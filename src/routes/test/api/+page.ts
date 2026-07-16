@@ -29,7 +29,8 @@ export function load() {
                     { method: 'GET', path: '/api/v1/echo-icons', summary: '声骸名称和图标' },
                     { method: 'GET', path: '/api/v1/element-icons', summary: '6 种属性图标' },
                     { method: 'GET', path: '/api/v1/weapon-type-icons', summary: '5 种武器类型图标' },
-                    { method: 'GET', path: '/api/v1/echo-set-icons', summary: '声骸套装图标' }
+                    { method: 'GET', path: '/api/v1/echo-set-icons', summary: '声骸套装图标' },
+                    { method: 'GET', path: '/api/v1/ui-btn-icons', summary: '操作键鼠图标' }
                 ]
             },
             {
@@ -83,6 +84,10 @@ export function load() {
             '/api/v1/echo-set-icons': {
                 name: 'EchoSetIcons',
                 code: 'type EchoSetIcons = [setName: string, iconUrl: string][];'
+            },
+            '/api/v1/ui-btn-icons': {
+                name: 'UiBtnIcons',
+                code: 'type UiBtnIcons = [keyName: string, iconUrl: string][];'
             },
             [CHAR_INFO]: {
                 name: 'CharacterInfo',
