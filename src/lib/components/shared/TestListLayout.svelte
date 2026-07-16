@@ -10,7 +10,7 @@
         filterValues?: string[]
         filterOptions?: { label: string; value: string }[]
         filterFn?: (item: any, values: string[]) => boolean
-        card: Snippet<[item: any]>
+        card: Snippet<[item: any, groupLabel: string]>
     }
 
     let {
@@ -188,7 +188,7 @@
                             <div
                                 class="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20"
                             >
-                                {@render card(item)}
+                                {@render card(item, group.label)}
                             </div>
                         {/each}
                     </div>

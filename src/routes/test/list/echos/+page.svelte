@@ -11,8 +11,10 @@
     }
 
     let selectedEcho = $state<string | null>(null)
+    let selectedSet = $state<string | null>(null)
+    let echoIconMap = $state<Record<string, string>>({})
+    let setIconMap = $state<Record<string, string>>({})
     let groups = $state<any[]>([])
-    let setIconPaths = $state<Record<string, string>>({})
     let search = $state('')
     let filterValues = $state<string[]>(['4', '3', '1'])
     const filterOptions = [
@@ -43,7 +45,7 @@
     })
 
     async function loadData() {
-        const [list, iconMap, setIconMap, setList] = await Promise.all([
+        const [list, iconMap, setIconMapRaw, setList] = await Promise.all([
             resources.getList<any>('echo'),
             resources.getIconMap('echo'),
             resources.getIconMap('echo-set'),
@@ -62,7 +64,7 @@
             icon: iconMap[item.name] ?? ''
         }))
 
-        setIconPaths = setIconMap
+        setIconMap = setIconMapRaw
 
         const groupMap = new Map<string, typeof items>()
         for (const item of items) {
@@ -76,24 +78,29 @@
             .map(([label, grpItems]) => ({
                 label,
                 items: grpItems.sort((a, b) => b.cost - a.cost || a.name.localeCompare(b.name)),
-                icon: setIconMap[label] ?? '',
+                icon: setIconMapRaw[label] ?? '',
                 pieces: piecesMap[label] ?? []
             }))
             .sort((a, b) => b.items.length - a.items.length)
 
-        resources.loadIcons([...Object.values(iconMap), ...Object.values(setIconMap)])
+        resources.loadIcons([...Object.values(iconMap), ...Object.values(setIconMapRaw)])
+
+        echoIconMap = iconMap
     }
 </script>
 
 <TestListLayout title="声骸列表" {groups} bind:search bind:filterValues {filterOptions} {filterFn}>
-    {#snippet card(item: Item)}
+    {#snippet card(item: Item, groupLabel: string)}
         {@const c = costColor(item.cost)}
         <div
             class="rounded-lg overflow-hidden flex items-center gap-2.5 p-3 border-0 border-r-2 border-b-2 cursor-pointer"
             style="border-right-color: {c}; border-bottom-color: {c}; background-image: linear-gradient(135deg, transparent 30%, {c}25 100%);"
             role="button"
             tabindex="0"
-            onclick={() => (selectedEcho = item.name)}
+            onclick={() => {
+                selectedEcho = item.name
+                selectedSet = groupLabel
+            }}
             onkeydown={(e) => e.key === 'Enter' && (selectedEcho = item.name)}
         >
             <div class="size-10 shrink-0 rounded-md bg-zinc-800/40 flex items-center justify-center overflow-hidden">
@@ -117,8 +124,8 @@
                 <span class="flex justify-between items-center gap-1 text-[11px] text-zinc-500 leading-none mt-0.5">
                     <span class="flex items-center gap-1">
                         {#each item.sets as set}
-                            {#if setIconPaths[set] && img(setIconPaths[set])}
-                                <img src={img(setIconPaths[set])} alt="" class="size-3 object-contain" title={set} />
+                            {#if setIconMap[set] && img(setIconMap[set])}
+                                <img src={img(setIconMap[set])} alt="" class="size-3 object-contain" title={set} />
                             {/if}
                         {/each}
                     </span>
@@ -129,4 +136,11 @@
     {/snippet}
 </TestListLayout>
 
-<EchoDetailModal show={selectedEcho !== null} name={selectedEcho} onClose={() => (selectedEcho = null)} />
+<EchoDetailModal
+    show={selectedEcho !== null}
+    name={selectedEcho}
+    setName={selectedSet}
+    {echoIconMap}
+    {setIconMap}
+    onClose={() => (selectedEcho = null)}
+/>

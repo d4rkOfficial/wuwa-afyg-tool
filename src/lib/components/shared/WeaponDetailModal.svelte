@@ -1,5 +1,19 @@
 <script lang="ts">
-    let { show, name, onClose }: { show: boolean; name: string | null; onClose: () => void } = $props()
+    import { resources } from '$lib/data/resources.svelte'
+
+    let {
+        show,
+        name,
+        onClose,
+        weaponIconMap = {},
+        weaponTypeIconMap = {}
+    }: {
+        show: boolean
+        name: string | null
+        onClose: () => void
+        weaponIconMap?: Record<string, string>
+        weaponTypeIconMap?: Record<string, string>
+    } = $props()
 
     interface WeaponInfo {
         rarity: number
@@ -27,7 +41,10 @@
                 const err = await res.json()
                 throw new Error(err.error || 'Failed to fetch')
             }
-            data = await res.json()
+            const info: WeaponInfo = await res.json()
+            data = info
+            const paths = [weaponIconMap[name ?? ''], weaponTypeIconMap[info.type]].filter(Boolean)
+            if (paths.length > 0) resources.loadIcons(paths)
         } catch (e) {
             error = String(e)
         } finally {
@@ -44,6 +61,8 @@
     }
 
     const renderDesc = (s: string) => s.replace(/\n/g, '<br>')
+
+    const img = (path: string) => resources.icons[path] || ''
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -92,8 +111,24 @@
                 {:else if data}
                     <div class="space-y-6">
                         <div class="flex items-center gap-3">
+                            {#if name && img(weaponIconMap[name])}
+                                <img
+                                    src={img(weaponIconMap[name])}
+                                    alt={name}
+                                    class="size-10 rounded-md bg-zinc-800/40 object-contain"
+                                />
+                            {/if}
                             <span class="text-lg">{'★'.repeat(data.rarity)}</span>
-                            <span class="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300">{data.type}</span>
+                            {#if img(weaponTypeIconMap[data.type])}
+                                <img
+                                    src={img(weaponTypeIconMap[data.type])}
+                                    alt={data.type}
+                                    class="size-5"
+                                    title={data.type}
+                                />
+                            {:else}
+                                <span class="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300">{data.type}</span>
+                            {/if}
                         </div>
 
                         <section>

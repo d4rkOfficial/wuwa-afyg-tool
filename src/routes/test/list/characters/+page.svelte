@@ -15,6 +15,9 @@
     const ELEMENT_ORDER = ['冷凝', '热熔', '导电', '气动', '衍射', '湮灭']
 
     let selectedChar = $state<string | null>(null)
+    let charIconMap = $state<Record<string, string>>({})
+    let elementIconMap = $state<Record<string, string>>({})
+    let weaponTypeIconMap = $state<Record<string, string>>({})
     let groups = $state<any[]>([])
     let search = $state('')
     let filterValues = $state<string[]>(['长刃', '迅刀', '佩枪', '臂铠', '音感仪'])
@@ -73,6 +76,9 @@
             headIcon: iconMap[item.name] ?? '',
             weaponTypeIcon: weaponTypeMap[item.weaponType] ?? ''
         }))
+        charIconMap = iconMap
+        elementIconMap = elementMap
+        weaponTypeIconMap = weaponTypeMap
 
         const sortCharacters = (a: Item, b: Item) => {
             const aIsRover = a.name.startsWith('漂泊者') ? 0 : 1
@@ -94,7 +100,7 @@
 </script>
 
 <TestListLayout title="角色列表" {groups} bind:search bind:filterValues {filterOptions} {filterFn}>
-    {#snippet card(item: Item)}
+    {#snippet card(item: Item, _groupLabel: string)}
         {@const c = starColor(item.star)}
         <div
             class="rounded-lg overflow-hidden flex items-center gap-2.5 p-3 border-0 border-r-2 border-b-2 cursor-pointer"
@@ -127,4 +133,11 @@
     {/snippet}
 </TestListLayout>
 
-<CharacterDetailModal show={selectedChar !== null} name={selectedChar} onClose={() => (selectedChar = null)} />
+<CharacterDetailModal
+    show={selectedChar !== null}
+    name={selectedChar}
+    onClose={() => (selectedChar = null)}
+    {charIconMap}
+    {elementIconMap}
+    {weaponTypeIconMap}
+/>

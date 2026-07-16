@@ -1,5 +1,21 @@
 <script lang="ts">
-    let { show, name, onClose }: { show: boolean; name: string | null; onClose: () => void } = $props()
+    import { resources } from '$lib/data/resources.svelte'
+
+    let {
+        show,
+        name,
+        onClose,
+        charIconMap = {},
+        elementIconMap = {},
+        weaponTypeIconMap = {}
+    }: {
+        show: boolean
+        name: string | null
+        onClose: () => void
+        charIconMap?: Record<string, string>
+        elementIconMap?: Record<string, string>
+        weaponTypeIconMap?: Record<string, string>
+    } = $props()
 
     interface SkillEntry {
         name: string
@@ -36,12 +52,21 @@
                 const err = await res.json()
                 throw new Error(err.error || 'Failed to fetch')
             }
-            data = await res.json()
+            const info: CharInfo = await res.json()
+            data = info
+            queueIconLoad(info)
         } catch (e) {
             error = String(e)
         } finally {
             loading = false
         }
+    }
+
+    function queueIconLoad(d: CharInfo) {
+        const paths = [charIconMap[name ?? ''], elementIconMap[d.element], weaponTypeIconMap[d.weaponType]].filter(
+            Boolean
+        )
+        if (paths.length > 0) resources.loadIcons(paths)
     }
 
     const handleKeydown = (e: KeyboardEvent) => {
@@ -53,6 +78,8 @@
     }
 
     const renderDesc = (s: string) => s.replace(/\n/g, '<br>')
+
+    const img = (path: string) => resources.icons[path] || ''
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -103,10 +130,42 @@
                 {:else if data}
                     <div class="space-y-6">
                         <!-- Header info -->
-                        <div class="flex items-center gap-4">
-                            <span class="text-lg">{'★'.repeat(data.rarity)}</span>
-                            <span class="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300">{data.element}</span>
-                            <span class="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300">{data.weaponType}</span>
+                        <div class="flex items-center gap-3">
+                            {#if name && img(charIconMap[name])}
+                                <img
+                                    src={img(charIconMap[name])}
+                                    alt={name}
+                                    class="size-10 rounded-md bg-zinc-800/40 object-contain"
+                                />
+                            {/if}
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-base font-semibold text-zinc-100">{name}</span>
+                                <span class="text-xs text-zinc-400">{'★'.repeat(data.rarity)}</span>
+                                {#if img(elementIconMap[data.element])}
+                                    <img
+                                        src={img(elementIconMap[data.element])}
+                                        alt={data.element}
+                                        class="size-5"
+                                        title={data.element}
+                                    />
+                                {:else}
+                                    <span class="rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400"
+                                        >{data.element}</span
+                                    >
+                                {/if}
+                                {#if img(weaponTypeIconMap[data.weaponType])}
+                                    <img
+                                        src={img(weaponTypeIconMap[data.weaponType])}
+                                        alt={data.weaponType}
+                                        class="size-5"
+                                        title={data.weaponType}
+                                    />
+                                {:else}
+                                    <span class="rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400"
+                                        >{data.weaponType}</span
+                                    >
+                                {/if}
+                            </div>
                         </div>
 
                         <!-- Base stats -->
@@ -115,12 +174,24 @@
                                 基础属性 (Lv90)
                             </h3>
                             <div class="grid grid-cols-4 gap-3">
-                                {#each Object.entries(data.lv90BaseStats) as [key, val]}
-                                    <div class="rounded-lg bg-zinc-800/60 p-3 text-center">
-                                        <div class="text-[11px] text-zinc-500 uppercase">{key}</div>
-                                        <div class="mt-1 text-sm font-semibold text-zinc-200">{val}</div>
+                                <div class="rounded-lg bg-zinc-800/60 p-3 text-center">
+                                    <div class="text-[11px] text-zinc-500">生命值白值</div>
+                                    <div class="mt-1 text-sm font-semibold text-zinc-200">{data.lv90BaseStats.hp}</div>
+                                </div>
+                                <div class="rounded-lg bg-zinc-800/60 p-3 text-center">
+                                    <div class="text-[11px] text-zinc-500">攻击力白值</div>
+                                    <div class="mt-1 text-sm font-semibold text-zinc-200">{data.lv90BaseStats.atk}</div>
+                                </div>
+                                <div class="rounded-lg bg-zinc-800/60 p-3 text-center">
+                                    <div class="text-[11px] text-zinc-500">防御力白值</div>
+                                    <div class="mt-1 text-sm font-semibold text-zinc-200">{data.lv90BaseStats.def}</div>
+                                </div>
+                                <div class="rounded-lg bg-zinc-800/60 p-3 text-center">
+                                    <div class="text-[11px] text-zinc-500">谐度破坏增幅</div>
+                                    <div class="mt-1 text-sm font-semibold text-zinc-200">
+                                        {data.lv90BaseStats.tune}
                                     </div>
-                                {/each}
+                                </div>
                             </div>
                         </section>
 

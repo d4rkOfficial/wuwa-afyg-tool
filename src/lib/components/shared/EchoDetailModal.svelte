@@ -1,7 +1,24 @@
 <script lang="ts">
-    let { show, name, onClose }: { show: boolean; name: string | null; onClose: () => void } = $props()
+    import { resources } from '$lib/data/resources.svelte'
+
+    let {
+        show,
+        name,
+        onClose,
+        echoIconMap = {},
+        setIconMap = {},
+        setName = null
+    }: {
+        show: boolean
+        name: string | null
+        onClose: () => void
+        echoIconMap?: Record<string, string>
+        setIconMap?: Record<string, string>
+        setName?: string | null
+    } = $props()
 
     let data = $state<{ cost: number; desc: string; groups: string[] } | null>(null)
+    let setBonus = $state<{ name: string; bonuses: Record<string, string> } | null>(null)
     let loading = $state(false)
     let error = $state('')
 
@@ -13,13 +30,30 @@
         loading = true
         error = ''
         data = null
+        setBonus = null
         try {
             const res = await fetch(`/api/v1/echo-info/${encodeURIComponent(name!)}`)
             if (!res.ok) {
                 const err = await res.json()
                 throw new Error(err.error || 'Failed to fetch')
             }
-            data = await res.json()
+            const info: { cost: number; desc: string; groups: string[] } = await res.json()
+            data = info
+
+            const paths = [echoIconMap[name ?? ''], setName ? setIconMap[setName] : ''].filter(Boolean)
+            if (paths.length > 0) resources.loadIcons(paths)
+
+            if (setName) {
+                try {
+                    const r = await fetch(`/api/v1/echo-set-info/${encodeURIComponent(setName)}`)
+                    if (r.ok) {
+                        const b = await r.json()
+                        setBonus = { name: setName, bonuses: b.bonuses as Record<string, string> }
+                    }
+                } catch {
+                    // ignore
+                }
+            }
         } catch (e) {
             error = String(e)
         } finally {
@@ -41,6 +75,8 @@
     }
 
     const renderDesc = (s: string) => s.replace(/\n/g, '<br>')
+
+    const img = (path: string) => resources.icons[path] || ''
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -89,26 +125,23 @@
                 {:else if data}
                     <div class="space-y-6">
                         <div class="flex items-center gap-3">
+                            {#if name && img(echoIconMap[name])}
+                                <img
+                                    src={img(echoIconMap[name])}
+                                    alt={name}
+                                    class="size-10 rounded-md bg-zinc-800/40 object-contain"
+                                />
+                            {/if}
                             <span
                                 class="rounded px-2.5 py-1 text-xs font-bold"
                                 style="background: {costColor(data.cost)}20; color: {costColor(data.cost)}"
                             >
                                 COST {data.cost}
                             </span>
+                            {#if setName && img(setIconMap[setName])}
+                                <img src={img(setIconMap[setName])} alt={setName} class="size-5" title={setName} />
+                            {/if}
                         </div>
-
-                        {#if data.groups.length > 0}
-                            <section>
-                                <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">套装</h3>
-                                <div class="flex flex-wrap gap-2">
-                                    {#each data.groups as group}
-                                        <span class="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300"
-                                            >{group}</span
-                                        >
-                                    {/each}
-                                </div>
-                            </section>
-                        {/if}
 
                         <section>
                             <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">技能描述</h3>
@@ -118,6 +151,24 @@
                                 {@html renderDesc(data.desc)}
                             </div>
                         </section>
+
+                        {#if setBonus}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                    {setBonus.name}
+                                </h3>
+                                <div class="space-y-1.5">
+                                    {#each Object.entries(setBonus.bonuses) as [pieces, desc]}
+                                        <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3">
+                                            <div class="text-[10px] font-semibold text-zinc-500 mb-1">{pieces}件套</div>
+                                            <div class="text-xs text-zinc-400 leading-relaxed">
+                                                {@html renderDesc(desc)}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
                     </div>
                 {/if}
             </div>

@@ -13,6 +13,8 @@
     const WEAPON_TYPE_ORDER = ['长刃', '迅刀', '佩枪', '臂铠', '音感仪']
 
     let selectedWeapon = $state<string | null>(null)
+    let weaponIconMap = $state<Record<string, string>>({})
+    let weaponTypeIconMap = $state<Record<string, string>>({})
     let groups = $state<any[]>([])
     let search = $state('')
     let filterValues = $state<string[]>(['5', '4', '3', '2', '1'])
@@ -65,6 +67,9 @@
             icon: iconMap[item.name] ?? ''
         }))
 
+        weaponIconMap = iconMap
+        weaponTypeIconMap = weaponTypeMap
+
         groups = WEAPON_TYPE_ORDER.map((label) => ({
             label,
             items: items
@@ -78,7 +83,7 @@
 </script>
 
 <TestListLayout title="武器列表" {groups} bind:search bind:filterValues {filterOptions} {filterFn}>
-    {#snippet card(item: Item)}
+    {#snippet card(item: Item, _groupLabel: string)}
         {@const c = starColor(item.star)}
         <div
             class="rounded-lg overflow-hidden flex items-center gap-2.5 p-3 border-0 border-r-2 border-b-2 cursor-pointer"
@@ -102,4 +107,10 @@
     {/snippet}
 </TestListLayout>
 
-<WeaponDetailModal show={selectedWeapon !== null} name={selectedWeapon} onClose={() => (selectedWeapon = null)} />
+<WeaponDetailModal
+    show={selectedWeapon !== null}
+    name={selectedWeapon}
+    {weaponIconMap}
+    {weaponTypeIconMap}
+    onClose={() => (selectedWeapon = null)}
+/>
