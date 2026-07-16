@@ -11,13 +11,23 @@
             label: '接口调试',
             links: [
                 { href: '/test/api', title: 'API 接口', desc: 'v1 接口测试面板', icon: 'mdi:api' },
-                { href: '/test/api-nanoka', title: 'nanoka 数据', desc: 'nanoka 原始数据调试', icon: 'mdi:database-search' }
+                {
+                    href: '/test/api-nanoka',
+                    title: 'nanoka 数据',
+                    desc: 'nanoka 原始数据调试',
+                    icon: 'mdi:database-search'
+                }
             ]
         },
         {
             label: '数据浏览',
             links: [
-                { href: '/test/list/characters', title: '角色列表', desc: '查看所有角色及技能详情', icon: 'mdi:account-group' },
+                {
+                    href: '/test/list/characters',
+                    title: '角色列表',
+                    desc: '查看所有角色及技能详情',
+                    icon: 'mdi:account-group'
+                },
                 { href: '/test/list/weapons', title: '武器列表', desc: '查看所有武器及详情', icon: 'mdi:sword-cross' },
                 { href: '/test/list/echos', title: '声骸列表', desc: '查看所有声骸及详情', icon: 'mdi:ghost' }
             ]
@@ -26,7 +36,13 @@
             label: '工具',
             links: [
                 { href: '/test/team-config', title: '配队配置', desc: '编辑队伍配置', icon: 'mdi:account-cog' },
-                { href: '/test/key-press', title: '按键测试', desc: '键盘鼠标图标录入测试', icon: 'mdi:keyboard-variant' }
+                {
+                    href: '/test/key-press',
+                    title: '按键测试',
+                    desc: '键盘鼠标图标录入测试',
+                    icon: 'mdi:keyboard-variant'
+                },
+                { href: '/test/timeline', title: '时间线', desc: '自定义参考线时间轴演示', icon: 'mdi:timeline' }
             ]
         }
     ]
@@ -43,7 +59,9 @@
             {#each groups as group}
                 <section>
                     <div class="flex items-center gap-3 mb-3">
-                        <span class="text-[11px] font-semibold uppercase tracking-widest text-zinc-600">{group.label}</span>
+                        <span class="text-[11px] font-semibold uppercase tracking-widest text-zinc-600"
+                            >{group.label}</span
+                        >
                         <div class="h-px flex-1 bg-zinc-800/50"></div>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-2">
@@ -55,10 +73,15 @@
                                 <div
                                     class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800/60 transition-colors group-hover:bg-blue-500/15"
                                 >
-                                    <Icon {icon} class="size-5 text-zinc-400 transition-colors group-hover:text-blue-400" />
+                                    <Icon
+                                        {icon}
+                                        class="size-5 text-zinc-400 transition-colors group-hover:text-blue-400"
+                                    />
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <div class="text-sm font-semibold text-zinc-200 transition-colors group-hover:text-blue-300">
+                                    <div
+                                        class="text-sm font-semibold text-zinc-200 transition-colors group-hover:text-blue-300"
+                                    >
                                         {title}
                                     </div>
                                     <div class="mt-0.5 text-xs text-zinc-500">{desc}</div>

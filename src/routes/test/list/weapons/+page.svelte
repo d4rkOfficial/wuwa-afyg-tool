@@ -86,8 +86,8 @@
     {#snippet card(item: Item, _groupLabel: string)}
         {@const c = starColor(item.star)}
         <div
-            class="rounded-lg overflow-hidden flex items-center gap-2.5 p-3 border-0 border-r-2 border-b-2 cursor-pointer"
-            style="border-right-color: {c}; border-bottom-color: {c}; background-image: linear-gradient(135deg, transparent 30%, {c}25 100%);"
+            class="rounded-lg overflow-hidden flex items-center gap-2.5 p-3 cursor-pointer"
+            style="background-image: linear-gradient(135deg, transparent 30%, {c}25 100%);"
             role="button"
             tabindex="0"
             onclick={() => (selectedWeapon = item.name)}

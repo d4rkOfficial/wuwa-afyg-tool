@@ -82,12 +82,11 @@
     const selectedStyle = (item: SelectorItem): string => {
         if (item.name !== selected) return ''
         const c = item.color ?? '#fbbf24'
-        return `border-right-color: ${c}; border-bottom-color: ${c}; background-image: linear-gradient(135deg, transparent 30%, ${c}25 100%);`
+        return `background-image: linear-gradient(135deg, transparent 30%, ${c}25 100%);`
     }
 
-    const defaultStyle = (item: SelectorItem): string => {
-        const c = item.color ?? '#52525b'
-        return `border-right-color: ${c}40; border-bottom-color: ${c}40;`
+    const defaultStyle = (_item: SelectorItem): string => {
+        return ''
     }
 </script>
 
@@ -175,7 +174,7 @@
                                 <div class="grid grid-cols-2 gap-2">
                                     {#each group.items as item}
                                         <button
-                                            class="rounded-lg overflow-hidden flex items-center gap-2.5 p-3 border-0 border-r-2 border-b-2 text-left transition-colors hover:brightness-125"
+                                            class="rounded-lg overflow-hidden flex items-center gap-2.5 p-3 text-left transition-colors hover:brightness-125"
                                             style={item.name === selected ? selectedStyle(item) : defaultStyle(item)}
                                             onclick={() => {
                                                 onSelect({ name: item.name, meta: item.meta })
