@@ -1,0 +1,39 @@
+# AGENTS.md — AI 辅助开发规则
+
+## 1. 代码风格
+
+- 能拆成 snippet（复用部件） 和纯函数（复杂功能里的无副作用成分）的，必须拆
+- 优先使用箭头函数（`const fn = () => { ... }`），非 `function` 声明
+- 优先flex布局
+
+## 2. 页面逻辑分离
+
+- `let props: Props = $props(); interface Props {}` 而不是 `let props: {...} = $props()`
+- `+page.svelte` 内必须按此顺序：`<script>` → main HTML（`{#if}`/`<div>` 等）→ `{#snippet}` → `<style>`
+- `+pages.svelte`内，能拆出的常量放到路由文件夹下的 `consts.ts`，类型放到`types.ts`，无副作用纯函数放到`utils.ts`，页面的临时共享状态放到路由下的`store.svelte.ts`
+- localStorage持久状态放到`src/lib/data/{状态集名}.svelte.ts`处理
+
+## 3. 组件约束
+
+- 重复的页内内容 → `{#snippet}` 内联在 `+page.svelte` 中
+- 大的布局结构 → 独立组件（放在 `src/lib/components/shared/`）
+- 所有独立组件的 props 必须使用 `interface Props extends ComponentsProps {}` 声明（`ComponentsProps` 在 `$lib/types`）
+- 所有独立组件必须暴露 `style` 和 `class` prop，支持外部定制，参考`src/lib/types/component-props.ts`
+- 尽量使用 TailwindCSS 而不是 `<style>` 样式
+- 不依赖外部 UI 库，所有控件使用原生 HTML + TailwindCSS 实现
+- Snippet 通过闭包访问父作用域的响应式状态（`$state`/`$derived`），避免使用带类型的 snippet 参数
+
+## 4. 文件组织
+
+- 组件遵循最小化原则，拆组件时先放到`src/lib/components/page/{当前路由}/{组件名}.svelte`，将来可能复用时，移动到`src/lib/components/shared/{组件名}.svelte`
+- 组件放在：
+    - `src/lib/components/page/{路由名}/` — 页面级组件
+    - `src/lib/components/shared/` — 通用组件
+- 不要用一级以上相对路径，如果涉及多级相对路径的导入，那么重构代码，把路由级的类型、常量、工具函数移动到`lib/`下
+
+## 5. 完成检查
+
+每次任务结束必须依次运行：
+
+1. `pnpm run format`
+2. `pnpm run check`

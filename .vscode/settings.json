@@ -1,0 +1,23 @@
+{
+    "files.associations": {
+        "*.css": "tailwindcss"
+    },
+    "files.exclude": {
+        ".svelte-kit": true,
+        ".vercel": true,
+        "node_modules": true
+    },
+    "search.exclude": {
+        ".svelte-kit": true,
+        ".vercel": true,
+        "node_modules": true
+    },
+    "explorer.sortOrder": "default",
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+        "package.json": ".gitignore, .npmrc, .prettierignore, prettier.config.js, pnpm-workspace.yaml, vite.config.ts, tsconfig.json, README.md, AGENTS.md, svelte.config.js, pnpm-lock.yaml",
+        "+page.svelte": "*.ts, *.js",
+        "+layout.svelte": "*.ts, *.js, layout.css",
+        "+server.ts": "*.ts, *.js"
+    }
+}

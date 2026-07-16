@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+@font-face {
+    font-family: 'FangXinShu';
+    src: url('/fonts/fang-xin-shu.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/jetbrains-mono.woff2') format('woff2');
+    font-weight: 400 800;
+    font-display: swap;
+}
+
+@layer components {
+    .method-get {
+        background: rgba(5, 150, 105, 0.3);
+        color: #6ee7b7;
+    }
+    .method-post {
+        background: rgba(30, 64, 175, 0.3);
+        color: #93c5fd;
+    }
+    .method-put {
+        background: rgba(180, 83, 9, 0.3);
+        color: #fcd34d;
+    }
+    .method-delete {
+        background: rgba(185, 28, 28, 0.3);
+        color: #fca5a5;
+    }
+    .method-unknown {
+        background: rgba(39, 39, 42, 0.3);
+        color: #d4d4d8;
+    }
+    .card-bg {
+        background: #111111;
+    }
+}
+
+@layer base {
+    html {
+        background: #0e0e10;
+        color: #e4e4e7;
+        color-scheme: dark;
+        font-family: 'FangXinShu', 'Inter', system-ui, sans-serif;
+    }
+    .font-mono {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: oklch(0.3 0 0) transparent;
+    }
+    *::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    *::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    *::-webkit-scrollbar-thumb {
+        background: oklch(0.3 0 0);
+        border-radius: 4px;
+        border: 1px solid oklch(0.22 0 0);
+    }
+    *::-webkit-scrollbar-thumb:hover {
+        background: oklch(0.45 0.1 260);
+    }
+    *::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+}
