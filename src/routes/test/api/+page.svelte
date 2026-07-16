@@ -36,6 +36,11 @@
     let copiedType = $state(false)
     let copiedData = $state(false)
     let stash = $state<Record<string, { res: string; err: string }>>({})
+    let origin = $state('')
+
+    $effect(() => {
+        if (browser) origin = location.origin
+    })
 
     let currentType = $derived(sel ? (data.typeMap[sel.path] ?? null) : null)
     let inputPlaceholder = $derived(sel?.path.includes('{names}') ? 'names' : '中文名')
@@ -111,7 +116,7 @@
         let p = sel.path
         if (idVal)
             p = p.replace('{seasonId}', idVal).replace('{id}', idVal).replace('{names}', idVal).replace('{name}', idVal)
-        return p
+        return origin + p
     }
 </script>
 
