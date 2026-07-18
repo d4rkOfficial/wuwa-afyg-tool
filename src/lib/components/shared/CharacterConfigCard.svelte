@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { ComponentsProps, CharacterConfig, Character, Weapon, Echo } from '$lib/types'
-    import { resources } from '$lib/data/resources.svelte'
+
     import SelectorModal from './SelectorModal.svelte'
     import EchoConfigModal from './EchoConfigModal.svelte'
     import { SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
@@ -152,15 +152,13 @@
         湮灭: 'bg-rose-500/20 text-rose-400'
     }
 
-    let charIconPath = $derived(charIconMap[config.name ?? ''] ?? '')
-    let charIcon = $derived(charIconPath ? (resources.icons[charIconPath] ?? '') : '')
-    let weaponIconPath = $derived((config.weapon?.name ? weaponIconMap[config.weapon.name] : '') ?? '')
-    let weaponIcon = $derived(weaponIconPath ? (resources.icons[weaponIconPath] ?? '') : '')
+    let charIcon = $derived(charIconMap[config.name ?? ''] ?? '')
+    let weaponIcon = $derived((config.weapon?.name ? weaponIconMap[config.weapon.name] : '') ?? '')
 
     const ELEMENT_ORDER = ['冷凝', '热熔', '导电', '气动', '衍射', '湮灭']
     const WEAPON_TYPE_ORDER = ['长刃', '迅刀', '佩枪', '臂铠', '音感仪']
 
-    const iconOrSrc = (path: string) => resources.icons[path] || path
+    const iconOrSrc = (path: string) => path || ''
 
     const SUBSTAT_BADGE_CLS = 'bg-gradient-to-br from-transparent to-white/30 border-white/40'
 

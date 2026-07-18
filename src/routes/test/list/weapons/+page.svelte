@@ -1,6 +1,6 @@
 <script lang="ts">
     import TestListLayout from '$lib/components/shared/TestListLayout.svelte'
-    import { resources } from '$lib/data/resources.svelte'
+    import { getWeaponList, getWeaponIcons, getWeaponTypeIcons } from '$lib/data/api'
     import WeaponDetailModal from '$lib/components/shared/WeaponDetailModal.svelte'
 
     interface Item {
@@ -38,26 +38,15 @@
         return map[star] || '#71717a'
     }
 
-    const img = (path: string) => resources.icons[path] || ''
-
     $effect(() => {
         loadData()
     })
 
-    $effect(() => {
-        const map = resources.icons
-        for (const g of groups) {
-            if (g.icon && map[g.icon]) {
-                g.icon = map[g.icon]
-            }
-        }
-    })
-
     async function loadData() {
         const [list, iconMap, weaponTypeMap] = await Promise.all([
-            resources.getList<any>('weapon'),
-            resources.getIconMap('weapon'),
-            resources.getIconMap('weapon-type')
+            getWeaponList(),
+            getWeaponIcons(),
+            getWeaponTypeIcons()
         ])
 
         const items: Item[] = list.map((item: any) => ({
@@ -77,8 +66,6 @@
                 .sort((a, b) => b.star - a.star || a.name.localeCompare(b.name)),
             icon: weaponTypeMap[label] ?? ''
         })).filter((g) => g.items.length > 0)
-
-        resources.loadIcons([...Object.values(iconMap), ...Object.values(weaponTypeMap)])
     }
 </script>
 
@@ -94,8 +81,8 @@
             onkeydown={(e) => e.key === 'Enter' && (selectedWeapon = item.name)}
         >
             <div class="size-10 shrink-0 rounded-md bg-zinc-800/40 flex items-center justify-center overflow-hidden">
-                {#if img(item.icon)}
-                    <img src={img(item.icon)} alt={item.name} class="size-full object-contain" />
+                {#if item.icon}
+                    <img src={item.icon} alt={item.name} class="size-full object-contain" />
                 {/if}
             </div>
             <div class="min-w-0 flex-1">

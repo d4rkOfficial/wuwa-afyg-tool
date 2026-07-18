@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { resources } from '$lib/data/resources.svelte'
+    import { getEchoInfo, getEchoSetInfo } from '$lib/data/api'
 
     let {
         show,
@@ -17,7 +17,11 @@
         setName?: string | null
     } = $props()
 
-    let data = $state<{ cost: number; desc: string; groups: string[] } | null>(null)
+    let data = $state<{
+        cost: number
+        skill: { desc: string; values: [string, string, string][] }
+        groups: string[]
+    } | null>(null)
     let setBonus = $state<{ name: string; bonuses: Record<string, string> } | null>(null)
     let loading = $state(false)
     let error = $state('')
@@ -32,24 +36,13 @@
         data = null
         setBonus = null
         try {
-            const res = await fetch(`/api/v1/echo-info/${encodeURIComponent(name!)}`)
-            if (!res.ok) {
-                const err = await res.json()
-                throw new Error(err.error || 'Failed to fetch')
-            }
-            const info: { cost: number; desc: string; groups: string[] } = await res.json()
+            const info = await getEchoInfo(name!)
             data = info
-
-            const paths = [echoIconMap[name ?? ''], setName ? setIconMap[setName] : ''].filter(Boolean)
-            if (paths.length > 0) resources.loadIcons(paths)
 
             if (setName) {
                 try {
-                    const r = await fetch(`/api/v1/echo-set-info/${encodeURIComponent(setName)}`)
-                    if (r.ok) {
-                        const b = await r.json()
-                        setBonus = { name: setName, bonuses: b.bonuses as Record<string, string> }
-                    }
+                    const b = await getEchoSetInfo(setName)
+                    if (b) setBonus = { name: setName, bonuses: b.bonuses }
                 } catch {
                     // ignore
                 }
@@ -76,7 +69,7 @@
 
     const renderDesc = (s: string) => s.replace(/\n/g, '<br>')
 
-    const img = (path: string) => resources.icons[path] || ''
+    const img = (path: string) => path || ''
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -148,9 +141,32 @@
                             <div
                                 class="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-xs text-zinc-400 leading-relaxed"
                             >
-                                {@html renderDesc(data.desc)}
+                                {@html renderDesc(data.skill.desc)}
                             </div>
                         </section>
+
+                        {#if data.skill.values.length > 0}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                    倍率数据
+                                </h3>
+                                <div class="space-y-1.5">
+                                    {#each data.skill.values as [name, value, element]}
+                                        <div
+                                            class="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2.5 flex items-center gap-3 text-xs"
+                                        >
+                                            <span class="text-zinc-400 min-w-[3rem]">{name}</span>
+                                            <span class="text-zinc-200 font-medium">{value}</span>
+                                            {#if element}
+                                                <span class="ml-auto text-zinc-500 text-[10px] font-medium">
+                                                    {element}
+                                                </span>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
 
                         {#if setBonus}
                             <section>

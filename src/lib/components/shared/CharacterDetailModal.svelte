@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { resources } from '$lib/data/resources.svelte'
+    import { getCharacterInfo } from '$lib/data/api'
 
     let {
         show,
@@ -21,7 +21,7 @@
         name: string
         type: string
         desc: string
-        values: [name: string, value: string][]
+        values: [name: string, value: string, element: string][]
     }
 
     interface CharInfo {
@@ -47,26 +47,13 @@
         error = ''
         data = null
         try {
-            const res = await fetch(`/api/v1/character-info/${encodeURIComponent(name!)}`)
-            if (!res.ok) {
-                const err = await res.json()
-                throw new Error(err.error || 'Failed to fetch')
-            }
-            const info: CharInfo = await res.json()
-            data = info
-            queueIconLoad(info)
+            const info = await getCharacterInfo(name!)
+            data = info as unknown as CharInfo
         } catch (e) {
             error = String(e)
         } finally {
             loading = false
         }
-    }
-
-    function queueIconLoad(d: CharInfo) {
-        const paths = [charIconMap[name ?? ''], elementIconMap[d.element], weaponTypeIconMap[d.weaponType]].filter(
-            Boolean
-        )
-        if (paths.length > 0) resources.loadIcons(paths)
     }
 
     const handleKeydown = (e: KeyboardEvent) => {
@@ -79,7 +66,7 @@
 
     const renderDesc = (s: string) => s.replace(/\n/g, '<br>')
 
-    const img = (path: string) => resources.icons[path] || ''
+    const img = (path: string) => path || ''
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -225,12 +212,18 @@
                                         </div>
                                         {#if skill.values.length > 0}
                                             <div class="border-t border-zinc-800 px-4 py-3">
-                                                {#each skill.values as [vname, vvalue]}
+                                                {#each skill.values as [vname, vvalue, velement]}
                                                     <div
                                                         class="flex justify-between gap-2 py-1 text-xs text-zinc-300 even:bg-zinc-800/30"
                                                     >
                                                         <span class="text-zinc-400">{vname}</span>
-                                                        <span class="tabular-nums">{vvalue}</span>
+                                                        <span class="tabular-nums whitespace-nowrap"
+                                                            ><span>{vvalue}</span>{#if velement}<span
+                                                                    class="text-zinc-600"
+                                                                >
+                                                                    {velement}</span
+                                                                >{/if}</span
+                                                        >
                                                     </div>
                                                 {/each}
                                             </div>

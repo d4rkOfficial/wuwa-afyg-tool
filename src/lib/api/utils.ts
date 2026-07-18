@@ -1,3 +1,4 @@
+import { ASSET_BASE, ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP } from './consts'
 import type {
     Character,
     Weapon,
@@ -20,25 +21,8 @@ import type {
     NanokaEcho,
     NanokaSonata
 } from './types'
-import { DATA_BASE, ZH_DATA_BASE, ASSET_BASE, ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP } from './consts'
 
-export const fetchData = async <T>(path: string): Promise<T> => {
-    const res = await fetch(DATA_BASE + path)
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-    return res.json()
-}
-
-export const fetchZhData = async <T>(path: string, version: string): Promise<T> => {
-    const res = await fetch(`${ZH_DATA_BASE}/${version}/zh${path}`)
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-    return res.json()
-}
-
-export const createJsonResponse = (data: unknown, status = 200, extraHeaders?: Record<string, string>) =>
-    new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json', ...extraHeaders }
-    })
+// ── Helpers ──
 
 export function ueToCdn(path: string): string {
     if (!path) return ''
@@ -60,6 +44,65 @@ export function findSonataSetEntry(data: ZhSonataDetail, name: string): [string,
     }
     return null
 }
+
+function strip(html: string): string {
+    return html
+        .replace(/<color=\w+>/gi, '')
+        .replace(/<\/color>/gi, '')
+        .replace(/<size=\d+>/gi, '')
+        .replace(/<\/size>/gi, '')
+        .replace(/<te href=\d+>/gi, '')
+        .replace(/<\/te>/gi, '')
+        .replace(/<highlight>/gi, '')
+        .replace(/<\/highlight>/gi, '')
+}
+
+function interpolate(text: string, params: string[]): string {
+    if (!text || !params.length) return text
+    return text.replace(/\{(\d+)\}/g, (_, i) => params[Number(i)] ?? `{${i}}`)
+}
+
+function makeSkillValues(
+    skill: ZhCharacterDetail['skill_trees'][string]['skill']
+): [name: string, value: string, element: string][] {
+    if (!skill.level) return []
+    const keys = Object.keys(skill.level)
+        .map(Number)
+        .filter((k) => !isNaN(k))
+    if (keys.length === 0) return []
+    const sorted = keys.sort((a, b) => a - b)
+    const result: [string, string, string][] = []
+
+    for (const lvKey of sorted) {
+        const lvData = skill.level[String(lvKey)]
+        if (!lvData) continue
+        const row = lvData.param[0]
+        if (!row || row.length === 0) continue
+        const idx = Math.min(row.length - 1, 9)
+        const raw = row[idx]
+        const fmt = lvData.format as string | null | undefined
+        const value = fmt ? fmt.replace('{0}', raw) : raw
+
+        let element = ''
+        if (skill.damage) {
+            const pct = parseFloat(raw.replace('%', '').split('*')[0])
+            if (!isNaN(pct)) {
+                const target = Math.round(pct * 100)
+                for (const dv of Object.values(skill.damage)) {
+                    if (dv.rate_lv && dv.rate_lv[idx] === target) {
+                        element = ELEMENT_MAP[dv.element] ?? ''
+                        break
+                    }
+                }
+            }
+        }
+
+        result.push([lvData.name, value, element])
+    }
+    return result
+}
+
+// ── List transforms ──
 
 export const transformCharacterList = (data: Record<string, NanokaCharacter>): Character[] => {
     const seen = new Set<string>()
@@ -102,6 +145,8 @@ export const transformEchoSetList = (sonata: NanokaSonata): EchoSetItem[] =>
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
 
+// ── Icon transforms ──
+
 export const transformCharacterIcons = (data: Record<string, NanokaCharacter>): IconPair[] =>
     Object.values(data)
         .filter((c) => c.zh && c.icon)
@@ -131,47 +176,15 @@ export const transformElementIcons = (sonata: NanokaSonata): IconPair[] => {
     })
 }
 
-function strip(html: string): string {
-    return html
-        .replace(/<color=\w+>/gi, '')
-        .replace(/<\/color>/gi, '')
-        .replace(/<size=\d+>/gi, '')
-        .replace(/<\/size>/gi, '')
-        .replace(/<te href=\d+>/gi, '')
-        .replace(/<\/te>/gi, '')
-        .replace(/<highlight>/gi, '')
-        .replace(/<\/highlight>/gi, '')
-}
+export const transformWeaponTypeIcons = (): IconPair[] => [
+    ['长刃', `${ASSET_BASE}/Static/SP_IconNorSword.webp`],
+    ['迅刀', `${ASSET_BASE}/Static/SP_IconNorKnife.webp`],
+    ['佩枪', `${ASSET_BASE}/Static/SP_IconNorGun.webp`],
+    ['臂铠', `${ASSET_BASE}/Static/SP_IconNorFist.webp`],
+    ['音感仪', `${ASSET_BASE}/Static/SP_IconNorMagic.webp`]
+]
 
-function interpolate(text: string, params: string[]): string {
-    if (!text || !params.length) return text
-    return text.replace(/\{(\d+)\}/g, (_, i) => params[Number(i)] ?? `{${i}}`)
-}
-
-function makeSkillValues(skill: ZhCharacterDetail['skill_trees'][string]['skill']): [name: string, value: string][] {
-    if (!skill.level) return []
-    const keys = Object.keys(skill.level)
-        .map(Number)
-        .filter((k) => !isNaN(k))
-    if (keys.length === 0) return []
-    const sorted = keys.sort((a, b) => a - b)
-    const result: [string, string][] = []
-    for (const lvKey of sorted) {
-        const lvData = skill.level[String(lvKey)]
-        if (!lvData) continue
-        const row = lvData.param[0]
-        if (!row || row.length === 0) continue
-        // 取10级
-        result.push([lvData.name, row[Math.min(row.length - 1, 9)]])
-        // result.push([lvData.name, row[row.length - 1]])
-    }
-    return result
-}
-
-function makeSimpleParams(skill: ZhCharacterDetail['skill_trees'][string]['skill']): string[] {
-    if (skill.param && skill.param.length > 0) return skill.param
-    return []
-}
+// ── Info transforms ──
 
 export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
     let baseStats: { hp: number; atk: number; def: number; tune: number } = { hp: 0, atk: 0, def: 0, tune: 0 }
@@ -193,7 +206,7 @@ export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
 
     const skills: SkillEntry[] = []
     const statNodes: StatNode[] = []
-    const elementName = ELEMENT_MAP[data.element] ?? ''
+    const elementName = (ELEMENT_MAP[data.element] ?? '') as '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'
     const hasTune = Object.values(data.tag ?? {}).some((t) => t.name === '震谐响应' || t.name === '集谐响应')
     baseStats.tune = hasTune ? 10 : 0
 
@@ -233,7 +246,7 @@ export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
     return {
         rarity: data.rarity as 4 | 5,
         element: elementName,
-        weaponType: WEAPON_TYPE_MAP[data.weapon] ?? '',
+        weaponType: (WEAPON_TYPE_MAP[data.weapon] ?? '') as '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪',
         lv90BaseStats: baseStats,
         skills,
         statNodes,
@@ -259,7 +272,7 @@ export function transformWeaponInfo(data: ZhWeaponDetail): WeaponInfo {
 
     return {
         rarity: data.rarity as 1 | 2 | 3 | 4 | 5,
-        type: WEAPON_TYPE_MAP[data.type] ?? '长刃',
+        type: (WEAPON_TYPE_MAP[data.type] ?? '长刃') as '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪',
         lv90BaseAtk: atkStat.value,
         substat: {
             name: subStat.name ?? '',
@@ -272,6 +285,23 @@ export function transformWeaponInfo(data: ZhWeaponDetail): WeaponInfo {
     }
 }
 
+function makeEchoSkillValues(skill: ZhEchoDetail['skill']): [name: string, value: string, element: string][] {
+    if (!skill.damage) return []
+    const result: [string, string, string][] = []
+    let i = 0
+    for (const [, dmg] of Object.entries(skill.damage)) {
+        const lastIdx = dmg.rate_lv ? dmg.rate_lv.length - 1 : 0
+        const rateVal = dmg.rate_lv?.[lastIdx] ?? 0
+        const pct = (rateVal / 100).toFixed(2) + '%'
+        const suffix = dmg.related_property === '攻击' ? '' : dmg.related_property
+        const value = suffix ? pct + suffix : pct
+        const element = ELEMENT_MAP[dmg.element] ?? ''
+        i++
+        result.push([`伤害${i}`, value, element])
+    }
+    return result
+}
+
 export function transformEchoInfo(data: ZhEchoDetail, intensity?: number): EchoInfo {
     let desc = data.skill?.desc ?? ''
     const params = data.skill?.param ?? []
@@ -281,7 +311,10 @@ export function transformEchoInfo(data: ZhEchoDetail, intensity?: number): EchoI
     }
     return {
         cost: intensity !== undefined ? (COST_MAP[intensity] ?? 1) : (COST_MAP[data.intensity] ?? 1),
-        desc,
+        skill: {
+            desc,
+            values: makeEchoSkillValues(data.skill)
+        },
         groups: Object.values(data.group ?? {}).map((g) => g.name)
     }
 }
@@ -295,11 +328,3 @@ export function transformEchoSetInfo(data: ZhSonataDetail, setId: string): EchoS
     }
     return { bonuses }
 }
-
-export const transformWeaponTypeIcons = (): IconPair[] => [
-    ['长刃', `${ASSET_BASE}/Static/SP_IconNorSword.webp`],
-    ['迅刀', `${ASSET_BASE}/Static/SP_IconNorKnife.webp`],
-    ['佩枪', `${ASSET_BASE}/Static/SP_IconNorGun.webp`],
-    ['臂铠', `${ASSET_BASE}/Static/SP_IconNorFist.webp`],
-    ['音感仪', `${ASSET_BASE}/Static/SP_IconNorMagic.webp`]
-]

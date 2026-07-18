@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { resources } from '$lib/data/resources.svelte'
+    import { getWeaponInfo } from '$lib/data/api'
 
     let {
         show,
@@ -36,15 +36,8 @@
         error = ''
         data = null
         try {
-            const res = await fetch(`/api/v1/weapon-info/${encodeURIComponent(name!)}`)
-            if (!res.ok) {
-                const err = await res.json()
-                throw new Error(err.error || 'Failed to fetch')
-            }
-            const info: WeaponInfo = await res.json()
-            data = info
-            const paths = [weaponIconMap[name ?? ''], weaponTypeIconMap[info.type]].filter(Boolean)
-            if (paths.length > 0) resources.loadIcons(paths)
+            const info = await getWeaponInfo(name!)
+            data = info as unknown as WeaponInfo
         } catch (e) {
             error = String(e)
         } finally {
@@ -62,7 +55,7 @@
 
     const renderDesc = (s: string) => s.replace(/\n/g, '<br>')
 
-    const img = (path: string) => resources.icons[path] || ''
+    const img = (path: string) => path || ''
 </script>
 
 <svelte:window onkeydown={handleKeydown} />

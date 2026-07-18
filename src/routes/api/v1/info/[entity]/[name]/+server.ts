@@ -1,15 +1,13 @@
-import { CACHE_CONTROL, NANOKA_BASE } from '../consts'
+import { CACHE_CONTROL, NANOKA_BASE } from '$lib/api/consts'
+import { fetchData, fetchZhData, createJsonResponse } from '$lib/api/fetch'
 import {
-    fetchData,
-    fetchZhData,
-    createJsonResponse,
     transformCharacterInfo,
     transformWeaponInfo,
     transformEchoInfo,
     transformEchoSetInfo,
     findEntryByName,
     findSonataSetEntry
-} from '../utils'
+} from '$lib/api/utils'
 import type {
     NanokaCharacter,
     NanokaWeapon,
@@ -19,7 +17,7 @@ import type {
     ZhWeaponDetail,
     ZhEchoDetail,
     ZhSonataDetail
-} from '../types'
+} from '$lib/api/types'
 
 let sonataCache: NanokaSonata | null = null
 let versionCache: string | null = null
@@ -37,13 +35,13 @@ async function getVersion(): Promise<string> {
     return versionCache
 }
 
-export const GET = async ({ params }: { params: { type: string; name: string } }) => {
-    const { type, name } = params
+export const GET = async ({ params }: { params: { entity: string; name: string } }) => {
+    const { entity, name } = params
     if (!name) return createJsonResponse({ error: 'Missing name parameter' }, 400)
 
     try {
-        switch (type) {
-            case 'character-info': {
+        switch (entity) {
+            case 'character': {
                 const list = await fetchData<Record<string, NanokaCharacter>>('/character.json')
                 const found = findEntryByName(list, name)
                 if (!found) return createJsonResponse({ error: 'Character not found' }, 404)
@@ -51,7 +49,7 @@ export const GET = async ({ params }: { params: { type: string; name: string } }
                 const data = await fetchZhData<ZhCharacterDetail>(`/character/${found[0]}.json`, version)
                 return createJsonResponse(transformCharacterInfo(data), 200, { 'Cache-Control': CACHE_CONTROL })
             }
-            case 'weapon-info': {
+            case 'weapon': {
                 const list = await fetchData<Record<string, NanokaWeapon>>('/weapon.json')
                 const found = findEntryByName(list, name)
                 if (!found) return createJsonResponse({ error: 'Weapon not found' }, 404)
@@ -59,7 +57,7 @@ export const GET = async ({ params }: { params: { type: string; name: string } }
                 const data = await fetchZhData<ZhWeaponDetail>(`/weapon/${found[0]}.json`, version)
                 return createJsonResponse(transformWeaponInfo(data), 200, { 'Cache-Control': CACHE_CONTROL })
             }
-            case 'echo-info': {
+            case 'echo': {
                 const list = await fetchData<Record<string, NanokaEcho>>('/echo.json')
                 const found = findEntryByName(list, name)
                 if (!found) return createJsonResponse({ error: 'Echo not found' }, 404)
@@ -69,7 +67,7 @@ export const GET = async ({ params }: { params: { type: string; name: string } }
                     'Cache-Control': CACHE_CONTROL
                 })
             }
-            case 'echo-set-info': {
+            case 'echo-set': {
                 const version = await getVersion()
                 const data = await fetchZhData<ZhSonataDetail>('/sonata.json', version)
                 const found = findSonataSetEntry(data, name)
@@ -78,7 +76,7 @@ export const GET = async ({ params }: { params: { type: string; name: string } }
                 return createJsonResponse(result, 200, { 'Cache-Control': CACHE_CONTROL })
             }
             default:
-                return createJsonResponse({ error: 'Invalid type' }, 400)
+                return createJsonResponse({ error: 'Invalid entity' }, 400)
         }
     } catch (e) {
         return createJsonResponse({ error: 'Failed to fetch data: ' + String(e) }, 500)

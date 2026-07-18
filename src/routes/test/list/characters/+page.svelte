@@ -1,6 +1,6 @@
 <script lang="ts">
     import TestListLayout from '$lib/components/shared/TestListLayout.svelte'
-    import { resources } from '$lib/data/resources.svelte'
+    import { getCharacterList, getCharacterIcons, getElementIcons, getWeaponTypeIcons } from '$lib/data/api'
     import CharacterDetailModal from '$lib/components/shared/CharacterDetailModal.svelte'
 
     interface Item {
@@ -45,27 +45,16 @@
         return map[star] || '#71717a'
     }
 
-    const img = (path: string) => resources.icons[path] || ''
-
     $effect(() => {
         loadData()
     })
 
-    $effect(() => {
-        const map = resources.icons
-        for (const g of groups) {
-            if (g.icon && map[g.icon]) {
-                g.icon = map[g.icon]
-            }
-        }
-    })
-
     async function loadData() {
-        const list = await resources.getList<any>('character')
+        const list = await getCharacterList()
         const [iconMap, elementMap, weaponTypeMap] = await Promise.all([
-            resources.getIconMap('character'),
-            resources.getIconMap('element'),
-            resources.getIconMap('weapon-type')
+            getCharacterIcons(),
+            getElementIcons(),
+            getWeaponTypeIcons()
         ])
 
         const items: Item[] = list.map((item: any) => ({
@@ -93,9 +82,6 @@
             items: items.filter((item) => item.element === label).sort(sortCharacters),
             icon: elementMap[label] ?? ''
         })).filter((g) => g.items.length > 0)
-
-        const paths = [...Object.values(iconMap), ...Object.values(elementMap), ...Object.values(weaponTypeMap)]
-        resources.loadIcons(paths)
     }
 </script>
 
@@ -111,8 +97,8 @@
             onkeydown={(e) => e.key === 'Enter' && (selectedChar = item.name)}
         >
             <div class="size-10 shrink-0 rounded-md bg-zinc-800/40 flex items-center justify-center overflow-hidden">
-                {#if img(item.headIcon)}
-                    <img src={img(item.headIcon)} alt={item.name} class="size-full object-contain" />
+                {#if item.headIcon}
+                    <img src={item.headIcon} alt={item.name} class="size-full object-contain" />
                 {/if}
             </div>
             <div class="min-w-0 flex-1">
@@ -124,8 +110,8 @@
                 <div
                     class="size-10 shrink-0 rounded-md bg-zinc-800/40 flex items-center justify-center overflow-hidden"
                 >
-                    {#if img(item.weaponTypeIcon)}
-                        <img src={img(item.weaponTypeIcon)} alt="" class="size-full object-contain" />
+                    {#if item.weaponTypeIcon}
+                        <img src={item.weaponTypeIcon} alt="" class="size-full object-contain" />
                     {/if}
                 </div>
             {/if}

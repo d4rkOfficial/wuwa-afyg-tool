@@ -18,10 +18,10 @@
     let { data }: Props = $props()
 
     const DEFAULTS: Record<string, string> = {
-        '/api/v1/character-info/{name}': '散华',
-        '/api/v1/weapon-info/{name}': '裁竹',
-        '/api/v1/echo-info/{name}': '无常凶鹭',
-        '/api/v1/echo-set-info/{name}': '轻云出月'
+        '/api/v1/info/character/{name}': '散华',
+        '/api/v1/info/weapon/{name}': '裁竹',
+        '/api/v1/info/echo/{name}': '无常凶鹭',
+        '/api/v1/info/echo-set/{name}': '轻云出月'
     }
 
     // svelte-ignore state_referenced_locally

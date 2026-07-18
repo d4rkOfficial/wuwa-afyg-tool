@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { EchoConfig, Echo, ComponentsProps } from '$lib/types'
-    import { resources } from '$lib/data/resources.svelte'
+
     import SelectorModal, { type SelectorItem } from './SelectorModal.svelte'
     import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 
@@ -55,7 +55,7 @@
         if ((e.target as HTMLElement).dataset?.modal === 'echo-config-backdrop') onClose()
     }
 
-    const img = (path: string) => resources.icons[path] || ''
+    const img = (path: string) => path || ''
 
     const onEchoSelect = (item: { name: string; meta?: Record<string, string> }) => {
         const found = echoes.find((e) => e.name === item.name)

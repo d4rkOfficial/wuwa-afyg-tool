@@ -1,6 +1,17 @@
 <script lang="ts">
     import CharacterConfigCard from '$lib/components/shared/CharacterConfigCard.svelte'
-    import { resources } from '$lib/data/resources.svelte'
+    import {
+        getCharacterList,
+        getWeaponList,
+        getEchoList,
+        getCharacterIcons,
+        getWeaponIcons,
+        getEchoIcons,
+        getElementIcons,
+        getWeaponTypeIcons,
+        getEchoSetIcons,
+        getEchoSetList
+    } from '$lib/data/api'
     import { getTeam, resetTeam } from './store.svelte'
     import type { Character, Weapon, Echo } from '$lib/types'
 
@@ -18,34 +29,24 @@
     let loading = $state(true)
 
     $effect(() => {
-        Promise.all([
-            resources.getList<Character>('character'),
-            resources.getList<Weapon>('weapon'),
-            resources.getList<Echo>('echo')
-        ]).then(([c, w, e]) => {
-            characters = c
-            weapons = w
-            echoes = e
-            loading = false
-        })
-    })
-
-    $effect(() => {
-        if (loading) return
-        fetch('/api/v1/echo-set-list')
-            .then((r) => r.json())
-            .then((setList) => {
+        Promise.all([getCharacterList(), getWeaponList(), getEchoList(), getEchoSetList()]).then(
+            ([c, w, e, setList]) => {
+                characters = c as unknown as Character[]
+                weapons = w as unknown as Weapon[]
+                echoes = e as unknown as Echo[]
                 const epMap: Record<string, number[]> = {}
                 for (const s of setList) epMap[s.name] = s.pieces
                 echoSetPiecesMap = epMap
-            })
+                loading = false
+            }
+        )
         Promise.all([
-            resources.getIconMap('character'),
-            resources.getIconMap('weapon'),
-            resources.getIconMap('echo'),
-            resources.getIconMap('element'),
-            resources.getIconMap('weapon-type'),
-            resources.getIconMap('echo-set')
+            getCharacterIcons(),
+            getWeaponIcons(),
+            getEchoIcons(),
+            getElementIcons(),
+            getWeaponTypeIcons(),
+            getEchoSetIcons()
         ]).then(([cMap, wMap, eMap, elMap, wtMap, esMap]) => {
             charIconMap = cMap
             weaponIconMap = wMap
@@ -53,15 +54,6 @@
             elementIconMap = elMap
             weaponTypeIconMap = wtMap
             echoSetIconMap = esMap
-            const paths = [
-                ...Object.values(cMap),
-                ...Object.values(wMap),
-                ...Object.values(eMap),
-                ...Object.values(elMap),
-                ...Object.values(wtMap),
-                ...Object.values(esMap)
-            ]
-            resources.loadIcons(paths)
         })
     })
 </script>

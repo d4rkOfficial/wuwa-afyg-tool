@@ -1,6 +1,6 @@
 <script lang="ts">
     import TestListLayout from '$lib/components/shared/TestListLayout.svelte'
-    import { resources } from '$lib/data/resources.svelte'
+    import { getEchoList, getEchoIcons, getEchoSetIcons, getEchoSetList } from '$lib/data/api'
     import EchoDetailModal from '$lib/components/shared/EchoDetailModal.svelte'
 
     interface Item {
@@ -29,27 +29,16 @@
         return map[cost] || '#71717a'
     }
 
-    const img = (path: string) => resources.icons[path] || ''
-
     $effect(() => {
         loadData()
     })
 
-    $effect(() => {
-        const map = resources.icons
-        for (const g of groups) {
-            if (g.icon && map[g.icon]) {
-                g.icon = map[g.icon]
-            }
-        }
-    })
-
     async function loadData() {
         const [list, iconMap, setIconMapRaw, setList] = await Promise.all([
-            resources.getList<any>('echo'),
-            resources.getIconMap('echo'),
-            resources.getIconMap('echo-set'),
-            fetch('/api/v1/echo-set-list').then((r) => r.json())
+            getEchoList(),
+            getEchoIcons(),
+            getEchoSetIcons(),
+            getEchoSetList()
         ])
 
         const piecesMap = {} as Record<string, number[]>
@@ -83,8 +72,6 @@
             }))
             .sort((a, b) => b.items.length - a.items.length)
 
-        resources.loadIcons([...Object.values(iconMap), ...Object.values(setIconMapRaw)])
-
         echoIconMap = iconMap
     }
 </script>
@@ -104,8 +91,8 @@
             onkeydown={(e) => e.key === 'Enter' && (selectedEcho = item.name)}
         >
             <div class="size-10 shrink-0 rounded-md bg-zinc-800/40 flex items-center justify-center overflow-hidden">
-                {#if img(item.icon)}
-                    <img src={img(item.icon)} alt={item.name} class="size-full object-contain" />
+                {#if item.icon}
+                    <img src={item.icon} alt={item.name} class="size-full object-contain" />
                 {/if}
             </div>
             <div class="min-w-0 flex-1">
@@ -124,8 +111,8 @@
                 <span class="flex justify-between items-center gap-1 text-[11px] text-zinc-500 leading-none mt-0.5">
                     <span class="flex items-center gap-1">
                         {#each item.sets as set}
-                            {#if setIconMap[set] && img(setIconMap[set])}
-                                <img src={img(setIconMap[set])} alt="" class="size-3 object-contain" title={set} />
+                            {#if setIconMap[set]}
+                                <img src={setIconMap[set]} alt="" class="size-3 object-contain" title={set} />
                             {/if}
                         {/each}
                     </span>

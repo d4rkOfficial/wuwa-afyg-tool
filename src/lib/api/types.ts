@@ -1,44 +1,3 @@
-// ── Enums ──
-
-export const enum WeaponType {
-    长刃 = '长刃',
-    迅刀 = '迅刀',
-    佩枪 = '佩枪',
-    臂铠 = '臂铠',
-    音感仪 = '音感仪'
-}
-
-export const enum Element {
-    冷凝 = '冷凝',
-    热熔 = '热熔',
-    导电 = '导电',
-    气动 = '气动',
-    衍射 = '衍射',
-    湮灭 = '湮灭'
-}
-
-export const enum SkillCategory {
-    常态攻击 = '常态攻击',
-    共鸣技能 = '共鸣技能',
-    共鸣解放 = '共鸣解放',
-    共鸣回路 = '共鸣回路',
-    变奏技能 = '变奏技能',
-    延奏技能 = '延奏技能',
-    谐度破坏 = '谐度破坏'
-}
-
-export const enum SkillNodeType {
-    共鸣回路 = 1,
-    技能 = 2,
-    属性节点 = 3,
-    共鸣链 = 4
-}
-
-export const enum Rarity {
-    Four = 4,
-    Five = 5
-}
-
 // ── List types ──
 
 export interface Character {
@@ -106,7 +65,7 @@ export interface SkillEntry {
     name: string
     type: '常态攻击' | '共鸣技能' | '共鸣解放' | '共鸣回路' | '变奏技能' | '延奏技能' | '谐度破坏'
     desc: string
-    values: [name: string, value: string][]
+    values: [name: string, value: string, element: string][]
 }
 
 export interface StatNode {
@@ -150,7 +109,10 @@ export interface WeaponInfo {
 
 export interface EchoInfo {
     cost: number
-    desc: string
+    skill: {
+        desc: string
+        values: [name: string, value: string, element: string][]
+    }
     groups: string[]
 }
 
@@ -162,9 +124,9 @@ export interface EchoSetInfo {
 
 export interface ZhDamageEntry {
     element: number
-    related_property: string // "攻击"
-    type: number // 0|2
-    rate_lv: number[] // 20 档
+    related_property: string
+    type: number
+    rate_lv: number[]
     energy: number
     element_power: number
     hardness_lv: number
@@ -239,7 +201,7 @@ export interface ZhEchoDetail {
         simple_desc: string
         param: string[][]
         icon: string
-        damage?: Record<string, unknown>
+        damage?: Record<string, ZhDamageEntry>
     }
     group: Record<
         string,

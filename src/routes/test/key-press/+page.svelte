@@ -18,10 +18,11 @@
         ' ': 'SpaceBar'
     }
 
+    import { getUiBtnIcons } from '$lib/data/api'
+
     onMount(async () => {
-        const res = await fetch('/api/v1/ui-btn-icons')
-        const data: [string, string][] = await res.json()
-        for (const [name, url] of data) {
+        const data = await getUiBtnIcons()
+        for (const [name, url] of Object.entries(data)) {
             icons[name] = url
         }
         loaded = true
