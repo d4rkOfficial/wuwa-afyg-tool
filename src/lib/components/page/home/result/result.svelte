@@ -147,6 +147,25 @@
 
             const stats = { atk: totalAtk, hp: totalHp, def: totalDef, tune: totalTune }
 
+            // ── Enemy resistance (shared by all damage types) ──
+            const enemyLevel = enemy?.level ?? 90
+            const defPen = zoneSum(e.id, 'def_pen') / 100
+            const defIgnore = zoneSum(e.id, 'def_ignore') / 100
+            const defDenom = (792 + enemyLevel * 8) * (1 - defPen) * (1 - defIgnore) + 1520
+            const defMulti = 1520 / defDenom
+
+            const enemyRes = enemy?.resistances?.[e.element] ?? 0
+            const resPen = zoneSum(e.id, 'res_pen') / 100
+            const resDown = zoneSum(e.id, 'res_down') / 100
+            let effRes = (enemyRes - resPen * 100 - resDown * 100) / 100
+            let resMulti: number
+            if (effRes < 0) resMulti = 1 + Math.abs(effRes)
+            else if (effRes > 1) resMulti = 1 - (1 + (effRes - 1) / 2)
+            else resMulti = 1 - effRes
+
+            const dmgRedPen = zoneSum(e.id, 'dmg_red_pen') / 100
+            const dmgReduction = Math.max(0, (enemy?.dmgReduction ?? 0) - dmgRedPen * 100) / 100
+
             // Determine base damage
             let baseDamage = 0
             const isEffect = ['光噪效应', '风蚀效应', '霜渐效应', '聚爆效应', '电磁效应'].includes(e.skillType)
@@ -251,25 +270,6 @@
                 critRate += critRateBuff / 100
                 critDmg += critDmgBuff / 100
             }
-
-            const defPen = zoneSum(e.id, 'def_pen') / 100
-            const defIgnore = zoneSum(e.id, 'def_ignore') / 100
-            const enemyLevel = enemy?.level ?? 90
-            const enemyDef = enemy?.defense ?? 1592
-            const defDenom = (792 + enemyLevel * 8) * (1 - defPen) * (1 - defIgnore) + 1520
-            const defMulti = 1520 / defDenom
-
-            const enemyRes = enemy?.resistances?.[e.element] ?? 0
-            const resPen = zoneSum(e.id, 'res_pen') / 100
-            const resDown = zoneSum(e.id, 'res_down') / 100
-            let effRes = (enemyRes - resPen * 100 - resDown * 100) / 100
-            let resMulti: number
-            if (effRes < 0) resMulti = 1 + Math.abs(effRes)
-            else if (effRes > 1) resMulti = 1 - (1 + (effRes - 1) / 2)
-            else resMulti = 1 - effRes
-
-            const dmgRedPen = zoneSum(e.id, 'dmg_red_pen') / 100
-            const dmgReduction = Math.max(0, (enemy?.dmgReduction ?? 0) - dmgRedPen * 100) / 100
 
             const finalHarmony = zoneSum(e.id, 'final_harmony') / 100
             const finalDmg = (zoneSum(e.id, 'final_dmg') + zoneSum(e.id, 'target_final_dmg')) / 100
