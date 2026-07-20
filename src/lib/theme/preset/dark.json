@@ -1,0 +1,60 @@
+{
+    "id": "dark",
+    "name": "黑夜",
+    "components": {
+        "avatar": {
+            "backgroundImage": "#2a2a32",
+            "backgroundImageFocused": "#3a3a42",
+            "textColor": "#e4e4e7",
+            "textColorFocused": "#ffffff"
+        },
+        "tabs": {
+            "backgroundImage": "#0a0a0c",
+            "backgroundImageFocused": "#3a3a42",
+            "textColor": "#e4e4e7",
+            "textColorFocused": "#ffffff"
+        },
+        "sidebar": {
+            "backgroundImage": "#000000",
+            "textColor": "#e4e4e7"
+        },
+        "btn": {
+            "backgroundImage": "linear-gradient(135deg, #6366f1, #8b5cf6)",
+            "backgroundImageFocused": "#818cf8",
+            "textColor": "#ffffff",
+            "textColorFocused": "#ffffff"
+        },
+        "search-box": {
+            "backgroundImage": "#1e1e24",
+            "backgroundImageFocused": "#2a2a32",
+            "textColor": "#e4e4e7",
+            "textColorFocused": "#ffffff"
+        },
+        "modal": {
+            "backgroundImage": "#111111",
+            "textColor": "#e4e4e7"
+        },
+        "context-menu": {
+            "backgroundImage": "rgba(26,26,31,0.85)",
+            "backgroundImageFocused": "rgba(42,42,50,0.9)",
+            "textColor": "#e4e4e7",
+            "textColorFocused": "#ffffff"
+        },
+        "toast": {
+            "backgroundImage": "rgba(26,26,31,0.85)",
+            "textColor": "#e4e4e7"
+        },
+        "toast-top": {
+            "backgroundImage": "#1a1a1f",
+            "textColor": "#e4e4e7"
+        },
+        "timeline": {
+            "backgroundImage": "#09090b",
+            "textColor": "#e4e4e7"
+        },
+        "layout": {
+            "backgroundImage": "#0e0e10",
+            "textColor": "#e4e4e7"
+        }
+    }
+}

@@ -40,10 +40,12 @@
 
 @layer base {
     html {
-        background: #0e0e10;
-        color: #e4e4e7;
-        color-scheme: dark;
+        background: var(--theme-layout-bg, #0e0e10);
+        color: var(--theme-layout-text, #e4e4e7);
+        color-scheme: var(--theme-layout-scheme, dark);
         font-family: 'FangXinShu', 'Inter', system-ui, sans-serif;
+        user-select: none;
+        -webkit-user-select: none;
     }
     .font-mono {
         font-family: 'JetBrains Mono', ui-monospace, monospace;

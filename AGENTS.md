@@ -19,20 +19,21 @@
 ## 3. 组件约束
 
 - 重复的页内内容 → `{#snippet}` 内联在 `+page.svelte` 中
-- 大的布局结构 → 独立组件（放在 `src/lib/components/shared/`）
+- 大的布局结构 → 独立组件
 - 所有独立组件的 props 必须使用 `interface Props extends ComponentsProps {}` 声明（`ComponentsProps` 在 `$lib/types`）
 - 所有独立组件必须暴露 `style` 和 `class` prop，支持外部定制，参考`src/lib/types/component-props.ts`
 - 尽量使用 TailwindCSS 而不是 `<style>` 样式
 - 不依赖外部 UI 库，所有控件使用原生 HTML + TailwindCSS 实现
     - 允许的例外：`@iconify/svelte`（图标渲染）、`prismjs`（代码高亮）
 - Snippet 通过闭包访问父作用域的响应式状态（`$state`/`$derived`），避免使用带类型的 snippet 参数
+- 主题托管在 `$lib/theme`，通过 CSS 自定义属性（`--theme-{key}-{prop}`）驱动；组件中使用 `bg-[var(--theme-{key}-bg)]` / `text-[var(--theme-{key}-text)]`，不要直接 import theme store
 
 ## 4. 文件组织
 
-- 组件遵循最小化原则，拆组件时先放到`src/lib/components/page/{当前路由}/{组件名}.svelte`，将来可能复用时，移动到`src/lib/components/shared/{组件名}.svelte`
-- 组件放在：
+- 组件遵循最小化原则，分类存放：
+    - `src/lib/components/ui/` — 通用 UI 元件（按钮、输入框、头像、Tabs 等）
+    - `src/lib/components/layout/` — 布局元件（弹窗、右键菜单、通知提示等）
     - `src/lib/components/page/{路由名}/` — 页面级组件
-    - `src/lib/components/shared/` — 通用组件
 - 不要用一级以上相对路径，如果涉及多级相对路径的导入，那么重构代码，把路由级的类型、常量、工具函数移动到`lib/`下
 
 ## 5. 完成检查

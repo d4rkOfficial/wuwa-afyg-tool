@@ -1,0 +1,36 @@
+export interface SelectedSet {
+    name: string
+    pieces: number
+}
+
+export interface EchoSlot {
+    name: string | null
+    cost: number
+}
+
+export interface CharSlot {
+    character: string | null
+    weapon: string | null
+    triggerSets: SelectedSet[]
+    echoes: [EchoSlot, EchoSlot, EchoSlot, EchoSlot, EchoSlot]
+}
+
+export interface PhaseState {
+    locked: boolean
+    data: unknown
+}
+
+export interface Project {
+    id: string
+    name: string
+    createdAt: number
+    team: [CharSlot, CharSlot, CharSlot]
+    phases: {
+        team: PhaseState
+        timeline: PhaseState
+        calculation: PhaseState
+        config: PhaseState
+    }
+}
+
+export type PhaseKey = 'team' | 'timeline' | 'calculation' | 'config'

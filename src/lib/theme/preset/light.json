@@ -1,0 +1,60 @@
+{
+    "id": "light",
+    "name": "白天",
+    "components": {
+        "avatar": {
+            "backgroundImage": "#e9edf5",
+            "backgroundImageFocused": "#d2dbee",
+            "textColor": "#18181b",
+            "textColorFocused": "#000000"
+        },
+        "tabs": {
+            "backgroundImage": "#ffffff",
+            "backgroundImageFocused": "#d2dbee",
+            "textColor": "#18181b",
+            "textColorFocused": "#000000"
+        },
+        "sidebar": {
+            "backgroundImage": "#eef3fc",
+            "textColor": "#18181b"
+        },
+        "btn": {
+            "backgroundImage": "linear-gradient(135deg, #4f46e5, #7c3aed)",
+            "backgroundImageFocused": "#6366f1",
+            "textColor": "#ffffff",
+            "textColorFocused": "#ffffff"
+        },
+        "search-box": {
+            "backgroundImage": "#e4ebf7",
+            "backgroundImageFocused": "#d2dbee",
+            "textColor": "#18181b",
+            "textColorFocused": "#000000"
+        },
+        "modal": {
+            "backgroundImage": "#f8faff",
+            "textColor": "#18181b"
+        },
+        "context-menu": {
+            "backgroundImage": "rgba(248,250,255,0.94)",
+            "backgroundImageFocused": "rgba(226,232,248,0.96)",
+            "textColor": "#18181b",
+            "textColorFocused": "#000000"
+        },
+        "toast": {
+            "backgroundImage": "rgba(248,250,255,0.94)",
+            "textColor": "#18181b"
+        },
+        "toast-top": {
+            "backgroundImage": "#eef3fc",
+            "textColor": "#18181b"
+        },
+        "timeline": {
+            "backgroundImage": "#ffffff",
+            "textColor": "#18181b"
+        },
+        "layout": {
+            "backgroundImage": "#f0f5ff",
+            "textColor": "#18181b"
+        }
+    }
+}

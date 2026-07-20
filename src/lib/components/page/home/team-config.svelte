@@ -1,0 +1,451 @@
+<script lang="ts">
+    import type { CharSlot, SelectedSet } from '$lib/data/types'
+    import type { Character, Weapon, Echo, EchoSetItem } from '$lib/api/types'
+    import { addToast } from '$lib/data/toast.svelte'
+    import {
+        getCharacterList,
+        getWeaponList,
+        getEchoList,
+        getEchoSetList,
+        getCharacterIcons,
+        getWeaponIcons,
+        getEchoIcons,
+        getEchoSetIcons,
+        getElementIcons,
+        getWeaponTypeIcons
+    } from '$lib/data/api'
+    import CharacterPicker from './pickers/character-picker.svelte'
+    import WeaponPicker from './pickers/weapon-picker.svelte'
+    import EchoPicker from './pickers/echo-picker.svelte'
+    import SetPicker from './set-picker.svelte'
+
+    interface Props {
+        team: [CharSlot, CharSlot, CharSlot]
+        onupdate: (team: [CharSlot, CharSlot, CharSlot]) => void
+        locked?: boolean
+    }
+
+    let { team: _team, onupdate, locked = false }: Props = $props()
+
+    function makeSlot(): CharSlot {
+        return {
+            character: null,
+            weapon: null,
+            triggerSets: [],
+            echoes: [
+                { name: null, cost: 0 },
+                { name: null, cost: 0 },
+                { name: null, cost: 0 },
+                { name: null, cost: 0 },
+                { name: null, cost: 0 }
+            ]
+        }
+    }
+
+    let localTeam = $state<[CharSlot, CharSlot, CharSlot]>([makeSlot(), makeSlot(), makeSlot()])
+
+    let characters: Character[] = $state([])
+    let weapons: Weapon[] = $state([])
+    let echoes: Echo[] = $state([])
+    let echoSets: EchoSetItem[] = $state([])
+    let characterIcons: Record<string, string> = $state({})
+    let weaponIcons: Record<string, string> = $state({})
+    let echoIcons: Record<string, string> = $state({})
+    let echoSetIcons: Record<string, string> = $state({})
+    let elementIcons: Record<string, string> = $state({})
+    let weaponTypeIcons: Record<string, string> = $state({})
+    let pickerSlot = $state<number | null>(null)
+    let pickerType = $state<'character' | 'weapon' | 'echo' | 'sets' | null>(null)
+
+    let characterMap = $derived(new Map(characters.map((c) => [c.name, c])))
+    let echoMap = $derived(new Map(echoes.map((e) => [e.name, e])))
+    let weaponMap = $derived(new Map(weapons.map((w) => [w.name, w])))
+
+    $effect(() => {
+        localTeam = JSON.parse(JSON.stringify(_team)) as [CharSlot, CharSlot, CharSlot]
+    })
+
+    $effect(() => {
+        Promise.all([
+            getCharacterList(),
+            getWeaponList(),
+            getEchoList(),
+            getEchoSetList(),
+            getCharacterIcons(),
+            getWeaponIcons(),
+            getEchoIcons(),
+            getEchoSetIcons(),
+            getElementIcons(),
+            getWeaponTypeIcons()
+        ]).then(([cl, wl, el, esl, ci, wi, ei, esi, eli, wti]) => {
+            characters = cl
+            weapons = wl
+            echoes = el
+            echoSets = esl
+            characterIcons = ci
+            weaponIcons = wi
+            echoIcons = ei
+            echoSetIcons = esi
+            elementIcons = eli
+            weaponTypeIcons = wti
+        })
+    })
+
+    function openPicker(slot: number, type: 'character' | 'weapon' | 'echo' | 'sets') {
+        if (locked) return
+        pickerSlot = slot
+        pickerType = type
+    }
+
+    function closePicker() {
+        pickerSlot = null
+        pickerType = null
+    }
+
+    function handleSelectCharacter(item: unknown) {
+        if (pickerSlot === null) return
+        const char = item as Character | null
+        localTeam[pickerSlot].character = char?.name ?? null
+        if (char && localTeam[pickerSlot].weapon) {
+            const wp = weaponMap.get(localTeam[pickerSlot].weapon!)
+            if (wp && wp.weaponType !== char.weaponType) {
+                localTeam[pickerSlot].weapon = null
+                addToast('武器类型与角色不匹配，已清空武器', 'bottom-right', 'info')
+            }
+        }
+        if (!char) {
+            localTeam[pickerSlot].weapon = null
+            localTeam[pickerSlot].echoes[0] = { name: null, cost: 0 }
+            localTeam[pickerSlot].triggerSets = []
+        }
+        closePicker()
+        onupdate(localTeam)
+    }
+
+    function handleSelectWeapon(item: unknown) {
+        if (pickerSlot === null) return
+        localTeam[pickerSlot].weapon = (item as Weapon | null)?.name ?? null
+        closePicker()
+        onupdate(localTeam)
+    }
+
+    function handleSelectEcho(item: unknown) {
+        if (pickerSlot === null) return
+        const echo = item as Echo | null
+        const slot = localTeam[pickerSlot]
+        slot.echoes[0] = echo ? { name: echo.name, cost: echo.cost } : { name: null, cost: 0 }
+        if (!echo) {
+            slot.triggerSets = []
+        } else if (getEffectiveTotal(slot.triggerSets) === 5) {
+            // 赫卡忒特殊处理：该声骸可属于任何套装
+            if (echo.name !== '赫卡忒') {
+                const setNames = new Set(slot.triggerSets.map((s) => s.name))
+                const echoData = echoMap.get(echo.name)
+                if (echoData && !echoData.sets.some((sn) => setNames.has(sn))) {
+                    slot.triggerSets = []
+                    addToast('当前声骸不属于已选套装组合，已清空触发套装', 'bottom-right', 'info')
+                }
+            }
+        }
+        closePicker()
+        onupdate(localTeam)
+    }
+
+    function handleConfirmSets(sets: SelectedSet[]) {
+        if (pickerSlot !== null) {
+            localTeam[pickerSlot].triggerSets = sets
+
+            if (getEffectiveTotal(sets) === 5) {
+                const slot = localTeam[pickerSlot]
+                // 赫卡忒特殊处理：该声骸可属于任何套装
+                if (slot.echoes[0].name !== '赫卡忒') {
+                    const echoData = slot.echoes[0].name ? echoMap.get(slot.echoes[0].name) : null
+                    if (echoData) {
+                        const setNames = new Set(sets.map((s) => s.name))
+                        if (!echoData.sets.some((sn) => setNames.has(sn))) {
+                            slot.echoes[0] = { name: null, cost: 0 }
+                            addToast('已选套装组合与首位声骸不匹配，已清空声骸', 'bottom-right', 'info')
+                        }
+                    }
+                }
+            }
+        }
+        closePicker()
+        onupdate(localTeam)
+    }
+
+    function getTriggerSetSummary(slot: CharSlot): string {
+        if (slot.triggerSets.length === 0) return ''
+        return slot.triggerSets.map((s) => `${s.name}(${s.pieces})`).join(' + ')
+    }
+
+    function getEffectiveTotal(sets: SelectedSet[]): number {
+        const byName = new Map<string, number>()
+        for (const s of sets) {
+            const cur = byName.get(s.name) ?? 0
+            if (s.pieces > cur) byName.set(s.name, s.pieces)
+        }
+        return [...byName.values()].reduce((a, b) => a + b, 0)
+    }
+
+    let filteredWeapons = $derived.by(() => {
+        if (pickerSlot === null) return []
+        const slot = localTeam[pickerSlot]
+        const charData = characterMap.get(slot.character ?? '')
+        if (!charData) return weapons
+        return weapons.filter((w) => w.weaponType === charData.weaponType)
+    })
+
+    let charPickerOpen = $derived(pickerSlot !== null && pickerType === 'character')
+    let weaponPickerOpen = $derived(pickerSlot !== null && pickerType === 'weapon')
+    let echoPickerOpen = $derived(pickerSlot !== null && pickerType === 'echo')
+    let setPickerOpen = $derived(pickerSlot !== null && pickerType === 'sets')
+
+    let pinnedSetNames = $derived.by(() => {
+        if (pickerSlot === null) return []
+        const slot = localTeam[pickerSlot]
+        const echoData = echoMap.get(slot.echoes[0].name ?? '')
+        return echoData?.sets ?? []
+    })
+
+    let activeSlot = $derived(pickerSlot !== null ? localTeam[pickerSlot] : null)
+
+    let currentCharName = $derived(pickerSlot !== null ? (localTeam[pickerSlot].character ?? undefined) : undefined)
+    let currentWeaponName = $derived(pickerSlot !== null ? (localTeam[pickerSlot].weapon ?? undefined) : undefined)
+    let currentEchoName = $derived(
+        pickerSlot !== null ? (localTeam[pickerSlot].echoes[0].name ?? undefined) : undefined
+    )
+</script>
+
+<div class="flex h-full flex-col p-6" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
+    <div class="flex flex-1 gap-4">
+        {#each localTeam as slot, i}
+            <div
+                class="flex flex-1 flex-col rounded-xl border border-white/10 bg-white/[0.03] p-6"
+                style="background-image: var(--theme-context-menu-bg)"
+            >
+                <div class="mb-4 flex items-center gap-2">
+                    <div
+                        class="flex size-9 items-center justify-center rounded-full bg-indigo-500/20 text-sm font-bold text-indigo-400"
+                    >
+                        {i + 1}
+                    </div>
+                    <span class="text-base font-medium">角色 {i + 1}</span>
+                </div>
+
+                <div class="flex flex-1 flex-col gap-3">
+                    <!-- Character -->
+                    <div class="flex flex-1 flex-col">
+                        <span class="mb-1 block text-sm text-zinc-500">角色</span>
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div
+                            class={[
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-white/5',
+                                slot.character ? 'bg-white/5' : 'border-2 border-dashed border-white/10',
+                                !slot.character && !locked ? 'border-2 border-dashed border-white/10' : ''
+                            ].join(' ')}
+                            onclick={() => openPicker(i, 'character')}
+                        >
+                            {#if slot.character && characterIcons[slot.character]}
+                                <img
+                                    src={characterIcons[slot.character]}
+                                    alt={slot.character}
+                                    class="size-14 shrink-0 rounded-full object-cover"
+                                />
+                            {/if}
+                            <div class="flex flex-col min-w-0 flex-1">
+                                <span class:opacity-40={!slot.character} class:text-zinc-500={!slot.character}>
+                                    {slot.character || (locked ? '未设置' : '点击选择')}
+                                </span>
+                                {#if slot.character}
+                                    {@const charData = characterMap.get(slot.character)}
+                                    {#if charData}
+                                        <span class="flex items-center gap-1.5 text-sm text-zinc-400">
+                                            {#if elementIcons[charData.element]}
+                                                <img
+                                                    src={elementIcons[charData.element]}
+                                                    alt={charData.element}
+                                                    class="size-4 shrink-0"
+                                                />
+                                            {/if}
+                                            {charData.element}
+                                            {#if weaponTypeIcons[charData.weaponType]}
+                                                <img
+                                                    src={weaponTypeIcons[charData.weaponType]}
+                                                    alt={charData.weaponType}
+                                                    class="size-4 shrink-0"
+                                                />
+                                            {/if}
+                                            {charData.weaponType}
+                                        </span>
+                                    {/if}
+                                {/if}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Weapon -->
+                    <div class="flex flex-1 flex-col">
+                        <span class="mb-1 block text-sm text-zinc-500">武器</span>
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div
+                            class={[
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-white/5',
+                                slot.weapon ? 'bg-white/5' : 'border-2 border-dashed border-white/10',
+                                !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
+                            ]
+                                .filter(Boolean)
+                                .join(' ')}
+                            onclick={() => openPicker(i, 'weapon')}
+                        >
+                            {#if slot.weapon && weaponIcons[slot.weapon]}
+                                <img
+                                    src={weaponIcons[slot.weapon]}
+                                    alt={slot.weapon}
+                                    class="size-14 shrink-0 rounded-lg object-contain bg-white/5"
+                                />
+                            {/if}
+                            <div class="flex flex-col min-w-0 flex-1">
+                                <span class:opacity-40={!slot.weapon} class:text-zinc-500={!slot.weapon}>
+                                    {slot.weapon || (slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色')}
+                                </span>
+                                {#if slot.weapon}
+                                    {@const wpData = weaponMap.get(slot.weapon)}
+                                    {#if wpData}
+                                        <span class="text-amber-400 text-sm tracking-wider">
+                                            {'★'.repeat(wpData.star)}
+                                        </span>
+                                    {/if}
+                                {/if}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- First Echo -->
+                    <div class="flex flex-1 flex-col">
+                        <span class="mb-1 block text-sm text-zinc-500">首位声骸</span>
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div
+                            class={[
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-white/5',
+                                slot.echoes[0].name ? 'bg-white/5' : 'border-2 border-dashed border-white/10',
+                                !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
+                            ]
+                                .filter(Boolean)
+                                .join(' ')}
+                            onclick={() => openPicker(i, 'echo')}
+                        >
+                            {#if slot.echoes[0].name && echoIcons[slot.echoes[0].name]}
+                                <img
+                                    src={echoIcons[slot.echoes[0].name]}
+                                    alt={slot.echoes[0].name}
+                                    class="size-14 shrink-0 rounded-lg object-contain bg-white/5"
+                                />
+                            {/if}
+                            <span
+                                class="flex-1 text-base"
+                                class:opacity-40={!slot.echoes[0].name}
+                                class:text-zinc-500={!slot.echoes[0].name}
+                            >
+                                {slot.echoes[0].name
+                                    ? `${slot.echoes[0].name} (C${slot.echoes[0].cost})`
+                                    : slot.character
+                                      ? '点击选择'
+                                      : locked
+                                        ? '未设置'
+                                        : '请先选择角色'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Trigger Sets -->
+                    <div class="flex flex-1 flex-col">
+                        <span class="mb-1 block text-sm text-zinc-500">触发套装</span>
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div
+                            class={[
+                                'flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-colors hover:bg-white/5',
+                                slot.triggerSets.length > 0 ? 'bg-white/5' : 'border-2 border-dashed border-white/10',
+                                !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
+                            ]
+                                .filter(Boolean)
+                                .join(' ')}
+                            onclick={() => openPicker(i, 'sets')}
+                        >
+                            {#if slot.triggerSets.length > 0}
+                                <div class="flex flex-wrap items-center gap-2">
+                                    {#each slot.triggerSets as set}
+                                        <span
+                                            class="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-sm"
+                                        >
+                                            {#if echoSetIcons[set.name]}
+                                                <img
+                                                    src={echoSetIcons[set.name]}
+                                                    alt={set.name}
+                                                    class="size-5 shrink-0 rounded"
+                                                />
+                                            {/if}
+                                            {set.name}({set.pieces})
+                                        </span>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <span
+                                    class="flex-1 truncate text-sm"
+                                    class:opacity-40={slot.triggerSets.length === 0}
+                                    class:text-zinc-500={slot.triggerSets.length === 0}
+                                >
+                                    {slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色'}
+                                </span>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {/each}
+    </div>
+</div>
+
+<CharacterPicker
+    open={charPickerOpen}
+    onclose={closePicker}
+    onselect={handleSelectCharacter}
+    {characters}
+    icons={characterIcons}
+    {elementIcons}
+    currentName={currentCharName}
+/>
+
+<WeaponPicker
+    open={weaponPickerOpen}
+    onclose={closePicker}
+    onselect={handleSelectWeapon}
+    weapons={filteredWeapons}
+    icons={weaponIcons}
+    currentName={currentWeaponName}
+/>
+
+<EchoPicker
+    open={echoPickerOpen}
+    onclose={closePicker}
+    onselect={handleSelectEcho}
+    {echoes}
+    icons={echoIcons}
+    currentName={currentEchoName}
+/>
+
+{#if activeSlot}
+    <SetPicker
+        open={setPickerOpen}
+        onclose={closePicker}
+        onconfirm={handleConfirmSets}
+        {echoSets}
+        pinnedSets={pinnedSetNames}
+        initialSets={activeSlot.triggerSets}
+        icons={echoSetIcons}
+    />
+{/if}

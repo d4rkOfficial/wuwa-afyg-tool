@@ -34,7 +34,8 @@ export async function dbGet<T>(key: string): Promise<{ data: T; ts: number } | n
             req.onsuccess = () => resolve((req.result as { data: T; ts: number }) ?? null)
             req.onerror = () => reject(req.error)
         })
-    } catch {
+    } catch (err) {
+        console.error('[dbGet]', key, err)
         return null
     }
 }
@@ -49,8 +50,8 @@ export async function dbSet(key: string, data: unknown): Promise<void> {
             tx.oncomplete = () => resolve()
             tx.onerror = () => reject(tx.error)
         })
-    } catch {
-        /* silently fail */
+    } catch (err) {
+        console.error('[dbSet]', key, err)
     }
 }
 
@@ -64,8 +65,8 @@ export async function dbDelete(key: string): Promise<void> {
             tx.oncomplete = () => resolve()
             tx.onerror = () => reject(tx.error)
         })
-    } catch {
-        /* silently fail */
+    } catch (err) {
+        console.error('[dbDelete]', key, err)
     }
 }
 
@@ -93,7 +94,7 @@ export async function dbClear(prefix?: string): Promise<void> {
             const tx = db.transaction(STORE_NAME, 'readwrite')
             tx.objectStore(STORE_NAME).clear()
         }
-    } catch {
-        /* silently fail */
+    } catch (err) {
+        console.error('[dbClear]', prefix ?? '(all)', err)
     }
 }
