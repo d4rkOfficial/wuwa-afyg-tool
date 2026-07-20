@@ -8,8 +8,6 @@
     interface Props extends ComponentsProps {
         code: string
         lang?: string
-        class?: string
-        style?: string
     }
 
     let { code, lang = 'typescript', class: className, style }: Props = $props()
@@ -25,5 +23,5 @@
     })
 </script>
 
-<pre {style} class="p-5 overflow-x-auto text-sm leading-relaxed font-mono {className}"><code>{@html html}</code>
+<pre {style} class="p-5 overflow-x-auto text-sm leading-relaxed font-mono {className ?? ''}"><code>{@html html}</code>
 </pre>

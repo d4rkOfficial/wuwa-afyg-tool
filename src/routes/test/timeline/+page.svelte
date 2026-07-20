@@ -67,7 +67,7 @@
         setBlockEditInput,
         setTrackMenu as storeSetTrackMenu,
         loadCharacters
-    } from '$lib/timeline/store.svelte'
+    } from './store.svelte'
     import { browser } from '$app/environment'
     import {
         SIDE_PAD,
@@ -79,14 +79,14 @@
         ELEMENT_COLORS,
         NON_DIRECT_ELEMENT,
         TRACK_COLORS
-    } from '$lib/timeline/consts'
-    import type { OpBlock, DamageBlock } from '$lib/timeline/types'
-    import CharacterSelect from '$lib/components/page/timeline/CharacterSelect.svelte'
-    import EchoSelect from '$lib/components/page/timeline/EchoSelect.svelte'
-    import ContextMenu from '$lib/components/page/timeline/ContextMenu.svelte'
-    import SkillPicker from '$lib/components/page/timeline/SkillPicker.svelte'
-    import NonDirectPicker from '$lib/components/page/timeline/NonDirectPicker.svelte'
-    import DamageList from '$lib/components/page/timeline/DamageList.svelte'
+    } from './consts'
+    import type { OpBlock, DamageBlock } from './types'
+    import CharacterSelect from '$lib/.test/components/page/timeline/CharacterSelect.svelte'
+    import EchoSelect from '$lib/.test/components/page/timeline/EchoSelect.svelte'
+    import ContextMenu from '$lib/.test/components/page/timeline/ContextMenu.svelte'
+    import SkillPicker from '$lib/.test/components/page/timeline/SkillPicker.svelte'
+    import NonDirectPicker from '$lib/.test/components/page/timeline/NonDirectPicker.svelte'
+    import DamageList from '$lib/.test/components/page/timeline/DamageList.svelte'
 
     let timelineEl: HTMLDivElement | undefined = $state()
     let editInput: HTMLInputElement | undefined = $state()
@@ -108,11 +108,11 @@
         if (browser && getShowCharSelect()) loadCharacters()
     })
 
-    function onWindowMouseDown(e: MouseEvent) {
+    const onWindowMouseDown = (e: MouseEvent) => {
         handleWindowMousedown(e)
     }
 
-    function onWindowMouseMove(e: MouseEvent) {
+    const onWindowMouseMove = (e: MouseEvent) => {
         if (!timelineEl) return
         const rect = timelineEl.getBoundingClientRect()
         const scrollL = timelineEl.scrollLeft
@@ -121,23 +121,23 @@
         storeOnBlockDrag(rawX)
     }
 
-    function onWindowMouseUp() {
+    const onWindowMouseUp = () => {
         storeStopDrag()
         storeStopBlockDrag()
     }
 
-    function onWindowMouseLeave() {
+    const onWindowMouseLeave = () => {
         storeStopDrag()
         storeStopBlockDrag()
     }
 
-    function onWheel(e: WheelEvent) {
+    const onWheel = (e: WheelEvent) => {
         if (!timelineEl) return
         e.preventDefault()
         timelineEl.scrollLeft += e.deltaY
     }
 
-    function measureWidth(node: HTMLElement, blockId: string) {
+    const measureWidth = (node: HTMLElement, blockId: string) => {
         const set = () => {
             setBlockWidths({ ...getBlockWidths(), [blockId]: node.offsetWidth })
         }
@@ -289,9 +289,11 @@
                                         {#each dmg.skillHits as hit}
                                             <span
                                                 class="text-[10px] font-bold leading-none border border-dashed px-3 py-0.5"
-                                                style="color: {(ELEMENT_COLORS as Record<string, string>)[hit.element] ??
-                                                    '#ef4444'}; border-color: {(ELEMENT_COLORS as Record<string, string>)[hit.element] ??
-                                                    '#ef4444'}; writing-mode: vertical-rl;"
+                                                style="color: {(ELEMENT_COLORS as Record<string, string>)[
+                                                    hit.element
+                                                ] ?? '#ef4444'}; border-color: {(
+                                                    ELEMENT_COLORS as Record<string, string>
+                                                )[hit.element] ?? '#ef4444'}; writing-mode: vertical-rl;"
                                             >
                                                 {hit.skillType === '声骸技能'
                                                     ? hit.character +
@@ -299,10 +301,12 @@
                                                       (echoNameForChar(hit.character) ?? '?') +
                                                       '-' +
                                                       hit.hitName.replace('伤害', '') +
-                                                       ((hit.hits ?? 0) >= 1 ? '*' + hit.hits : '')
-                                                     : (dmg.sourceType === 'ref' && hit.character ? `[${hit.character}]` : '') +
-                                                       hit.hitName.replace('伤害', '') +
-                                                       ((hit.hits ?? 0) >= 1 ? '×' + hit.hits : '')}
+                                                      ((hit.hits ?? 0) >= 1 ? '*' + hit.hits : '')
+                                                    : (dmg.sourceType === 'ref' && hit.character
+                                                          ? `[${hit.character}]`
+                                                          : '') +
+                                                      hit.hitName.replace('伤害', '') +
+                                                      ((hit.hits ?? 0) >= 1 ? '×' + hit.hits : '')}
                                             </span>
                                         {/each}
                                         {#each [...dmg.nonDirectEntries].sort((a, b) => {
@@ -315,7 +319,9 @@
                                                     : nd.category === '处决'
                                                       ? '#ffffff'
                                                       : (NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]
-                                                        ? (ELEMENT_COLORS as Record<string, string>)[(NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]]
+                                                        ? (ELEMENT_COLORS as Record<string, string>)[
+                                                              (NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]
+                                                          ]
                                                         : '#ef4444'}
                                             <span
                                                 class="text-[10px] font-bold leading-none border border-dashed px-3 py-0.5"
@@ -323,9 +329,8 @@
                                                     ? 0.75
                                                     : 1}; writing-mode: vertical-rl;"
                                             >
-                                                {nd.category === '效应'
-                                                    ? nd.name + nd.layers + '层'
-                                                    : nd.name}{nd.responders?.length
+                                                {nd.category === '效应' ? nd.name + nd.layers + '层' : nd.name}{nd
+                                                    .responders?.length
                                                     ? '[' + nd.responders.join(',') + ']'
                                                     : ''}
                                             </span>

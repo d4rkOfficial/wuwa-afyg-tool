@@ -1,5 +1,5 @@
 <script lang="ts">
-    import TestApiLayout from '$lib/components/shared/TestApiLayout.svelte'
+    import TestApiLayout from '$lib/.test/components/shared/TestApiLayout.svelte'
     import { browser } from '$app/environment'
     import { NANOKA_BASE } from './consts'
 

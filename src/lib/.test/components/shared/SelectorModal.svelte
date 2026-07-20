@@ -95,6 +95,7 @@
 {#if show}
     <div
         class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 {className ?? ''}"
+        {style}
         role="button"
         tabindex="-1"
         data-modal="backdrop"
@@ -103,7 +104,6 @@
     >
         <div
             class="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl"
-            {style}
         >
             <div class="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
                 <h2 class="text-base font-semibold text-zinc-100">{title}</h2>

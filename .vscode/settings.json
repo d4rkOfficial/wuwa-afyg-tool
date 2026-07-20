@@ -15,7 +15,7 @@
     "explorer.sortOrder": "default",
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
-        "package.json": ".gitignore, .npmrc, .prettierignore, prettier.config.js, pnpm-workspace.yaml, vite.config.ts, tsconfig.json, README.md, AGENTS.md, svelte.config.js, pnpm-lock.yaml",
+        "package.json": ".gitignore, .npmrc, .prettierignore, prettier.config.js, pnpm-workspace.yaml, vite.config.ts, tsconfig.json, *.md, svelte.config.js, pnpm-lock.yaml",
         "+page.svelte": "*.ts, *.js",
         "+layout.svelte": "*.ts, *.js, layout.css",
         "+server.ts": "*.ts, *.js"

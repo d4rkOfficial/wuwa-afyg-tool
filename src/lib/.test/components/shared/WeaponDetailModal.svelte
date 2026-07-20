@@ -1,19 +1,15 @@
 <script lang="ts">
+    import type { ComponentsProps } from '$lib/types/component-props'
     import { getWeaponInfo } from '$lib/data/api'
 
-    let {
-        show,
-        name,
-        onClose,
-        weaponIconMap = {},
-        weaponTypeIconMap = {}
-    }: {
+    interface Props extends ComponentsProps {
         show: boolean
         name: string | null
         onClose: () => void
         weaponIconMap?: Record<string, string>
         weaponTypeIconMap?: Record<string, string>
-    } = $props()
+    }
+    let { class: className, style, show, name, onClose, weaponIconMap = {}, weaponTypeIconMap = {} }: Props = $props()
 
     interface WeaponInfo {
         rarity: number
@@ -31,7 +27,7 @@
         if (show && name) fetchDetail()
     })
 
-    async function fetchDetail() {
+    const fetchDetail = async () => {
         loading = true
         error = ''
         data = null
@@ -62,7 +58,8 @@
 
 {#if show}
     <div
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 {className ?? ''}"
+        {style}
         role="button"
         tabindex="-1"
         data-modal="backdrop"

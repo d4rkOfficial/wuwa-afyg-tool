@@ -16,8 +16,8 @@
         getEchoSelectedSet,
         setEchoSelectedSet,
         imgUrl
-    } from '$lib/timeline/store.svelte'
-    import { hideImg } from '$lib/timeline/utils'
+    } from '../../../../../routes/test/timeline/store.svelte'
+    import { hideImg } from '../../../../../routes/test/timeline/utils'
 
     interface Props extends ComponentsProps {}
     let { class: _class = '', style = '' }: Props = $props()

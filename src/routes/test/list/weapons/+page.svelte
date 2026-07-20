@@ -1,7 +1,7 @@
 <script lang="ts">
-    import TestListLayout from '$lib/components/shared/TestListLayout.svelte'
+    import TestListLayout from '$lib/.test/components/shared/TestListLayout.svelte'
     import { getWeaponList, getWeaponIcons, getWeaponTypeIcons } from '$lib/data/api'
-    import WeaponDetailModal from '$lib/components/shared/WeaponDetailModal.svelte'
+    import WeaponDetailModal from '$lib/.test/components/shared/WeaponDetailModal.svelte'
 
     interface Item {
         name: string
@@ -42,7 +42,7 @@
         loadData()
     })
 
-    async function loadData() {
+    const loadData = async () => {
         const [list, iconMap, weaponTypeMap] = await Promise.all([
             getWeaponList(),
             getWeaponIcons(),

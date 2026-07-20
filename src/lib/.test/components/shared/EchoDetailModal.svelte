@@ -1,21 +1,25 @@
 <script lang="ts">
+    import type { ComponentsProps } from '$lib/types/component-props'
     import { getEchoInfo, getEchoSetInfo } from '$lib/data/api'
 
-    let {
-        show,
-        name,
-        onClose,
-        echoIconMap = {},
-        setIconMap = {},
-        setName = null
-    }: {
+    interface Props extends ComponentsProps {
         show: boolean
         name: string | null
         onClose: () => void
         echoIconMap?: Record<string, string>
         setIconMap?: Record<string, string>
         setName?: string | null
-    } = $props()
+    }
+    let {
+        class: className,
+        style,
+        show,
+        name,
+        onClose,
+        echoIconMap = {},
+        setIconMap = {},
+        setName = null
+    }: Props = $props()
 
     let data = $state<{
         cost: number
@@ -30,7 +34,7 @@
         if (show && name) fetchDetail()
     })
 
-    async function fetchDetail() {
+    const fetchDetail = async () => {
         loading = true
         error = ''
         data = null
@@ -76,7 +80,8 @@
 
 {#if show}
     <div
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 {className ?? ''}"
+        {style}
         role="button"
         tabindex="-1"
         data-modal="backdrop"

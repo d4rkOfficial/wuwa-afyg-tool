@@ -1,6 +1,10 @@
 <script lang="ts">
     import type { ComponentsProps } from '$lib/types/component-props'
-    import { getShowDamageList, setShowDamageList, getDamageList } from '$lib/timeline/store.svelte'
+    import {
+        getShowDamageList,
+        setShowDamageList,
+        getDamageList
+    } from '../../../../../routes/test/timeline/store.svelte'
 
     interface Props extends ComponentsProps {}
     let { class: _class = '', style = '' }: Props = $props()

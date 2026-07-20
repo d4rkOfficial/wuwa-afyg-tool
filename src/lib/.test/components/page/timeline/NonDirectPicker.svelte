@@ -12,8 +12,8 @@
         getSelectedCharNames,
         imgUrl,
         applyNonDirectEntries
-    } from '$lib/timeline/store.svelte'
-    import { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT, ELEMENT_COLORS } from '$lib/timeline/consts'
+    } from '../../../../../routes/test/timeline/store.svelte'
+    import { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT, ELEMENT_COLORS } from '../../../../../routes/test/timeline/consts'
 
     interface Props extends ComponentsProps {}
     let { class: _class = '', style = '' }: Props = $props()

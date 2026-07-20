@@ -19,9 +19,9 @@
         isSelected,
         confirmPick,
         scrollTo
-    } from '$lib/timeline/store.svelte'
-    import { starColor, hideImg } from '$lib/timeline/utils'
-    import { ELEMENT_COLORS } from '$lib/timeline/consts'
+    } from '../../../../../routes/test/timeline/store.svelte'
+    import { starColor, hideImg } from '../../../../../routes/test/timeline/utils'
+    import { ELEMENT_COLORS } from '../../../../../routes/test/timeline/consts'
 
     interface Props extends ComponentsProps {
         class?: string

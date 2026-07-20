@@ -96,7 +96,7 @@
     })
 </script>
 
-<div {style} class="h-dvh flex flex-col bg-zinc-950 text-zinc-100 {className}">
+<div {style} class="h-dvh flex flex-col bg-zinc-950 text-zinc-100 {className ?? ''}">
     <header class="shrink-0 h-12 flex items-center px-5 border-b border-zinc-800/50 bg-zinc-950 gap-4">
         <div class="flex items-center gap-3 shrink-0">
             <h1 class="text-sm font-semibold tracking-tight text-zinc-100">{title}</h1>

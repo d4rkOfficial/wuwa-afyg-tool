@@ -29,13 +29,13 @@
         addDamageBlock,
         removeDamageBySource,
         addOpBlock
-    } from '$lib/timeline/store.svelte'
-    import { clampMenu, canDelete } from '$lib/timeline/utils'
+    } from '../../../../../routes/test/timeline/store.svelte'
+    import { clampMenu, canDelete } from '../../../../../routes/test/timeline/utils'
 
     interface Props extends ComponentsProps {}
     let { class: _class = '', style = '' }: Props = $props()
 
-    function handleEsc(e: KeyboardEvent) {
+    const handleEsc = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             setContextMenu(null)
             setTrackMenu(null)

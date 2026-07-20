@@ -1,4 +1,7 @@
 <script lang="ts">
+    import { onMount } from 'svelte'
+    import { getUiBtnIcons } from '$lib/data/api'
+
     let activeBox = $state(0)
     let icons = $state<Record<string, string>>({})
     let loaded = $state(false)
@@ -18,8 +21,6 @@
         ' ': 'SpaceBar'
     }
 
-    import { getUiBtnIcons } from '$lib/data/api'
-
     onMount(async () => {
         const data = await getUiBtnIcons()
         for (const [name, url] of Object.entries(data)) {
@@ -29,7 +30,7 @@
         boxEls[0]?.focus()
     })
 
-    function insertIconAtCursor(name: string) {
+    const insertIconAtCursor = (name: string) => {
         const el = boxEls[activeBox]
         const url = icons[name]
         if (!el || !url) return
@@ -56,7 +57,7 @@
         el.scrollTop = el.scrollHeight
     }
 
-    function appendIcon(name: string) {
+    const appendIcon = (name: string) => {
         const el = boxEls[activeBox]
         const url = icons[name]
         if (!el || !url) return
@@ -71,7 +72,7 @@
         el.scrollTop = el.scrollHeight
     }
 
-    function handleKeydown(e: KeyboardEvent) {
+    const handleKeydown = (e: KeyboardEvent) => {
         const key = e.key
         if (key === 'ArrowDown') {
             e.preventDefault()
@@ -92,7 +93,7 @@
         }
     }
 
-    function handleMousedown(e: MouseEvent) {
+    const handleMousedown = (e: MouseEvent) => {
         const target = e.target as HTMLElement
         if (target.closest('button') || target.closest('header')) return
         if (e.button === 2) {
@@ -108,12 +109,10 @@
         }
     }
 
-    function handleContextmenu(e: MouseEvent) {
+    const handleContextmenu = (e: MouseEvent) => {
         e.preventDefault()
         appendIcon('MouseRight')
     }
-
-    import { onMount } from 'svelte'
 </script>
 
 <svelte:window onkeydown={handleKeydown} onmousedown={handleMousedown} oncontextmenu={handleContextmenu} />

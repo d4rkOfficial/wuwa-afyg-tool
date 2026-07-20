@@ -1,7 +1,7 @@
 <script lang="ts">
-    import TestListLayout from '$lib/components/shared/TestListLayout.svelte'
+    import TestListLayout from '$lib/.test/components/shared/TestListLayout.svelte'
     import { getEchoList, getEchoIcons, getEchoSetIcons, getEchoSetList } from '$lib/data/api'
-    import EchoDetailModal from '$lib/components/shared/EchoDetailModal.svelte'
+    import EchoDetailModal from '$lib/.test/components/shared/EchoDetailModal.svelte'
 
     interface Item {
         name: string
@@ -33,7 +33,7 @@
         loadData()
     })
 
-    async function loadData() {
+    const loadData = async () => {
         const [list, iconMap, setIconMapRaw, setList] = await Promise.all([
             getEchoList(),
             getEchoIcons(),

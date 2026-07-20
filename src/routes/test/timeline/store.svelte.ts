@@ -11,7 +11,7 @@ import {
     getEchoInfo
 } from '$lib/data/api'
 import type { SkillEntry } from '$lib/api/types'
-import type { RefLine, OpBlock, SkillHit, SkillPickerGroup, NonDirectEntry, DamageBlock } from '$lib/timeline/types'
+import type { RefLine, OpBlock, SkillHit, SkillPickerGroup, NonDirectEntry, DamageBlock } from './types'
 import {
     ELEMENT_ORDER,
     ELEMENT_COLORS,
@@ -27,8 +27,8 @@ import {
     MAX_TIME,
     TRACK_COLORS,
     BUTTON_KEY_ORDER
-} from '$lib/timeline/consts'
-import { sortChars, isBoundary, canDelete, hideImg } from '$lib/timeline/utils'
+} from './consts'
+import { sortChars, isBoundary, canDelete, hideImg } from './utils'
 
 // ── Character Select ──
 let _showCharSelect = $state(true)
@@ -440,24 +440,13 @@ const _damageList = $derived(
                       ? _timeToX(op.time) - (_blockWidths[op.id] ?? 0) / 2
                       : 0
             const sourceChar =
-                d.sourceType === 'ref'
-                    ? '无'
-                    : op && op.trackIndex < 3
-                      ? _selectedCharNames[op.trackIndex]
-                      : '无'
+                d.sourceType === 'ref' ? '无' : op && op.trackIndex < 3 ? _selectedCharNames[op.trackIndex] : '无'
             const entries: { character: string; name: string; value: string; time: number; x: number }[] = []
             for (const h of d.skillHits) {
                 const echoName = h.skillType === '声骸技能' ? (_echoNameForChar(h.character) ?? '?') : null
                 const character =
-                    d.sourceType === 'ref'
-                        ? h.character || '无'
-                        : h.skillType === '声骸技能'
-                          ? h.character
-                          : sourceChar
-                const name =
-                    h.skillType === '声骸技能'
-                        ? echoName + '·' + h.hitName.replace('伤害', '')
-                        : h.hitName
+                    d.sourceType === 'ref' ? h.character || '无' : h.skillType === '声骸技能' ? h.character : sourceChar
+                const name = h.skillType === '声骸技能' ? echoName + '·' + h.hitName.replace('伤害', '') : h.hitName
                 const value = h.ratio + ((h.hits ?? 0) >= 1 ? ' ×' + h.hits : '')
                 entries.push({ character, name, value, time, x })
             }
@@ -980,15 +969,11 @@ export function openNonDirectPicker(sourceType: 'op' | 'ref', blockId: string) {
         return { name: cfg.name, category: cfg.category, layers: cfg.category === '响应' ? 0 : (existing?.layers ?? 0) }
     })
     _nonDirectPickerSelected = new Set<string>([
-        ...block.nonDirectEntries
-            .filter((e) => e.category === '响应')
-            .map((e) => e.name),
+        ...block.nonDirectEntries.filter((e) => e.category === '响应').map((e) => e.name),
         ...(block.nonDirectEntries.some((e) => e.name === '谐度破坏') ? ['谐度破坏'] : [])
     ])
     _nonDirectPickerResponders = Object.fromEntries(
-        block.nonDirectEntries
-            .filter((e) => e.category === '响应')
-            .map((e) => [e.name, e.responders ?? []])
+        block.nonDirectEntries.filter((e) => e.category === '响应').map((e) => [e.name, e.responders ?? []])
     )
 }
 

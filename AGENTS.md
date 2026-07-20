@@ -4,13 +4,16 @@
 
 - 能拆成 snippet（复用部件） 和纯函数（复杂功能里的无副作用成分）的，必须拆
 - 优先使用箭头函数（`const fn = () => { ... }`），非 `function` 声明
+    - 例外：事件处理函数（`onWindowMouseDown` 等）、SvelteKit 要求的 `load`/`actions` 函数可以保留 `function` 声明
 - 优先flex布局
 
 ## 2. 页面逻辑分离
 
 - `let props: Props = $props(); interface Props {}` 而不是 `let props: {...} = $props()`
-- `+page.svelte` 内必须按此顺序：`<script>` → main HTML（`{#if}`/`<div>` 等）→ `{#snippet}` → `<style>`
-- `+pages.svelte`内，能拆出的常量放到路由文件夹下的 `consts.ts`，类型放到`types.ts`，无副作用纯函数放到`utils.ts`，页面的临时共享状态放到路由下的`store.svelte.ts`
+    - 允许直接解构形式 `let { class, style }: Props = $props()`，但必须扩展 `ComponentsProps`
+- `+page.svelte` 内必须按此顺序：`<script>` → main HTML（`{#if}`/`{#each}`/`<div>` 等）→ `{#snippet}` → `<style>`
+- `+page.svelte` 的路由类型、常量、工具函数、store 必须放在路由文件夹下的 `types.ts` `consts.ts` `utils.ts` `store.svelte.ts`，不能放在 `$lib/` 下
+- 只有跨路由复用的类型、常量、工具函数才放到 `$lib/{模块名}/` 下
 - localStorage持久状态放到`src/lib/data/{状态集名}.svelte.ts`处理
 
 ## 3. 组件约束
@@ -21,6 +24,7 @@
 - 所有独立组件必须暴露 `style` 和 `class` prop，支持外部定制，参考`src/lib/types/component-props.ts`
 - 尽量使用 TailwindCSS 而不是 `<style>` 样式
 - 不依赖外部 UI 库，所有控件使用原生 HTML + TailwindCSS 实现
+    - 允许的例外：`@iconify/svelte`（图标渲染）、`prismjs`（代码高亮）
 - Snippet 通过闭包访问父作用域的响应式状态（`$state`/`$derived`），避免使用带类型的 snippet 参数
 
 ## 4. 文件组织
@@ -30,8 +34,18 @@
     - `src/lib/components/page/{路由名}/` — 页面级组件
     - `src/lib/components/shared/` — 通用组件
 - 不要用一级以上相对路径，如果涉及多级相对路径的导入，那么重构代码，把路由级的类型、常量、工具函数移动到`lib/`下
+- 测试专用文件必须放在 `src/lib/.test/` 下，保持路径结构与 `src/lib/` 镜像
 
-## 5. 完成检查
+## 5. 开工检查
+
+每次开工前必须完成以下检查：
+
+1. 读取项目根目录 `PLAN.md`
+2. 确认所有 `□` 任务已完成（无未勾选项）
+3. 如果 `PLAN.md` 不存在，则询问用户是否需要创建
+4. 阅读并遵守 `AGENTS.md` 中的所有规则
+
+## 6. 完成检查
 
 每次任务结束必须依次运行：
 

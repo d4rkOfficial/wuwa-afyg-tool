@@ -1,4 +1,5 @@
 import { browser } from '$app/environment'
+import { dbGet, dbSet, dbClear } from './db'
 import type {
     Character,
     Weapon,
@@ -42,28 +43,8 @@ function setLocal(k: string, data: unknown): void {
     if (!browser) return
     try {
         localStorage.setItem(k, JSON.stringify({ data, ts: Date.now() }))
-    } catch (e) {
-        if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-            const entries: { key: string; ts: number }[] = []
-            for (let i = 0; i < localStorage.length; i++) {
-                const k = localStorage.key(i)
-                if (!k || !k.startsWith(PREFIX)) continue
-                try {
-                    const entry = JSON.parse(localStorage.getItem(k)!)
-                    entries.push({ key: k, ts: entry.ts ?? 0 })
-                } catch {
-                    /* skip */
-                }
-            }
-            entries.sort((a, b) => a.ts - b.ts)
-            const removeCount = Math.max(1, Math.floor(entries.length * 0.2))
-            for (const { key } of entries.slice(0, removeCount)) localStorage.removeItem(key)
-            try {
-                localStorage.setItem(k, JSON.stringify({ data, ts: Date.now() }))
-            } catch {
-                /* give up */
-            }
-        }
+    } catch {
+        /* silently ignore quota errors; list/info data is small */
     }
 }
 
@@ -96,11 +77,23 @@ async function fetchJSON<T>(url: string, cacheK: string, ttl: number): Promise<T
 async function fetchIcons(entity: string): Promise<Record<string, string>> {
     const k = cacheKey('icons', entity)
     if (memoryCache.has(k)) return memoryCache.get(k) as Record<string, string>
-    const cached = getLocal<Record<string, string>>(k, ICON_TTL)
-    if (cached) {
-        memoryCache.set(k, cached)
-        return cached
+
+    // Check IndexedDB first
+    const idbEntry = await dbGet<Record<string, string>>(k)
+    if (idbEntry && Date.now() - idbEntry.ts <= ICON_TTL) {
+        memoryCache.set(k, idbEntry.data)
+        return idbEntry.data
     }
+
+    // Migration: check localStorage for old cached data
+    const lsCached = getLocal<Record<string, string>>(k, ICON_TTL)
+    if (lsCached) {
+        memoryCache.set(k, lsCached)
+        dbSet(k, lsCached)
+        localStorage.removeItem(k)
+        return lsCached
+    }
+
     if (inFlight.has(k)) return inFlight.get(k) as Promise<Record<string, string>>
 
     const promise = (async () => {
@@ -129,7 +122,7 @@ async function fetchIcons(entity: string): Promise<Record<string, string>> {
         )
 
         memoryCache.set(k, map)
-        setLocal(k, map)
+        await dbSet(k, map)
         return map
     })()
 
@@ -228,6 +221,7 @@ export function getEchoSetInfo(name: string): Promise<EchoSetInfo> {
 export function clearCache(category?: string, entity?: string): void {
     if (!browser) return
     if (!category) {
+        dbClear(PREFIX)
         for (let i = localStorage.length - 1; i >= 0; i--) {
             const k = localStorage.key(i)
             if (k?.startsWith(PREFIX)) localStorage.removeItem(k)
@@ -236,6 +230,7 @@ export function clearCache(category?: string, entity?: string): void {
         return
     }
     const prefix = cacheKey(category, entity ?? '')
+    dbClear(prefix)
     for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i)
         if (k?.startsWith(prefix)) localStorage.removeItem(k)

@@ -19,7 +19,7 @@
         imgUrl,
         applySkillHits,
         switchRefSkillPickerTab
-    } from '$lib/timeline/store.svelte'
+    } from '../../../../../routes/test/timeline/store.svelte'
 
     interface Props extends ComponentsProps {}
     let { class: _class = '', style = '' }: Props = $props()

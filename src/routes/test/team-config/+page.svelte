@@ -1,5 +1,5 @@
 <script lang="ts">
-    import CharacterConfigCard from '$lib/components/shared/CharacterConfigCard.svelte'
+    import CharacterConfigCard from '$lib/.test/components/shared/CharacterConfigCard.svelte'
     import {
         getCharacterList,
         getWeaponList,
