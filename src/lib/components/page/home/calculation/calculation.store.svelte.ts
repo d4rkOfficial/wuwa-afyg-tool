@@ -1,21 +1,24 @@
 import type { BuffBlock, BuffZoneValue, CalcState, DamageEntry } from './calculation.types'
-import { parseRatio } from './calculation.consts'
+import { parseValueString, sumRatioNum } from '$lib/consts/parse-value-string'
 import type { TimelineData, DamageBlock } from '../timeline/timeline.types'
 import type { CharSlot } from '$lib/data/types'
 import { NON_DIRECT_ELEMENT } from '../timeline/timeline.consts'
-import { getCharElementMap } from '../timeline/timeline.store.svelte'
-import { getEffectMultiplier, getEffectBurstMultiplier } from '$lib/consts/effect-data'
+import { getCharElementMap, getCharWeaponTypeMap, getSkillCache } from '../timeline/timeline.store.svelte'
+import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$lib/consts/tune-data'
 
 let _entries = $state<DamageEntry[]>([])
 let _blocks = $state<BuffBlock[]>([])
 let _entryBlockIds = $state<Record<string, string[]>>({})
 let _showBuffModal = $state(false)
+let _locked = $state(false)
 
 export function init(
     team: [CharSlot, CharSlot, CharSlot],
     timelineData: TimelineData | null,
-    savedState: CalcState | null
+    savedState: CalcState | null,
+    locked = false
 ) {
+    _locked = locked
     _entries = buildEntries(team, timelineData)
     if (savedState) {
         _blocks = JSON.parse(JSON.stringify(savedState.blocks ?? []))
@@ -74,7 +77,7 @@ function buildEntries(team: [CharSlot, CharSlot, CharSlot], timelineData: Timeli
                 skillType: h.skillType,
                 element: h.element,
                 ratio: h.ratio,
-                ratioNum: parseRatio(h.ratio),
+                ratioNum: sumRatioNum(parseValueString(h.ratio)),
                 hits: h.hits ?? 1,
                 sourceType: d.sourceType,
                 time
@@ -125,14 +128,30 @@ function buildEntries(team: [CharSlot, CharSlot, CharSlot], timelineData: Timeli
         }
         for (const nd of otherNDs) {
             if (nd.category === '处决') {
+                const harmonyChar = nd.responders?.[0] ?? sourceChar
+                const op2 = opBlocks.find((b) => b.id === d.sourceId)
+                const trackIdx2 = op2?.trackIndex ?? -1
+                const weapType = trackIdx2 >= 0 && trackIdx2 < 3 ? getCharWeaponTypeMap()[harmonyChar] ?? '' : ''
+                const echoCost = trackIdx2 >= 0 && trackIdx2 < 3 ? (team[trackIdx2]?.echoes?.[0]?.cost ?? 4) : 4
+                let tuneRatio = '—'
+                let tuneRatioNum = 0
+                if (weapType) {
+                    const hits = getTuneDamage(weapType, echoCost)
+                    if (hits.length > 0) {
+                        const totalMult = hits.reduce((s, h) => s + h.multiplier, 0)
+                        const totalDmg = hits.reduce((s, h) => s + h.damage, 0)
+                        tuneRatio = `失谐${totalDmg} × ${(totalMult * 100).toFixed(2)}%`
+                        tuneRatioNum = totalMult
+                    }
+                }
                 entries.push({
                     id: `entry-${idCounter++}`,
-                    character: nd.responders?.[0] ?? sourceChar,
+                    character: harmonyChar,
                     hitName: '谐度破坏',
                     skillType: '谐度破坏',
                     element: '物理',
-                    ratio: '—',
-                    ratioNum: 0,
+                    ratio: tuneRatio,
+                    ratioNum: tuneRatioNum,
                     hits: 1,
                     sourceType: d.sourceType,
                     time
@@ -140,14 +159,29 @@ function buildEntries(team: [CharSlot, CharSlot, CharSlot], timelineData: Timeli
             } else if (nd.category === '响应') {
                 if (nd.responders?.length) {
                     for (const r of nd.responders) {
+                        let respRatio = '—'
+                        let respRatioNum = 0
+                        const respGroups = r !== '无' ? getSkillCache()[r] : null
+                        if (respGroups) {
+                            const tuneGroup = respGroups.find((g) => g.type === '谐度破坏')
+                            if (tuneGroup) {
+                                const match = tuneGroup.hits.find(
+                                    (h) => h.name.includes('震谐') || h.name.includes('骇破')
+                                )
+                                if (match) {
+                                    respRatio = match.ratio
+                                    respRatioNum = sumRatioNum(parseValueString(match.ratio))
+                                }
+                            }
+                        }
                         entries.push({
                             id: `entry-${idCounter++}`,
                             character: r,
                             hitName: nd.name,
                             skillType: nd.name,
                             element: charElements[r] ?? '',
-                            ratio: '—',
-                            ratioNum: 0,
+                            ratio: respRatio,
+                            ratioNum: respRatioNum,
                             hits: 1,
                             sourceType: d.sourceType,
                             time
@@ -185,10 +219,12 @@ export function getBlocks(): BuffBlock[] {
 }
 
 export function addBlock(name: string) {
+    if (_locked) return
     _blocks = [..._blocks, { id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name, zones: [] }]
 }
 
 export function removeBlock(id: string) {
+    if (_locked) return
     _blocks = _blocks.filter((b) => b.id !== id)
     const next: Record<string, string[]> = {}
     for (const [eid, ids] of Object.entries(_entryBlockIds)) {
@@ -199,18 +235,22 @@ export function removeBlock(id: string) {
 }
 
 export function updateBlockName(id: string, name: string) {
+    if (_locked) return
     _blocks = _blocks.map((b) => (b.id === id ? { ...b, name } : b))
 }
 
 export function addZone(blockId: string, zoneId: string) {
+    if (_locked) return
     _blocks = _blocks.map((b) => (b.id === blockId ? { ...b, zones: [...b.zones, { zoneId, value: 0 }] } : b))
 }
 
 export function removeZone(blockId: string, zoneId: string) {
+    if (_locked) return
     _blocks = _blocks.map((b) => (b.id === blockId ? { ...b, zones: b.zones.filter((z) => z.zoneId !== zoneId) } : b))
 }
 
 export function updateZoneValue(blockId: string, zoneId: string, value: number) {
+    if (_locked) return
     _blocks = _blocks.map((b) =>
         b.id === blockId ? { ...b, zones: b.zones.map((z) => (z.zoneId === zoneId ? { ...z, value } : z)) } : b
     )
@@ -223,6 +263,7 @@ export function getEntryBlockIds(entryId: string): string[] {
 }
 
 export function toggleEntryBlock(entryId: string, blockId: string) {
+    if (_locked) return
     const current = _entryBlockIds[entryId] ?? []
     if (current.includes(blockId)) {
         _entryBlockIds = { ..._entryBlockIds, [entryId]: current.filter((id) => id !== blockId) }

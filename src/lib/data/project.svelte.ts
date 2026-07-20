@@ -3,6 +3,7 @@ import { dbGet, dbSet } from '$lib/data/db'
 import type { Project, CharSlot, EchoSlot, PhaseKey, SelectedSet } from './types'
 import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
 import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
+import type { ConfigState } from '$lib/components/page/home/config/config.types'
 
 const PROJECTS_KEY = 'projects'
 const ACTIVE_KEY = 'project-active'
@@ -56,6 +57,7 @@ function normalizeProject(p: Partial<Project>): Project {
         name: p.name ?? '未命名项目',
         createdAt: p.createdAt ?? Date.now(),
         team: p.team ?? [emptyCharSlot(), emptyCharSlot(), emptyCharSlot()],
+        customSkillHits: p.customSkillHits ?? {},
         phases: {
             team: phases.team ?? emptyPhaseState(),
             timeline: phases.timeline ?? emptyPhaseState(),
@@ -140,6 +142,8 @@ export async function cloneProject(id: string, newName: string, selectedPhases: 
         }
     }
 
+    newProject.customSkillHits = JSON.parse(JSON.stringify(source.customSkillHits ?? {}))
+
     projects = [...projects, newProject]
     activeId = newProject.id
     await dbSet(ACTIVE_KEY, activeId)
@@ -174,6 +178,20 @@ export async function updateCalculation(data: CalcState) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
     project.phases.calculation.data = data
+    await persist()
+}
+
+export async function updateCustomSkillHits(hits: Record<string, import('./types').CustomHit[]>) {
+    const project = projects.find((p) => p.id === activeId)
+    if (!project) return
+    project.customSkillHits = hits
+    await persist()
+}
+
+export async function updateConfig(data: ConfigState) {
+    const project = projects.find((p) => p.id === activeId)
+    if (!project) return
+    project.phases.config.data = data
     await persist()
 }
 

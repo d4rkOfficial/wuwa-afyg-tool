@@ -14,6 +14,7 @@
         updateTeam,
         updateTimeline,
         updateCalculation,
+        updateConfig,
         setActiveProject,
         getPhaseOrder,
         lockPhase,
@@ -24,14 +25,21 @@
     import type { PhaseKey, CharSlot } from '$lib/data/types'
     import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
     import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
+    import type { ConfigState } from '$lib/components/page/home/config/config.types'
     import { setActiveTheme, getActiveId as getActiveThemeId, getThemes } from '$lib/theme'
     import { addToast } from '$lib/data/toast.svelte'
-    import { loadIcons, setShowDamageList } from '$lib/components/page/home/timeline/timeline.store.svelte'
+    import {
+        loadIcons,
+        setShowDamageList,
+        loadCustomHits
+    } from '$lib/components/page/home/timeline/timeline.store.svelte'
     import { setShowBuffModal } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
+    import Config from '$lib/components/page/home/config/config.svelte'
+    import Result from '$lib/components/page/home/result/result.svelte'
     import PhaseTabs from '$lib/components/page/home/phase-tabs.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
     import Icon from '@iconify/svelte'
@@ -45,6 +53,7 @@
 
     let showNewModal = $state(false)
     let newName = $state('')
+    let showResult = $state(false)
 
     let renameModal = $state(false)
     let renameId = $state('')
@@ -86,6 +95,10 @@
     let projects = $derived(getProjects())
     let activeId = $derived(getActiveId())
     let activeProject = $derived(getActiveProject())
+
+    $effect(() => {
+        if (activeProject) loadCustomHits(activeProject.customSkillHits ?? {})
+    })
 
     function handleCreate(name: string) {
         if (!name.trim()) return
@@ -200,6 +213,7 @@
             .map(([k]) => k)
         const data: Record<string, unknown> = { id: p.id, name: p.name, createdAt: p.createdAt }
         if (selected.includes('team')) data.team = p.team
+        data.customSkillHits = p.customSkillHits ?? {}
         data.phases = {}
         for (const ph of getPhaseOrder()) {
             if (selected.includes(ph)) {
@@ -259,7 +273,8 @@
                             data: null
                         },
                         config: (item.phases as Record<string, unknown>)?.config ?? { locked: false, data: null }
-                    }
+                    },
+                    customSkillHits: (item.customSkillHits as Record<string, unknown[]>) ?? {}
                 })) as Project[]
                 importProjects(normalized)
                 addToast(`成功导入 ${normalized.length} 个项目`, 'top', 'success')
@@ -277,6 +292,9 @@
     }
 
     let teamPhaseLocked = $derived(activeProject?.phases.team?.locked ?? false)
+    let allPhasesLocked = $derived(
+        activeProject ? getPhaseOrder().every((p) => activeProject!.phases[p]?.locked === true) : false
+    )
 
     function toggleClonePhase(phase: PhaseKey) {
         const order = getPhaseOrder()
@@ -383,10 +401,26 @@
                 </div>
             </div>
         {:else if activeProject}
-            <PhaseTabs project={activeProject} active={activePhase} onchange={(k) => (activePhase = k)} />
+            <PhaseTabs
+                project={activeProject}
+                active={activePhase}
+                {showResult}
+                onchange={(k) => {
+                    activePhase = k
+                    showResult = false
+                }}
+                resultEnabled={allPhasesLocked}
+                onresult={() => (showResult = true)}
+            />
 
             <div class="flex-1 overflow-hidden relative">
-                {#if activePhase === 'team'}
+                {#if showResult}
+                    <Result
+                        team={activeProject.team}
+                        calcState={activeProject.phases.calculation.data as CalcState | null}
+                        configState={activeProject.phases.config.data as ConfigState | null}
+                    />
+                {:else if activePhase === 'team'}
                     <TeamConfig team={activeProject.team} onupdate={handleUpdateTeam} locked={teamPhaseLocked} />
                 {:else if activePhase === 'timeline'}
                     <Timeline
@@ -400,18 +434,18 @@
                         team={activeProject.team}
                         timelineData={activeProject.phases.timeline.data as TimelineData | null}
                         calcState={activeProject.phases.calculation.data as CalcState | null}
+                        locked={phaseLocked}
                         onupdate={(state) => updateCalculation(state)}
                     />
                 {:else}
-                    <div class="flex h-full items-center justify-center p-8">
-                        <div class="max-w-xl text-sm text-zinc-500 leading-relaxed">
-                            <p class="mb-4 text-base font-medium text-zinc-400">词条 / 环境配置</p>
-                            <p>调整主副词条，怪物抗性/防御/免伤，环境级buff，最终可视化伤害</p>
-                            <p class="mt-4">待后续版本实现具体交互 UI。</p>
-                        </div>
-                    </div>
+                    <Config
+                        team={activeProject.team}
+                        data={activeProject.phases.config.data as ConfigState | null}
+                        locked={phaseLocked}
+                        onupdate={(state) => updateConfig(state)}
+                    />
                 {/if}
-                {#if phaseLocked}
+                {#if !showResult && phaseLocked}
                     <div
                         class="absolute inset-0 z-40 flex items-center justify-center bg-black/10 pointer-events-none select-none"
                     >
@@ -469,17 +503,19 @@
                     </button>
                 {/if}
                 <div class="flex-1"></div>
-                <button
-                    onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
-                    disabled={!phaseLocked && !canLock}
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40 disabled:opacity-40 disabled:pointer-events-none"
-                >
-                    <Icon
-                        icon={phaseLocked ? 'mdi:lock-open-variant-outline' : 'mdi:lock-outline'}
-                        class="size-4 shrink-0"
-                    />
-                    {phaseLocked ? '解锁' : '锁定'}
-                </button>
+                {#if !showResult}
+                    <button
+                        onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
+                        disabled={!phaseLocked && !canLock}
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40 disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                        <Icon
+                            icon={phaseLocked ? 'mdi:lock-open-variant-outline' : 'mdi:lock-outline'}
+                            class="size-4 shrink-0"
+                        />
+                        {phaseLocked ? '解锁' : '锁定'}
+                    </button>
+                {/if}
             </div>
         {/if}
     </div>

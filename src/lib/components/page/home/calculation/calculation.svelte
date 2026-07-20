@@ -22,15 +22,16 @@
         team: [CharSlot, CharSlot, CharSlot]
         timelineData: TimelineData | null
         calcState: CalcState | null
+        locked?: boolean
         onupdate: (state: CalcState) => void
     }
 
-    let { team, timelineData, calcState, onupdate }: Props = $props()
+    let { team, timelineData, calcState, locked = false, onupdate }: Props = $props()
 
     let expandedId = $state<string | null>(null)
 
     $effect(() => {
-        init(team, timelineData, calcState)
+        init(team, timelineData, calcState, locked)
     })
 
     let entries = $derived(getEntries())
@@ -106,9 +107,6 @@
                         {#if entry.hits > 1}
                             <span class="text-[var(--theme-modal-text)]/40"> ×{entry.hits}</span>
                         {/if}
-                        <span class="tabular-nums text-[var(--theme-modal-text)]/40 ml-2">
-                            {entry.ratioNum > 0 ? (entry.ratioNum * 100).toFixed(2) + '%' : entry.ratio}
-                        </span>
                     </td>
                     <td class="py-1.5 px-3">
                         <div class="flex flex-wrap gap-1">

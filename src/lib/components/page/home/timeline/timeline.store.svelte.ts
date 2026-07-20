@@ -1,4 +1,5 @@
 import type { CharSlot } from '$lib/data/types'
+import { updateCustomSkillHits } from '$lib/data/project.svelte'
 import type { SkillEntry } from '$lib/api/types'
 import {
     getCharacterInfo,
@@ -32,7 +33,8 @@ import {
     BUTTON_KEY_ORDER,
     BLOCK_H_PAD
 } from './timeline.consts'
-import { getEffectMultiplier, getEffectBurstMultiplier } from '$lib/consts/effect-data'
+import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$lib/consts/tune-data'
+import { parseValueString, sumRatioNum } from '$lib/consts/parse-value-string'
 
 // ── Core Data ──
 let _refLines = $state<RefLine[]>([
@@ -49,6 +51,7 @@ let _uiBtnIcons = $state<[string, string][]>([])
 let _charIconMap = $state<Record<string, string>>({})
 let _elementIconMap = $state<Record<string, string>>({})
 let _charElementMap = $state<Record<string, string>>({})
+let _charWeaponTypeMap = $state<Record<string, string>>({})
 
 export function init(
     data: TimelineData | null,
@@ -92,15 +95,18 @@ export function init(
 async function loadCharElements() {
     const names = getTeamCharNames()
     if (names.length === 0) return
-    const map: Record<string, string> = {}
+    const elemMap: Record<string, string> = {}
+    const weapMap: Record<string, string> = {}
     const results = await Promise.allSettled(names.map((n) => getCharacterInfo(n)))
     for (let i = 0; i < names.length; i++) {
         const r = results[i]
         if (r.status === 'fulfilled') {
-            map[names[i]] = r.value.element
+            elemMap[names[i]] = r.value.element
+            weapMap[names[i]] = r.value.weaponType
         }
     }
-    _charElementMap = map
+    _charElementMap = elemMap
+    _charWeaponTypeMap = weapMap
 }
 
 function save() {
@@ -304,16 +310,31 @@ export function getCustomSkillHits(): Record<string, CustomHit[]> {
     return _customSkillHits
 }
 
+export function loadCustomHits(hits: Record<string, CustomHit[]>) {
+    _customSkillHits = JSON.parse(JSON.stringify(hits))
+}
+
 export function addCustomHit(charName: string, hit: CustomHit) {
     const list = _customSkillHits[charName] ?? []
     _customSkillHits = { ..._customSkillHits, [charName]: [...list, hit] }
+    updateCustomSkillHits(_customSkillHits)
     refreshSkillPickerGroups()
 }
 
 export function removeCustomHit(charName: string, hitId: string) {
     const list = _customSkillHits[charName] ?? []
     _customSkillHits = { ..._customSkillHits, [charName]: list.filter((h) => h.id !== hitId) }
+    updateCustomSkillHits(_customSkillHits)
     refreshSkillPickerGroups()
+}
+
+export function getSkillCache() {
+    return _skillCache
+}
+
+export function charHasTuneSkills(charName: string): boolean {
+    const groups = _skillCache[charName]
+    return groups?.some((g) => g.type === '谐度破坏' && g.hits.length > 0) ?? false
 }
 
 function refreshSkillPickerGroups() {
@@ -403,6 +424,10 @@ function elementNameForChar(slot: CharSlot): string {
 
 export function getCharElementMap(): Record<string, string> {
     return _charElementMap
+}
+
+export function getCharWeaponTypeMap(): Record<string, string> {
+    return _charWeaponTypeMap
 }
 
 export function damageBlockLeft(d: DamageBlock): number {
@@ -1179,21 +1204,45 @@ export function getDamageList() {
             }
             for (const nd of otherNDs) {
                 if (nd.category === '处决') {
+                    const harmonyChar = nd.responders?.[0] ?? sourceChar
+                    const op = _opBlocks.find((b) => b.id === d.sourceId)
+                    const trackIdx = op?.trackIndex ?? -1
+                    const weaponType = trackIdx >= 0 && trackIdx < 3 ? _charWeaponTypeMap[harmonyChar] ?? '' : ''
+                    const echoCost = trackIdx >= 0 && trackIdx < 3 ? (_team[trackIdx]?.echoes?.[0]?.cost ?? 4) : 4
+                    let tuneValue = '—'
+                    if (weaponType) {
+                        const hits = getTuneDamage(weaponType, echoCost)
+                        if (hits.length > 0) {
+                            const totalDmg = hits.reduce((s, h) => s + h.damage, 0)
+                            const totalMult = hits.reduce((s, h) => s + h.multiplier, 0)
+                            tuneValue = `失谐${totalDmg} × ${(totalMult * 100).toFixed(2)}%`
+                        }
+                    }
                     entries.push({
-                        character: nd.responders?.[0] ?? sourceChar,
+                        character: harmonyChar,
                         name: '谐度破坏',
-                        value: '—',
-                        time,
-                        x,
+                        value: tuneValue,
+                        time, x,
                         element: '物理'
                     })
                 } else if (nd.category === '响应') {
                     if (nd.responders?.length) {
                         for (const r of nd.responders) {
+                            let respValue = '—'
+                            const respGroups = r !== '无' ? _skillCache[r] : null
+                            if (respGroups) {
+                                const tuneGroup = respGroups.find((g) => g.type === '谐度破坏')
+                                if (tuneGroup) {
+                                    const match = tuneGroup.hits.find(
+                                        (h) => h.name.includes('震谐') || h.name.includes('骇破')
+                                    )
+                                    if (match) respValue = match.ratio
+                                }
+                            }
                             entries.push({
                                 character: r,
                                 name: nd.name,
-                                value: '—',
+                                value: respValue,
                                 time,
                                 x,
                                 element: _charElementMap[r] ?? ''

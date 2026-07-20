@@ -29,9 +29,12 @@
         project: Project
         active: PhaseKey
         onchange: (key: PhaseKey) => void
+        showResult?: boolean
+        resultEnabled?: boolean
+        onresult?: () => void
     }
 
-    let { project, active, onchange }: Props = $props()
+    let { project, active, onchange, showResult = false, resultEnabled = false, onresult }: Props = $props()
 
     let tabs = $derived<PhaseTab[]>(
         getPhaseOrder().map((key) => ({
@@ -55,9 +58,9 @@
             title={tab.disabled ? tab.disabledReason : ''}
             class={[
                 'relative flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors',
-                tab.locked && active === tab.key
+                !showResult && tab.locked && active === tab.key
                     ? 'text-emerald-300'
-                    : active === tab.key
+                    : !showResult && active === tab.key
                       ? 'text-indigo-300'
                       : tab.disabled
                         ? 'cursor-not-allowed text-zinc-700'
@@ -73,9 +76,28 @@
                 <Icon icon="mdi:lock-open-outline" class="size-3.5 text-zinc-500" />
             {/if}
             {tab.label}
-            {#if active === tab.key}
+            {#if !showResult && active === tab.key}
                 <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-indigo-500"></div>
             {/if}
         </button>
     {/each}
+    <button
+        onclick={onresult}
+        disabled={!resultEnabled}
+        class={[
+            'relative flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors',
+            showResult
+                ? 'text-indigo-300'
+                : resultEnabled
+                  ? 'text-indigo-300 hover:bg-white/[0.02]'
+                  : 'cursor-not-allowed text-zinc-700'
+        ].join(' ')}
+        title={resultEnabled ? '' : '请先锁定全部阶段'}
+    >
+        <Icon icon="mdi:chart-box-outline" class="size-3.5" />
+        结果
+        {#if showResult}
+            <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-indigo-500"></div>
+        {/if}
+    </button>
 </div>

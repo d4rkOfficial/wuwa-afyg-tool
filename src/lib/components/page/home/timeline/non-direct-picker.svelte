@@ -13,6 +13,7 @@
         getNonDirectPickerHarmonyTrigger,
         setNonDirectPickerHarmonyTrigger,
         getTeamCharNames,
+        charHasTuneSkills,
         applyNonDirectEntries
     } from './timeline.store.svelte'
     import { getCharIconMap } from './timeline.store.svelte'
@@ -43,7 +44,9 @@
                     {@const isHarmony = cfg.name === '谐度破坏'}
                     {@const isResp = cfg.category === '响应'}
                     {@const harmonySelected = getNonDirectPickerSelected().has('谐度破坏')}
-                    {@const disabled = isResp && !harmonySelected}
+                    {@const tuneChar = getNonDirectPickerHarmonyTrigger() ?? ''}
+                    {@const hasTune = tuneChar ? charHasTuneSkills(tuneChar) : false}
+                    {@const disabled = isResp && (!harmonySelected || !hasTune)}
                     <div class="flex flex-col gap-1">
                         <div class="flex items-center gap-2">
                             <button

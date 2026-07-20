@@ -186,7 +186,13 @@
                             <div
                                 class="text-[10px] font-semibold text-[var(--theme-modal-text)]/50 uppercase tracking-wider px-2 pt-2 pb-1 flex items-center justify-between"
                             >
-                                <span>{group.type} ({group.hits.length})</span>
+                                <span>
+                                    {group.type} ({group.hits.length})
+                                    {#if group.type === '谐度破坏'}
+                                        <span class="text-zinc-600 font-normal normal-case">(请到非直伤配置中配置)</span
+                                        >
+                                    {/if}
+                                </span>
                                 {#if group.type === '自定义'}
                                     <button
                                         onclick={() => openAddCustom(getSkillPickerCharacter())}
@@ -206,12 +212,16 @@
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <div
-                                    class="flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors {getSkillPickerSelected().has(
-                                        key
-                                    )
-                                        ? 'bg-white/5 text-[var(--theme-modal-text)]'
-                                        : 'text-[var(--theme-modal-text)]/60'} hover:bg-white/5"
+                                    class={[
+                                        'flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors',
+                                        group.type === '谐度破坏'
+                                            ? 'opacity-40 cursor-not-allowed select-none text-[var(--theme-modal-text)]/60'
+                                            : getSkillPickerSelected().has(key)
+                                              ? 'bg-white/5 text-[var(--theme-modal-text)]'
+                                              : 'text-[var(--theme-modal-text)]/60 hover:bg-white/5'
+                                    ].join(' ')}
                                     onclick={() => {
+                                        if (group.type === '谐度破坏') return
                                         const next = new Set(getSkillPickerSelected())
                                         if (next.has(key)) next.delete(key)
                                         else next.add(key)
@@ -219,11 +229,14 @@
                                     }}
                                 >
                                     <div
-                                        class="size-5 shrink-0 rounded-full flex items-center justify-center {order > 0
+                                        class="size-5 shrink-0 rounded-full flex items-center justify-center {order >
+                                            0 && group.type !== '谐度破坏'
                                             ? 'bg-indigo-500 text-white'
                                             : 'border border-white/20'}"
                                     >
-                                        {#if order > 0}<span class="text-[10px] font-bold">{order}</span>{/if}
+                                        {#if order > 0 && group.type !== '谐度破坏'}<span class="text-[10px] font-bold"
+                                                >{order}</span
+                                            >{/if}
                                     </div>
                                     <span class="flex-1 truncate">
                                         {group.type === '声骸技能' && echoName
@@ -242,7 +255,7 @@
                                                 ] ?? '#888'}">{hit.element}</span
                                             >{/if}</span
                                     >
-                                    {#if getSkillPickerSelected().has(key)}
+                                    {#if getSkillPickerSelected().has(key) && group.type !== '谐度破坏'}
                                         <span class="flex items-center gap-1" onclick={(e) => e.stopPropagation()}>
                                             <span class="text-xs text-[var(--theme-modal-text)]/50">×</span>
                                             <input

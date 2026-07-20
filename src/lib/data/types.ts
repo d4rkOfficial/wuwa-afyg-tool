@@ -20,11 +20,21 @@ export interface PhaseState {
     data: unknown
 }
 
+export interface CustomHit {
+    id: string
+    name: string
+    flatValue: number
+    pctValue: number
+    pctUnit: string
+    element: string
+}
+
 export interface Project {
     id: string
     name: string
     createdAt: number
     team: [CharSlot, CharSlot, CharSlot]
+    customSkillHits: Record<string, CustomHit[]>
     phases: {
         team: PhaseState
         timeline: PhaseState

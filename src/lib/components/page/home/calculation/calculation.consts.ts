@@ -19,12 +19,15 @@ export const ZONE_DEFS: ZoneDef[] = [
     { id: 'res_pen', label: '对目标属性抗性无视(穿抗)', unit: '%' },
     { id: 'def_pen', label: '对目标防御无视(穿防)', unit: '%' },
     { id: 'dmg_red_pen', label: '对目标免伤无视(穿免)', unit: '%' },
+    { id: 'res_down', label: '减抗(减抗区)', unit: '%' },
+    { id: 'def_ignore', label: '无视防御(无视区)', unit: '%' },
     { id: 'final_harmony', label: '集谐最终伤害(集谐区)', unit: '%' },
     { id: 'final_dmg', label: '最终伤害(终伤区)', unit: '%' },
     { id: 'target_final_dmg', label: '目标受最终伤害(终伤区)', unit: '%' },
-    { id: 'custom_final_dmg', label: '自定义最终伤害(终伤区)', unit: '%' },
+
     { id: 'dmg_taken_inc', label: '伤害提升(易伤区)', unit: '%' },
-    { id: 'target_dmg_taken_inc', label: '目标受到伤害提升(易伤区)', unit: '%' }
+    { id: 'target_dmg_taken_inc', label: '目标受到伤害提升(易伤区)', unit: '%' },
+    { id: 'custom_final_dmg', label: '倍率或其它自定义乘区', unit: '%' }
 ]
 
 export const ZONE_MAP = new Map(ZONE_DEFS.map((z) => [z.id, z]))
