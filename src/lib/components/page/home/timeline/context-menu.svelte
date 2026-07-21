@@ -306,7 +306,7 @@
             {#each getUiBtnIcons() as [name, url]}
                 <button
                     class="size-7 flex items-center justify-center rounded hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
-                    onclick={() => addOpBlock(tm.trackIndex, tm.time, name)}
+                    onclick={() => addOpBlock(tm.trackIndex, tm.pos, name)}
                     title={name}
                 >
                     {#if url}

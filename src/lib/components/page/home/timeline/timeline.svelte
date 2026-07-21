@@ -25,7 +25,6 @@
         getTrackMenu,
         getTRACKS,
         getTableWidth,
-        timeToX,
         vx,
         damageBlockLeft,
         getDamageBlocksStacked,
@@ -54,6 +53,7 @@
         MIN_GAP,
         MIN_TIME,
         MAX_TIME,
+        MAX_POS,
         ELEMENT_COLORS,
         NON_DIRECT_ELEMENT,
         TRACK_COLORS
@@ -143,8 +143,8 @@
         const rect = timelineEl.getBoundingClientRect()
         const scrollL = timelineEl.scrollLeft
         const x = e.clientX - rect.left + scrollL - 80
-        const t = Math.max(0, Math.min(MAX_TIME, (x - SIDE_PAD) / PPS))
-        setTrackMenu({ x: e.clientX, y: e.clientY, trackIndex: i, time: t })
+        const pos2 = Math.max(SIDE_PAD, Math.min(MAX_POS, x))
+        setTrackMenu({ x: e.clientX, y: e.clientY, trackIndex: i, pos: pos2 })
     }
 
     function onBlockContextMenu(e: MouseEvent, blockId: string) {
@@ -223,9 +223,8 @@
                                 {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
                                     <div
                                         class="absolute inset-y-0 flex items-center pointer-events-auto cursor-grab active:cursor-grabbing select-none"
-                                        style="left: {timeToX(
-                                            block.time
-                                        )}px; transform: translateX(-50%) {getDragBlockId() === block.id
+                                        style="left: {block.pos}px; transform: translateX(-50%) {getDragBlockId() ===
+                                        block.id
                                             ? 'translateY(-4px)'
                                             : ''}; z-index: {getDragBlockId() === block.id ? 20 : 5};"
                                         data-block={block.id}

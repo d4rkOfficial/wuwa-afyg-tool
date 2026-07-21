@@ -1,6 +1,6 @@
 import type { ConfigState } from './config.types'
 import { defaultConfig } from './config.consts'
-import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
+import { SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 
 let _config = $state<ConfigState>(defaultConfig())
 let _locked = $state(false)
@@ -54,7 +54,9 @@ export function addSubstat(charIndex: number, slotIndex: number, label: string) 
     const slots = _config.characters[charIndex].echoes[slotIndex]
     if (slots.substats.length >= 5) return
     if (slots.substats.some((s) => s.type === label)) return
-    slots.substats = [...slots.substats, { type: label, value: 0, unit: '' }]
+    const opt = SUBSTAT_OPTIONS.find((o) => o.label === label)
+    const value = opt ? opt.tiers[Math.floor((opt.tiers.length - 1) / 2)] : 0
+    slots.substats = [...slots.substats, { type: label, value, unit: opt?.unit ?? '' }]
 }
 
 export function removeSubstat(charIndex: number, slotIndex: number, idx: number) {

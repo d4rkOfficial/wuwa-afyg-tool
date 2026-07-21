@@ -28,9 +28,7 @@
 
     let activeTab = $state<'char0' | 'char1' | 'char2' | 'enemy'>('char0')
     let showMainStatMenu = $state<{ ci: number; si: number } | null>(null)
-    let showSubstatMenu = $state<{ ci: number; si: number } | null>(null)
-    let substatMenuDir = $state<'down' | 'up'>('down')
-    let substatMenuRect = $state<{ top: number; bottom: number; left: number } | null>(null)
+    let showSubstatModal = $state<{ ci: number; si: number } | null>(null)
 
     $effect(() => {
         init(data, locked)
@@ -58,8 +56,6 @@
 
     function handleAddSubstat(ci: number, si: number, label: string) {
         addSubstat(ci, si, label)
-        const slots = config.characters[ci].echoes[si]
-        if (slots.substats.length >= 5) showSubstatMenu = null
         onupdate(getCalcState())
     }
 
@@ -142,11 +138,11 @@
                                                 return other + c <= 12
                                             })()}
                                         class={[
-                                            'w-7 h-6 rounded text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
+                                            'min-w-7 px-2 h-6 rounded text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
                                             slot.cost === c
                                                 ? 'bg-indigo-500/15 text-indigo-300'
                                                 : 'bg-white/5 text-[var(--theme-modal-text)]/40 hover:bg-white/10'
-                                        ].join(' ')}>C{c}</button
+                                        ].join(' ')}>{c} COST</button
                                     >
                                 {/each}
                             </div>
@@ -271,70 +267,75 @@
                             {#if slot.substats.length < 5}
                                 <div class="mt-1">
                                     <button
-                                        onclick={(e) => {
-                                            const next =
-                                                showSubstatMenu?.ci === ci && showSubstatMenu?.si === si
+                                        onclick={() =>
+                                            (showSubstatModal =
+                                                showSubstatModal?.ci === ci && showSubstatModal?.si === si
                                                     ? null
-                                                    : { ci, si }
-                                            if (next) {
-                                                const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                                                substatMenuRect = { top: r.top, bottom: r.bottom, left: r.left }
-                                                substatMenuDir = window.innerHeight - r.bottom - 8 < 300 ? 'up' : 'down'
-                                            }
-                                            showSubstatMenu = next
-                                        }}
+                                                    : { ci, si })}
                                         class="flex items-center gap-1 rounded px-2 py-1 text-xs text-indigo-400 transition-colors hover:bg-white/5"
                                     >
-                                        <Icon
-                                            icon={showSubstatMenu?.ci === ci && showSubstatMenu?.si === si
-                                                ? 'mdi:chevron-up'
-                                                : 'mdi:plus'}
-                                            class="size-3"
-                                        />
-                                        {showSubstatMenu?.ci === ci && showSubstatMenu?.si === si
-                                            ? '收起'
-                                            : '添加副词条'}
+                                        <Icon icon="mdi:plus" class="size-3" />
+                                        选择副词条
                                     </button>
-                                    {#if showSubstatMenu?.ci === ci && showSubstatMenu?.si === si && substatMenuRect}
-                                        <div
-                                            class="fixed z-20 min-w-40 max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
-                                            style={substatMenuDir === 'up'
-                                                ? `bottom: ${window.innerHeight - substatMenuRect.top + 4}px; left: ${substatMenuRect.left}px`
-                                                : `top: ${substatMenuRect.bottom + 4}px; left: ${substatMenuRect.left}px`}
-                                            onclick={(e) => e.stopPropagation()}
-                                        >
-                                            {#each SUBSTAT_OPTIONS as opt}
-                                                {@const exists = slot.substats.some((s) => s.type === opt.label)}
-                                                <button
-                                                    onclick={() => !exists && handleAddSubstat(ci, si, opt.label)}
-                                                    disabled={exists}
-                                                    class={[
-                                                        'flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
-                                                        exists
-                                                            ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
-                                                            : 'text-[var(--theme-modal-text)] hover:bg-white/5'
-                                                    ].join(' ')}
-                                                >
-                                                    <span class="flex-1">{opt.label}</span>
-                                                    <span class="text-[10px] text-[var(--theme-modal-text)]/40"
-                                                        >{opt.unit}</span
-                                                    >
-                                                    {#if exists}<svg
-                                                            class="size-3 text-indigo-400"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            stroke-width="3"><path d="M5 13l4 4L19 7" /></svg
-                                                        >{/if}
-                                                </button>
-                                            {/each}
-                                        </div>
-                                    {/if}
                                 </div>
                             {/if}
                         </div>
                     </div>
                 {/each}
+            </div>
+        </div>
+    {/if}
+
+    <!-- Substat selector modal -->
+    {#if showSubstatModal}
+        {@const ms = showSubstatModal}
+        {@const mSlot = config.characters[ms.ci].echoes[ms.si]}
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onclick={() => (showSubstatModal = null)}
+        >
+            <div
+                class="w-72 max-h-80 rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-medium text-[var(--theme-modal-text)]">选择副词条</span>
+                    <button
+                        onclick={() => (showSubstatModal = null)}
+                        class="rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-[var(--theme-modal-text)]/70"
+                    >
+                        <Icon icon="mdi:close" class="size-4" />
+                    </button>
+                </div>
+                <div class="space-y-0.5 max-h-56 overflow-y-auto">
+                    {#each SUBSTAT_OPTIONS as opt}
+                        {@const exists = mSlot.substats.some((s) => s.type === opt.label)}
+                        <button
+                            onclick={() => {
+                                if (!exists) handleAddSubstat(ms.ci, ms.si, opt.label)
+                            }}
+                            disabled={exists}
+                            class={[
+                                'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
+                                exists
+                                    ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
+                                    : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                            ].join(' ')}
+                        >
+                            <span class="flex-1">{opt.label}</span>
+                            <span class="text-[10px] text-[var(--theme-modal-text)]/40">{opt.unit}</span>
+                            {#if exists}
+                                <svg
+                                    class="size-3 shrink-0 text-indigo-400"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="3"><path d="M5 13l4 4L19 7" /></svg
+                                >
+                            {/if}
+                        </button>
+                    {/each}
+                </div>
             </div>
         </div>
     {/if}

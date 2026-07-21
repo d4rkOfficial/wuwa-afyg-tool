@@ -7,7 +7,7 @@ export interface RefLine {
 export interface OpBlock {
     id: string
     trackIndex: number
-    time: number
+    pos: number
     key: string
     desc: string
     intro: boolean

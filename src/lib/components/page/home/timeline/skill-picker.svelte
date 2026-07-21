@@ -32,11 +32,12 @@
         '攻击百分比',
         '生命百分比',
         '防御百分比',
-        '共鸣效率',
-        '谐度破坏增幅',
-        '偏谐值累积效率',
-        '暴击率',
-        '暴击伤害'
+        '偏谐系数' // 特殊 根据怪物品质
+        // '共鸣效率',
+        // '谐度破坏增幅',
+        // '偏谐值累积效率',
+        // '暴击率',
+        // '暴击伤害'
     ]
     const ELEMENTS = ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭']
 
@@ -209,19 +210,20 @@
                                     : 0}
                                 {@const slot = getTeam().find((s) => s.character === getSkillPickerCharacter())}
                                 {@const echoName = slot?.echoes?.[0]?.name}
+                                {@const isResponseHit = hit.name.includes('响应')}
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <div
                                     class={[
                                         'flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors',
-                                        group.type === '谐度破坏'
+                                        group.type === '谐度破坏' || isResponseHit
                                             ? 'opacity-40 cursor-not-allowed select-none text-[var(--theme-modal-text)]/60'
                                             : getSkillPickerSelected().has(key)
                                               ? 'bg-white/5 text-[var(--theme-modal-text)]'
                                               : 'text-[var(--theme-modal-text)]/60 hover:bg-white/5'
                                     ].join(' ')}
                                     onclick={() => {
-                                        if (group.type === '谐度破坏') return
+                                        if (group.type === '谐度破坏' || isResponseHit) return
                                         const next = new Set(getSkillPickerSelected())
                                         if (next.has(key)) next.delete(key)
                                         else next.add(key)
@@ -230,12 +232,14 @@
                                 >
                                     <div
                                         class="size-5 shrink-0 rounded-full flex items-center justify-center {order >
-                                            0 && group.type !== '谐度破坏'
+                                            0 &&
+                                        group.type !== '谐度破坏' &&
+                                        !isResponseHit
                                             ? 'bg-indigo-500 text-white'
                                             : 'border border-white/20'}"
                                     >
-                                        {#if order > 0 && group.type !== '谐度破坏'}<span class="text-[10px] font-bold"
-                                                >{order}</span
+                                        {#if order > 0 && group.type !== '谐度破坏' && !isResponseHit}<span
+                                                class="text-[10px] font-bold">{order}</span
                                             >{/if}
                                     </div>
                                     <span class="flex-1 truncate">
@@ -246,6 +250,11 @@
                                                     (c) => c.id === hit.name
                                                 )?.name ?? hit.name)
                                               : hit.name}
+                                        {#if isResponseHit}
+                                            <span class="text-zinc-600 font-normal normal-case ml-1"
+                                                >(请到非直伤配置中配置)</span
+                                            >
+                                        {/if}
                                     </span>
                                     <span class="text-[var(--theme-modal-text)]/50"
                                         >{hit.ratio}{#if hit.element}<span
@@ -255,7 +264,7 @@
                                                 ] ?? '#888'}">{hit.element}</span
                                             >{/if}</span
                                     >
-                                    {#if getSkillPickerSelected().has(key) && group.type !== '谐度破坏'}
+                                    {#if getSkillPickerSelected().has(key) && group.type !== '谐度破坏' && !isResponseHit}
                                         <span class="flex items-center gap-1" onclick={(e) => e.stopPropagation()}>
                                             <span class="text-xs text-[var(--theme-modal-text)]/50">×</span>
                                             <input

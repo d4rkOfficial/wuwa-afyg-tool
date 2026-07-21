@@ -17,6 +17,7 @@ export const MIN_GAP = 60
 export const SNAP_PX = 8
 export const MIN_TIME = 0
 export const MAX_TIME = 150
+export const MAX_POS = SIDE_PAD + MAX_TIME * PPS
 export const BLOCK_H_PAD = 18.6
 
 export const TRACK_COLORS = ['#60a5fa', '#a78bfa', '#f472b6', '#22c55e'] as const

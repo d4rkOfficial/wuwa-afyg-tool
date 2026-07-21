@@ -33,6 +33,7 @@
                             <tr class="text-[var(--theme-modal-text)]/50 border-b border-white/10">
                                 <th class="text-left font-medium py-1.5 pr-3">角色</th>
                                 <th class="text-left font-medium py-1.5 pr-3">倍率名</th>
+                                <th class="text-left font-medium py-1.5 pr-3">倍率基础</th>
                                 <th class="text-left font-medium py-1.5 pr-3">属性</th>
                                 <th class="text-left font-medium py-1.5">倍率值</th>
                             </tr>
@@ -42,6 +43,7 @@
                                 <tr class="border-b border-white/5 last:border-0">
                                     <td class="py-1.5 pr-3 text-[var(--theme-modal-text)]">{entry.character}</td>
                                     <td class="py-1.5 pr-3 text-[var(--theme-modal-text)]">{entry.name}</td>
+                                    <td class="py-1.5 pr-3 text-[var(--theme-modal-text)]/60">{entry.baseType}</td>
                                     <td
                                         class="py-1.5 pr-3"
                                         style="color: {(ELEMENT_COLORS as Record<string, string>)[entry.element] ??

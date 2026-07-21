@@ -289,11 +289,17 @@
     function handleSelectProject(id: string) {
         setActiveProject(id)
         const p = getActiveProject()
-        if (!p) { activePhase = 'team'; return }
+        if (!p) {
+            activePhase = 'team'
+            return
+        }
         const order = getPhaseOrder()
         let lastLocked = -1
         for (let i = order.length - 1; i >= 0; i--) {
-            if (p.phases[order[i]]?.locked === true) { lastLocked = i; break }
+            if (p.phases[order[i]]?.locked === true) {
+                lastLocked = i
+                break
+            }
         }
         if (lastLocked < 0) {
             activePhase = 'team'
@@ -393,7 +399,7 @@
                         />
                     </svg>
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
-                    <p class="mb-6 text-sm text-zinc-500">测试阶段，伤害计算相关有bug，待修复。其他问题优先级都降低。<br>声骸词条计入问题，处决武器问题，处决/响应公式问题......<br>说实话需要有用的建议：有用的建议要有 异常表现 和 期望正常表现。<br>如果您能够提供有用的建议，我将十分感谢。</p>
+                    <p class="mb-6 text-sm text-zinc-500">测试：上次 PUSH 2026-0722-0458。内部维修bug中</p>
                     <button
                         onclick={() => {
                             newName = ''

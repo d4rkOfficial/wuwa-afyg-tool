@@ -93,20 +93,19 @@
                 >
                     <td class="py-1.5 px-3">
                         <span
-                            style="color: {(ELEMENT_COLORS as Record<string, string>)[charElements[entry.character]] ??
-                                '#888'}"
+                            style="color: {(ELEMENT_COLORS as Record<string, string>)[
+                                charElements[entry.character ?? '']
+                            ] ?? '#888'}"
                         >
-                            {entry.character}
+                            {entry.character ?? ''}
                         </span>
                     </td>
                     <td class="py-1.5 px-3">
-                        <span class="text-[var(--theme-modal-text)]/40">[{entry.skillType}]</span>
+                        <span class="text-[var(--theme-modal-text)]/40">[{entry.skillType ?? ''}]</span>
                         <span style="color: {(ELEMENT_COLORS as Record<string, string>)[entry.element] ?? '#888'}">
                             {entry.hitName}
                         </span>
-                        {#if entry.hits > 1}
-                            <span class="text-[var(--theme-modal-text)]/40"> ×{entry.hits}</span>
-                        {/if}
+                        <span class="text-[var(--theme-modal-text)]/30"> ({entry.damageBaseType})</span>
                     </td>
                     <td class="py-1.5 px-3">
                         <div class="flex flex-wrap gap-1">

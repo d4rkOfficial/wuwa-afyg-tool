@@ -28,6 +28,7 @@ import {
     SNAP_PX,
     MIN_TIME,
     MAX_TIME,
+    MAX_POS,
     NON_DIRECT_CONFIGS,
     NON_DIRECT_ELEMENT,
     BUTTON_KEY_ORDER,
@@ -69,7 +70,13 @@ export function init(
             pos:
                 (rl as { pos?: number }).pos ?? (typeof rl.time === 'number' ? SIDE_PAD + (rl.time as number) * PPS : 0)
         }))
-        _opBlocks = data.opBlocks
+        _opBlocks = data.opBlocks.map((op) => {
+            const b = op as OpBlock & { time?: number }
+            if (b.time !== undefined && b.pos === undefined) {
+                return { ...b, pos: SIDE_PAD + b.time * PPS }
+            }
+            return b as OpBlock
+        })
         _damageBlocks = data.damageBlocks
     } else {
         _refLines = [
@@ -97,16 +104,19 @@ async function loadCharElements() {
     if (names.length === 0) return
     const elemMap: Record<string, string> = {}
     const weapMap: Record<string, string> = {}
+    const skillsMap: Record<string, SkillPickerGroup[]> = {}
     const results = await Promise.allSettled(names.map((n) => getCharacterInfo(n)))
     for (let i = 0; i < names.length; i++) {
         const r = results[i]
         if (r.status === 'fulfilled') {
             elemMap[names[i]] = r.value.element
             weapMap[names[i]] = r.value.weaponType
+            skillsMap[names[i]] = buildSkillGroups(r.value.skills)
         }
     }
     _charElementMap = elemMap
     _charWeaponTypeMap = weapMap
+    Object.assign(_skillCache, skillsMap)
 }
 
 function save() {
@@ -198,11 +208,11 @@ export function setDragVisualPositions(v: Record<string, number>) {
 }
 
 // ── Op Block State ──
-let _trackMenu = $state<{ x: number; y: number; trackIndex: number; time: number } | null>(null)
+let _trackMenu = $state<{ x: number; y: number; trackIndex: number; pos: number } | null>(null)
 let _editingBlockId = $state<string | null>(null)
 let _editingBlockDesc = $state('')
 let _dragBlockId = $state<string | null>(null)
-let _dragBlockStartTime = $state(0)
+let _dragBlockStartPos = $state(0)
 let _blockWidths = $state<Record<string, number>>({})
 let _damageWidths = $state<Record<string, number>>({})
 let _blockMenu = $state<{ x: number; y: number; blockId: string } | null>(null)
@@ -210,7 +220,7 @@ let _blockMenu = $state<{ x: number; y: number; blockId: string } | null>(null)
 export function getTrackMenu() {
     return _trackMenu
 }
-export function setTrackMenu(v: { x: number; y: number; trackIndex: number; time: number } | null) {
+export function setTrackMenu(v: { x: number; y: number; trackIndex: number; pos: number } | null) {
     _trackMenu = v
 }
 export function getEditingBlockId() {
@@ -407,10 +417,6 @@ export function vx(id: string, pos: number): number {
     return _dragVisualPositions[id] ?? pos
 }
 
-export function timeToX(t: number): number {
-    return SIDE_PAD + (t - MIN_TIME) * PPS
-}
-
 export function elementColor(name: string): string {
     const char = _team.find((s) => s.character === name)
     if (!char) return '#71717a'
@@ -437,7 +443,7 @@ export function damageBlockLeft(d: DamageBlock): number {
     }
     const op = _opBlocks.find((b) => b.id === d.sourceId)
     if (!op) return 0
-    return timeToX(op.time) - (_blockWidths[op.id] ?? 0) / 2
+    return op.pos - (_blockWidths[op.id] ?? 56) / 2
 }
 
 export function setDamageWidth(id: string, width: number) {
@@ -458,7 +464,7 @@ function estimateDamageWidth(d: DamageBlock): number {
     return Math.max(singleTagW, Math.min(count * (singleTagW + 4), 160)) + 8
 }
 
-export function getDamageBlocksStacked() {
+export function getDamageBlocksStacked(): { block: DamageBlock; top: number; left: number }[] {
     const blocks = _damageBlocks
         .filter((d) => d.trackIndex === 3 && (d.skillHits.length > 0 || d.nonDirectEntries.length > 0))
         .map((d) => ({ block: d, left: damageBlockLeft(d) }))
@@ -591,9 +597,9 @@ export function stopDrag() {
 }
 
 // ── Op Block Functions ──
-export function addOpBlock(trackIndex: number, time: number, key: string) {
+export function addOpBlock(trackIndex: number, pos: number, key: string) {
     if (_locked) return
-    _opBlocks = [..._opBlocks, { id: `b${Date.now()}`, trackIndex, time, key, desc: '', intro: false }]
+    _opBlocks = [..._opBlocks, { id: `b${Date.now()}`, trackIndex, pos, key, desc: '', intro: false }]
     _trackMenu = null
     enforceIntro()
     save()
@@ -606,9 +612,9 @@ export function startBlockDrag(e: MouseEvent, blockId: string, mouseContentX?: n
     _dragBlockId = blockId
     const block = _opBlocks.find((b) => b.id === blockId)
     if (block) {
-        _dragBlockStartTime = block.time
+        _dragBlockStartPos = block.pos
         if (mouseContentX !== undefined) {
-            _dragBlockOffset = mouseContentX - timeToX(block.time)
+            _dragBlockOffset = mouseContentX - block.pos
         }
     }
 }
@@ -618,8 +624,8 @@ export function onBlockDrag(rawX: number) {
     const idx = _opBlocks.findIndex((b) => b.id === _dragBlockId)
     if (idx < 0) return
     const centerX = rawX - _dragBlockOffset
-    const t = snapBlockX(centerX, _opBlocks[idx].trackIndex, _dragBlockId, _blockWidths[_dragBlockId] ?? 0)
-    _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, time: Math.max(0, Math.min(MAX_TIME, t)) } : b))
+    const pos = snapBlockX(centerX, _opBlocks[idx].trackIndex, _dragBlockId, _blockWidths[_dragBlockId] ?? 0)
+    _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: Math.max(0, Math.min(MAX_POS, pos)) } : b))
 }
 
 export function stopBlockDrag() {
@@ -630,21 +636,17 @@ export function stopBlockDrag() {
     const idx = _opBlocks.findIndex((b) => b.id === _dragBlockId)
     if (idx >= 0) {
         const dragged = _opBlocks[idx]
-        if (Math.abs(dragged.time - _dragBlockStartTime) > 0.01) {
+        if (Math.abs(dragged.pos - _dragBlockStartPos) > 1) {
             const dw = _blockWidths[_dragBlockId] ?? 0
-            const dx = timeToX(dragged.time)
-            const dLeft = dx - dw / 2
+            const dLeft = dragged.pos - dw / 2
             for (const b of _opBlocks) {
                 if (b.id === _dragBlockId || b.trackIndex !== dragged.trackIndex) continue
                 const bw = _blockWidths[b.id] ?? 0
-                const bx = timeToX(b.time)
-                const bLeft = bx - bw / 2
-                const bRight = bx + bw / 2
-                if (dragged.time >= b.time && dLeft > bLeft + SNAP_PX && dLeft < bRight - SNAP_PX) {
+                const bLeft = b.pos - bw / 2
+                const bRight = b.pos + bw / 2
+                if (dragged.pos >= b.pos && dLeft > bLeft + SNAP_PX && dLeft < bRight - SNAP_PX) {
                     _opBlocks = _opBlocks.map((ob) =>
-                        ob.id === _dragBlockId
-                            ? { ...ob, time: Math.max(0, Math.min(MAX_TIME, (bRight + dw / 2 - SIDE_PAD) / PPS)) }
-                            : ob
+                        ob.id === _dragBlockId ? { ...ob, pos: Math.max(0, Math.min(MAX_POS, bRight + dw / 2)) } : ob
                     )
                     break
                 }
@@ -668,7 +670,7 @@ export function removeBlock(blockId: string) {
 export function canSetIntro(blockId: string): boolean {
     const block = _opBlocks.find((b) => b.id === blockId)
     if (!block || block.intro || block.trackIndex >= 3) return false
-    const sorted = _opBlocks.filter((b) => b.trackIndex < 3).sort((a, b) => a.time - b.time)
+    const sorted = _opBlocks.filter((b) => b.trackIndex < 3).sort((a, b) => a.pos - b.pos)
     const idx = sorted.findIndex((b) => b.id === blockId)
     if (idx <= 0) return true
     const prev = sorted[idx - 1]
@@ -687,7 +689,7 @@ export function toggleIntro(blockId: string) {
 }
 
 function enforceIntro() {
-    const sorted = _opBlocks.filter((b) => b.trackIndex < 3).sort((a, b) => a.time - b.time)
+    const sorted = _opBlocks.filter((b) => b.trackIndex < 3).sort((a, b) => a.pos - b.pos)
     let changed = false
     const updated = _opBlocks.map((b) => {
         if (!b.intro) return b
@@ -720,12 +722,12 @@ export function confirmBlockDesc() {
             const dw = newW - oldW
             if (Math.abs(dw) > 1 && idx >= 0) {
                 const edited = _opBlocks[idx]
-                const oldRight = timeToX(edited.time) + oldW / 2
+                const oldRight = edited.pos + oldW / 2
                 const shift = dw / 2
                 _opBlocks = _opBlocks.map((b) => {
                     if (b.id === _editingBlockId || b.trackIndex >= 3) return b
-                    const bl = timeToX(b.time) - (_blockWidths[b.id] ?? 0) / 2
-                    if (bl >= oldRight) return { ...b, time: Math.max(0, Math.min(MAX_TIME, b.time + shift / PPS)) }
+                    const bl = b.pos - (_blockWidths[b.id] ?? 0) / 2
+                    if (bl >= oldRight) return { ...b, pos: Math.max(0, Math.min(MAX_POS, b.pos + shift)) }
                     return b
                 })
             }
@@ -743,36 +745,34 @@ export function snapBlockX(centerX: number, trackIndex: number, excludeId: strin
     for (const b of _opBlocks) {
         if (b.id === excludeId) continue
         const bw = _blockWidths[b.id] ?? 0
-        const bx = timeToX(b.time)
-        const bLeft = bx - bw / 2
-        const bRight = bx + bw / 2
+        const bLeft = b.pos - bw / 2
+        const bRight = b.pos + bw / 2
 
-        if (Math.abs(left - bRight) < SNAP_PX) return (bRight + width / 2 - SIDE_PAD) / PPS
-        if (Math.abs(right - bLeft) < SNAP_PX) return (bLeft - width / 2 - SIDE_PAD) / PPS
-        if (centerX > bx) {
+        if (Math.abs(left - bRight) < SNAP_PX) return bRight + width / 2
+        if (Math.abs(right - bLeft) < SNAP_PX) return bLeft - width / 2
+        if (centerX > b.pos) {
             const inL = bLeft + BLOCK_H_PAD
             const inR = bRight - BLOCK_H_PAD
-            if (Math.abs(left - inL) < SNAP_PX) return (inL + width / 2 - SIDE_PAD) / PPS
-            if (Math.abs(left - inR) < SNAP_PX) return (inR + width / 2 - SIDE_PAD) / PPS
+            if (Math.abs(left - inL) < SNAP_PX) return inL + width / 2
+            if (Math.abs(left - inR) < SNAP_PX) return inR + width / 2
         }
     }
-    return (centerX - SIDE_PAD) / PPS
+    return centerX
 }
 
 function areBlocksTouching(leftBlock: OpBlock, rightBlock: OpBlock): boolean {
     const lw = _blockWidths[leftBlock.id] ?? 0
     const rw = _blockWidths[rightBlock.id] ?? 0
-    const lr = timeToX(leftBlock.time) + lw / 2
-    const rl = timeToX(rightBlock.time) - rw / 2
+    const lr = leftBlock.pos + lw / 2
+    const rl = rightBlock.pos - rw / 2
     if (Math.abs(lr - rl) < SNAP_PX) return true
-    const lc = timeToX(leftBlock.time)
-    const inL = lc - lw / 2 + BLOCK_H_PAD
-    const inR = lc + lw / 2 - BLOCK_H_PAD
+    const inL = leftBlock.pos - lw / 2 + BLOCK_H_PAD
+    const inR = leftBlock.pos + lw / 2 - BLOCK_H_PAD
     return Math.abs(rl - inL) < SNAP_PX || Math.abs(rl - inR) < SNAP_PX
 }
 
 export function reflowTrack(trackIndex: number) {
-    const sorted = _opBlocks.filter((b) => b.trackIndex === trackIndex).sort((a, b) => a.time - b.time)
+    const sorted = _opBlocks.filter((b) => b.trackIndex === trackIndex).sort((a, b) => a.pos - b.pos)
     if (sorted.length < 2) return
     const groups: OpBlock[][] = []
     let cur: OpBlock[] = [sorted[0]]
@@ -793,9 +793,9 @@ export function reflowTrack(trackIndex: number) {
             const pw = _blockWidths[prev.id] ?? 0
             const cur = group[i]
             const cw = _blockWidths[cur.id] ?? 0
-            const prx = timeToX(prev.time) + pw / 2
-            const newTime = (prx + 1 + cw / 2 - SIDE_PAD) / PPS
-            result.push({ ...cur, time: Math.max(0, Math.min(MAX_TIME, newTime)) })
+            const prx = prev.pos + pw / 2
+            const newPos = prx + 1 + cw / 2
+            result.push({ ...cur, pos: Math.max(0, Math.min(MAX_POS, newPos)) })
         }
     }
     const updated = _opBlocks.map((b) => {
@@ -1129,17 +1129,11 @@ export function getDamageList() {
             const time =
                 d.sourceType === 'ref'
                     ? (_refLines.find((r) => r.id === d.sourceId)?.pos ?? 0)
-                    : (_opBlocks.find((b) => b.id === d.sourceId)?.time ?? 0)
+                    : (_opBlocks.find((b) => b.id === d.sourceId)?.pos ?? 0)
             const op = _opBlocks.find((b) => b.id === d.sourceId)
             const rl = d.sourceType === 'ref' ? _refLines.find((r) => r.id === d.sourceId) : null
             const x =
-                d.sourceType === 'ref'
-                    ? rl
-                        ? vx(rl.id, rl.pos)
-                        : 0
-                    : op
-                      ? timeToX(op.time) - (_blockWidths[op.id] ?? 0) / 2
-                      : 0
+                d.sourceType === 'ref' ? (rl ? vx(rl.id, rl.pos) : 0) : op ? op.pos - (_blockWidths[op.id] ?? 0) / 2 : 0
             const sourceChar =
                 d.sourceType === 'ref'
                     ? '无'
@@ -1150,6 +1144,7 @@ export function getDamageList() {
                 character: string
                 name: string
                 value: string
+                baseType: string
                 time: number
                 x: number
                 element: string
@@ -1164,7 +1159,9 @@ export function getDamageList() {
                 const name =
                     h.skillType === '声骸技能' && echoName ? echoName + '·' + h.hitName.replace('伤害', '') : h.hitName
                 const value = h.ratio + ((h.hits ?? 0) > 1 ? ' ×' + h.hits : '')
-                entries.push({ character, name, value, time, x, element: h.element })
+                const comps = parseValueString(h.ratio)
+                const baseType = comps.length > 0 ? (comps[0].baseType ?? '') : ''
+                entries.push({ character, name, value, baseType, time, x, element: h.element })
             }
             const ndEntries = d.nonDirectEntries
             const effectNDs = ndEntries.filter((nd) => nd.category === '效应')
@@ -1185,6 +1182,7 @@ export function getDamageList() {
                         burstLayers > 0
                             ? (mult * 100).toFixed(2) + '%+' + (burstMult * 100).toFixed(2) + '%'
                             : (mult * 100).toFixed(2) + '%',
+                    baseType: '攻击力',
                     time,
                     x,
                     element: '导电'
@@ -1197,6 +1195,7 @@ export function getDamageList() {
                     character: '无',
                     name: nd.name,
                     value: (mult * 100).toFixed(2) + '%',
+                    baseType: '攻击力',
                     time,
                     x,
                     element: NON_DIRECT_ELEMENT[nd.name] ?? ''
@@ -1205,51 +1204,49 @@ export function getDamageList() {
             for (const nd of otherNDs) {
                 if (nd.category === '处决') {
                     const harmonyChar = nd.responders?.[0] ?? sourceChar
-                    const op = _opBlocks.find((b) => b.id === d.sourceId)
-                    const trackIdx = op?.trackIndex ?? -1
-                    const weaponType = trackIdx >= 0 && trackIdx < 3 ? _charWeaponTypeMap[harmonyChar] ?? '' : ''
-                    const echoCost = trackIdx >= 0 && trackIdx < 3 ? (_team[trackIdx]?.echoes?.[0]?.cost ?? 4) : 4
-                    let tuneValue = '—'
-                    if (weaponType) {
-                        const hits = getTuneDamage(weaponType, echoCost)
-                        if (hits.length > 0) {
-                            const totalDmg = hits.reduce((s, h) => s + h.damage, 0)
-                            const totalMult = hits.reduce((s, h) => s + h.multiplier, 0)
-                            tuneValue = `失谐${totalDmg} × ${(totalMult * 100).toFixed(2)}%`
-                        }
-                    }
                     entries.push({
                         character: harmonyChar,
                         name: '谐度破坏',
-                        value: tuneValue,
-                        time, x,
+                        value: '1600%',
+                        baseType: '偏谐系数',
+                        time,
+                        x,
                         element: '物理'
                     })
                 } else if (nd.category === '响应') {
                     if (nd.responders?.length) {
                         for (const r of nd.responders) {
                             let respValue = '—'
+                            let respBase = ''
                             const respGroups = r !== '无' ? _skillCache[r] : null
                             if (respGroups) {
-                                const tuneGroup = respGroups.find((g) => g.type === '谐度破坏')
-                                if (tuneGroup) {
-                                    const match = tuneGroup.hits.find(
-                                        (h) => h.name.includes('震谐') || h.name.includes('骇破')
+                                for (const group of respGroups) {
+                                    const match = group.hits.find(
+                                        (h) =>
+                                            (h.name.includes('震谐') || h.name.includes('骇破')) &&
+                                            h.name.includes('响应')
                                     )
-                                    if (match) respValue = match.ratio
+                                    if (match) {
+                                        respValue = match.ratio
+                                        const comps = parseValueString(match.ratio)
+                                        respBase = comps.length > 0 ? (comps[0].baseType ?? '偏谐系数') : '偏谐系数'
+                                        break
+                                    }
                                 }
                             }
+                            if (!respBase) respBase = '偏谐系数'
                             entries.push({
                                 character: r,
                                 name: nd.name,
                                 value: respValue,
+                                baseType: respBase,
                                 time,
                                 x,
                                 element: _charElementMap[r] ?? ''
                             })
                         }
                     } else {
-                        entries.push({ character: '无', name: nd.name, value: '—', time, x, element: '' })
+                        entries.push({ character: '无', name: nd.name, value: '—', baseType: '', time, x, element: '' })
                     }
                 }
             }

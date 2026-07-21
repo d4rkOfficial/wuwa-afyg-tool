@@ -1,14 +1,16 @@
-export interface DamageEntry {
+export interface DamageItem {
     id: string
-    character: string
+    character?: string
+    skillType?: string
     hitName: string
-    skillType: string
-    element: string
-    ratio: string
-    ratioNum: number
-    hits: number
-    sourceType: 'op' | 'ref'
-    time: number
+    isEffect: boolean
+    isTuneBreak: boolean
+    isTuneReaction: boolean
+    ratioValue: number
+    ratioUnit: '%' | 'fixed'
+    damageBaseType: string
+    damageElement: string
+    damageBlockId: string
 }
 
 export interface ZoneDef {
