@@ -3,58 +3,86 @@
     "name": "白天",
     "components": {
         "avatar": {
-            "backgroundImage": "#e9edf5",
-            "backgroundImageFocused": "#d2dbee",
-            "textColor": "#18181b",
-            "textColorFocused": "#000000"
+            "backgroundImage": "#e6e4df",
+            "backgroundImageFocused": "#d6d3cd",
+            "textColor": "#292524",
+            "textColorFocused": "#1c1917"
         },
         "tabs": {
-            "backgroundImage": "#ffffff",
-            "backgroundImageFocused": "#d2dbee",
-            "textColor": "#18181b",
-            "textColorFocused": "#000000"
+            "backgroundImage": "#f7f5f0",
+            "textColor": "#44403c",
+            "textColorFocused": "#292524"
         },
         "sidebar": {
-            "backgroundImage": "#eef3fc",
-            "textColor": "#18181b"
+            "backgroundImage": "#eeebe4",
+            "textColor": "#1c1917"
         },
         "btn": {
-            "backgroundImage": "linear-gradient(135deg, #4f46e5, #7c3aed)",
-            "backgroundImageFocused": "#6366f1",
+            "backgroundImage": "linear-gradient(135deg, #6366f1, #8b5cf6)",
+            "backgroundImageFocused": "#818cf8",
             "textColor": "#ffffff",
             "textColorFocused": "#ffffff"
         },
         "search-box": {
-            "backgroundImage": "#e4ebf7",
-            "backgroundImageFocused": "#d2dbee",
-            "textColor": "#18181b",
-            "textColorFocused": "#000000"
+            "backgroundImage": "#f0ede6",
+            "backgroundImageFocused": "#e6e2da",
+            "textColor": "#292524",
+            "textColorFocused": "#1c1917"
         },
         "modal": {
-            "backgroundImage": "#f8faff",
-            "textColor": "#18181b"
+            "backgroundImage": "#fcfaf5",
+            "textColor": "#292524"
         },
         "context-menu": {
-            "backgroundImage": "rgba(248,250,255,0.94)",
-            "backgroundImageFocused": "rgba(226,232,248,0.96)",
-            "textColor": "#18181b",
-            "textColorFocused": "#000000"
+            "backgroundImage": "rgba(252,250,245,0.95)",
+            "backgroundImageFocused": "rgba(238,235,228,0.96)",
+            "textColor": "#292524",
+            "textColorFocused": "#1c1917"
         },
         "toast": {
-            "backgroundImage": "rgba(248,250,255,0.94)",
-            "textColor": "#18181b"
+            "backgroundImage": "rgba(252,250,245,0.95)",
+            "textColor": "#292524"
         },
         "toast-top": {
-            "backgroundImage": "#eef3fc",
-            "textColor": "#18181b"
+            "backgroundImage": "#fcfaf5",
+            "textColor": "#292524"
         },
         "timeline": {
-            "backgroundImage": "#ffffff",
-            "textColor": "#18181b"
+            "backgroundImage": "#faf8f4",
+            "textColor": "#292524"
         },
         "layout": {
-            "backgroundImage": "#f0f5ff",
-            "textColor": "#18181b"
+            "backgroundImage": "#f7f5f0",
+            "textColor": "#292524"
+        },
+        "card": {
+            "backgroundImage": "#ffffff",
+            "backgroundImageFocused": "#f7f5f0",
+            "textColor": "#292524",
+            "borderColor": "#e5e2da"
+        },
+        "input": {
+            "backgroundImage": "#faf8f4",
+            "backgroundImageFocused": "#ffffff",
+            "textColor": "#292524",
+            "textColorFocused": "#1c1917",
+            "borderColor": "#e0ddd5",
+            "borderColorFocused": "#6366f1"
+        },
+        "accent": {
+            "backgroundImage": "#6366f1",
+            "backgroundImageFocused": "#4f46e5",
+            "textColor": "#4f46e5",
+            "borderColor": "rgba(99,102,241,0.3)"
+        },
+        "divider": {
+            "borderColor": "#e5e2da"
+        },
+        "overlay": {
+            "backgroundImage": "rgba(41,37,36,0.4)"
+        },
+        "muted": {
+            "textColor": "#a8a29e"
         }
     }
 }

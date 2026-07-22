@@ -258,7 +258,11 @@
 
 {#if loading}
     <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-lg" onclick={onclose}>
+    <div
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-50 flex items-center justify-center"
+        onclick={onclose}
+    >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
             class="rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-8 shadow-2xl"
@@ -269,7 +273,11 @@
     </div>
 {:else}
     <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-lg" onclick={onclose}>
+    <div
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-50 flex items-center justify-center"
+        onclick={onclose}
+    >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
             class="mx-4 max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-6 shadow-2xl"

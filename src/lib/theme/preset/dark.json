@@ -55,6 +55,35 @@
         "layout": {
             "backgroundImage": "#0e0e10",
             "textColor": "#e4e4e7"
+        },
+        "card": {
+            "backgroundImage": "rgba(255,255,255,0.02)",
+            "backgroundImageFocused": "rgba(255,255,255,0.05)",
+            "textColor": "#e4e4e7",
+            "borderColor": "rgba(255,255,255,0.1)"
+        },
+        "input": {
+            "backgroundImage": "rgba(255,255,255,0.05)",
+            "backgroundImageFocused": "rgba(255,255,255,0.08)",
+            "textColor": "#e4e4e7",
+            "textColorFocused": "#ffffff",
+            "borderColor": "rgba(255,255,255,0.1)",
+            "borderColorFocused": "rgba(99,102,241,0.5)"
+        },
+        "accent": {
+            "backgroundImage": "#6366f1",
+            "backgroundImageFocused": "#4f46e5",
+            "textColor": "#a5b4fc",
+            "borderColor": "rgba(99,102,241,0.3)"
+        },
+        "divider": {
+            "borderColor": "rgba(255,255,255,0.1)"
+        },
+        "overlay": {
+            "backgroundImage": "rgba(0,0,0,0.5)"
+        },
+        "muted": {
+            "textColor": "#71717a"
         }
     }
 }

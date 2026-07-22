@@ -2,6 +2,8 @@
     import Icon from '@iconify/svelte'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
     import type { Project, PhaseKey } from '$lib/data/types'
+    import { setActiveTheme, getActiveId as getActiveThemeId, getThemes } from '$lib/theme'
+    import { addToast } from '$lib/data/toast.svelte'
 
     interface Props {
         projects: Project[]
@@ -75,14 +77,16 @@
         }
     ])
 
+    let currentTheme = $derived(getActiveThemeId())
+
     function selectProject(id: string) {
         onselect(id)
     }
 </script>
 
 <aside
-    class="flex h-full shrink-0 flex-col border-r border-white/5 bg-zinc-950"
-    style="width: {width}px; background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)"
+    class="flex h-full shrink-0 flex-col border-r"
+    style="width: {width}px; background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text); border-color: var(--theme-divider-border, rgba(255,255,255,0.1))"
 >
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -102,6 +106,19 @@
             />
         </svg>
         <span class="text-sm font-semibold tracking-tight">椰果工具箱</span>
+        <div class="flex-1"></div>
+        <button
+            onclick={async () => {
+                const next = currentTheme === 'dark' ? 'light' : 'dark'
+                await setActiveTheme(next)
+                const t = getThemes().find((th) => th.id === next)
+                addToast(`已切换至「${t?.name ?? next}」`, 'success')
+            }}
+            class="rounded p-1 text-[var(--theme-sidebar-text)]/40 transition-colors hover:text-[var(--theme-sidebar-text)]/70 hover:bg-white/5"
+            title="切换主题"
+        >
+            <Icon icon="mdi:theme-light-dark" class="size-4" />
+        </button>
     </div>
 
     <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 py-2">

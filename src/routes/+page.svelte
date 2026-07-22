@@ -26,7 +26,6 @@
     import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
     import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
     import type { ConfigState } from '$lib/components/page/home/config/config.types'
-    import { setActiveTheme, getActiveId as getActiveThemeId, getThemes } from '$lib/theme'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         loadIcons,
@@ -375,7 +374,6 @@
         cloneSelections = updated as Record<PhaseKey, boolean>
     }
 
-    let currentTheme = $derived(getActiveThemeId())
     let phaseLocked = $derived(activeProject?.phases[activePhase]?.locked ?? false)
     let canLock = $derived.by(() => {
         if (phaseLocked) return false
@@ -457,7 +455,7 @@
                         />
                     </svg>
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
-                    <p class="mb-6 text-sm text-zinc-500">测试：上次 PUSH 2026-0722-2254。直伤/处决/响应测试中。</p>
+                    <p class="mb-6 text-sm text-zinc-500">测试：上次 PUSH 2026-0723-0001。伤害计算稳定，潜在bug测试中。白天主题调整中。</p>
                     <button
                         onclick={() => {
                             newName = ''
@@ -550,19 +548,6 @@
                 class="flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5"
                 style="background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)"
             >
-                <!-- 先禁用主题切换 -->
-                <!-- <button
-                    onclick={async () => {
-                        const next = currentTheme === 'dark' ? 'light' : 'dark'
-                        await setActiveTheme(next)
-                        const t = getThemes().find((th) => th.id === next)
-                        addToast(`已切换至「${t?.name ?? next}」`, 'success')
-                    }}
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
-                >
-                    <Icon icon="mdi:theme-light-dark" class="size-4 shrink-0" />
-                    {currentTheme === 'dark' ? '白天主题' : '黑夜主题'}
-                </button> -->
                 <button
                     onclick={() => goto('/api-test')}
                     class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"

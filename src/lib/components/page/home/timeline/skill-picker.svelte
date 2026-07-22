@@ -96,7 +96,8 @@
 {#if getSkillPickerBlockId() !== null}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-lg"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-[60] flex items-center justify-center"
         onclick={(e) => {
             if ((e.target as HTMLElement) === e.currentTarget) {
                 setSkillPickerBlockId(null)
@@ -342,7 +343,8 @@
 {#if showCustomModal}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-lg"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-[70] flex items-center justify-center"
         onkeydown={(e) => e.key === 'Escape' && (showCustomModal = false)}
     >
         <div

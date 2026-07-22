@@ -22,6 +22,8 @@ function applyThemeCSS() {
         setCSSVar(root, key, 'bg-focused', comp.backgroundImageFocused)
         setCSSVar(root, key, 'text', comp.textColor)
         setCSSVar(root, key, 'text-focused', comp.textColorFocused)
+        setCSSVar(root, key, 'border', comp.borderColor)
+        setCSSVar(root, key, 'border-focused', comp.borderColorFocused)
     }
 
     root.style.setProperty('--theme-layout-scheme', theme.id === 'light' ? 'light' : 'dark')

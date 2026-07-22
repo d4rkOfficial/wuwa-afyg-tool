@@ -163,7 +163,8 @@
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-lg"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-50 flex items-center justify-center"
         onkeydown={(e) => e.key === 'Escape' && onclose()}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -451,6 +452,7 @@
 {#if showRename}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
         class="fixed inset-0 z-60 flex items-center justify-center bg-black/40"
         onkeydown={(e) => e.key === 'Escape' && (showRename = false)}
     >
@@ -486,6 +488,7 @@
 {#if showRefModal}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
         class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
         onkeydown={(e) => e.key === 'Escape' && (showRefModal = false)}
     >

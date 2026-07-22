@@ -247,26 +247,11 @@
                                             <div class="pl-3 text-indigo-300 font-bold">
                                                 最终期望 = {Math.round(s5).toLocaleString()}
                                             </div>
-                                        {:else}
-                                            <!-- Direct damage entry -->
+                                        {:else if entry.baseUnit === '效应系数'}
+                                            <!-- Effect damage entry -->
                                             <div class="text-indigo-400 font-semibold font-sans">① 基础属性</div>
                                             <div class="pl-3 space-y-0.5">
-                                                {#if entry.baseUnit === 'ATK'}
-                                                    <div>
-                                                        总ATK = {entry.baseAtk} × (1 + {entry.atkPctSum.toFixed(1)}%) + {entry.atkFlatSum}
-                                                        = {entry.totalAtk}
-                                                    </div>
-                                                {:else if entry.baseUnit === 'HP'}
-                                                    <div>
-                                                        总HP = {entry.totalHp}
-                                                    </div>
-                                                {:else if entry.baseUnit === 'DEF'}
-                                                    <div>
-                                                        总DEF = {entry.totalDef}
-                                                    </div>
-                                                {:else if entry.baseUnit === '固定'}
-                                                    <div>固定值 {Math.round(entry.baseValue)}</div>
-                                                {/if}
+                                                <div>效应系数 = {entry.baseAtk}</div>
                                                 <div>
                                                     × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(
                                                         entry.baseValue
@@ -274,26 +259,7 @@
                                                 </div>
                                             </div>
 
-                                            <div class="text-indigo-400 font-semibold font-sans">② 加深 × 加成</div>
-                                            <div class="pl-3">
-                                                {Math.round(entry.baseValue).toLocaleString()} × (1 + {(
-                                                    entry.deepen * 100
-                                                ).toFixed(1)}%)(加深) × (1 + {(entry.dmgBonus * 100).toFixed(1)}%)(加成)
-                                                = {Math.round(s2).toLocaleString()}
-                                            </div>
-
-                                            <div class="text-indigo-400 font-semibold font-sans">③ 暴击期望 × 易伤</div>
-                                            <div class="pl-3">
-                                                {Math.round(s2).toLocaleString()} × (1 + {(
-                                                    entry.critRate * 100
-                                                ).toFixed(1)}% × {(entry.critDmg * 100).toFixed(1)}%)(暴击) × (1 + {(
-                                                    entry.vulnerability * 100
-                                                ).toFixed(1)}%)(易伤) = {Math.round(s3).toLocaleString()}
-                                            </div>
-
-                                            <div class="text-indigo-400 font-semibold font-sans">
-                                                ④ 抗性区 × 免伤区 × 防御区
-                                            </div>
+                                            <div class="text-indigo-400 font-semibold font-sans">② 敌人减免</div>
                                             <div class="pl-3 space-y-0.5">
                                                 <div>抗性区 = {entry.resMulti.toFixed(4)}</div>
                                                 <div>免伤区 = {entry.dmgRedMulti.toFixed(4)}</div>
@@ -306,19 +272,100 @@
                                                 </div>
                                             </div>
 
-                                            <div class="text-indigo-400 font-semibold font-sans">
-                                                ⑤ 集谐 × 终伤 × 特殊
-                                            </div>
+                                            <div class="text-indigo-400 font-semibold font-sans">③ 终伤 × 特殊</div>
                                             <div class="pl-3">
-                                                {Math.round(s4).toLocaleString()} ×
-                                                {harmony.toFixed(4)}(集谐) × (1 + {(entry.finalDmg * 100).toFixed(
-                                                    1
-                                                )}%)(终伤) ×
+                                                {Math.round(s4).toLocaleString()} × (1 + {(
+                                                    entry.finalDmg * 100
+                                                ).toFixed(1)}%)(终伤) ×
                                                 {entry.customMult.toFixed(4)}(特殊) = {Math.round(s5).toLocaleString()}
                                             </div>
                                             <div class="pl-3 text-indigo-300 font-bold">
                                                 最终期望 = {Math.round(s5).toLocaleString()}
                                             </div>
+                                        {:else}
+                                            <!-- Direct damage entry -->
+                                            <div class="text-indigo-400 font-semibold font-sans">① 基础属性</div>
+                                            <div class="pl-3 space-y-0.5">
+                                                {#if entry.baseUnit === '攻击'}
+                                                    <div>
+                                                        总ATK = {entry.baseAtk} × (1 + {entry.atkPctSum.toFixed(1)}%) + {entry.atkFlatSum}
+                                                        = {entry.totalAtk}
+                                                    </div>
+                                                {:else if entry.baseUnit === '生命'}
+                                                    <div>
+                                                        总HP = {entry.totalHp}
+                                                    </div>
+                                                {:else if entry.baseUnit === '防御'}
+                                                    <div>
+                                                        总DEF = {entry.totalDef}
+                                                    </div>
+                                                {:else if entry.baseUnit === '固定'}
+                                                    <div>固定值 {Math.round(entry.baseValue)}</div>
+                                                {/if}
+                                                {#if entry.baseUnit !== '固定'}
+                                                    <div>
+                                                        × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(
+                                                            entry.baseValue
+                                                        ).toLocaleString()}
+                                                    </div>
+                                                {/if}
+                                            </div>
+
+                                            {#if entry.baseUnit === '固定'}
+                                                <div class="pl-3 text-indigo-300 font-bold">
+                                                    最终期望 = {Math.round(entry.baseValue).toLocaleString()}
+                                                </div>
+                                            {:else}
+                                                <div class="text-indigo-400 font-semibold font-sans">② 加深 × 加成</div>
+                                                <div class="pl-3">
+                                                    {Math.round(entry.baseValue).toLocaleString()} × (1 + {(
+                                                        entry.deepen * 100
+                                                    ).toFixed(1)}%)(加深) × (1 + {(entry.dmgBonus * 100).toFixed(
+                                                        1
+                                                    )}%)(加成) = {Math.round(s2).toLocaleString()}
+                                                </div>
+
+                                                <div class="text-indigo-400 font-semibold font-sans">
+                                                    ③ 暴击期望 × 易伤
+                                                </div>
+                                                <div class="pl-3">
+                                                    {Math.round(s2).toLocaleString()} × (1 + {(
+                                                        entry.critRate * 100
+                                                    ).toFixed(1)}% × {(entry.critDmg * 100).toFixed(1)}%)(暴击) × (1 + {(
+                                                        entry.vulnerability * 100
+                                                    ).toFixed(1)}%)(易伤) = {Math.round(s3).toLocaleString()}
+                                                </div>
+
+                                                <div class="text-indigo-400 font-semibold font-sans">
+                                                    ④ 抗性区 × 免伤区 × 防御区
+                                                </div>
+                                                <div class="pl-3 space-y-0.5">
+                                                    <div>抗性区 = {entry.resMulti.toFixed(4)}</div>
+                                                    <div>免伤区 = {entry.dmgRedMulti.toFixed(4)}</div>
+                                                    <div>防御区 = {entry.defMulti.toFixed(4)}</div>
+                                                    <div>
+                                                        {Math.round(s3).toLocaleString()} × {entry.resMulti.toFixed(4)} ×
+                                                        {entry.dmgRedMulti.toFixed(4)} × {entry.defMulti.toFixed(4)}
+                                                        = {Math.round(s4).toLocaleString()}
+                                                    </div>
+                                                </div>
+
+                                                <div class="text-indigo-400 font-semibold font-sans">
+                                                    ⑤ 集谐 × 终伤 × 特殊
+                                                </div>
+                                                <div class="pl-3">
+                                                    {Math.round(s4).toLocaleString()} ×
+                                                    {harmony.toFixed(4)}(集谐) × (1 + {(entry.finalDmg * 100).toFixed(
+                                                        1
+                                                    )}%)(终伤) ×
+                                                    {entry.customMult.toFixed(4)}(特殊) = {Math.round(
+                                                        s5
+                                                    ).toLocaleString()}
+                                                </div>
+                                                <div class="pl-3 text-indigo-300 font-bold">
+                                                    最终期望 = {Math.round(s5).toLocaleString()}
+                                                </div>
+                                            {/if}
                                         {/if}
                                     </div>
                                 </td>

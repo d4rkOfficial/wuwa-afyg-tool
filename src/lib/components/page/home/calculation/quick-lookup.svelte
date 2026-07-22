@@ -172,7 +172,8 @@
 
 {#if open}
     <div
-        class="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-lg select-text"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-[70] flex items-center justify-center select-text"
         onkeydown={(e) => e.key === 'Escape' && onclose()}
         oncontextmenu={handleCtxMenu}
     >

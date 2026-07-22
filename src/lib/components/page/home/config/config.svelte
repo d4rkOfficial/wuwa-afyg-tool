@@ -362,7 +362,8 @@
         {@const ms = showSubstatModal}
         {@const mSlot = config.characters[ms.ci].echoes[ms.si]}
         <div
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+            class="fixed inset-0 z-50 flex items-center justify-center"
             onclick={() => (showSubstatModal = null)}
         >
             <div

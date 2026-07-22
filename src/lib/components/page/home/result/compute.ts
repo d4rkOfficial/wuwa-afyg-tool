@@ -3,6 +3,8 @@ import type { ConfigState, EchoSlotConfig } from '../config/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry } from './result.types'
 import type { CharSlot } from '$lib/data/types'
+import { getEffectMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
+import { NON_DIRECT_ELEMENT } from '../timeline/timeline.consts'
 
 // ── helpers ──
 
@@ -350,28 +352,38 @@ function computeResultEntry(
         switch (entry.damageBaseType) {
             case '攻击':
                 totalStat = stats.totalAtk
-                baseUnit = 'ATK'
+                baseUnit = '攻击'
                 break
             case '生命':
                 totalStat = stats.totalHp
-                baseUnit = 'HP'
+                baseUnit = '生命'
                 break
             case '防御':
                 totalStat = stats.totalDef
-                baseUnit = 'DEF'
+                baseUnit = '防御'
                 break
             case '偏谐系数':
                 totalStat = stats.totalAtk
-                baseUnit = 'ATK'
+                baseUnit = '偏谐系数'
                 break
             default:
                 totalStat = stats.totalAtk
-                baseUnit = 'ATK'
+                baseUnit = '攻击'
                 break
         }
         baseValue = totalStat * ratioNum
     } else {
         baseValue = entry.ratioValue
+        // fixed damage: skip all multipliers, show 100%
+        const r: ResultEntry = makeStubEntry(entry)
+        r.ratioNum = 1
+        r.baseValue = Math.round(baseValue)
+        r.baseUnit = '固定'
+        r.expectedPerHit = Math.round(baseValue)
+        r.rawPerHit = Math.round(baseValue)
+        r.totalDamage = Math.round(baseValue)
+        r.totalMultiplier = 1
+        return r
     }
 
     // element/type bonus -> total dmg bonus
@@ -533,16 +545,12 @@ const TUNE_COEFF_MAP: Record<string, number> = {
     小怪: 716.2
 }
 
-const TUNE_BASE_UNIT_MAP: Record<string, string> = {
-    BOSS: '偏谐系数(4cost)',
-    精英怪: '偏谐系数(3cost)',
-    小怪: '偏谐系数(1cost)'
-}
+const TUNE_BASE_UNIT = '偏谐系数'
 
 function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: ConfigState['enemy']): ResultEntry {
     const ratioNum = entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue
     const tuneCoeff = TUNE_COEFF_MAP[enemy.type] ?? 716.2
-    const baseUnit = TUNE_BASE_UNIT_MAP[enemy.type] ?? '偏谐系数'
+    const baseUnit = TUNE_BASE_UNIT
     const baseValue = tuneCoeff * ratioNum
 
     // harmony zone: 1 + tuneStat / 100
@@ -611,6 +619,111 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
     }
 }
 
+function emptyCharacterStats(): CharacterComputed {
+    return {
+        baseAtk: 0,
+        baseHp: 0,
+        baseDef: 0,
+        totalAtk: 0,
+        totalHp: 0,
+        totalDef: 0,
+        totalTune: 0,
+        atkPctSum: 0,
+        atkFlatSum: 0,
+        hpPctSum: 0,
+        hpFlatSum: 0,
+        defPctSum: 0,
+        defFlatSum: 0,
+        critRate: 5,
+        critDmg: 150,
+        bonusDmg: 0,
+        deepenDmg: 0,
+        resPen: 0,
+        defPen: 0,
+        defDown: 0,
+        resDown: 0,
+        tuneStrain: 0,
+        finalDmg: 0,
+        dmgTakenInc: 0,
+        customMult: 0,
+        dmgRedPen: 0,
+        elementBonus: {},
+        typeBonus: {}
+    }
+}
+
+// ── effect damage ──
+
+function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy: ConfigState['enemy']): ResultEntry {
+    const layers = Math.round(entry.ratioValue)
+    const multiplier = getEffectMultiplier(entry.hitName, layers)
+    const ratioNum = multiplier
+    const element = (NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? ''
+
+    const baseUnit = '效应系数'
+    const baseValue = Math.round(EFFECT_BASE_VALUE * ratioNum)
+
+    // defense zone
+    const defFactor = 792 + enemy.level * 8
+    const defMulti = enemy.defense / (defFactor * (1 - stats.defPen / 100) * (1 - stats.defDown / 100) + enemy.defense)
+
+    // resistance zone
+    const baseResist = (enemy.resistances[element] ?? 0) / 100
+    let combinedResist = (1 - baseResist) * (1 - stats.resPen / 100) + stats.resDown / 100
+    if (combinedResist > 1) combinedResist = 1 + (combinedResist - 1) / 2
+    const resMulti = combinedResist
+
+    // damage reduction zone
+    const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
+
+    // final dmg & custom mult
+    const finalDmgDec = stats.finalDmg / 100
+    const customMultVal = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
+
+    const totalPerHit = baseValue * defMulti * resMulti * dmgRedMulti * (1 + finalDmgDec) * customMultVal
+    const expectedPerHit = Math.round(totalPerHit)
+
+    return {
+        id: entry.id,
+        character: entry.character ?? '',
+        hitName: entry.hitName,
+        skillType: entry.skillType ?? '',
+        displayName: entry.displayName,
+        element,
+        ratioNum,
+        hits: 1,
+        time: 0,
+        baseValue,
+        baseUnit,
+        totalMultiplier: ratioNum * defMulti * resMulti * dmgRedMulti * (1 + finalDmgDec) * customMultVal,
+        baseAtk: EFFECT_BASE_VALUE,
+        totalAtk: 0,
+        atkPctSum: 0,
+        atkFlatSum: 0,
+        totalHp: 0,
+        hpPctSum: 0,
+        hpFlatSum: 0,
+        totalDef: 0,
+        defPctSum: 0,
+        defFlatSum: 0,
+        totalTune: stats.totalTune,
+        dmgBonus: 0,
+        deepen: 0,
+        critRate: 0,
+        critDmg: 0,
+        defMulti,
+        resMulti,
+        dmgRedMulti,
+        finalDmg: finalDmgDec,
+        finalHarmony: 0,
+        customMult: customMultVal,
+        vulnerability: 0,
+        rawPerHit: expectedPerHit,
+        expectedPerHit,
+        totalDamage: expectedPerHit
+    }
+}
+
 // ── main entry point ──
 
 export function computeAll(
@@ -626,9 +739,22 @@ export function computeAll(
     const enemy = configState.enemy
 
     return damageEntries.map((entry) => {
-        // effect damage → stub (0 damage)
+        // effect damage - handle before character check (effects may lack character)
         if (entry.isEffect) {
-            return makeStubEntry(entry)
+            const charName = entry.character
+            if (charName && charInfoMap[charName]) {
+                const charInfo = charInfoMap[charName]
+                const charIndex = team.findIndex((s) => s.character === charName)
+                if (charIndex >= 0) {
+                    const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds)
+                    const weaponName = team[charIndex]?.weapon ?? null
+                    const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
+                    const echoes = configState.characters[charIndex]?.echoes ?? []
+                    const stats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, boundBuffSets)
+                    return computeEffectEntry(entry, stats, enemy)
+                }
+            }
+            return computeEffectEntry(entry, emptyCharacterStats(), enemy)
         }
 
         const charName = entry.character

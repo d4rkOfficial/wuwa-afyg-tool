@@ -3,6 +3,8 @@ export interface ComponentTheme {
     backgroundImageFocused?: string
     textColor?: string
     textColorFocused?: string
+    borderColor?: string
+    borderColorFocused?: string
 }
 
 export interface Theme {
@@ -23,3 +25,9 @@ export type ThemeComponentKey =
     | 'timeline'
     | 'layout'
     | 'sidebar'
+    | 'card'
+    | 'input'
+    | 'accent'
+    | 'divider'
+    | 'overlay'
+    | 'muted'
