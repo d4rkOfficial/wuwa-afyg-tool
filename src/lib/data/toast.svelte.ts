@@ -3,19 +3,13 @@ export interface ToastItem {
     message: string
     type: 'info' | 'success' | 'error'
     duration: number
-    position: 'bottom-right' | 'top'
 }
 
 let toasts = $state<ToastItem[]>([])
 
-export function addToast(
-    message: string,
-    position: 'bottom-right' | 'top' = 'bottom-right',
-    type: 'info' | 'success' | 'error' = 'info',
-    duration = 3000
-): string {
+export function addToast(message: string, type: 'info' | 'success' | 'error' = 'info', duration = 3000): string {
     const id = crypto.randomUUID()
-    toasts = [...toasts, { id, message, type, duration, position }]
+    toasts = [...toasts, { id, message, type, duration }]
     if (duration > 0) {
         setTimeout(() => removeToast(id), duration)
     }

@@ -30,6 +30,35 @@
             .join(';')
     )
 
+    let modalEl = $state<HTMLElement | undefined>()
+    let modalWidth = $state<number | null>(null)
+    let modalResizing = $state(false)
+
+    $effect(() => {
+        if (!modalResizing) return
+        const onMove = (e: MouseEvent) => {
+            const vw = document.documentElement.clientWidth
+            modalWidth = Math.max(320, Math.min(vw - 40, e.clientX * 2))
+        }
+        const onUp = () => {
+            modalResizing = false
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+        return () => {
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+        }
+    })
+
+    function handleResizeStart(e: MouseEvent) {
+        e.preventDefault()
+        if (modalEl) {
+            modalWidth = modalEl.getBoundingClientRect().width
+        }
+        modalResizing = true
+    }
+
     function handleBackdropClick(e: MouseEvent) {
         if (e.target === e.currentTarget) onclose?.()
     }
@@ -48,14 +77,15 @@
         onkeydown={handleKeydown}
     >
         <div
+            bind:this={modalEl}
             class={[
-                'relative max-h-[85vh] min-w-80 max-w-lg overflow-y-auto rounded-xl p-6 shadow-2xl',
+                'relative max-h-[85vh] min-w-80 overflow-y-auto rounded-xl p-6 shadow-2xl',
                 'bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)]',
                 className || ''
             ]
                 .filter(Boolean)
                 .join(' ')}
-            style={mergedStyle}
+            style="max-width: calc(100vw - 40px); {modalWidth ? `width: ${modalWidth}px` : ''}; {mergedStyle}"
             role="dialog"
             aria-modal="true"
         >
@@ -71,6 +101,10 @@
                     />
                 </svg>
             </button>
+            <div
+                class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 transition-colors hover:bg-indigo-500/50 rounded-r-xl"
+                onmousedown={handleResizeStart}
+            ></div>
             {#if title}
                 <div class="mb-4 pr-6 text-base font-semibold">
                     {@render title()}

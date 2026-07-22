@@ -165,14 +165,14 @@
     oncut={(e) => e.preventDefault()}
 />
 
-<div class="flex h-full flex-col bg-[var(--theme-timeline-bg)] text-[var(--theme-timeline-text)]">
+<div class="flex h-full flex-col bg-(--theme-timeline-bg) text-(--theme-timeline-text)">
     <div class="flex-1 overflow-x-auto overflow-y-hidden" bind:this={timelineEl} onwheel={onWheel}>
         <div class="relative" style="width: {getTableWidth()}px; min-width: 100%; height: 100%;">
             <div class="flex flex-col h-full">
                 <!-- Header row -->
                 <div class="relative shrink-0 h-8 border-b border-white/10">
                     <div
-                        class="sticky left-0 z-[35] w-20 h-full bg-[var(--theme-timeline-bg)] border-r border-white/10"
+                        class="sticky left-0 z-35 w-20 h-full bg-[var(--theme-timeline-bg)] border-r border-white/10"
                     ></div>
                 </div>
 
@@ -259,7 +259,7 @@
                                                     src={uiBtnIconMap.get(block.key)}
                                                     alt={block.key}
                                                     draggable="false"
-                                                    class="size-6 object-contain shrink-0"
+                                                    class="size-10 object-contain shrink-0"
                                                 />
                                             {:else}
                                                 <span class="font-bold text-[var(--theme-timeline-text)]"

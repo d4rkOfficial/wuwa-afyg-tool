@@ -31,14 +31,22 @@
     import {
         loadIcons,
         setShowDamageList,
-        loadCustomHits
+        loadCustomHits,
+        init as initTimeline
     } from '$lib/components/page/home/timeline/timeline.store.svelte'
-    import { setShowBuffModal } from '$lib/components/page/home/calculation/calculation.store.svelte'
+    import {
+        setShowBuffModal,
+        syncGlobalBuffs,
+        getCalcState,
+        init as initCalculation
+    } from '$lib/components/page/home/calculation/calculation.store.svelte'
+    import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
     import Config from '$lib/components/page/home/config/config.svelte'
+    import StatOverview from '$lib/components/page/home/config/stat-overview.svelte'
     import Result from '$lib/components/page/home/result/result.svelte'
     import PhaseTabs from '$lib/components/page/home/phase-tabs.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
@@ -55,6 +63,27 @@
     let newName = $state('')
     let showResult = $state(false)
 
+    let sidebarWidth = $state(240)
+    let sidebarDragging = $state(false)
+
+    $effect(() => {
+        if (!sidebarDragging) return
+        const onMove = (e: MouseEvent) => {
+            sidebarWidth = Math.max(160, Math.min(400, e.clientX))
+        }
+        const onUp = () => {
+            sidebarDragging = false
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+        return () => {
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+        }
+    })
+
+    let showStatOverview = $state(false)
+    let resultRefreshKey = $state(0)
     let renameModal = $state(false)
     let renameId = $state('')
     let renameValue = $state('')
@@ -106,7 +135,7 @@
         showNewModal = false
         newName = ''
         activePhase = 'team'
-        addToast(`项目「${name.trim()}」已创建`, 'top', 'success')
+        addToast(`项目「${name.trim()}」已创建`, 'success')
     }
 
     function openRename(id: string) {
@@ -121,7 +150,7 @@
         if (!renameValue.trim()) return
         renameProject(renameId, renameValue.trim())
         renameModal = false
-        addToast('项目已重命名', 'top', 'success')
+        addToast('项目已重命名', 'success')
     }
 
     function openClone(id: string) {
@@ -154,7 +183,7 @@
             cloneModal = false
             const firstUnchecked = getPhaseOrder().find((ph) => !cloneSelections[ph]) ?? 'config'
             activePhase = firstUnchecked
-            addToast(`已克隆为「${p.name}」`, 'top', 'success')
+            addToast(`已克隆为「${p.name}」`, 'success')
         }
     }
 
@@ -169,7 +198,7 @@
     function handleDelete() {
         deleteProject(deleteId)
         deleteModal = false
-        addToast('项目已删除', 'top', 'info')
+        addToast('项目已删除', 'info')
     }
 
     function goHome() {
@@ -230,7 +259,7 @@
         a.click()
         URL.revokeObjectURL(url)
         exportModal = false
-        addToast(`项目「${p.name}」已导出`, 'top', 'success')
+        addToast(`项目「${p.name}」已导出`, 'success')
     }
 
     function handleImport() {
@@ -277,9 +306,9 @@
                     customSkillHits: (item.customSkillHits as Record<string, unknown[]>) ?? {}
                 })) as Project[]
                 importProjects(normalized)
-                addToast(`成功导入 ${normalized.length} 个项目`, 'top', 'success')
+                addToast(`成功导入 ${normalized.length} 个项目`, 'success')
             } catch {
-                addToast('导入失败：文件格式错误', 'top', 'error')
+                addToast('导入失败：文件格式错误', 'error')
             }
         }
         reader.readAsText(file)
@@ -293,6 +322,19 @@
             activePhase = 'team'
             return
         }
+        initTimeline(
+            p.phases.timeline.data as TimelineData | null,
+            () => {},
+            p.team,
+            p.phases.timeline?.locked ?? false
+        )
+        initCalculation(
+            p.team,
+            p.phases.timeline.data as TimelineData | null,
+            p.phases.calculation.data as CalcState | null,
+            p.phases.calculation?.locked ?? false
+        )
+        initConfig(p.phases.config.data as ConfigState | null, p.phases.config?.locked ?? false)
         const order = getPhaseOrder()
         let lastLocked = -1
         for (let i = order.length - 1; i >= 0; i--) {
@@ -355,13 +397,20 @@
     function handleLockPhase() {
         if (!activeProject) return
         lockPhase(activePhase)
-        addToast(`${PHASE_LABELS[activePhase]} 已锁定`, 'top', 'success')
+        if (activePhase === 'timeline') {
+            syncGlobalBuffs(activeProject.team.map((s) => s.character))
+            updateCalculation(getCalcState())
+        }
+        if (activePhase === 'config') {
+            updateConfig(getConfig())
+        }
+        addToast(`${PHASE_LABELS[activePhase]} 已锁定`, 'success')
     }
 
     function handleUnlockPhase() {
         if (!activeProject) return
         unlockPhase(activeProject.id, activePhase)
-        addToast(`${PHASE_LABELS[activePhase]} 已解锁`, 'top', 'info')
+        addToast(`${PHASE_LABELS[activePhase]} 已解锁`, 'info')
     }
 </script>
 
@@ -369,6 +418,7 @@
     <ProjectSidebar
         {projects}
         {activeId}
+        width={sidebarWidth}
         oncreate={() => {
             newName = ''
             showNewModal = true
@@ -381,6 +431,14 @@
         ondelete={openDelete}
         onselect={handleSelectProject}
     />
+    <button
+        class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-indigo-500/50"
+        style="background: transparent;"
+        onmousedown={(e) => {
+            e.preventDefault()
+            sidebarDragging = true
+        }}
+    ></button>
     <input type="file" accept=".json" class="hidden" bind:this={importInput} onchange={handleImport} />
 
     <div class="flex flex-1 flex-col overflow-hidden">
@@ -399,7 +457,7 @@
                         />
                     </svg>
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
-                    <p class="mb-6 text-sm text-zinc-500">测试：上次 PUSH 2026-0722-0458。内部维修bug中</p>
+                    <p class="mb-6 text-sm text-zinc-500">测试：上次 PUSH 2026-0722-2254。直伤/处决/响应测试中。</p>
                     <button
                         onclick={() => {
                             newName = ''
@@ -438,6 +496,7 @@
                         team={activeProject.team}
                         calcState={activeProject.phases.calculation.data as CalcState | null}
                         configState={activeProject.phases.config.data as ConfigState | null}
+                        refreshKey={resultRefreshKey}
                     />
                 {:else if activePhase === 'team'}
                     <TeamConfig team={activeProject.team} onupdate={handleUpdateTeam} locked={teamPhaseLocked} />
@@ -464,15 +523,23 @@
                         onupdate={(state) => updateConfig(state)}
                     />
                 {/if}
+                {#if showStatOverview}
+                    <StatOverview
+                        team={activeProject.team}
+                        configState={activeProject.phases.config.data as ConfigState | null}
+                        calcState={activeProject.phases.calculation.data as CalcState | null}
+                        onclose={() => (showStatOverview = false)}
+                    />
+                {/if}
                 {#if !showResult && phaseLocked}
                     <div
                         class="absolute inset-0 z-40 flex items-center justify-center bg-black/10 pointer-events-none select-none"
                     >
                         <div
-                            class="flex items-center gap-3 text-3xl font-bold tracking-widest text-white/30"
+                            class="flex items-center gap-6 text-[7.5rem] font-bold tracking-widest text-white/10"
                             style="transform: rotate(-30deg)"
                         >
-                            <Icon icon="mdi:lock" class="size-8" />
+                            <Icon icon="mdi:lock" class="size-32" />
                             已锁定
                         </div>
                     </div>
@@ -489,7 +556,7 @@
                         const next = currentTheme === 'dark' ? 'light' : 'dark'
                         await setActiveTheme(next)
                         const t = getThemes().find((th) => th.id === next)
-                        addToast(`已切换至「${t?.name ?? next}」`, 'top', 'success')
+                        addToast(`已切换至「${t?.name ?? next}」`, 'success')
                     }}
                     class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
                 >
@@ -503,22 +570,41 @@
                     <Icon icon="mdi:api" class="size-4 shrink-0" />
                     API测试
                 </button>
-                {#if activePhase === 'timeline'}
+                {#if !showResult}
+                    {#if activePhase === 'timeline'}
+                        <button
+                            onclick={() => setShowDamageList(true)}
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
+                        >
+                            <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
+                            查看所有伤害
+                        </button>
+                    {/if}
+                    {#if activePhase === 'calculation'}
+                        <button
+                            onclick={() => setShowBuffModal(true)}
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
+                        >
+                            <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
+                            BUFF配置
+                        </button>
+                    {/if}
+                    {#if activePhase === 'config'}
+                        <button
+                            onclick={() => (showStatOverview = true)}
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
+                        >
+                            <Icon icon="mdi:account-details" class="size-4 shrink-0" />
+                            角色面板总览
+                        </button>
+                    {/if}
+                {:else}
                     <button
-                        onclick={() => setShowDamageList(true)}
+                        onclick={() => resultRefreshKey++}
                         class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
                     >
-                        <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
-                        查看所有伤害
-                    </button>
-                {/if}
-                {#if activePhase === 'calculation'}
-                    <button
-                        onclick={() => setShowBuffModal(true)}
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
-                    >
-                        <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
-                        BUFF配置
+                        <Icon icon="mdi:refresh" class="size-4 shrink-0" />
+                        刷新结果
                     </button>
                 {/if}
                 <div class="flex-1"></div>

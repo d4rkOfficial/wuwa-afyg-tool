@@ -14,6 +14,7 @@
         setNonDirectPickerHarmonyTrigger,
         getTeamCharNames,
         charHasTuneSkills,
+        charHasResponseSkill,
         applyNonDirectEntries
     } from './timeline.store.svelte'
     import { getCharIconMap } from './timeline.store.svelte'
@@ -43,10 +44,7 @@
                 {#each NON_DIRECT_CONFIGS.filter((c) => c.name === '谐度破坏' || c.category === '响应') as cfg}
                     {@const isHarmony = cfg.name === '谐度破坏'}
                     {@const isResp = cfg.category === '响应'}
-                    {@const harmonySelected = getNonDirectPickerSelected().has('谐度破坏')}
-                    {@const tuneChar = getNonDirectPickerHarmonyTrigger() ?? ''}
-                    {@const hasTune = tuneChar ? charHasTuneSkills(tuneChar) : false}
-                    {@const disabled = isResp && (!harmonySelected || !hasTune)}
+                    {@const disabled = false}
                     <div class="flex flex-col gap-1">
                         <div class="flex items-center gap-2">
                             <button
@@ -67,9 +65,6 @@
                                 }}
                             >
                                 {cfg.name}
-                                {#if isResp && !harmonySelected}
-                                    <span class="ml-1 text-[10px] opacity-60">(需先开启谐度破坏)</span>
-                                {/if}
                             </button>
                             {#if getNonDirectPickerSelected().has(cfg.name)}
                                 <div class="flex items-center gap-3">
@@ -79,19 +74,23 @@
                                             : (getNonDirectPickerResponders()[cfg.name]?.includes(name) ?? false)}
                                         {@const locked =
                                             isHarmony && getNonDirectPickerHarmonyTrigger() !== null && selected}
+                                        {@const hasRespSkill = isResp ? charHasResponseSkill(name, cfg.name) : true}
+                                        {@const responderDisabled = isResp && !hasRespSkill}
                                         <button
                                             class={[
                                                 'size-9 rounded-full overflow-hidden flex items-center justify-center',
-                                                isHarmony
-                                                    ? selected
+                                                responderDisabled
+                                                    ? 'opacity-10 cursor-not-allowed'
+                                                    : isHarmony
+                                                      ? selected
+                                                          ? 'ring-2 ring-indigo-500'
+                                                          : 'ring-1 ring-white/20 opacity-60'
+                                                      : selected
                                                         ? 'ring-2 ring-indigo-500'
                                                         : 'ring-1 ring-white/20 opacity-60'
-                                                    : selected
-                                                      ? 'ring-2 ring-indigo-500'
-                                                      : 'ring-1 ring-white/20 opacity-60'
                                             ].join(' ')}
                                             onclick={() => {
-                                                if (locked) return
+                                                if (locked || responderDisabled) return
                                                 if (isHarmony) {
                                                     setNonDirectPickerHarmonyTrigger(selected ? null : name)
                                                 } else {

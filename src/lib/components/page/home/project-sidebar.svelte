@@ -6,6 +6,7 @@
     interface Props {
         projects: Project[]
         activeId: string
+        width?: number
         oncreate: () => void
         onimport: () => void
         onhome: () => void
@@ -16,8 +17,19 @@
         onselect: (id: string) => void
     }
 
-    let { projects, activeId, oncreate, onimport, onhome, onrename, onclone, onexport, ondelete, onselect }: Props =
-        $props()
+    let {
+        projects,
+        activeId,
+        width = 240,
+        oncreate,
+        onimport,
+        onhome,
+        onrename,
+        onclone,
+        onexport,
+        ondelete,
+        onselect
+    }: Props = $props()
 
     let ctxMenuOpen = $state(false)
     let ctxX = $state(0)
@@ -69,8 +81,8 @@
 </script>
 
 <aside
-    class="flex h-full w-60 shrink-0 flex-col border-r border-white/5 bg-zinc-950"
-    style="background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)"
+    class="flex h-full shrink-0 flex-col border-r border-white/5 bg-zinc-950"
+    style="width: {width}px; background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)"
 >
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->

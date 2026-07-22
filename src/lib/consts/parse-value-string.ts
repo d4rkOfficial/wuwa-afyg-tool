@@ -5,15 +5,15 @@ export interface HitComponent {
 }
 
 const SUFFIX_MAP: Record<string, string> = {
-    '': '攻击力',
-    生命: '生命值',
-    防御: '防御力'
+    '': '攻击',
+    生命: '生命',
+    防御: '防御'
 }
 
 export function parseValueString(value: string): HitComponent[] {
     if (!value || value === '0') return []
 
-    const parts = value.split(' + ')
+    const parts = value.split('+')
     const result: HitComponent[] = []
 
     for (const part of parts) {
@@ -25,6 +25,7 @@ export function parseValueString(value: string): HitComponent[] {
             const numStr = trimmed.slice(0, pctIdx)
             let suffix = trimmed.slice(pctIdx + 1)
             if (!suffix) suffix = ''
+            suffix = suffix.replace(/^\*\d+/, '')
 
             const num = parseFloat(numStr)
             if (isNaN(num)) continue

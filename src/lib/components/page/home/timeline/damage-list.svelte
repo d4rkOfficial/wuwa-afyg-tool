@@ -42,14 +42,20 @@
                             {#each getDamageList() as entry}
                                 <tr class="border-b border-white/5 last:border-0">
                                     <td class="py-1.5 pr-3 text-[var(--theme-modal-text)]">{entry.character}</td>
-                                    <td class="py-1.5 pr-3 text-[var(--theme-modal-text)]">{entry.name}</td>
+                                    <td
+                                        class="py-1.5 pr-3 text-[var(--theme-modal-text)] max-w-48 truncate"
+                                        title={entry.name}>{entry.name}</td
+                                    >
                                     <td class="py-1.5 pr-3 text-[var(--theme-modal-text)]/60">{entry.baseType}</td>
                                     <td
                                         class="py-1.5 pr-3"
                                         style="color: {(ELEMENT_COLORS as Record<string, string>)[entry.element] ??
                                             '#888'}">{entry.element || '物理'}</td
                                     >
-                                    <td class="py-1.5 text-[var(--theme-modal-text)]/60">{entry.value}</td>
+                                    <td
+                                        class="py-1.5 text-[var(--theme-modal-text)]/60 max-w-36 truncate"
+                                        title={entry.value}>{entry.value}</td
+                                    >
                                 </tr>
                             {/each}
                         </tbody>

@@ -36,6 +36,7 @@ import {
 } from './timeline.consts'
 import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$lib/consts/tune-data'
 import { parseValueString, sumRatioNum } from '$lib/consts/parse-value-string'
+import { addToast } from '$lib/data/toast.svelte'
 
 // ── Core Data ──
 let _refLines = $state<RefLine[]>([
@@ -46,6 +47,14 @@ let _refLines = $state<RefLine[]>([
 let _opBlocks = $state<OpBlock[]>([])
 let _damageBlocks = $state<DamageBlock[]>([])
 let _locked = $state(false)
+
+function assertUnlocked(): boolean {
+    if (_locked) {
+        addToast('本环节已锁定，请先解锁后编辑。编辑产生的副作用需您来承担。', 'info')
+        return false
+    }
+    return true
+}
 let _onupdate: ((data: TimelineData) => void) | undefined = $state()
 let _team = $state<[CharSlot, CharSlot, CharSlot]>([{}, {}, {}] as unknown as [CharSlot, CharSlot, CharSlot])
 let _uiBtnIcons = $state<[string, string][]>([])
@@ -347,6 +356,12 @@ export function charHasTuneSkills(charName: string): boolean {
     return groups?.some((g) => g.type === '谐度破坏' && g.hits.length > 0) ?? false
 }
 
+export function charHasResponseSkill(charName: string, responseName: string): boolean {
+    const groups = _skillCache[charName]
+    if (!groups) return false
+    return groups.some((g) => g.hits.some((h) => h.name.includes(responseName)))
+}
+
 function refreshSkillPickerGroups() {
     if (!_skillPickerBlockId) return
     const base = _skillPickerGroups.filter((g) => g.type !== '自定义')
@@ -511,7 +526,7 @@ export function canAddAfter(id: string): boolean {
 }
 
 export function addBefore(id: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     const idx = _refLines.findIndex((r) => r.id === id)
     if (idx <= 0) return
     const prevX = vx(_refLines[idx - 1].id, _refLines[idx - 1].pos)
@@ -525,7 +540,7 @@ export function addBefore(id: string) {
 }
 
 export function addAfter(id: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     const idx = _refLines.findIndex((r) => r.id === id)
     if (idx < 0 || idx >= _refLines.length - 1) return
     const parentX = vx(id, _refLines[idx].pos)
@@ -539,7 +554,8 @@ export function addAfter(id: string) {
 }
 
 export function removeLine(id: string) {
-    if (_locked || !canDelete(id)) return
+    if (!assertUnlocked()) return
+    if (!canDelete(id)) return
     _refLines = _refLines.filter((r) => r.id !== id)
     _damageBlocks = _damageBlocks.filter((d) => !(d.sourceId === id && d.sourceType === 'ref'))
     const { [id]: _, ...rest } = _dragVisualPositions
@@ -573,7 +589,8 @@ export function clampDragPos(cx: number, id: string): number {
 }
 
 export function startDrag(e: MouseEvent, id: string) {
-    if (_locked || e.button !== 0 || id === 'left') return
+    if (!assertUnlocked()) return
+    if (e.button !== 0 || id === 'left') return
     _draggingId = id
 }
 
@@ -598,7 +615,7 @@ export function stopDrag() {
 
 // ── Op Block Functions ──
 export function addOpBlock(trackIndex: number, pos: number, key: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     _opBlocks = [..._opBlocks, { id: `b${Date.now()}`, trackIndex, pos, key, desc: '', intro: false }]
     _trackMenu = null
     enforceIntro()
@@ -608,7 +625,8 @@ export function addOpBlock(trackIndex: number, pos: number, key: string) {
 let _dragBlockOffset = $state(0)
 
 export function startBlockDrag(e: MouseEvent, blockId: string, mouseContentX?: number) {
-    if (_locked || e.button !== 0) return
+    if (!assertUnlocked()) return
+    if (e.button !== 0) return
     _dragBlockId = blockId
     const block = _opBlocks.find((b) => b.id === blockId)
     if (block) {
@@ -659,7 +677,7 @@ export function stopBlockDrag() {
 }
 
 export function removeBlock(blockId: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     _opBlocks = _opBlocks.filter((b) => b.id !== blockId)
     _damageBlocks = _damageBlocks.filter((d) => !(d.sourceId === blockId && d.sourceType === 'op'))
     _blockMenu = null
@@ -678,7 +696,7 @@ export function canSetIntro(blockId: string): boolean {
 }
 
 export function toggleIntro(blockId: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     const block = _opBlocks.find((b) => b.id === blockId)
     if (!block) return
     if (block.intro) {
@@ -808,7 +826,7 @@ export function reflowTrack(trackIndex: number) {
 
 // ── Damage Block Functions ──
 export function addDamageBlock(sourceType: 'op' | 'ref', sourceId: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     const trackIndex = 3
     const exists = _damageBlocks.some((d) => d.sourceId === sourceId && d.trackIndex === trackIndex)
     if (exists) return
@@ -819,13 +837,13 @@ export function addDamageBlock(sourceType: 'op' | 'ref', sourceId: string) {
 }
 
 export function removeDamageBlock(id: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     _damageBlocks = _damageBlocks.filter((d) => d.id !== id)
     save()
 }
 
 export function removeDamageBySource(sourceId: string, type: 'skillHits' | 'nonDirect' | 'all') {
-    if (_locked) return
+    if (!assertUnlocked()) return
     _damageBlocks = _damageBlocks
         .map((d) => {
             if (d.sourceId !== sourceId || d.trackIndex !== 3) return d
@@ -879,7 +897,8 @@ async function loadEchoSkill(echoName: string): Promise<{ values: [string, strin
 
 export async function openSkillPicker(blockId: string) {
     const op = _opBlocks.find((b) => b.id === blockId)
-    if (!op || op.trackIndex >= 3 || _locked) return
+    if (!assertUnlocked()) return
+    if (!op || op.trackIndex >= 3) return
     const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
     if (!dmg) return
     _skillPickerBlockId = dmg.id
@@ -888,13 +907,18 @@ export async function openSkillPicker(blockId: string) {
     _skillPickerLoading = true
     _skillPickerGroups = []
     _skillPickerHitHits = {}
-    _skillPickerSelected = new Set(
-        dmg.skillHits.map((h) => `${h.character ?? _skillPickerCharacter}|${h.skillType}|${h.hitName}`)
-    )
-    for (const sel of dmg.skillHits) {
-        if (sel.hits) {
-            _skillPickerHitHits[`${sel.character ?? _skillPickerCharacter}|${sel.skillType}|${sel.hitName}`] = sel.hits
+    _skillPickerSelected = new Set()
+    for (const h of dmg.skillHits) {
+        const base = `${h.character ?? _skillPickerCharacter}|${h.skillType}`
+        let key: string
+        if (h.skillType === '自定义') {
+            const ch = _customSkillHits[h.character ?? _skillPickerCharacter]?.find((c) => c.name === h.hitName)
+            key = ch ? `${base}|${ch.id}` : `${base}|${h.hitName}`
+        } else {
+            key = `${base}|${h.hitName}`
         }
+        _skillPickerSelected.add(key)
+        if (h.hits) _skillPickerHitHits[key] = h.hits
     }
     try {
         const groups = await loadCharSkills(_skillPickerCharacter)
@@ -947,7 +971,7 @@ export function applySkillHits() {
                                         : ch.pctUnit
                             parts.push(ch.pctValue + '%' + suf)
                         }
-                        ratio = parts.join(' + ') || '0'
+                        ratio = parts.join('+') || '0'
                     }
                 }
                 const entry: SkillHit = {
@@ -971,19 +995,26 @@ export function applySkillHits() {
 }
 
 export async function openRefSkillPicker(blockId: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
     if (!dmg) addDamageBlock('ref', blockId)
     const block = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
     if (!block) return
     _skillPickerBlockId = block.id
     _skillPickerIsRef = true
-    _skillPickerSelected = new Set(block.skillHits.map((h) => `${h.character}|${h.skillType}|${h.hitName}`))
+    _skillPickerSelected = new Set()
     _skillPickerHitHits = {}
-    for (const sel of block.skillHits) {
-        if (sel.hits) {
-            _skillPickerHitHits[`${sel.character}|${sel.skillType}|${sel.hitName}`] = sel.hits
+    for (const h of block.skillHits) {
+        const base = `${h.character}|${h.skillType}`
+        let key: string
+        if (h.skillType === '自定义') {
+            const ch = _customSkillHits[h.character]?.find((c) => c.name === h.hitName)
+            key = ch ? `${base}|${ch.id}` : `${base}|${h.hitName}`
+        } else {
+            key = `${base}|${h.hitName}`
         }
+        _skillPickerSelected.add(key)
+        if (h.hits) _skillPickerHitHits[key] = h.hits
     }
     _refSkillPickerCache = {}
     _skillPickerCharacter = _team[0]?.character ?? ''
@@ -1021,7 +1052,7 @@ function appendCustomGroups(groups: SkillPickerGroup[], charName: string): Skill
                                 : ch.pctUnit
                     parts.push(ch.pctValue + '%' + suf)
                 }
-                return { name: ch.id, ratio: parts.join(' + ') || '0', element: ch.element }
+                return { name: ch.id, ratio: parts.join('+') || '0', element: ch.element }
             })
         }
     ]
@@ -1061,7 +1092,7 @@ export async function switchRefSkillPickerTab(charName: string) {
 
 // ── Non-Direct Picker Functions ──
 export function openNonDirectPicker(sourceType: 'op' | 'ref', blockId: string) {
-    if (_locked) return
+    if (!assertUnlocked()) return
     const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
     if (!dmg) addDamageBlock(sourceType, blockId)
     const block = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
@@ -1122,7 +1153,7 @@ export function applyNonDirectEntries() {
 }
 
 // ── Damage List ──
-export function getDamageList() {
+function buildDamageList() {
     return _damageBlocks
         .flatMap((d) => {
             if (d.skillHits.length === 0 && d.nonDirectEntries.length === 0) return []
@@ -1157,10 +1188,21 @@ export function getDamageList() {
                 const character =
                     d.sourceType === 'ref' ? h.character || '无' : h.skillType === '声骸技能' ? h.character : sourceChar
                 const name =
-                    h.skillType === '声骸技能' && echoName ? echoName + '·' + h.hitName.replace('伤害', '') : h.hitName
-                const value = h.ratio + ((h.hits ?? 0) > 1 ? ' ×' + h.hits : '')
+                    h.skillType === '声骸技能' && echoName
+                        ? echoName + '·' + h.hitName.replace('伤害', '') + '(' + h.skillType + ')'
+                        : h.hitName.replace('伤害', '') + '(' + h.skillType + ')'
                 const comps = parseValueString(h.ratio)
-                const baseType = comps.length > 0 ? (comps[0].baseType ?? '') : ''
+                const valueParts = comps.map((c) => {
+                    if (c.flatValue !== undefined) return c.flatValue.toString()
+                    return c.ratioNum + '%'
+                })
+                const multMatch = h.ratio.match(/\*(\d+(?:\.\d+)?)/)
+                const value =
+                    valueParts.join('+') +
+                    (multMatch ? '*' + multMatch[1] : '') +
+                    ((h.hits ?? 0) > 1 ? '*' + h.hits : '')
+                const baseTypes = [...new Set(comps.map((c) => c.baseType || '固定'))]
+                const baseType = baseTypes.join('+')
                 entries.push({ character, name, value, baseType, time, x, element: h.element })
             }
             const ndEntries = d.nonDirectEntries
@@ -1177,12 +1219,12 @@ export function getDamageList() {
                 const total = mult + burstMult
                 entries.push({
                     character: '无',
-                    name: `电磁效应${layers}层(爆发${burstLayers}层)`,
+                    name: `电磁效应${layers}层+爆发${burstLayers}层`,
                     value:
                         burstLayers > 0
                             ? (mult * 100).toFixed(2) + '%+' + (burstMult * 100).toFixed(2) + '%'
                             : (mult * 100).toFixed(2) + '%',
-                    baseType: '攻击力',
+                    baseType: '效应系数',
                     time,
                     x,
                     element: '导电'
@@ -1193,9 +1235,9 @@ export function getDamageList() {
                 const mult = getEffectMultiplier(nd.name, nd.layers)
                 entries.push({
                     character: '无',
-                    name: nd.name,
+                    name: nd.name + nd.layers + '层',
                     value: (mult * 100).toFixed(2) + '%',
-                    baseType: '攻击力',
+                    baseType: '效应系数',
                     time,
                     x,
                     element: NON_DIRECT_ELEMENT[nd.name] ?? ''
@@ -1227,8 +1269,12 @@ export function getDamageList() {
                                             h.name.includes('响应')
                                     )
                                     if (match) {
-                                        respValue = match.ratio
                                         const comps = parseValueString(match.ratio)
+                                        const cleanParts = comps.map((c) => {
+                                            if (c.flatValue !== undefined) return c.flatValue.toString()
+                                            return c.ratioNum + '%'
+                                        })
+                                        respValue = cleanParts.join('+')
                                         respBase = comps.length > 0 ? (comps[0].baseType ?? '偏谐系数') : '偏谐系数'
                                         break
                                     }
@@ -1253,4 +1299,10 @@ export function getDamageList() {
             return entries
         })
         .sort((a, b) => a.x - b.x || a.time - b.time)
+}
+
+let _damageList = $derived(buildDamageList())
+
+export function getDamageList() {
+    return _damageList
 }

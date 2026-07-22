@@ -38,7 +38,7 @@
     let charData = $state<CharacterInfo | null>(null)
     let weaponData = $state<WeaponInfo | null>(null)
     let echoSkillData = $state<{ desc: string; values: [string, string, string][] } | null>(null)
-    let setBonuses = $state<Record<string, string> | null>(null)
+    let setBonuses = $state<{ name: string; pieces: number; bonuses: Record<string, string> }[] | null>(null)
     let loading = $state(false)
     let charIcons = $state<Record<string, string>>({})
     let weaponIcons = $state<Record<string, string>>({})
@@ -52,6 +52,17 @@
 
     let charNames = $derived(team.map((s) => s.character).filter((c): c is string => c !== null))
     let currentSlot = $derived(team[charIndex])
+    let inherentSkills = $derived(charData?.statNodes.filter((n) => !n.name.endsWith('提升')) ?? [])
+    let statAttrs = $derived(charData?.statNodes.filter((n) => n.name.endsWith('提升')) ?? [])
+    let sortedStatAttrs = $derived(
+        [...statAttrs].sort((a, b) => {
+            if (a.name < b.name) return -1
+            if (a.name > b.name) return 1
+            const numA = parseFloat(a.desc?.match(/[\d.]+/)?.[0] ?? '0')
+            const numB = parseFloat(b.desc?.match(/[\d.]+/)?.[0] ?? '0')
+            return numA - numB
+        })
+    )
 
     $effect(() => {
         if (open) loadIcons()
@@ -99,10 +110,16 @@
                 getEchoInfo(echoName)
                     .then((e) => (echoSkillData = e.skill))
                     .catch(() => {})
-            if (slot.triggerSets.length > 0)
-                getEchoSetInfo(slot.triggerSets[0].name)
-                    .then((s) => (setBonuses = s.bonuses))
-                    .catch(() => {})
+            if (slot.triggerSets.length > 0) {
+                const setResults = await Promise.allSettled(slot.triggerSets.map((s) => getEchoSetInfo(s.name)))
+                setBonuses = slot.triggerSets
+                    .map((s, i) => ({
+                        name: s.name,
+                        pieces: s.pieces,
+                        bonuses: setResults[i].status === 'fulfilled' ? setResults[i].value.bonuses : {}
+                    }))
+                    .filter((s) => Object.keys(s.bonuses).length > 0)
+            }
         } catch {
             /* ignore */
         }
@@ -232,25 +249,25 @@
                             </h3>
                             <div class="grid grid-cols-4 gap-2">
                                 <div class="rounded-lg bg-white/5 p-2.5 text-center">
-                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">HP</div>
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础生命</div>
                                     <div class="mt-0.5 text-xs font-semibold tabular-nums">
                                         {charData.lv90BaseStats.hp}
                                     </div>
                                 </div>
                                 <div class="rounded-lg bg-white/5 p-2.5 text-center">
-                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">ATK</div>
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础攻击</div>
                                     <div class="mt-0.5 text-xs font-semibold tabular-nums">
                                         {charData.lv90BaseStats.atk}
                                     </div>
                                 </div>
                                 <div class="rounded-lg bg-white/5 p-2.5 text-center">
-                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">DEF</div>
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础防御</div>
                                     <div class="mt-0.5 text-xs font-semibold tabular-nums">
                                         {charData.lv90BaseStats.def}
                                     </div>
                                 </div>
                                 <div class="rounded-lg bg-white/5 p-2.5 text-center">
-                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">谐度</div>
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">谐度破坏增幅</div>
                                     <div class="mt-0.5 text-xs font-semibold tabular-nums">
                                         {charData.lv90BaseStats.tune}
                                     </div>
@@ -330,12 +347,32 @@
                                 <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
                                     套装加成
                                 </h3>
-                                <div class="rounded-lg bg-white/5 p-3 space-y-1">
-                                    {#each Object.entries(setBonuses) as [pieces, desc]}<div class="text-xs">
-                                            <span class="text-indigo-400 font-medium">{pieces}件套</span><span
-                                                class="text-[var(--theme-modal-text)]/70 ml-1">{desc}</span
-                                            >
-                                        </div>{/each}
+                                <div class="space-y-2">
+                                    {#each setBonuses as set}
+                                        <div class="rounded-lg bg-white/5 p-3">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                {#if img(setIcons[set.name])}<img
+                                                        src={img(setIcons[set.name])}
+                                                        alt=""
+                                                        class="size-6 rounded object-contain bg-white/10"
+                                                    />{/if}
+                                                <span class="text-xs font-medium">{set.name}</span>
+                                                <span class="text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >({set.pieces}件)</span
+                                                >
+                                            </div>
+                                            <div class="space-y-0.5">
+                                                {#each Object.entries(set.bonuses) as [pieces, desc]}
+                                                    <div class="text-xs">
+                                                        <span class="text-indigo-400 font-medium">{pieces}件套</span
+                                                        ><span class="text-[var(--theme-modal-text)]/70 ml-1"
+                                                            >{desc}</span
+                                                        >
+                                                    </div>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    {/each}
                                 </div>
                             </section>
                         {/if}
@@ -399,9 +436,55 @@
                                             {/if}
                                         </div>
                                     {/each}
+                                    {#each inherentSkills as skill}
+                                        <div class="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+                                            <button
+                                                onclick={() => handleSkillToggle(skill.name)}
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span
+                                                    class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >固有技能</span
+                                                >
+                                                <span class="flex-1 text-left">{skill.name}</span>
+                                                <Icon
+                                                    icon={openSkillName === skill.name
+                                                        ? 'mdi:chevron-down'
+                                                        : 'mdi:chevron-right'}
+                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                />
+                                            </button>
+                                            {#if openSkillName === skill.name}
+                                                <div
+                                                    class="border-t border-white/10 px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(skill.desc)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
                                 </div>
                             {/if}
                         </section>
+                        {#if statAttrs.length > 0}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    固有属性
+                                </h3>
+                                <div class="grid grid-cols-2 gap-2">
+                                    {#each sortedStatAttrs as attr}
+                                        <div class="rounded-lg bg-white/5 p-2.5">
+                                            <div class="text-[10px] text-[var(--theme-modal-text)]/50">{attr.name}</div>
+                                            {#if attr.desc}
+                                                <div class="mt-0.5 text-xs font-semibold tabular-nums leading-relaxed">
+                                                    {@html rd(attr.desc)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
                         {#if charData.chains.length > 0}
                             <section>
                                 <button

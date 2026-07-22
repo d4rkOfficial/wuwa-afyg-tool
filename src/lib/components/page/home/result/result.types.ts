@@ -3,6 +3,7 @@ export interface ResultEntry {
     character: string
     hitName: string
     skillType: string
+    displayName: string
     element: string
     ratioNum: number
     hits: number

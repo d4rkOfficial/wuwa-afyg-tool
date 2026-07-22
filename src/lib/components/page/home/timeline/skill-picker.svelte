@@ -64,11 +64,11 @@
         const flat = parseFloat(customFlat)
         const pct = parseFloat(customPct)
         if (!customName.trim()) {
-            addToast('请输入直伤名称', 'top', 'info')
+            addToast('请输入直伤名称', 'info')
             return
         }
         if ((isNaN(flat) || flat <= 0) && (isNaN(pct) || pct <= 0)) {
-            addToast('请填写固定值或百分比值', 'top', 'info')
+            addToast('请填写固定值或百分比值', 'info')
             return
         }
         const hit: CustomHit = {
@@ -211,6 +211,14 @@
                                 {@const slot = getTeam().find((s) => s.character === getSkillPickerCharacter())}
                                 {@const echoName = slot?.echoes?.[0]?.name}
                                 {@const isResponseHit = hit.name.includes('响应')}
+                                {@const displayName =
+                                    group.type === '声骸技能' && echoName
+                                        ? echoName + '·' + hit.name
+                                        : group.type === '自定义'
+                                          ? ((getCustomSkillHits()[getSkillPickerCharacter()] ?? []).find(
+                                                (c) => c.id === hit.name
+                                            )?.name ?? hit.name)
+                                          : hit.name}
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <div
@@ -242,14 +250,8 @@
                                                 class="text-[10px] font-bold">{order}</span
                                             >{/if}
                                     </div>
-                                    <span class="flex-1 truncate">
-                                        {group.type === '声骸技能' && echoName
-                                            ? echoName + '·' + hit.name
-                                            : group.type === '自定义'
-                                              ? ((getCustomSkillHits()[getSkillPickerCharacter()] ?? []).find(
-                                                    (c) => c.id === hit.name
-                                                )?.name ?? hit.name)
-                                              : hit.name}
+                                    <span class="flex-1 truncate" title={displayName}>
+                                        {displayName}
                                         {#if isResponseHit}
                                             <span class="text-zinc-600 font-normal normal-case ml-1"
                                                 >(请到非直伤配置中配置)</span

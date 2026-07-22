@@ -6,6 +6,9 @@
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/data/api'
     import { getCharElementMap } from '../timeline/timeline.store.svelte'
     import { ELEMENT_COLORS } from '../timeline/timeline.consts'
+    import { getAllDamageEntries, getCalcState } from '../calculation/calculation.store.svelte'
+    import { getConfig } from '../config/config.store.svelte'
+    import { computeAll as computeAllDamage } from './compute'
     import type { ResultEntry } from './result.types'
     import Icon from '@iconify/svelte'
 
@@ -13,9 +16,10 @@
         team: [CharSlot, CharSlot, CharSlot]
         calcState: CalcState | null
         configState: ConfigState | null
+        refreshKey?: number
     }
 
-    let { team, calcState, configState }: Props = $props()
+    let { team, calcState, configState, refreshKey = 0 }: Props = $props()
 
     let charInfoMap = $state<Record<string, CharacterInfo>>({})
     let weaponInfoMap = $state<Record<string, WeaponInfo>>({})
@@ -26,7 +30,13 @@
     let charElements = $derived(getCharElementMap())
 
     $effect(() => {
+        calcState
+        configState
         loadData()
+    })
+
+    $effect(() => {
+        if (refreshKey > 0) computeAll()
     })
 
     async function loadData() {
@@ -61,7 +71,23 @@
     }
 
     function computeAll() {
-        entries = []
+        const calc = getCalcState()
+        const config = getConfig()
+        const dmgEntries = getAllDamageEntries()
+        if (dmgEntries.length === 0) {
+            entries = []
+            return
+        }
+        entries = computeAllDamage(
+            dmgEntries,
+            calc.buffSets,
+            calc.damageEntryBuffSetIds,
+            calc.damageEntryDamageTypes,
+            config,
+            team,
+            charInfoMap,
+            weaponInfoMap
+        )
     }
 
     let charSummaries = $derived.by(() => {
@@ -103,10 +129,11 @@
                     <div>
                         <div
                             class="text-[10px] text-[var(--theme-modal-text)]/40 mb-1"
-                            style="color: {(ELEMENT_COLORS as Record<string, string>)[charElements[cs.character]] ??
-                                '#888'}"
+                            style="color: {cs.character
+                                ? ((ELEMENT_COLORS as Record<string, string>)[charElements[cs.character]] ?? '#888')
+                                : 'var(--theme-modal-text)'}"
                         >
-                            {cs.character}
+                            {cs.character || '—'}
                         </div>
                         <div class="text-sm font-semibold tabular-nums">
                             {Math.round(cs.totalDamage).toLocaleString()}
@@ -125,7 +152,7 @@
                         style="background: var(--theme-modal-bg)"
                     >
                         <th class="text-left font-medium py-2 px-3">来源</th>
-                        <th class="text-left font-medium py-2 px-3">[技能]倍率名</th>
+                        <th class="text-left font-medium py-2 px-3">条目</th>
                         <th class="text-right font-medium py-2 px-3">基础值</th>
                         <th class="text-right font-medium py-2 px-3">单位</th>
                         <th class="text-right font-medium py-2 px-3">倍率</th>
@@ -141,16 +168,18 @@
                             class="cursor-pointer border-b border-white/5 transition-colors hover:bg-white/5"
                         >
                             <td
-                                class="py-1.5 px-3 text-[var(--theme-modal-text)]"
-                                style="color: {(ELEMENT_COLORS as Record<string, string>)[
-                                    charElements[entry.character]
-                                ] ?? '#888'}">{entry.character}</td
+                                class="py-1.5 px-3"
+                                style="color: {entry.character
+                                    ? ((ELEMENT_COLORS as Record<string, string>)[charElements[entry.character]] ??
+                                      '#888')
+                                    : 'var(--theme-modal-text)'}">{entry.character || '—'}</td
                             >
-                            <td class="py-1.5 px-3 text-[var(--theme-modal-text)]/80">
-                                [{entry.skillType}] {entry.hitName}
-                                {#if entry.hits > 1}<span class="text-[var(--theme-modal-text)]/40">
-                                        ×{entry.hits}</span
-                                    >{/if}
+                            <td
+                                class="py-1.5 px-3 max-w-48 truncate"
+                                title={entry.displayName}
+                                style="color: {(ELEMENT_COLORS as Record<string, string>)[entry.element] ?? '#888'}"
+                            >
+                                {entry.displayName}
                             </td>
                             <td class="py-1.5 px-3 text-right tabular-nums text-[var(--theme-modal-text)]/60"
                                 >{Math.round(entry.baseValue).toLocaleString()}</td
@@ -168,148 +197,129 @@
                             <td class="py-1.5 w-8"></td>
                         </tr>
                         {#if expandedEntry === entry.id}
-                            {@const baseATK = Math.round(
-                                (charInfoMap[entry.character]?.lv90BaseStats?.atk ?? 0) +
-                                    (weaponInfoMap[team.find((s) => s.character === entry.character)?.weapon ?? '']
-                                        ?.lv90BaseAtk ?? 0)
-                            )}
-                            {@const baseHP = Math.round(charInfoMap[entry.character]?.lv90BaseStats?.hp ?? 0)}
-                            {@const baseDEF = Math.round(charInfoMap[entry.character]?.lv90BaseStats?.def ?? 0)}
-                            {@const step1 = entry.baseValue}
-                            {@const step2 =
-                                step1 *
-                                (1 + entry.dmgBonus) *
-                                (1 + entry.deepen) *
-                                (1 + entry.vulnerability) *
-                                (1 + entry.finalHarmony) *
-                                (1 + entry.finalDmg) *
-                                entry.customMult}
-                            {@const step3 = step2 * entry.defMulti * entry.resMulti * entry.dmgRedMulti}
-                            {@const step4 = step3 * (1 + entry.critRate * entry.critDmg)}
+                            {@const s2 = entry.baseValue * (1 + entry.deepen) * (1 + entry.dmgBonus)}
+                            {@const s3 = s2 * (1 + entry.critRate * entry.critDmg) * (1 + entry.vulnerability)}
+                            {@const s4 = s3 * entry.resMulti * entry.dmgRedMulti * entry.defMulti}
+                            {@const harmony = 1 + entry.finalHarmony}
+                            {@const s5 = s4 * harmony * (1 + entry.finalDmg) * entry.customMult}
                             <tr class="bg-white/[0.02]">
                                 <td colspan="8" class="p-0">
                                     <div
-                                        class="border-b border-white/5 px-6 py-3 space-y-2 text-xs text-[var(--theme-modal-text)]/60 font-mono"
+                                        class="border-b border-white/5 px-6 py-3 space-y-3 text-xs text-[var(--theme-modal-text)]/60 font-mono"
                                     >
-                                        <div class="text-indigo-400 font-semibold font-sans">① 基础属性</div>
-                                        {#if entry.baseUnit === 'ATK'}
-                                            <div class="pl-3">
-                                                白值 {baseATK} (角色{Math.round(
-                                                    charInfoMap[entry.character]?.lv90BaseStats?.atk ?? 0
-                                                )} + 武器{Math.round(
-                                                    weaponInfoMap[
-                                                        team.find((s) => s.character === entry.character)?.weapon ?? ''
-                                                    ]?.lv90BaseAtk ?? 0
-                                                )})
+                                        {#if entry.baseUnit.startsWith('偏谐系数')}
+                                            <!-- Tune entry (处决/响应) -->
+                                            <div class="text-indigo-400 font-semibold font-sans">① 基础属性</div>
+                                            <div class="pl-3 space-y-0.5">
+                                                <div>
+                                                    基础{entry.baseUnit} = {Math.round(entry.baseAtk).toLocaleString()}
+                                                </div>
+                                                <div>
+                                                    × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(
+                                                        entry.baseValue
+                                                    ).toLocaleString()}
+                                                </div>
+                                            </div>
+
+                                            <div class="text-indigo-400 font-semibold font-sans">② 敌人减免</div>
+                                            <div class="pl-3 space-y-0.5">
+                                                <div>抗性区 = {entry.resMulti.toFixed(4)}</div>
+                                                <div>免伤区 = {entry.dmgRedMulti.toFixed(4)}</div>
+                                                <div>防御区 = {entry.defMulti.toFixed(4)}</div>
+                                                <div>
+                                                    {Math.round(s3).toLocaleString()} × {entry.resMulti.toFixed(4)} × {entry.dmgRedMulti.toFixed(
+                                                        4
+                                                    )} × {entry.defMulti.toFixed(4)}
+                                                    = {Math.round(s4).toLocaleString()}
+                                                </div>
+                                            </div>
+
+                                            <div class="text-indigo-400 font-semibold font-sans">
+                                                ③ 谐度增幅 × 终伤 × 特殊
                                             </div>
                                             <div class="pl-3">
-                                                百分比 {entry.atkPctSum.toFixed(1)}% = {Math.round(
-                                                    (baseATK * entry.atkPctSum) / 100
-                                                )}
+                                                {Math.round(s4).toLocaleString()} ×
+                                                {harmony.toFixed(4)}(谐度) × (1 + {(entry.finalDmg * 100).toFixed(
+                                                    1
+                                                )}%)(终伤) ×
+                                                {entry.customMult.toFixed(4)}(特殊) = {Math.round(s5).toLocaleString()}
                                             </div>
-                                            <div class="pl-3">固定值 {entry.atkFlatSum}</div>
-                                            <div class="pl-3 text-[var(--theme-modal-text)]">
-                                                总ATK = {baseATK} × (1 + {entry.atkPctSum.toFixed(1)}%) + {entry.atkFlatSum}
-                                                = {entry.totalAtk}
+                                            <div class="pl-3 text-indigo-300 font-bold">
+                                                最终期望 = {Math.round(s5).toLocaleString()}
+                                            </div>
+                                        {:else}
+                                            <!-- Direct damage entry -->
+                                            <div class="text-indigo-400 font-semibold font-sans">① 基础属性</div>
+                                            <div class="pl-3 space-y-0.5">
+                                                {#if entry.baseUnit === 'ATK'}
+                                                    <div>
+                                                        总ATK = {entry.baseAtk} × (1 + {entry.atkPctSum.toFixed(1)}%) + {entry.atkFlatSum}
+                                                        = {entry.totalAtk}
+                                                    </div>
+                                                {:else if entry.baseUnit === 'HP'}
+                                                    <div>
+                                                        总HP = {entry.totalHp}
+                                                    </div>
+                                                {:else if entry.baseUnit === 'DEF'}
+                                                    <div>
+                                                        总DEF = {entry.totalDef}
+                                                    </div>
+                                                {:else if entry.baseUnit === '固定'}
+                                                    <div>固定值 {Math.round(entry.baseValue)}</div>
+                                                {/if}
+                                                <div>
+                                                    × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(
+                                                        entry.baseValue
+                                                    ).toLocaleString()}
+                                                </div>
+                                            </div>
+
+                                            <div class="text-indigo-400 font-semibold font-sans">② 加深 × 加成</div>
+                                            <div class="pl-3">
+                                                {Math.round(entry.baseValue).toLocaleString()} × (1 + {(
+                                                    entry.deepen * 100
+                                                ).toFixed(1)}%)(加深) × (1 + {(entry.dmgBonus * 100).toFixed(1)}%)(加成)
+                                                = {Math.round(s2).toLocaleString()}
+                                            </div>
+
+                                            <div class="text-indigo-400 font-semibold font-sans">③ 暴击期望 × 易伤</div>
+                                            <div class="pl-3">
+                                                {Math.round(s2).toLocaleString()} × (1 + {(
+                                                    entry.critRate * 100
+                                                ).toFixed(1)}% × {(entry.critDmg * 100).toFixed(1)}%)(暴击) × (1 + {(
+                                                    entry.vulnerability * 100
+                                                ).toFixed(1)}%)(易伤) = {Math.round(s3).toLocaleString()}
+                                            </div>
+
+                                            <div class="text-indigo-400 font-semibold font-sans">
+                                                ④ 抗性区 × 免伤区 × 防御区
+                                            </div>
+                                            <div class="pl-3 space-y-0.5">
+                                                <div>抗性区 = {entry.resMulti.toFixed(4)}</div>
+                                                <div>免伤区 = {entry.dmgRedMulti.toFixed(4)}</div>
+                                                <div>防御区 = {entry.defMulti.toFixed(4)}</div>
+                                                <div>
+                                                    {Math.round(s3).toLocaleString()} × {entry.resMulti.toFixed(4)} × {entry.dmgRedMulti.toFixed(
+                                                        4
+                                                    )} × {entry.defMulti.toFixed(4)}
+                                                    = {Math.round(s4).toLocaleString()}
+                                                </div>
+                                            </div>
+
+                                            <div class="text-indigo-400 font-semibold font-sans">
+                                                ⑤ 集谐 × 终伤 × 特殊
                                             </div>
                                             <div class="pl-3">
-                                                × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(step1)}
+                                                {Math.round(s4).toLocaleString()} ×
+                                                {harmony.toFixed(4)}(集谐) × (1 + {(entry.finalDmg * 100).toFixed(
+                                                    1
+                                                )}%)(终伤) ×
+                                                {entry.customMult.toFixed(4)}(特殊) = {Math.round(s5).toLocaleString()}
                                             </div>
-                                        {:else if entry.baseUnit === 'HP'}
-                                            <div class="pl-3">白值 {baseHP}</div>
-                                            <div class="pl-3">
-                                                百分比 {entry.hpPctSum.toFixed(1)}% = {Math.round(
-                                                    (baseHP * entry.hpPctSum) / 100
-                                                )}
-                                            </div>
-                                            <div class="pl-3">固定值 {entry.hpFlatSum}</div>
-                                            <div class="pl-3 text-[var(--theme-modal-text)]">
-                                                总HP = {baseHP} × (1 + {entry.hpPctSum.toFixed(1)}%) + {entry.hpFlatSum} =
-                                                {entry.totalHp}
-                                            </div>
-                                            <div class="pl-3">
-                                                × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(step1)}
-                                            </div>
-                                        {:else if entry.baseUnit === 'DEF'}
-                                            <div class="pl-3">白值 {baseDEF}</div>
-                                            <div class="pl-3">
-                                                百分比 {entry.defPctSum.toFixed(1)}% = {Math.round(
-                                                    (baseDEF * entry.defPctSum) / 100
-                                                )}
-                                            </div>
-                                            <div class="pl-3">固定值 {entry.defFlatSum}</div>
-                                            <div class="pl-3 text-[var(--theme-modal-text)]">
-                                                总DEF = {baseDEF} × (1 + {entry.defPctSum.toFixed(1)}%) + {entry.defFlatSum}
-                                                = {entry.totalDef}
-                                            </div>
-                                            <div class="pl-3">
-                                                × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(step1)}
-                                            </div>
-                                        {:else if entry.baseUnit === 'TUNE'}
-                                            <div class="pl-3">
-                                                基础谐度 {Math.round(
-                                                    charInfoMap[entry.character]?.lv90BaseStats?.tune ?? 0
-                                                )}
-                                            </div>
-                                            <div class="pl-3 text-[var(--theme-modal-text)]">
-                                                总谐度 = {entry.totalTune}
-                                            </div>
-                                            <div class="pl-3">
-                                                × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(step1)}
-                                            </div>
-                                        {:else if entry.baseUnit === '固定'}
-                                            <div class="pl-3">固定值 {Math.round(step1)}</div>
-                                        {:else if entry.baseUnit === '异常'}
-                                            <div class="pl-3">
-                                                异常基础值 × 倍率 {(entry.ratioNum * 100).toFixed(2)}% = {Math.round(
-                                                    step1
-                                                )}
+                                            <div class="pl-3 text-indigo-300 font-bold">
+                                                最终期望 = {Math.round(s5).toLocaleString()}
                                             </div>
                                         {/if}
-
-                                        <div class="text-indigo-400 font-semibold font-sans pt-1">
-                                            ② 倍率×增伤×加深×易伤×集谐×终伤×特殊
-                                        </div>
-                                        <div class="pl-3">
-                                            {Math.round(step1)} ×
-                                            {(1 + entry.dmgBonus).toFixed(4)}(增伤) ×
-                                            {(1 + entry.deepen).toFixed(4)}(加深) ×
-                                            {(1 + entry.vulnerability).toFixed(4)}(易伤) ×
-                                            {(1 + entry.finalHarmony).toFixed(4)}(集谐) ×
-                                            {(1 + entry.finalDmg).toFixed(4)}(终伤) ×
-                                            {entry.customMult.toFixed(4)}(特殊) = {Math.round(step2).toLocaleString()}
-                                        </div>
-
-                                        <div class="text-indigo-400 font-semibold font-sans pt-1">
-                                            ③ 三大敌人抵抗系数
-                                        </div>
-                                        <div class="pl-3">
-                                            {Math.round(step2).toLocaleString()} ×
-                                            {entry.defMulti.toFixed(4)}(防御) ×
-                                            {entry.resMulti.toFixed(4)}(抗性) ×
-                                            {entry.dmgRedMulti.toFixed(4)}(免伤) = {Math.round(step3).toLocaleString()}
-                                        </div>
-
-                                        <div class="text-indigo-400 font-semibold font-sans pt-1">④ 暴击因子</div>
-                                        <div class="pl-3">
-                                            {Math.round(step3).toLocaleString()} × (1 + {(entry.critRate * 100).toFixed(
-                                                1
-                                            )}% × {(entry.critDmg * 100).toFixed(1)}%) = {Math.round(
-                                                step4
-                                            ).toLocaleString()}
-                                        </div>
-
-                                        <div class="text-indigo-400 font-semibold font-sans pt-1">⑤ 以上 × 段数</div>
-                                        <div class="pl-3">
-                                            {Math.round(step4).toLocaleString()}
-                                            {#if entry.hits > 1}
-                                                × {entry.hits}段
-                                            {/if}
-                                            =
-                                            <span class="text-indigo-300 font-bold"
-                                                >{Math.round(entry.expectedPerHit).toLocaleString()}</span
-                                            >
-                                        </div>
                                     </div>
                                 </td>
                             </tr>

@@ -105,12 +105,19 @@
     function handleSelectCharacter(item: unknown) {
         if (pickerSlot === null) return
         const char = item as Character | null
+        if (char) {
+            const dupIdx = localTeam.findIndex((s, i) => i !== pickerSlot && s.character === char.name)
+            if (dupIdx !== -1) {
+                addToast(`已经在${dupIdx + 1}号位选择了${char.name}`, 'error')
+                return
+            }
+        }
         localTeam[pickerSlot].character = char?.name ?? null
         if (char && localTeam[pickerSlot].weapon) {
             const wp = weaponMap.get(localTeam[pickerSlot].weapon!)
             if (wp && wp.weaponType !== char.weaponType) {
                 localTeam[pickerSlot].weapon = null
-                addToast('武器类型与角色不匹配，已清空武器', 'bottom-right', 'info')
+                addToast('武器类型与角色不匹配，已清空武器', 'info')
             }
         }
         if (!char) {
@@ -143,7 +150,7 @@
                 const echoData = echoMap.get(echo.name)
                 if (echoData && !echoData.sets.some((sn) => setNames.has(sn))) {
                     slot.triggerSets = []
-                    addToast('当前声骸不属于已选套装组合，已清空触发套装', 'bottom-right', 'info')
+                    addToast('当前声骸不属于已选套装组合，已清空触发套装', 'info')
                 }
             }
         }
@@ -164,7 +171,7 @@
                         const setNames = new Set(sets.map((s) => s.name))
                         if (!echoData.sets.some((sn) => setNames.has(sn))) {
                             slot.echoes[0] = { name: null, cost: 0 }
-                            addToast('已选套装组合与首位声骸不匹配，已清空声骸', 'bottom-right', 'info')
+                            addToast('已选套装组合与首位声骸不匹配，已清空声骸', 'info')
                         }
                     }
                 }

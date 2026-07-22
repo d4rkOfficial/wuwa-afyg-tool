@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from 'svelte'
     import {
         init,
         getConfig,
@@ -10,10 +11,17 @@
         updateSubstatValue,
         getCalcState
     } from './config.store.svelte'
-    import { totalCost, RESISTANCE_KEYS } from './config.consts'
+    import { RESISTANCE_KEYS } from './config.consts'
     import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
     import type { CharSlot } from '$lib/data/types'
     import type { ConfigState } from './config.types'
+    import {
+        getAllDamageEntries,
+        getAllBuffSets,
+        getBuffSetIdsForEntry,
+        getDamageTypesForEntry
+    } from '../calculation/calculation.store.svelte'
+    import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
     import EnemyPanel from './enemy-panel.svelte'
     import Icon from '@iconify/svelte'
 
@@ -34,11 +42,53 @@
         init(data, locked)
     })
 
+    onMount(() => {
+        const damageEntries = getAllDamageEntries()
+        const buffSets = getAllBuffSets()
+        console.log('=== 词条/环境配置 — 拉表数据 ===')
+        console.log('damageEntries:', JSON.parse(JSON.stringify(damageEntries)))
+        console.log('buffSets:', JSON.parse(JSON.stringify(buffSets)))
+        const bindings: Record<string, string[]> = {}
+        const dmgTypes: Record<string, string[]> = {}
+        for (const e of damageEntries) {
+            bindings[e.id] = getBuffSetIdsForEntry(e.id)
+            dmgTypes[e.id] = getDamageTypesForEntry(e.id)
+        }
+        console.log('damageEntryBuffSetIds:', bindings)
+        console.log('damageEntryDamageTypes:', dmgTypes)
+        console.log('=== end ===')
+    })
+
     let config = $derived(getConfig())
     let charNames = $derived(team.map((s) => s.character).filter((c): c is string => c !== null))
+    let charIcons = $derived(getCharIconMap())
+    let charCostStrings = $derived(
+        [0, 1, 2].map((ci) =>
+            config.characters[ci].echoes
+                .map((e) => e.cost)
+                .sort((a, b) => b - a)
+                .join('')
+        )
+    )
 
     const TAB_LABELS = ['角色1', '角色2', '角色3', '敌人配置']
     const COST_OPTIONS = [4, 3, 1]
+
+    function costBorder(cost: number): string {
+        if (cost === 4) return 'border-red-500/40'
+        if (cost === 3) return 'border-yellow-500/40'
+        return 'border-green-500/40'
+    }
+    function costLabel(cost: number): string {
+        if (cost === 4) return 'text-red-400'
+        if (cost === 3) return 'text-yellow-400'
+        return 'text-green-400'
+    }
+    function costBtnCls(cost: number): string {
+        if (cost === 4) return 'bg-red-500/15 text-red-300'
+        if (cost === 3) return 'bg-yellow-500/15 text-yellow-300'
+        return 'bg-green-500/15 text-green-300'
+    }
 
     function handleSetCost(ci: number, si: number, cost: number) {
         const slots = config.characters[ci].echoes
@@ -90,15 +140,28 @@
                     showSubstatMenu = null
                 }}
                 class={[
-                    'px-4 py-2 text-xs font-medium transition-colors relative',
+                    'px-3 py-2 text-xs font-medium transition-colors relative flex items-center gap-2',
                     (i < 3 ? activeTab === `char${i}` : activeTab === 'enemy')
                         ? 'text-indigo-300'
                         : 'text-[var(--theme-modal-text)]/50 hover:text-[var(--theme-modal-text)]/70'
                 ].join(' ')}
             >
-                {label}
                 {#if i < 3 && charNames[i]}
-                    <span class="text-[10px] text-[var(--theme-modal-text)]/40 ml-1">({charNames[i]})</span>
+                    {#if charIcons[charNames[i]]}
+                        <img src={charIcons[charNames[i]]} alt="" class="size-6 rounded-full shrink-0" />
+                    {:else}
+                        <div
+                            class="size-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] shrink-0"
+                        >
+                            {charNames[i]!.charAt(0)}
+                        </div>
+                    {/if}
+                    <span style="color: {elementColor(charNames[i])}">{charNames[i]}</span>
+                    <span class="text-[10px] text-[var(--theme-modal-text)]/40">({charCostStrings[i]})</span>
+                {:else if i === 3}
+                    {label}
+                {:else}
+                    {label}
                 {/if}
                 {#if i < 3 && activeTab === `char${i}`}
                     <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-indigo-500"></div>
@@ -121,10 +184,10 @@
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {#each config.characters[ci].echoes as slot, si}
                     {@const second = SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT]}
-                    <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                    <div class={['rounded-xl border bg-white/[0.02] p-4', costBorder(slot.cost)].join(' ')}>
                         <!-- Cost selector -->
                         <div class="flex items-center justify-between mb-3">
-                            <span class="text-xs font-medium text-[var(--theme-modal-text)]/60">声骸 {si + 1}</span>
+                            <span class={['text-sm font-medium', costLabel(slot.cost)].join(' ')}>声骸 {si + 1}</span>
                             <div class="flex gap-1">
                                 {#each COST_OPTIONS as c}
                                     <button
@@ -140,7 +203,7 @@
                                         class={[
                                             'min-w-7 px-2 h-6 rounded text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
                                             slot.cost === c
-                                                ? 'bg-indigo-500/15 text-indigo-300'
+                                                ? costBtnCls(slot.cost)
                                                 : 'bg-white/5 text-[var(--theme-modal-text)]/40 hover:bg-white/10'
                                         ].join(' ')}>{c} COST</button
                                     >
@@ -148,23 +211,10 @@
                             </div>
                         </div>
 
-                        <!-- Cost total -->
-                        <div class="text-[10px] text-[var(--theme-modal-text)]/30 mb-3">
-                            合计: {totalCost(config.characters[ci].echoes)}/12
-                        </div>
-
-                        <!-- Second main stat -->
-                        {#if second}
-                            <div class="flex items-center gap-2 mb-2 text-xs">
-                                <span class="text-[var(--theme-modal-text)]/40">副属性</span>
-                                <span class="text-[var(--theme-modal-text)]/70">{second.label} +{second.value}</span>
-                            </div>
-                        {/if}
-
                         <!-- Main stat -->
-                        <div class="mb-3">
+                        <div class="mb-2">
                             <span class="text-[10px] text-[var(--theme-modal-text)]/40 block mb-1">主词条</span>
-                            <div class="relative">
+                            <div class="relative z-20">
                                 <button
                                     onclick={() =>
                                         (showMainStatMenu =
@@ -188,7 +238,7 @@
                                 </button>
                                 {#if showMainStatMenu?.ci === ci && showMainStatMenu?.si === si}
                                     <div
-                                        class="absolute left-0 top-full z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                        class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
                                         onclick={(e) => e.stopPropagation()}
                                     >
                                         <button
@@ -224,6 +274,14 @@
                             </div>
                         </div>
 
+                        <!-- Second main stat -->
+                        {#if second}
+                            <div class="flex items-center gap-2 mb-2 text-xs">
+                                <span class="text-[var(--theme-modal-text)]/40">副属性</span>
+                                <span class="text-[var(--theme-modal-text)]/70">{second.label} +{second.value}</span>
+                            </div>
+                        {/if}
+
                         <!-- Substats -->
                         <div>
                             <span class="text-[10px] text-[var(--theme-modal-text)]/40 block mb-1"
@@ -233,30 +291,43 @@
                                 {#each slot.substats as sub, idx}
                                     {@const opt = SUBSTAT_OPTIONS.find((o) => o.label === sub.type)}
                                     {#if opt}
+                                        {@const tierIdx = getTierIndex(opt, sub.value)}
+                                        {@const maxTier = opt.tiers.length - 1}
+                                        {@const pct = tierIdx > 0 ? (tierIdx / maxTier) * 100 : 0}
                                         <div class="flex items-center gap-2 rounded bg-white/5 px-2 py-1.5">
-                                            <span class="text-xs text-[var(--theme-modal-text)]/70 w-16 shrink-0"
+                                            <span class="text-xs text-[var(--theme-modal-text)]/70 w-20 shrink-0 mr-2"
                                                 >{sub.type}</span
                                             >
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max={opt.tiers.length - 1}
-                                                value={getTierIndex(opt, sub.value) > 0
-                                                    ? getTierIndex(opt, sub.value)
-                                                    : 0}
-                                                oninput={(e) => {
-                                                    const idx2 = parseInt((e.target as HTMLInputElement).value)
-                                                    handleUpdateSubstatValue(ci, si, idx, opt.tiers[idx2])
-                                                }}
-                                                class="flex-1 h-1.5 appearance-none cursor-pointer rounded-full accent-indigo-500 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-500"
-                                            />
-                                            <span
-                                                class="text-xs tabular-nums text-[var(--theme-modal-text)]/50 w-12 text-right"
-                                                >{sub.value}{opt.unit}</span
-                                            >
+                                            <div class="relative flex-1 h-5">
+                                                <div
+                                                    class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-white/10"
+                                                >
+                                                    <div
+                                                        class="h-full rounded-full"
+                                                        style="width: {pct}%; background: #6366f1"
+                                                    ></div>
+                                                </div>
+                                                <div
+                                                    class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium text-white whitespace-nowrap pointer-events-none z-10"
+                                                    style="left: {pct}%; background: #6366f1"
+                                                >
+                                                    {sub.value}{opt.unit}
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max={maxTier}
+                                                    value={tierIdx > 0 ? tierIdx : 0}
+                                                    oninput={(e) => {
+                                                        const idx2 = parseInt((e.target as HTMLInputElement).value)
+                                                        handleUpdateSubstatValue(ci, si, idx, opt.tiers[idx2])
+                                                    }}
+                                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-0"
+                                                />
+                                            </div>
                                             <button
                                                 onclick={() => handleRemoveSubstat(ci, si, idx)}
-                                                class="shrink-0 rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400"
+                                                class="shrink-0 rounded p-0.5 ml-2 text-zinc-500 transition-colors hover:text-red-400"
                                             >
                                                 <Icon icon="mdi:close" class="size-3" />
                                             </button>
