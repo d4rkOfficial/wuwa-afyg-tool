@@ -48,8 +48,8 @@
 </script>
 
 <div
-    class="flex items-center gap-1 border-b border-white/5 px-4"
-    style="background: var(--theme-tabs-bg); color: var(--theme-tabs-text)"
+    class="flex items-center gap-1 border-b px-4"
+    style="background: var(--theme-tabs-bg); color: var(--theme-tabs-text); border-color: var(--theme-divider-border)"
 >
     {#each tabs as tab}
         <button
@@ -59,25 +59,25 @@
             class={[
                 'relative flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors',
                 !showResult && tab.locked && active === tab.key
-                    ? 'text-emerald-300'
+                    ? 'text-emerald-600'
                     : !showResult && active === tab.key
-                      ? 'text-indigo-300'
+                      ? 'text-[var(--theme-accent-text)]'
                       : tab.disabled
-                        ? 'cursor-not-allowed text-zinc-700'
-                        : 'text-zinc-400 hover:text-zinc-200',
-                !tab.disabled && 'hover:bg-white/[0.02]'
+                        ? 'opacity-30 cursor-not-allowed'
+                        : 'opacity-60 hover:opacity-100',
+                !tab.disabled && 'hover:bg-[var(--theme-tabs-text)]/5'
             ].join(' ')}
         >
             {#if tab.locked}
-                <Icon icon="mdi:lock" class="size-3.5 text-emerald-500" />
+                <Icon icon="mdi:lock" class="size-3.5 text-emerald-600" />
             {:else if tab.disabled}
-                <Icon icon="mdi:lock-outline" class="size-3.5 text-zinc-700" />
+                <Icon icon="mdi:lock-outline" class="size-3.5 opacity-30" />
             {:else}
-                <Icon icon="mdi:lock-open-outline" class="size-3.5 text-zinc-500" />
+                <Icon icon="mdi:lock-open-outline" class="size-3.5 opacity-50" />
             {/if}
             {tab.label}
             {#if !showResult && active === tab.key}
-                <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-indigo-500"></div>
+                <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[var(--theme-accent-bg)]"></div>
             {/if}
         </button>
     {/each}
@@ -86,11 +86,7 @@
         disabled={!resultEnabled}
         class={[
             'relative flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors',
-            showResult
-                ? 'text-indigo-300'
-                : resultEnabled
-                  ? 'text-indigo-300 hover:bg-white/[0.02]'
-                  : 'cursor-not-allowed text-zinc-700'
+            showResult || resultEnabled ? 'text-[var(--theme-accent-text)]' : 'opacity-30 cursor-not-allowed'
         ].join(' ')}
         title={resultEnabled ? '' : '请先锁定全部阶段'}
     >

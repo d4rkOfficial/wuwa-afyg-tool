@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { SelectedSet } from '$lib/data/types'
     import type { EchoSetItem } from '$lib/api/types'
+    import Icon from '@iconify/svelte'
 
     interface Props {
         open: boolean
@@ -113,10 +114,12 @@
 
             <div class="flex-1 overflow-y-auto">
                 {#if pinnedList.length > 0}
-                    <div class="mb-2 text-xs font-semibold tracking-wider text-zinc-500">首位声骸所属</div>
+                    <div class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-muted-text)]">
+                        首位声骸所属
+                    </div>
                     <div class="grid grid-cols-2 gap-3">
                         {#each pinnedList as set}
-                            <div class="flex flex-col gap-2 rounded-lg bg-white/5 p-3">
+                            <div class="flex flex-col gap-2 rounded-lg p-3" style="background: var(--theme-input-bg);">
                                 <div class="flex items-center gap-2 min-w-0">
                                     {#if icons[set.name]}
                                         <img
@@ -127,7 +130,8 @@
                                     {/if}
                                     <span class="min-w-0 truncate text-sm font-medium">{set.name}</span>
                                     <span
-                                        class="ml-auto shrink-0 rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-400"
+                                        class="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px]"
+                                        style="background: var(--theme-accent-bg)/15; color: var(--theme-accent-text);"
                                         >首位所属</span
                                     >
                                 </div>
@@ -139,8 +143,8 @@
                                             class={[
                                                 'rounded px-2.5 py-1 text-xs font-medium transition-colors',
                                                 isPieceSelected(set.name, piece)
-                                                    ? 'bg-indigo-500/30 text-indigo-300'
-                                                    : 'bg-white/10 text-zinc-400 hover:bg-white/20',
+                                                    ? 'bg-[var(--theme-accent-bg)]/30 text-[var(--theme-accent-text)]'
+                                                    : 'bg-[var(--theme-input-bg)] text-[var(--theme-muted-text)] hover:bg-[var(--theme-modal-text)]/10',
                                                 !isPieceAvailable(set.name, piece) && !isSelected(set.name)
                                                     ? 'opacity-30 pointer-events-none'
                                                     : ''
@@ -155,16 +159,16 @@
                             </div>
                         {/each}
                     </div>
-                    <div class="my-3 border-t border-white/5"></div>
+                    <div class="my-3" style="border-top: 1px solid var(--theme-divider-border);"></div>
                 {/if}
 
                 {#if otherList.length === 0}
-                    <div class="py-8 text-center text-sm text-zinc-600">无其他套装</div>
+                    <div class="py-8 text-center text-sm text-[var(--theme-muted-text)]">无其他套装</div>
                 {:else}
-                    <div class="mb-2 text-xs font-semibold tracking-wider text-zinc-500">其它套装</div>
+                    <div class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-muted-text)]">其它套装</div>
                     <div class="grid grid-cols-2 gap-3">
                         {#each otherList as set}
-                            <div class="flex flex-col gap-2 rounded-lg bg-white/5 p-3">
+                            <div class="flex flex-col gap-2 rounded-lg p-3" style="background: var(--theme-input-bg);">
                                 <div class="flex items-center gap-2 min-w-0">
                                     {#if icons[set.name]}
                                         <img
@@ -183,8 +187,8 @@
                                             class={[
                                                 'rounded px-2.5 py-1 text-xs font-medium transition-colors',
                                                 isPieceSelected(set.name, piece)
-                                                    ? 'bg-indigo-500/30 text-indigo-300'
-                                                    : 'bg-white/10 text-zinc-400 hover:bg-white/20',
+                                                    ? 'bg-[var(--theme-accent-bg)]/30 text-[var(--theme-accent-text)]'
+                                                    : 'bg-[var(--theme-input-bg)] text-[var(--theme-muted-text)] hover:bg-[var(--theme-modal-text)]/10',
                                                 !isPieceAvailable(set.name, piece) && !isSelected(set.name)
                                                     ? 'opacity-30 pointer-events-none'
                                                     : ''
@@ -202,17 +206,16 @@
                 {/if}
             </div>
 
-            <div class="mt-4 flex items-center justify-end border-t border-white/5 pt-3">
+            <div
+                class="mt-4 flex items-center justify-end pt-3"
+                style="border-top: 1px solid var(--theme-divider-border);"
+            >
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium text-[var(--theme-btn-text)] transition-colors hover:bg-white/5"
+                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                        ><path
-                            fill="currentColor"
-                            d="M9 16.17L5.53 12.7a1 1 0 0 0-1.42 1.42l4.18 4.18a1 1 0 0 0 1.42 0L20.29 7.71a1 1 0 1 0-1.42-1.42z"
-                        /></svg
-                    >
+                    <Icon icon="mdi:check" class="size-4" />
                     确认 ({formatSets(selected)} = {totalPieces}/5)
                 </button>
             </div>

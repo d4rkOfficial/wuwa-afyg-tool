@@ -475,8 +475,14 @@ function estimateDamageWidth(d: DamageBlock): number {
     }
     const maxChars = Math.max(...texts.map((t) => t.length), 0)
     const singleTagW = maxChars * 5.5 + 22
-    const count = texts.length
-    return Math.max(singleTagW, Math.min(count * (singleTagW + 4), 160)) + 8
+    return singleTagW + 8
+}
+
+export function estimateDamageHeight(d: DamageBlock): number {
+    const count = d.skillHits.length + d.nonDirectEntries.length
+    const TAG_HEIGHT = 18
+    const PAD = 4
+    return count * TAG_HEIGHT + PAD
 }
 
 export function getDamageBlocksStacked(): { block: DamageBlock; top: number; left: number }[] {
@@ -485,17 +491,41 @@ export function getDamageBlocksStacked(): { block: DamageBlock; top: number; lef
         .map((d) => ({ block: d, left: damageBlockLeft(d) }))
         .sort((a, b) => a.left - b.left)
 
-    const GAP = 26
+    const GAP = 4
     const result: { block: DamageBlock; top: number; left: number }[] = []
     for (const item of blocks) {
-        let top = 0
+        const hB = estimateDamageHeight(item.block)
         const wB = _damageWidths[item.block.id] ?? estimateDamageWidth(item.block)
+
+        const candidateSet = new Set<number>()
+        candidateSet.add(0)
         for (const placed of result) {
             const wA = _damageWidths[placed.block.id] ?? estimateDamageWidth(placed.block)
             if (Math.abs(placed.left - item.left) < (wA + wB) / 2) {
-                top = Math.max(top, placed.top + GAP)
+                candidateSet.add(placed.top + estimateDamageHeight(placed.block) + GAP)
             }
         }
+
+        const candidates = [...candidateSet].sort((a, b) => a - b)
+        let top = candidates[candidates.length - 1]
+        for (const y of candidates) {
+            let valid = true
+            for (const placed of result) {
+                const wA = _damageWidths[placed.block.id] ?? estimateDamageWidth(placed.block)
+                if (Math.abs(placed.left - item.left) < (wA + wB) / 2) {
+                    const hA = estimateDamageHeight(placed.block)
+                    if (y < placed.top + hA + GAP && placed.top < y + hB + GAP) {
+                        valid = false
+                        break
+                    }
+                }
+            }
+            if (valid) {
+                top = y
+                break
+            }
+        }
+
         result.push({ block: item.block, top, left: item.left })
     }
     return result
@@ -560,6 +590,42 @@ export function removeLine(id: string) {
     _damageBlocks = _damageBlocks.filter((d) => !(d.sourceId === id && d.sourceType === 'ref'))
     const { [id]: _, ...rest } = _dragVisualPositions
     _dragVisualPositions = rest
+    _contextMenu = null
+    save()
+}
+
+export function clearLeftOpBlocks(refId: string) {
+    if (!assertUnlocked()) return
+    const idx = _refLines.findIndex((r) => r.id === refId)
+    if (idx <= 0) return
+    const leftBound = _refLines[idx - 1].pos
+    const rightBound = _refLines[idx].pos
+    const toRemove = _opBlocks.filter((b) => b.pos > leftBound && b.pos < rightBound)
+    const removeIds = new Set(toRemove.map((b) => b.id))
+    _opBlocks = _opBlocks.filter((b) => !removeIds.has(b.id))
+    _damageBlocks = _damageBlocks.filter((d) => !(d.sourceType === 'op' && removeIds.has(d.sourceId)))
+    _contextMenu = null
+    save()
+}
+
+export function resetLeftDamageBindings(refId: string) {
+    if (!assertUnlocked()) return
+    const idx = _refLines.findIndex((r) => r.id === refId)
+    if (idx <= 0) return
+    const leftBound = _refLines[idx - 1].pos
+    const rightBound = _refLines[idx].pos
+    const inRangeOpIds = new Set(_opBlocks.filter((b) => b.pos > leftBound && b.pos < rightBound).map((b) => b.id))
+    const inRangeRefIds = new Set(_refLines.filter((r) => r.pos > leftBound && r.pos < rightBound).map((r) => r.id))
+    _damageBlocks = _damageBlocks
+        .map((d) => {
+            if (d.trackIndex !== 3) return d
+            const isInRange =
+                (d.sourceType === 'op' && inRangeOpIds.has(d.sourceId)) ||
+                (d.sourceType === 'ref' && inRangeRefIds.has(d.sourceId))
+            if (!isInRange) return d
+            return { ...d, skillHits: [], nonDirectEntries: [] }
+        })
+        .filter((d) => !(d.skillHits.length === 0 && d.nonDirectEntries.length === 0))
     _contextMenu = null
     save()
 }

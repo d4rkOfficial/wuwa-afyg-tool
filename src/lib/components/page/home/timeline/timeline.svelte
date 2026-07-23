@@ -31,6 +31,7 @@
         setDamageWidth,
         getSegments,
         elementColor,
+        estimateDamageHeight,
         startDrag,
         startBlockDrag,
         onDrag,
@@ -78,6 +79,14 @@
     let blockEditInput: HTMLInputElement | undefined = $state()
 
     let uiBtnIconMap = $derived(new Map(getUiBtnIcons()))
+    let damageStack = $derived(getDamageBlocksStacked())
+    let damageStackHeight = $derived.by(() => {
+        let maxBottom = 0
+        for (const item of damageStack) {
+            maxBottom = Math.max(maxBottom, item.top + estimateDamageHeight(item.block))
+        }
+        return maxBottom + 12
+    })
 
     $effect(() => {
         init(data, onupdate, team, locked)
@@ -120,6 +129,24 @@
         if (!timelineEl) return
         e.preventDefault()
         timelineEl.scrollLeft += e.deltaY
+    }
+
+    const onDamageWheel = (e: WheelEvent) => {
+        if (e.ctrlKey) {
+            e.preventDefault()
+            e.stopPropagation()
+            const el = e.currentTarget as HTMLElement
+            el.scrollTop += e.deltaY
+        }
+    }
+
+    function nonpassiveWheel(node: HTMLElement, handler: (e: WheelEvent) => void) {
+        node.addEventListener('wheel', handler, { passive: false })
+        return {
+            destroy() {
+                node.removeEventListener('wheel', handler)
+            }
+        }
     }
 
     function measureWidth(node: HTMLElement, blockId: string) {
@@ -292,78 +319,72 @@
                         {:else}
                             <!-- Damage blocks overlay for track 3 -->
                             <div
-                                class="absolute pointer-events-none"
+                                class="absolute pointer-events-auto overflow-y-auto"
                                 style="left: 5rem; top: 0; right: 0; bottom: 0; z-index: 6;"
+                                use:nonpassiveWheel={onDamageWheel}
                             >
-                                {#each getDamageBlocksStacked() as { block: dmg, top, left } (dmg.id)}
-                                    <div
-                                        class="absolute pointer-events-auto cursor-default"
-                                        style="left: {left}px; top: {top}px;"
-                                    >
-                                        <div
-                                            class="flex flex-row items-start justify-start gap-x-1 gap-y-0.5 flex-wrap content-start overflow-y-auto overflow-x-hidden px-1 py-0.5"
-                                            use:measureDamageWidth={dmg.id}
-                                            onwheel={(e) => {
-                                                if (!e.ctrlKey) return
-                                                e.preventDefault()
-                                                e.stopPropagation()
-                                                const el = e.currentTarget as HTMLElement
-                                                el.scrollTop += e.deltaY
-                                            }}
-                                        >
-                                            {#each dmg.skillHits as hit}
-                                                {@const echoName = team.find((s) => s.character === hit.character)
-                                                    ?.echoes?.[0]?.name}
-                                                <span
-                                                    class="text-[9px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
-                                                    style="color: {(ELEMENT_COLORS as Record<string, string>)[
-                                                        hit.element
-                                                    ] ?? '#ef4444'}; border-color: {(
-                                                        ELEMENT_COLORS as Record<string, string>
-                                                    )[hit.element] ?? '#ef4444'};"
-                                                >
-                                                    {(dmg.sourceType === 'ref' && hit.character
-                                                        ? `[${hit.character}]`
-                                                        : '') +
-                                                        (hit.skillType === '声骸技能' && echoName
-                                                            ? echoName + '·'
+                                <div class="relative" style="height: {damageStackHeight}px; width: 100%;">
+                                    {#each damageStack as { block: dmg, top, left } (dmg.id)}
+                                        <div class="absolute cursor-default" style="left: {left}px; top: {top}px;">
+                                            <div
+                                                class="flex flex-col items-start gap-0.5 px-1 py-0.5"
+                                                use:measureDamageWidth={dmg.id}
+                                            >
+                                                {#each dmg.skillHits as hit}
+                                                    {@const echoName = team.find((s) => s.character === hit.character)
+                                                        ?.echoes?.[0]?.name}
+                                                    <span
+                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
+                                                        style="color: {(ELEMENT_COLORS as Record<string, string>)[
+                                                            hit.element
+                                                        ] ?? '#ef4444'}; border-color: {(
+                                                            ELEMENT_COLORS as Record<string, string>
+                                                        )[hit.element] ?? '#ef4444'};"
+                                                    >
+                                                        {(dmg.sourceType === 'ref' && hit.character
+                                                            ? `[${hit.character}]`
                                                             : '') +
-                                                        hit.hitName.replace('伤害', '') +
-                                                        ((hit.hits ?? 0) > 1 ? '\u00D7' + hit.hits : '')}
-                                                </span>
-                                            {/each}
-                                            {#each [...dmg.nonDirectEntries].sort((a, b) => {
-                                                const w = { 处决: 0, 响应: 1, 效应: 2 }
-                                                return (w[a.category] ?? 3) - (w[b.category] ?? 3)
-                                            }) as nd}
-                                                {@const c =
-                                                    nd.category === '响应'
-                                                        ? '#22c55e'
-                                                        : nd.category === '处决'
-                                                          ? '#ffffff'
-                                                          : (NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]
-                                                            ? (ELEMENT_COLORS as Record<string, string>)[
-                                                                  (NON_DIRECT_ELEMENT as Record<string, string>)[
-                                                                      nd.name
+                                                            (hit.skillType === '声骸技能' && echoName
+                                                                ? echoName + '·'
+                                                                : '') +
+                                                            hit.hitName.replace('伤害', '') +
+                                                            ((hit.hits ?? 0) > 1 ? '\u00D7' + hit.hits : '')}
+                                                    </span>
+                                                {/each}
+                                                {#each [...dmg.nonDirectEntries].sort((a, b) => {
+                                                    const w = { 处决: 0, 响应: 1, 效应: 2 }
+                                                    return (w[a.category] ?? 3) - (w[b.category] ?? 3)
+                                                }) as nd}
+                                                    {@const c =
+                                                        nd.category === '响应'
+                                                            ? '#22c55e'
+                                                            : nd.category === '处决'
+                                                              ? '#ffffff'
+                                                              : (NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]
+                                                                ? (ELEMENT_COLORS as Record<string, string>)[
+                                                                      (NON_DIRECT_ELEMENT as Record<string, string>)[
+                                                                          nd.name
+                                                                      ]
                                                                   ]
-                                                              ]
-                                                            : '#ef4444'}
-                                                <span
-                                                    class="text-[9px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
-                                                    style="color: {c}; border-color: {c}; opacity: {nd.category ===
-                                                    '效应'
-                                                        ? 0.75
-                                                        : 1};"
-                                                >
-                                                    {nd.category === '效应' ? nd.name + nd.layers + '层' : nd.name}{nd
-                                                        .responders?.length
-                                                        ? '[' + nd.responders.join(',') + ']'
-                                                        : ''}
-                                                </span>
-                                            {/each}
+                                                                : '#ef4444'}
+                                                    <span
+                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
+                                                        style="color: {c}; border-color: {c}; opacity: {nd.category ===
+                                                        '效应'
+                                                            ? 0.75
+                                                            : 1};"
+                                                    >
+                                                        {nd.category === '效应'
+                                                            ? nd.name + nd.layers + '层'
+                                                            : nd.name}{nd.responders?.length
+                                                            ? '[' + nd.responders.join(',') + ']'
+                                                            : ''}
+                                                    </span>
+                                                {/each}
+                                            </div>
                                         </div>
-                                    </div>
-                                {/each}
+                                    {/each}
+                                </div>
                             </div>
                         {/if}
                     </div>

@@ -12,6 +12,7 @@ export interface DamageEntry {
     damageBaseType: string
     damageElement: string
     sourceTimelineBlockId: string
+    burstLayers?: number
 }
 
 import type { ZoneId } from './calculation.consts'

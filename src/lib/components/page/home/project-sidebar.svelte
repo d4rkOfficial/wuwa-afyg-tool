@@ -63,7 +63,7 @@
         },
         {
             label: '导出项目',
-            icon: 'mdi:file-export-outline',
+            icon: 'mdi:file-export',
             action: () => {
                 if (ctxTargetId) onexport(ctxTargetId)
             }
@@ -91,10 +91,11 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="flex items-center gap-2 border-b border-white/5 px-4 py-3 cursor-pointer transition-colors hover:bg-white/5"
+        class="flex items-center gap-2 border-b px-4 py-3 cursor-pointer transition-colors hover:bg-[var(--theme-sidebar-text)]/5"
+        style="border-color: var(--theme-divider-border);"
         onclick={onhome}
     >
-        <svg viewBox="0 0 1024 1024" class="size-5 text-indigo-400" fill="currentColor">
+        <svg viewBox="0 0 1024 1024" class="size-5 text-[var(--theme-sidebar-text)]" fill="currentColor">
             <path
                 d="M769 887.9c-245.9 154.5-571.7 80-726.1-165.9C10.3 670.1 0.8 613.4 14.6 553.6 55.1 378.1 287.7 226 333.8 197l1.1-0.6 1.4-0.9c1-0.6 1.9-1.3 2.9-1.9 68.3-42.9 288.3-169 456.2-131 59.9 13.6 106.9 47 139.7 99.2 154.4 246 79.8 571.7-166.1 726.1z m-424-667C295 252.4 77.6 397 40 559.5 27.8 612.2 36.3 662.2 65 708c146.8 233.7 456.3 304.4 690 157.7 233.7-146.8 304.6-456.3 157.8-690-28.9-46.1-70.5-75.5-123.3-87.5C624.9 50.9 395 189.7 350.3 217.7l-1.4 0.9-1.1 0.8c-1 0.5-1.9 1-2.8 1.5z"
             />
@@ -131,8 +132,8 @@
                 class={[
                     'flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
                     project.id === activeId
-                        ? 'bg-indigo-500/10 text-indigo-300'
-                        : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                        ? 'bg-[var(--theme-accent-bg)]/10 text-[var(--theme-accent-text)]'
+                        : 'text-[var(--theme-sidebar-text)]/60 hover:bg-[var(--theme-sidebar-text)]/5 hover:text-[var(--theme-sidebar-text)]/90'
                 ].join(' ')}
             >
                 <Icon icon="mdi:file-document-outline" class="size-4 shrink-0 opacity-60" />
@@ -143,14 +144,14 @@
         <div class="px-1 pt-1 space-y-0.5">
             <button
                 onclick={oncreate}
-                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-300"
+                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--theme-sidebar-text)]/60 transition-colors hover:bg-[var(--theme-sidebar-text)]/5 hover:text-[var(--theme-sidebar-text)]/90"
             >
                 <Icon icon="mdi:plus" class="size-4 shrink-0" />
                 <span>新建项目</span>
             </button>
             <button
                 onclick={onimport}
-                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-300"
+                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--theme-sidebar-text)]/60 transition-colors hover:bg-[var(--theme-sidebar-text)]/5 hover:text-[var(--theme-sidebar-text)]/90"
             >
                 <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
                 <span>导入项目</span>

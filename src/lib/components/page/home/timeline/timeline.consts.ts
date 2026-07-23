@@ -1,12 +1,12 @@
 export const ELEMENT_ORDER = ['冷凝', '热熔', '导电', '气动', '衍射', '湮灭'] as const
 
 export const ELEMENT_COLORS: Record<string, string> = {
-    冷凝: '#38bdf8',
-    热熔: '#fb923c',
-    导电: '#a78bfa',
-    气动: '#34d399',
-    衍射: '#facc15',
-    湮灭: '#f472b6'
+    冷凝: '#0284c7',
+    热熔: '#ea580c',
+    导电: '#7c3aed',
+    气动: '#059669',
+    衍射: '#ca8a04',
+    湮灭: '#db2777'
 }
 
 export const PPS = 60
@@ -20,7 +20,7 @@ export const MAX_TIME = 150
 export const MAX_POS = SIDE_PAD + MAX_TIME * PPS
 export const BLOCK_H_PAD = 18.6
 
-export const TRACK_COLORS = ['#60a5fa', '#a78bfa', '#f472b6', '#22c55e'] as const
+export const TRACK_COLORS = ['#3b82f6', '#7c3aed', '#db2777', '#16a34a'] as const
 
 export const BUTTON_KEY_ORDER = ['MouseLeft', 'MouseRight', 'Q', 'E', 'R', 'F', 'T', 'SpaceBar', 'MouseMiddle'] as const
 

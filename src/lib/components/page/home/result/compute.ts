@@ -1,15 +1,40 @@
-import type { DamageEntry, BuffSet } from '../calculation/calculation.types'
+import type { DamageEntry, BuffSet, ZoneRef } from '../calculation/calculation.types'
 import type { ConfigState, EchoSlotConfig } from '../config/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry } from './result.types'
 import type { CharSlot } from '$lib/data/types'
-import { getEffectMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
+import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import { NON_DIRECT_ELEMENT } from '../timeline/timeline.consts'
 
 // ── helpers ──
 
 function clamp(v: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, v))
+}
+
+const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
+    base_atk: 'baseAtk',
+    total_atk: 'totalAtk',
+    base_hp: 'baseHp',
+    total_hp: 'totalHp',
+    base_def: 'baseDef',
+    total_def: 'totalDef',
+    recharge: 'recharge',
+    harmony_dmg: 'totalTune',
+    crit_rate: 'critRate',
+    crit_dmg: 'critDmg'
+}
+
+function resolveRefValue(ref: ZoneRef, allCharStats: CharacterComputed[]): number {
+    const stats = allCharStats[ref.characterIdx]
+    if (!stats) return 0
+    const key = REF_STAT_MAP[ref.zoneId]
+    if (!key) return 0
+    const statValue = stats[key] as number
+    let value = ((statValue - ref.threshold) * ref.pct) / 100
+    if (ref.lower !== undefined) value = Math.max(ref.lower, value)
+    if (ref.upper !== undefined) value = Math.min(ref.upper, value)
+    return value
 }
 
 const ELEMENT_BONUS_MAP: Record<string, string> = {
@@ -184,6 +209,7 @@ interface CharacterComputed {
     totalHp: number
     totalDef: number
     totalTune: number
+    recharge: number
     atkPctSum: number
     atkFlatSum: number
     hpPctSum: number
@@ -255,42 +281,45 @@ function computeCharacterStats(
 
     for (const bs of boundBuffSets) {
         for (const z of bs.zones) {
+            if (z.ref) continue
+            if (z.value === 0) continue
+            const value = z.value
             switch (z.zoneId) {
                 case 'bonus_dmg':
-                    bonusDmg += z.value
+                    bonusDmg += value
                     break
                 case 'deepen_dmg':
-                    deepenDmg += z.value
+                    deepenDmg += value
                     break
                 case 'res_pen':
-                    resPen += z.value
+                    resPen += value
                     break
                 case 'def_pen':
-                    defPen += z.value
+                    defPen += value
                     break
                 case 'def_down':
-                    defDown += z.value
+                    defDown += value
                     break
                 case 'res_down':
-                    resDown += z.value
+                    resDown += value
                     break
                 case 'tune_strain':
-                    tuneStrain += z.value
+                    tuneStrain += value
                     break
                 case 'final_dmg':
-                    finalDmg += z.value
+                    finalDmg += value
                     break
                 case 'dmg_taken_inc':
-                    dmgTakenInc += z.value
+                    dmgTakenInc += value
                     break
                 case 'custom_final_dmg':
-                    customMult += z.value
+                    customMult += value
                     break
                 case 'dmg_red_pen':
-                    dmgRedPen += z.value
+                    dmgRedPen += value
                     break
                 default:
-                    applyZoneToAccum(z.zoneId, z.value, acc)
+                    applyZoneToAccum(z.zoneId, value, acc)
                     break
             }
         }
@@ -309,6 +338,7 @@ function computeCharacterStats(
         totalHp: baseHp + hpGreen,
         totalDef: baseDef + defGreen,
         totalTune,
+        recharge: acc.recharge,
         atkPctSum: acc.pctAtk,
         atkFlatSum: acc.flatAtk,
         hpPctSum: acc.pctHp,
@@ -628,6 +658,7 @@ function emptyCharacterStats(): CharacterComputed {
         totalHp: 0,
         totalDef: 0,
         totalTune: 0,
+        recharge: 100,
         atkPctSum: 0,
         atkFlatSum: 0,
         hpPctSum: 0,
@@ -656,7 +687,10 @@ function emptyCharacterStats(): CharacterComputed {
 
 function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy: ConfigState['enemy']): ResultEntry {
     const layers = Math.round(entry.ratioValue)
-    const multiplier = getEffectMultiplier(entry.hitName, layers)
+    const burstLayers = entry.burstLayers ?? 0
+    const effectMult = getEffectMultiplier(entry.hitName, layers)
+    const burstMult = getEffectBurstMultiplier(entry.hitName, burstLayers)
+    const multiplier = effectMult + burstMult
     const ratioNum = multiplier
     const element = (NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? ''
 
@@ -724,6 +758,79 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
     }
 }
 
+// ── apply resolved ref value to stats (after partial stats are computed) ──
+
+function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number): void {
+    switch (zoneId) {
+        case 'bonus_dmg':
+            stats.bonusDmg += value
+            break
+        case 'deepen_dmg':
+            stats.deepenDmg += value
+            break
+        case 'res_pen':
+            stats.resPen += value
+            break
+        case 'def_pen':
+            stats.defPen += value
+            break
+        case 'def_down':
+            stats.defDown += value
+            break
+        case 'res_down':
+            stats.resDown += value
+            break
+        case 'tune_strain':
+            stats.tuneStrain += value
+            break
+        case 'final_dmg':
+            stats.finalDmg += value
+            break
+        case 'dmg_taken_inc':
+            stats.dmgTakenInc += value
+            break
+        case 'custom_final_dmg':
+            stats.customMult += value
+            break
+        case 'dmg_red_pen':
+            stats.dmgRedPen += value
+            break
+        case 'atk_flat':
+            stats.atkFlatSum += value
+            break
+        case 'atk_pct':
+            stats.atkPctSum += value
+            break
+        case 'hp_flat':
+            stats.hpFlatSum += value
+            break
+        case 'hp_pct':
+            stats.hpPctSum += value
+            break
+        case 'def_flat':
+            stats.defFlatSum += value
+            break
+        case 'def_pct':
+            stats.defPctSum += value
+            break
+        case 'crit_rate':
+            stats.critRate += value
+            break
+        case 'crit_dmg':
+            stats.critDmg += value
+            break
+        case 'recharge':
+            stats.recharge += value
+            break
+        case 'harmony_dmg':
+            stats.totalTune += value
+            break
+    }
+    stats.totalAtk = stats.baseAtk + Math.round(stats.atkFlatSum + (stats.baseAtk * stats.atkPctSum) / 100)
+    stats.totalHp = stats.baseHp + Math.round(stats.hpFlatSum + (stats.baseHp * stats.hpPctSum) / 100)
+    stats.totalDef = stats.baseDef + Math.round(stats.defFlatSum + (stats.baseDef * stats.defPctSum) / 100)
+}
+
 // ── main entry point ──
 
 export function computeAll(
@@ -738,40 +845,65 @@ export function computeAll(
 ): ResultEntry[] {
     const enemy = configState.enemy
 
-    return damageEntries.map((entry) => {
-        // effect damage - handle before character check (effects may lack character)
-        if (entry.isEffect) {
-            const charName = entry.character
-            if (charName && charInfoMap[charName]) {
-                const charInfo = charInfoMap[charName]
-                const charIndex = team.findIndex((s) => s.character === charName)
-                if (charIndex >= 0) {
-                    const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds)
-                    const weaponName = team[charIndex]?.weapon ?? null
-                    const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
-                    const echoes = configState.characters[charIndex]?.echoes ?? []
-                    const stats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, boundBuffSets)
-                    return computeEffectEntry(entry, stats, enemy)
-                }
-            }
-            return computeEffectEntry(entry, emptyCharacterStats(), enemy)
+    // Phase 1: per-character full stats (echo+weapon + all non-ref buffs from all entries)
+    // Used as the data source for ZoneRef resolution
+    const charFullStats: CharacterComputed[] = team.map((slot, i) => {
+        if (!slot.character || !charInfoMap[slot.character]) return emptyCharacterStats()
+
+        const charBuffSetIds = new Set<string>()
+        for (const entry of damageEntries) {
+            if (entry.character !== slot.character) continue
+            const boundIds = damageEntryBuffSetIds[entry.id] ?? []
+            for (const id of boundIds) charBuffSetIds.add(id)
         }
 
+        const charBoundBuffSets = buffSets.filter((bs) => {
+            if (!charBuffSetIds.has(bs.id)) return false
+            if (bs.scope === 'all') return true
+            return (bs.scope as number[]).includes(i)
+        })
+
+        return computeCharacterStats(
+            charInfoMap[slot.character],
+            slot.weapon,
+            weaponInfoMap[slot.weapon ?? ''] ?? null,
+            configState.characters[i]?.echoes ?? [],
+            charBoundBuffSets
+        )
+    })
+
+    // Phase 2: per-entry computation with ref resolution as final step
+    return damageEntries.map((entry) => {
         const charName = entry.character
-        if (!charName) return makeStubEntry(entry)
-
-        const charInfo = charInfoMap[charName]
-        if (!charInfo) return makeStubEntry(entry)
-
         const charIndex = team.findIndex((s) => s.character === charName)
-        if (charIndex < 0) return makeStubEntry(entry)
-
-        const weaponName = team[charIndex]?.weapon ?? null
+        const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
         const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
-        const echoes = configState.characters[charIndex]?.echoes ?? []
+        const echoes = charIndex >= 0 ? (configState.characters[charIndex]?.echoes ?? []) : []
+        const boundBuffSets =
+            charIndex >= 0 ? getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds) : []
+        const charInfo = charName ? charInfoMap[charName] : undefined
 
-        const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds)
-        const stats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, boundBuffSets)
+        // Compute partial stats (echo+weapon + non-ref buffs only)
+        const partialStats = charInfo
+            ? computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, boundBuffSets)
+            : emptyCharacterStats()
+
+        // Resolve ref zones and apply to stats (final step)
+        const stats = { ...partialStats }
+        for (const bs of boundBuffSets) {
+            for (const z of bs.zones) {
+                if (!z.ref) continue
+                const resolved = resolveRefValue(z.ref, charFullStats)
+                if (resolved === 0) continue
+                applyRefToStats(stats, z.zoneId, resolved)
+            }
+        }
+
+        // effect damage
+        if (entry.isEffect) {
+            return computeEffectEntry(entry, stats, enemy)
+        }
+        if (!charName || !charInfo || charIndex < 0) return makeStubEntry(entry)
 
         // tune damage (处决/响应)
         if (entry.isTuneBreak || entry.isTuneResponse) {

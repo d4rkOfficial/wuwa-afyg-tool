@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Echo } from '$lib/api/types'
+    import Icon from '@iconify/svelte'
 
     interface Props {
         open: boolean
@@ -57,9 +58,9 @@
     function itemClass(e: Echo): string {
         const base = 'flex w-[110px] flex-col items-center gap-1.5 rounded-lg p-3 transition-colors cursor-pointer'
         if (isSelected(e)) {
-            return base + ' ring-2 ring-indigo-500 bg-indigo-500/10'
+            return base + ' ring-2 ring-[var(--theme-accent-bg)] bg-[var(--theme-accent-bg)]/10'
         }
-        return base + ' hover:bg-white/10'
+        return base + ' hover:bg-[var(--theme-modal-text)]/5'
     }
 </script>
 
@@ -77,42 +78,27 @@
             role="dialog"
             aria-modal="true"
         >
-            <div class="flex items-center gap-2 border-b border-white/5 px-4 py-3">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    class="shrink-0 opacity-50"
-                    ><path
-                        fill="currentColor"
-                        d="m19.6 21l-6.3-6.3q-.75.6-1.725.95T9.5 16q-2.725 0-4.612-1.888T3 9.5t1.888-4.612T9.5 3t4.613 1.888T16 9.5q0 1.1-.35 2.075T14.7 13.3l6.3 6.3zM9.5 14q1.875 0 3.188-1.312T14 9.5t-1.312-3.187T9.5 5T6.313 6.313T5 9.5t1.313 3.188T9.5 14"
-                    /></svg
-                >
+            <div class="flex items-center gap-2 border-b px-4 py-3" style="border-color: var(--theme-divider-border)">
+                <Icon icon="mdi:magnify" class="size-4 shrink-0 text-[var(--theme-muted-text)]" />
                 <input
                     bind:value={query}
                     placeholder="搜索声骸..."
-                    class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-white/30"
+                    class="min-w-0 flex-1 bg-transparent text-sm outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
                 />
                 {#if query}
                     <button
                         onclick={() => (query = '')}
-                        class="rounded p-0.5 opacity-50 hover:opacity-100"
+                        class="rounded p-0.5 text-[var(--theme-muted-text)] hover:text-[var(--theme-modal-text)]"
                         aria-label="Clear search"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                            ><path
-                                fill="currentColor"
-                                d="M18.3 5.71a1 1 0 0 0-1.42 0L12 10.59L7.12 5.71a1 1 0 1 0-1.42 1.42L10.59 12l-4.89 4.88a1 1 0 1 0 1.42 1.42L12 13.41l4.88 4.89a1 1 0 0 0 1.42-1.42L13.41 12l4.89-4.88a1 1 0 0 0 0-1.41"
-                            /></svg
-                        >
+                        <Icon icon="mdi:close" class="size-4" />
                     </button>
                 {/if}
             </div>
 
             <div class="flex-1 overflow-y-auto p-4">
                 {#if filtered.length === 0}
-                    <div class="py-12 text-center text-sm text-zinc-500">无匹配声骸</div>
+                    <div class="py-12 text-center text-sm text-[var(--theme-muted-text)]">无匹配声骸</div>
                 {:else}
                     {#if query}
                         <div class="flex flex-wrap gap-2">
@@ -131,18 +117,20 @@
                                     tabindex="0"
                                     class={itemClass(e)}
                                 >
-                                    <div class="size-14 overflow-hidden rounded-lg bg-white/10 p-1">
+                                    <div class="size-14 overflow-hidden rounded-lg bg-[var(--theme-modal-text)]/10 p-1">
                                         {#if icons[e.name]}
                                             <img src={icons[e.name]} alt={e.name} class="size-full object-contain" />
                                         {:else}
                                             <div
-                                                class="flex size-full items-center justify-center text-xs text-zinc-500"
+                                                class="flex size-full items-center justify-center text-xs text-[var(--theme-muted-text)]"
                                             >
                                                 {e.name.charAt(0)}
                                             </div>
                                         {/if}
                                     </div>
-                                    <span class="truncate text-sm leading-tight text-zinc-300">{e.name}</span>
+                                    <span class="truncate text-sm leading-tight text-[var(--theme-modal-text)]"
+                                        >{e.name}</span
+                                    >
                                     <span class="text-[10px] text-cyan-600">C{e.cost}</span>
                                 </div>
                             {/each}
@@ -150,7 +138,7 @@
                     {:else}
                         {#each groupedByCost as [cost, list]}
                             <div class="mb-4">
-                                <div class="mb-2 text-xs font-medium text-zinc-500">C{cost}</div>
+                                <div class="mb-2 text-xs font-medium text-[var(--theme-muted-text)]">C{cost}</div>
                                 <div class="flex flex-wrap gap-2">
                                     {#each list as e}
                                         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -167,7 +155,9 @@
                                             tabindex="0"
                                             class={itemClass(e)}
                                         >
-                                            <div class="size-14 overflow-hidden rounded-lg bg-white/10 p-1">
+                                            <div
+                                                class="size-14 overflow-hidden rounded-lg bg-[var(--theme-modal-text)]/10 p-1"
+                                            >
                                                 {#if icons[e.name]}
                                                     <img
                                                         src={icons[e.name]}
@@ -176,13 +166,14 @@
                                                     />
                                                 {:else}
                                                     <div
-                                                        class="flex size-full items-center justify-center text-xs text-zinc-500"
+                                                        class="flex size-full items-center justify-center text-xs text-[var(--theme-muted-text)]"
                                                     >
                                                         {e.name.charAt(0)}
                                                     </div>
                                                 {/if}
                                             </div>
-                                            <span class="truncate text-[11px] leading-tight text-zinc-300"
+                                            <span
+                                                class="truncate text-[11px] leading-tight text-[var(--theme-modal-text)]"
                                                 >{e.name}</span
                                             >
                                         </div>
@@ -194,17 +185,13 @@
                 {/if}
             </div>
 
-            <div class="flex justify-end border-t border-white/5 px-4 py-2.5">
+            <div class="flex justify-end border-t px-4 py-2.5" style="border-color: var(--theme-divider-border)">
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium text-[var(--theme-btn-text)] transition-colors hover:bg-white/5"
+                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                        ><path
-                            fill="currentColor"
-                            d="M9 16.17L5.53 12.7a1 1 0 0 0-1.42 1.42l4.18 4.18a1 1 0 0 0 1.42 0L20.29 7.71a1 1 0 1 0-1.42-1.42z"
-                        /></svg
-                    >
+                    <Icon icon="mdi:check" class="size-4" />
                     确认
                 </button>
             </div>

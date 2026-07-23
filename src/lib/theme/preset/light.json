@@ -3,19 +3,20 @@
     "name": "白天",
     "components": {
         "avatar": {
-            "backgroundImage": "#e6e4df",
-            "backgroundImageFocused": "#d6d3cd",
-            "textColor": "#292524",
-            "textColorFocused": "#1c1917"
+            "backgroundImage": "#e2e8f0",
+            "backgroundImageFocused": "#cbd5e1",
+            "textColor": "#1e293b",
+            "textColorFocused": "#0f172a"
         },
         "tabs": {
-            "backgroundImage": "#f7f5f0",
-            "textColor": "#44403c",
-            "textColorFocused": "#292524"
+            "backgroundImage": "#f1f5f9",
+            "backgroundImageFocused": "#ffffff",
+            "textColor": "#475569",
+            "textColorFocused": "#0f172a"
         },
         "sidebar": {
-            "backgroundImage": "#eeebe4",
-            "textColor": "#1c1917"
+            "backgroundImage": "#f1f5f9",
+            "textColor": "#1e293b"
         },
         "btn": {
             "backgroundImage": "linear-gradient(135deg, #6366f1, #8b5cf6)",
@@ -24,49 +25,49 @@
             "textColorFocused": "#ffffff"
         },
         "search-box": {
-            "backgroundImage": "#f0ede6",
-            "backgroundImageFocused": "#e6e2da",
-            "textColor": "#292524",
-            "textColorFocused": "#1c1917"
+            "backgroundImage": "#f1f5f9",
+            "backgroundImageFocused": "#ffffff",
+            "textColor": "#1e293b",
+            "textColorFocused": "#0f172a"
         },
         "modal": {
-            "backgroundImage": "#fcfaf5",
-            "textColor": "#292524"
+            "backgroundImage": "#ffffff",
+            "textColor": "#1e293b"
         },
         "context-menu": {
-            "backgroundImage": "rgba(252,250,245,0.95)",
-            "backgroundImageFocused": "rgba(238,235,228,0.96)",
-            "textColor": "#292524",
-            "textColorFocused": "#1c1917"
+            "backgroundImage": "rgba(255,255,255,0.95)",
+            "backgroundImageFocused": "rgba(241,245,249,0.96)",
+            "textColor": "#1e293b",
+            "textColorFocused": "#0f172a"
         },
         "toast": {
-            "backgroundImage": "rgba(252,250,245,0.95)",
-            "textColor": "#292524"
+            "backgroundImage": "rgba(255,255,255,0.95)",
+            "textColor": "#1e293b"
         },
         "toast-top": {
-            "backgroundImage": "#fcfaf5",
-            "textColor": "#292524"
+            "backgroundImage": "#ffffff",
+            "textColor": "#1e293b"
         },
         "timeline": {
-            "backgroundImage": "#faf8f4",
-            "textColor": "#292524"
+            "backgroundImage": "#f8fafc",
+            "textColor": "#1e293b"
         },
         "layout": {
-            "backgroundImage": "#f7f5f0",
-            "textColor": "#292524"
+            "backgroundImage": "#f8fafc",
+            "textColor": "#1e293b"
         },
         "card": {
             "backgroundImage": "#ffffff",
-            "backgroundImageFocused": "#f7f5f0",
-            "textColor": "#292524",
-            "borderColor": "#e5e2da"
+            "backgroundImageFocused": "#f8fafc",
+            "textColor": "#1e293b",
+            "borderColor": "#e2e8f0"
         },
         "input": {
-            "backgroundImage": "#faf8f4",
+            "backgroundImage": "#f8fafc",
             "backgroundImageFocused": "#ffffff",
-            "textColor": "#292524",
-            "textColorFocused": "#1c1917",
-            "borderColor": "#e0ddd5",
+            "textColor": "#1e293b",
+            "textColorFocused": "#0f172a",
+            "borderColor": "#cbd5e1",
             "borderColorFocused": "#6366f1"
         },
         "accent": {
@@ -76,13 +77,17 @@
             "borderColor": "rgba(99,102,241,0.3)"
         },
         "divider": {
-            "borderColor": "#e5e2da"
+            "borderColor": "#e2e8f0"
         },
         "overlay": {
-            "backgroundImage": "rgba(41,37,36,0.4)"
+            "backgroundImage": "rgba(15,23,42,0.3)"
         },
         "muted": {
-            "textColor": "#a8a29e"
+            "textColor": "#64748b"
+        },
+        "watermark": {
+            "backgroundImage": "rgba(0,0,0,0.06)",
+            "textColor": "rgba(0,0,0,0.08)"
         }
     }
 }

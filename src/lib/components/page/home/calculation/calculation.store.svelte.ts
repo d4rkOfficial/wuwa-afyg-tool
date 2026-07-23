@@ -226,6 +226,8 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                 })
             } else if (nd.category === '效应') {
                 if (nd.name === '电磁爆发') continue
+                const burstND = db.nonDirectEntries.find((n) => n.name === '电磁爆发' && n.category === '效应')
+                const burstLayers = burstND?.layers ?? 0
                 const id = `${db.id}-nd|${nd.name}`
                 temp.push({
                     item: {
@@ -233,7 +235,10 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         character: undefined,
                         skillType: '效应结算',
                         hitName: nd.name,
-                        displayName: nd.name + nd.layers + '层',
+                        displayName:
+                            burstLayers > 0
+                                ? nd.name + nd.layers + '层+爆发' + burstLayers + '层'
+                                : nd.name + nd.layers + '层',
                         isEffect: true,
                         isTuneBreak: false,
                         isTuneResponse: false,
@@ -241,7 +246,8 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         ratioUnit: '%',
                         damageBaseType: '效应系数',
                         damageElement: NON_DIRECT_ELEMENT[nd.name] ?? '',
-                        sourceTimelineBlockId: db.id
+                        sourceTimelineBlockId: db.id,
+                        burstLayers
                     },
                     pos,
                     order: order++
@@ -340,6 +346,12 @@ export function setBuffSetZoneValue(setId: string, zoneId: string, value: number
 
 export function getBuffSetIdsForEntry(entryId: string): string[] {
     return _damageEntryBuffSetIds[entryId] ?? []
+}
+
+export function setBuffSetIdsForEntry(entryId: string, setIds: string[]): boolean {
+    if (!assertUnlocked()) return false
+    _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: [...setIds] }
+    return true
 }
 
 export function toggleBuffSetForEntry(entryId: string, setId: string) {

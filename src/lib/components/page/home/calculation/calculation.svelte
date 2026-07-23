@@ -5,6 +5,7 @@
         getAllBuffSets,
         getBuffSetIdsForEntry,
         toggleBuffSetForEntry,
+        setBuffSetIdsForEntry,
         getShowBuffModal,
         setShowBuffModal,
         getCalcState,
@@ -14,6 +15,7 @@
         init,
         getGlobalBuffSetIds
     } from './calculation.store.svelte'
+    import { addToast } from '$lib/data/toast.svelte'
     import { ZONE_MAP, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from './calculation.consts'
     import { ELEMENT_COLORS } from '../timeline/timeline.consts'
     import type { CharSlot } from '$lib/data/types'
@@ -35,6 +37,10 @@
     let expandedEntryId = $state<string | null>(null)
 
     $effect(() => {
+        team
+        timelineData
+        calcState
+        locked
         untrack(() => init(team, timelineData, calcState, locked))
     })
 
@@ -75,6 +81,61 @@
 
     function handleToggleDamageType(entryId: string, damageType: string) {
         toggleDamageTypeForEntry(entryId, damageType)
+        onupdate(getCalcState())
+    }
+
+    function isDirectDamage(e: { isEffect: boolean; isTuneBreak: boolean; isTuneResponse: boolean }): boolean {
+        return !e.isEffect && !e.isTuneBreak && !e.isTuneResponse
+    }
+
+    function handleCopyFromPrevDirect(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.character) return
+
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        if (entryIndex <= 0) {
+            addToast('未找到本角色的上一个直伤', 'info')
+            return
+        }
+
+        for (let i = entryIndex - 1; i >= 0; i--) {
+            const prev = damageEntries[i]
+            if (prev.character === entry.character && isDirectDamage(prev)) {
+                const prevSetIds = getBuffSetIdsForEntry(prev.id)
+                if (!setBuffSetIdsForEntry(entryId, prevSetIds)) return
+                onupdate(getCalcState())
+                addToast('已复制前段直伤的增益', 'success')
+                return
+            }
+        }
+
+        addToast('未找到本角色的上一个直伤', 'info')
+    }
+
+    function handleCopyToNextDirect(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.character) return
+
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        const char = entry.character
+        const currentSetIds = getBuffSetIdsForEntry(entryId)
+
+        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
+            const next = damageEntries[i]
+            if (next.character === char && isDirectDamage(next)) {
+                if (!setBuffSetIdsForEntry(next.id, [...currentSetIds])) return
+                onupdate(getCalcState())
+                expandedEntryId = next.id
+                addToast('已复制增益到下一段直伤', 'success')
+                return
+            }
+        }
+
+        expandedEntryId = null
+    }
+
+    function handleClearAllBuffs(entryId: string) {
+        if (!setBuffSetIdsForEntry(entryId, [])) return
         onupdate(getCalcState())
     }
 
@@ -167,7 +228,6 @@
                                     <span
                                         class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-indigo-500/15 text-indigo-400"
                                     >
-                                        <Icon icon="mdi:widgets" class="size-3" />
                                         {buffSet.name}
                                     </span>
                                 {/if}
@@ -207,36 +267,77 @@
                                         </div>
                                     </div>
                                 {/if}
-                                {#if visibleBuffSets.length > 0}
-                                    <div>
-                                        <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">BUFF</div>
+                                <div>
+                                    <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">增益选择</div>
+                                    {#if visibleBuffSets.length > 0}
                                         <div
-                                            class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-0.5"
+                                            class="flex flex-wrap items-center gap-1 pb-2 border-b border-white/5 mb-2"
                                         >
+                                            {#if isDirectDamage(damageEntry)}
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyFromPrevDirect(damageEntry.id)
+                                                    }}
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)]"
+                                                >
+                                                    <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
+                                                    复制前段直伤
+                                                </button>
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyToNextDirect(damageEntry.id)
+                                                    }}
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)]"
+                                                >
+                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
+                                                    复制到下段直伤
+                                                </button>
+                                            {/if}
+                                            <button
+                                                disabled={selectedEntrySetIds.length === 0}
+                                                onclick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleClearAllBuffs(damageEntry.id)
+                                                }}
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)] disabled:opacity-40 disabled:pointer-events-none"
+                                            >
+                                                <Icon icon="mdi:close-circle-outline" class="size-3 shrink-0" />
+                                                清除所有增益
+                                            </button>
+                                        </div>
+                                        <div class="flex flex-wrap gap-1">
                                             {#each visibleBuffSets as buffSet}
                                                 {@const checked = selectedEntrySetIds.includes(buffSet.id)}
-                                                <label
-                                                    class="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-white/5"
-                                                    onclick={(e) => e.stopPropagation()}
+                                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleToggleBuffSetForEntry(buffSet.id)
+                                                    }}
+                                                    class={[
+                                                        'px-2 py-1 text-xs rounded transition-colors inline-flex items-center gap-1',
+                                                        checked
+                                                            ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40'
+                                                            : 'bg-white/5 text-(--theme-modal-text)/50 border border-white/10 hover:bg-white/10'
+                                                    ].join(' ')}
                                                 >
-                                                    <input
-                                                        type="checkbox"
-                                                        {checked}
-                                                        onchange={() => handleToggleBuffSetForEntry(buffSet.id)}
-                                                        class="size-3.5 accent-indigo-500 shrink-0"
+                                                    <Icon
+                                                        icon={checked ? 'mdi:check' : 'mdi:close'}
+                                                        class="size-3 shrink-0"
                                                     />
-                                                    <span class="text-xs text-[var(--theme-modal-text)] truncate"
-                                                        >{buffSet.name}</span
-                                                    >
-                                                </label>
+                                                    {buffSet.name}
+                                                </button>
                                             {/each}
                                         </div>
-                                    </div>
-                                {:else}
-                                    <div class="text-xs text-[var(--theme-modal-text)]/30">
-                                        无可用 BUFF 块，点击底栏【BUFF配置】按钮进行配置
-                                    </div>
-                                {/if}
+                                    {:else}
+                                        <div class="text-xs text-[var(--theme-modal-text)]/30">
+                                            无可用 BUFF 块，点击底栏【BUFF配置】按钮进行配置
+                                        </div>
+                                    {/if}
+                                </div>
                             </div>
                         </td>
                     </tr>

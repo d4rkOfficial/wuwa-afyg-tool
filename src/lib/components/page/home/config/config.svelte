@@ -228,13 +228,7 @@
                                             ? slot.mainStat.type + ' ' + slot.mainStat.value + slot.mainStat.unit
                                             : '未选择'}</span
                                     >
-                                    <svg
-                                        class="size-3 text-[var(--theme-modal-text)]/40"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"><path d="M6 9l6 6 6-6" /></svg
-                                    >
+                                    <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                                 </button>
                                 {#if showMainStatMenu?.ci === ci && showMainStatMenu?.si === si}
                                     <div
@@ -260,13 +254,10 @@
                                                 <span class="text-[var(--theme-modal-text)]/40"
                                                     >{opt.maxValue}{opt.unit}</span
                                                 >
-                                                {#if slot.mainStat?.type === opt.label}<svg
+                                                {#if slot.mainStat?.type === opt.label}<Icon
+                                                        icon="mdi:check"
                                                         class="size-3 text-indigo-400"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        stroke-width="3"><path d="M5 13l4 4L19 7" /></svg
-                                                    >{/if}
+                                                    />{/if}
                                             </button>
                                         {/each}
                                     </div>
@@ -397,13 +388,7 @@
                             <span class="flex-1">{opt.label}</span>
                             <span class="text-[10px] text-[var(--theme-modal-text)]/40">{opt.unit}</span>
                             {#if exists}
-                                <svg
-                                    class="size-3 shrink-0 text-indigo-400"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="3"><path d="M5 13l4 4L19 7" /></svg
-                                >
+                                <Icon icon="mdi:check" class="size-3 shrink-0 text-indigo-400" />
                             {/if}
                         </button>
                     {/each}

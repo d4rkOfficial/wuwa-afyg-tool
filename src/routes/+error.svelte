@@ -1,6 +1,7 @@
 <script lang="ts">
     import { page } from '$app/stores'
     import { goto } from '$app/navigation'
+    import Icon from '@iconify/svelte'
 </script>
 
 <div
@@ -15,9 +16,7 @@
         class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
         style="background: linear-gradient(135deg, #6366f1, #8b5cf6)"
     >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
-            ><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" /></svg
-        >
+        <Icon icon="mdi:arrow-left" class="size-4" />
         返回首页
     </button>
 </div>

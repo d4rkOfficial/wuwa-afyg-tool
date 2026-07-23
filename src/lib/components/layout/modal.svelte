@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
+    import Icon from '@iconify/svelte'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -95,12 +96,7 @@
                 class="absolute right-3 top-3 rounded p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
                 aria-label="Close"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
-                    <path
-                        fill="currentColor"
-                        d="M18.3 5.71a1 1 0 0 0-1.42 0L12 10.59L7.12 5.71a1 1 0 1 0-1.42 1.42L10.59 12l-4.89 4.88a1 1 0 1 0 1.42 1.42L12 13.41l4.88 4.89a1 1 0 0 0 1.42-1.42L13.41 12l4.89-4.88a1 1 0 0 0 0-1.41"
-                    />
-                </svg>
+                <Icon icon="mdi:close" class="size-[18px]" />
             </button>
             <div
                 class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 transition-colors hover:bg-indigo-500/50 rounded-r-xl"

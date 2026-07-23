@@ -455,7 +455,9 @@
                         />
                     </svg>
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
-                    <p class="mb-6 text-sm text-zinc-500">测试：上次 PUSH 2026-0723-0001。伤害计算稳定，潜在bug测试中。白天主题调整中。</p>
+                    <p class="mb-6 text-sm text-zinc-500">
+                        鸣潮社区公益工具喵~ 公测中，即将开源！
+                    </p>
                     <button
                         onclick={() => {
                             newName = ''
@@ -464,13 +466,7 @@
                         class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
                         style="background: linear-gradient(135deg, #6366f1, #8b5cf6)"
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg
-                        >
+                        <Icon icon="mdi:plus" class="size-4" />
                         新建项目
                     </button>
                 </div>
@@ -531,11 +527,12 @@
                 {/if}
                 {#if !showResult && phaseLocked}
                     <div
-                        class="absolute inset-0 z-40 flex items-center justify-center bg-black/10 pointer-events-none select-none"
+                        class="absolute inset-0 z-40 flex items-center justify-center pointer-events-none select-none"
+                        style="background: var(--theme-watermark-bg, rgba(0,0,0,0.1))"
                     >
                         <div
-                            class="flex items-center gap-6 text-[7.5rem] font-bold tracking-widest text-white/10"
-                            style="transform: rotate(-30deg)"
+                            class="flex items-center gap-6 text-[7.5rem] font-bold tracking-widest"
+                            style="transform: rotate(-30deg); color: var(--theme-watermark-text, rgba(255,255,255,0.1))"
                         >
                             <Icon icon="mdi:lock" class="size-32" />
                             已锁定

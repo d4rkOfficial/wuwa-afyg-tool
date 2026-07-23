@@ -228,12 +228,12 @@
     <div class="flex flex-1 gap-4">
         {#each localTeam as slot, i}
             <div
-                class="flex flex-1 flex-col rounded-xl border border-white/10 bg-white/[0.03] p-6"
-                style="background-image: var(--theme-context-menu-bg)"
+                class="flex flex-1 flex-col rounded-xl border p-6"
+                style="background: var(--theme-context-menu-bg); border-color: var(--theme-card-border)"
             >
                 <div class="mb-4 flex items-center gap-2">
                     <div
-                        class="flex size-9 items-center justify-center rounded-full bg-indigo-500/20 text-sm font-bold text-indigo-400"
+                        class="flex size-9 items-center justify-center rounded-full bg-[var(--theme-accent-bg)]/15 text-sm font-bold text-[var(--theme-accent-text)]"
                     >
                         {i + 1}
                     </div>
@@ -243,14 +243,18 @@
                 <div class="flex flex-1 flex-col gap-3">
                     <!-- Character -->
                     <div class="flex flex-1 flex-col">
-                        <span class="mb-1 block text-sm text-zinc-500">角色</span>
+                        <span class="mb-1 block text-sm text-[var(--theme-muted-text)]">角色</span>
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-white/5',
-                                slot.character ? 'bg-white/5' : 'border-2 border-dashed border-white/10',
-                                !slot.character && !locked ? 'border-2 border-dashed border-white/10' : ''
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]',
+                                slot.character
+                                    ? 'bg-[var(--theme-input-bg)]'
+                                    : 'border-2 border-dashed border-[var(--theme-card-border)]',
+                                !slot.character && !locked
+                                    ? 'border-2 border-dashed border-[var(--theme-card-border)]'
+                                    : ''
                             ].join(' ')}
                             onclick={() => openPicker(i, 'character')}
                         >
@@ -262,13 +266,16 @@
                                 />
                             {/if}
                             <div class="flex flex-col min-w-0 flex-1">
-                                <span class:opacity-40={!slot.character} class:text-zinc-500={!slot.character}>
+                                <span
+                                    class:opacity-40={!slot.character}
+                                    class:text-[var(--theme-muted-text)]={!slot.character}
+                                >
                                     {slot.character || (locked ? '未设置' : '点击选择')}
                                 </span>
                                 {#if slot.character}
                                     {@const charData = characterMap.get(slot.character)}
                                     {#if charData}
-                                        <span class="flex items-center gap-1.5 text-sm text-zinc-400">
+                                        <span class="flex items-center gap-1.5 text-sm text-[var(--theme-muted-text)]">
                                             {#if elementIcons[charData.element]}
                                                 <img
                                                     src={elementIcons[charData.element]}
@@ -294,13 +301,15 @@
 
                     <!-- Weapon -->
                     <div class="flex flex-1 flex-col">
-                        <span class="mb-1 block text-sm text-zinc-500">武器</span>
+                        <span class="mb-1 block text-sm text-[var(--theme-muted-text)]">武器</span>
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-white/5',
-                                slot.weapon ? 'bg-white/5' : 'border-2 border-dashed border-white/10',
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]',
+                                slot.weapon
+                                    ? 'bg-[var(--theme-input-bg)]'
+                                    : 'border-2 border-dashed border-[var(--theme-card-border)]',
                                 !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                             ]
                                 .filter(Boolean)
@@ -311,17 +320,20 @@
                                 <img
                                     src={weaponIcons[slot.weapon]}
                                     alt={slot.weapon}
-                                    class="size-14 shrink-0 rounded-lg object-contain bg-white/5"
+                                    class="size-14 shrink-0 rounded-lg object-contain bg-[var(--theme-card-bg)]"
                                 />
                             {/if}
                             <div class="flex flex-col min-w-0 flex-1">
-                                <span class:opacity-40={!slot.weapon} class:text-zinc-500={!slot.weapon}>
+                                <span
+                                    class:opacity-40={!slot.weapon}
+                                    class:text-[var(--theme-muted-text)]={!slot.weapon}
+                                >
                                     {slot.weapon || (slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色')}
                                 </span>
                                 {#if slot.weapon}
                                     {@const wpData = weaponMap.get(slot.weapon)}
                                     {#if wpData}
-                                        <span class="text-amber-400 text-sm tracking-wider">
+                                        <span class="text-amber-600 text-sm tracking-wider">
                                             {'★'.repeat(wpData.star)}
                                         </span>
                                     {/if}
@@ -332,13 +344,15 @@
 
                     <!-- First Echo -->
                     <div class="flex flex-1 flex-col">
-                        <span class="mb-1 block text-sm text-zinc-500">首位声骸</span>
+                        <span class="mb-1 block text-sm text-[var(--theme-muted-text)]">首位声骸</span>
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-white/5',
-                                slot.echoes[0].name ? 'bg-white/5' : 'border-2 border-dashed border-white/10',
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]',
+                                slot.echoes[0].name
+                                    ? 'bg-[var(--theme-input-bg)]'
+                                    : 'border-2 border-dashed border-[var(--theme-card-border)]',
                                 !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                             ]
                                 .filter(Boolean)
@@ -349,13 +363,13 @@
                                 <img
                                     src={echoIcons[slot.echoes[0].name]}
                                     alt={slot.echoes[0].name}
-                                    class="size-14 shrink-0 rounded-lg object-contain bg-white/5"
+                                    class="size-14 shrink-0 rounded-lg object-contain bg-[var(--theme-card-bg)]"
                                 />
                             {/if}
                             <span
                                 class="flex-1 text-base"
                                 class:opacity-40={!slot.echoes[0].name}
-                                class:text-zinc-500={!slot.echoes[0].name}
+                                class:text-[var(--theme-muted-text)]={!slot.echoes[0].name}
                             >
                                 {slot.echoes[0].name
                                     ? `${slot.echoes[0].name} (C${slot.echoes[0].cost})`
@@ -370,13 +384,15 @@
 
                     <!-- Trigger Sets -->
                     <div class="flex flex-1 flex-col">
-                        <span class="mb-1 block text-sm text-zinc-500">触发套装</span>
+                        <span class="mb-1 block text-sm text-[var(--theme-muted-text)]">触发套装</span>
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             class={[
-                                'flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-colors hover:bg-white/5',
-                                slot.triggerSets.length > 0 ? 'bg-white/5' : 'border-2 border-dashed border-white/10',
+                                'flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-colors hover:bg-[var(--theme-input-bg)]',
+                                slot.triggerSets.length > 0
+                                    ? 'bg-[var(--theme-input-bg)]'
+                                    : 'border-2 border-dashed border-[var(--theme-card-border)]',
                                 !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                             ]
                                 .filter(Boolean)
@@ -387,7 +403,7 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     {#each slot.triggerSets as set}
                                         <span
-                                            class="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-sm"
+                                            class="inline-flex items-center gap-1 rounded bg-[var(--theme-input-bg)] px-2 py-1 text-sm"
                                         >
                                             {#if echoSetIcons[set.name]}
                                                 <img
@@ -404,7 +420,7 @@
                                 <span
                                     class="flex-1 truncate text-sm"
                                     class:opacity-40={slot.triggerSets.length === 0}
-                                    class:text-zinc-500={slot.triggerSets.length === 0}
+                                    class:text-[var(--theme-muted-text)]={slot.triggerSets.length === 0}
                                 >
                                     {slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色'}
                                 </span>

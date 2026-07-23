@@ -31,3 +31,4 @@ export type ThemeComponentKey =
     | 'divider'
     | 'overlay'
     | 'muted'
+    | 'watermark'

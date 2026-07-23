@@ -1,5 +1,6 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
+    import Modal from '$lib/components/layout/modal.svelte'
     import {
         getContextMenu,
         setContextMenu,
@@ -31,8 +32,26 @@
         canDelete,
         setEditingBlockId,
         setEditingBlockDesc,
-        handleBlockDblclick
+        handleBlockDblclick,
+        clearLeftOpBlocks,
+        resetLeftDamageBindings
     } from './timeline.store.svelte'
+
+    let confirmAction = $state<{
+        type: 'clear' | 'reset'
+        refId: string
+        prevLabel: string
+        curLabel: string
+    } | null>(null)
+
+    function openConfirm(type: 'clear' | 'reset', refId: string) {
+        const refLines = getRefLines()
+        const idx = refLines.findIndex((r) => r.id === refId)
+        if (idx <= 0) return
+        const prevLabel = refLines[idx - 1].time || '(起始)'
+        const curLabel = refLines[idx].time || '(未命名)'
+        confirmAction = { type, refId, prevLabel, curLabel }
+    }
 
     function clampMenu(node: HTMLElement, pos: { x: number; y: number }) {
         node.style.left = pos.x + 'px'
@@ -92,7 +111,7 @@
                 class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
             >
                 <Icon icon="mdi:clock-edit" class="size-4 shrink-0" />
-                设置时间值
+                命名参考线
             </button>
             <button
                 onclick={() => {
@@ -165,7 +184,66 @@
                 重置伤害绑定
             </button>
         {/if}
+        {#if getRefLines().findIndex((r) => r.id === cm.id) > 0}
+            <div class="border-t border-white/10 my-1"></div>
+            <div class="px-3 py-1 text-xs font-semibold text-red-400/70 uppercase tracking-wider">危险操作</div>
+            <button
+                onclick={() => openConfirm('clear', cm.id)}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:playlist-remove" class="size-4 shrink-0" />
+                清空左侧操作块
+            </button>
+            <button
+                onclick={() => openConfirm('reset', cm.id)}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:delete-sweep" class="size-4 shrink-0" />
+                重置左侧伤害绑定
+            </button>
+        {/if}
     </div>
+{/if}
+
+{#if confirmAction}
+    <Modal open={true} onclose={() => (confirmAction = null)}>
+        {#snippet title()}
+            <div class="flex items-center gap-2 text-red-400">
+                <Icon icon="mdi:alert-circle" class="size-5" />
+                危险操作
+            </div>
+        {/snippet}
+        {#snippet children()}
+            <p class="text-sm leading-relaxed">
+                {#if confirmAction.type === 'clear'}
+                    这将清空 参考线{confirmAction.prevLabel} 到 参考线{confirmAction.curLabel} 之间的操作块，是否确认？
+                {:else}
+                    这将重置 参考线{confirmAction.prevLabel} 到 参考线{confirmAction.curLabel} 之间的伤害绑定，是否确认？
+                {/if}
+            </p>
+            <div class="flex justify-end gap-2 mt-5">
+                <button
+                    onclick={() => (confirmAction = null)}
+                    class="h-8 rounded-md bg-white/5 px-4 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                >
+                    取消
+                </button>
+                <button
+                    onclick={() => {
+                        if (confirmAction.type === 'clear') {
+                            clearLeftOpBlocks(confirmAction.refId)
+                        } else {
+                            resetLeftDamageBindings(confirmAction.refId)
+                        }
+                        confirmAction = null
+                    }}
+                    class="h-8 rounded-md bg-red-600 px-4 text-xs text-white transition-colors hover:bg-red-500"
+                >
+                    确认
+                </button>
+            </div>
+        {/snippet}
+    </Modal>
 {/if}
 
 <!-- Block Context Menu -->

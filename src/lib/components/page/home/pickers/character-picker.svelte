@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Character } from '$lib/api/types'
+    import Icon from '@iconify/svelte'
 
     interface GroupData {
         rover: Character[]
@@ -79,9 +80,9 @@
     function itemClass(c: Character): string {
         const base = 'flex w-[100px] flex-col items-center gap-1.5 rounded-lg p-3 transition-colors cursor-pointer'
         if (isSelected(c)) {
-            return base + ' ring-2 ring-indigo-500 bg-indigo-500/10'
+            return base + ' ring-2 ring-[var(--theme-accent-bg)] bg-[var(--theme-accent-bg)]/10'
         }
-        return base + ' hover:bg-white/10'
+        return base + ' hover:bg-[var(--theme-modal-text)]/5'
     }
 </script>
 
@@ -99,35 +100,20 @@
             role="dialog"
             aria-modal="true"
         >
-            <div class="flex items-center gap-2 border-b border-white/5 px-4 py-3">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    class="shrink-0 opacity-50"
-                    ><path
-                        fill="currentColor"
-                        d="m19.6 21l-6.3-6.3q-.75.6-1.725.95T9.5 16q-2.725 0-4.612-1.888T3 9.5t1.888-4.612T9.5 3t4.613 1.888T16 9.5q0 1.1-.35 2.075T14.7 13.3l6.3 6.3zM9.5 14q1.875 0 3.188-1.312T14 9.5t-1.312-3.187T9.5 5T6.313 6.313T5 9.5t1.313 3.188T9.5 14"
-                    /></svg
-                >
+            <div class="flex items-center gap-2 border-b px-4 py-3" style="border-color: var(--theme-divider-border)">
+                <Icon icon="mdi:magnify" class="size-4 shrink-0 text-[var(--theme-muted-text)]" />
                 <input
                     bind:value={query}
                     placeholder="搜索角色..."
-                    class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-white/30"
+                    class="min-w-0 flex-1 bg-transparent text-sm outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
                 />
                 {#if query}
                     <button
                         onclick={() => (query = '')}
-                        class="rounded p-0.5 opacity-50 hover:opacity-100"
+                        class="rounded p-0.5 text-[var(--theme-muted-text)] hover:text-[var(--theme-modal-text)]"
                         aria-label="Clear search"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                            ><path
-                                fill="currentColor"
-                                d="M18.3 5.71a1 1 0 0 0-1.42 0L12 10.59L7.12 5.71a1 1 0 1 0-1.42 1.42L10.59 12l-4.89 4.88a1 1 0 1 0 1.42 1.42L12 13.41l4.88 4.89a1 1 0 0 0 1.42-1.42L13.41 12l4.89-4.88a1 1 0 0 0 0-1.41"
-                            /></svg
-                        >
+                        <Icon icon="mdi:close" class="size-4" />
                     </button>
                 {/if}
             </div>
@@ -137,7 +123,7 @@
                 <div class="flex-1 overflow-y-auto p-4">
                     {#if showSearchResults}
                         {#if searchResults.length === 0}
-                            <div class="py-12 text-center text-sm text-zinc-500">无匹配角色</div>
+                            <div class="py-12 text-center text-sm text-[var(--theme-muted-text)]">无匹配角色</div>
                         {:else}
                             <div class="flex flex-wrap gap-2">
                                 {#each searchResults as c}
@@ -155,18 +141,22 @@
                                         tabindex="0"
                                         class={itemClass(c)}
                                     >
-                                        <div class="size-14 overflow-hidden rounded-full bg-white/10">
+                                        <div
+                                            class="size-14 overflow-hidden rounded-full bg-[var(--theme-modal-text)]/10"
+                                        >
                                             {#if icons[c.name]}
                                                 <img src={icons[c.name]} alt={c.name} class="size-full object-cover" />
                                             {:else}
                                                 <div
-                                                    class="flex size-full items-center justify-center text-xs text-zinc-500"
+                                                    class="flex size-full items-center justify-center text-xs text-[var(--theme-muted-text)]"
                                                 >
                                                     {c.name.charAt(0)}
                                                 </div>
                                             {/if}
                                         </div>
-                                        <span class="truncate text-sm leading-tight text-zinc-300">{c.name}</span>
+                                        <span class="truncate text-sm leading-tight text-[var(--theme-modal-text)]"
+                                            >{c.name}</span
+                                        >
                                     </div>
                                 {/each}
                             </div>
@@ -176,7 +166,9 @@
                             {@const group = groupedCharacters.get(el)}
                             {#if group && (group.rover.length > 0 || group.fiveStar.length > 0 || group.fourStar.length > 0)}
                                 <div bind:this={groupRefs[el]} class="mb-4">
-                                    <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+                                    <div
+                                        class="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--theme-muted-text)]"
+                                    >
                                         {#if elementIcons[el]}
                                             <img src={elementIcons[el]} alt={el} class="size-4 object-contain" />
                                         {/if}
@@ -198,7 +190,9 @@
                                                 tabindex="0"
                                                 class={itemClass(c)}
                                             >
-                                                <div class="size-14 overflow-hidden rounded-full bg-white/10">
+                                                <div
+                                                    class="size-14 overflow-hidden rounded-full bg-[var(--theme-modal-text)]/10"
+                                                >
                                                     {#if icons[c.name]}
                                                         <img
                                                             src={icons[c.name]}
@@ -207,13 +201,14 @@
                                                         />
                                                     {:else}
                                                         <div
-                                                            class="flex size-full items-center justify-center text-xs text-zinc-500"
+                                                            class="flex size-full items-center justify-center text-xs text-[var(--theme-muted-text)]"
                                                         >
                                                             {c.name.charAt(0)}
                                                         </div>
                                                     {/if}
                                                 </div>
-                                                <span class="truncate text-[11px] leading-tight text-zinc-300"
+                                                <span
+                                                    class="truncate text-[11px] leading-tight text-[var(--theme-modal-text)]"
                                                     >{c.name}</span
                                                 >
                                             </div>
@@ -227,22 +222,20 @@
 
                 <!-- Element nav sidebar (right) -->
                 {#if !showSearchResults}
-                    <div class="flex w-10 shrink-0 flex-col items-center gap-2 border-l border-white/5 py-3">
+                    <div
+                        class="flex w-10 shrink-0 flex-col items-center gap-2 border-l py-3"
+                        style="border-color: var(--theme-divider-border)"
+                    >
                         {#each ELEMENT_ORDER as el}
                             <button
                                 onclick={() => scrollToElement(el)}
-                                class="flex size-7 items-center justify-center rounded p-0.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-zinc-300"
+                                class="flex size-7 items-center justify-center rounded p-0.5 text-[var(--theme-muted-text)] transition-colors hover:bg-[var(--theme-modal-text)]/5 hover:text-[var(--theme-modal-text)]"
                                 title={el}
                             >
                                 {#if elementIcons[el]}
                                     <img src={elementIcons[el]} alt={el} class="size-full object-contain" />
                                 {:else}
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                        ><path
-                                            fill="currentColor"
-                                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2"
-                                        /></svg
-                                    >
+                                    <Icon icon="mdi:circle" class="size-3.5" />
                                 {/if}
                             </button>
                         {/each}
@@ -250,17 +243,13 @@
                 {/if}
             </div>
 
-            <div class="flex justify-end border-t border-white/5 px-4 py-2.5">
+            <div class="flex justify-end border-t px-4 py-2.5" style="border-color: var(--theme-divider-border)">
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium text-[var(--theme-btn-text)] transition-colors hover:bg-white/5"
+                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                        ><path
-                            fill="currentColor"
-                            d="M9 16.17L5.53 12.7a1 1 0 0 0-1.42 1.42l4.18 4.18a1 1 0 0 0 1.42 0L20.29 7.71a1 1 0 1 0-1.42-1.42z"
-                        /></svg
-                    >
+                    <Icon icon="mdi:check" class="size-4" />
                     确认
                 </button>
             </div>

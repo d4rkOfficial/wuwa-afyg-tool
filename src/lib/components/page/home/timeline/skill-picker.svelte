@@ -391,13 +391,7 @@
                             class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
                         >
                             <span>{customPctUnit}</span>
-                            <svg
-                                class="size-3 text-[var(--theme-modal-text)]/40"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"><path d="M6 9l6 6 6-6" /></svg
-                            >
+                            <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                         </button>
                         {#if showUnitMenu}
                             <div
@@ -413,13 +407,10 @@
                                         class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
                                     >
                                         <span class="flex-1">{u}</span>
-                                        {#if u === customPctUnit}<svg
+                                        {#if u === customPctUnit}<Icon
+                                                icon="mdi:check"
                                                 class="size-3 text-indigo-400"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="3"><path d="M5 13l4 4L19 7" /></svg
-                                            >{/if}
+                                            />{/if}
                                     </button>
                                 {/each}
                             </div>
@@ -436,13 +427,7 @@
                         class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
                     >
                         <span>{customElement}</span>
-                        <svg
-                            class="size-3 text-[var(--theme-modal-text)]/40"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"><path d="M6 9l6 6 6-6" /></svg
-                        >
+                        <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                     </button>
                     {#if showElementMenu}
                         <div
@@ -458,13 +443,10 @@
                                     class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
                                 >
                                     <span class="flex-1">{el}</span>
-                                    {#if el === customElement}<svg
+                                    {#if el === customElement}<Icon
+                                            icon="mdi:check"
                                             class="size-3 text-indigo-400"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="3"><path d="M5 13l4 4L19 7" /></svg
-                                        >{/if}
+                                        />{/if}
                                 </button>
                             {/each}
                         </div>
