@@ -1,0 +1,2608 @@
+
+> wuwa-afyg-tool@0.0.1 check E:\D4rK6\Projects\wuwa-afyg-tool
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: e:\D4rK6\Projects\wuwa-afyg-tool
+Getting Svelte diagnostics...
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:93:35
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 1: "冷凝"; readonly 2: "热熔"; readonly 3: "导电"; readonly 4: "气动"; readonly 5: "衍射"; readonly 6: "湮灭"; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 1: "冷凝"; readonly 2: "热熔"; readonly 3: "导电"; readonly 4: "气动"; readonly 5: "衍射"; readonly 6: "湮灭"; }'. 
+[36m                    if (dv.rate_lv && dv.rate_lv[idx] === target) {
+                        element = [35mELEMENT_MAP[dv.element][36m ?? ''
+                        break[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:114:22
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 1: "冷凝"; readonly 2: "热熔"; readonly 3: "导电"; readonly 4: "气动"; readonly 5: "衍射"; readonly 6: "湮灭"; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 1: "冷凝"; readonly 2: "热熔"; readonly 3: "导电"; readonly 4: "气动"; readonly 5: "衍射"; readonly 6: "湮灭"; }'. 
+[36m            star: c.rank,
+            element: [35mELEMENT_MAP[c.element][36m ?? '',
+            weaponType: WEAPON_TYPE_MAP[c.weapon] ?? ''[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:115:25
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 1: "长刃"; readonly 2: "迅刀"; readonly 3: "佩枪"; readonly 4: "臂铠"; readonly 5: "音感仪"; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 1: "长刃"; readonly 2: "迅刀"; readonly 3: "佩枪"; readonly 4: "臂铠"; readonly 5: "音感仪"; }'. 
+[36m            element: ELEMENT_MAP[c.element] ?? '',
+            weaponType: [35mWEAPON_TYPE_MAP[c.weapon][36m ?? ''
+        }))[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:125:25
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 1: "长刃"; readonly 2: "迅刀"; readonly 3: "佩枪"; readonly 4: "臂铠"; readonly 5: "音感仪"; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 1: "长刃"; readonly 2: "迅刀"; readonly 3: "佩枪"; readonly 4: "臂铠"; readonly 5: "音感仪"; }'. 
+[36m            star: w.rank,
+            weaponType: [35mWEAPON_TYPE_MAP[w.type][36m ?? ''
+        }))[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:134:19
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 0: 1; readonly 1: 3; readonly 2: 4; readonly 3: 4; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 0: 1; readonly 1: 3; readonly 2: 4; readonly 3: 4; }'. 
+[36m            sets: e.group.map((gid) => sonata[String(gid)]?.name?.zh ?? '').filter(Boolean),
+            cost: [35mCOST_MAP[e.intensity][36m ?? 1
+        }))[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:209:26
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 1: "冷凝"; readonly 2: "热熔"; readonly 3: "导电"; readonly 4: "气动"; readonly 5: "衍射"; readonly 6: "湮灭"; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 1: "冷凝"; readonly 2: "热熔"; readonly 3: "导电"; readonly 4: "气动"; readonly 5: "衍射"; readonly 6: "湮灭"; }'. 
+[36m    const statNodes: StatNode[] = []
+    const elementName = ([35mELEMENT_MAP[data.element][36m ?? '') as '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'
+    const hasTune = Object.values(data.tag ?? {}).some((t) => t.name === '震谐响应' || t.name === '集谐响应')[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:249:22
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 1: "长刃"; readonly 2: "迅刀"; readonly 3: "佩枪"; readonly 4: "臂铠"; readonly 5: "音感仪"; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 1: "长刃"; readonly 2: "迅刀"; readonly 3: "佩枪"; readonly 4: "臂铠"; readonly 5: "音感仪"; }'. 
+[36m        element: elementName,
+        weaponType: ([35mWEAPON_TYPE_MAP[data.weapon][36m ?? '') as '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪',
+        lv90BaseStats: baseStats,[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:275:16
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 1: "长刃"; readonly 2: "迅刀"; readonly 3: "佩枪"; readonly 4: "臂铠"; readonly 5: "音感仪"; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 1: "长刃"; readonly 2: "迅刀"; readonly 3: "佩枪"; readonly 4: "臂铠"; readonly 5: "音感仪"; }'. 
+[36m        rarity: data.rarity as 1 | 2 | 3 | 4 | 5,
+        type: ([35mWEAPON_TYPE_MAP[data.type][36m ?? '长刃') as '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪',
+        lv90BaseAtk: atkStat.value,[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:298:25
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 1: "冷凝"; readonly 2: "热熔"; readonly 3: "导电"; readonly 4: "气动"; readonly 5: "衍射"; readonly 6: "湮灭"; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 1: "冷凝"; readonly 2: "热熔"; readonly 3: "导电"; readonly 4: "气动"; readonly 5: "衍射"; readonly 6: "湮灭"; }'. 
+[36m        const value = suffix ? pct + suffix : pct
+        const element = [35mELEMENT_MAP[dmg.element][36m ?? ''
+        i++[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:313:42
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 0: 1; readonly 1: 3; readonly 2: 4; readonly 3: 4; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 0: 1; readonly 1: 3; readonly 2: 4; readonly 3: 4; }'. 
+[36m    return {
+        cost: intensity !== undefined ? ([35mCOST_MAP[intensity][36m ?? 1) : (COST_MAP[data.intensity] ?? 1),
+        skill: {[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\api\utils.ts[39m:313:71
+[31mError[39m: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{ readonly 0: 1; readonly 1: 3; readonly 2: 4; readonly 3: 4; }'.
+  No index signature with a parameter of type 'number' was found on type '{ readonly 0: 1; readonly 1: 3; readonly 2: 4; readonly 3: 4; }'. 
+[36m    return {
+        cost: intensity !== undefined ? (COST_MAP[intensity] ?? 1) : ([35mCOST_MAP[data.intensity][36m ?? 1),
+        skill: {[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\quick-lookup.svelte[39m:174:5
+[33mWarn[39m: `<div>` with a keydown or contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m{#if open}
+    [35m<div
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-[70] flex items-center justify-center select-text"
+        onkeydown={(e) => e.key === 'Escape' && onclose()}
+        oncontextmenu={handleCtxMenu}
+    >
+        <div
+            class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-2xl"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <div class="flex items-center justify-between border-b border-white/10 px-5 py-3">
+                <h2 class="text-sm font-semibold">速查</h2>
+                <button
+                    onclick={onclose}
+                    class="flex size-7 items-center justify-center rounded-md text-[var(--theme-modal-text)]/50 hover:bg-white/10 hover:text-[var(--theme-modal-text)]"
+                    ><Icon icon="mdi:close" class="size-4" /></button
+                >
+            </div>
+            <div class="flex gap-1 border-b border-white/10 px-5 py-2">
+                {#each charNames as name, i}
+                    <button
+                        onclick={() => {
+                            charIndex = i
+                        }}
+                        class={[
+                            'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                            i === charIndex
+                                ? 'bg-indigo-500/15 text-indigo-300'
+                                : 'text-[var(--theme-modal-text)]/50 hover:bg-white/5'
+                        ].join(' ')}
+                    >
+                        {#if img(charIcons[name])}<img
+                                src={img(charIcons[name])}
+                                alt={name}
+                                class="inline size-4 mr-1 rounded-full object-cover"
+                            />{/if}{name}
+                    </button>
+                {/each}
+            </div>
+            <div class="flex-1 overflow-y-auto px-5 py-4">
+                {#if loading}
+                    <div class="flex items-center justify-center py-16 text-xs text-[var(--theme-modal-text)]/50">
+                        加载中...
+                    </div>
+                {:else if charData}
+                    <div class="space-y-5">
+                        <div class="flex items-center gap-3">
+                            {#if img(charIcons[currentSlot.character ?? ''])}<img
+                                    src={img(charIcons[currentSlot.character ?? ''])}
+                                    alt=""
+                                    class="size-10 rounded-md object-contain bg-white/5"
+                                />{/if}
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-sm font-semibold">{currentSlot.character}</span>
+                                <span class="text-xs text-yellow-400">{'★'.repeat(charData.rarity)}</span>
+                                {#if img(elementIcons[charData.element])}<img
+                                        src={img(elementIcons[charData.element])}
+                                        alt={charData.element}
+                                        class="size-4"
+                                        title={charData.element}
+                                    />{:else}<span class="rounded bg-white/5 px-1.5 py-0.5 text-[10px]"
+                                        >{charData.element}</span
+                                    >{/if}
+                                {#if img(weaponTypeIcons[charData.weaponType])}<img
+                                        src={img(weaponTypeIcons[charData.weaponType])}
+                                        alt={charData.weaponType}
+                                        class="size-4"
+                                        title={charData.weaponType}
+                                    />{:else}<span class="rounded bg-white/5 px-1.5 py-0.5 text-[10px]"
+                                        >{charData.weaponType}</span
+                                    >{/if}
+                            </div>
+                        </div>
+                        <section>
+                            <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                基础属性 (Lv90)
+                            </h3>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础生命</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.hp}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础攻击</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.atk}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础防御</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.def}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">谐度破坏增幅</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.tune}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        {#if currentSlot.weapon}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    武器
+                                </h3>
+                                <div class="rounded-lg bg-white/5 p-3 space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        {#if img(weaponIcons[currentSlot.weapon])}<img
+                                                src={img(weaponIcons[currentSlot.weapon])}
+                                                alt=""
+                                                class="size-8 rounded object-contain bg-white/5"
+                                            />{/if}
+                                        <div>
+                                            <div class="flex items-center gap-1.5 text-xs font-medium">
+                                                <span>{currentSlot.weapon}</span>{#if weaponData}<span
+                                                        class="text-yellow-400 text-[10px]"
+                                                        >{'★'.repeat(weaponData.rarity)}</span
+                                                    >{/if}
+                                            </div>
+                                            {#if weaponData}<div
+                                                    class="text-[10px] text-[var(--theme-modal-text)]/50 mt-0.5"
+                                                >
+                                                    基础攻击 {weaponData.lv90BaseAtk}
+                                                </div>{/if}
+                                        </div>
+                                    </div>
+                                    {#if weaponData}<div
+                                            class="text-[10px] text-[var(--theme-modal-text)]/70 border-t border-white/10 pt-2"
+                                        >
+                                            <span class="text-cyan-400">{weaponData.substat.name}</span>
+                                            {weaponData.substat.value}
+                                        </div>
+                                        <div class="mt-1 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed">
+                                            {@html rd(weaponData.effect.desc)}
+                                        </div>{/if}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if currentSlot.echoes[0]?.name}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    首位声骸
+                                </h3>
+                                <div class="rounded-lg bg-white/5 p-3">
+                                    <div class="flex items-center gap-2">
+                                        {#if img(echoIcons[currentSlot.echoes[0].name])}<img
+                                                src={img(echoIcons[currentSlot.echoes[0].name])}
+                                                alt=""
+                                                class="size-8 rounded object-contain bg-white/5"
+                                            />{/if}
+                                        <div class="text-xs font-medium">
+                                            {currentSlot.echoes[0].name}<span
+                                                class="text-[var(--theme-modal-text)]/50 ml-1"
+                                                >(C{currentSlot.echoes[0].cost})</span
+                                            >{#if currentSlot.triggerSets.length > 0}<span
+                                                    class="text-[10px] text-indigo-400 ml-1.5"
+                                                    >[{currentSlot.triggerSets[0].name}]</span
+                                                >{/if}
+                                        </div>
+                                    </div>
+                                    {#if echoSkillData}<div
+                                            class="mt-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed border-t border-white/10 pt-2"
+                                        >
+                                            {@html rd(echoSkillData.desc)}
+                                        </div>{/if}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if setBonuses}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    套装加成
+                                </h3>
+                                <div class="space-y-2">
+                                    {#each setBonuses as set}
+                                        <div class="rounded-lg bg-white/5 p-3">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                {#if img(setIcons[set.name])}<img
+                                                        src={img(setIcons[set.name])}
+                                                        alt=""
+                                                        class="size-6 rounded object-contain bg-white/10"
+                                                    />{/if}
+                                                <span class="text-xs font-medium">{set.name}</span>
+                                                <span class="text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >({set.pieces}件)</span
+                                                >
+                                            </div>
+                                            <div class="space-y-0.5">
+                                                {#each Object.entries(set.bonuses) as [pieces, desc]}
+                                                    <div class="text-xs">
+                                                        <span class="text-indigo-400 font-medium">{pieces}件套</span
+                                                        ><span class="text-[var(--theme-modal-text)]/70 ml-1"
+                                                            >{desc}</span
+                                                        >
+                                                    </div>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
+                        <section>
+                            <button
+                                onclick={() => handleAccordion('skills')}
+                                class="flex w-full items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/70 transition-colors hover:bg-white/10"
+                            >
+                                <Icon
+                                    icon={activeAccordion === 'skills' ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                    class="size-3.5"
+                                />
+                                技能
+                            </button>
+                            {#if activeAccordion === 'skills'}
+                                <div class="mt-2 space-y-1">
+                                    {#each charData.skills as skill}
+                                        <div class="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+                                            <button
+                                                onclick={() => handleSkillToggle(skill.name)}
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span
+                                                    class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >{skill.type}</span
+                                                >
+                                                <span class="flex-1 text-left">{skill.name}</span>
+                                                <Icon
+                                                    icon={openSkillName === skill.name
+                                                        ? 'mdi:chevron-down'
+                                                        : 'mdi:chevron-right'}
+                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                />
+                                            </button>
+                                            {#if openSkillName === skill.name}
+                                                <div
+                                                    class="border-t border-white/10 px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(skill.desc)}
+                                                </div>
+                                                {#if skill.values.length > 0}
+                                                    <div class="border-t border-white/10 px-3 py-2 space-y-0.5">
+                                                        {#each skill.values as [vname, vvalue, velement]}
+                                                            <div
+                                                                class="flex justify-between gap-2 text-[10px] even:bg-white/5 px-1 py-0.5 text-[var(--theme-modal-text)]/70"
+                                                            >
+                                                                <span class="text-[var(--theme-modal-text)]/50"
+                                                                    >{vname}</span
+                                                                >
+                                                                <span class="tabular-nums whitespace-nowrap"
+                                                                    >{vvalue}{#if velement}<span
+                                                                            class="text-[var(--theme-modal-text)]/30"
+                                                                        >
+                                                                            {velement}</span
+                                                                        >{/if}</span
+                                                                >
+                                                            </div>
+                                                        {/each}
+                                                    </div>
+                                                {/if}
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                    {#each inherentSkills as skill}
+                                        <div class="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+                                            <button
+                                                onclick={() => handleSkillToggle(skill.name)}
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span
+                                                    class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >固有技能</span
+                                                >
+                                                <span class="flex-1 text-left">{skill.name}</span>
+                                                <Icon
+                                                    icon={openSkillName === skill.name
+                                                        ? 'mdi:chevron-down'
+                                                        : 'mdi:chevron-right'}
+                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                />
+                                            </button>
+                                            {#if openSkillName === skill.name}
+                                                <div
+                                                    class="border-t border-white/10 px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(skill.desc)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </section>
+                        {#if statAttrs.length > 0}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    固有属性
+                                </h3>
+                                <div class="grid grid-cols-2 gap-2">
+                                    {#each sortedStatAttrs as attr}
+                                        <div class="rounded-lg bg-white/5 p-2.5">
+                                            <div class="text-[10px] text-[var(--theme-modal-text)]/50">{attr.name}</div>
+                                            {#if attr.desc}
+                                                <div class="mt-0.5 text-xs font-semibold tabular-nums leading-relaxed">
+                                                    {@html rd(attr.desc)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if charData.chains.length > 0}
+                            <section>
+                                <button
+                                    onclick={() => handleAccordion('chains')}
+                                    class="flex w-full items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/70 transition-colors hover:bg-white/10"
+                                >
+                                    <Icon
+                                        icon={activeAccordion === 'chains' ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                        class="size-3.5"
+                                    />
+                                    共鸣链
+                                </button>
+                                {#if activeAccordion === 'chains'}
+                                    <div class="mt-2 space-y-2">
+                                        {#each charData.chains as chain, i}
+                                            <div class="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                                                <div class="flex items-center gap-2 text-xs font-medium">
+                                                    <span class="text-[10px] text-[var(--theme-modal-text)]/40"
+                                                        >C{i + 1}</span
+                                                    ><span>{chain.name}</span>
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(chain.desc)}
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </section>
+                        {/if}
+                    </div>
+                {:else}
+                    <div class="flex items-center justify-center py-16 text-xs text-[var(--theme-modal-text)]/40">
+                        选择角色查看详情
+                    </div>
+                {/if}
+            </div>
+        </div>
+    </div>[36m
+{/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\quick-lookup.svelte[39m:180:9
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m    >
+        [35m<div
+            class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-2xl"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <div class="flex items-center justify-between border-b border-white/10 px-5 py-3">
+                <h2 class="text-sm font-semibold">速查</h2>
+                <button
+                    onclick={onclose}
+                    class="flex size-7 items-center justify-center rounded-md text-[var(--theme-modal-text)]/50 hover:bg-white/10 hover:text-[var(--theme-modal-text)]"
+                    ><Icon icon="mdi:close" class="size-4" /></button
+                >
+            </div>
+            <div class="flex gap-1 border-b border-white/10 px-5 py-2">
+                {#each charNames as name, i}
+                    <button
+                        onclick={() => {
+                            charIndex = i
+                        }}
+                        class={[
+                            'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                            i === charIndex
+                                ? 'bg-indigo-500/15 text-indigo-300'
+                                : 'text-[var(--theme-modal-text)]/50 hover:bg-white/5'
+                        ].join(' ')}
+                    >
+                        {#if img(charIcons[name])}<img
+                                src={img(charIcons[name])}
+                                alt={name}
+                                class="inline size-4 mr-1 rounded-full object-cover"
+                            />{/if}{name}
+                    </button>
+                {/each}
+            </div>
+            <div class="flex-1 overflow-y-auto px-5 py-4">
+                {#if loading}
+                    <div class="flex items-center justify-center py-16 text-xs text-[var(--theme-modal-text)]/50">
+                        加载中...
+                    </div>
+                {:else if charData}
+                    <div class="space-y-5">
+                        <div class="flex items-center gap-3">
+                            {#if img(charIcons[currentSlot.character ?? ''])}<img
+                                    src={img(charIcons[currentSlot.character ?? ''])}
+                                    alt=""
+                                    class="size-10 rounded-md object-contain bg-white/5"
+                                />{/if}
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-sm font-semibold">{currentSlot.character}</span>
+                                <span class="text-xs text-yellow-400">{'★'.repeat(charData.rarity)}</span>
+                                {#if img(elementIcons[charData.element])}<img
+                                        src={img(elementIcons[charData.element])}
+                                        alt={charData.element}
+                                        class="size-4"
+                                        title={charData.element}
+                                    />{:else}<span class="rounded bg-white/5 px-1.5 py-0.5 text-[10px]"
+                                        >{charData.element}</span
+                                    >{/if}
+                                {#if img(weaponTypeIcons[charData.weaponType])}<img
+                                        src={img(weaponTypeIcons[charData.weaponType])}
+                                        alt={charData.weaponType}
+                                        class="size-4"
+                                        title={charData.weaponType}
+                                    />{:else}<span class="rounded bg-white/5 px-1.5 py-0.5 text-[10px]"
+                                        >{charData.weaponType}</span
+                                    >{/if}
+                            </div>
+                        </div>
+                        <section>
+                            <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                基础属性 (Lv90)
+                            </h3>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础生命</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.hp}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础攻击</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.atk}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础防御</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.def}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">谐度破坏增幅</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.tune}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        {#if currentSlot.weapon}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    武器
+                                </h3>
+                                <div class="rounded-lg bg-white/5 p-3 space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        {#if img(weaponIcons[currentSlot.weapon])}<img
+                                                src={img(weaponIcons[currentSlot.weapon])}
+                                                alt=""
+                                                class="size-8 rounded object-contain bg-white/5"
+                                            />{/if}
+                                        <div>
+                                            <div class="flex items-center gap-1.5 text-xs font-medium">
+                                                <span>{currentSlot.weapon}</span>{#if weaponData}<span
+                                                        class="text-yellow-400 text-[10px]"
+                                                        >{'★'.repeat(weaponData.rarity)}</span
+                                                    >{/if}
+                                            </div>
+                                            {#if weaponData}<div
+                                                    class="text-[10px] text-[var(--theme-modal-text)]/50 mt-0.5"
+                                                >
+                                                    基础攻击 {weaponData.lv90BaseAtk}
+                                                </div>{/if}
+                                        </div>
+                                    </div>
+                                    {#if weaponData}<div
+                                            class="text-[10px] text-[var(--theme-modal-text)]/70 border-t border-white/10 pt-2"
+                                        >
+                                            <span class="text-cyan-400">{weaponData.substat.name}</span>
+                                            {weaponData.substat.value}
+                                        </div>
+                                        <div class="mt-1 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed">
+                                            {@html rd(weaponData.effect.desc)}
+                                        </div>{/if}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if currentSlot.echoes[0]?.name}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    首位声骸
+                                </h3>
+                                <div class="rounded-lg bg-white/5 p-3">
+                                    <div class="flex items-center gap-2">
+                                        {#if img(echoIcons[currentSlot.echoes[0].name])}<img
+                                                src={img(echoIcons[currentSlot.echoes[0].name])}
+                                                alt=""
+                                                class="size-8 rounded object-contain bg-white/5"
+                                            />{/if}
+                                        <div class="text-xs font-medium">
+                                            {currentSlot.echoes[0].name}<span
+                                                class="text-[var(--theme-modal-text)]/50 ml-1"
+                                                >(C{currentSlot.echoes[0].cost})</span
+                                            >{#if currentSlot.triggerSets.length > 0}<span
+                                                    class="text-[10px] text-indigo-400 ml-1.5"
+                                                    >[{currentSlot.triggerSets[0].name}]</span
+                                                >{/if}
+                                        </div>
+                                    </div>
+                                    {#if echoSkillData}<div
+                                            class="mt-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed border-t border-white/10 pt-2"
+                                        >
+                                            {@html rd(echoSkillData.desc)}
+                                        </div>{/if}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if setBonuses}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    套装加成
+                                </h3>
+                                <div class="space-y-2">
+                                    {#each setBonuses as set}
+                                        <div class="rounded-lg bg-white/5 p-3">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                {#if img(setIcons[set.name])}<img
+                                                        src={img(setIcons[set.name])}
+                                                        alt=""
+                                                        class="size-6 rounded object-contain bg-white/10"
+                                                    />{/if}
+                                                <span class="text-xs font-medium">{set.name}</span>
+                                                <span class="text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >({set.pieces}件)</span
+                                                >
+                                            </div>
+                                            <div class="space-y-0.5">
+                                                {#each Object.entries(set.bonuses) as [pieces, desc]}
+                                                    <div class="text-xs">
+                                                        <span class="text-indigo-400 font-medium">{pieces}件套</span
+                                                        ><span class="text-[var(--theme-modal-text)]/70 ml-1"
+                                                            >{desc}</span
+                                                        >
+                                                    </div>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
+                        <section>
+                            <button
+                                onclick={() => handleAccordion('skills')}
+                                class="flex w-full items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/70 transition-colors hover:bg-white/10"
+                            >
+                                <Icon
+                                    icon={activeAccordion === 'skills' ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                    class="size-3.5"
+                                />
+                                技能
+                            </button>
+                            {#if activeAccordion === 'skills'}
+                                <div class="mt-2 space-y-1">
+                                    {#each charData.skills as skill}
+                                        <div class="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+                                            <button
+                                                onclick={() => handleSkillToggle(skill.name)}
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span
+                                                    class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >{skill.type}</span
+                                                >
+                                                <span class="flex-1 text-left">{skill.name}</span>
+                                                <Icon
+                                                    icon={openSkillName === skill.name
+                                                        ? 'mdi:chevron-down'
+                                                        : 'mdi:chevron-right'}
+                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                />
+                                            </button>
+                                            {#if openSkillName === skill.name}
+                                                <div
+                                                    class="border-t border-white/10 px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(skill.desc)}
+                                                </div>
+                                                {#if skill.values.length > 0}
+                                                    <div class="border-t border-white/10 px-3 py-2 space-y-0.5">
+                                                        {#each skill.values as [vname, vvalue, velement]}
+                                                            <div
+                                                                class="flex justify-between gap-2 text-[10px] even:bg-white/5 px-1 py-0.5 text-[var(--theme-modal-text)]/70"
+                                                            >
+                                                                <span class="text-[var(--theme-modal-text)]/50"
+                                                                    >{vname}</span
+                                                                >
+                                                                <span class="tabular-nums whitespace-nowrap"
+                                                                    >{vvalue}{#if velement}<span
+                                                                            class="text-[var(--theme-modal-text)]/30"
+                                                                        >
+                                                                            {velement}</span
+                                                                        >{/if}</span
+                                                                >
+                                                            </div>
+                                                        {/each}
+                                                    </div>
+                                                {/if}
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                    {#each inherentSkills as skill}
+                                        <div class="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+                                            <button
+                                                onclick={() => handleSkillToggle(skill.name)}
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span
+                                                    class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >固有技能</span
+                                                >
+                                                <span class="flex-1 text-left">{skill.name}</span>
+                                                <Icon
+                                                    icon={openSkillName === skill.name
+                                                        ? 'mdi:chevron-down'
+                                                        : 'mdi:chevron-right'}
+                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                />
+                                            </button>
+                                            {#if openSkillName === skill.name}
+                                                <div
+                                                    class="border-t border-white/10 px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(skill.desc)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </section>
+                        {#if statAttrs.length > 0}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    固有属性
+                                </h3>
+                                <div class="grid grid-cols-2 gap-2">
+                                    {#each sortedStatAttrs as attr}
+                                        <div class="rounded-lg bg-white/5 p-2.5">
+                                            <div class="text-[10px] text-[var(--theme-modal-text)]/50">{attr.name}</div>
+                                            {#if attr.desc}
+                                                <div class="mt-0.5 text-xs font-semibold tabular-nums leading-relaxed">
+                                                    {@html rd(attr.desc)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if charData.chains.length > 0}
+                            <section>
+                                <button
+                                    onclick={() => handleAccordion('chains')}
+                                    class="flex w-full items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/70 transition-colors hover:bg-white/10"
+                                >
+                                    <Icon
+                                        icon={activeAccordion === 'chains' ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                        class="size-3.5"
+                                    />
+                                    共鸣链
+                                </button>
+                                {#if activeAccordion === 'chains'}
+                                    <div class="mt-2 space-y-2">
+                                        {#each charData.chains as chain, i}
+                                            <div class="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                                                <div class="flex items-center gap-2 text-xs font-medium">
+                                                    <span class="text-[10px] text-[var(--theme-modal-text)]/40"
+                                                        >C{i + 1}</span
+                                                    ><span>{chain.name}</span>
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(chain.desc)}
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </section>
+                        {/if}
+                    </div>
+                {:else}
+                    <div class="flex items-center justify-center py-16 text-xs text-[var(--theme-modal-text)]/40">
+                        选择角色查看详情
+                    </div>
+                {/if}
+            </div>
+        </div>[36m
+    </div>[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\quick-lookup.svelte[39m:180:9
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m    >
+        [35m<div
+            class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-2xl"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <div class="flex items-center justify-between border-b border-white/10 px-5 py-3">
+                <h2 class="text-sm font-semibold">速查</h2>
+                <button
+                    onclick={onclose}
+                    class="flex size-7 items-center justify-center rounded-md text-[var(--theme-modal-text)]/50 hover:bg-white/10 hover:text-[var(--theme-modal-text)]"
+                    ><Icon icon="mdi:close" class="size-4" /></button
+                >
+            </div>
+            <div class="flex gap-1 border-b border-white/10 px-5 py-2">
+                {#each charNames as name, i}
+                    <button
+                        onclick={() => {
+                            charIndex = i
+                        }}
+                        class={[
+                            'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                            i === charIndex
+                                ? 'bg-indigo-500/15 text-indigo-300'
+                                : 'text-[var(--theme-modal-text)]/50 hover:bg-white/5'
+                        ].join(' ')}
+                    >
+                        {#if img(charIcons[name])}<img
+                                src={img(charIcons[name])}
+                                alt={name}
+                                class="inline size-4 mr-1 rounded-full object-cover"
+                            />{/if}{name}
+                    </button>
+                {/each}
+            </div>
+            <div class="flex-1 overflow-y-auto px-5 py-4">
+                {#if loading}
+                    <div class="flex items-center justify-center py-16 text-xs text-[var(--theme-modal-text)]/50">
+                        加载中...
+                    </div>
+                {:else if charData}
+                    <div class="space-y-5">
+                        <div class="flex items-center gap-3">
+                            {#if img(charIcons[currentSlot.character ?? ''])}<img
+                                    src={img(charIcons[currentSlot.character ?? ''])}
+                                    alt=""
+                                    class="size-10 rounded-md object-contain bg-white/5"
+                                />{/if}
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-sm font-semibold">{currentSlot.character}</span>
+                                <span class="text-xs text-yellow-400">{'★'.repeat(charData.rarity)}</span>
+                                {#if img(elementIcons[charData.element])}<img
+                                        src={img(elementIcons[charData.element])}
+                                        alt={charData.element}
+                                        class="size-4"
+                                        title={charData.element}
+                                    />{:else}<span class="rounded bg-white/5 px-1.5 py-0.5 text-[10px]"
+                                        >{charData.element}</span
+                                    >{/if}
+                                {#if img(weaponTypeIcons[charData.weaponType])}<img
+                                        src={img(weaponTypeIcons[charData.weaponType])}
+                                        alt={charData.weaponType}
+                                        class="size-4"
+                                        title={charData.weaponType}
+                                    />{:else}<span class="rounded bg-white/5 px-1.5 py-0.5 text-[10px]"
+                                        >{charData.weaponType}</span
+                                    >{/if}
+                            </div>
+                        </div>
+                        <section>
+                            <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                基础属性 (Lv90)
+                            </h3>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础生命</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.hp}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础攻击</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.atk}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础防御</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.def}
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-white/5 p-2.5 text-center">
+                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">谐度破坏增幅</div>
+                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
+                                        {charData.lv90BaseStats.tune}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        {#if currentSlot.weapon}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    武器
+                                </h3>
+                                <div class="rounded-lg bg-white/5 p-3 space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        {#if img(weaponIcons[currentSlot.weapon])}<img
+                                                src={img(weaponIcons[currentSlot.weapon])}
+                                                alt=""
+                                                class="size-8 rounded object-contain bg-white/5"
+                                            />{/if}
+                                        <div>
+                                            <div class="flex items-center gap-1.5 text-xs font-medium">
+                                                <span>{currentSlot.weapon}</span>{#if weaponData}<span
+                                                        class="text-yellow-400 text-[10px]"
+                                                        >{'★'.repeat(weaponData.rarity)}</span
+                                                    >{/if}
+                                            </div>
+                                            {#if weaponData}<div
+                                                    class="text-[10px] text-[var(--theme-modal-text)]/50 mt-0.5"
+                                                >
+                                                    基础攻击 {weaponData.lv90BaseAtk}
+                                                </div>{/if}
+                                        </div>
+                                    </div>
+                                    {#if weaponData}<div
+                                            class="text-[10px] text-[var(--theme-modal-text)]/70 border-t border-white/10 pt-2"
+                                        >
+                                            <span class="text-cyan-400">{weaponData.substat.name}</span>
+                                            {weaponData.substat.value}
+                                        </div>
+                                        <div class="mt-1 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed">
+                                            {@html rd(weaponData.effect.desc)}
+                                        </div>{/if}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if currentSlot.echoes[0]?.name}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    首位声骸
+                                </h3>
+                                <div class="rounded-lg bg-white/5 p-3">
+                                    <div class="flex items-center gap-2">
+                                        {#if img(echoIcons[currentSlot.echoes[0].name])}<img
+                                                src={img(echoIcons[currentSlot.echoes[0].name])}
+                                                alt=""
+                                                class="size-8 rounded object-contain bg-white/5"
+                                            />{/if}
+                                        <div class="text-xs font-medium">
+                                            {currentSlot.echoes[0].name}<span
+                                                class="text-[var(--theme-modal-text)]/50 ml-1"
+                                                >(C{currentSlot.echoes[0].cost})</span
+                                            >{#if currentSlot.triggerSets.length > 0}<span
+                                                    class="text-[10px] text-indigo-400 ml-1.5"
+                                                    >[{currentSlot.triggerSets[0].name}]</span
+                                                >{/if}
+                                        </div>
+                                    </div>
+                                    {#if echoSkillData}<div
+                                            class="mt-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed border-t border-white/10 pt-2"
+                                        >
+                                            {@html rd(echoSkillData.desc)}
+                                        </div>{/if}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if setBonuses}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    套装加成
+                                </h3>
+                                <div class="space-y-2">
+                                    {#each setBonuses as set}
+                                        <div class="rounded-lg bg-white/5 p-3">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                {#if img(setIcons[set.name])}<img
+                                                        src={img(setIcons[set.name])}
+                                                        alt=""
+                                                        class="size-6 rounded object-contain bg-white/10"
+                                                    />{/if}
+                                                <span class="text-xs font-medium">{set.name}</span>
+                                                <span class="text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >({set.pieces}件)</span
+                                                >
+                                            </div>
+                                            <div class="space-y-0.5">
+                                                {#each Object.entries(set.bonuses) as [pieces, desc]}
+                                                    <div class="text-xs">
+                                                        <span class="text-indigo-400 font-medium">{pieces}件套</span
+                                                        ><span class="text-[var(--theme-modal-text)]/70 ml-1"
+                                                            >{desc}</span
+                                                        >
+                                                    </div>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
+                        <section>
+                            <button
+                                onclick={() => handleAccordion('skills')}
+                                class="flex w-full items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/70 transition-colors hover:bg-white/10"
+                            >
+                                <Icon
+                                    icon={activeAccordion === 'skills' ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                    class="size-3.5"
+                                />
+                                技能
+                            </button>
+                            {#if activeAccordion === 'skills'}
+                                <div class="mt-2 space-y-1">
+                                    {#each charData.skills as skill}
+                                        <div class="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+                                            <button
+                                                onclick={() => handleSkillToggle(skill.name)}
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span
+                                                    class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >{skill.type}</span
+                                                >
+                                                <span class="flex-1 text-left">{skill.name}</span>
+                                                <Icon
+                                                    icon={openSkillName === skill.name
+                                                        ? 'mdi:chevron-down'
+                                                        : 'mdi:chevron-right'}
+                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                />
+                                            </button>
+                                            {#if openSkillName === skill.name}
+                                                <div
+                                                    class="border-t border-white/10 px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(skill.desc)}
+                                                </div>
+                                                {#if skill.values.length > 0}
+                                                    <div class="border-t border-white/10 px-3 py-2 space-y-0.5">
+                                                        {#each skill.values as [vname, vvalue, velement]}
+                                                            <div
+                                                                class="flex justify-between gap-2 text-[10px] even:bg-white/5 px-1 py-0.5 text-[var(--theme-modal-text)]/70"
+                                                            >
+                                                                <span class="text-[var(--theme-modal-text)]/50"
+                                                                    >{vname}</span
+                                                                >
+                                                                <span class="tabular-nums whitespace-nowrap"
+                                                                    >{vvalue}{#if velement}<span
+                                                                            class="text-[var(--theme-modal-text)]/30"
+                                                                        >
+                                                                            {velement}</span
+                                                                        >{/if}</span
+                                                                >
+                                                            </div>
+                                                        {/each}
+                                                    </div>
+                                                {/if}
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                    {#each inherentSkills as skill}
+                                        <div class="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+                                            <button
+                                                onclick={() => handleSkillToggle(skill.name)}
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span
+                                                    class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    >固有技能</span
+                                                >
+                                                <span class="flex-1 text-left">{skill.name}</span>
+                                                <Icon
+                                                    icon={openSkillName === skill.name
+                                                        ? 'mdi:chevron-down'
+                                                        : 'mdi:chevron-right'}
+                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                />
+                                            </button>
+                                            {#if openSkillName === skill.name}
+                                                <div
+                                                    class="border-t border-white/10 px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(skill.desc)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </section>
+                        {#if statAttrs.length > 0}
+                            <section>
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                    固有属性
+                                </h3>
+                                <div class="grid grid-cols-2 gap-2">
+                                    {#each sortedStatAttrs as attr}
+                                        <div class="rounded-lg bg-white/5 p-2.5">
+                                            <div class="text-[10px] text-[var(--theme-modal-text)]/50">{attr.name}</div>
+                                            {#if attr.desc}
+                                                <div class="mt-0.5 text-xs font-semibold tabular-nums leading-relaxed">
+                                                    {@html rd(attr.desc)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
+                        {#if charData.chains.length > 0}
+                            <section>
+                                <button
+                                    onclick={() => handleAccordion('chains')}
+                                    class="flex w-full items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/70 transition-colors hover:bg-white/10"
+                                >
+                                    <Icon
+                                        icon={activeAccordion === 'chains' ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                        class="size-3.5"
+                                    />
+                                    共鸣链
+                                </button>
+                                {#if activeAccordion === 'chains'}
+                                    <div class="mt-2 space-y-2">
+                                        {#each charData.chains as chain, i}
+                                            <div class="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                                                <div class="flex items-center gap-2 text-xs font-medium">
+                                                    <span class="text-[10px] text-[var(--theme-modal-text)]/40"
+                                                        >C{i + 1}</span
+                                                    ><span>{chain.name}</span>
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                >
+                                                    {@html rd(chain.desc)}
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </section>
+                        {/if}
+                    </div>
+                {:else}
+                    <div class="flex items-center justify-center py-16 text-xs text-[var(--theme-modal-text)]/40">
+                        选择角色查看详情
+                    </div>
+                {/if}
+            </div>
+        </div>[36m
+    </div>[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\quick-lookup.svelte[39m:533:5
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m{#if ctxShow}
+    [35m<div class="fixed inset-0 z-[80]" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
+        <div
+            class="absolute min-w-36 rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+            style="left: {ctxX}px; top: {ctxY}px;"
+        >
+            <button
+                onclick={handleCopy}
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                ><Icon icon="mdi:content-copy" class="size-3.5 shrink-0" /> 复制</button
+            >
+            {#if showBuffOption}
+                <button
+                    onclick={handleCreateBuffFromSel}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-indigo-400 transition-colors hover:bg-white/5"
+                    ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</button
+                >
+            {/if}
+            {#if showCustomHitOption}
+                <button
+                    onclick={handleCreateCustomHit}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-amber-400 transition-colors hover:bg-white/5"
+                    ><Icon icon="mdi:plus-circle-outline" class="size-3.5 shrink-0" /> 创建自定义直伤</button
+                >
+            {/if}
+        </div>
+    </div>[36m
+{/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\quick-lookup.svelte[39m:533:5
+[33mWarn[39m: `<div>` with a click or contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m{#if ctxShow}
+    [35m<div class="fixed inset-0 z-[80]" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
+        <div
+            class="absolute min-w-36 rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+            style="left: {ctxX}px; top: {ctxY}px;"
+        >
+            <button
+                onclick={handleCopy}
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                ><Icon icon="mdi:content-copy" class="size-3.5 shrink-0" /> 复制</button
+            >
+            {#if showBuffOption}
+                <button
+                    onclick={handleCreateBuffFromSel}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-indigo-400 transition-colors hover:bg-white/5"
+                    ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</button
+                >
+            {/if}
+            {#if showCustomHitOption}
+                <button
+                    onclick={handleCreateCustomHit}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-amber-400 transition-colors hover:bg-white/5"
+                    ><Icon icon="mdi:plus-circle-outline" class="size-3.5 shrink-0" /> 创建自定义直伤</button
+                >
+            {/if}
+        </div>
+    </div>[36m
+{/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\buff-modal.svelte[39m:495:9
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m    >
+        [35m<div
+            class="rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-5 shadow-xl w-80"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <h3 class="text-sm font-semibold mb-4">引用配置</h3>
+
+            <div class="space-y-3">
+                <!-- Character selector -->
+                <div>
+                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1.5">引用角色</label>
+                    <div class="flex gap-1.5">
+                        {#each team as slot, i}
+                            <button
+                                onclick={() => (refCharacterIdx = i)}
+                                class={[
+                                    'size-9 rounded-full overflow-hidden border-2 transition-all',
+                                    refCharacterIdx === i
+                                        ? 'border-indigo-400 ring-2 ring-indigo-400/40'
+                                        : 'border-white/10 grayscale opacity-30 hover:opacity-60'
+                                ].join(' ')}
+                            >
+                                {#if slot.character && charIconMap[slot.character]}
+                                    <img
+                                        src={charIconMap[slot.character]}
+                                        alt={slot.character}
+                                        draggable="false"
+                                        class="h-full w-full object-cover"
+                                    />
+                                {:else}
+                                    <span
+                                        class="w-full h-full flex items-center justify-center text-xs font-bold text-[var(--theme-modal-text)]/50"
+                                        >{slot.character?.charAt(0) ?? '?'}</span
+                                    >
+                                {/if}
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+
+                <!-- Zone selector (custom dropdown) -->
+                <div>
+                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">引用乘区</label>
+                    <div class="relative">
+                        <button
+                            onclick={() => (showRefZoneMenu = !showRefZoneMenu)}
+                            class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
+                        >
+                            <span>{refTargetDef?.label ?? refTargetZoneId}</span>
+                            <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
+                        </button>
+                        {#if showRefZoneMenu}
+                            <div
+                                class="absolute left-0 top-full z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                onclick={(e) => e.stopPropagation()}
+                            >
+                                {#each ZONE_REF_DEFS.filter((d) => d.id !== refZoneId) as def}
+                                    <button
+                                        onclick={() => {
+                                            refTargetZoneId = def.id
+                                            showRefZoneMenu = false
+                                        }}
+                                        class={[
+                                            'flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
+                                            refTargetZoneId === def.id
+                                                ? 'text-indigo-400 bg-indigo-500/10'
+                                                : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                                        ].join(' ')}
+                                    >
+                                        <span class="flex-1">{def.label}</span>
+                                        <span class="text-[10px] text-[var(--theme-modal-text)]/40">{def.unit}</span>
+                                    </button>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+
+                <!-- Threshold & Pct -->
+                <div>
+                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">阈值 × 百分比</label>
+                    <div class="flex items-center gap-1.5">
+                        <input
+                            type="number"
+                            bind:value={refThreshold}
+                            class="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                        />
+                        <span class="text-[var(--theme-modal-text)]/40 text-xs">×</span>
+                        <input
+                            type="number"
+                            bind:value={refPct}
+                            oninput={() => {
+                                refPct = refPct
+                            }}
+                            class="w-20 rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                        />
+                        <span class="text-[var(--theme-modal-text)]/40 text-xs">%</span>
+                    </div>
+                </div>
+
+                <!-- Lower & Upper -->
+                <div>
+                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">下限 ~ 上限</label>
+                    <div class="flex items-center gap-1.5">
+                        <input
+                            type="number"
+                            bind:value={refLower}
+                            class="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                        />
+                        <span class="text-[var(--theme-modal-text)]/40 text-xs">~</span>
+                        <input
+                            type="number"
+                            bind:value={refUpper}
+                            oninput={() => {
+                                if (refUpper !== undefined && refLower !== undefined && refUpper < refLower) {
+                                    refLower = refUpper
+                                }
+                            }}
+                            class="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                        />
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                {#if refTargetDef}
+                    {@const rChar = teamNames[refCharacterIdx] ?? '?'}
+                    {@const pOp = refThreshold < 0 ? '+' : '-'}
+                    {@const pTh = refThreshold < 0 ? -refThreshold : refThreshold}
+                    {@const pClamp =
+                        (refLower !== undefined && !isNaN(refLower) ? refLower : '') +
+                        ' ~ ' +
+                        (refUpper !== undefined && !isNaN(refUpper) ? refUpper : '')}
+                    <div
+                        class="rounded bg-white/5 px-2 py-1.5 text-[10px] text-[var(--theme-modal-text)]/50 text-center"
+                    >
+                        = ({rChar}.{refTargetDef.label}{pTh !== 0
+                            ? pOp + pTh + (refTargetDef.unit === '%' ? '%' : '')
+                            : ''}) × {refPct}%
+                        {#if pClamp.trim() !== ' ~ '}
+                            clamp({pClamp})
+                        {/if}
+                    </div>
+                {/if}
+            </div>
+
+            <div class="flex justify-between mt-5">
+                <button
+                    onclick={handleClearRef}
+                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-red-400 transition-colors hover:bg-red-500/20"
+                    >清除引用</button
+                >
+                <div class="flex gap-2">
+                    <button
+                        onclick={() => (showRefModal = false)}
+                        class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                        >取消</button
+                    >
+                    <button
+                        onclick={handleConfirmRef}
+                        class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500"
+                        >确认</button
+                    >
+                </div>
+            </div>
+        </div>[36m
+    </div>[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\buff-modal.svelte[39m:504:21
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                <div>
+                    [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1.5">引用角色</label>[36m
+                    <div class="flex gap-1.5">[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\buff-modal.svelte[39m:536:21
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                <div>
+                    [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">引用乘区</label>[36m
+                    <div class="relative">[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\buff-modal.svelte[39m:546:29
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m                        {#if showRefZoneMenu}
+                            [35m<div
+                                class="absolute left-0 top-full z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                onclick={(e) => e.stopPropagation()}
+                            >
+                                {#each ZONE_REF_DEFS.filter((d) => d.id !== refZoneId) as def}
+                                    <button
+                                        onclick={() => {
+                                            refTargetZoneId = def.id
+                                            showRefZoneMenu = false
+                                        }}
+                                        class={[
+                                            'flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
+                                            refTargetZoneId === def.id
+                                                ? 'text-indigo-400 bg-indigo-500/10'
+                                                : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                                        ].join(' ')}
+                                    >
+                                        <span class="flex-1">{def.label}</span>
+                                        <span class="text-[10px] text-[var(--theme-modal-text)]/40">{def.unit}</span>
+                                    </button>
+                                {/each}
+                            </div>[36m
+                        {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\buff-modal.svelte[39m:574:21
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                <div>
+                    [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">阈值 × 百分比</label>[36m
+                    <div class="flex items-center gap-1.5">[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\calculation\buff-modal.svelte[39m:596:21
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                <div>
+                    [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">下限 ~ 上限</label>[36m
+                    <div class="flex items-center gap-1.5">[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\config\config.svelte[39m:210:37
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m                                {#if showMainStatMenu?.ci === ci && showMainStatMenu?.si === si}
+                                    [35m<div
+                                        class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                        onclick={(e) => e.stopPropagation()}
+                                    >
+                                        <button
+                                            onclick={() => handleSetMainStat(ci, si, null)}
+                                            class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)]/40 transition-colors hover:bg-white/5"
+                                            >未选择</button
+                                        >
+                                        {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt}
+                                            <button
+                                                onclick={() =>
+                                                    handleSetMainStat(ci, si, {
+                                                        type: opt.label,
+                                                        value: opt.maxValue,
+                                                        unit: opt.unit
+                                                    })}
+                                                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span class="flex-1">{opt.label}</span>
+                                                <span class="text-[var(--theme-modal-text)]/40"
+                                                    >{opt.maxValue}{opt.unit}</span
+                                                >
+                                                {#if slot.mainStat?.type === opt.label}<Icon
+                                                        icon="mdi:check"
+                                                        class="size-3 text-indigo-400"
+                                                    />{/if}
+                                            </button>
+                                        {/each}
+                                    </div>[36m
+                                {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\config\config.svelte[39m:210:37
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m                                {#if showMainStatMenu?.ci === ci && showMainStatMenu?.si === si}
+                                    [35m<div
+                                        class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                        onclick={(e) => e.stopPropagation()}
+                                    >
+                                        <button
+                                            onclick={() => handleSetMainStat(ci, si, null)}
+                                            class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)]/40 transition-colors hover:bg-white/5"
+                                            >未选择</button
+                                        >
+                                        {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt}
+                                            <button
+                                                onclick={() =>
+                                                    handleSetMainStat(ci, si, {
+                                                        type: opt.label,
+                                                        value: opt.maxValue,
+                                                        unit: opt.unit
+                                                    })}
+                                                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                            >
+                                                <span class="flex-1">{opt.label}</span>
+                                                <span class="text-[var(--theme-modal-text)]/40"
+                                                    >{opt.maxValue}{opt.unit}</span
+                                                >
+                                                {#if slot.mainStat?.type === opt.label}<Icon
+                                                        icon="mdi:check"
+                                                        class="size-3 text-indigo-400"
+                                                    />{/if}
+                                            </button>
+                                        {/each}
+                                    </div>[36m
+                                {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\config\config.svelte[39m:331:9
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m        {@const mSlot = config.characters[ms.ci].echoes[ms.si]}
+        [35m<div
+            style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+            class="fixed inset-0 z-50 flex items-center justify-center"
+            onclick={() => (showSubstatModal = null)}
+        >
+            <div
+                class="w-72 max-h-80 rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-medium text-[var(--theme-modal-text)]">选择副词条</span>
+                    <button
+                        onclick={() => (showSubstatModal = null)}
+                        class="rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-[var(--theme-modal-text)]/70"
+                    >
+                        <Icon icon="mdi:close" class="size-4" />
+                    </button>
+                </div>
+                <div class="space-y-0.5 max-h-56 overflow-y-auto">
+                    {#each SUBSTAT_OPTIONS as opt}
+                        {@const exists = mSlot.substats.some((s) => s.type === opt.label)}
+                        <button
+                            onclick={() => {
+                                if (!exists) handleAddSubstat(ms.ci, ms.si, opt.label)
+                            }}
+                            disabled={exists}
+                            class={[
+                                'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
+                                exists
+                                    ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
+                                    : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                            ].join(' ')}
+                        >
+                            <span class="flex-1">{opt.label}</span>
+                            <span class="text-[10px] text-[var(--theme-modal-text)]/40">{opt.unit}</span>
+                            {#if exists}
+                                <Icon icon="mdi:check" class="size-3 shrink-0 text-indigo-400" />
+                            {/if}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+        </div>[36m
+    {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\config\config.svelte[39m:331:9
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m        {@const mSlot = config.characters[ms.ci].echoes[ms.si]}
+        [35m<div
+            style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+            class="fixed inset-0 z-50 flex items-center justify-center"
+            onclick={() => (showSubstatModal = null)}
+        >
+            <div
+                class="w-72 max-h-80 rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-medium text-[var(--theme-modal-text)]">选择副词条</span>
+                    <button
+                        onclick={() => (showSubstatModal = null)}
+                        class="rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-[var(--theme-modal-text)]/70"
+                    >
+                        <Icon icon="mdi:close" class="size-4" />
+                    </button>
+                </div>
+                <div class="space-y-0.5 max-h-56 overflow-y-auto">
+                    {#each SUBSTAT_OPTIONS as opt}
+                        {@const exists = mSlot.substats.some((s) => s.type === opt.label)}
+                        <button
+                            onclick={() => {
+                                if (!exists) handleAddSubstat(ms.ci, ms.si, opt.label)
+                            }}
+                            disabled={exists}
+                            class={[
+                                'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
+                                exists
+                                    ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
+                                    : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                            ].join(' ')}
+                        >
+                            <span class="flex-1">{opt.label}</span>
+                            <span class="text-[10px] text-[var(--theme-modal-text)]/40">{opt.unit}</span>
+                            {#if exists}
+                                <Icon icon="mdi:check" class="size-3 shrink-0 text-indigo-400" />
+                            {/if}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+        </div>[36m
+    {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\config\config.svelte[39m:336:13
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m        >
+            [35m<div
+                class="w-72 max-h-80 rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-medium text-[var(--theme-modal-text)]">选择副词条</span>
+                    <button
+                        onclick={() => (showSubstatModal = null)}
+                        class="rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-[var(--theme-modal-text)]/70"
+                    >
+                        <Icon icon="mdi:close" class="size-4" />
+                    </button>
+                </div>
+                <div class="space-y-0.5 max-h-56 overflow-y-auto">
+                    {#each SUBSTAT_OPTIONS as opt}
+                        {@const exists = mSlot.substats.some((s) => s.type === opt.label)}
+                        <button
+                            onclick={() => {
+                                if (!exists) handleAddSubstat(ms.ci, ms.si, opt.label)
+                            }}
+                            disabled={exists}
+                            class={[
+                                'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
+                                exists
+                                    ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
+                                    : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                            ].join(' ')}
+                        >
+                            <span class="flex-1">{opt.label}</span>
+                            <span class="text-[10px] text-[var(--theme-modal-text)]/40">{opt.unit}</span>
+                            {#if exists}
+                                <Icon icon="mdi:check" class="size-3 shrink-0 text-indigo-400" />
+                            {/if}
+                        </button>
+                    {/each}
+                </div>
+            </div>[36m
+        </div>[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\config\config.svelte[39m:336:13
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m        >
+            [35m<div
+                class="w-72 max-h-80 rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-medium text-[var(--theme-modal-text)]">选择副词条</span>
+                    <button
+                        onclick={() => (showSubstatModal = null)}
+                        class="rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-[var(--theme-modal-text)]/70"
+                    >
+                        <Icon icon="mdi:close" class="size-4" />
+                    </button>
+                </div>
+                <div class="space-y-0.5 max-h-56 overflow-y-auto">
+                    {#each SUBSTAT_OPTIONS as opt}
+                        {@const exists = mSlot.substats.some((s) => s.type === opt.label)}
+                        <button
+                            onclick={() => {
+                                if (!exists) handleAddSubstat(ms.ci, ms.si, opt.label)
+                            }}
+                            disabled={exists}
+                            class={[
+                                'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
+                                exists
+                                    ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
+                                    : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                            ].join(' ')}
+                        >
+                            <span class="flex-1">{opt.label}</span>
+                            <span class="text-[10px] text-[var(--theme-modal-text)]/40">{opt.unit}</span>
+                            {#if exists}
+                                <Icon icon="mdi:check" class="size-3 shrink-0 text-indigo-400" />
+                            {/if}
+                        </button>
+                    {/each}
+                </div>
+            </div>[36m
+        </div>[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\config\config.svelte[39m:114:21
+[31mError[39m: Type '"enemy" | `char${number}`' is not assignable to type '"enemy" | "char0" | "char1" | "char2"'.
+  Type '`char${number}`' is not assignable to type '"enemy" | "char0" | "char1" | "char2"'. (ts)
+[36m                onclick={() => {
+                    [35mactiveTab[36m = i < 3 ? (`char${i}` as const) : 'enemy'
+                    showMainStatMenu = null[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\config\config.svelte[39m:116:21
+[31mError[39m: Cannot find name 'showSubstatMenu'. (ts)
+[36m                    showMainStatMenu = null
+                    [35mshowSubstatMenu[36m = null
+                }}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:73:5
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    [35m<div
+        class="fixed z-50 min-w-44 rounded-lg border border-white/10 bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1 shadow-xl backdrop-blur-lg"
+        style="left: {cm.x}px; top: {cm.y}px"
+        data-context-menu="true"
+        use:clampMenu={{ x: cm.x, y: cm.y }}
+        onclick={() => setContextMenu(null)}
+    >
+        <div class="px-3 py-1 text-xs font-semibold text-[var(--theme-context-menu-text)]/50 uppercase tracking-wider">
+            参考线
+        </div>
+        {#if canAddBefore(cm.id)}
+            <button
+                onclick={() => {
+                    addBefore(cm.id)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:arrow-left-bold" class="size-4 shrink-0" />
+                左侧添加参考线
+            </button>
+        {/if}
+        {#if canAddAfter(cm.id)}
+            <button
+                onclick={() => {
+                    addAfter(cm.id)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:arrow-right-bold" class="size-4 shrink-0" />
+                右侧添加参考线
+            </button>
+        {/if}
+        {#if canDelete(cm.id)}
+            <button
+                onclick={() => {
+                    const r = getRefLines().find((rl) => rl.id === cm.id)
+                    if (r) startEdit(cm.id, r.time)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:clock-edit" class="size-4 shrink-0" />
+                命名参考线
+            </button>
+            <button
+                onclick={() => {
+                    removeLine(cm.id)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:delete" class="size-4 shrink-0" />
+                删除参考线
+            </button>
+        {/if}
+        <div class="border-t border-white/10 my-1"></div>
+        <div class="px-3 py-1 text-xs font-semibold text-[var(--theme-context-menu-text)]/50 uppercase tracking-wider">
+            伤害绑定
+        </div>
+        <div class="px-3 py-0.5 text-[9px] text-[var(--theme-context-menu-text)]/40">直伤</div>
+        {#if getDamageBlocks().some((d) => d.sourceId === cm.id && d.trackIndex === 3 && d.skillHits.length > 0)}
+            <button
+                onclick={() => {
+                    openRefSkillPicker(cm.id)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:pencil" class="size-4 shrink-0" />
+                编辑直伤
+            </button>
+        {:else}
+            <button
+                onclick={() => {
+                    openRefSkillPicker(cm.id)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
+                绑定直伤
+            </button>
+        {/if}
+        <div class="px-3 py-0.5 text-[9px] text-[var(--theme-context-menu-text)]/40">效应/处决</div>
+        {#if getDamageBlocks().some((d) => d.sourceId === cm.id && d.trackIndex === 3 && d.nonDirectEntries.length > 0)}
+            <button
+                onclick={() => {
+                    openNonDirectPicker('ref', cm.id)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:pencil" class="size-4 shrink-0" />
+                编辑效应/处决
+            </button>
+        {:else}
+            <button
+                onclick={() => {
+                    addDamageBlock('ref', cm.id)
+                    openNonDirectPicker('ref', cm.id)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
+                绑定效应/处决
+            </button>
+        {/if}
+        {#if getDamageBlocks().some((d) => d.sourceId === cm.id && d.trackIndex === 3)}
+            <div class="border-t border-white/10 my-1"></div>
+            <button
+                onclick={() => {
+                    removeDamageBySource(cm.id, 'all')
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:restore" class="size-4 shrink-0" />
+                重置伤害绑定
+            </button>
+        {/if}
+        {#if getRefLines().findIndex((r) => r.id === cm.id) > 0}
+            <div class="border-t border-white/10 my-1"></div>
+            <div class="px-3 py-1 text-xs font-semibold text-red-400/70 uppercase tracking-wider">危险操作</div>
+            <button
+                onclick={() => openConfirm('clear', cm.id)}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:playlist-remove" class="size-4 shrink-0" />
+                清空左侧操作块
+            </button>
+            <button
+                onclick={() => openConfirm('reset', cm.id)}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+            >
+                <Icon icon="mdi:delete-sweep" class="size-4 shrink-0" />
+                重置左侧伤害绑定
+            </button>
+        {/if}
+    </div>[36m
+{/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:253:5
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    [35m<div
+        class="fixed z-50 min-w-44 rounded-lg border border-white/10 bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1 shadow-xl backdrop-blur-lg"
+        style="left: {bm.x}px; top: {bm.y}px"
+        data-block-menu="true"
+        use:clampMenu={{ x: bm.x, y: bm.y }}
+        onclick={() => setBlockMenu(null)}
+    >
+        <div class="px-3 py-1 text-xs font-semibold text-[var(--theme-context-menu-text)]/50 uppercase tracking-wider">
+            操作块
+        </div>
+        <button
+            onclick={() => {
+                handleBlockDblclick(bm.blockId)
+            }}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:comment-edit" class="size-4 shrink-0" />
+            修改备注
+        </button>
+        <button
+            onclick={() => {
+                removeBlock(bm.blockId)
+            }}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:delete" class="size-4 shrink-0" />
+            删除操作块
+        </button>
+        <div class="border-t border-white/10 my-1"></div>
+        <div class="px-3 py-1 text-xs font-semibold text-[var(--theme-context-menu-text)]/50 uppercase tracking-wider">
+            变奏
+        </div>
+        {#if canSetIntro(bm.blockId)}
+            <button
+                onclick={() => {
+                    toggleIntro(bm.blockId)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:play-circle" class="size-4 shrink-0" />
+                设置变奏入场
+            </button>
+        {/if}
+        {#if getOpBlocks().some((b) => b.id === bm.blockId && b.intro)}
+            <button
+                onclick={() => {
+                    toggleIntro(bm.blockId)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:stop-circle" class="size-4 shrink-0" />
+                取消变奏入场
+            </button>
+        {/if}
+        <div class="border-t border-white/10 my-1"></div>
+        <div class="px-3 py-1 text-xs font-semibold text-[var(--theme-context-menu-text)]/50 uppercase tracking-wider">
+            伤害绑定
+        </div>
+        <div class="px-3 py-0.5 text-[9px] text-[var(--theme-context-menu-text)]/40">直伤</div>
+        {#if getDamageBlocks().some((d) => d.sourceId === bm.blockId && d.trackIndex === 3 && d.skillHits.length > 0)}
+            <button
+                onclick={() => {
+                    openSkillPicker(bm.blockId)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:pencil" class="size-4 shrink-0" />
+                编辑直伤
+            </button>
+        {:else}
+            <button
+                onclick={() => {
+                    addDamageBlock('op', bm.blockId)
+                    openSkillPicker(bm.blockId)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
+                绑定直伤
+            </button>
+        {/if}
+        <div class="px-3 py-0.5 text-[9px] text-[var(--theme-context-menu-text)]/40">效应/处决</div>
+        {#if getDamageBlocks().some((d) => d.sourceId === bm.blockId && d.trackIndex === 3 && d.nonDirectEntries.length > 0)}
+            <button
+                onclick={() => {
+                    openNonDirectPicker('op', bm.blockId)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:pencil" class="size-4 shrink-0" />
+                编辑效应/处决
+            </button>
+        {:else}
+            <button
+                onclick={() => {
+                    addDamageBlock('op', bm.blockId)
+                    openNonDirectPicker('op', bm.blockId)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--theme-context-menu-text)] hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
+                绑定效应/处决
+            </button>
+        {/if}
+        {#if getDamageBlocks().some((d) => d.sourceId === bm.blockId && d.trackIndex === 3)}
+            <div class="border-t border-white/10 mt-1 mb-0"></div>
+            <button
+                onclick={() => {
+                    removeDamageBySource(bm.blockId, 'all')
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:restore" class="size-4 shrink-0" />
+                重置伤害绑定
+            </button>
+        {/if}
+    </div>[36m
+{/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:376:5
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    [35m<div
+        class="fixed z-50 rounded-lg border border-white/10 bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1.5 px-2 shadow-xl backdrop-blur-lg"
+        style="left: {tm.x}px; top: {tm.y}px"
+        data-track-menu="true"
+        use:clampMenu={{ x: tm.x, y: tm.y }}
+        onclick={() => setTrackMenu(null)}
+    >
+        <div class="flex items-center gap-1">
+            {#each getUiBtnIcons() as [name, url]}
+                <button
+                    class="size-7 flex items-center justify-center rounded hover:bg-[var(--theme-context-menu-bg-focused)] transition-colors"
+                    onclick={() => addOpBlock(tm.trackIndex, tm.pos, name)}
+                    title={name}
+                >
+                    {#if url}
+                        <img src={url} alt={name} draggable="false" class="size-5 object-contain pointer-events-none" />
+                    {:else}
+                        <span class="text-[10px] font-bold text-[var(--theme-context-menu-text)]"
+                            >{name === 'SpaceBar'
+                                ? '⎵'
+                                : name === 'MouseLeft'
+                                  ? 'L'
+                                  : name === 'MouseRight'
+                                    ? 'R'
+                                    : name === 'MouseMiddle'
+                                      ? 'M'
+                                      : name}</span
+                        >
+                    {/if}
+                </button>
+            {/each}
+        </div>
+    </div>[36m
+{/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:218:22
+[31mError[39m: 'confirmAction' is possibly 'null'. (ts)
+[36m            <p class="text-sm leading-relaxed">
+                {#if [35mconfirmAction[36m.type === 'clear'}
+                    这将清空 参考线{confirmAction.prevLabel} 到 参考线{confirmAction.curLabel} 之间的操作块，是否确认？[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:219:30
+[31mError[39m: 'confirmAction' is possibly 'null'. (ts)
+[36m                {#if confirmAction.type === 'clear'}
+                    这将清空 参考线{[35mconfirmAction[36m.prevLabel} 到 参考线{confirmAction.curLabel} 之间的操作块，是否确认？
+                {:else}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:219:61
+[31mError[39m: 'confirmAction' is possibly 'null'. (ts)
+[36m                {#if confirmAction.type === 'clear'}
+                    这将清空 参考线{confirmAction.prevLabel} 到 参考线{[35mconfirmAction[36m.curLabel} 之间的操作块，是否确认？
+                {:else}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:221:30
+[31mError[39m: 'confirmAction' is possibly 'null'. (ts)
+[36m                {:else}
+                    这将重置 参考线{[35mconfirmAction[36m.prevLabel} 到 参考线{confirmAction.curLabel} 之间的伤害绑定，是否确认？
+                {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:221:61
+[31mError[39m: 'confirmAction' is possibly 'null'. (ts)
+[36m                {:else}
+                    这将重置 参考线{confirmAction.prevLabel} 到 参考线{[35mconfirmAction[36m.curLabel} 之间的伤害绑定，是否确认？
+                {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:233:29
+[31mError[39m: 'confirmAction' is possibly 'null'. (ts)
+[36m                    onclick={() => {
+                        if ([35mconfirmAction[36m.type === 'clear') {
+                            clearLeftOpBlocks(confirmAction.refId)[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:234:47
+[31mError[39m: 'confirmAction' is possibly 'null'. (ts)
+[36m                        if (confirmAction.type === 'clear') {
+                            clearLeftOpBlocks([35mconfirmAction[36m.refId)
+                        } else {[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\context-menu.svelte[39m:236:53
+[31mError[39m: 'confirmAction' is possibly 'null'. (ts)
+[36m                        } else {
+                            resetLeftDamageBindings([35mconfirmAction[36m.refId)
+                        }[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:350:9
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m    >
+        [35m<div
+            class="rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-5 shadow-xl w-96"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <h3 class="text-sm font-semibold mb-4">自定义直伤</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">名称</label>
+                    <input
+                        type="text"
+                        bind:value={customName}
+                        placeholder="输入名称"
+                        class="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                    />
+                </div>
+                <div>
+                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">固定值</label>
+                    <input
+                        type="number"
+                        bind:value={customFlat}
+                        placeholder="0"
+                        class="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                    />
+                </div>
+                <div class="flex gap-2">
+                    <div class="flex-1">
+                        <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">百分比值</label>
+                        <input
+                            type="number"
+                            bind:value={customPct}
+                            placeholder="0"
+                            class="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                        />
+                    </div>
+                    <div class="w-32 relative">
+                        <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">单位</label>
+                        <button
+                            onclick={() => {
+                                showUnitMenu = !showUnitMenu
+                                showElementMenu = false
+                            }}
+                            class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
+                        >
+                            <span>{customPctUnit}</span>
+                            <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
+                        </button>
+                        {#if showUnitMenu}
+                            <div
+                                class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                onclick={(e) => e.stopPropagation()}
+                            >
+                                {#each PCT_UNITS as u}
+                                    <button
+                                        onclick={() => {
+                                            customPctUnit = u
+                                            showUnitMenu = false
+                                        }}
+                                        class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                    >
+                                        <span class="flex-1">{u}</span>
+                                        {#if u === customPctUnit}<Icon
+                                                icon="mdi:check"
+                                                class="size-3 text-indigo-400"
+                                            />{/if}
+                                    </button>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+                <div class="relative">
+                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">属性</label>
+                    <button
+                        onclick={() => {
+                            showElementMenu = !showElementMenu
+                            showUnitMenu = false
+                        }}
+                        class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
+                    >
+                        <span>{customElement}</span>
+                        <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
+                    </button>
+                    {#if showElementMenu}
+                        <div
+                            class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                            onclick={(e) => e.stopPropagation()}
+                        >
+                            {#each ELEMENTS as el}
+                                <button
+                                    onclick={() => {
+                                        customElement = el
+                                        showElementMenu = false
+                                    }}
+                                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                >
+                                    <span class="flex-1">{el}</span>
+                                    {#if el === customElement}<Icon
+                                            icon="mdi:check"
+                                            class="size-3 text-indigo-400"
+                                        />{/if}
+                                </button>
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button
+                    onclick={() => (showCustomModal = false)}
+                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    >取消</button
+                >
+                <button
+                    onclick={() => confirmAddCustom(getSkillPickerCharacter())}
+                    class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500"
+                    >确认</button
+                >
+            </div>
+        </div>[36m
+    </div>[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:357:21
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                <div>
+                    [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">名称</label>[36m
+                    <input[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:366:21
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                <div>
+                    [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">固定值</label>[36m
+                    <input[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:376:25
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                    <div class="flex-1">
+                        [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">百分比值</label>[36m
+                        <input[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:385:25
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                    <div class="w-32 relative">
+                        [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">单位</label>[36m
+                        <button[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:397:29
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m                        {#if showUnitMenu}
+                            [35m<div
+                                class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                onclick={(e) => e.stopPropagation()}
+                            >
+                                {#each PCT_UNITS as u}
+                                    <button
+                                        onclick={() => {
+                                            customPctUnit = u
+                                            showUnitMenu = false
+                                        }}
+                                        class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                    >
+                                        <span class="flex-1">{u}</span>
+                                        {#if u === customPctUnit}<Icon
+                                                icon="mdi:check"
+                                                class="size-3 text-indigo-400"
+                                            />{/if}
+                                    </button>
+                                {/each}
+                            </div>[36m
+                        {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:421:21
+[33mWarn[39m: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+[36m                <div class="relative">
+                    [35m<label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">属性</label>[36m
+                    <button[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:433:25
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m                    {#if showElementMenu}
+                        [35m<div
+                            class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                            onclick={(e) => e.stopPropagation()}
+                        >
+                            {#each ELEMENTS as el}
+                                <button
+                                    onclick={() => {
+                                        customElement = el
+                                        showElementMenu = false
+                                    }}
+                                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                >
+                                    <span class="flex-1">{el}</span>
+                                    {#if el === customElement}<Icon
+                                            icon="mdi:check"
+                                            class="size-3 text-indigo-400"
+                                        />{/if}
+                                </button>
+                            {/each}
+                        </div>[36m
+                    {/if}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\skill-picker.svelte[39m:472:2
+[31mError[39m: Property 'onCreateBuff' is missing in type '{ open: boolean; team: [CharSlot, CharSlot, CharSlot]; showBuffOption: false; onCreateCustomHit: (name: string) => void; onclose: () => boolean; }' but required in type 'Props'. (ts)
+[36m
+<[35mQuickLookup[36m
+    open={showLookup}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\timeline.svelte[39m:208:21
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m                {#each getTRACKS() as name, i}
+                    [35m<div
+                        class="relative shrink-0 {i < 3 ? 'h-14' : 'flex-1'}"
+                        style="border-bottom: 1px solid color-mix(in srgb, {TRACK_COLORS[i]} 15%, transparent);"
+                        oncontextmenu={(e) => {
+                            e.preventDefault()
+                            onTrackContextMenu(e, i)
+                        }}
+                    >
+                        <!-- Sticky label column -->
+                        <div
+                            class="sticky left-0 z-[35] w-20 h-full bg-[var(--theme-timeline-bg)] border-r border-white/10 flex items-center justify-center"
+                        >
+                            {#if i < 3}
+                                <div
+                                    class="flex items-center justify-center w-full h-full overflow-hidden"
+                                    style="border-right: 3px solid {elementColor(
+                                        name
+                                    )}; margin-right: 4px; width: calc(100% - 4px); background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, {elementColor(
+                                        name
+                                    )} 25%, transparent) 100%);"
+                                >
+                                    {#if getCharIconMap()[name]}
+                                        <img
+                                            src={getCharIconMap()[name]}
+                                            alt={name}
+                                            draggable="false"
+                                            class="h-full w-full object-cover"
+                                        />
+                                    {/if}
+                                </div>
+                            {:else}
+                                <div
+                                    class="[writing-mode:vertical-rl] text-[11px] font-medium text-[var(--theme-timeline-text)]/60"
+                                >
+                                    伤害绑定
+                                </div>
+                            {/if}
+                        </div>
+
+                        <!-- Op blocks overlay -->
+                        {#if i < 3}
+                            <div class="absolute pointer-events-none" style="left: 5rem; top: 0; right: 0; bottom: 0;">
+                                {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
+                                    <div
+                                        class="absolute inset-y-0 flex items-center pointer-events-auto cursor-grab active:cursor-grabbing select-none"
+                                        style="left: {block.pos}px; transform: translateX(-50%) {getDragBlockId() ===
+                                        block.id
+                                            ? 'translateY(-4px)'
+                                            : ''}; z-index: {getDragBlockId() === block.id ? 20 : 5};"
+                                        data-block={block.id}
+                                        onmousedown={(e) => {
+                                            if (!timelineEl) return
+                                            const rect = timelineEl.getBoundingClientRect()
+                                            const scrollL2 = timelineEl.scrollLeft
+                                            const mx = e.clientX - rect.left + scrollL2 - 80
+                                            startBlockDrag(e, block.id, mx)
+                                        }}
+                                        oncontextmenu={(e) => onBlockContextMenu(e, block.id)}
+                                        ondblclick={() => {
+                                            if (!getLocked()) handleBlockDblclick(block.id)
+                                        }}
+                                    >
+                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                        <div
+                                            class="flex items-center gap-1 h-full rounded-md {getEditingBlockId() ===
+                                            block.id
+                                                ? ''
+                                                : 'px-2.5'} text-sm bg-[var(--theme-timeline-bg)]/80 border whitespace-nowrap shadow-sm min-w-[56px] {getDragBlockId() ===
+                                            block.id
+                                                ? 'border-indigo-400 shadow-indigo-500/20'
+                                                : 'border-white/10'}"
+                                            use:measureWidth={block.id}
+                                        >
+                                            {#if block.intro}
+                                                <span class="text-xs text-yellow-400 font-semibold shrink-0">变奏</span>
+                                            {/if}
+                                            {#if uiBtnIconMap.get(block.key)}
+                                                <img
+                                                    src={uiBtnIconMap.get(block.key)}
+                                                    alt={block.key}
+                                                    draggable="false"
+                                                    class="size-10 object-contain shrink-0"
+                                                />
+                                            {:else}
+                                                <span class="font-bold text-[var(--theme-timeline-text)]"
+                                                    >{block.key}</span
+                                                >
+                                            {/if}
+                                            {#if getEditingBlockId() === block.id}
+                                                <input
+                                                    bind:this={blockEditInput}
+                                                    value={getEditingBlockDesc()}
+                                                    oninput={(e) =>
+                                                        setEditingBlockDesc((e.target as HTMLInputElement).value)}
+                                                    onblur={confirmBlockDesc}
+                                                    onkeydown={(e) => {
+                                                        if (e.key === 'Enter') confirmBlockDesc()
+                                                        if (e.key === 'Escape') setEditingBlockId(null)
+                                                    }}
+                                                    size={Math.max(6, (getEditingBlockDesc()?.length || 0) + 3)}
+                                                    class="bg-[var(--theme-timeline-bg)]/60 text-[var(--theme-timeline-text)] text-xs text-left rounded outline-none border border-indigo-500/50 px-1"
+                                                />
+                                            {:else}
+                                                <span class="text-[var(--theme-timeline-text)]/60 max-w-24 truncate"
+                                                    >{block.desc}</span
+                                                >
+                                            {/if}
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {:else}
+                            <!-- Damage blocks overlay for track 3 -->
+                            <div
+                                class="absolute pointer-events-auto overflow-y-auto"
+                                style="left: 5rem; top: 0; right: 0; bottom: 0; z-index: 6;"
+                                use:nonpassiveWheel={onDamageWheel}
+                            >
+                                <div class="relative" style="height: {damageStackHeight}px; width: 100%;">
+                                    {#each damageStack as { block: dmg, top, left } (dmg.id)}
+                                        <div class="absolute cursor-default" style="left: {left}px; top: {top}px;">
+                                            <div
+                                                class="flex flex-col items-start gap-0.5 px-1 py-0.5"
+                                                use:measureDamageWidth={dmg.id}
+                                            >
+                                                {#each dmg.skillHits as hit}
+                                                    {@const echoName = team.find((s) => s.character === hit.character)
+                                                        ?.echoes?.[0]?.name}
+                                                    <span
+                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
+                                                        style="color: {(ELEMENT_COLORS as Record<string, string>)[
+                                                            hit.element
+                                                        ] ?? '#ef4444'}; border-color: {(
+                                                            ELEMENT_COLORS as Record<string, string>
+                                                        )[hit.element] ?? '#ef4444'};"
+                                                    >
+                                                        {(dmg.sourceType === 'ref' && hit.character
+                                                            ? `[${hit.character}]`
+                                                            : '') +
+                                                            (hit.skillType === '声骸技能' && echoName
+                                                                ? echoName + '·'
+                                                                : '') +
+                                                            hit.hitName.replace('伤害', '') +
+                                                            ((hit.hits ?? 0) > 1 ? '\u00D7' + hit.hits : '')}
+                                                    </span>
+                                                {/each}
+                                                {#each [...dmg.nonDirectEntries].sort((a, b) => {
+                                                    const w = { 处决: 0, 响应: 1, 效应: 2 }
+                                                    return (w[a.category] ?? 3) - (w[b.category] ?? 3)
+                                                }) as nd}
+                                                    {@const c =
+                                                        nd.category === '响应'
+                                                            ? '#22c55e'
+                                                            : nd.category === '处决'
+                                                              ? '#ffffff'
+                                                              : (NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]
+                                                                ? (ELEMENT_COLORS as Record<string, string>)[
+                                                                      (NON_DIRECT_ELEMENT as Record<string, string>)[
+                                                                          nd.name
+                                                                      ]
+                                                                  ]
+                                                                : '#ef4444'}
+                                                    <span
+                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
+                                                        style="color: {c}; border-color: {c}; opacity: {nd.category ===
+                                                        '效应'
+                                                            ? 0.75
+                                                            : 1};"
+                                                    >
+                                                        {nd.category === '效应'
+                                                            ? nd.name + nd.layers + '层'
+                                                            : nd.name}{nd.responders?.length
+                                                            ? '[' + nd.responders.join(',') + ']'
+                                                            : ''}
+                                                    </span>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
+                    </div>[36m
+                {/each}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\timeline.svelte[39m:251:37
+[33mWarn[39m: `<div>` with a mousedown, contextmenu or dblclick handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m                                {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
+                                    [35m<div
+                                        class="absolute inset-y-0 flex items-center pointer-events-auto cursor-grab active:cursor-grabbing select-none"
+                                        style="left: {block.pos}px; transform: translateX(-50%) {getDragBlockId() ===
+                                        block.id
+                                            ? 'translateY(-4px)'
+                                            : ''}; z-index: {getDragBlockId() === block.id ? 20 : 5};"
+                                        data-block={block.id}
+                                        onmousedown={(e) => {
+                                            if (!timelineEl) return
+                                            const rect = timelineEl.getBoundingClientRect()
+                                            const scrollL2 = timelineEl.scrollLeft
+                                            const mx = e.clientX - rect.left + scrollL2 - 80
+                                            startBlockDrag(e, block.id, mx)
+                                        }}
+                                        oncontextmenu={(e) => onBlockContextMenu(e, block.id)}
+                                        ondblclick={() => {
+                                            if (!getLocked()) handleBlockDblclick(block.id)
+                                        }}
+                                    >
+                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                        <div
+                                            class="flex items-center gap-1 h-full rounded-md {getEditingBlockId() ===
+                                            block.id
+                                                ? ''
+                                                : 'px-2.5'} text-sm bg-[var(--theme-timeline-bg)]/80 border whitespace-nowrap shadow-sm min-w-[56px] {getDragBlockId() ===
+                                            block.id
+                                                ? 'border-indigo-400 shadow-indigo-500/20'
+                                                : 'border-white/10'}"
+                                            use:measureWidth={block.id}
+                                        >
+                                            {#if block.intro}
+                                                <span class="text-xs text-yellow-400 font-semibold shrink-0">变奏</span>
+                                            {/if}
+                                            {#if uiBtnIconMap.get(block.key)}
+                                                <img
+                                                    src={uiBtnIconMap.get(block.key)}
+                                                    alt={block.key}
+                                                    draggable="false"
+                                                    class="size-10 object-contain shrink-0"
+                                                />
+                                            {:else}
+                                                <span class="font-bold text-[var(--theme-timeline-text)]"
+                                                    >{block.key}</span
+                                                >
+                                            {/if}
+                                            {#if getEditingBlockId() === block.id}
+                                                <input
+                                                    bind:this={blockEditInput}
+                                                    value={getEditingBlockDesc()}
+                                                    oninput={(e) =>
+                                                        setEditingBlockDesc((e.target as HTMLInputElement).value)}
+                                                    onblur={confirmBlockDesc}
+                                                    onkeydown={(e) => {
+                                                        if (e.key === 'Enter') confirmBlockDesc()
+                                                        if (e.key === 'Escape') setEditingBlockId(null)
+                                                    }}
+                                                    size={Math.max(6, (getEditingBlockDesc()?.length || 0) + 3)}
+                                                    class="bg-[var(--theme-timeline-bg)]/60 text-[var(--theme-timeline-text)] text-xs text-left rounded outline-none border border-indigo-500/50 px-1"
+                                                />
+                                            {:else}
+                                                <span class="text-[var(--theme-timeline-text)]/60 max-w-24 truncate"
+                                                    >{block.desc}</span
+                                                >
+                                            {/if}
+                                        </div>
+                                    </div>[36m
+                                {/each}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\lib\components\page\home\timeline\timeline.svelte[39m:445:21
+[33mWarn[39m: `<div>` with a mousedown or contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m                {#each getRefLines() as rl}
+                    [35m<div
+                        class="absolute inset-y-0 pointer-events-auto cursor-col-resize"
+                        style="left: {vx(rl.id, rl.pos) - 10}px; width: 20px;"
+                        onmousedown={(e) => {
+                            startDrag(e, rl.id)
+                        }}
+                        oncontextmenu={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setContextMenu({ x: e.clientX, y: e.clientY, id: rl.id })
+                        }}
+                    ></div>[36m
+                {/each}[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\routes\+page.svelte[39m:432:5
+[33mWarn[39m: Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute
+https://svelte.dev/e/a11y_consider_explicit_label (svelte)
+[36m    />
+    [35m<button
+        class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-indigo-500/50"
+        style="background: transparent;"
+        onmousedown={(e) => {
+            e.preventDefault()
+            sidebarDragging = true
+        }}
+    ></button>[36m
+    <input type="file" accept=".json" class="hidden" bind:this={importInput} onchange={handleImport} />[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\routes\+page.svelte[39m:248:17
+[31mError[39m: 'data.phases' is of type 'unknown'. (ts)
+[36m            if (selected.includes(ph)) {
+                [35mdata.phases[36m[ph] = { locked: p.phases[ph]?.locked ?? false, data: p.phases[ph]?.data ?? null }
+            }[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\routes\api-test\+page.svelte[39m:12:24
+[33mWarn[39m: This reference only captures the initial value of `sel`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m    let sel = $state<Endpoint | null>(endpointGroups[0]?.endpoints[0] ?? null)
+    let idVal = $state([35msel[36m ? (DEFAULTS[sel.path] ?? '') : '')
+    let res = $state('')[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\routes\api-test\+page.svelte[39m:12:40
+[33mWarn[39m: This reference only captures the initial value of `sel`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m    let sel = $state<Endpoint | null>(endpointGroups[0]?.endpoints[0] ?? null)
+    let idVal = $state(sel ? (DEFAULTS[[35msel[36m.path] ?? '') : '')
+    let res = $state('')[39m
+
+e:\D4rK6\Projects\wuwa-afyg-tool\[32msrc\routes\api-test\+page.svelte[39m:201:13
+[33mWarn[39m: Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute
+https://svelte.dev/e/a11y_consider_explicit_label (svelte)
+[36m            </div>
+            [35m<button
+                class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 transition-colors hover:bg-indigo-500/50"
+                onmousedown={onDragStart}
+            ></button>[36m
+        </aside>[39m
+
+====================================
+[31msvelte-check found 23 errors and 35 warnings in 9 files
+[39m ELIFECYCLE  Command failed with exit code 1.

@@ -943,7 +943,7 @@ function buildSkillGroups(skills: SkillEntry[]): SkillPickerGroup[] {
     for (const skill of skills) {
         const hits: { name: string; ratio: string; element: string }[] = []
         for (const [name, value, element] of skill.values) {
-            if (value && name.endsWith('伤害')) hits.push({ name, ratio: value, element })
+            if (value && (name.endsWith('伤害') || element)) hits.push({ name, ratio: value, element })
         }
         if (hits.length > 0) groups.push({ type: skill.type, hits })
     }
