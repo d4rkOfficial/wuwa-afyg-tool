@@ -1260,13 +1260,9 @@ function buildDamageList() {
                 const comps = parseValueString(h.ratio)
                 const valueParts = comps.map((c) => {
                     if (c.flatValue !== undefined) return c.flatValue.toString()
-                    return c.ratioNum + '%'
+                    return c.ratioNum + '%' + (c.mult && c.mult > 1 ? '*' + c.mult : '')
                 })
-                const multMatch = h.ratio.match(/\*(\d+(?:\.\d+)?)/)
-                const value =
-                    valueParts.join('+') +
-                    (multMatch ? '*' + multMatch[1] : '') +
-                    ((h.hits ?? 0) > 1 ? '*' + h.hits : '')
+                const value = valueParts.join('+') + ((h.hits ?? 0) > 1 ? '*' + h.hits : '')
                 const baseTypes = [...new Set(comps.map((c) => c.baseType || '固定'))]
                 const baseType = baseTypes.join('+')
                 entries.push({ character, name, value, baseType, time, x, element: h.element })
@@ -1338,7 +1334,7 @@ function buildDamageList() {
                                         const comps = parseValueString(match.ratio)
                                         const cleanParts = comps.map((c) => {
                                             if (c.flatValue !== undefined) return c.flatValue.toString()
-                                            return c.ratioNum + '%'
+                                            return c.ratioNum + '%' + (c.mult && c.mult > 1 ? '*' + c.mult : '')
                                         })
                                         respValue = cleanParts.join('+')
                                         respBase = comps.length > 0 ? (comps[0].baseType ?? '偏谐系数') : '偏谐系数'

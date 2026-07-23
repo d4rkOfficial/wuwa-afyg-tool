@@ -31,6 +31,7 @@
         "vite": "^8.0.16"
     },
     "dependencies": {
+        "chart.js": "^4.5.1",
         "prismjs": "^1.30.0",
         "xlsx": "^0.18.5"
     }

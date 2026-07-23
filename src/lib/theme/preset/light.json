@@ -86,8 +86,8 @@
             "textColor": "#64748b"
         },
         "watermark": {
-            "backgroundImage": "rgba(0,0,0,0.06)",
-            "textColor": "rgba(0,0,0,0.08)"
+            "backgroundImage": "rgba(255,255,255,0.5)",
+            "textColor": "rgba(0,0,0,0.06)"
         }
     }
 }

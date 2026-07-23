@@ -15,11 +15,15 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[70vh] max-w-2xl rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            class="w-full max-h-[70vh] max-w-2xl rounded-lg border bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
-            <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div
+                class="flex items-center justify-between px-4 py-3 border-b"
+                style="border-color: var(--theme-divider-border);"
+            >
                 <h2 class="text-sm font-semibold">伤害列表</h2>
                 <span class="text-xs text-[var(--theme-modal-text)]/50">{getDamageList().length} 条</span>
             </div>
@@ -31,7 +35,10 @@
                 {:else}
                     <table class="w-full text-xs">
                         <thead>
-                            <tr class="text-[var(--theme-modal-text)]/50 border-b border-white/10">
+                            <tr
+                                class="text-[var(--theme-modal-text)]/50 border-b"
+                                style="border-color: var(--theme-divider-border);"
+                            >
                                 <th class="text-left font-medium py-1.5 pr-3">角色</th>
                                 <th class="text-left font-medium py-1.5 pr-3">倍率名</th>
                                 <th class="text-left font-medium py-1.5 pr-3">倍率基础</th>
@@ -41,7 +48,7 @@
                         </thead>
                         <tbody>
                             {#each getDamageList() as entry}
-                                <tr class="border-b border-white/5 last:border-0">
+                                <tr class="border-b last:border-0" style="border-color: var(--theme-divider-border);">
                                     <td class="py-1.5 pr-3 text-[var(--theme-modal-text)]">{entry.character}</td>
                                     <td
                                         class="py-1.5 pr-3 text-[var(--theme-modal-text)] max-w-48 truncate"
@@ -63,9 +70,13 @@
                     </table>
                 {/if}
             </div>
-            <div class="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-2.5">
+            <div
+                class="flex items-center justify-end gap-2 border-t px-4 py-2.5"
+                style="border-color: var(--theme-divider-border);"
+            >
                 <button
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    class="h-7 rounded-md px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                    style="background: var(--theme-input-bg);"
                     onclick={() => setShowDamageList(false)}>关闭</button
                 >
             </div>

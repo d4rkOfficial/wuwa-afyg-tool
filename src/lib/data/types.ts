@@ -35,6 +35,7 @@ export interface Project {
     createdAt: number
     team: [CharSlot, CharSlot, CharSlot]
     customSkillHits: Record<string, CustomHit[]>
+    resultAnalysis?: ResultAnalysisData
     phases: {
         team: PhaseState
         timeline: PhaseState
@@ -44,3 +45,7 @@ export interface Project {
 }
 
 export type PhaseKey = 'team' | 'timeline' | 'calculation' | 'config'
+
+export interface ResultAnalysisData {
+    timings: { refLineId: string; seconds: number }[]
+}

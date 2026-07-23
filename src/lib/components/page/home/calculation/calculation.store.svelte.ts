@@ -99,13 +99,26 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
         for (const hit of db.skillHits) {
             const comps = parseValueString(hit.ratio)
 
+            // Determine contextual baseType: last part with an explicit suffix
+            let contextBaseType = '攻击'
+            for (let i = comps.length - 1; i >= 0; i--) {
+                const c = comps[i]
+                if (c.flatValue !== undefined) continue
+                if (!c.implicitSuffix) {
+                    contextBaseType = c.baseType
+                    break
+                }
+            }
+
             const pctMap = new Map<string, number>()
             let flatTotal = 0
             for (const c of comps) {
                 if (c.flatValue !== undefined) {
                     flatTotal += c.flatValue
                 } else {
-                    pctMap.set(c.baseType, (pctMap.get(c.baseType) ?? 0) + c.ratioNum)
+                    const resolvedType = c.implicitSuffix ? contextBaseType : c.baseType
+                    const weighted = c.ratioNum * (c.mult ?? 1)
+                    pctMap.set(resolvedType, (pctMap.get(resolvedType) ?? 0) + weighted)
                 }
             }
 
@@ -133,7 +146,8 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         ratioUnit: '%',
                         damageBaseType: baseType,
                         damageElement: hit.element || _calcElementMap[hit.character] || '',
-                        sourceTimelineBlockId: db.id
+                        sourceTimelineBlockId: db.sourceId,
+                        hits: hit.hits ?? 1
                     },
                     pos,
                     order: order++
@@ -156,7 +170,8 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         ratioUnit: 'fixed',
                         damageBaseType: '固定',
                         damageElement: hit.element || _calcElementMap[hit.character] || '',
-                        sourceTimelineBlockId: db.id
+                        sourceTimelineBlockId: db.sourceId,
+                        hits: hit.hits ?? 1
                     },
                     pos,
                     order: order++
@@ -196,7 +211,8 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                             ratioUnit: '%',
                             damageBaseType: '偏谐系数',
                             damageElement: element,
-                            sourceTimelineBlockId: db.id
+                            sourceTimelineBlockId: db.sourceId,
+                            hits: 1
                         },
                         pos,
                         order: order++
@@ -219,7 +235,8 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         ratioUnit: '%',
                         damageBaseType: '偏谐系数',
                         damageElement: '物理',
-                        sourceTimelineBlockId: db.id
+                        sourceTimelineBlockId: db.sourceId,
+                        hits: 1
                     },
                     pos,
                     order: order++
@@ -246,8 +263,9 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         ratioUnit: '%',
                         damageBaseType: '效应系数',
                         damageElement: NON_DIRECT_ELEMENT[nd.name] ?? '',
-                        sourceTimelineBlockId: db.id,
-                        burstLayers
+                        sourceTimelineBlockId: db.sourceId,
+                        burstLayers,
+                        hits: 1
                     },
                     pos,
                     order: order++

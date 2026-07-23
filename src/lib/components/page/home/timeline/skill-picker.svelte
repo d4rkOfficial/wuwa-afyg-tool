@@ -113,12 +113,16 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[70vh] max-w-xl rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            class="w-full max-h-[70vh] max-w-xl rounded-lg border bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
             <!-- Header -->
-            <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div
+                class="flex items-center justify-between px-4 py-3 border-b"
+                style="border-color: var(--theme-divider-border);"
+            >
                 <h2 class="text-sm font-semibold">配置直伤倍率</h2>
                 <div class="flex items-center gap-2">
                     {#if getSkillPickerIsRef()}
@@ -126,8 +130,8 @@
                             {#each getTeamCharNames() as name}
                                 <button
                                     class="size-7 rounded-full overflow-hidden {getSkillPickerCharacter() === name
-                                        ? 'ring-2 ring-indigo-500'
-                                        : 'ring-1 ring-zinc-600'}"
+                                        ? 'ring-2 ring-[var(--theme-accent-bg)]'
+                                        : 'ring-1 ring-[var(--theme-divider-border)]'}"
                                     onclick={() => switchRefSkillPickerTab(name)}
                                 >
                                     {#if getCharIconMap()[name]}
@@ -151,7 +155,8 @@
                         <div class="flex items-center gap-1.5">
                             {#if getCharIconMap()[name]}
                                 <div
-                                    class="size-7 rounded-full overflow-hidden ring-2 ring-indigo-500 flex items-center justify-center bg-white/10"
+                                    class="size-7 rounded-full overflow-hidden ring-2 ring-[var(--theme-accent-bg)] flex items-center justify-center"
+                                    style="background: var(--theme-input-bg);"
                                 >
                                     <img
                                         src={getCharIconMap()[name]}
@@ -162,7 +167,7 @@
                                 </div>
                             {:else}
                                 <div
-                                    class="size-7 rounded-full ring-2 ring-indigo-500 flex items-center justify-center text-[10px] font-medium text-[var(--theme-modal-text)]/60 bg-[var(--theme-modal-bg)]/80"
+                                    class="size-7 rounded-full ring-2 ring-[var(--theme-accent-bg)] flex items-center justify-center text-[10px] font-medium text-[var(--theme-modal-text)]/60 bg-[var(--theme-modal-bg)]/80"
                                 >
                                     {name[0]}
                                 </div>
@@ -191,14 +196,15 @@
                                 <span>
                                     {group.type} ({group.hits.length})
                                     {#if group.type === '谐度破坏'}
-                                        <span class="text-zinc-600 font-normal normal-case">(请到非直伤配置中配置)</span
+                                        <span class="text-[var(--theme-modal-text)]/50 font-normal normal-case"
+                                            >(请到非直伤配置中配置)</span
                                         >
                                     {/if}
                                 </span>
                                 {#if group.type === '自定义'}
                                     <button
                                         onclick={() => openAddCustom(getSkillPickerCharacter())}
-                                        class="text-indigo-400 hover:text-indigo-300 text-[10px] flex items-center gap-0.5"
+                                        class="text-[var(--theme-accent-text)] hover:text-[var(--theme-accent-text)] text-[10px] flex items-center gap-0.5"
                                     >
                                         <Icon icon="mdi:plus" class="size-3" /> 添加
                                     </button>
@@ -228,8 +234,8 @@
                                         group.type === '谐度破坏' || isResponseHit
                                             ? 'opacity-40 cursor-not-allowed select-none text-[var(--theme-modal-text)]/60'
                                             : getSkillPickerSelected().has(key)
-                                              ? 'bg-white/5 text-[var(--theme-modal-text)]'
-                                              : 'text-[var(--theme-modal-text)]/60 hover:bg-white/5'
+                                              ? 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]'
+                                              : 'text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/[0.05]'
                                     ].join(' ')}
                                     onclick={() => {
                                         if (group.type === '谐度破坏' || isResponseHit) return
@@ -244,8 +250,11 @@
                                             0 &&
                                         group.type !== '谐度破坏' &&
                                         !isResponseHit
-                                            ? 'bg-indigo-500 text-white'
-                                            : 'border border-white/20'}"
+                                            ? 'bg-[var(--theme-accent-bg)] text-white'
+                                            : 'border'}"
+                                        style="border-color: {order > 0 && group.type !== '谐度破坏' && !isResponseHit
+                                            ? 'transparent'
+                                            : 'var(--theme-divider-border)'};"
                                     >
                                         {#if order > 0 && group.type !== '谐度破坏' && !isResponseHit}<span
                                                 class="text-[10px] font-bold">{order}</span
@@ -254,7 +263,7 @@
                                     <span class="flex-1 truncate" title={displayName}>
                                         {displayName}
                                         {#if isResponseHit}
-                                            <span class="text-zinc-600 font-normal normal-case ml-1"
+                                            <span class="text-[var(--theme-modal-text)]/50 font-normal normal-case ml-1"
                                                 >(请到非直伤配置中配置)</span
                                             >
                                         {/if}
@@ -282,7 +291,8 @@
                                                         [key]: Math.min(20, Math.max(0, isNaN(v) ? 1 : v))
                                                     })
                                                 }}
-                                                class="w-10 h-6 bg-[var(--theme-modal-bg)]/60 text-xs text-[var(--theme-modal-text)] text-center rounded outline-none border border-white/20 tabular-nums"
+                                                class="w-10 h-6 bg-[var(--theme-modal-bg)]/60 text-xs text-[var(--theme-modal-text)] text-center rounded outline-none border tabular-nums"
+                                                style="border-color: var(--theme-divider-border);"
                                             />
                                         </span>
                                     {/if}
@@ -292,7 +302,7 @@
                                                 e.stopPropagation()
                                                 removeCustomHit(getSkillPickerCharacter(), hit.name)
                                             }}
-                                            class="shrink-0 rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400"
+                                            class="shrink-0 rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-red-500"
                                             ><Icon icon="mdi:close" class="size-3.5" /></button
                                         >
                                     {/if}
@@ -304,10 +314,13 @@
             </div>
 
             <!-- Footer -->
-            <div class="flex items-center justify-between gap-2 border-t border-white/10 px-4 py-2.5">
+            <div
+                class="flex items-center justify-between gap-2 border-t px-4 py-2.5"
+                style="border-color: var(--theme-divider-border);"
+            >
                 <div class="flex items-center gap-1">
                     <button
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-indigo-400 transition-colors hover:bg-white/5"
+                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
                         onclick={() => openAddCustom(getSkillPickerCharacter())}
                     >
                         <Icon icon="mdi:plus-circle-outline" class="size-3.5" />
@@ -315,7 +328,7 @@
                     </button>
                     <button
                         onclick={() => (showLookup = true)}
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-indigo-400 transition-colors hover:bg-white/5"
+                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
                     >
                         <Icon icon="mdi:magnify" class="size-3.5" />
                         速查
@@ -323,14 +336,15 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <button
-                        class="h-7 rounded-md bg-[var(--theme-modal-bg)]/60 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                        class="h-7 rounded-md bg-[var(--theme-modal-bg)]/60 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
                         onclick={() => {
                             setSkillPickerBlockId(null)
                             setSkillPickerIsRef(false)
                         }}>取消</button
                     >
                     <button
-                        class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500"
+                        class="h-7 rounded-md px-3 text-xs text-white transition-colors"
+                        style="background: var(--theme-accent-bg);"
                         onclick={applySkillHits}>确认</button
                     >
                 </div>
@@ -348,7 +362,8 @@
         onkeydown={(e) => e.key === 'Escape' && (showCustomModal = false)}
     >
         <div
-            class="rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-5 shadow-xl w-96"
+            class="rounded-xl border bg-[var(--theme-modal-bg)] p-5 shadow-xl w-96"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-4">自定义直伤</h3>
@@ -359,7 +374,8 @@
                         type="text"
                         bind:value={customName}
                         placeholder="输入名称"
-                        class="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                        class="w-full rounded border px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     />
                 </div>
                 <div>
@@ -368,7 +384,8 @@
                         type="number"
                         bind:value={customFlat}
                         placeholder="0"
-                        class="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                        class="w-full rounded border px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     />
                 </div>
                 <div class="flex gap-2">
@@ -378,7 +395,8 @@
                             type="number"
                             bind:value={customPct}
                             placeholder="0"
-                            class="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                            class="w-full rounded border px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         />
                     </div>
                     <div class="w-32 relative">
@@ -388,14 +406,16 @@
                                 showUnitMenu = !showUnitMenu
                                 showElementMenu = false
                             }}
-                            class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
+                            class="w-full flex items-center justify-between rounded border px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <span>{customPctUnit}</span>
                             <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                         </button>
                         {#if showUnitMenu}
                             <div
-                                class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                style="border-color: var(--theme-divider-border);"
                                 onclick={(e) => e.stopPropagation()}
                             >
                                 {#each PCT_UNITS as u}
@@ -404,12 +424,12 @@
                                             customPctUnit = u
                                             showUnitMenu = false
                                         }}
-                                        class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                        class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
                                     >
                                         <span class="flex-1">{u}</span>
                                         {#if u === customPctUnit}<Icon
                                                 icon="mdi:check"
-                                                class="size-3 text-indigo-400"
+                                                class="size-3 text-[var(--theme-accent-text)]"
                                             />{/if}
                                     </button>
                                 {/each}
@@ -424,14 +444,16 @@
                             showElementMenu = !showElementMenu
                             showUnitMenu = false
                         }}
-                        class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
+                        class="w-full flex items-center justify-between rounded border px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
                         <span>{customElement}</span>
                         <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                     </button>
                     {#if showElementMenu}
                         <div
-                            class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                            class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                            style="border-color: var(--theme-divider-border);"
                             onclick={(e) => e.stopPropagation()}
                         >
                             {#each ELEMENTS as el}
@@ -440,12 +462,12 @@
                                         customElement = el
                                         showElementMenu = false
                                     }}
-                                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
                                 >
                                     <span class="flex-1">{el}</span>
                                     {#if el === customElement}<Icon
                                             icon="mdi:check"
-                                            class="size-3 text-indigo-400"
+                                            class="size-3 text-[var(--theme-accent-text)]"
                                         />{/if}
                                 </button>
                             {/each}
@@ -456,13 +478,13 @@
             <div class="flex justify-end gap-2 mt-5">
                 <button
                     onclick={() => (showCustomModal = false)}
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
-                    >取消</button
+                    class="h-7 rounded-md px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                    style="background: var(--theme-input-bg);">取消</button
                 >
                 <button
                     onclick={() => confirmAddCustom(getSkillPickerCharacter())}
-                    class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500"
-                    >确认</button
+                    class="h-7 rounded-md px-3 text-xs text-white transition-colors"
+                    style="background: var(--theme-accent-bg);">确认</button
                 >
             </div>
         </div>

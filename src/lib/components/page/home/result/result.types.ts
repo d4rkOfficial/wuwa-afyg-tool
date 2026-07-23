@@ -7,7 +7,7 @@ export interface ResultEntry {
     element: string
     ratioNum: number
     hits: number
-    time: number
+    sourceTimelineBlockId: string
 
     // computed
     baseValue: number

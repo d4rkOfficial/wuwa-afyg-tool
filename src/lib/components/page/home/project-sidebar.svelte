@@ -109,7 +109,8 @@
         <span class="text-sm font-semibold tracking-tight">椰果工具箱</span>
         <div class="flex-1"></div>
         <button
-            onclick={async () => {
+            onclick={async (e: MouseEvent) => {
+                e.stopPropagation()
                 const next = currentTheme === 'dark' ? 'light' : 'dark'
                 await setActiveTheme(next)
                 const t = getThemes().find((th) => th.id === next)

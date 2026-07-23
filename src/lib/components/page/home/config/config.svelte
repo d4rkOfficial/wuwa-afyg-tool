@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from 'svelte'
     import {
         init,
         getConfig,
@@ -13,16 +12,13 @@
     } from './config.store.svelte'
     import { RESISTANCE_KEYS } from './config.consts'
     import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
+    import { simulateEnhancement } from '$lib/consts/substat-roll-data'
+    import { addToast } from '$lib/data/toast.svelte'
     import type { CharSlot } from '$lib/data/types'
     import type { ConfigState } from './config.types'
-    import {
-        getAllDamageEntries,
-        getAllBuffSets,
-        getBuffSetIdsForEntry,
-        getDamageTypesForEntry
-    } from '../calculation/calculation.store.svelte'
     import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
     import EnemyPanel from './enemy-panel.svelte'
+    import RandomEnhanceModal from './random-enhance-modal.svelte'
     import Icon from '@iconify/svelte'
 
     interface Props {
@@ -37,26 +33,10 @@
     let activeTab = $state<'char0' | 'char1' | 'char2' | 'enemy'>('char0')
     let showMainStatMenu = $state<{ ci: number; si: number } | null>(null)
     let showSubstatModal = $state<{ ci: number; si: number } | null>(null)
+    let showEnhanceModal = $state<{ ci: number; si: number } | null>(null)
 
     $effect(() => {
         init(data, locked)
-    })
-
-    onMount(() => {
-        const damageEntries = getAllDamageEntries()
-        const buffSets = getAllBuffSets()
-        console.log('=== 词条/环境配置 — 拉表数据 ===')
-        console.log('damageEntries:', JSON.parse(JSON.stringify(damageEntries)))
-        console.log('buffSets:', JSON.parse(JSON.stringify(buffSets)))
-        const bindings: Record<string, string[]> = {}
-        const dmgTypes: Record<string, string[]> = {}
-        for (const e of damageEntries) {
-            bindings[e.id] = getBuffSetIdsForEntry(e.id)
-            dmgTypes[e.id] = getDamageTypesForEntry(e.id)
-        }
-        console.log('damageEntryBuffSetIds:', bindings)
-        console.log('damageEntryDamageTypes:', dmgTypes)
-        console.log('=== end ===')
     })
 
     let config = $derived(getConfig())
@@ -76,18 +56,18 @@
 
     function costBorder(cost: number): string {
         if (cost === 4) return 'border-red-500/40'
-        if (cost === 3) return 'border-yellow-500/40'
+        if (cost === 3) return 'border-yellow-600/40'
         return 'border-green-500/40'
     }
     function costLabel(cost: number): string {
-        if (cost === 4) return 'text-red-400'
-        if (cost === 3) return 'text-yellow-400'
-        return 'text-green-400'
+        if (cost === 4) return 'text-red-600'
+        if (cost === 3) return 'text-yellow-700'
+        return 'text-green-600'
     }
     function costBtnCls(cost: number): string {
-        if (cost === 4) return 'bg-red-500/15 text-red-300'
-        if (cost === 3) return 'bg-yellow-500/15 text-yellow-300'
-        return 'bg-green-500/15 text-green-300'
+        if (cost === 4) return 'bg-red-500/15 text-red-500'
+        if (cost === 3) return 'bg-yellow-500/15 text-yellow-600'
+        return 'bg-green-500/15 text-green-600'
     }
 
     function handleSetCost(ci: number, si: number, cost: number) {
@@ -114,9 +94,30 @@
         onupdate(getCalcState())
     }
 
+    function handleClearSubstats(ci: number, si: number) {
+        const slot = getConfig().characters[ci].echoes[si]
+        for (let i = slot.substats.length - 1; i >= 0; i--) {
+            removeSubstat(ci, si, i)
+        }
+        onupdate(getCalcState())
+    }
+
     function handleUpdateSubstatValue(ci: number, si: number, idx: number, value: number) {
         updateSubstatValue(ci, si, idx, value)
         onupdate(getCalcState())
+    }
+
+    function handleEnhanceResult(ci: number, si: number) {
+        return (result: { substats: import('$lib/types/game-data').EchoStat[]; attempts: number }) => {
+            for (const s of result.substats) {
+                addSubstat(ci, si, s.type)
+                const slot = getConfig().characters[ci].echoes[si]
+                const idx = slot.substats.findIndex((x) => x.type === s.type)
+                if (idx !== -1) updateSubstatValue(ci, si, idx, s.value)
+            }
+            onupdate(getCalcState())
+            addToast(`消耗了 ${result.attempts} 个声骸胚子`, 'success', 5000)
+        }
     }
 
     function getTierIndex(option: (typeof SUBSTAT_OPTIONS)[number], value: number): number {
@@ -131,7 +132,7 @@
 
 <div class="flex h-full flex-col p-5" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
     <!-- Tabs -->
-    <div class="flex gap-1 mb-4 border-b border-white/10">
+    <div class="flex gap-1 mb-4 border-b" style="border-color: var(--theme-divider-border)">
         {#each TAB_LABELS as label, i}
             <button
                 onclick={() => {
@@ -142,7 +143,7 @@
                 class={[
                     'px-3 py-2 text-xs font-medium transition-colors relative flex items-center gap-2',
                     (i < 3 ? activeTab === `char${i}` : activeTab === 'enemy')
-                        ? 'text-indigo-300'
+                        ? 'text-[var(--theme-accent-text)]'
                         : 'text-[var(--theme-modal-text)]/50 hover:text-[var(--theme-modal-text)]/70'
                 ].join(' ')}
             >
@@ -151,7 +152,7 @@
                         <img src={charIcons[charNames[i]]} alt="" class="size-6 rounded-full shrink-0" />
                     {:else}
                         <div
-                            class="size-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] shrink-0"
+                            class="size-6 rounded-full bg-[var(--theme-modal-text)]/10 flex items-center justify-center text-[10px] shrink-0"
                         >
                             {charNames[i]!.charAt(0)}
                         </div>
@@ -164,10 +165,10 @@
                     {label}
                 {/if}
                 {#if i < 3 && activeTab === `char${i}`}
-                    <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-indigo-500"></div>
+                    <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[var(--theme-accent-bg)]"></div>
                 {/if}
                 {#if i === 3 && activeTab === 'enemy'}
-                    <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-indigo-500"></div>
+                    <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[var(--theme-accent-bg)]"></div>
                 {/if}
             </button>
         {/each}
@@ -184,10 +185,23 @@
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {#each config.characters[ci].echoes as slot, si}
                     {@const second = SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT]}
-                    <div class={['rounded-xl border bg-white/[0.02] p-4', costBorder(slot.cost)].join(' ')}>
+                    <div
+                        class={['rounded-xl border p-4', costBorder(slot.cost)].join(' ')}
+                        style="background: var(--theme-input-bg);"
+                    >
                         <!-- Cost selector -->
                         <div class="flex items-center justify-between mb-3">
-                            <span class={['text-sm font-medium', costLabel(slot.cost)].join(' ')}>声骸 {si + 1}</span>
+                            <div class="flex items-center gap-1">
+                                <span class={['text-sm font-medium', costLabel(slot.cost)].join(' ')}
+                                    >声骸 {si + 1}</span
+                                >
+                                <button
+                                    onclick={() => handleClearSubstats(ci, si)}
+                                    class="rounded p-0.5 text-[var(--theme-muted-text)] transition-colors hover:text-red-500"
+                                >
+                                    <Icon icon="mdi:refresh" class="size-3.5" />
+                                </button>
+                            </div>
                             <div class="flex gap-1">
                                 {#each COST_OPTIONS as c}
                                     <button
@@ -204,7 +218,7 @@
                                             'min-w-7 px-2 h-6 rounded text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
                                             slot.cost === c
                                                 ? costBtnCls(slot.cost)
-                                                : 'bg-white/5 text-[var(--theme-modal-text)]/40 hover:bg-white/10'
+                                                : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/40 hover:bg-[var(--theme-modal-text)]/10'
                                         ].join(' ')}>{c} COST</button
                                     >
                                 {/each}
@@ -221,7 +235,8 @@
                                             showMainStatMenu?.ci === ci && showMainStatMenu?.si === si
                                                 ? null
                                                 : { ci, si })}
-                                    class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
+                                    class="w-full flex items-center justify-between rounded border px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/10"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <span
                                         >{slot.mainStat
@@ -232,12 +247,13 @@
                                 </button>
                                 {#if showMainStatMenu?.ci === ci && showMainStatMenu?.si === si}
                                     <div
-                                        class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                        class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                        style="border-color: var(--theme-divider-border);"
                                         onclick={(e) => e.stopPropagation()}
                                     >
                                         <button
                                             onclick={() => handleSetMainStat(ci, si, null)}
-                                            class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)]/40 transition-colors hover:bg-white/5"
+                                            class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)]/40 transition-colors hover:bg-[var(--theme-input-bg)]"
                                             >未选择</button
                                         >
                                         {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt}
@@ -248,7 +264,7 @@
                                                         value: opt.maxValue,
                                                         unit: opt.unit
                                                     })}
-                                                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-white/5"
+                                                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-input-bg)]"
                                             >
                                                 <span class="flex-1">{opt.label}</span>
                                                 <span class="text-[var(--theme-modal-text)]/40"
@@ -256,7 +272,7 @@
                                                 >
                                                 {#if slot.mainStat?.type === opt.label}<Icon
                                                         icon="mdi:check"
-                                                        class="size-3 text-indigo-400"
+                                                        class="size-3 text-[var(--theme-accent-text)]"
                                                     />{/if}
                                             </button>
                                         {/each}
@@ -285,22 +301,25 @@
                                         {@const tierIdx = getTierIndex(opt, sub.value)}
                                         {@const maxTier = opt.tiers.length - 1}
                                         {@const pct = tierIdx > 0 ? (tierIdx / maxTier) * 100 : 0}
-                                        <div class="flex items-center gap-2 rounded bg-white/5 px-2 py-1.5">
+                                        <div
+                                            class="flex items-center gap-2 rounded px-2 py-1.5"
+                                            style="background: var(--theme-input-bg);"
+                                        >
                                             <span class="text-xs text-[var(--theme-modal-text)]/70 w-20 shrink-0 mr-2"
                                                 >{sub.type}</span
                                             >
                                             <div class="relative flex-1 h-5">
                                                 <div
-                                                    class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-white/10"
+                                                    class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-[var(--theme-modal-text)]/10"
                                                 >
                                                     <div
                                                         class="h-full rounded-full"
-                                                        style="width: {pct}%; background: #6366f1"
+                                                        style="width: {pct}%; background: var(--theme-accent-bg)"
                                                     ></div>
                                                 </div>
                                                 <div
-                                                    class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium text-white whitespace-nowrap pointer-events-none z-10"
-                                                    style="left: {pct}%; background: #6366f1"
+                                                    class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap pointer-events-none z-10"
+                                                    style="left: {pct}%; background: var(--theme-accent-bg); color: var(--theme-btn-text);"
                                                 >
                                                     {sub.value}{opt.unit}
                                                 </div>
@@ -318,7 +337,7 @@
                                             </div>
                                             <button
                                                 onclick={() => handleRemoveSubstat(ci, si, idx)}
-                                                class="shrink-0 rounded p-0.5 ml-2 text-zinc-500 transition-colors hover:text-red-400"
+                                                class="shrink-0 rounded p-0.5 ml-2 text-[var(--theme-muted-text)] transition-colors hover:text-red-600"
                                             >
                                                 <Icon icon="mdi:close" class="size-3" />
                                             </button>
@@ -326,7 +345,28 @@
                                     {/if}
                                 {/each}
                             </div>
-                            {#if slot.substats.length < 5}
+                            {#if slot.substats.length === 0}
+                                <div class="mt-1 flex gap-2">
+                                    <button
+                                        onclick={() =>
+                                            (showSubstatModal =
+                                                showSubstatModal?.ci === ci && showSubstatModal?.si === si
+                                                    ? null
+                                                    : { ci, si })}
+                                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-input-bg)]"
+                                    >
+                                        <Icon icon="mdi:plus" class="size-3" />
+                                        选择副词条
+                                    </button>
+                                    <button
+                                        onclick={() => (showEnhanceModal = { ci, si })}
+                                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-fuchsia-500 transition-colors hover:bg-[var(--theme-input-bg)]"
+                                    >
+                                        <Icon icon="mdi:dice-5" class="size-3" />
+                                        随机强化
+                                    </button>
+                                </div>
+                            {:else if slot.substats.length < 5}
                                 <div class="mt-1">
                                     <button
                                         onclick={() =>
@@ -334,7 +374,7 @@
                                                 showSubstatModal?.ci === ci && showSubstatModal?.si === si
                                                     ? null
                                                     : { ci, si })}
-                                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-indigo-400 transition-colors hover:bg-white/5"
+                                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-input-bg)]"
                                     >
                                         <Icon icon="mdi:plus" class="size-3" />
                                         选择副词条
@@ -358,7 +398,8 @@
             onclick={() => (showSubstatModal = null)}
         >
             <div
-                class="w-72 max-h-80 rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
+                class="w-72 max-h-80 rounded-xl border bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
+                style="border-color: var(--theme-divider-border);"
                 onclick={(e) => e.stopPropagation()}
             >
                 <div class="flex items-center justify-between mb-3">
@@ -382,18 +423,29 @@
                                 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
                                 exists
                                     ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
-                                    : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                                    : 'text-[var(--theme-modal-text)] hover:bg-[var(--theme-input-bg)]'
                             ].join(' ')}
                         >
                             <span class="flex-1">{opt.label}</span>
                             <span class="text-[10px] text-[var(--theme-modal-text)]/40">{opt.unit}</span>
                             {#if exists}
-                                <Icon icon="mdi:check" class="size-3 shrink-0 text-indigo-400" />
+                                <Icon icon="mdi:check" class="size-3 shrink-0 text-[var(--theme-accent-text)]" />
                             {/if}
                         </button>
                     {/each}
                 </div>
             </div>
         </div>
+    {/if}
+
+    <!-- Random enhance modal -->
+    {#if showEnhanceModal}
+        {@const em = showEnhanceModal}
+        {@const emSlot = config.characters[em.ci].echoes[em.si]}
+        <RandomEnhanceModal
+            existingTypes={emSlot.substats.map((s) => s.type)}
+            onclose={() => (showEnhanceModal = null)}
+            onresult={handleEnhanceResult(em.ci, em.si)}
+        />
     {/if}
 </div>

@@ -93,7 +93,7 @@
         <Icon icon="mdi:chart-box-outline" class="size-3.5" />
         结果
         {#if showResult}
-            <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-indigo-500"></div>
+            <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[var(--theme-accent-bg)]"></div>
         {/if}
     </button>
 </div>

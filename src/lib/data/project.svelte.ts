@@ -1,6 +1,6 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
-import type { Project, CharSlot, EchoSlot, PhaseKey, SelectedSet } from './types'
+import type { Project, CharSlot, EchoSlot, PhaseKey, SelectedSet, ResultAnalysisData } from './types'
 import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
 import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
 import type { ConfigState } from '$lib/components/page/home/config/config.types'
@@ -58,6 +58,7 @@ function normalizeProject(p: Partial<Project>): Project {
         createdAt: p.createdAt ?? Date.now(),
         team: p.team ?? [emptyCharSlot(), emptyCharSlot(), emptyCharSlot()],
         customSkillHits: p.customSkillHits ?? {},
+        resultAnalysis: p.resultAnalysis,
         phases: {
             team: phases.team ?? emptyPhaseState(),
             timeline: phases.timeline ?? emptyPhaseState(),
@@ -143,6 +144,7 @@ export async function cloneProject(id: string, newName: string, selectedPhases: 
     }
 
     newProject.customSkillHits = JSON.parse(JSON.stringify(source.customSkillHits ?? {}))
+    newProject.resultAnalysis = source.resultAnalysis ? JSON.parse(JSON.stringify(source.resultAnalysis)) : undefined
 
     projects = [...projects, newProject]
     activeId = newProject.id
@@ -192,6 +194,13 @@ export async function updateConfig(data: ConfigState) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
     project.phases.config.data = data
+    await persist()
+}
+
+export async function updateResultAnalysis(data: ResultAnalysisData) {
+    const project = projects.find((p) => p.id === activeId)
+    if (!project) return
+    project.resultAnalysis = data
     await persist()
 }
 

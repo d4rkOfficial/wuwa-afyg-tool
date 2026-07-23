@@ -169,15 +169,19 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[95vh] h-full max-w-3xl rounded-xl border border-white/10 bg-(--theme-modal-bg) text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
+            class="w-full max-h-[95vh] h-full max-w-3xl rounded-xl border bg-(--theme-modal-bg) text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
-            <div class="flex items-center justify-between px-5 py-3 border-b border-white/10">
+            <div
+                class="flex items-center justify-between px-5 py-3 border-b"
+                style="border-bottom: 1px solid var(--theme-divider-border);"
+            >
                 <h2 class="text-sm font-semibold">BUFF 配置</h2>
                 <button
                     onclick={() => (showLookup = true)}
-                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-indigo-400 transition-colors hover:bg-white/5"
+                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
                 >
                     <Icon icon="mdi:magnify" class="size-3.5" />
                     速查
@@ -186,7 +190,10 @@
 
             <div class="flex flex-1 overflow-hidden">
                 <!-- Left column: block list -->
-                <div class="w-56 shrink-0 border-r border-white/10 flex flex-col">
+                <div
+                    class="w-56 shrink-0 border-r flex flex-col"
+                    style="border-right: 1px solid var(--theme-divider-border);"
+                >
                     <div class="flex-1 overflow-y-auto p-2 space-y-1">
                         {#each sortedBuffSets as buffSet}
                             {@const isGlobal = globalBuffSetIds.includes(buffSet.id)}
@@ -198,8 +205,8 @@
                                 class={[
                                     'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
                                     selectedBuffSetId === buffSet.id
-                                        ? 'bg-indigo-500/15 text-indigo-300'
-                                        : 'text-(--theme-modal-text)/70 hover:bg-white/5'
+                                        ? 'bg-[var(--theme-accent-bg)]/15 text-[var(--theme-accent-text)]'
+                                        : 'text-(--theme-modal-text)/70 hover:bg-[var(--theme-modal-text)]/[0.05]'
                                 ].join(' ')}
                             >
                                 <Icon
@@ -226,18 +233,20 @@
                             <div class="text-xs text-(--theme-modal-text)/30 text-center py-4">暂无 BUFF 块</div>
                         {/if}
                     </div>
-                    <div class="shrink-0 border-t border-white/10 p-2">
+                    <div class="shrink-0 border-t p-2" style="border-top: 1px solid var(--theme-divider-border);">
                         <div class="flex gap-1">
                             <input
                                 type="text"
                                 bind:value={newName}
                                 placeholder="新BUFF块名称"
                                 onkeydown={(e) => e.key === 'Enter' && handleCreateBuffSet()}
-                                class="flex-1 min-w-0 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
+                                class="flex-1 min-w-0 rounded border px-2 py-1 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             />
                             <button
                                 onclick={handleCreateBuffSet}
-                                class="shrink-0 rounded px-2 py-1 text-xs bg-indigo-500 text-white transition-colors hover:bg-indigo-400"
+                                class="shrink-0 rounded px-2 py-1 text-xs text-white transition-colors"
+                                style="background: var(--theme-accent-bg);"
                             >
                                 <Icon icon="mdi:plus" class="size-3" />
                             </button>
@@ -249,7 +258,10 @@
                 <div class="flex-1 flex flex-col">
                     {#if selectedBuffSet}
                         <!-- Character scope -->
-                        <div class="shrink-0 px-3 pt-3 pb-1 border-b border-white/10">
+                        <div
+                            class="shrink-0 px-3 pt-3 pb-1 border-b"
+                            style="border-bottom: 1px solid var(--theme-divider-border);"
+                        >
                             <div class="flex items-center gap-1.5">
                                 <span class="text-[10px] text-(--theme-modal-text)/50 mr-1">角色</span>
                                 {#each team as slot, i}
@@ -260,10 +272,10 @@
                                         class={[
                                             'size-8 rounded-full overflow-hidden border-2 transition-all',
                                             scopeChars[i]
-                                                ? 'border-indigo-400 ring-2 ring-indigo-400/40'
+                                                ? 'border-[var(--theme-accent-bg)]' + ' ring-2'
                                                 : globalDisabled
-                                                  ? 'border-white/10'
-                                                  : 'border-white/10 grayscale opacity-30 hover:opacity-60',
+                                                  ? 'border-[var(--theme-divider-border)]'
+                                                  : 'border-[var(--theme-divider-border)] grayscale opacity-30 hover:opacity-60',
                                             globalDisabled ? 'pointer-events-none' : ''
                                         ].join(' ')}
                                     >
@@ -286,11 +298,15 @@
                         </div>
 
                         <!-- Add zone button -->
-                        <div class="shrink-0 p-3 border-b border-white/10">
+                        <div
+                            class="shrink-0 p-3 border-b"
+                            style="border-bottom: 1px solid var(--theme-divider-border);"
+                        >
                             <div class="relative w-full">
                                 <button
                                     onclick={() => (showAddZone = !showAddZone)}
-                                    class="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-white/20 px-3 py-2 text-xs text-indigo-400 transition-colors hover:bg-white/5 hover:border-indigo-500/50"
+                                    class="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                                    style="border-color: var(--theme-divider-border);"
                                 >
                                     <Icon icon="mdi:plus" class="size-3.5" />
                                     添加乘区
@@ -298,7 +314,8 @@
                                 {#if showAddZone}
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <div
-                                        class="absolute left-0 top-full z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-white/10 bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                        class="absolute left-0 top-full z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                        style="border-color: var(--theme-divider-border);"
                                         onclick={(e) => e.stopPropagation()}
                                     >
                                         {#each ZONE_DEFS as def}
@@ -310,13 +327,16 @@
                                                     'flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
                                                     exists
                                                         ? 'text-(--theme-modal-text)/20 cursor-not-allowed'
-                                                        : 'text-(--theme-modal-text) hover:bg-white/5'
+                                                        : 'text-(--theme-modal-text) hover:bg-[var(--theme-modal-text)]/[0.05]'
                                                 ].join(' ')}
                                             >
                                                 <span class="flex-1">{def.label}</span>
                                                 <span class="text-[10px] text-(--theme-modal-text)/40">{def.unit}</span>
                                                 {#if exists}
-                                                    <Icon icon="mdi:check" class="size-3 text-indigo-400" />
+                                                    <Icon
+                                                        icon="mdi:check"
+                                                        class="size-3 text-[var(--theme-accent-text)]"
+                                                    />
                                                 {/if}
                                             </button>
                                         {/each}
@@ -330,7 +350,10 @@
                             {#each selectedBuffSet.zones as zone}
                                 {@const def = ZONE_MAP.get(zone.zoneId)}
                                 {#if def}
-                                    <div class="flex items-center gap-1.5 rounded bg-white/5 px-3 py-2">
+                                    <div
+                                        class="flex items-center gap-1.5 rounded px-3 py-2"
+                                        style="background: var(--theme-input-bg);"
+                                    >
                                         <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
                                             >{def.label}</span
                                         >
@@ -377,7 +400,8 @@
                                                             isNaN(v) ? 0 : v
                                                         )
                                                     }}
-                                                    class="w-14 h-6 rounded border border-white/10 bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                                                    class="w-14 h-6 rounded border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                                                    style="border-color: var(--theme-divider-border);"
                                                 />
                                                 <span class="text-[10px] text-(--theme-modal-text)/40 w-3"
                                                     >{def.unit === '%' ? '%' : ''}</span
@@ -389,8 +413,8 @@
                                             class={[
                                                 'shrink-0 rounded p-0.5 transition-colors',
                                                 zone.ref
-                                                    ? 'text-indigo-400 hover:text-indigo-300'
-                                                    : 'text-zinc-500 hover:text-indigo-400'
+                                                    ? 'text-[var(--theme-accent-text)] hover:text-[var(--theme-accent-text)]'
+                                                    : 'text-[var(--theme-modal-text)]/40 hover:text-[var(--theme-accent-text)]'
                                             ].join(' ')}
                                             title={zone.ref ? '编辑引用' : '设置引用'}
                                         >
@@ -398,7 +422,7 @@
                                         </button>
                                         <button
                                             onclick={() => removeZoneFromBuffSet(selectedBuffSet.id, zone.zoneId)}
-                                            class="shrink-0 rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400"
+                                            class="shrink-0 rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-red-500"
                                         >
                                             <Icon icon="mdi:close" class="size-3.5" />
                                         </button>
@@ -417,21 +441,26 @@
                 </div>
             </div>
 
-            <div class="flex items-center justify-between gap-2 border-t border-white/10 px-5 py-3">
+            <div
+                class="flex items-center justify-between gap-2 border-t px-5 py-3"
+                style="border-top: 1px solid var(--theme-divider-border);"
+            >
                 <div class="flex items-center gap-2">
                     {#if selectedBuffSet}
                         {@const isGlobal = globalBuffSetIds.includes(selectedBuffSet.id)}
                         {#if !isGlobal}
                             <button
                                 onclick={openRename}
-                                class="h-7 rounded-md bg-white/5 px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-white/10"
+                                class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                                style="background: var(--theme-input-bg);"
                             >
                                 <Icon icon="mdi:rename-outline" class="size-3.5 inline mr-1" />
                                 编辑名称
                             </button>
                             <button
                                 onclick={handleDeleteBuffSet}
-                                class="h-7 rounded-md bg-white/5 px-3 text-xs text-red-400 transition-colors hover:bg-red-500/20"
+                                class="h-7 rounded-md px-3 text-xs text-red-500 transition-colors hover:bg-red-500/30"
+                                style="background: var(--theme-input-bg);"
                             >
                                 <Icon icon="mdi:delete-outline" class="size-3.5 inline mr-1" />
                                 删除
@@ -441,8 +470,8 @@
                 </div>
                 <button
                     onclick={onclose}
-                    class="h-7 rounded-md bg-white/5 px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-white/10"
-                    >保存并关闭</button
+                    class="h-7 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                    style="background: var(--theme-input-bg);">保存并关闭</button
                 >
             </div>
         </div>
@@ -458,7 +487,8 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border border-white/10 bg-(--theme-modal-bg) p-5 shadow-xl w-80"
+            class="rounded-xl border bg-(--theme-modal-bg) p-5 shadow-xl w-80"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-3">编辑名称</h3>
@@ -467,18 +497,19 @@
                 bind:value={renameValue}
                 placeholder="输入新名称"
                 onkeydown={(e) => e.key === 'Enter' && handleRename()}
-                class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none text-(--theme-modal-text) placeholder:text-[var(--theme-modal-text)]/30 mb-4"
+                class="w-full rounded-lg border px-3 py-2 text-sm outline-none text-(--theme-modal-text) placeholder:text-[var(--theme-modal-text)]/30 mb-4"
+                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             />
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (showRename = false)}
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
-                    >取消</button
+                    class="h-7 rounded-md px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                    style="background: var(--theme-input-bg);">取消</button
                 >
                 <button
                     onclick={handleRename}
-                    class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500"
-                    >确认</button
+                    class="h-7 rounded-md px-3 text-xs text-white transition-colors"
+                    style="background: var(--theme-accent-bg);">确认</button
                 >
             </div>
         </div>
@@ -493,7 +524,8 @@
         onkeydown={(e) => e.key === 'Escape' && (showRefModal = false)}
     >
         <div
-            class="rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-5 shadow-xl w-80"
+            class="rounded-xl border bg-[var(--theme-modal-bg)] p-5 shadow-xl w-80"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-4">引用配置</h3>
@@ -509,8 +541,8 @@
                                 class={[
                                     'size-9 rounded-full overflow-hidden border-2 transition-all',
                                     refCharacterIdx === i
-                                        ? 'border-indigo-400 ring-2 ring-indigo-400/40'
-                                        : 'border-white/10 grayscale opacity-30 hover:opacity-60'
+                                        ? 'border-[var(--theme-accent-bg)] ring-2'
+                                        : 'border-[var(--theme-divider-border)] grayscale opacity-30 hover:opacity-60'
                                 ].join(' ')}
                             >
                                 {#if slot.character && charIconMap[slot.character]}
@@ -537,14 +569,16 @@
                     <div class="relative">
                         <button
                             onclick={() => (showRefZoneMenu = !showRefZoneMenu)}
-                            class="w-full flex items-center justify-between rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-white/10"
+                            class="w-full flex items-center justify-between rounded border px-2 py-1.5 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <span>{refTargetDef?.label ?? refTargetZoneId}</span>
                             <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                         </button>
                         {#if showRefZoneMenu}
                             <div
-                                class="absolute left-0 top-full z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                class="absolute left-0 top-full z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                                style="border-color: var(--theme-divider-border);"
                                 onclick={(e) => e.stopPropagation()}
                             >
                                 {#each ZONE_REF_DEFS.filter((d) => d.id !== refZoneId) as def}
@@ -556,8 +590,8 @@
                                         class={[
                                             'flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
                                             refTargetZoneId === def.id
-                                                ? 'text-indigo-400 bg-indigo-500/10'
-                                                : 'text-[var(--theme-modal-text)] hover:bg-white/5'
+                                                ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent-bg)]/10'
+                                                : 'text-[var(--theme-modal-text)] hover:bg-[var(--theme-modal-text)]/[0.05]'
                                         ].join(' ')}
                                     >
                                         <span class="flex-1">{def.label}</span>
@@ -576,7 +610,8 @@
                         <input
                             type="number"
                             bind:value={refThreshold}
-                            class="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                            class="w-full rounded border px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         />
                         <span class="text-[var(--theme-modal-text)]/40 text-xs">×</span>
                         <input
@@ -585,7 +620,8 @@
                             oninput={() => {
                                 refPct = refPct
                             }}
-                            class="w-20 rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                            class="w-20 rounded border px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         />
                         <span class="text-[var(--theme-modal-text)]/40 text-xs">%</span>
                     </div>
@@ -598,7 +634,8 @@
                         <input
                             type="number"
                             bind:value={refLower}
-                            class="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                            class="w-full rounded border px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         />
                         <span class="text-[var(--theme-modal-text)]/40 text-xs">~</span>
                         <input
@@ -609,7 +646,8 @@
                                     refLower = refUpper
                                 }
                             }}
-                            class="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                            class="w-full rounded border px-2 py-1.5 text-xs text-[var(--theme-modal-text)] outline-none tabular-nums"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         />
                     </div>
                 </div>
@@ -624,7 +662,8 @@
                         ' ~ ' +
                         (refUpper !== undefined && !isNaN(refUpper) ? refUpper : '')}
                     <div
-                        class="rounded bg-white/5 px-2 py-1.5 text-[10px] text-[var(--theme-modal-text)]/50 text-center"
+                        class="rounded px-2 py-1.5 text-[10px] text-[var(--theme-modal-text)]/50 text-center"
+                        style="background: var(--theme-input-bg);"
                     >
                         = ({rChar}.{refTargetDef.label}{pTh !== 0
                             ? pOp + pTh + (refTargetDef.unit === '%' ? '%' : '')
@@ -639,19 +678,19 @@
             <div class="flex justify-between mt-5">
                 <button
                     onclick={handleClearRef}
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-red-400 transition-colors hover:bg-red-500/20"
-                    >清除引用</button
+                    class="h-7 rounded-md px-3 text-xs text-red-500 transition-colors hover:bg-red-500/30"
+                    style="background: var(--theme-input-bg);">清除引用</button
                 >
                 <div class="flex gap-2">
                     <button
                         onclick={() => (showRefModal = false)}
-                        class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
-                        >取消</button
+                        class="h-7 rounded-md px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                        style="background: var(--theme-input-bg);">取消</button
                     >
                     <button
                         onclick={handleConfirmRef}
-                        class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500"
-                        >确认</button
+                        class="h-7 rounded-md px-3 text-xs text-white transition-colors"
+                        style="background: var(--theme-accent-bg);">确认</button
                     >
                 </div>
             </div>

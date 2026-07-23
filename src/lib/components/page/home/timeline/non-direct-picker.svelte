@@ -33,11 +33,15 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[70vh] max-w-xl rounded-lg border border-white/10 bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            class="w-full max-h-[70vh] max-w-xl rounded-lg border bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
-            <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div
+                class="flex items-center justify-between px-4 py-3 border-b"
+                style="border-bottom-color: var(--theme-divider-border);"
+            >
                 <h2 class="text-sm font-semibold">配置非直伤</h2>
             </div>
             <div class="flex-1 overflow-y-auto p-4 space-y-3">
@@ -52,11 +56,14 @@
                                 class={[
                                     'h-7 rounded-md px-3 text-xs font-medium transition-colors whitespace-nowrap',
                                     getNonDirectPickerSelected().has(cfg.name)
-                                        ? 'bg-indigo-500 text-white'
+                                        ? 'text-white'
                                         : disabled
-                                          ? 'bg-white/[0.02] text-[var(--theme-modal-text)]/20 cursor-not-allowed'
-                                          : 'bg-white/5 text-[var(--theme-modal-text)]/60 hover:bg-white/10'
+                                          ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
+                                          : 'text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/[0.1]'
                                 ].join(' ')}
+                                style={getNonDirectPickerSelected().has(cfg.name)
+                                    ? 'background: var(--theme-accent-bg);'
+                                    : 'background: var(--theme-input-bg);'}
                                 onclick={() => {
                                     if (disabled) return
                                     const next = new Set(getNonDirectPickerSelected())
@@ -82,14 +89,13 @@
                                                 'size-9 rounded-full overflow-hidden flex items-center justify-center',
                                                 responderDisabled
                                                     ? 'opacity-10 cursor-not-allowed'
-                                                    : isHarmony
-                                                      ? selected
-                                                          ? 'ring-2 ring-indigo-500'
-                                                          : 'ring-1 ring-white/20 opacity-60'
-                                                      : selected
-                                                        ? 'ring-2 ring-indigo-500'
-                                                        : 'ring-1 ring-white/20 opacity-60'
+                                                    : !selected
+                                                      ? 'ring-1 ring-[var(--theme-divider-border)] opacity-60'
+                                                      : ''
                                             ].join(' ')}
+                                            style={!responderDisabled && selected
+                                                ? 'box-shadow: 0 0 0 2px var(--theme-accent-bg);'
+                                                : ''}
                                             onclick={() => {
                                                 if (locked || responderDisabled) return
                                                 if (isHarmony) {
@@ -126,7 +132,7 @@
                     </div>
                 {/each}
 
-                <div class="pt-3 border-t border-white/10">
+                <div class="pt-3 border-t" style="border-top-color: var(--theme-divider-border);">
                     <div class="text-[11px] font-semibold text-[var(--theme-modal-text)]/60 tracking-wider mb-3">
                         效应结算
                     </div>
@@ -156,8 +162,8 @@
                                                 )
                                             )
                                         }}
-                                        class="w-full h-2 appearance-none cursor-pointer rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:shadow-md"
-                                        style="background: linear-gradient(to right, #6366f1 0%, #6366f1 {pct}%, rgba(255,255,255,0.1) {pct}%, rgba(255,255,255,0.1) 100%);"
+                                        class="w-full h-2 appearance-none cursor-pointer rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--theme-accent-bg)] [&::-webkit-slider-thumb]:shadow-md"
+                                        style="background: linear-gradient(to right, var(--theme-accent-bg) 0%, var(--theme-accent-bg) {pct}%, rgba(255,255,255,0.1) {pct}%, rgba(255,255,255,0.1) 100%);"
                                     />
                                     {#if cfg.name === '电磁效应'}
                                         {@const burstLayers = getNonDirectPickerBurstLayers()['burst'] ?? 0}
@@ -178,8 +184,8 @@
                                                 const v = parseInt((e.target as HTMLInputElement).value)
                                                 setNonDirectPickerBurstLayers({ burst: v })
                                             }}
-                                            class="w-full h-2 appearance-none cursor-pointer rounded-full disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:shadow-md"
-                                            style="background: linear-gradient(to right, #6366f1 0%, #6366f1 {burstPct}%, rgba(255,255,255,0.1) {burstPct}%, rgba(255,255,255,0.1) 100%);"
+                                            class="w-full h-2 appearance-none cursor-pointer rounded-full disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--theme-accent-bg)] [&::-webkit-slider-thumb]:shadow-md"
+                                            style="background: linear-gradient(to right, var(--theme-accent-bg) 0%, var(--theme-accent-bg) {burstPct}%, rgba(255,255,255,0.1) {burstPct}%, rgba(255,255,255,0.1) 100%);"
                                         />
                                     {/if}
                                 </div>
@@ -188,13 +194,18 @@
                     </div>
                 </div>
             </div>
-            <div class="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-2.5">
+            <div
+                class="flex items-center justify-end gap-2 border-t px-4 py-2.5"
+                style="border-top-color: var(--theme-divider-border);"
+            >
                 <button
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    class="h-7 rounded-md px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                    style="background: var(--theme-input-bg);"
                     onclick={() => setNonDirectPickerBlockId(null)}>取消</button
                 >
                 <button
-                    class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500"
+                    class="h-7 rounded-md px-3 text-xs text-white transition-colors hover:opacity-80"
+                    style="background: var(--theme-accent-bg);"
                     onclick={applyNonDirectEntries}>确认</button
                 >
             </div>

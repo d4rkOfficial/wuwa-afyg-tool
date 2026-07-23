@@ -265,7 +265,8 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-8 shadow-2xl"
+            class="rounded-xl border bg-[var(--theme-modal-bg)] p-8 shadow-2xl"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <span class="text-xs text-[var(--theme-modal-text)]/40">加载中…</span>
@@ -280,7 +281,8 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
-            class="mx-4 max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-white/10 bg-[var(--theme-modal-bg)] p-6 shadow-2xl"
+            class="mx-4 max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-xl border bg-[var(--theme-modal-bg)] p-6 shadow-2xl"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <!-- Header -->
@@ -297,15 +299,21 @@
             <!-- Character panels -->
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {#each stats as s, i}
-                    <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                    <div
+                        class="rounded-xl border p-4"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                    >
                         <!-- Header -->
-                        <div class="flex items-start gap-3 mb-3 pb-3 border-b border-white/10">
+                        <div
+                            class="flex items-start gap-3 mb-3 pb-3"
+                            style="border-bottom: 1px solid var(--theme-divider-border);"
+                        >
                             <div class="flex items-center gap-2 shrink-0">
                                 {#if charIcons[s.name]}
                                     <img src={charIcons[s.name]} alt={s.name} class="size-10 rounded-full" />
                                 {:else}
                                     <div
-                                        class="size-10 rounded-full bg-white/10 flex items-center justify-center text-sm"
+                                        class="size-10 rounded-full bg-[var(--theme-modal-text)]/10 flex items-center justify-center text-sm"
                                     >
                                         {s.name.charAt(0)}
                                     </div>
@@ -345,7 +353,7 @@
                                     {s.atkTotal.toLocaleString()}
                                     <span class="text-[var(--theme-modal-text)]/30">
                                         ({s.atkWhite.toLocaleString()} +
-                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-400"
+                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-600"
                                         >{s.atkGreen.toLocaleString()}</span
                                     ><span class="text-[var(--theme-modal-text)]/30">)</span>
                                 </span>
@@ -358,7 +366,7 @@
                                     {s.hpTotal.toLocaleString()}
                                     <span class="text-[var(--theme-modal-text)]/30">
                                         ({s.hpWhite.toLocaleString()} +
-                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-400"
+                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-600"
                                         >{s.hpGreen.toLocaleString()}</span
                                     ><span class="text-[var(--theme-modal-text)]/30">)</span>
                                 </span>
@@ -371,7 +379,7 @@
                                     {s.defTotal.toLocaleString()}
                                     <span class="text-[var(--theme-modal-text)]/30">
                                         ({s.defWhite.toLocaleString()} +
-                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-400"
+                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-600"
                                         >{s.defGreen.toLocaleString()}</span
                                     ><span class="text-[var(--theme-modal-text)]/30">)</span>
                                 </span>
@@ -433,9 +441,12 @@
 
                             <!-- Bonus dmg -->
                             {#if s.bonusDmg > 0}
-                                <div class="flex items-center justify-between pt-1 border-t border-white/10">
+                                <div
+                                    class="flex items-center justify-between pt-1"
+                                    style="border-top: 1px solid var(--theme-divider-border);"
+                                >
                                     <span class="text-[var(--theme-modal-text)]/50">全伤害加成</span>
-                                    <span class="tabular-nums text-indigo-300">+{s.bonusDmg}%</span>
+                                    <span class="tabular-nums text-[var(--theme-accent-text)]">+{s.bonusDmg}%</span>
                                 </div>
                             {/if}
                         </div>

@@ -160,16 +160,20 @@
     <table class="w-full text-xs table-fixed">
         <thead>
             <tr
-                class="text-(--theme-modal-text)/50 border-b border-white/10 sticky top-0 bg-[var(--theme-modal-bg)] opacity-100!"
+                class="text-(--theme-modal-text)/50 sticky top-0 bg-[var(--theme-modal-bg)] opacity-100!"
+                style="border-bottom: 1px solid var(--theme-divider-border);"
             >
-                <th class="text-left font-medium py-2 px-3 w-20 shrink-0 border-r border-dashed border-white/[0.05]"
-                    >来源</th
+                <th
+                    class="text-left font-medium py-2 px-3 w-20 shrink-0 border-r border-dashed"
+                    style="border-color: var(--theme-divider-border);">来源</th
                 >
-                <th class="text-left font-medium py-2 px-3 w-56 shrink-0 border-r border-dashed border-white/[0.05]"
-                    >条目</th
+                <th
+                    class="text-left font-medium py-2 px-3 w-56 shrink-0 border-r border-dashed"
+                    style="border-color: var(--theme-divider-border);">条目</th
                 >
-                <th class="text-left font-medium py-2 px-3 w-32 shrink-0 border-r border-dashed border-white/[0.05]"
-                    >视为</th
+                <th
+                    class="text-left font-medium py-2 px-3 w-32 shrink-0 border-r border-dashed"
+                    style="border-color: var(--theme-divider-border);">视为</th
                 >
                 <th class="text-left font-medium py-2 px-3">Buff</th>
             </tr>
@@ -181,13 +185,18 @@
                 <tr
                     onclick={() => handleToggleExpand(damageEntry.id)}
                     class={[
-                        'cursor-pointer border-b border-white/5 transition-colors',
-                        expandedEntryId === damageEntry.id ? 'bg-indigo-500/10' : 'hover:bg-white/5',
+                        'cursor-pointer border-b transition-colors',
+                        expandedEntryId === damageEntry.id ? '' : 'hover:bg-[var(--theme-modal-text)]/[0.05]',
                         expandedEntryId !== null && expandedEntryId !== damageEntry.id ? 'opacity-40' : ''
                     ].join(' ')}
+                    style={'border-color: var(--theme-divider-border);' +
+                        (expandedEntryId === damageEntry.id
+                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 10%, transparent);'
+                            : '')}
                 >
                     <td
-                        class="py-1.5 px-3 w-20 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed border-white/[0.05]"
+                        class="py-1.5 px-3 w-20 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        style="border-color: var(--theme-divider-border);"
                     >
                         <span
                             style="color: {(ELEMENT_COLORS as Record<string, string>)[
@@ -198,7 +207,8 @@
                         </span>
                     </td>
                     <td
-                        class="py-1.5 px-3 w-56 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed border-white/[0.05]"
+                        class="py-1.5 px-3 w-56 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        style="border-color: var(--theme-divider-border);"
                     >
                         <span
                             style="color: {(ELEMENT_COLORS as Record<string, string>)[damageEntry.damageElement] ??
@@ -209,12 +219,14 @@
                         </span>
                     </td>
                     <td
-                        class="py-1.5 px-3 w-32 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed border-white/[0.05]"
+                        class="py-1.5 px-3 w-32 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        style="border-color: var(--theme-divider-border);"
                     >
                         <div class="flex flex-wrap gap-0.5">
                             {#each entryDamageTypeMap[damageEntry.id] ?? [] as dt}
                                 <span
-                                    class="text-[10px] px-1 rounded bg-white/10 text-(--theme-modal-text)/70 leading-tight"
+                                    class="text-[10px] px-1 rounded text-(--theme-modal-text)/70 leading-tight"
+                                    style="background: var(--theme-input-bg);"
                                     >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}</span
                                 >
                             {/each}
@@ -226,7 +238,8 @@
                                 {@const buffSet = buffSets.find((s) => s.id === setId)}
                                 {#if buffSet && !globalBuffSetIds.includes(setId)}
                                     <span
-                                        class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-indigo-500/15 text-indigo-400"
+                                        class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                        style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
                                     >
                                         {buffSet.name}
                                     </span>
@@ -236,9 +249,12 @@
                     </td>
                 </tr>
                 {#if expandedEntryId === damageEntry.id}
-                    <tr class="bg-white/[0.02]">
+                    <tr style="background: var(--theme-input-bg);">
                         <td colspan="4" class="p-0">
-                            <div class="border-b border-white/5 px-6 py-3 space-y-3">
+                            <div
+                                class="border-b px-6 py-3 space-y-3"
+                                style="border-color: var(--theme-divider-border);"
+                            >
                                 {#if !damageEntry.isEffect && !damageEntry.isTuneBreak && !damageEntry.isTuneResponse}
                                     <div>
                                         <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">伤害类型</div>
@@ -255,11 +271,14 @@
                                                         handleToggleDamageType(damageEntry.id, dt)
                                                     }}
                                                     class={[
-                                                        'px-2 py-1 text-xs rounded transition-colors',
+                                                        'px-2 py-1 text-xs rounded transition-colors border',
                                                         selected
-                                                            ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40'
-                                                            : 'bg-white/5 text-(--theme-modal-text)/50 border border-white/10 hover:bg-white/10'
+                                                            ? ''
+                                                            : 'text-(--theme-modal-text)/50 hover:bg-[var(--theme-modal-text)]/[0.1]'
                                                     ].join(' ')}
+                                                    style={selected
+                                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
+                                                        : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
                                                 >
                                                     {dt}
                                                 </button>
@@ -271,7 +290,8 @@
                                     <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">增益选择</div>
                                     {#if visibleBuffSets.length > 0}
                                         <div
-                                            class="flex flex-wrap items-center gap-1 pb-2 border-b border-white/5 mb-2"
+                                            class="flex flex-wrap items-center gap-1 pb-2 border-b mb-2"
+                                            style="border-color: var(--theme-divider-border);"
                                         >
                                             {#if isDirectDamage(damageEntry)}
                                                 <button
@@ -318,11 +338,14 @@
                                                         handleToggleBuffSetForEntry(buffSet.id)
                                                     }}
                                                     class={[
-                                                        'px-2 py-1 text-xs rounded transition-colors inline-flex items-center gap-1',
+                                                        'px-2 py-1 text-xs rounded transition-colors inline-flex items-center gap-1 border',
                                                         checked
-                                                            ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40'
-                                                            : 'bg-white/5 text-(--theme-modal-text)/50 border border-white/10 hover:bg-white/10'
+                                                            ? ''
+                                                            : 'text-(--theme-modal-text)/50 hover:bg-[var(--theme-modal-text)]/[0.1]'
                                                     ].join(' ')}
+                                                    style={checked
+                                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
+                                                        : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
                                                 >
                                                     <Icon
                                                         icon={checked ? 'mdi:check' : 'mdi:close'}

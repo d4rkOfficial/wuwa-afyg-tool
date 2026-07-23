@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte'
+    import { onMount, tick } from 'svelte'
     import { goto } from '$app/navigation'
     import { loadThemes } from '$lib/theme'
     import {
@@ -455,9 +455,7 @@
                         />
                     </svg>
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
-                    <p class="mb-6 text-sm text-zinc-500">
-                        鸣潮社区公益工具喵~ 公测中，即将开源！
-                    </p>
+                    <p class="mb-6 text-sm text-zinc-500">鸣潮社区公益工具喵~ 公测中，即将开源！</p>
                     <button
                         onclick={() => {
                             newName = ''
@@ -582,7 +580,15 @@
                     {/if}
                 {:else}
                     <button
-                        onclick={() => resultRefreshKey++}
+                        onclick={async () => {
+                            showResult = false
+                            activePhase = 'team';       await tick()
+                            activePhase = 'timeline';   await tick()
+                            activePhase = 'calculation'; await tick()
+                            activePhase = 'config';     await tick()
+                            showResult = true
+                            resultRefreshKey++
+                        }}
                         class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
                     >
                         <Icon icon="mdi:refresh" class="size-4 shrink-0" />

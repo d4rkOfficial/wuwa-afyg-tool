@@ -71,8 +71,8 @@
     {@const cm = getContextMenu()!}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed z-50 min-w-44 rounded-lg border border-white/10 bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1 shadow-xl backdrop-blur-lg"
-        style="left: {cm.x}px; top: {cm.y}px"
+        class="fixed z-50 min-w-44 rounded-lg border bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1 shadow-xl backdrop-blur-lg"
+        style="left: {cm.x}px; top: {cm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: cm.x, y: cm.y }}
         onclick={() => setContextMenu(null)}
@@ -123,7 +123,7 @@
                 删除参考线
             </button>
         {/if}
-        <div class="border-t border-white/10 my-1"></div>
+        <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
         <div class="px-3 py-1 text-xs font-semibold text-[var(--theme-context-menu-text)]/50 uppercase tracking-wider">
             伤害绑定
         </div>
@@ -173,7 +173,7 @@
             </button>
         {/if}
         {#if getDamageBlocks().some((d) => d.sourceId === cm.id && d.trackIndex === 3)}
-            <div class="border-t border-white/10 my-1"></div>
+            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
             <button
                 onclick={() => {
                     removeDamageBySource(cm.id, 'all')
@@ -185,7 +185,7 @@
             </button>
         {/if}
         {#if getRefLines().findIndex((r) => r.id === cm.id) > 0}
-            <div class="border-t border-white/10 my-1"></div>
+            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
             <div class="px-3 py-1 text-xs font-semibold text-red-400/70 uppercase tracking-wider">危险操作</div>
             <button
                 onclick={() => openConfirm('clear', cm.id)}
@@ -224,7 +224,8 @@
             <div class="flex justify-end gap-2 mt-5">
                 <button
                     onclick={() => (confirmAction = null)}
-                    class="h-8 rounded-md bg-white/5 px-4 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    class="h-8 rounded-md px-4 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                    style="background: var(--theme-input-bg);"
                 >
                     取消
                 </button>
@@ -237,7 +238,7 @@
                         }
                         confirmAction = null
                     }}
-                    class="h-8 rounded-md bg-red-600 px-4 text-xs text-white transition-colors hover:bg-red-500"
+                    class="h-8 rounded-md bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
                 >
                     确认
                 </button>
@@ -251,8 +252,8 @@
     {@const bm = getBlockMenu()!}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed z-50 min-w-44 rounded-lg border border-white/10 bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1 shadow-xl backdrop-blur-lg"
-        style="left: {bm.x}px; top: {bm.y}px"
+        class="fixed z-50 min-w-44 rounded-lg border bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1 shadow-xl backdrop-blur-lg"
+        style="left: {bm.x}px; top: {bm.y}px; border-color: var(--theme-divider-border);"
         data-block-menu="true"
         use:clampMenu={{ x: bm.x, y: bm.y }}
         onclick={() => setBlockMenu(null)}
@@ -278,7 +279,7 @@
             <Icon icon="mdi:delete" class="size-4 shrink-0" />
             删除操作块
         </button>
-        <div class="border-t border-white/10 my-1"></div>
+        <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
         <div class="px-3 py-1 text-xs font-semibold text-[var(--theme-context-menu-text)]/50 uppercase tracking-wider">
             变奏
         </div>
@@ -304,7 +305,7 @@
                 取消变奏入场
             </button>
         {/if}
-        <div class="border-t border-white/10 my-1"></div>
+        <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
         <div class="px-3 py-1 text-xs font-semibold text-[var(--theme-context-menu-text)]/50 uppercase tracking-wider">
             伤害绑定
         </div>
@@ -355,7 +356,7 @@
             </button>
         {/if}
         {#if getDamageBlocks().some((d) => d.sourceId === bm.blockId && d.trackIndex === 3)}
-            <div class="border-t border-white/10 mt-1 mb-0"></div>
+            <div class="border-t mt-1 mb-0" style="border-color: var(--theme-divider-border);"></div>
             <button
                 onclick={() => {
                     removeDamageBySource(bm.blockId, 'all')
@@ -374,8 +375,8 @@
     {@const tm = getTrackMenu()!}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed z-50 rounded-lg border border-white/10 bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1.5 px-2 shadow-xl backdrop-blur-lg"
-        style="left: {tm.x}px; top: {tm.y}px"
+        class="fixed z-50 rounded-lg border bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1.5 px-2 shadow-xl backdrop-blur-lg"
+        style="left: {tm.x}px; top: {tm.y}px; border-color: var(--theme-divider-border);"
         data-track-menu="true"
         use:clampMenu={{ x: tm.x, y: tm.y }}
         onclick={() => setTrackMenu(null)}

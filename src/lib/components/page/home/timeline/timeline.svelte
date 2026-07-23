@@ -197,9 +197,10 @@
         <div class="relative" style="width: {getTableWidth()}px; min-width: 100%; height: 100%;">
             <div class="flex flex-col h-full">
                 <!-- Header row -->
-                <div class="relative shrink-0 h-8 border-b border-white/10">
+                <div class="relative shrink-0 h-8 border-b" style="border-bottom-color: var(--theme-divider-border);">
                     <div
-                        class="sticky left-0 z-35 w-20 h-full bg-[var(--theme-timeline-bg)] border-r border-white/10"
+                        class="sticky left-0 z-35 w-20 h-full bg-[var(--theme-timeline-bg)] border-r"
+                        style="border-right-color: var(--theme-divider-border);"
                     ></div>
                 </div>
 
@@ -215,7 +216,8 @@
                     >
                         <!-- Sticky label column -->
                         <div
-                            class="sticky left-0 z-[35] w-20 h-full bg-[var(--theme-timeline-bg)] border-r border-white/10 flex items-center justify-center"
+                            class="sticky left-0 z-[35] w-20 h-full bg-[var(--theme-timeline-bg)] border-r flex items-center justify-center"
+                            style="border-right-color: var(--theme-divider-border);"
                         >
                             {#if i < 3}
                                 <div
@@ -272,10 +274,12 @@
                                             class="flex items-center gap-1 h-full rounded-md {getEditingBlockId() ===
                                             block.id
                                                 ? ''
-                                                : 'px-2.5'} text-sm bg-[var(--theme-timeline-bg)]/80 border whitespace-nowrap shadow-sm min-w-[56px] {getDragBlockId() ===
-                                            block.id
-                                                ? 'border-indigo-400 shadow-indigo-500/20'
-                                                : 'border-white/10'}"
+                                                : 'px-2.5'} text-sm bg-[var(--theme-timeline-bg)]/80 border whitespace-nowrap shadow-sm min-w-[56px]"
+                                            style="border-color: {getDragBlockId() === block.id
+                                                ? 'var(--theme-accent-bg)'
+                                                : 'var(--theme-divider-border)'};{getDragBlockId() === block.id
+                                                ? ' box-shadow: 0 1px 3px color-mix(in srgb, var(--theme-accent-bg) 20%, transparent);'
+                                                : ''}"
                                             use:measureWidth={block.id}
                                         >
                                             {#if block.intro}
@@ -305,7 +309,8 @@
                                                         if (e.key === 'Escape') setEditingBlockId(null)
                                                     }}
                                                     size={Math.max(6, (getEditingBlockDesc()?.length || 0) + 3)}
-                                                    class="bg-[var(--theme-timeline-bg)]/60 text-[var(--theme-timeline-text)] text-xs text-left rounded outline-none border border-indigo-500/50 px-1"
+                                                    class="bg-[var(--theme-timeline-bg)]/60 text-[var(--theme-timeline-text)] text-xs text-left rounded outline-none border px-1"
+                                                    style="border-color: color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);"
                                                 />
                                             {:else}
                                                 <span class="text-[var(--theme-timeline-text)]/60 max-w-24 truncate"
@@ -395,10 +400,10 @@
             <div class="absolute pointer-events-none" style="left: 5rem; top: 2rem; right: 0; bottom: 0; z-index: 10;">
                 {#each getRefLines() as rl}
                     <div
-                        class="absolute top-0 bottom-0 {getDraggingId() === rl.id
-                            ? 'border-l border-dashed border-indigo-400'
-                            : 'border-l border-dashed border-white/10'}"
-                        style="left: {vx(rl.id, rl.pos)}px;"
+                        class="absolute top-0 bottom-0 border-l border-dashed"
+                        style="left: {vx(rl.id, rl.pos)}px; border-left-color: {getDraggingId() === rl.id
+                            ? 'var(--theme-accent-bg)'
+                            : 'var(--theme-divider-border)'};"
                     ></div>
                 {/each}
             </div>
@@ -421,7 +426,8 @@
                                     if (e.key === 'Escape') setEditingId(null)
                                 }}
                                 size={Math.max(5, (getEditValue()?.length || 0) + 2)}
-                                class="bg-[var(--theme-timeline-bg)]/60 text-[9px] text-[var(--theme-timeline-text)] text-left rounded outline-none border border-indigo-500/50 tabular-nums"
+                                class="bg-[var(--theme-timeline-bg)]/60 text-[9px] text-[var(--theme-timeline-text)] text-left rounded outline-none border tabular-nums"
+                                style="border-color: color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);"
                             />
                         {:else}
                             <span
