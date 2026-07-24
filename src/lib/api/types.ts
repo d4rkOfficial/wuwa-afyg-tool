@@ -175,6 +175,7 @@ export interface ZhCharacterDetail {
             icon: string
         }
     >
+    recommend?: { weapon: number[] }
 }
 
 export interface ZhWeaponDetail {

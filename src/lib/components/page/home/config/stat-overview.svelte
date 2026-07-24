@@ -10,7 +10,9 @@
         ELEMENT_ORDER,
         ELEMENT_BONUS_MAP,
         TYPE_BONUS_MAP,
-        ELEMENT_MAP
+        ELEMENT_MAP,
+        WEAPON_SUBSTAT_NAME_MAP,
+        SUBSTAT_DECIMAL_TO_PCT
     } from '$lib/consts/game-terms'
     import Icon from '@iconify/svelte'
 
@@ -109,44 +111,50 @@
         let bonusDmg = 0
 
         function add(type: string, value: number) {
-            switch (type) {
+            const canonicalLabel = WEAPON_SUBSTAT_NAME_MAP[type] ?? type
+            let canonicalValue = value
+            if (SUBSTAT_DECIMAL_TO_PCT.has(canonicalLabel) && value < 1) {
+                canonicalValue = value * 100
+            }
+
+            switch (canonicalLabel) {
                 case '攻击':
-                    flatAtk += value
+                    flatAtk += canonicalValue
                     break
                 case '生命':
-                    flatHp += value
+                    flatHp += canonicalValue
                     break
                 case '防御':
-                    flatDef += value
+                    flatDef += canonicalValue
                     break
                 case '攻击%':
-                    pctAtk += value
+                    pctAtk += canonicalValue
                     break
                 case '生命%':
-                    pctHp += value
+                    pctHp += canonicalValue
                     break
                 case '防御%':
-                    pctDef += value
+                    pctDef += canonicalValue
                     break
                 case '暴击率':
-                    critRate += value
+                    critRate += canonicalValue
                     break
                 case '暴击伤害':
-                    critDmg += value
+                    critDmg += canonicalValue
                     break
                 case '共鸣效率':
-                    recharge += value
+                    recharge += canonicalValue
                     break
                 case '治疗加成':
-                    healBonus += value
+                    healBonus += canonicalValue
                     break
                 default:
-                    if (type in ELEMENT_BONUS_MAP) {
-                        const el = ELEMENT_BONUS_MAP[type]
-                        elementDmg[el] = (elementDmg[el] ?? 0) + value
-                    } else if (type in TYPE_BONUS_MAP) {
-                        const t = TYPE_BONUS_MAP[type]
-                        typeDmg[t] = (typeDmg[t] ?? 0) + value
+                    if (canonicalLabel in ELEMENT_BONUS_MAP) {
+                        const el = ELEMENT_BONUS_MAP[canonicalLabel]
+                        elementDmg[el] = (elementDmg[el] ?? 0) + canonicalValue
+                    } else if (canonicalLabel in TYPE_BONUS_MAP) {
+                        const t = TYPE_BONUS_MAP[canonicalLabel]
+                        typeDmg[t] = (typeDmg[t] ?? 0) + canonicalValue
                     }
                     break
             }

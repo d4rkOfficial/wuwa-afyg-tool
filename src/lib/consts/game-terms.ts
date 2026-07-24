@@ -114,6 +114,17 @@ export const PHASE_LABELS: Record<PhaseKey, string> = {
 // ── Echo Cost ──
 export const COST_MAP: Record<number, number> = { 0: 1, 1: 3, 2: 4, 3: 4 }
 
+// ── Weapon Substat Name Mapping (API short form → canonical form) ──
+export const WEAPON_SUBSTAT_NAME_MAP: Record<string, string> = {
+    暴击: '暴击率',
+    攻击: '攻击%',
+    生命: '生命%',
+    防御: '防御%'
+}
+
+/** Substat names where the API raw value is a decimal fraction needing ×100 */
+export const SUBSTAT_DECIMAL_TO_PCT = new Set(['攻击%', '生命%', '防御%'])
+
 // ── Non-direct Configs (effect / tune) ──
 export const NON_DIRECT_CONFIGS = [
     { name: '谐度破坏', category: '处决' as const, max: 0 },

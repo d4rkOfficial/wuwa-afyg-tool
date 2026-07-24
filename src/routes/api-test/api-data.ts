@@ -14,6 +14,8 @@ export const CHAR_INFO = '/api/v1/info/character/{name}'
 export const WEAPON_INFO = '/api/v1/info/weapon/{name}'
 export const ECHO_INFO = '/api/v1/info/echo/{name}'
 export const SET_INFO = '/api/v1/info/echo-set/{name}'
+export const RECOMMEND = '/api/v1/recommend/{character}'
+export const RECOMMEND_WEAPON = '/api/v1/recommend-weapon/{character}'
 
 const VERSION_LATEST = '/api/v1/version/latest'
 const VERSION_AVAILABLE = '/api/v1/version/available'
@@ -58,6 +60,14 @@ export const endpointGroups: EndpointGroup[] = [
             { method: 'GET', path: WEAPON_INFO, summary: '武器详情（面板+特效）' },
             { method: 'GET', path: ECHO_INFO, summary: '声骸详情（技能+套装）' },
             { method: 'GET', path: SET_INFO, summary: '声骸套装详情（套装效果）' }
+        ]
+    },
+    {
+        name: 'recommend',
+        label: '推荐',
+        endpoints: [
+            { method: 'GET', path: RECOMMEND, summary: '根据角色推荐（武器+声骸套装+首位声骸）' },
+            { method: 'GET', path: RECOMMEND_WEAPON, summary: '仅推荐武器数组' }
         ]
     }
 ]
@@ -130,6 +140,14 @@ export const typeMap: Record<string, { name: string; code: string }> = {
     [SET_INFO]: {
         name: 'EchoSetInfo',
         code: 'interface EchoSetInfo {\n    bonuses: Record<string, string>\n}'
+    },
+    [RECOMMEND_WEAPON]: {
+        name: 'WeaponNames',
+        code: 'type WeaponNames = string[]'
+    },
+    [RECOMMEND]: {
+        name: 'Recommendation',
+        code: 'interface Recommendation {\n    weapons: string[]\n    echoSets: string[]\n    primaryEchoes: string[]\n}'
     }
 }
 
@@ -137,5 +155,7 @@ export const DEFAULTS: Record<string, string> = {
     [CHAR_INFO]: '散华',
     [WEAPON_INFO]: '裁竹',
     [ECHO_INFO]: '无常凶鹭',
-    [SET_INFO]: '轻云出月'
+    [SET_INFO]: '轻云出月',
+    [RECOMMEND]: '珂莱塔',
+    [RECOMMEND_WEAPON]: '珂莱塔'
 }

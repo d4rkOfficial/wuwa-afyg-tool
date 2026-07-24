@@ -212,7 +212,7 @@
                         </tr>
                         {#if expandedEntry === entry.id}
                             {@const s2 = entry.baseValue * (1 + entry.deepen) * (1 + entry.dmgBonus)}
-                            {@const s3 = s2 * (1 + entry.critRate * entry.critDmg) * (1 + entry.vulnerability)}
+                            {@const s3 = s2 * (1 + entry.critRate * (entry.critDmg - 1)) * (1 + entry.vulnerability)}
                             {@const s4 = s3 * entry.resMulti * entry.dmgRedMulti * entry.defMulti}
                             {@const harmony = 1 + entry.finalHarmony}
                             {@const s5 = s4 * harmony * (1 + entry.finalDmg) * entry.customMult}
@@ -367,11 +367,13 @@
                                                     ③ 暴击期望 × 易伤
                                                 </div>
                                                 <div class="pl-3">
-                                                    {Math.round(s2).toLocaleString()} × (1 + {(
+                                                    {Math.round(s2).toLocaleString()} × ((1 - {(
                                                         entry.critRate * 100
-                                                    ).toFixed(1)}% × {(entry.critDmg * 100).toFixed(1)}%)(暴击) × (1 + {(
-                                                        entry.vulnerability * 100
-                                                    ).toFixed(1)}%)(易伤) = {Math.round(s3).toLocaleString()}
+                                                    ).toFixed(1)}%) + {(entry.critRate * 100).toFixed(1)}% × {(
+                                                        entry.critDmg * 100
+                                                    ).toFixed(1)}%)(暴击) × (1 + {(entry.vulnerability * 100).toFixed(
+                                                        1
+                                                    )}%)(易伤) = {Math.round(s3).toLocaleString()}
                                                 </div>
 
                                                 <div class="font-semibold font-sans text-[var(--theme-accent-text)]">

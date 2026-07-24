@@ -2,6 +2,8 @@
     import type { CharSlot, SelectedSet } from '$lib/data/types'
     import type { Character, Weapon, Echo, EchoSetItem } from '$lib/api/types'
     import { addToast } from '$lib/data/toast.svelte'
+    import Icon from '@iconify/svelte'
+    import { ELEMENT_COLORS } from '$lib/consts/game-terms'
     import {
         getCharacterList,
         getWeaponList,
@@ -56,6 +58,8 @@
     let weaponTypeIcons: Record<string, string> = $state({})
     let pickerSlot = $state<number | null>(null)
     let pickerType = $state<'character' | 'weapon' | 'echo' | 'sets' | null>(null)
+    let autoRecommending: Record<number, boolean> = $state({ 0: false, 1: false, 2: false })
+    let autoRecommendAbort: AbortController | null = null
 
     let characterMap = $derived(new Map(characters.map((c) => [c.name, c])))
     let echoMap = $derived(new Map(echoes.map((e) => [e.name, e])))
@@ -93,6 +97,12 @@
 
     function openPicker(slot: number, type: 'character' | 'weapon' | 'echo' | 'sets') {
         if (locked) return
+        if (type === 'weapon' && autoRecommending[slot]) {
+            autoRecommendAbort?.abort()
+            autoRecommendAbort = null
+            autoRecommending[slot] = false
+            addToast(`已阻止为 ${localTeam[slot].character} 自动推荐武器。`, 'info')
+        }
         pickerSlot = slot
         pickerType = type
     }
@@ -102,8 +112,27 @@
         pickerType = null
     }
 
-    function handleSelectCharacter(item: unknown) {
+    function resetSlot(idx: number) {
+        const name = localTeam[idx].character
+        localTeam[idx] = {
+            character: null,
+            weapon: null,
+            triggerSets: [],
+            echoes: [
+                { name: null, cost: 0 },
+                { name: null, cost: 0 },
+                { name: null, cost: 0 },
+                { name: null, cost: 0 },
+                { name: null, cost: 0 }
+            ]
+        }
+        if (name) addToast(`角色 ${name} 已重置`, 'success')
+        onupdate(localTeam)
+    }
+
+    async function handleSelectCharacter(item: unknown) {
         if (pickerSlot === null) return
+        const slot = pickerSlot
         const char = item as Character | null
         if (char) {
             const dupIdx = localTeam.findIndex((s, i) => i !== pickerSlot && s.character === char.name)
@@ -127,6 +156,31 @@
         }
         closePicker()
         onupdate(localTeam)
+
+        if (char && !localTeam[slot].weapon) {
+            autoRecommending[slot] = true
+            const controller = new AbortController()
+            autoRecommendAbort = controller
+            try {
+                const res = await fetch(`/api/v1/recommend-weapon/${encodeURIComponent(char.name)}`, {
+                    signal: controller.signal
+                })
+                if (res.ok && !controller.signal.aborted) {
+                    const weapons: string[] = await res.json()
+                    const recommended = weapons[0]
+                    if (recommended && weaponMap.get(recommended)?.weaponType === char.weaponType) {
+                        localTeam[slot].weapon = recommended
+                        addToast(`已自动为 ${char.name} 推荐 ${recommended}。`, 'success')
+                        onupdate(localTeam)
+                    }
+                }
+            } catch (e) {
+                if (e instanceof DOMException && e.name === 'AbortError') return
+            } finally {
+                if (autoRecommendAbort === controller) autoRecommendAbort = null
+                autoRecommending[slot] = false
+            }
+        }
     }
 
     function handleSelectWeapon(item: unknown) {
@@ -227,20 +281,33 @@
 <div class="flex h-full flex-col p-6" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
     <div class="flex flex-1 gap-4">
         {#each localTeam as slot, i}
+            {@const charData = characterMap.get(slot.character ?? '')}
+            {@const eColor = charData ? ((ELEMENT_COLORS as Record<string, string>)[charData.element] ?? '') : ''}
             <div
-                class="flex flex-1 flex-col rounded-xl border p-6"
-                style="background: var(--theme-context-menu-bg); border-color: var(--theme-card-border)"
+                class="group relative flex flex-1 flex-col overflow-hidden rounded-xl border p-6"
+                style={slot.character && eColor
+                    ? `background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, ${eColor} 18%, transparent) 100%); border-color: color-mix(in srgb, ${eColor} 50%, transparent)`
+                    : 'background: var(--theme-context-menu-bg); border-color: var(--theme-card-border)'}
             >
-                <div class="mb-4 flex items-center gap-2">
-                    <div
-                        class="flex size-9 items-center justify-center rounded-full bg-[var(--theme-accent-bg)]/15 text-sm font-bold text-[var(--theme-accent-text)]"
+                <div class="pointer-events-none absolute inset-0 flex select-none items-center justify-center">
+                    <span class="text-[280px] font-black leading-none opacity-[0.08] text-[var(--theme-accent-text)]"
+                        >{i + 1}</span
                     >
-                        {i + 1}
-                    </div>
-                    <span class="text-base font-medium">角色 {i + 1}</span>
                 </div>
 
-                <div class="flex flex-1 flex-col gap-3">
+                {#if slot.character}
+                    <button
+                        class="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-[var(--theme-input-bg)]/50 text-[var(--theme-muted-text)] opacity-0 backdrop-blur-sm transition-all hover:text-[var(--theme-accent-text)] group-hover:opacity-100"
+                        onclick={(e) => {
+                            e.stopPropagation()
+                            resetSlot(i)
+                        }}
+                    >
+                        <Icon icon="mdi:restore" class="size-4" />
+                    </button>
+                {/if}
+
+                <div class="relative z-[1] flex flex-1 flex-col gap-3">
                     <!-- Character -->
                     <div class="flex flex-1 flex-col">
                         <span class="mb-1 block text-sm text-[var(--theme-muted-text)]">角色</span>
@@ -248,9 +315,9 @@
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]',
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]/80',
                                 slot.character
-                                    ? 'bg-[var(--theme-input-bg)]'
+                                    ? 'bg-[var(--theme-input-bg)]/60 backdrop-blur-sm'
                                     : 'border-2 border-dashed border-[var(--theme-card-border)]',
                                 !slot.character && !locked
                                     ? 'border-2 border-dashed border-[var(--theme-card-border)]'
@@ -306,9 +373,9 @@
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]',
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]/80',
                                 slot.weapon
-                                    ? 'bg-[var(--theme-input-bg)]'
+                                    ? 'bg-[var(--theme-input-bg)]/60 backdrop-blur-sm'
                                     : 'border-2 border-dashed border-[var(--theme-card-border)]',
                                 !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                             ]
@@ -324,12 +391,17 @@
                                 />
                             {/if}
                             <div class="flex flex-col min-w-0 flex-1">
-                                <span
-                                    class:opacity-40={!slot.weapon}
-                                    class:text-[var(--theme-muted-text)]={!slot.weapon}
-                                >
-                                    {slot.weapon || (slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色')}
-                                </span>
+                                {#if autoRecommending[i]}
+                                    <span class="text-[var(--theme-muted-text)]">自动推荐中...</span>
+                                {:else}
+                                    <span
+                                        class:opacity-40={!slot.weapon}
+                                        class:text-[var(--theme-muted-text)]={!slot.weapon}
+                                    >
+                                        {slot.weapon ||
+                                            (slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色')}
+                                    </span>
+                                {/if}
                                 {#if slot.weapon}
                                     {@const wpData = weaponMap.get(slot.weapon)}
                                     {#if wpData}
@@ -349,9 +421,9 @@
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]',
+                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-colors hover:bg-[var(--theme-input-bg)]/80',
                                 slot.echoes[0].name
-                                    ? 'bg-[var(--theme-input-bg)]'
+                                    ? 'bg-[var(--theme-input-bg)]/60 backdrop-blur-sm'
                                     : 'border-2 border-dashed border-[var(--theme-card-border)]',
                                 !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                             ]
@@ -389,9 +461,9 @@
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             class={[
-                                'flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-colors hover:bg-[var(--theme-input-bg)]',
+                                'flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-colors hover:bg-[var(--theme-input-bg)]/80',
                                 slot.triggerSets.length > 0
-                                    ? 'bg-[var(--theme-input-bg)]'
+                                    ? 'bg-[var(--theme-input-bg)]/60 backdrop-blur-sm'
                                     : 'border-2 border-dashed border-[var(--theme-card-border)]',
                                 !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                             ]

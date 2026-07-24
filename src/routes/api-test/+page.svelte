@@ -30,7 +30,11 @@
 
     let currentType = $derived(sel ? (typeMap[sel.path] ?? null) : null)
     let inputPlaceholder = $derived(
-        sel?.path.includes('{names}') ? 'names' : sel?.path.includes('{name}') ? '中文名' : ''
+        sel?.path.includes('{names}')
+            ? 'names'
+            : sel?.path.includes('{name}') || sel?.path.includes('{character}')
+              ? '中文名'
+              : ''
     )
 
     let sidebarWidth = $state(220)
@@ -80,6 +84,7 @@
                     .replace('{id}', idVal)
                     .replace('{names}', idVal)
                     .replace('{seasonId}', idVal)
+                    .replace('{character}', idVal)
             const r = await fetch(p)
             if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + r.statusText)
             res = JSON.stringify(await r.json(), null, 4)
@@ -122,7 +127,12 @@
         if (!sel) return ''
         let p = sel.path
         if (idVal)
-            p = p.replace('{name}', idVal).replace('{id}', idVal).replace('{names}', idVal).replace('{seasonId}', idVal)
+            p = p
+                .replace('{name}', idVal)
+                .replace('{id}', idVal)
+                .replace('{names}', idVal)
+                .replace('{seasonId}', idVal)
+                .replace('{character}', idVal)
         return origin + p
     }
 
@@ -145,7 +155,11 @@
     })
 
     const hasIdParam = (p: string) =>
-        p.includes('{name}') || p.includes('{id}') || p.includes('{names}') || p.includes('{seasonId}')
+        p.includes('{name}') ||
+        p.includes('{id}') ||
+        p.includes('{names}') ||
+        p.includes('{seasonId}') ||
+        p.includes('{character}')
 </script>
 
 <div class="flex h-dvh flex-col" style="background: var(--theme-layout-bg); color: var(--theme-layout-text)">

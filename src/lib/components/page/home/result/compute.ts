@@ -4,7 +4,13 @@ import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry } from './result.types'
 import type { CharSlot } from '$lib/data/types'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
-import { NON_DIRECT_ELEMENT, TYPE_BONUS_MAP, ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
+import {
+    NON_DIRECT_ELEMENT,
+    TYPE_BONUS_MAP,
+    ELEMENT_BONUS_MAP,
+    WEAPON_SUBSTAT_NAME_MAP,
+    SUBSTAT_DECIMAL_TO_PCT
+} from '$lib/consts/game-terms'
 
 // ── helpers ──
 
@@ -83,43 +89,50 @@ function applyZoneToAccum(zoneId: string, value: number, acc: CharAccum) {
 }
 
 function applyEntryStatToAccum(label: string, value: number, acc: CharAccum) {
-    if (isElementBonus(label)) {
-        const el = ELEMENT_BONUS_MAP[label]
-        acc.elementBonus[el] = (acc.elementBonus[el] ?? 0) + value
+    // normalize weapon substat name (API short form → canonical)
+    const canonicalLabel = WEAPON_SUBSTAT_NAME_MAP[label] ?? label
+    let canonicalValue = value
+    if (SUBSTAT_DECIMAL_TO_PCT.has(canonicalLabel) && value < 1) {
+        canonicalValue = value * 100
+    }
+
+    if (isElementBonus(canonicalLabel)) {
+        const el = ELEMENT_BONUS_MAP[canonicalLabel]
+        acc.elementBonus[el] = (acc.elementBonus[el] ?? 0) + canonicalValue
         return
     }
-    if (isTypeBonus(label)) {
-        const t = TYPE_BONUS_MAP[label]
-        acc.typeBonus[t] = (acc.typeBonus[t] ?? 0) + value
+    if (isTypeBonus(canonicalLabel)) {
+        const t = TYPE_BONUS_MAP[canonicalLabel]
+        acc.typeBonus[t] = (acc.typeBonus[t] ?? 0) + canonicalValue
         return
     }
-    switch (label) {
+    switch (canonicalLabel) {
         case '攻击':
-            acc.flatAtk += value
+            acc.flatAtk += canonicalValue
             break
         case '生命':
-            acc.flatHp += value
+            acc.flatHp += canonicalValue
             break
         case '防御':
-            acc.flatDef += value
+            acc.flatDef += canonicalValue
             break
         case '攻击%':
-            acc.pctAtk += value
+            acc.pctAtk += canonicalValue
             break
         case '生命%':
-            acc.pctHp += value
+            acc.pctHp += canonicalValue
             break
         case '防御%':
-            acc.pctDef += value
+            acc.pctDef += canonicalValue
             break
         case '暴击率':
-            acc.critRate += value
+            acc.critRate += canonicalValue
             break
         case '暴击伤害':
-            acc.critDmg += value
+            acc.critDmg += canonicalValue
             break
         case '共鸣效率':
-            acc.recharge += value
+            acc.recharge += canonicalValue
             break
         case '治疗加成':
             break // not used in damage formula
@@ -421,7 +434,7 @@ function computeResultEntry(
     // crit (cap at 100%)
     const critDecimal = Math.min(stats.critRate, 100) / 100
     const critDmgDecimal = stats.critDmg / 100
-    const critAvg = 1 + critDecimal * critDmgDecimal
+    const critAvg = 1 + critDecimal * (critDmgDecimal - 1)
 
     // defense zone
     const defFactor = 792 + enemy.level * 8
