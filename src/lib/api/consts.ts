@@ -1,6 +1,33 @@
 export const NANOKA_BASE = 'https://static.nanoka.cc'
-export const WW_VERSION = '3.5'
-export const DATA_BASE = `${NANOKA_BASE}/ww/${WW_VERSION}`
+
+let _wwVersion = '3.5'
+
+export function getWWVersion() {
+    return _wwVersion
+}
+
+export function getDataBase() {
+    return `${NANOKA_BASE}/ww/${_wwVersion}`
+}
+
+let _versionPromise: Promise<void> | null = null
+
+export async function ensureVersion() {
+    if (!_versionPromise) {
+        _versionPromise = (async () => {
+            try {
+                const res = await fetch(`${NANOKA_BASE}/manifest.json`)
+                const json: Record<string, unknown> = await res.json()
+                const ww = json.ww as { latest?: string } | undefined
+                if (ww?.latest) _wwVersion = ww.latest
+            } catch {
+                // keep fallback
+            }
+        })()
+    }
+    return _versionPromise
+}
+
 export const ZH_DATA_BASE = `${NANOKA_BASE}/ww`
 export const ASSET_BASE = `${NANOKA_BASE}/assets/ww`
 

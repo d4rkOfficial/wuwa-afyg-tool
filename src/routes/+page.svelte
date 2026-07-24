@@ -582,10 +582,14 @@
                     <button
                         onclick={async () => {
                             showResult = false
-                            activePhase = 'team';       await tick()
-                            activePhase = 'timeline';   await tick()
-                            activePhase = 'calculation'; await tick()
-                            activePhase = 'config';     await tick()
+                            activePhase = 'team'
+                            await tick()
+                            activePhase = 'timeline'
+                            await tick()
+                            activePhase = 'calculation'
+                            await tick()
+                            activePhase = 'config'
+                            await tick()
                             showResult = true
                             resultRefreshKey++
                         }}

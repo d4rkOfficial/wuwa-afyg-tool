@@ -26,3 +26,7 @@ vite.config.ts.timestamp-*
 .tmp/
 .tmp
 *Tempopencode*.*
+.opencode
+
+# Log
+*.log

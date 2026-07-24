@@ -27,8 +27,6 @@
     let pieChart: Chart<'doughnut'> | null = $state(null)
     let chartDrawn = $state(false)
 
-
-
     // ── timing state ──
     let timings = $state<{ refLineId: string; seconds: number }[]>(resultAnalysis?.timings ?? [])
 
