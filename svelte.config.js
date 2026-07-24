@@ -1,4 +1,7 @@
-import adapter from '@sveltejs/adapter-vercel'
+import vercelAdapter from '@sveltejs/adapter-vercel'
+import cloudflareAdapter from '@sveltejs/adapter-cloudflare'
+
+const deployTarget = process.env.DEPLOY_TARGET || 'vercel'
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -6,7 +9,7 @@ const config = {
         runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
     },
     kit: {
-        adapter: adapter()
+        adapter: deployTarget === 'cloudflare' ? cloudflareAdapter() : vercelAdapter()
     }
 }
 
