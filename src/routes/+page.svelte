@@ -131,7 +131,7 @@
         createProject(name.trim())
         showNewModal = false
         newName = ''
-        activePhase = 'team'
+        initForActiveProject()
         addToast(`项目「${name.trim()}」已创建`, 'success')
     }
 
@@ -315,6 +315,11 @@
 
     function handleSelectProject(id: string) {
         setActiveProject(id)
+        initForActiveProject()
+    }
+
+    function initForActiveProject() {
+        setShowBuffModal(false)
         const p = getActiveProject()
         if (!p) {
             activePhase = 'team'
