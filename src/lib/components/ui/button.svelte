@@ -39,9 +39,9 @@
     {onclick}
     class={[
         'inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm',
-        'text-[var(--theme-btn-text)]',
-        'focus-visible:bg-[var(--theme-btn-bg-focused)] focus-visible:text-[var(--theme-btn-text-focused)]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-btn-text)]/30',
+        'text-(--theme-btn-text)',
+        'focus-visible:bg-(--theme-btn-bg-focused) focus-visible:text-(--theme-btn-text-focused)',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--theme-btn-text)/30',
         'disabled:opacity-40 disabled:pointer-events-none',
         'transition-colors duration-150',
         variant === 'icon' ? 'p-1.5' : '',

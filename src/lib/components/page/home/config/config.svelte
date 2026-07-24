@@ -236,8 +236,8 @@
                 }}
                 class={[
                     'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-2',
-                    isActive && i >= 3 && 'bg-[var(--theme-modal-text)]/10 text-[var(--theme-modal-text)]',
-                    !isActive && 'text-[var(--theme-modal-text)]/40 hover:text-[var(--theme-modal-text)]/70'
+                    isActive && i >= 3 && 'bg-(--theme-modal-text)/10 text-(--theme-modal-text)',
+                    !isActive && 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                 ].join(' ')}
                 style={isActive && i < 3
                     ? `background: color-mix(in srgb, ${elementColor(charNames[i] ?? '')} 18%, transparent); color: ${elementColor(charNames[i] ?? '')};`
@@ -248,7 +248,7 @@
                         <img src={charIcons[charNames[i]]} alt="" class="size-5 rounded-full shrink-0" />
                     {:else}
                         <div
-                            class="size-5 rounded-full bg-[var(--theme-modal-text)]/10 flex items-center justify-center text-[10px] shrink-0"
+                            class="size-5 rounded-full bg-(--theme-modal-text)/10 flex items-center justify-center text-[10px] shrink-0"
                         >
                             {charNames[i]!.charAt(0)}
                         </div>
@@ -302,17 +302,17 @@
                                 class="pointer-events-none absolute inset-0 flex select-none items-center justify-center"
                             >
                                 <span
-                                    class="text-[200px] font-black leading-none opacity-[0.06] text-[var(--theme-accent-text)]"
+                                    class="text-[200px] font-black leading-none opacity-[0.06] text-(--theme-accent-text)"
                                     >{slot.cost}</span
                                 >
                             </div>
 
-                            <div class="relative z-[1] p-4">
+                            <div class="relative z-1 p-4">
                                 <!-- Cost selector -->
                                 <div class="flex items-center justify-between mb-3">
                                     <button
                                         onclick={() => handleClearSubstats(ci, si)}
-                                        class="rounded p-0.5 text-[var(--theme-muted-text)] transition-colors hover:text-red-500"
+                                        class="rounded p-0.5 text-(--theme-muted-text) transition-colors hover:text-red-500"
                                     >
                                         <Icon icon="mdi:refresh" class="size-3.5" />
                                     </button>
@@ -332,7 +332,7 @@
                                                     'min-w-7 px-2 h-6 rounded text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
                                                     slot.cost === c
                                                         ? costBtnCls(slot.cost)
-                                                        : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/40 hover:bg-[var(--theme-modal-text)]/10'
+                                                        : 'bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:bg-(--theme-modal-text)/10'
                                                 ].join(' ')}>{c} COST</button
                                             >
                                         {/each}
@@ -347,12 +347,12 @@
                                                 showMainStatMenu?.ci === ci && showMainStatMenu?.si === si
                                                     ? null
                                                     : { ci, si })}
-                                        class="w-full rounded border px-3 py-2 transition-colors hover:bg-[var(--theme-modal-text)]/10"
+                                        class="w-full rounded border px-3 py-2 transition-colors hover:bg-(--theme-modal-text)/10"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
                                         <div class="flex items-center justify-between">
                                             <div class="flex flex-col text-left">
-                                                <span class="text-sm font-medium text-[var(--theme-modal-text)]">
+                                                <span class="text-sm font-medium text-(--theme-modal-text)">
                                                     {slot.mainStat
                                                         ? shortLabel(slot.mainStat.type) +
                                                           ' ' +
@@ -361,14 +361,14 @@
                                                         : '未选择'}
                                                 </span>
                                                 {#if second}
-                                                    <span class="text-xs text-[var(--theme-modal-text)]/60"
+                                                    <span class="text-xs text-(--theme-modal-text)/60"
                                                         >{second.label} +{second.value}</span
                                                     >
                                                 {/if}
                                             </div>
                                             <Icon
                                                 icon="mdi:chevron-down"
-                                                class="size-3.5 text-[var(--theme-modal-text)]/40 shrink-0"
+                                                class="size-3.5 text-(--theme-modal-text)/40 shrink-0"
                                             />
                                         </div>
                                     </button>
@@ -383,7 +383,7 @@
                                         >
                                             <button
                                                 onclick={() => handleSetMainStat(ci, si, null)}
-                                                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)]/40 transition-colors hover:bg-[var(--theme-input-bg)]"
+                                                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-input-bg)"
                                                 >未选择</button
                                             >
                                             {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt}
@@ -394,15 +394,15 @@
                                                             value: opt.maxValue,
                                                             unit: opt.unit
                                                         })}
-                                                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-input-bg)]"
+                                                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-input-bg)"
                                                 >
                                                     <span class="flex-1">{opt.label}</span>
-                                                    <span class="text-[var(--theme-modal-text)]/40"
+                                                    <span class="text-(--theme-modal-text)/40"
                                                         >{opt.maxValue}{opt.unit}</span
                                                     >
                                                     {#if slot.mainStat?.type === opt.label}<Icon
                                                             icon="mdi:check"
-                                                            class="size-3 text-[var(--theme-accent-text)]"
+                                                            class="size-3 text-(--theme-accent-text)"
                                                         />{/if}
                                                 </button>
                                             {/each}
@@ -412,7 +412,7 @@
 
                                 <!-- Substats -->
                                 <div>
-                                    <span class="text-[10px] text-[var(--theme-modal-text)]/40 block mb-1"
+                                    <span class="text-[10px] text-(--theme-modal-text)/40 block mb-1"
                                         >副词条 ({slot.substats.length}/5)</span
                                     >
                                     <div class="space-y-1">
@@ -427,7 +427,7 @@
                                                     dragState?.si === si &&
                                                     dragState?.idx === idx}
                                                 {#if dragState?.ci === ci && dragState?.si === si && !dragState?.outside && dragState?.dropIdx === idx}
-                                                    <div class="h-0.5 rounded-full bg-[var(--theme-accent-bg)]"></div>
+                                                    <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
                                                 {/if}
                                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                                 <div
@@ -439,7 +439,7 @@
                                                         'cursor-grab active:cursor-grabbing',
                                                         isDragged &&
                                                             !dragState?.outside &&
-                                                            'ring-2 ring-[var(--theme-accent-bg)]',
+                                                            'ring-2 ring-(--theme-accent-bg)',
                                                         isDragged &&
                                                             dragState?.outside &&
                                                             'ring-2 ring-red-500 opacity-50'
@@ -450,12 +450,12 @@
                                                     onpointerup={(e) => onDragEnd(e, ci, si, idx)}
                                                 >
                                                     <span
-                                                        class="text-xs text-[var(--theme-modal-text)]/70 w-20 shrink-0 mr-2"
+                                                        class="text-xs text-(--theme-modal-text)/70 w-20 shrink-0 mr-2"
                                                         >{shortLabel(sub.type)}</span
                                                     >
                                                     <div class="relative flex-1 h-5">
                                                         <div
-                                                            class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-[var(--theme-modal-text)]/10"
+                                                            class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-(--theme-modal-text)/10"
                                                         >
                                                             <div
                                                                 class="h-full rounded-full"
@@ -486,7 +486,7 @@
                                             {/if}
                                         {/each}
                                         {#if dragState?.ci === ci && dragState?.si === si && !dragState?.outside && dragState?.dropIdx === slot.substats.length}
-                                            <div class="h-0.5 rounded-full bg-[var(--theme-accent-bg)]"></div>
+                                            <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
                                         {/if}
                                     </div>
                                     {#if slot.substats.length === 0}
@@ -497,14 +497,14 @@
                                                         showSubstatModal?.ci === ci && showSubstatModal?.si === si
                                                             ? null
                                                             : { ci, si })}
-                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-input-bg)]"
+                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
                                             >
                                                 <Icon icon="mdi:plus" class="size-3" />
                                                 选择副词条
                                             </button>
                                             <button
                                                 onclick={() => (showEnhanceModal = { ci, si })}
-                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-emerald-600 transition-colors hover:bg-[var(--theme-input-bg)]"
+                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-emerald-600 transition-colors hover:bg-(--theme-input-bg)"
                                             >
                                                 <Icon icon="mdi:dice-5" class="size-3" />
                                                 随机强化
@@ -518,7 +518,7 @@
                                                         showSubstatModal?.ci === ci && showSubstatModal?.si === si
                                                             ? null
                                                             : { ci, si })}
-                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-input-bg)]"
+                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
                                             >
                                                 <Icon icon="mdi:plus" class="size-3" />
                                                 选择副词条
@@ -553,10 +553,10 @@
                 onclick={(e) => e.stopPropagation()}
             >
                 <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm font-medium text-[var(--theme-modal-text)]">选择副词条</span>
+                    <span class="text-sm font-medium text-(--theme-modal-text)">选择副词条</span>
                     <button
                         onclick={() => (showSubstatModal = null)}
-                        class="rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-[var(--theme-modal-text)]/70"
+                        class="rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                     >
                         <Icon icon="mdi:close" class="size-4" />
                     </button>
@@ -572,14 +572,14 @@
                             class={[
                                 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
                                 exists
-                                    ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
-                                    : 'text-[var(--theme-modal-text)] hover:bg-[var(--theme-input-bg)]'
+                                    ? 'text-(--theme-modal-text)/20 cursor-not-allowed'
+                                    : 'text-(--theme-modal-text) hover:bg-(--theme-input-bg)'
                             ].join(' ')}
                         >
                             <span class="flex-1">{opt.label}</span>
-                            <span class="text-[10px] text-[var(--theme-modal-text)]/40">{opt.unit}</span>
+                            <span class="text-[10px] text-(--theme-modal-text)/40">{opt.unit}</span>
                             {#if exists}
-                                <Icon icon="mdi:check" class="size-3 shrink-0 text-[var(--theme-accent-text)]" />
+                                <Icon icon="mdi:check" class="size-3 shrink-0 text-(--theme-accent-text)" />
                             {/if}
                         </button>
                     {/each}

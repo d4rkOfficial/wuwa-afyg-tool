@@ -1,6 +1,5 @@
 # 椰果工具箱 · WUWA-AFYG-TOOL
 
-
 <p style="width:100%;text-align:center;">
   <img src="https://img.shields.io/badge/Framework-SvelteKit-FF3E00?logo=svelte&logoColor=white" alt="SvelteKit">
   <img src="https://img.shields.io/badge/Build-Vite-646CFF?logo=vite&logoColor=white" alt="Vite">
@@ -80,7 +79,9 @@ API 基于 [nanoka](https://ww.nanoka.cc) 精简提纯，随版本自动更新�
 详情见 [API测试页(afyg)](https://wuwa-afyg-tool.200503.xyz/api-test) 或者 [API测试页(hpyg)](https://wuwa-hpyg-tool.200503.xyz/api-test)。
 
 ### 列表
+
 直接获取 Nanoka 的各种资源列表。
+
 ```
 GET /api/v1/list/character
 GET /api/v1/list/weapon
@@ -89,7 +90,9 @@ GET /api/v1/list/echo-set
 ```
 
 ### 图标
+
 直接获取 Nanoka 的各种图标资源列表。
+
 ```
 GET /api/v1/icons/character
 GET /api/v1/icons/weapon
@@ -101,7 +104,9 @@ GET /api/v1/icons/ui-btn
 ```
 
 ### 详情
+
 传角色/武器/声骸/套装中文名，返回详情。
+
 ```
 GET /api/v1/info/character/:name
 GET /api/v1/info/weapon/:name
@@ -110,7 +115,9 @@ GET /api/v1/info/echo-set/:name
 ```
 
 ### 推荐
+
 传角色中文名，返回声骸推荐。
+
 ```
 GET /api/v1/recommend/:character
 GET /api/v1/recommend-weapon/:character

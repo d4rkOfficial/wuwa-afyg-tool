@@ -174,13 +174,13 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[70] flex items-center justify-center select-text backdrop-blur-sm"
+        class="fixed inset-0 z-70 flex items-center justify-center select-text backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && onclose()}
         oncontextmenu={handleCtxMenu}
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-[var(--theme-modal-text)] shadow-2xl"
+            class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -191,7 +191,7 @@
                 <h2 class="text-sm font-semibold">速查</h2>
                 <button
                     onclick={onclose}
-                    class="flex size-7 items-center justify-center rounded-md text-[var(--theme-modal-text)]/50 hover:bg-[var(--theme-modal-text)]/[0.1] hover:text-[var(--theme-modal-text)]"
+                    class="flex size-7 items-center justify-center rounded-md text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
                     ><Icon icon="mdi:close" class="size-4" /></button
                 >
             </div>
@@ -204,8 +204,8 @@
                         class={[
                             'rounded-md px-3 py-1 text-xs font-medium transition-colors',
                             i === charIndex
-                                ? 'text-[var(--theme-accent-text)]'
-                                : 'text-[var(--theme-modal-text)]/50 hover:bg-[var(--theme-modal-text)]/[0.05]'
+                                ? 'text-(--theme-accent-text)'
+                                : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
                         ].join(' ')}
                         style={i === charIndex
                             ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent);'
@@ -221,7 +221,7 @@
             </div>
             <div class="flex-1 overflow-y-auto px-5 py-4">
                 {#if loading}
-                    <div class="flex items-center justify-center py-16 text-xs text-[var(--theme-modal-text)]/50">
+                    <div class="flex items-center justify-center py-16 text-xs text-(--theme-modal-text)/50">
                         加载中...
                     </div>
                 {:else if charData}
@@ -259,39 +259,39 @@
                             </div>
                         </div>
                         <section>
-                            <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                            <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
                                 基础属性 (Lv90)
                             </h3>
                             <div class="grid grid-cols-4 gap-2">
                                 <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础生命</div>
+                                    <div class="text-[10px] text-(--theme-modal-text)/50">基础生命</div>
                                     <div class="mt-0.5 text-xs font-semibold tabular-nums">
                                         {charData.lv90BaseStats.hp}
                                     </div>
                                 </div>
                                 <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础攻击</div>
+                                    <div class="text-[10px] text-(--theme-modal-text)/50">基础攻击</div>
                                     <div class="mt-0.5 text-xs font-semibold tabular-nums">
                                         {charData.lv90BaseStats.atk}
                                     </div>
                                 </div>
                                 <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">基础防御</div>
+                                    <div class="text-[10px] text-(--theme-modal-text)/50">基础防御</div>
                                     <div class="mt-0.5 text-xs font-semibold tabular-nums">
                                         {charData.lv90BaseStats.def}
                                     </div>
                                 </div>
                                 <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                    <div class="text-[10px] text-[var(--theme-modal-text)]/50">谐度破坏增幅</div>
+                                    <div class="text-[10px] text-(--theme-modal-text)/50">谐度破坏增幅</div>
                                     <div class="mt-0.5 text-xs font-semibold tabular-nums">
-                                        {charData.lv90BaseStats.tune}
+                                        {charData.lv90BaseStats.tuneBreakBoost}
                                     </div>
                                 </div>
                             </div>
                         </section>
                         {#if currentSlot.weapon}
                             <section>
-                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
                                     武器
                                 </h3>
                                 <div class="rounded-lg p-3 space-y-2" style="background: var(--theme-input-bg);">
@@ -310,20 +310,20 @@
                                                     >{/if}
                                             </div>
                                             {#if weaponData}<div
-                                                    class="text-[10px] text-[var(--theme-modal-text)]/50 mt-0.5"
+                                                    class="text-[10px] text-(--theme-modal-text)/50 mt-0.5"
                                                 >
                                                     基础攻击 {weaponData.lv90BaseAtk}
                                                 </div>{/if}
                                         </div>
                                     </div>
                                     {#if weaponData}<div
-                                            class="text-[10px] text-[var(--theme-modal-text)]/70 border-t pt-2"
+                                            class="text-[10px] text-(--theme-modal-text)/70 border-t pt-2"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             <span class="text-cyan-400">{weaponData.substat.name}</span>
                                             {weaponData.substat.value}
                                         </div>
-                                        <div class="mt-1 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed">
+                                        <div class="mt-1 text-[10px] text-(--theme-modal-text)/60 leading-relaxed">
                                             {@html rd(weaponData.effect.desc)}
                                         </div>{/if}
                                 </div>
@@ -331,7 +331,7 @@
                         {/if}
                         {#if currentSlot.echoes[0]?.name}
                             <section>
-                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
                                     首位声骸
                                 </h3>
                                 <div class="rounded-lg p-3" style="background: var(--theme-input-bg);">
@@ -343,17 +343,16 @@
                                                 style="background: var(--theme-input-bg);"
                                             />{/if}
                                         <div class="text-xs font-medium">
-                                            {currentSlot.echoes[0].name}<span
-                                                class="text-[var(--theme-modal-text)]/50 ml-1"
+                                            {currentSlot.echoes[0].name}<span class="text-(--theme-modal-text)/50 ml-1"
                                                 >(C{currentSlot.echoes[0].cost})</span
                                             >{#if currentSlot.triggerSets.length > 0}<span
-                                                    class="text-[10px] text-[var(--theme-accent-text)] ml-1.5"
+                                                    class="text-[10px] text-(--theme-accent-text) ml-1.5"
                                                     >[{currentSlot.triggerSets[0].name}]</span
                                                 >{/if}
                                         </div>
                                     </div>
                                     {#if echoSkillData}<div
-                                            class="mt-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed border-t pt-2"
+                                            class="mt-2 text-[10px] text-(--theme-modal-text)/60 leading-relaxed border-t pt-2"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             {@html rd(echoSkillData.desc)}
@@ -363,7 +362,7 @@
                         {/if}
                         {#if setBonuses}
                             <section>
-                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
                                     套装加成
                                 </h3>
                                 <div class="space-y-2">
@@ -377,18 +376,16 @@
                                                         style="background: var(--theme-input-bg);"
                                                     />{/if}
                                                 <span class="text-xs font-medium">{set.name}</span>
-                                                <span class="text-[10px] text-[var(--theme-modal-text)]/50"
+                                                <span class="text-[10px] text-(--theme-modal-text)/50"
                                                     >({set.pieces}件)</span
                                                 >
                                             </div>
                                             <div class="space-y-0.5">
                                                 {#each Object.entries(set.bonuses) as [pieces, desc]}
                                                     <div class="text-xs">
-                                                        <span class="text-[var(--theme-accent-text)] font-medium"
+                                                        <span class="text-(--theme-accent-text) font-medium"
                                                             >{pieces}件套</span
-                                                        ><span class="text-[var(--theme-modal-text)]/70 ml-1"
-                                                            >{desc}</span
-                                                        >
+                                                        ><span class="text-(--theme-modal-text)/70 ml-1">{desc}</span>
                                                     </div>
                                                 {/each}
                                             </div>
@@ -400,7 +397,7 @@
                         <section>
                             <button
                                 onclick={() => handleAccordion('skills')}
-                                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/70 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/70 transition-colors hover:bg-(--theme-modal-text)/10"
                                 style="background: var(--theme-input-bg);"
                             >
                                 <Icon
@@ -418,10 +415,10 @@
                                         >
                                             <button
                                                 onclick={() => handleSkillToggle(skill.name)}
-                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                                             >
                                                 <span
-                                                    class="rounded px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    class="rounded px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/50"
                                                     style="background: var(--theme-input-bg);">{skill.type}</span
                                                 >
                                                 <span class="flex-1 text-left">{skill.name}</span>
@@ -429,12 +426,12 @@
                                                     icon={openSkillName === skill.name
                                                         ? 'mdi:chevron-down'
                                                         : 'mdi:chevron-right'}
-                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                    class="size-3.5 text-(--theme-modal-text)/30"
                                                 />
                                             </button>
                                             {#if openSkillName === skill.name}
                                                 <div
-                                                    class="border-t px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                    class="border-t px-3 py-2 text-[10px] text-(--theme-modal-text)/60 leading-relaxed"
                                                     style="border-color: var(--theme-divider-border);"
                                                 >
                                                     {@html rd(skill.desc)}
@@ -446,14 +443,13 @@
                                                     >
                                                         {#each skill.values as [vname, vvalue, velement]}
                                                             <div
-                                                                class="flex justify-between gap-2 text-[10px] even:bg-[var(--theme-input-bg)] px-1 py-0.5 text-[var(--theme-modal-text)]/70"
+                                                                class="flex justify-between gap-2 text-[10px] even:bg-(--theme-input-bg) px-1 py-0.5 text-(--theme-modal-text)/70"
                                                             >
-                                                                <span class="text-[var(--theme-modal-text)]/50"
-                                                                    >{vname}</span
+                                                                <span class="text-(--theme-modal-text)/50">{vname}</span
                                                                 >
                                                                 <span class="tabular-nums whitespace-nowrap"
                                                                     >{vvalue}{#if velement}<span
-                                                                            class="text-[var(--theme-modal-text)]/30"
+                                                                            class="text-(--theme-modal-text)/30"
                                                                         >
                                                                             {velement}</span
                                                                         >{/if}</span
@@ -472,10 +468,10 @@
                                         >
                                             <button
                                                 onclick={() => handleSkillToggle(skill.name)}
-                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                                             >
                                                 <span
-                                                    class="rounded px-1.5 py-0.5 text-[10px] text-[var(--theme-modal-text)]/50"
+                                                    class="rounded px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/50"
                                                     style="background: var(--theme-input-bg);">固有技能</span
                                                 >
                                                 <span class="flex-1 text-left">{skill.name}</span>
@@ -483,12 +479,12 @@
                                                     icon={openSkillName === skill.name
                                                         ? 'mdi:chevron-down'
                                                         : 'mdi:chevron-right'}
-                                                    class="size-3.5 text-[var(--theme-modal-text)]/30"
+                                                    class="size-3.5 text-(--theme-modal-text)/30"
                                                 />
                                             </button>
                                             {#if openSkillName === skill.name}
                                                 <div
-                                                    class="border-t px-3 py-2 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                    class="border-t px-3 py-2 text-[10px] text-(--theme-modal-text)/60 leading-relaxed"
                                                     style="border-color: var(--theme-divider-border);"
                                                 >
                                                     {@html rd(skill.desc)}
@@ -501,13 +497,13 @@
                         </section>
                         {#if statAttrs.length > 0}
                             <section>
-                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/50">
+                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
                                     固有属性
                                 </h3>
                                 <div class="grid grid-cols-2 gap-2">
                                     {#each sortedStatAttrs as attr}
                                         <div class="rounded-lg p-2.5" style="background: var(--theme-input-bg);">
-                                            <div class="text-[10px] text-[var(--theme-modal-text)]/50">{attr.name}</div>
+                                            <div class="text-[10px] text-(--theme-modal-text)/50">{attr.name}</div>
                                             {#if attr.desc}
                                                 <div class="mt-0.5 text-xs font-semibold tabular-nums leading-relaxed">
                                                     {@html rd(attr.desc)}
@@ -522,7 +518,7 @@
                             <section>
                                 <button
                                     onclick={() => handleAccordion('chains')}
-                                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold tracking-wider text-[var(--theme-modal-text)]/70 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/70 transition-colors hover:bg-(--theme-modal-text)/10"
                                     style="background: var(--theme-input-bg);"
                                 >
                                     <Icon
@@ -539,12 +535,12 @@
                                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                             >
                                                 <div class="flex items-center gap-2 text-xs font-medium">
-                                                    <span class="text-[10px] text-[var(--theme-modal-text)]/40"
+                                                    <span class="text-[10px] text-(--theme-modal-text)/40"
                                                         >C{i + 1}</span
                                                     ><span>{chain.name}</span>
                                                 </div>
                                                 <div
-                                                    class="mt-1 text-[10px] text-[var(--theme-modal-text)]/60 leading-relaxed"
+                                                    class="mt-1 text-[10px] text-(--theme-modal-text)/60 leading-relaxed"
                                                 >
                                                     {@html rd(chain.desc)}
                                                 </div>
@@ -556,7 +552,7 @@
                         {/if}
                     </div>
                 {:else}
-                    <div class="flex items-center justify-center py-16 text-xs text-[var(--theme-modal-text)]/40">
+                    <div class="flex items-center justify-center py-16 text-xs text-(--theme-modal-text)/40">
                         选择角色查看详情
                     </div>
                 {/if}
@@ -568,27 +564,27 @@
 {#if ctxShow}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="fixed inset-0 z-[80]" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
+    <div class="fixed inset-0 z-80" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
         <div
-            class="absolute min-w-36 rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+            class="absolute min-w-36 rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
             style="border-color: var(--theme-divider-border); left: {ctxX}px; top: {ctxY}px;"
         >
             <button
                 onclick={handleCopy}
-                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                 ><Icon icon="mdi:content-copy" class="size-3.5 shrink-0" /> 复制</button
             >
             {#if showBuffOption}
                 <button
                     onclick={handleCreateBuffFromSel}
-                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                     ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</button
                 >
             {/if}
             {#if showCustomHitOption}
                 <button
                     onclick={handleCreateCustomHit}
-                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-amber-400 transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-amber-400 transition-colors hover:bg-(--theme-modal-text)/5"
                     ><Icon icon="mdi:plus-circle-outline" class="size-3.5 shrink-0" /> 创建自定义直伤</button
                 >
             {/if}

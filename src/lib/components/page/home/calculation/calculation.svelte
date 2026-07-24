@@ -93,9 +93,13 @@
                     type: 'global' as const
                 }))
 
+            const isFirstCharEntry = e.character
+                ? !damageEntries.slice(0, i).some((p) => p.character === e.character)
+                : true
+
             if (e.isTuneBreak || e.isTuneResponse) {
                 result[e.id] = [
-                    ...globalItems,
+                    ...(isFirstCharEntry ? globalItems : []),
                     ...(entryBuffSetIdMap[e.id] ?? [])
                         .filter((sid) => !globalBuffSetIds.includes(sid))
                         .map((sid) => ({
@@ -128,7 +132,7 @@
 
             if (!prevId) {
                 result[e.id] = [
-                    ...globalItems,
+                    ...(isFirstCharEntry ? globalItems : []),
                     ...(entryBuffSetIdMap[e.id] ?? [])
                         .filter((sid) => !globalBuffSetIds.includes(sid))
                         .map((sid) => ({
@@ -292,7 +296,7 @@
     <table class="w-full text-xs table-fixed">
         <thead>
             <tr
-                class="text-(--theme-modal-text)/50 sticky top-0 bg-[var(--theme-modal-bg)] opacity-100!"
+                class="text-(--theme-modal-text)/50 sticky top-0 bg-(--theme-modal-bg) opacity-100!"
                 style="border-bottom: 1px solid var(--theme-divider-border);"
             >
                 <th
@@ -318,7 +322,7 @@
                     onclick={() => handleToggleExpand(damageEntry.id)}
                     class={[
                         'cursor-pointer border-b transition-colors',
-                        expandedEntryId === damageEntry.id ? '' : 'hover:bg-[var(--theme-modal-text)]/[0.05]',
+                        expandedEntryId === damageEntry.id ? '' : 'hover:bg-(--theme-modal-text)/5',
                         expandedEntryId !== null && expandedEntryId !== damageEntry.id ? 'opacity-40' : ''
                     ].join(' ')}
                     style={'border-color: var(--theme-divider-border);' +
@@ -437,7 +441,7 @@
                                                         'px-2 py-1 text-xs rounded transition-colors border',
                                                         selected
                                                             ? ''
-                                                            : 'text-(--theme-modal-text)/50 hover:bg-[var(--theme-modal-text)]/[0.1]'
+                                                            : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
                                                     ].join(' ')}
                                                     style={selected
                                                         ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
@@ -462,7 +466,7 @@
                                                         e.stopPropagation()
                                                         handleCopyFromPrevDirect(damageEntry.id)
                                                     }}
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)]"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
                                                     复制前段直伤
@@ -472,7 +476,7 @@
                                                         e.stopPropagation()
                                                         handleCopyToNextDirect(damageEntry.id)
                                                     }}
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)]"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段直伤
@@ -483,7 +487,7 @@
                                                         e.stopPropagation()
                                                         handleCopyFromPrevEffect(damageEntry.id)
                                                     }}
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)]"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
                                                     复制前段效应
@@ -493,7 +497,7 @@
                                                         e.stopPropagation()
                                                         handleCopyToNextEffect(damageEntry.id)
                                                     }}
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)]"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段效应
@@ -505,7 +509,7 @@
                                                     e.stopPropagation()
                                                     handleClearAllBuffs(damageEntry.id)
                                                 }}
-                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)] disabled:opacity-40 disabled:pointer-events-none"
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40 disabled:pointer-events-none"
                                             >
                                                 <Icon icon="mdi:close-circle-outline" class="size-3 shrink-0" />
                                                 清除所有增益
@@ -525,7 +529,7 @@
                                                         'px-2 py-1 text-xs rounded transition-colors inline-flex items-center gap-1 border',
                                                         checked
                                                             ? ''
-                                                            : 'text-(--theme-modal-text)/50 hover:bg-[var(--theme-modal-text)]/[0.1]'
+                                                            : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
                                                     ].join(' ')}
                                                     style={checked
                                                         ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
@@ -540,7 +544,7 @@
                                             {/each}
                                         </div>
                                     {:else}
-                                        <div class="text-xs text-[var(--theme-modal-text)]/30">
+                                        <div class="text-xs text-(--theme-modal-text)/30">
                                             无可用 BUFF 块，点击底栏【BUFF配置】按钮进行配置
                                         </div>
                                     {/if}
@@ -553,6 +557,6 @@
         </tbody>
     </table>
     {#if damageEntries.length === 0}
-        <div class="flex items-center justify-center py-12 text-xs text-[var(--theme-modal-text)]/40">暂无伤害数据</div>
+        <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {/if}
 </div>

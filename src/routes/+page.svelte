@@ -44,6 +44,7 @@
         init as initCalculation
     } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
+    import favicon from '$lib/assets/favicon.svg'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
@@ -445,7 +446,7 @@
     }
 </script>
 
-<div class="flex h-dvh overflow-hidden bg-[var(--theme-layout-bg)] text-[var(--theme-layout-text)]">
+<div class="flex h-dvh overflow-hidden bg-(--theme-layout-bg) text-(--theme-layout-text)">
     <ProjectSidebar
         {projects}
         {activeId}
@@ -477,32 +478,31 @@
         {#if !activeProject}
             <div class="flex flex-1 items-center justify-center">
                 <div class="text-center">
-                    <svg viewBox="0 0 1024 1024" class="mx-auto mb-4 size-12 text-zinc-700" fill="currentColor">
-                        <path
-                            d="M769 887.9c-245.9 154.5-571.7 80-726.1-165.9C10.3 670.1 0.8 613.4 14.6 553.6 55.1 378.1 287.7 226 333.8 197l1.1-0.6 1.4-0.9c1-0.6 1.9-1.3 2.9-1.9 68.3-42.9 288.3-169 456.2-131 59.9 13.6 106.9 47 139.7 99.2 154.4 246 79.8 571.7-166.1 726.1z m-424-667C295 252.4 77.6 397 40 559.5 27.8 612.2 36.3 662.2 65 708c146.8 233.7 456.3 304.4 690 157.7 233.7-146.8 304.6-456.3 157.8-690-28.9-46.1-70.5-75.5-123.3-87.5C624.9 50.9 395 189.7 350.3 217.7l-1.4 0.9-1.1 0.8c-1 0.5-1.9 1-2.8 1.5z"
-                        />
-                        <path
-                            d="M923.9 168.8C1074.7 409 1002.4 726 762 876.8 521.7 1027.7 204.8 955.3 54 715-96.8 474.7 325.5 217.7 341.7 207.4c20.2-12.4 431.4-278.8 582.2-38.6z"
-                        />
-                        <path
-                            d="M86.6 619c32.3 51.4 132.3 54.9 262.5 9 130.1-45.8 270.5-134 368.4-231.3 97.8-97.3 138.2-188.9 105.9-240.3-32.3-51.4-132.4-54.9-262.5-9-130.1 45.8-270.5 134-368.4 231.3C94.6 476 54.3 567.6 86.6 619z"
-                        />
-                    </svg>
+                    <img src={favicon} alt="椰果工具箱" class="mx-auto mb-4 size-12" />
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
                     <p class="mb-6 text-sm text-zinc-500">
                         鸣潮社区公益工具！ 游戏数据版本:{getWWVersion()}
                     </p>
-                    <button
-                        onclick={() => {
-                            newName = ''
-                            showNewModal = true
-                        }}
-                        class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
-                        style="background: linear-gradient(135deg, #6366f1, #8b5cf6)"
-                    >
-                        <Icon icon="mdi:plus" class="size-4" />
-                        新建项目
-                    </button>
+                    <div class="flex justify-center gap-3">
+                        <button
+                            onclick={() => {
+                                newName = ''
+                                showNewModal = true
+                            }}
+                            class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                            style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
+                        >
+                            <Icon icon="mdi:plus" class="size-4" />
+                            新建项目
+                        </button>
+                        <button
+                            onclick={() => goto('/api-test')}
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-4 py-2 text-sm font-medium text-(--theme-card-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                        >
+                            <Icon icon="mdi:api" class="size-4" />
+                            接口测试
+                        </button>
+                    </div>
                 </div>
             </div>
         {:else if activeProject}
@@ -586,18 +586,11 @@
                 class="flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5"
                 style="background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)"
             >
-                <button
-                    onclick={() => goto('/api-test')}
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
-                >
-                    <Icon icon="mdi:api" class="size-4 shrink-0" />
-                    API测试
-                </button>
                 {#if !showResult}
                     {#if activePhase === 'timeline'}
                         <button
                             onclick={() => setShowDamageList(true)}
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
                         >
                             <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
                             查看所有伤害
@@ -606,7 +599,7 @@
                     {#if activePhase === 'calculation'}
                         <button
                             onclick={() => setShowBuffModal(true)}
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
                         >
                             <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
                             BUFF配置
@@ -614,8 +607,8 @@
                         <button
                             onclick={toggleBuffDiffMode}
                             class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getBuffDiffMode()
-                                ? 'border-[var(--theme-accent-bg)]'
-                                : 'border-[var(--theme-sidebar-text)]/20'}"
+                                ? 'border-(--theme-accent-bg)'
+                                : 'border-(--theme-sidebar-text)/20'}"
                             style="color: {getBuffDiffMode()
                                 ? 'var(--theme-accent-text)'
                                 : 'var(--theme-sidebar-text)'}"
@@ -630,7 +623,7 @@
                     {#if activePhase === 'config'}
                         <button
                             onclick={() => (showStatOverview = true)}
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
                         >
                             <Icon icon="mdi:account-details" class="size-4 shrink-0" />
                             角色面板总览
@@ -651,7 +644,7 @@
                             showResult = true
                             resultRefreshKey++
                         }}
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
                     >
                         <Icon icon="mdi:refresh" class="size-4 shrink-0" />
                         刷新结果
@@ -662,7 +655,7 @@
                     <button
                         onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
                         disabled={!phaseLocked && !canLock}
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-sidebar-text)]/20 px-3 py-1.5 text-sm text-[var(--theme-sidebar-text)] transition-colors hover:border-[var(--theme-sidebar-text)]/40 disabled:opacity-40 disabled:pointer-events-none"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none"
                     >
                         <Icon
                             icon={phaseLocked ? 'mdi:lock-open-variant-outline' : 'mdi:lock-outline'}
@@ -708,14 +701,14 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (showNewModal = false)}
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
                     disabled={!newName.trim()}
                     onclick={() => handleCreate(newName)}
-                    class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500 disabled:opacity-40 disabled:pointer-events-none"
-                    >确认</button
+                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">确认</button
                 >
             </div>
         </div>
@@ -743,14 +736,14 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (renameModal = false)}
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
                     disabled={!renameValue.trim()}
                     onclick={handleRename}
-                    class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500 disabled:opacity-40 disabled:pointer-events-none"
-                    >确认</button
+                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">确认</button
                 >
             </div>
         </div>
@@ -783,13 +776,13 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (exportModal = false)}
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
                     onclick={handleExport}
-                    class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500"
-                    >导出</button
+                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">导出</button
                 >
             </div>
         </div>
@@ -835,14 +828,14 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (cloneModal = false)}
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
                     disabled={!cloneName.trim()}
                     onclick={handleClone}
-                    class="h-7 rounded-md bg-indigo-600 px-3 text-xs text-white transition-colors hover:bg-indigo-500 disabled:opacity-40 disabled:pointer-events-none"
-                    >复制</button
+                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">复制</button
                 >
             </div>
         </div>
@@ -862,12 +855,12 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (deleteModal = false)}
-                    class="h-7 rounded-md bg-white/5 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-white/10"
+                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
                     onclick={handleDelete}
-                    class="h-7 rounded-md bg-red-600 px-3 text-xs text-white transition-colors hover:bg-red-500 disabled:opacity-40 disabled:pointer-events-none"
+                    class="h-7 rounded-md bg-red-600 px-3 text-xs text-white transition-all hover:brightness-110 disabled:opacity-40 disabled:pointer-events-none"
                     >删除</button
                 >
             </div>

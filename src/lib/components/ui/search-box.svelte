@@ -46,8 +46,8 @@
 <div
     class={[
         'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm',
-        'bg-[var(--theme-search-box-bg)] text-[var(--theme-search-box-text)]',
-        'focus-within:bg-[var(--theme-search-box-bg-focused)] focus-within:text-[var(--theme-search-box-text-focused)]',
+        'bg-(--theme-search-box-bg) text-(--theme-search-box-text)',
+        'focus-within:bg-(--theme-search-box-bg-focused) focus-within:text-(--theme-search-box-text-focused)',
         'ring-1 ring-inset ring-white/5 focus-within:ring-white/10',
         'transition-colors duration-150',
         className || ''

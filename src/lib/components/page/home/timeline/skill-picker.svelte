@@ -481,8 +481,8 @@
                 >
                 <button
                     onclick={() => confirmAddCustom(getSkillPickerCharacter())}
-                    class="h-7 rounded-md px-3 text-xs text-white transition-colors"
-                    style="background: var(--theme-accent-bg);">确认</button
+                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">确认</button
                 >
             </div>
         </div>

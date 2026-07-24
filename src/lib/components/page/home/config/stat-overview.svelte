@@ -101,7 +101,7 @@
             pctHp = 0
         let flatDef = 0,
             pctDef = 0
-        let tune = charInfo.lv90BaseStats.tune
+        let tune = charInfo.lv90BaseStats.tuneBreakBoost
         let recharge = 100
         let critRate = 5
         let critDmg = 150
@@ -176,37 +176,37 @@
         for (const bs of globalBuffs) {
             for (const z of bs.zones) {
                 switch (z.zoneId) {
-                    case 'atk_flat':
+                    case 'atkFlat':
                         flatAtk += z.value
                         break
-                    case 'atk_pct':
+                    case 'atkPct':
                         pctAtk += z.value
                         break
-                    case 'hp_flat':
+                    case 'hpFlat':
                         flatHp += z.value
                         break
-                    case 'hp_pct':
+                    case 'hpPct':
                         pctHp += z.value
                         break
-                    case 'def_flat':
+                    case 'defFlat':
                         flatDef += z.value
                         break
-                    case 'def_pct':
+                    case 'defPct':
                         pctDef += z.value
                         break
-                    case 'crit_rate':
+                    case 'critRate':
                         critRate += z.value
                         break
-                    case 'crit_dmg':
+                    case 'critDmg':
                         critDmg += z.value
                         break
                     case 'recharge':
                         recharge += z.value
                         break
-                    case 'harmony_dmg':
+                    case 'tuneBreakBoost':
                         tune += z.value
                         break
-                    case 'bonus_dmg':
+                    case 'bonusDmg':
                         bonusDmg += z.value
                         break
                 }
@@ -258,7 +258,7 @@
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <span class="text-xs text-[var(--theme-modal-text)]/40">加载中…</span>
+            <span class="text-xs text-(--theme-modal-text)/40">加载中…</span>
         </div>
     </div>
 {:else}
@@ -276,10 +276,10 @@
         >
             <!-- Header -->
             <div class="flex items-center justify-between mb-5">
-                <span class="text-base font-semibold text-[var(--theme-modal-text)]">角色面板总览</span>
+                <span class="text-base font-semibold text-(--theme-modal-text)">角色面板总览</span>
                 <button
                     onclick={onclose}
-                    class="rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-[var(--theme-modal-text)]/70"
+                    class="rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                 >
                     <Icon icon="mdi:close" class="size-5" />
                 </button>
@@ -302,7 +302,7 @@
                                     <img src={charIcons[s.name]} alt={s.name} class="size-10 rounded-full" />
                                 {:else}
                                     <div
-                                        class="size-10 rounded-full bg-[var(--theme-modal-text)]/10 flex items-center justify-center text-sm"
+                                        class="size-10 rounded-full bg-(--theme-modal-text)/10 flex items-center justify-center text-sm"
                                     >
                                         {s.name.charAt(0)}
                                     </div>
@@ -337,61 +337,58 @@
                         <div class="space-y-1.5 text-xs">
                             <!-- ATK -->
                             <div class="flex items-center justify-between">
-                                <span class="text-[var(--theme-modal-text)]/50">攻击</span>
-                                <span class="tabular-nums text-[var(--theme-modal-text)]/80">
+                                <span class="text-(--theme-modal-text)/50">攻击</span>
+                                <span class="tabular-nums text-(--theme-modal-text)/80">
                                     {s.atkTotal.toLocaleString()}
-                                    <span class="text-[var(--theme-modal-text)]/30">
+                                    <span class="text-(--theme-modal-text)/30">
                                         ({s.atkWhite.toLocaleString()} +
-                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-600"
+                                    </span><span class="text-(--theme-modal-text)/30"
                                         >{s.atkGreen.toLocaleString()}</span
-                                    ><span class="text-[var(--theme-modal-text)]/30">)</span>
+                                    ><span class="text-(--theme-modal-text)/30">)</span>
                                 </span>
                             </div>
 
                             <!-- HP -->
                             <div class="flex items-center justify-between">
-                                <span class="text-[var(--theme-modal-text)]/50">生命</span>
-                                <span class="tabular-nums text-[var(--theme-modal-text)]/80">
+                                <span class="text-(--theme-modal-text)/50">生命</span>
+                                <span class="tabular-nums text-(--theme-modal-text)/80">
                                     {s.hpTotal.toLocaleString()}
-                                    <span class="text-[var(--theme-modal-text)]/30">
+                                    <span class="text-(--theme-modal-text)/30">
                                         ({s.hpWhite.toLocaleString()} +
-                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-600"
-                                        >{s.hpGreen.toLocaleString()}</span
-                                    ><span class="text-[var(--theme-modal-text)]/30">)</span>
+                                    </span><span class="text-(--theme-modal-text)/30">{s.hpGreen.toLocaleString()}</span
+                                    ><span class="text-(--theme-modal-text)/30">)</span>
                                 </span>
                             </div>
 
                             <!-- DEF -->
                             <div class="flex items-center justify-between">
-                                <span class="text-[var(--theme-modal-text)]/50">防御</span>
-                                <span class="tabular-nums text-[var(--theme-modal-text)]/80">
+                                <span class="text-(--theme-modal-text)/50">防御</span>
+                                <span class="tabular-nums text-(--theme-modal-text)/80">
                                     {s.defTotal.toLocaleString()}
-                                    <span class="text-[var(--theme-modal-text)]/30">
+                                    <span class="text-(--theme-modal-text)/30">
                                         ({s.defWhite.toLocaleString()} +
-                                    </span><span class="text-[var(--theme-modal-text)]/30 text-green-600"
+                                    </span><span class="text-(--theme-modal-text)/30"
                                         >{s.defGreen.toLocaleString()}</span
-                                    ><span class="text-[var(--theme-modal-text)]/30">)</span>
+                                    ><span class="text-(--theme-modal-text)/30">)</span>
                                 </span>
                             </div>
 
                             <!-- Tune -->
                             <div class="flex items-center justify-between">
-                                <span class="text-[var(--theme-modal-text)]/50">谐度破坏增幅</span>
-                                <span class="tabular-nums text-[var(--theme-modal-text)]/80">{s.tune}</span>
+                                <span class="text-(--theme-modal-text)/50">谐度破坏增幅</span>
+                                <span class="tabular-nums text-(--theme-modal-text)/80">{s.tune}</span>
                             </div>
 
                             <!-- Recharge -->
                             <div class="flex items-center justify-between">
-                                <span class="text-[var(--theme-modal-text)]/50">共鸣效率</span>
-                                <span class="tabular-nums text-[var(--theme-modal-text)]/80"
-                                    >{s.recharge.toFixed(1)}%</span
-                                >
+                                <span class="text-(--theme-modal-text)/50">共鸣效率</span>
+                                <span class="tabular-nums text-(--theme-modal-text)/80">{s.recharge.toFixed(1)}%</span>
                             </div>
 
                             <!-- Crit rate + dmg on one line -->
                             <div class="flex items-center justify-between">
-                                <span class="text-[var(--theme-modal-text)]/50">暴击 / 暴击伤害</span>
-                                <span class="tabular-nums text-[var(--theme-modal-text)]/80">
+                                <span class="text-(--theme-modal-text)/50">暴击 / 暴击伤害</span>
+                                <span class="tabular-nums text-(--theme-modal-text)/80">
                                     {s.critRate.toFixed(1)}% / {s.critDmg.toFixed(1)}%
                                 </span>
                             </div>
@@ -399,8 +396,8 @@
                             <!-- Heal bonus -->
                             {#if s.healBonus > 0}
                                 <div class="flex items-center justify-between">
-                                    <span class="text-[var(--theme-modal-text)]/50">治疗加成</span>
-                                    <span class="tabular-nums text-[var(--theme-modal-text)]/80">+{s.healBonus}%</span>
+                                    <span class="text-(--theme-modal-text)/50">治疗加成</span>
+                                    <span class="tabular-nums text-(--theme-modal-text)/80">+{s.healBonus}%</span>
                                 </div>
                             {/if}
 
@@ -409,7 +406,7 @@
                                 {@const v = s.elementDmg[el]}
                                 {#if v && v > 0}
                                     <div class="flex items-center justify-between">
-                                        <span class="text-[var(--theme-modal-text)]/50">{el}伤害加成</span>
+                                        <span class="text-(--theme-modal-text)/50">{el}伤害加成</span>
                                         <span
                                             class="tabular-nums"
                                             style="color: {(ELEMENT_COLORS as Record<string, string>)[el]}">+{v}%</span
@@ -422,8 +419,8 @@
                             {#each Object.entries(s.typeDmg) as [type, v]}
                                 {#if v > 0}
                                     <div class="flex items-center justify-between">
-                                        <span class="text-[var(--theme-modal-text)]/50">{type}伤害加成</span>
-                                        <span class="tabular-nums text-[var(--theme-modal-text)]/80">+{v}%</span>
+                                        <span class="text-(--theme-modal-text)/50">{type}伤害加成</span>
+                                        <span class="tabular-nums text-(--theme-modal-text)/80">+{v}%</span>
                                     </div>
                                 {/if}
                             {/each}
@@ -434,8 +431,8 @@
                                     class="flex items-center justify-between pt-1"
                                     style="border-top: 1px solid var(--theme-divider-border);"
                                 >
-                                    <span class="text-[var(--theme-modal-text)]/50">全伤害加成</span>
-                                    <span class="tabular-nums text-[var(--theme-accent-text)]">+{s.bonusDmg}%</span>
+                                    <span class="text-(--theme-modal-text)/50">全伤害加成</span>
+                                    <span class="tabular-nums text-(--theme-accent-text)">+{s.bonusDmg}%</span>
                                 </div>
                             {/if}
                         </div>

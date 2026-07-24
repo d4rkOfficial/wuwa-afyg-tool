@@ -23,7 +23,7 @@ export interface ResultEntry {
     totalDef: number
     defPctSum: number
     defFlatSum: number
-    totalTune: number
+    totalTuneBreakBoost: number
     dmgBonus: number
     deepen: number
     critRate: number
@@ -32,7 +32,8 @@ export interface ResultEntry {
     resMulti: number
     dmgRedMulti: number
     finalDmg: number
-    finalHarmony: number
+    finalTuneStrainMulti: number
+    finalTuneBreakZone: number
     customMult: number
     vulnerability: number
 

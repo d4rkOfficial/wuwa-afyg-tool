@@ -4,9 +4,7 @@
     import Icon from '@iconify/svelte'
 </script>
 
-<div
-    class="flex h-dvh flex-col items-center justify-center gap-6 bg-[var(--theme-layout-bg)] text-[var(--theme-layout-text)]"
->
+<div class="flex h-dvh flex-col items-center justify-center gap-6 bg-(--theme-layout-bg) text-(--theme-layout-text)">
     <div class="text-center">
         <div class="text-6xl font-bold text-indigo-400/80">{$page.status}</div>
         <p class="mt-3 text-sm text-zinc-400">{$page.error?.message ?? '页面不存在或发生错误'}</p>

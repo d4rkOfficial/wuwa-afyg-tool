@@ -47,7 +47,7 @@
         class="rounded-lg border p-3.5"
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
-        <span class="text-xs font-medium text-[var(--theme-modal-text)]/70 block mb-3">怪物属性</span>
+        <span class="text-xs font-medium text-(--theme-modal-text)/70 block mb-3">怪物属性</span>
 
         <div class="flex items-center gap-1 min-w-0">
             {#each ['BOSS', '精英怪', '小怪'] as t}
@@ -57,8 +57,8 @@
                     class={[
                         'rounded-lg text-[10px] font-medium transition-colors flex flex-col items-center justify-center gap-0.5 w-12 aspect-square',
                         config.enemy.type === t
-                            ? 'bg-[var(--theme-accent-bg)]/15 text-[var(--theme-accent-text)] ring-1 ring-[var(--theme-accent-bg)]/30'
-                            : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/10'
+                            ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
+                            : 'bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/10'
                     ].join(' ')}
                 >
                     <Icon {icon} class="size-4 shrink-0" />
@@ -76,7 +76,7 @@
             <div class="flex flex-col gap-2 min-w-0 flex-1">
                 <!-- Level -->
                 <div class="flex items-center gap-1.5">
-                    <span class="text-[10px] text-[var(--theme-modal-text)]/50 shrink-0 w-6">等级</span>
+                    <span class="text-[10px] text-(--theme-modal-text)/50 shrink-0 w-6">等级</span>
                     <div class="relative">
                         <input
                             type="number"
@@ -85,7 +85,7 @@
                             max="150"
                             oninput={(e) => handleLevelChange(parseInt((e.target as HTMLInputElement).value) || 0)}
                             disabled={config.enemy.defenseLocked}
-                            class="w-28 h-6 rounded-md border px-2 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
+                            class="w-28 h-6 rounded-md border px-2 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             class:opacity-70={config.enemy.defenseLocked}
                         />
@@ -98,8 +98,8 @@
                                 class={[
                                     'min-w-7 h-6 rounded-md text-xs font-medium transition-colors',
                                     config.enemy.level === lv
-                                        ? 'bg-[var(--theme-accent-bg)]/15 text-[var(--theme-accent-text)] ring-1 ring-[var(--theme-accent-bg)]/30'
-                                        : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/50 hover:bg-[var(--theme-modal-text)]/10'
+                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
+                                        : 'bg-(--theme-input-bg) text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
                                 ].join(' ')}>{lv}</button
                             >
                         {/each}
@@ -108,7 +108,7 @@
 
                 <!-- Defense -->
                 <div class="flex items-center gap-1.5">
-                    <span class="text-[10px] text-[var(--theme-modal-text)]/50 shrink-0 w-6">防御</span>
+                    <span class="text-[10px] text-(--theme-modal-text)/50 shrink-0 w-6">防御</span>
                     <input
                         type="number"
                         value={config.enemy.defense}
@@ -122,7 +122,7 @@
                             updateEnemy('defenseLocked', true)
                         }}
                         disabled={config.enemy.defenseLocked}
-                        class="w-28 h-6 rounded-md border px-2 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
+                        class="w-28 h-6 rounded-md border px-2 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         class:opacity-70={config.enemy.defenseLocked}
                     />
@@ -136,7 +136,7 @@
         class="rounded-lg border p-3.5"
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
-        <span class="text-xs font-medium text-[var(--theme-modal-text)]/70 block mb-3">抗性</span>
+        <span class="text-xs font-medium text-(--theme-modal-text)/70 block mb-3">抗性</span>
         <div class="grid grid-cols-3 gap-2">
             {#each sortedResistanceKeys as el}
                 {@const val = config.enemy.resistances[el]}
@@ -161,21 +161,21 @@
                                             Math.max(-100, parseInt((e.target as HTMLInputElement).value) || 0)
                                         )
                                     )}
-                                class="w-12 rounded border px-1.5 py-0.5 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
+                                class="w-12 rounded border px-1.5 py-0.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             />
-                            <span class="text-[10px] text-[var(--theme-modal-text)]/20 w-2.5 shrink-0">%</span>
+                            <span class="text-[10px] text-(--theme-modal-text)/20 w-2.5 shrink-0">%</span>
                         </div>
-                        <div class="flex flex-col gap-px rounded bg-[var(--theme-input-bg)] p-px">
+                        <div class="flex flex-col gap-px rounded bg-(--theme-input-bg) p-px">
                             <button
                                 onclick={() => updateResistance(el, Math.min(100, val + STEP))}
-                                class="rounded px-1 py-0.5 text-[var(--theme-modal-text)]/20 transition-colors hover:text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/5"
+                                class="rounded px-1 py-0.5 text-(--theme-modal-text)/20 transition-colors hover:text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5"
                             >
                                 <Icon icon="mdi:plus" class="size-3" />
                             </button>
                             <button
                                 onclick={() => updateResistance(el, Math.max(-100, val - STEP))}
-                                class="rounded px-1 py-0.5 text-[var(--theme-modal-text)]/20 transition-colors hover:text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/5"
+                                class="rounded px-1 py-0.5 text-(--theme-modal-text)/20 transition-colors hover:text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5"
                             >
                                 <Icon icon="mdi:minus" class="size-3" />
                             </button>
@@ -192,7 +192,7 @@
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
         <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-[var(--theme-modal-text)]/70">免伤率</span>
+            <span class="text-xs font-medium text-(--theme-modal-text)/70">免伤率</span>
             <div class="flex items-center gap-1 ml-auto">
                 <input
                     type="number"
@@ -204,21 +204,21 @@
                             'dmgReduction',
                             Math.min(100, Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0))
                         )}
-                    class="w-16 rounded-md border px-2 py-1 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
+                    class="w-16 rounded-md border px-2 py-1 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 />
-                <span class="text-[10px] text-[var(--theme-modal-text)]/30 w-3">%</span>
+                <span class="text-[10px] text-(--theme-modal-text)/30 w-3">%</span>
                 <button
                     onclick={() =>
                         updateEnemy('dmgReduction', Math.min(100, Math.max(0, config.enemy.dmgReduction - STEP)))}
-                    class="rounded p-0.5 text-[var(--theme-modal-text)]/20 transition-colors hover:text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/5"
+                    class="rounded p-0.5 text-(--theme-modal-text)/20 transition-colors hover:text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5"
                 >
                     <Icon icon="mdi:minus" class="size-3.5" />
                 </button>
                 <button
                     onclick={() =>
                         updateEnemy('dmgReduction', Math.min(100, Math.max(0, config.enemy.dmgReduction + STEP)))}
-                    class="rounded p-0.5 text-[var(--theme-modal-text)]/20 transition-colors hover:text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/5"
+                    class="rounded p-0.5 text-(--theme-modal-text)/20 transition-colors hover:text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5"
                 >
                     <Icon icon="mdi:plus" class="size-3.5" />
                 </button>

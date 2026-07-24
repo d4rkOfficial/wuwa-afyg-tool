@@ -86,7 +86,7 @@ export interface CharacterInfo {
         hp: number
         atk: number
         def: number
-        tune: number
+        tuneBreakBoost: number
     }
     skills: SkillEntry[]
     statNodes: StatNode[]

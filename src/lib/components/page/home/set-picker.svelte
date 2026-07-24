@@ -104,7 +104,7 @@
         }}
     >
         <div
-            class="relative flex max-h-[85vh] w-[600px] max-w-[90vw] flex-col rounded-xl p-4 shadow-2xl text-[var(--theme-modal-text)]"
+            class="relative flex max-h-[85vh] w-150 max-w-[90vw] flex-col rounded-xl p-4 shadow-2xl text-(--theme-modal-text)"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent);"
             role="dialog"
             aria-modal="true"
@@ -115,9 +115,7 @@
 
             <div class="flex-1 overflow-y-auto">
                 {#if pinnedList.length > 0}
-                    <div class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-muted-text)]">
-                        首位声骸所属
-                    </div>
+                    <div class="mb-2 text-xs font-semibold tracking-wider text-(--theme-muted-text)">首位声骸所属</div>
                     <div class="grid grid-cols-2 gap-3">
                         {#each pinnedList as set}
                             <div class="flex flex-col gap-2 rounded-lg p-3" style="background: var(--theme-input-bg);">
@@ -144,8 +142,8 @@
                                             class={[
                                                 'rounded px-2.5 py-1 text-xs font-medium transition-colors',
                                                 isPieceSelected(set.name, piece)
-                                                    ? 'bg-[var(--theme-accent-bg)]/30 text-[var(--theme-accent-text)]'
-                                                    : 'bg-[var(--theme-input-bg)] text-[var(--theme-muted-text)] hover:bg-[var(--theme-modal-text)]/10',
+                                                    ? 'bg-(--theme-accent-bg)/30 text-(--theme-accent-text)'
+                                                    : 'bg-(--theme-input-bg) text-(--theme-muted-text) hover:bg-(--theme-modal-text)/10',
                                                 !isPieceAvailable(set.name, piece) && !isSelected(set.name)
                                                     ? 'opacity-30 pointer-events-none'
                                                     : ''
@@ -164,9 +162,9 @@
                 {/if}
 
                 {#if otherList.length === 0}
-                    <div class="py-8 text-center text-sm text-[var(--theme-muted-text)]">无其他套装</div>
+                    <div class="py-8 text-center text-sm text-(--theme-muted-text)">无其他套装</div>
                 {:else}
-                    <div class="mb-2 text-xs font-semibold tracking-wider text-[var(--theme-muted-text)]">其它套装</div>
+                    <div class="mb-2 text-xs font-semibold tracking-wider text-(--theme-muted-text)">其它套装</div>
                     <div class="grid grid-cols-2 gap-3">
                         {#each otherList as set}
                             <div class="flex flex-col gap-2 rounded-lg p-3" style="background: var(--theme-input-bg);">
@@ -188,8 +186,8 @@
                                             class={[
                                                 'rounded px-2.5 py-1 text-xs font-medium transition-colors',
                                                 isPieceSelected(set.name, piece)
-                                                    ? 'bg-[var(--theme-accent-bg)]/30 text-[var(--theme-accent-text)]'
-                                                    : 'bg-[var(--theme-input-bg)] text-[var(--theme-muted-text)] hover:bg-[var(--theme-modal-text)]/10',
+                                                    ? 'bg-(--theme-accent-bg)/30 text-(--theme-accent-text)'
+                                                    : 'bg-(--theme-input-bg) text-(--theme-muted-text) hover:bg-(--theme-modal-text)/10',
                                                 !isPieceAvailable(set.name, piece) && !isSelected(set.name)
                                                     ? 'opacity-30 pointer-events-none'
                                                     : ''
@@ -213,7 +211,7 @@
             >
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
                     style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
                 >
                     <Icon icon="mdi:check" class="size-4" />

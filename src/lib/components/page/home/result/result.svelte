@@ -116,23 +116,23 @@
 
 <div class="flex h-full flex-col" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
     {#if loading}
-        <div class="flex items-center justify-center py-20 text-xs text-[var(--theme-modal-text)]/40">计算中…</div>
+        <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">计算中…</div>
     {:else if entries.length === 0}
-        <div class="flex items-center justify-center py-20 text-xs text-[var(--theme-modal-text)]/40">暂无伤害数据</div>
+        <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {:else}
         <!-- Summary -->
         <div class="shrink-0 border-b px-5 py-4" style="border-color: var(--theme-divider-border);">
             <div class="flex items-end gap-6">
                 <div>
-                    <div class="text-[10px] text-[var(--theme-modal-text)]/40 mb-1">总伤害</div>
-                    <div class="text-2xl font-bold tabular-nums text-[var(--theme-accent-text)]">
+                    <div class="text-[10px] text-(--theme-modal-text)/40 mb-1">总伤害</div>
+                    <div class="text-2xl font-bold tabular-nums text-(--theme-accent-text)">
                         {Math.round(totalDamage).toLocaleString()}
                     </div>
                 </div>
                 {#each charSummaries as cs}
                     <div>
                         <div
-                            class="text-[10px] text-[var(--theme-modal-text)]/40 mb-1"
+                            class="text-[10px] text-(--theme-modal-text)/40 mb-1"
                             style="color: {cs.character
                                 ? ((ELEMENT_COLORS as Record<string, string>)[charElements[cs.character]] ?? '#888')
                                 : 'var(--theme-modal-text)'}"
@@ -160,7 +160,7 @@
             <table class="w-full text-xs">
                 <thead>
                     <tr
-                        class="text-[var(--theme-modal-text)]/50 sticky top-0"
+                        class="text-(--theme-modal-text)/50 sticky top-0"
                         style="background: var(--theme-modal-bg); border-bottom: 1px solid var(--theme-divider-border);"
                     >
                         <th class="text-left font-medium py-2 px-3">来源</th>
@@ -177,7 +177,7 @@
                     {#each entries as entry}
                         <tr
                             onclick={() => toggleExpand(entry.id)}
-                            class="cursor-pointer border-b transition-colors hover:bg-[var(--theme-modal-text)]/[0.03]"
+                            class="cursor-pointer border-b transition-colors hover:bg-(--theme-modal-text)/3"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <td
@@ -194,18 +194,18 @@
                             >
                                 {entry.displayName}
                             </td>
-                            <td class="py-1.5 px-3 text-right tabular-nums text-[var(--theme-modal-text)]/60"
+                            <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
                                 >{Math.round(entry.baseValue).toLocaleString()}</td
                             >
-                            <td class="py-1.5 px-3 text-right text-[var(--theme-modal-text)]/60">{entry.baseUnit}</td>
-                            <td class="py-1.5 px-3 text-right tabular-nums text-[var(--theme-modal-text)]/60"
+                            <td class="py-1.5 px-3 text-right text-(--theme-modal-text)/60">{entry.baseUnit}</td>
+                            <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
                                 >{((entry.ratioNum / entry.hits) * 100).toFixed(2)}%{#if entry.hits > 1}
                                     ×{entry.hits}{/if}</td
                             >
-                            <td class="py-1.5 px-3 text-right tabular-nums text-[var(--theme-modal-text)]/60"
+                            <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
                                 >{(entry.totalMultiplier * 100).toFixed(1)}%</td
                             >
-                            <td class="py-1.5 px-3 text-right tabular-nums font-medium text-[var(--theme-accent-text)]"
+                            <td class="py-1.5 px-3 text-right tabular-nums font-medium text-(--theme-accent-text)"
                                 >{Math.round(entry.expectedPerHit).toLocaleString()}</td
                             >
                             <td class="py-1.5 w-8"></td>
@@ -214,17 +214,17 @@
                             {@const s2 = entry.baseValue * (1 + entry.deepen) * (1 + entry.dmgBonus)}
                             {@const s3 = s2 * (1 + entry.critRate * (entry.critDmg - 1)) * (1 + entry.vulnerability)}
                             {@const s4 = s3 * entry.resMulti * entry.dmgRedMulti * entry.defMulti}
-                            {@const harmony = 1 + entry.finalHarmony}
-                            {@const s5 = s4 * harmony * (1 + entry.finalDmg) * entry.customMult}
+                            {@const tuneBreakMulti = 1 + entry.finalTuneBreakZone + entry.finalTuneStrainMulti}
+                            {@const s5 = s4 * tuneBreakMulti * (1 + entry.finalDmg) * entry.customMult}
                             <tr style="background: var(--theme-input-bg);">
                                 <td colspan="8" class="p-0">
                                     <div
-                                        class="border-b px-6 py-3 space-y-3 text-xs text-[var(--theme-modal-text)]/60 font-mono"
+                                        class="border-b px-6 py-3 space-y-3 text-xs text-(--theme-modal-text)/60 font-mono"
                                         style="border-color: var(--theme-divider-border);"
                                     >
                                         {#if entry.baseUnit.startsWith('偏谐系数')}
                                             <!-- Tune entry (处决/响应) -->
-                                            <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                 ① 基础属性
                                             </div>
                                             <div class="pl-3 space-y-0.5">
@@ -241,7 +241,7 @@
                                                 </div>
                                             </div>
 
-                                            <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                 ② 敌人减免
                                             </div>
                                             <div class="pl-3 space-y-0.5">
@@ -256,22 +256,22 @@
                                                 </div>
                                             </div>
 
-                                            <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
-                                                ③ 谐度增幅 × 终伤 × 特殊
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
+                                                ③ 谐度增幅区 × 终伤 × 特殊
                                             </div>
                                             <div class="pl-3">
                                                 {Math.round(s4).toLocaleString()} ×
-                                                {harmony.toFixed(4)}(谐度) × (1 + {(entry.finalDmg * 100).toFixed(
-                                                    1
-                                                )}%)(终伤) ×
+                                                {(1 + entry.finalTuneBreakZone).toFixed(4)}(谐度增幅区) × (1 + {(
+                                                    entry.finalDmg * 100
+                                                ).toFixed(1)}%)(终伤) ×
                                                 {entry.customMult.toFixed(4)}(特殊) = {Math.round(s5).toLocaleString()}
                                             </div>
-                                            <div class="pl-3 font-bold text-[var(--theme-accent-text)]">
+                                            <div class="pl-3 font-bold text-(--theme-accent-text)">
                                                 最终期望 = {Math.round(s5).toLocaleString()}
                                             </div>
                                         {:else if entry.baseUnit === '效应系数'}
                                             <!-- Effect damage entry -->
-                                            <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                 ① 基础属性
                                             </div>
                                             <div class="pl-3 space-y-0.5">
@@ -286,7 +286,7 @@
                                                 </div>
                                             </div>
 
-                                            <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                 ② 敌人减免
                                             </div>
                                             <div class="pl-3 space-y-0.5">
@@ -301,7 +301,7 @@
                                                 </div>
                                             </div>
 
-                                            <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                 ③ 终伤 × 特殊
                                             </div>
                                             <div class="pl-3">
@@ -310,12 +310,12 @@
                                                 ).toFixed(1)}%)(终伤) ×
                                                 {entry.customMult.toFixed(4)}(特殊) = {Math.round(s5).toLocaleString()}
                                             </div>
-                                            <div class="pl-3 font-bold text-[var(--theme-accent-text)]">
+                                            <div class="pl-3 font-bold text-(--theme-accent-text)">
                                                 最终期望 = {Math.round(s5).toLocaleString()}
                                             </div>
                                         {:else}
                                             <!-- Direct damage entry -->
-                                            <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                 ① 基础属性
                                             </div>
                                             <div class="pl-3 space-y-0.5">
@@ -348,11 +348,11 @@
                                             </div>
 
                                             {#if entry.baseUnit === '固定'}
-                                                <div class="pl-3 font-bold text-[var(--theme-accent-text)]">
+                                                <div class="pl-3 font-bold text-(--theme-accent-text)">
                                                     最终期望 = {Math.round(entry.baseValue).toLocaleString()}
                                                 </div>
                                             {:else}
-                                                <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                                <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                     ② 加深 × 加成
                                                 </div>
                                                 <div class="pl-3">
@@ -363,7 +363,7 @@
                                                     )}%)(加成) = {Math.round(s2).toLocaleString()}
                                                 </div>
 
-                                                <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                                <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                     ③ 暴击期望 × 易伤
                                                 </div>
                                                 <div class="pl-3">
@@ -376,7 +376,7 @@
                                                     )}%)(易伤) = {Math.round(s3).toLocaleString()}
                                                 </div>
 
-                                                <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
+                                                <div class="font-semibold font-sans text-(--theme-accent-text)">
                                                     ④ 抗性区 × 免伤区 × 防御区
                                                 </div>
                                                 <div class="pl-3 space-y-0.5">
@@ -390,19 +390,19 @@
                                                     </div>
                                                 </div>
 
-                                                <div class="font-semibold font-sans text-[var(--theme-accent-text)]">
-                                                    ⑤ 集谐 × 终伤 × 特殊
+                                                <div class="font-semibold font-sans text-(--theme-accent-text)">
+                                                    ⑤ 集谐区 × 终伤 × 特殊
                                                 </div>
                                                 <div class="pl-3">
                                                     {Math.round(s4).toLocaleString()} ×
-                                                    {harmony.toFixed(4)}(集谐) × (1 + {(entry.finalDmg * 100).toFixed(
-                                                        1
-                                                    )}%)(终伤) ×
+                                                    {(1 + entry.finalTuneStrainMulti).toFixed(4)}(集谐区) × (1 + {(
+                                                        entry.finalDmg * 100
+                                                    ).toFixed(1)}%)(终伤) ×
                                                     {entry.customMult.toFixed(4)}(特殊) = {Math.round(
                                                         s5
                                                     ).toLocaleString()}
                                                 </div>
-                                                <div class="pl-3 font-bold text-[var(--theme-accent-text)]">
+                                                <div class="pl-3 font-bold text-(--theme-accent-text)">
                                                     最终期望 = {Math.round(s5).toLocaleString()}
                                                 </div>
                                             {/if}

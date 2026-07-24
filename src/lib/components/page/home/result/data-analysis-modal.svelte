@@ -221,7 +221,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="w-[740px] max-h-[85vh] rounded-xl border shadow-2xl overflow-y-auto"
+        class="w-185 max-h-[85vh] rounded-xl border shadow-2xl overflow-y-auto"
         style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >

@@ -30,16 +30,16 @@ function computeDefMulti(enemy: EnemyConfig, defPen: number, defDown: number): n
 }
 
 const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
-    base_atk: 'baseAtk',
-    total_atk: 'totalAtk',
-    base_hp: 'baseHp',
-    total_hp: 'totalHp',
-    base_def: 'baseDef',
-    total_def: 'totalDef',
+    baseAtk: 'baseAtk',
+    totalAtk: 'totalAtk',
+    baseHp: 'baseHp',
+    totalHp: 'totalHp',
+    baseDef: 'baseDef',
+    totalDef: 'totalDef',
     recharge: 'recharge',
-    harmony_dmg: 'totalTune',
-    crit_rate: 'critRate',
-    crit_dmg: 'critDmg'
+    tuneBreakBoost: 'totalTuneBreakBoost',
+    critRate: 'critRate',
+    critDmg: 'critDmg'
 }
 
 function resolveRefValue(ref: ZoneRef, allCharStats: CharacterComputed[]): number {
@@ -66,35 +66,35 @@ function isTypeBonus(label: string): boolean {
 
 function applyZoneToAccum(zoneId: string, value: number, acc: CharAccum) {
     switch (zoneId) {
-        case 'atk_flat':
+        case 'atkFlat':
             acc.flatAtk += value
             break
-        case 'atk_pct':
+        case 'atkPct':
             acc.pctAtk += value
             break
-        case 'hp_flat':
+        case 'hpFlat':
             acc.flatHp += value
             break
-        case 'hp_pct':
+        case 'hpPct':
             acc.pctHp += value
             break
-        case 'def_flat':
+        case 'defFlat':
             acc.flatDef += value
             break
-        case 'def_pct':
+        case 'defPct':
             acc.pctDef += value
             break
-        case 'crit_rate':
+        case 'critRate':
             acc.critRate += value
             break
-        case 'crit_dmg':
+        case 'critDmg':
             acc.critDmg += value
             break
         case 'recharge':
             acc.recharge += value
             break
-        case 'harmony_dmg':
-            acc.tune += value
+        case 'tuneBreakBoost':
+            acc.tuneBreakBoost += value
             break
     }
 }
@@ -153,7 +153,7 @@ interface CharAccum {
     critRate: number
     critDmg: number
     recharge: number
-    tune: number
+    tuneBreakBoost: number
     elementBonus: Record<string, number>
     typeBonus: Record<string, number>
 }
@@ -169,7 +169,7 @@ function emptyAccum(): CharAccum {
         critRate: 5,
         critDmg: 150,
         recharge: 100,
-        tune: 0,
+        tuneBreakBoost: 0,
         elementBonus: {},
         typeBonus: {}
     }
@@ -209,7 +209,7 @@ interface CharacterComputed {
     totalAtk: number
     totalHp: number
     totalDef: number
-    totalTune: number
+    totalTuneBreakBoost: number
     recharge: number
     atkPctSum: number
     atkFlatSum: number
@@ -259,10 +259,10 @@ function computeCharacterStats(
     const baseAtk = Math.round(charInfo.lv90BaseStats.atk + (weaponInfo?.lv90BaseAtk ?? 0))
     const baseHp = Math.round(charInfo.lv90BaseStats.hp)
     const baseDef = Math.round(charInfo.lv90BaseStats.def)
-    const baseTune = Math.round(charInfo.lv90BaseStats.tune)
+    const baseTuneBreakBoost = Math.round(charInfo.lv90BaseStats.tuneBreakBoost)
 
     const acc = emptyAccum()
-    acc.tune = baseTune
+    acc.tuneBreakBoost = baseTuneBreakBoost
 
     const wSubValue = weaponInfo?.substat ? parseFloat(weaponInfo.substat.value) : 0
     const wSubName = weaponInfo?.substat?.name
@@ -295,37 +295,37 @@ function computeCharacterStats(
             if (z.value === 0) continue
             const value = z.value
             switch (z.zoneId) {
-                case 'bonus_dmg':
+                case 'bonusDmg':
                     bonusDmg += value
                     break
-                case 'deepen_dmg':
+                case 'deepenDmg':
                     deepenDmg += value
                     break
-                case 'res_pen':
+                case 'resPen':
                     resPen += value
                     break
-                case 'def_pen':
+                case 'defPen':
                     defPen += value
                     break
-                case 'def_down':
+                case 'defDown':
                     defDown += value
                     break
-                case 'res_down':
+                case 'resDown':
                     resDown += value
                     break
-                case 'tune_strain':
+                case 'tuneStrainLayer':
                     tuneStrain += value
                     break
-                case 'final_dmg':
+                case 'finalDmg':
                     finalDmg += value
                     break
-                case 'dmg_taken_inc':
+                case 'dmgTakenInc':
                     dmgTakenInc += value
                     break
-                case 'custom_final_dmg':
+                case 'customFinalDmg':
                     customMult += value
                     break
-                case 'dmg_red_pen':
+                case 'dmgRedPen':
                     dmgRedPen += value
                     break
                 default:
@@ -338,7 +338,7 @@ function computeCharacterStats(
     const atkGreen = Math.round(acc.flatAtk + (baseAtk * acc.pctAtk) / 100)
     const hpGreen = Math.round(acc.flatHp + (baseHp * acc.pctHp) / 100)
     const defGreen = Math.round(acc.flatDef + (baseDef * acc.pctDef) / 100)
-    const totalTune = Math.round(acc.tune)
+    const totalTuneBreakBoost = Math.round(acc.tuneBreakBoost)
 
     return {
         baseAtk,
@@ -347,7 +347,7 @@ function computeCharacterStats(
         totalAtk: baseAtk + atkGreen,
         totalHp: baseHp + hpGreen,
         totalDef: baseDef + defGreen,
-        totalTune,
+        totalTuneBreakBoost,
         recharge: acc.recharge,
         atkPctSum: acc.pctAtk,
         atkFlatSum: acc.flatAtk,
@@ -442,7 +442,7 @@ function computeResultEntry(
     const vulnerability = 1 + stats.dmgTakenInc / 100
     const finalDmg = 1 + stats.finalDmg / 100
     const customMult = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
-    const harmonyMulti = 1 + 0.0012 * stats.totalTune * stats.tuneStrain
+    const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * stats.tuneStrain
 
     // crit (cap at 100%)
     const critDecimal = Math.min(stats.critRate, 100) / 100
@@ -469,7 +469,7 @@ function computeResultEntry(
         bonus *
         deepen *
         vulnerability *
-        harmonyMulti *
+        tuneStrainMulti *
         finalDmg *
         customMult *
         defMulti *
@@ -486,7 +486,7 @@ function computeResultEntry(
             resMulti *
             dmgRedMulti *
             defMulti *
-            harmonyMulti *
+            tuneStrainMulti *
             finalDmg *
             customMult
     )
@@ -514,7 +514,7 @@ function computeResultEntry(
         totalDef: stats.totalDef,
         defPctSum: stats.defPctSum,
         defFlatSum: stats.defFlatSum,
-        totalTune: stats.totalTune,
+        totalTuneBreakBoost: stats.totalTuneBreakBoost,
         dmgBonus: totalDmgBonus / 100,
         deepen: stats.deepenDmg / 100,
         critRate: critDecimal,
@@ -523,11 +523,12 @@ function computeResultEntry(
         resMulti,
         dmgRedMulti,
         finalDmg: stats.finalDmg / 100,
-        finalHarmony: stats.tuneStrain > 0 ? harmonyMulti - 1 : 0,
+        finalTuneStrainMulti: stats.tuneStrain > 0 ? tuneStrainMulti - 1 : 0,
+        finalTuneBreakZone: 0,
         customMult,
         vulnerability: stats.dmgTakenInc / 100,
         rawPerHit: Math.round(
-            baseValue * deepen * bonus * resMulti * dmgRedMulti * defMulti * harmonyMulti * finalDmg * customMult
+            baseValue * deepen * bonus * resMulti * dmgRedMulti * defMulti * tuneStrainMulti * finalDmg * customMult
         ),
         expectedPerHit: Math.round(expectedPerHit),
         totalDamage: Math.round(expectedPerHit)
@@ -558,7 +559,7 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         totalDef: 0,
         defPctSum: 0,
         defFlatSum: 0,
-        totalTune: 0,
+        totalTuneBreakBoost: 0,
         dmgBonus: 0,
         deepen: 0,
         critRate: 0,
@@ -567,7 +568,8 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         resMulti: 0,
         dmgRedMulti: 0,
         finalDmg: 0,
-        finalHarmony: 0,
+        finalTuneStrainMulti: 0,
+        finalTuneBreakZone: 0,
         customMult: 1,
         vulnerability: 0,
         rawPerHit: 0,
@@ -592,8 +594,8 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
     const baseUnit = TUNE_BASE_UNIT
     const baseValue = tuneCoeff * ratioNum
 
-    // harmony zone: 1 + tuneStat / 100
-    const harmonyZone = 1 + stats.totalTune / 100
+    // tune break zone: 1 + tuneBreakBoost / 100
+    const tuneBreakZone = 1 + stats.totalTuneBreakBoost / 100
 
     // defense zone (same as direct damage)
     const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
@@ -613,7 +615,8 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
     const finalDmgDec = stats.finalDmg / 100
     const customMultVal = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
 
-    const totalPerHit = baseValue * defMulti * resMulti * dmgRedMulti * harmonyZone * (1 + finalDmgDec) * customMultVal
+    const totalPerHit =
+        baseValue * defMulti * resMulti * dmgRedMulti * tuneBreakZone * (1 + finalDmgDec) * customMultVal
     const expectedPerHit = Math.round(totalPerHit)
 
     return {
@@ -628,7 +631,8 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         sourceTimelineBlockId: entry.sourceTimelineBlockId,
         baseValue: Math.round(baseValue),
         baseUnit,
-        totalMultiplier: ratioNum * defMulti * resMulti * dmgRedMulti * harmonyZone * (1 + finalDmgDec) * customMultVal,
+        totalMultiplier:
+            ratioNum * defMulti * resMulti * dmgRedMulti * tuneBreakZone * (1 + finalDmgDec) * customMultVal,
         baseAtk: tuneCoeff,
         totalAtk: 0,
         atkPctSum: 0,
@@ -639,7 +643,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         totalDef: 0,
         defPctSum: 0,
         defFlatSum: 0,
-        totalTune: stats.totalTune,
+        totalTuneBreakBoost: stats.totalTuneBreakBoost,
         dmgBonus: 0,
         deepen: 0,
         critRate: 0,
@@ -648,7 +652,8 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         resMulti,
         dmgRedMulti,
         finalDmg: finalDmgDec,
-        finalHarmony: harmonyZone - 1,
+        finalTuneStrainMulti: 0,
+        finalTuneBreakZone: tuneBreakZone - 1,
         customMult: customMultVal,
         vulnerability: 0,
         rawPerHit: expectedPerHit,
@@ -665,7 +670,7 @@ function emptyCharacterStats(): CharacterComputed {
         totalAtk: 0,
         totalHp: 0,
         totalDef: 0,
-        totalTune: 0,
+        totalTuneBreakBoost: 0,
         recharge: 100,
         atkPctSum: 0,
         atkFlatSum: 0,
@@ -747,7 +752,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         totalDef: 0,
         defPctSum: 0,
         defFlatSum: 0,
-        totalTune: stats.totalTune,
+        totalTuneBreakBoost: stats.totalTuneBreakBoost,
         dmgBonus: 0,
         deepen: 0,
         critRate: 0,
@@ -756,7 +761,8 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         resMulti,
         dmgRedMulti,
         finalDmg: finalDmgDec,
-        finalHarmony: 0,
+        finalTuneStrainMulti: 0,
+        finalTuneBreakZone: 0,
         customMult: customMultVal,
         vulnerability: 0,
         rawPerHit: expectedPerHit,
@@ -769,68 +775,68 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
 
 function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number): void {
     switch (zoneId) {
-        case 'bonus_dmg':
+        case 'bonusDmg':
             stats.bonusDmg += value
             break
-        case 'deepen_dmg':
+        case 'deepenDmg':
             stats.deepenDmg += value
             break
-        case 'res_pen':
+        case 'resPen':
             stats.resPen += value
             break
-        case 'def_pen':
+        case 'defPen':
             stats.defPen += value
             break
-        case 'def_down':
+        case 'defDown':
             stats.defDown += value
             break
-        case 'res_down':
+        case 'resDown':
             stats.resDown += value
             break
-        case 'tune_strain':
+        case 'tuneStrainLayer':
             stats.tuneStrain += value
             break
-        case 'final_dmg':
+        case 'finalDmg':
             stats.finalDmg += value
             break
-        case 'dmg_taken_inc':
+        case 'dmgTakenInc':
             stats.dmgTakenInc += value
             break
-        case 'custom_final_dmg':
+        case 'customFinalDmg':
             stats.customMult += value
             break
-        case 'dmg_red_pen':
+        case 'dmgRedPen':
             stats.dmgRedPen += value
             break
-        case 'atk_flat':
+        case 'atkFlat':
             stats.atkFlatSum += value
             break
-        case 'atk_pct':
+        case 'atkPct':
             stats.atkPctSum += value
             break
-        case 'hp_flat':
+        case 'hpFlat':
             stats.hpFlatSum += value
             break
-        case 'hp_pct':
+        case 'hpPct':
             stats.hpPctSum += value
             break
-        case 'def_flat':
+        case 'defFlat':
             stats.defFlatSum += value
             break
-        case 'def_pct':
+        case 'defPct':
             stats.defPctSum += value
             break
-        case 'crit_rate':
+        case 'critRate':
             stats.critRate += value
             break
-        case 'crit_dmg':
+        case 'critDmg':
             stats.critDmg += value
             break
         case 'recharge':
             stats.recharge += value
             break
-        case 'harmony_dmg':
-            stats.totalTune += value
+        case 'tuneBreakBoost':
+            stats.totalTuneBreakBoost += value
             break
     }
     stats.totalAtk = stats.baseAtk + Math.round(stats.atkFlatSum + (stats.baseAtk * stats.atkPctSum) / 100)

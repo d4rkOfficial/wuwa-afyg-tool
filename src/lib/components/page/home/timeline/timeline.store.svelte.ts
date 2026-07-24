@@ -26,8 +26,6 @@ import {
     ADD_OFFSET,
     MIN_GAP,
     SNAP_PX,
-    MIN_TIME,
-    MAX_TIME,
     MAX_POS,
     NON_DIRECT_CONFIGS,
     NON_DIRECT_ELEMENT,
@@ -275,7 +273,7 @@ let _nonDirectPickerData = $state<{ name: string; category: string; layers: numb
 let _nonDirectPickerSelected = $state<Set<string>>(new Set())
 let _nonDirectPickerResponders = $state<Record<string, string[]>>({})
 let _nonDirectPickerBurstLayers = $state<Record<string, number>>({})
-let _nonDirectPickerHarmonyTrigger = $state<string | null>(null)
+let _nonDirectPickerTuneTrigger = $state<string | null>(null)
 let _skillCache = $state<Record<string, SkillPickerGroup[]>>({})
 let _echoSkillCache = $state<Record<string, { values: [string, string, string][] }>>({})
 let _customSkillHits = $state<Record<string, CustomHit[]>>({})
@@ -398,11 +396,11 @@ export function getNonDirectPickerBurstLayers() {
 export function setNonDirectPickerBurstLayers(v: Record<string, number>) {
     _nonDirectPickerBurstLayers = v
 }
-export function getNonDirectPickerHarmonyTrigger() {
-    return _nonDirectPickerHarmonyTrigger
+export function getNonDirectPickerTuneTrigger() {
+    return _nonDirectPickerTuneTrigger
 }
-export function setNonDirectPickerHarmonyTrigger(v: string | null) {
-    _nonDirectPickerHarmonyTrigger = v
+export function setNonDirectPickerTuneTrigger(v: string | null) {
+    _nonDirectPickerTuneTrigger = v
 }
 
 // ── Derived ──
@@ -1175,10 +1173,10 @@ export function openNonDirectPicker(sourceType: 'op' | 'ref', blockId: string) {
     _nonDirectPickerResponders = Object.fromEntries(
         block.nonDirectEntries.filter((e) => e.category === '响应').map((e) => [e.name, e.responders ?? []])
     )
-    const existingHarmony = block.nonDirectEntries.find((e) => e.name === '谐度破坏')
+    const existingTune = block.nonDirectEntries.find((e) => e.name === '谐度破坏')
     const op = _opBlocks.find((b) => b.id === blockId)
     const sourceChar = op && op.trackIndex < 3 ? (_team[op.trackIndex]?.character ?? null) : null
-    _nonDirectPickerHarmonyTrigger = existingHarmony?.responders?.[0] ?? sourceChar ?? null
+    _nonDirectPickerTuneTrigger = existingTune?.responders?.[0] ?? sourceChar ?? null
     const burstEntry = block.nonDirectEntries.find((e) => e.name === '电磁爆发')
     _nonDirectPickerBurstLayers = burstEntry ? { burst: burstEntry.layers } : {}
 }
@@ -1196,8 +1194,8 @@ export function applyNonDirectEntries() {
         } else if (d.name === '谐度破坏') {
             if (_nonDirectPickerSelected.has(d.name)) {
                 const entry: NonDirectEntry = { name: d.name, category: '处决', layers: 0 }
-                if (_nonDirectPickerHarmonyTrigger) {
-                    entry.responders = [_nonDirectPickerHarmonyTrigger]
+                if (_nonDirectPickerTuneTrigger) {
+                    entry.responders = [_nonDirectPickerTuneTrigger]
                 }
                 entries.push(entry)
             }
@@ -1307,9 +1305,9 @@ function buildDamageList() {
             }
             for (const nd of otherNDs) {
                 if (nd.category === '处决') {
-                    const harmonyChar = nd.responders?.[0] ?? sourceChar
+                    const tuneChar = nd.responders?.[0] ?? sourceChar
                     entries.push({
-                        character: harmonyChar,
+                        character: tuneChar,
                         name: '谐度破坏',
                         value: '1600%',
                         baseType: '偏谐系数',

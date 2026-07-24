@@ -50,16 +50,16 @@
         onclick={(e) => e.stopPropagation()}
     >
         <div class="flex items-center justify-between mb-3">
-            <span class="text-sm font-medium text-[var(--theme-modal-text)]">随机强化目标</span>
+            <span class="text-sm font-medium text-(--theme-modal-text)">随机强化目标</span>
             <button
                 onclick={onclose}
                 disabled={running}
-                class="rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-[var(--theme-modal-text)]/70"
+                class="rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
             >
                 <Icon icon="mdi:close" class="size-4" />
             </button>
         </div>
-        <div class="text-xs text-[var(--theme-modal-text)]/50 mb-2">选择希望出现的副词条（最多 5 个）</div>
+        <div class="text-xs text-(--theme-modal-text)/50 mb-2">选择希望出现的副词条（最多 5 个）</div>
         <div class="space-y-0.5 max-h-56 overflow-y-auto mb-3">
             {#each available as type}
                 {@const isSelected = selected.includes(type)}
@@ -69,8 +69,8 @@
                     class={[
                         'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
                         isSelected
-                            ? 'text-[var(--theme-modal-text)]'
-                            : 'text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-input-bg)]'
+                            ? 'text-(--theme-modal-text)'
+                            : 'text-(--theme-modal-text)/60 hover:bg-(--theme-input-bg)'
                     ].join(' ')}
                     style={isSelected ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);' : ''}
                 >
@@ -88,7 +88,7 @@
                 'w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5',
                 selected.length > 0 && !running
                     ? 'hover:opacity-80'
-                    : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/30 cursor-not-allowed'
+                    : 'bg-(--theme-input-bg) text-(--theme-modal-text)/30 cursor-not-allowed'
             ].join(' ')}
             style={selected.length > 0 && !running
                 ? 'background: var(--theme-accent-bg); color: var(--theme-btn-text, #fff);'

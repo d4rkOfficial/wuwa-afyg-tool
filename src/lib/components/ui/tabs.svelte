@@ -32,9 +32,7 @@
             onclick={() => onchange?.(i)}
             class={[
                 'rounded-md px-3 py-1 text-sm transition-colors duration-150',
-                i === active
-                    ? 'bg-[var(--theme-tabs-bg)] text-[var(--theme-tabs-text)]'
-                    : 'text-white/50 hover:text-white/80',
+                i === active ? 'bg-(--theme-tabs-bg) text-(--theme-tabs-text)' : 'text-white/50 hover:text-white/80',
                 className || ''
             ]
                 .filter(Boolean)

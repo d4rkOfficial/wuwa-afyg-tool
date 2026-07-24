@@ -6,6 +6,7 @@ import { NON_DIRECT_ELEMENT } from '../timeline/timeline.consts'
 import { getSkillCache, getCharElementMap } from '../timeline/timeline.store.svelte'
 import { getCharacterInfo } from '$lib/data/api'
 import { addToast } from '$lib/data/toast.svelte'
+import { migrateZoneId } from '$lib/data/zone-id-migration'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffSet[]>([])
@@ -55,6 +56,12 @@ export function init(
             JSON.stringify((savedState.buffSets ?? []).filter((bs) => !bs.name.startsWith('[配置]')))
         )
         _damageEntryBuffSetIds = JSON.parse(JSON.stringify(savedState.damageEntryBuffSetIds ?? {}))
+        for (const bs of _buffSets) {
+            for (const z of bs.zones) {
+                z.zoneId = migrateZoneId(z.zoneId) as typeof z.zoneId
+                if (z.ref) z.ref.zoneId = migrateZoneId(z.ref.zoneId) as typeof z.zoneId
+            }
+        }
         for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
             _damageEntryBuffSetIds[entryId] = setIds.filter((sid) => !autoIds.includes(sid))
         }
@@ -65,6 +72,7 @@ export function init(
         _damageEntryDamageTypes = {}
     }
     _globalBuffSetIds = _buffSets.filter((bs) => bs.id.startsWith('global-')).map((bs) => bs.id)
+    syncGlobalBuffs(team.map((s) => s.character))
 }
 
 async function queueElementFetch(names: string[]) {
@@ -190,8 +198,12 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         for (const group of groups) {
                             const match = group.hits.find((h) => h.name.includes('震谐') || h.name.includes('骇破'))
                             if (match) {
-                                const num = parseFloat(match.ratio.replace('%', ''))
-                                if (ratio === 0) ratio = num
+                                const comps = parseValueString(match.ratio)
+                                const total = comps.reduce((sum, c) => {
+                                    if (c.flatValue !== undefined) return sum + c.flatValue
+                                    return sum + c.ratioNum * (c.mult ?? 1)
+                                }, 0)
+                                if (ratio === 0) ratio = total
                                 if (match.element && !element) element = match.element
                             }
                         }
@@ -486,7 +498,6 @@ export function syncGlobalBuffs(charNames: (string | null)[]) {
     }
 
     for (const entry of _entries) {
-        if (entry.isEffect || entry.isTuneBreak || entry.isTuneResponse) continue
         if (!entry.character) continue
         const gbsId = `global-${entry.character}`
         if (!newGlobalIds.includes(gbsId)) continue

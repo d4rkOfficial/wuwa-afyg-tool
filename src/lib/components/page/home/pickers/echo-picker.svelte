@@ -74,22 +74,22 @@
         }}
     >
         <div
-            class="relative flex max-h-[70vh] min-h-[40vh] w-[640px] max-w-[90vw] flex-col rounded-xl text-[var(--theme-modal-text)] shadow-2xl"
+            class="relative flex max-h-[70vh] min-h-[40vh] w-160 max-w-[90vw] flex-col rounded-xl text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent);"
             role="dialog"
             aria-modal="true"
         >
             <div class="flex items-center gap-2 border-b px-4 py-3" style="border-color: var(--theme-divider-border)">
-                <Icon icon="mdi:magnify" class="size-4 shrink-0 text-[var(--theme-muted-text)]" />
+                <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
                 <input
                     bind:value={query}
                     placeholder="搜索声骸..."
-                    class="min-w-0 flex-1 bg-transparent text-sm outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                    class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
                 />
                 {#if query}
                     <button
                         onclick={() => (query = '')}
-                        class="rounded p-0.5 text-[var(--theme-muted-text)] hover:text-[var(--theme-modal-text)]"
+                        class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
                         aria-label="Clear search"
                     >
                         <Icon icon="mdi:close" class="size-4" />
@@ -99,7 +99,7 @@
 
             <div class="flex-1 overflow-y-auto p-4">
                 {#if filtered.length === 0}
-                    <div class="py-12 text-center text-sm text-[var(--theme-muted-text)]">无匹配声骸</div>
+                    <div class="py-12 text-center text-sm text-(--theme-muted-text)">无匹配声骸</div>
                 {:else}
                     {#if query}
                         <div class="flex flex-wrap gap-2">
@@ -118,18 +118,18 @@
                                     tabindex="0"
                                     class={itemClass(e)}
                                 >
-                                    <div class="size-14 overflow-hidden rounded-lg bg-[var(--theme-modal-text)]/10 p-1">
+                                    <div class="size-14 overflow-hidden rounded-lg bg-(--theme-modal-text)/10 p-1">
                                         {#if icons[e.name]}
                                             <img src={icons[e.name]} alt={e.name} class="size-full object-contain" />
                                         {:else}
                                             <div
-                                                class="flex size-full items-center justify-center text-xs text-[var(--theme-muted-text)]"
+                                                class="flex size-full items-center justify-center text-xs text-(--theme-muted-text)"
                                             >
                                                 {e.name.charAt(0)}
                                             </div>
                                         {/if}
                                     </div>
-                                    <span class="truncate text-sm leading-tight text-[var(--theme-modal-text)]"
+                                    <span class="truncate text-sm leading-tight text-(--theme-modal-text)"
                                         >{e.name}</span
                                     >
                                     <span class="text-[10px] text-cyan-600">C{e.cost}</span>
@@ -139,7 +139,7 @@
                     {:else}
                         {#each groupedByCost as [cost, list]}
                             <div class="mb-4">
-                                <div class="mb-2 text-xs font-medium text-[var(--theme-muted-text)]">C{cost}</div>
+                                <div class="mb-2 text-xs font-medium text-(--theme-muted-text)">C{cost}</div>
                                 <div class="flex flex-wrap gap-2">
                                     {#each list as e}
                                         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -157,7 +157,7 @@
                                             class={itemClass(e)}
                                         >
                                             <div
-                                                class="size-14 overflow-hidden rounded-lg bg-[var(--theme-modal-text)]/10 p-1"
+                                                class="size-14 overflow-hidden rounded-lg bg-(--theme-modal-text)/10 p-1"
                                             >
                                                 {#if icons[e.name]}
                                                     <img
@@ -167,14 +167,13 @@
                                                     />
                                                 {:else}
                                                     <div
-                                                        class="flex size-full items-center justify-center text-xs text-[var(--theme-muted-text)]"
+                                                        class="flex size-full items-center justify-center text-xs text-(--theme-muted-text)"
                                                     >
                                                         {e.name.charAt(0)}
                                                     </div>
                                                 {/if}
                                             </div>
-                                            <span
-                                                class="truncate text-[11px] leading-tight text-[var(--theme-modal-text)]"
+                                            <span class="truncate text-[11px] leading-tight text-(--theme-modal-text)"
                                                 >{e.name}</span
                                             >
                                         </div>
@@ -189,7 +188,7 @@
             <div class="flex justify-end border-t px-4 py-2.5" style="border-color: var(--theme-divider-border)">
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
                     style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
                 >
                     <Icon icon="mdi:check" class="size-4" />

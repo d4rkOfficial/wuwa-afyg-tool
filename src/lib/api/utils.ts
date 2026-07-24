@@ -188,7 +188,12 @@ export const transformWeaponTypeIcons = (): IconPair[] => [
 // ── Info transforms ──
 
 export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
-    let baseStats: { hp: number; atk: number; def: number; tune: number } = { hp: 0, atk: 0, def: 0, tune: 0 }
+    let baseStats: { hp: number; atk: number; def: number; tuneBreakBoost: number } = {
+        hp: 0,
+        atk: 0,
+        def: 0,
+        tuneBreakBoost: 0
+    }
     for (const ascStr of Object.keys(data.stats)) {
         const asc = Number(ascStr)
         const levelMap = data.stats[ascStr]
@@ -199,7 +204,7 @@ export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
                     hp: levelMap[lvStr].life,
                     atk: levelMap[lvStr].atk,
                     def: levelMap[lvStr].def,
-                    tune: 0
+                    tuneBreakBoost: 0
                 }
             }
         }
@@ -211,7 +216,7 @@ export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
     const hasTune = Object.values(data.tag ?? {}).some(
         (t) => t.name === '震谐响应' || t.name === '集谐响应' || t.name === '骇破响应'
     )
-    baseStats.tune = hasTune ? 10 : 0
+    baseStats.tuneBreakBoost = hasTune ? 10 : 0
 
     for (const node of Object.values(data.skill_trees)) {
         const s = node.skill

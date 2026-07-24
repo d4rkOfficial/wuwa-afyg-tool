@@ -10,8 +10,8 @@
         setNonDirectPickerResponders,
         getNonDirectPickerBurstLayers,
         setNonDirectPickerBurstLayers,
-        getNonDirectPickerHarmonyTrigger,
-        setNonDirectPickerHarmonyTrigger,
+        getNonDirectPickerTuneTrigger,
+        setNonDirectPickerTuneTrigger,
         getTeamCharNames,
         charHasTuneSkills,
         charHasResponseSkill,
@@ -47,7 +47,7 @@
             <div class="flex-1 overflow-y-auto p-4 space-y-3">
                 <div class="text-[11px] font-semibold text-[var(--theme-modal-text)]/60 tracking-wider">处决/响应</div>
                 {#each NON_DIRECT_CONFIGS.filter((c) => c.name === '谐度破坏' || c.category === '响应') as cfg}
-                    {@const isHarmony = cfg.name === '谐度破坏'}
+                    {@const isTuneBreak = cfg.name === '谐度破坏'}
                     {@const isResp = cfg.category === '响应'}
                     {@const disabled = false}
                     <div class="flex flex-col gap-1">
@@ -77,11 +77,11 @@
                             {#if getNonDirectPickerSelected().has(cfg.name)}
                                 <div class="flex items-center gap-3">
                                     {#each getTeamCharNames() as name}
-                                        {@const selected = isHarmony
-                                            ? getNonDirectPickerHarmonyTrigger() === name
+                                        {@const selected = isTuneBreak
+                                            ? getNonDirectPickerTuneTrigger() === name
                                             : (getNonDirectPickerResponders()[cfg.name]?.includes(name) ?? false)}
                                         {@const locked =
-                                            isHarmony && getNonDirectPickerHarmonyTrigger() !== null && selected}
+                                            isTuneBreak && getNonDirectPickerTuneTrigger() !== null && selected}
                                         {@const hasRespSkill = isResp ? charHasResponseSkill(name, cfg.name) : true}
                                         {@const responderDisabled = isResp && !hasRespSkill}
                                         <button
@@ -98,8 +98,8 @@
                                                 : ''}
                                             onclick={() => {
                                                 if (locked || responderDisabled) return
-                                                if (isHarmony) {
-                                                    setNonDirectPickerHarmonyTrigger(selected ? null : name)
+                                                if (isTuneBreak) {
+                                                    setNonDirectPickerTuneTrigger(selected ? null : name)
                                                 } else {
                                                     const list = getNonDirectPickerResponders()[cfg.name] ?? []
                                                     const next2 = selected
@@ -204,8 +204,8 @@
                     onclick={() => setNonDirectPickerBlockId(null)}>取消</button
                 >
                 <button
-                    class="h-7 rounded-md px-3 text-xs text-white transition-colors hover:opacity-80"
-                    style="background: var(--theme-accent-bg);"
+                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
+                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
                     onclick={applyNonDirectEntries}>确认</button
                 >
             </div>

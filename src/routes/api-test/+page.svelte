@@ -170,7 +170,7 @@
         <h1 class="text-sm font-semibold">API 测试</h1>
         <button
             onclick={() => goto('/')}
-            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-modal-text)]/50 transition-colors hover:bg-white/5"
+            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-white/5"
         >
             <Icon icon="mdi:arrow-left" class="size-3.5" />
             返回主页
@@ -188,18 +188,18 @@
                     <div>
                         <div class="flex items-center justify-between px-4 py-2 mt-1">
                             <span
-                                class="text-[11px] font-semibold uppercase tracking-widest text-[var(--theme-modal-text)]/40"
+                                class="text-[11px] font-semibold uppercase tracking-widest text-(--theme-modal-text)/40"
                                 >{group.label ?? group.name}</span
                             >
-                            <span class="text-[10px] text-[var(--theme-modal-text)]/20">{group.endpoints.length}</span>
+                            <span class="text-[10px] text-(--theme-modal-text)/20">{group.endpoints.length}</span>
                         </div>
                         {#each group.endpoints as ep}
                             <button
                                 onclick={() => pick(ep)}
                                 class="relative w-full flex items-center gap-2.5 pl-3 pr-4 py-2 text-left text-xs transition-colors {ep ===
                                 sel
-                                    ? 'bg-indigo-500/10 text-[var(--theme-modal-text)]'
-                                    : 'text-[var(--theme-modal-text)]/50 hover:bg-white/5 hover:text-[var(--theme-modal-text)]/80'}"
+                                    ? 'bg-indigo-500/10 text-(--theme-modal-text)'
+                                    : 'text-(--theme-modal-text)/50 hover:bg-white/5 hover:text-(--theme-modal-text)/80'}"
                             >
                                 {#if ep === sel}
                                     <div
@@ -238,12 +238,11 @@
                                     >GET</span
                                 >
                                 <div class="min-w-0">
-                                    <span
-                                        class="font-mono text-sm font-medium truncate block text-[var(--theme-modal-text)]"
+                                    <span class="font-mono text-sm font-medium truncate block text-(--theme-modal-text)"
                                         >{sel.path}</span
                                     >
                                     {#if sel.summary}
-                                        <span class="text-xs text-[var(--theme-modal-text)]/50 truncate block mt-0.5"
+                                        <span class="text-xs text-(--theme-modal-text)/50 truncate block mt-0.5"
                                             >{sel.summary}</span
                                         >
                                     {/if}
@@ -251,7 +250,7 @@
                             </div>
                             <button
                                 onclick={copyUrl}
-                                class="shrink-0 h-7 px-2.5 rounded-lg border border-white/10 text-[11px] text-[var(--theme-modal-text)]/50 transition-colors hover:bg-white/5 inline-flex items-center gap-1.5"
+                                class="shrink-0 h-7 px-2.5 rounded-lg border border-white/10 text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-white/5 inline-flex items-center gap-1.5"
                             >
                                 <Icon icon={urlCopied ? 'mdi:check' : 'mdi:content-copy'} class="size-3.5" />
                                 {urlCopied ? '已复制' : '复制'}
@@ -259,7 +258,7 @@
                         </div>
 
                         <div
-                            class="flex items-center gap-2 mt-3 text-xs font-mono text-[var(--theme-modal-text)]/40 bg-white/5 rounded-lg px-3 py-2"
+                            class="flex items-center gap-2 mt-3 text-xs font-mono text-(--theme-modal-text)/40 bg-white/5 rounded-lg px-3 py-2"
                         >
                             <Icon icon="mdi:link-variant" class="size-3.5 shrink-0" />
                             <span class="truncate">{resolveUrl()}</span>
@@ -273,7 +272,7 @@
                                             value={idVal}
                                             oninput={(e) => (idVal = (e.target as HTMLInputElement).value)}
                                             placeholder={inputPlaceholder}
-                                            class="h-9 w-full px-3 rounded-lg bg-white/5 border border-white/10 text-xs text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30 outline-none transition-colors focus:border-indigo-500/50"
+                                            class="h-9 w-full px-3 rounded-lg bg-white/5 border border-white/10 text-xs text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 outline-none transition-colors focus:border-indigo-500/50"
                                         />
                                     </div>
                                 {/if}
@@ -305,7 +304,7 @@
                                 onclick={() => (showType = true)}
                                 class="relative h-10 px-1 text-xs font-medium transition-colors mr-4 {showType
                                     ? 'text-indigo-400'
-                                    : 'text-[var(--theme-modal-text)]/40 hover:text-[var(--theme-modal-text)]/60'}"
+                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/60'}"
                             >
                                 <Icon icon="mdi:code-tags" class="size-3.5 inline mr-1.5 align-text-bottom" />
                                 Type
@@ -317,7 +316,7 @@
                                 onclick={() => (showType = false)}
                                 class="relative h-10 px-1 text-xs font-medium transition-colors {!showType
                                     ? 'text-indigo-400'
-                                    : 'text-[var(--theme-modal-text)]/40 hover:text-[var(--theme-modal-text)]/60'}"
+                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/60'}"
                             >
                                 <Icon icon="mdi:database-outline" class="size-3.5 inline mr-1.5 align-text-bottom" />
                                 Data
@@ -330,7 +329,7 @@
                             {#if showType && currentType}
                                 <button
                                     onclick={copyType}
-                                    class="h-7 px-2.5 rounded-lg border border-white/10 text-[11px] text-[var(--theme-modal-text)]/50 transition-colors hover:bg-white/5 inline-flex items-center gap-1.5"
+                                    class="h-7 px-2.5 rounded-lg border border-white/10 text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-white/5 inline-flex items-center gap-1.5"
                                 >
                                     <Icon icon={typeCopied ? 'mdi:check' : 'mdi:content-copy'} class="size-3" />
                                     {typeCopied ? '已复制' : '复制'}
@@ -338,14 +337,14 @@
                             {:else if !showType && res}
                                 <button
                                     onclick={copyData}
-                                    class="h-7 px-2.5 rounded-lg border border-white/10 text-[11px] text-[var(--theme-modal-text)]/50 transition-colors hover:bg-white/5 inline-flex items-center gap-1.5"
+                                    class="h-7 px-2.5 rounded-lg border border-white/10 text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-white/5 inline-flex items-center gap-1.5"
                                 >
                                     <Icon icon={dataCopied ? 'mdi:check' : 'mdi:content-copy'} class="size-3" />
                                     {dataCopied ? '已复制' : '复制'}
                                 </button>
                                 <button
                                     onclick={clearRes}
-                                    class="h-7 px-2.5 rounded-lg border border-white/10 text-[11px] text-[var(--theme-modal-text)]/50 transition-colors hover:bg-white/5 inline-flex items-center gap-1.5"
+                                    class="h-7 px-2.5 rounded-lg border border-white/10 text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-white/5 inline-flex items-center gap-1.5"
                                 >
                                     <Icon icon="mdi:close" class="size-3" />
                                     清除
@@ -359,7 +358,7 @@
                             {#if currentType}
                                 <div class="flex items-center gap-2 px-5 pt-3 pb-1">
                                     <Icon icon="mdi:code-tags" class="size-3.5 text-indigo-400/70" />
-                                    <span class="text-xs font-semibold text-[var(--theme-modal-text)]/60"
+                                    <span class="text-xs font-semibold text-(--theme-modal-text)/60"
                                         >{currentType.name}</span
                                     >
                                 </div>
@@ -368,7 +367,7 @@
                                     ></pre>
                             {:else}
                                 <div
-                                    class="flex flex-col items-center justify-center py-14 text-[var(--theme-modal-text)]/40"
+                                    class="flex flex-col items-center justify-center py-14 text-(--theme-modal-text)/40"
                                 >
                                     <Icon icon="mdi:file-document-outline" class="size-7 mb-2" />
                                     <span class="text-sm font-medium">无类型定义</span>
@@ -395,7 +394,7 @@
                                     ></pre>
                             {:else}
                                 <div
-                                    class="flex flex-col items-center justify-center py-14 text-[var(--theme-modal-text)]/40"
+                                    class="flex flex-col items-center justify-center py-14 text-(--theme-modal-text)/40"
                                 >
                                     <Icon icon="mdi:send-circle-outline" class="size-8 mb-2" />
                                     <span class="text-sm font-medium">暂无响应</span>

@@ -72,11 +72,11 @@
                 !showResult && tab.locked && active === tab.key
                     ? 'text-emerald-600'
                     : !showResult && active === tab.key
-                      ? 'text-[var(--theme-accent-text)]'
+                      ? 'text-(--theme-accent-text)'
                       : tab.disabled
                         ? 'opacity-30 cursor-not-allowed'
                         : 'opacity-60 hover:opacity-100',
-                !tab.disabled && 'hover:bg-[var(--theme-tabs-text)]/5'
+                !tab.disabled && 'hover:bg-(--theme-tabs-text)/5'
             ].join(' ')}
         >
             {#if tab.locked}
@@ -124,7 +124,7 @@
             {/if}
             {tab.label}
             {#if !showResult && active === tab.key}
-                <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[var(--theme-accent-bg)]"></div>
+                <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
             {/if}
         </button>
     {/each}
@@ -133,14 +133,14 @@
         disabled={!resultEnabled}
         class={[
             'relative flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors',
-            showResult || resultEnabled ? 'text-[var(--theme-accent-text)]' : 'opacity-30 cursor-not-allowed'
+            showResult || resultEnabled ? 'text-(--theme-accent-text)' : 'opacity-30 cursor-not-allowed'
         ].join(' ')}
         title={resultEnabled ? '' : '请先锁定队伍配置'}
     >
         <Icon icon="mdi:chart-box-outline" class="size-3.5" />
         结果
         {#if showResult}
-            <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[var(--theme-accent-bg)]"></div>
+            <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
         {/if}
     </button>
 </div>

@@ -27,8 +27,8 @@
 <div
     class={[
         'inline-flex shrink-0 items-center justify-center rounded-full bg-cover bg-center',
-        'bg-[var(--theme-avatar-bg)] text-[var(--theme-avatar-text)]',
-        'focus-visible:bg-[var(--theme-avatar-bg-focused)] focus-visible:text-[var(--theme-avatar-text-focused)]',
+        'bg-(--theme-avatar-bg) text-(--theme-avatar-text)',
+        'focus-visible:bg-(--theme-avatar-bg-focused) focus-visible:text-(--theme-avatar-text-focused)',
         sizeClass,
         className || ''
     ]
