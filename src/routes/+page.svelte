@@ -669,6 +669,8 @@
     </div>
 </div>
 
+<svelte:head><title>椰果工具箱</title></svelte:head>
+
 <svelte:window
     onkeydown={(e) => {
         if (e.key === 'Escape') {

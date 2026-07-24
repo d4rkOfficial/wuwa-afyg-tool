@@ -162,6 +162,8 @@
         p.includes('{character}')
 </script>
 
+<svelte:head><title>椰果API</title></svelte:head>
+
 <div class="flex h-dvh flex-col" style="background: var(--theme-layout-bg); color: var(--theme-layout-text)">
     <header
         class="shrink-0 flex items-center justify-between border-b border-white/10 px-5 py-3"

@@ -292,14 +292,14 @@
                         {@const second = SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT]}
                         <div
                             class={[
-                                'relative rounded-xl overflow-hidden shrink-0 w-72 scale-y-[-1]',
+                                'relative rounded-xl shrink-0 w-72 scale-y-[-1]',
                                 si % 2 === 1 ? 'self-center' : 'self-end'
                             ].join(' ')}
                             style="background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, var(--theme-modal-text) 6%, transparent) 100%);"
                         >
                             <!-- COST overlay -->
                             <div
-                                class="pointer-events-none absolute inset-0 flex select-none items-center justify-center"
+                                class="pointer-events-none absolute inset-0 flex select-none items-center justify-center overflow-hidden"
                             >
                                 <span
                                     class="text-[200px] font-black leading-none opacity-[0.06] text-(--theme-accent-text)"
