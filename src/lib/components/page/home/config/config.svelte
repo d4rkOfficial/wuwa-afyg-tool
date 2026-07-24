@@ -186,7 +186,7 @@
     function onDragMove(e: PointerEvent) {
         if (!dragState) return
         const el = e.currentTarget as HTMLElement
-        const card = el.closest('.rounded-xl.overflow-hidden') as HTMLElement | null
+        const card = el.closest('.rounded-xl') as HTMLElement | null
         const container = el.closest('.space-y-1') as HTMLElement | null
         if (!card || !container) return
 
