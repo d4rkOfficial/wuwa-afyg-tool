@@ -9,7 +9,7 @@
     import 'prismjs/themes/prism-dark.css'
 
     let sel = $state<Endpoint | null>(endpointGroups[0]?.endpoints[0] ?? null)
-    let idVal = $state(sel ? (DEFAULTS[sel.path] ?? '') : '')
+    let idVal = $state('')
     let res = $state('')
     let loading = $state(false)
     let err = $state('')
@@ -22,6 +22,10 @@
 
     $effect(() => {
         if (browser) origin = location.origin
+    })
+
+    $effect(() => {
+        idVal = sel ? (DEFAULTS[sel.path] ?? '') : ''
     })
 
     let currentType = $derived(sel ? (typeMap[sel.path] ?? null) : null)
@@ -199,6 +203,7 @@
                 {/each}
             </div>
             <button
+                aria-label="调整侧栏宽度"
                 class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 transition-colors hover:bg-indigo-500/50"
                 onmousedown={onDragStart}
             ></button>

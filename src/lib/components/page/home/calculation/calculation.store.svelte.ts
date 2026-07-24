@@ -12,6 +12,7 @@ let _buffSets = $state<BuffSet[]>([])
 let _damageEntryBuffSetIds = $state<Record<string, string[]>>({})
 let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
 let _showBuffModal = $state(false)
+let _buffDiffMode = $state(false)
 let _locked = $state(false)
 
 function assertUnlocked(): boolean {
@@ -405,6 +406,15 @@ export function getShowBuffModal(): boolean {
 }
 export function setShowBuffModal(v: boolean) {
     _showBuffModal = v
+}
+
+// ── Buff Diff Mode ──
+
+export function getBuffDiffMode(): boolean {
+    return _buffDiffMode
+}
+export function toggleBuffDiffMode() {
+    _buffDiffMode = !_buffDiffMode
 }
 
 // ── Persistence ──

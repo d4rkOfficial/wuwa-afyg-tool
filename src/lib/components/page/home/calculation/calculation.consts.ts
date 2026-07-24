@@ -1,5 +1,8 @@
 import type { ZoneDef } from './calculation.types'
 
+/**
+ * @description 使用 harmony 错误表述，是遗留问题，不能乱动，理解成谐度（tune）即可
+ */
 export const ZONE_DEFS = [
     { id: 'atk_flat', label: '攻击固定值', unit: 'flat' },
     { id: 'atk_pct', label: '攻击百分比', unit: '%' },
@@ -14,6 +17,7 @@ export const ZONE_DEFS = [
     { id: 'crit_dmg', label: '暴击伤害', unit: '%' },
 
     { id: 'recharge', label: '共鸣效率', unit: '%' },
+
     { id: 'harmony_dmg', label: '谐度破坏增幅', unit: '%' },
     { id: 'harmony_acc', label: '偏谐值累积效率', unit: '%' },
 
@@ -60,22 +64,4 @@ export function parseRatio(r: string): number {
     return parseFloat(r.replace('%', '')) / 100
 }
 
-export const DAMAGE_TYPES = [
-    '普攻伤害',
-    '重击伤害',
-    '共鸣技能伤害',
-    '共鸣解放伤害',
-    '声骸技能伤害',
-    '变奏技能伤害',
-    '延奏技能伤害'
-] as const
-
-export const DAMAGE_TYPE_SHORT = {
-    普攻伤害: '普攻',
-    重击伤害: '重击',
-    共鸣技能伤害: '共技',
-    共鸣解放伤害: '共解',
-    声骸技能伤害: '声骸',
-    变奏技能伤害: '变奏',
-    延奏技能伤害: '延奏'
-} as const
+export { DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'

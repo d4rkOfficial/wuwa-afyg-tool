@@ -15,7 +15,7 @@
     interface Props {
         open: boolean
         team: [CharSlot, CharSlot, CharSlot]
-        onCreateBuff: (name: string) => void
+        onCreateBuff?: (name: string) => void
         onCreateCustomHit?: (name: string) => void
         showBuffOption?: boolean
         showCustomHitOption?: boolean
@@ -151,7 +151,7 @@
     function handleCreateBuffFromSel() {
         const s = window.getSelection()?.toString()
         if (s) {
-            onCreateBuff(s.trim())
+            onCreateBuff?.(s.trim())
             onclose()
         }
         ctxShow = false
@@ -171,15 +171,17 @@
 </script>
 
 {#if open}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[70] flex items-center justify-center select-text"
+        class="fixed inset-0 z-[70] flex items-center justify-center select-text backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && onclose()}
         oncontextmenu={handleCtxMenu}
     >
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-2xl"
-            style="border-color: var(--theme-divider-border);"
+            class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-[var(--theme-modal-text)] shadow-2xl"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <div
@@ -564,6 +566,8 @@
 {/if}
 
 {#if ctxShow}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="fixed inset-0 z-[80]" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
         <div
             class="absolute min-w-36 rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"

@@ -1,4 +1,5 @@
-import { ASSET_BASE, ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP } from './consts'
+import { ASSET_BASE } from './consts'
+import { ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP } from '$lib/consts/game-terms'
 import type {
     Character,
     Weapon,

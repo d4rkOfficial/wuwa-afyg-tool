@@ -1,13 +1,4 @@
-export const ELEMENT_ORDER = ['冷凝', '热熔', '导电', '气动', '衍射', '湮灭'] as const
-
-export const ELEMENT_COLORS: Record<string, string> = {
-    冷凝: '#0284c7',
-    热熔: '#ea580c',
-    导电: '#7c3aed',
-    气动: '#059669',
-    衍射: '#ca8a04',
-    湮灭: '#db2777'
-}
+export { ELEMENT_ORDER, ELEMENT_COLORS } from '$lib/consts/game-terms'
 
 export const PPS = 60
 export const SIDE_PAD = 48
@@ -24,24 +15,4 @@ export const TRACK_COLORS = ['#3b82f6', '#7c3aed', '#db2777', '#16a34a'] as cons
 
 export const BUTTON_KEY_ORDER = ['MouseLeft', 'MouseRight', 'Q', 'E', 'R', 'F', 'T', 'SpaceBar', 'MouseMiddle'] as const
 
-export const NON_DIRECT_CONFIGS = [
-    { name: '谐度破坏', category: '处决' as const, max: 0 },
-    { name: '震谐响应', category: '响应' as const, max: 0 },
-    { name: '骇破响应', category: '响应' as const, max: 0 },
-    { name: '光噪效应', category: '效应' as const, max: 19 },
-    { name: '风蚀效应', category: '效应' as const, max: 12 },
-    { name: '霜渐效应', category: '效应' as const, max: 19 },
-    { name: '聚爆效应', category: '效应' as const, max: 19 },
-    { name: '电磁效应', category: '效应' as const, max: 19 },
-    { name: '虚湮效应', category: '效应' as const, max: 6 }
-] as const
-
-export const NON_DIRECT_ELEMENT: Record<string, string> = {
-    光噪效应: '衍射',
-    风蚀效应: '气动',
-    霜渐效应: '冷凝',
-    聚爆效应: '热熔',
-    电磁效应: '导电',
-    电磁爆发: '导电',
-    虚湮效应: '湮灭'
-}
+export { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from '$lib/consts/game-terms'

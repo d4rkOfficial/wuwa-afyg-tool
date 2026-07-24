@@ -1,7 +1,8 @@
 import type { EchoStat } from '$lib/types/game-data'
 import type { EchoSlotConfig, CharEchoConfig, EnemyConfig, ConfigState } from './config.types'
+import { ELEMENTS } from '$lib/consts/game-terms'
 
-export const RESISTANCE_KEYS = ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭']
+export const RESISTANCE_KEYS = ELEMENTS
 
 function emptySlot(cost = 1): EchoSlotConfig {
     return { cost, mainStat: null, secondMainStat: null, substats: [] }

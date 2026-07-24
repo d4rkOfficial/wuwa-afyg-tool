@@ -36,14 +36,17 @@
     }
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
     style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-    class="fixed inset-0 z-50 flex items-center justify-center"
+    class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
     onclick={() => !running && onclose()}
 >
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="w-72 rounded-xl border bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
-        style="border-color: var(--theme-divider-border);"
+        class="w-72 rounded-xl border p-4 shadow-2xl"
+        style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
         <div class="flex items-center justify-between mb-3">

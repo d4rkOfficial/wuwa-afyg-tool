@@ -44,7 +44,7 @@ export interface Project {
     }
 }
 
-export type PhaseKey = 'team' | 'timeline' | 'calculation' | 'config'
+export type { PhaseKey } from '$lib/consts/game-terms'
 
 export interface ResultAnalysisData {
     timings: { refLineId: string; seconds: number }[]

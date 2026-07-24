@@ -95,7 +95,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if (e.target === e.currentTarget) onclose()
         }}
@@ -104,7 +104,8 @@
         }}
     >
         <div
-            class="relative flex max-h-[85vh] w-[600px] max-w-[90vw] flex-col rounded-xl p-4 shadow-2xl bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)]"
+            class="relative flex max-h-[85vh] w-[600px] max-w-[90vw] flex-col rounded-xl p-4 shadow-2xl text-[var(--theme-modal-text)]"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent);"
             role="dialog"
             aria-modal="true"
         >

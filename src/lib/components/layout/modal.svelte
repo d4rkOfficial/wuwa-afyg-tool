@@ -82,12 +82,14 @@
             bind:this={modalEl}
             class={[
                 'relative max-h-[85vh] min-w-80 overflow-y-auto rounded-xl p-6 shadow-2xl',
-                'bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)]',
+                'text-[var(--theme-modal-text)]',
                 className || ''
             ]
                 .filter(Boolean)
                 .join(' ')}
-            style="max-width: calc(100vw - 40px); {modalWidth ? `width: ${modalWidth}px` : ''}; {mergedStyle}"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); max-width: calc(100vw - 40px); {modalWidth
+                ? `width: ${modalWidth}px`
+                : ''}; {mergedStyle}"
             role="dialog"
             aria-modal="true"
         >

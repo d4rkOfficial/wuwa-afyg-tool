@@ -136,9 +136,9 @@
         {#each TAB_LABELS as label, i}
             <button
                 onclick={() => {
-                    activeTab = i < 3 ? (`char${i}` as const) : 'enemy'
+                    activeTab = i < 3 ? (`char${i}` as 'char0' | 'char1' | 'char2') : 'enemy'
                     showMainStatMenu = null
-                    showSubstatMenu = null
+                    showSubstatModal = null
                 }}
                 class={[
                     'px-3 py-2 text-xs font-medium transition-colors relative flex items-center gap-2',
@@ -246,6 +246,8 @@
                                     <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                                 </button>
                                 {#if showMainStatMenu?.ci === ci && showMainStatMenu?.si === si}
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
                                         class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
                                         style="border-color: var(--theme-divider-border);"
@@ -392,14 +394,18 @@
     {#if showSubstatModal}
         {@const ms = showSubstatModal}
         {@const mSlot = config.characters[ms.ci].echoes[ms.si]}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-            class="fixed inset-0 z-50 flex items-center justify-center"
+            class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
             onclick={() => (showSubstatModal = null)}
         >
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-                class="w-72 max-h-80 rounded-xl border bg-[var(--theme-modal-bg)] p-4 shadow-2xl backdrop-blur-lg"
-                style="border-color: var(--theme-divider-border);"
+                class="w-72 max-h-80 rounded-xl border p-4 shadow-2xl"
+                style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
                 onclick={(e) => e.stopPropagation()}
             >
                 <div class="flex items-center justify-between mb-3">

@@ -22,24 +22,11 @@
         applySkillHits,
         switchRefSkillPickerTab
     } from './timeline.store.svelte'
-    import { ELEMENT_COLORS } from './timeline.consts'
+    import { ELEMENT_COLORS, ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
     import type { CustomHit } from './timeline.types'
     import { addToast } from '$lib/data/toast.svelte'
     import QuickLookup from '../calculation/quick-lookup.svelte'
     import Icon from '@iconify/svelte'
-
-    const PCT_UNITS = [
-        '攻击百分比',
-        '生命百分比',
-        '防御百分比',
-        '偏谐系数' // 特殊 根据怪物品质
-        // '共鸣效率',
-        // '谐度破坏增幅',
-        // '偏谐值累积效率',
-        // '暴击率',
-        // '暴击伤害'
-    ]
-    const ELEMENTS = ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭']
 
     let showLookup = $state(false)
     let showCustomModal = $state(false)
@@ -97,7 +84,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[60] flex items-center justify-center"
+        class="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if ((e.target as HTMLElement) === e.currentTarget) {
                 setSkillPickerBlockId(null)
@@ -113,8 +100,8 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[70vh] max-w-xl rounded-lg border bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
-            style="border-color: var(--theme-divider-border);"
+            class="w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
@@ -358,17 +345,20 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[70] flex items-center justify-center"
+        class="fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && (showCustomModal = false)}
     >
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border bg-[var(--theme-modal-bg)] p-5 shadow-xl w-96"
-            style="border-color: var(--theme-divider-border);"
+            class="rounded-xl border p-5 shadow-xl w-96"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-4">自定义直伤</h3>
             <div class="space-y-3">
                 <div>
+                    <!-- svelte-ignore a11y_label_has_associated_control -->
                     <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">名称</label>
                     <input
                         type="text"
@@ -379,6 +369,7 @@
                     />
                 </div>
                 <div>
+                    <!-- svelte-ignore a11y_label_has_associated_control -->
                     <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">固定值</label>
                     <input
                         type="number"
@@ -390,6 +381,7 @@
                 </div>
                 <div class="flex gap-2">
                     <div class="flex-1">
+                        <!-- svelte-ignore a11y_label_has_associated_control -->
                         <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">百分比值</label>
                         <input
                             type="number"
@@ -400,6 +392,7 @@
                         />
                     </div>
                     <div class="w-32 relative">
+                        <!-- svelte-ignore a11y_label_has_associated_control -->
                         <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">单位</label>
                         <button
                             onclick={() => {
@@ -413,6 +406,8 @@
                             <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                         </button>
                         {#if showUnitMenu}
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <div
                                 class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
                                 style="border-color: var(--theme-divider-border);"
@@ -438,6 +433,7 @@
                     </div>
                 </div>
                 <div class="relative">
+                    <!-- svelte-ignore a11y_label_has_associated_control -->
                     <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">属性</label>
                     <button
                         onclick={() => {
@@ -451,6 +447,8 @@
                         <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
                     </button>
                     {#if showElementMenu}
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <div
                             class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
                             style="border-color: var(--theme-divider-border);"

@@ -5,8 +5,13 @@
     import type { CalcState, BuffZoneValue } from '../calculation/calculation.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/data/api'
-    import { ELEMENT_COLORS, ELEMENT_ORDER } from '../timeline/timeline.consts'
-    import { ELEMENT_MAP } from '$lib/api/consts'
+    import {
+        ELEMENT_COLORS,
+        ELEMENT_ORDER,
+        ELEMENT_BONUS_MAP,
+        TYPE_BONUS_MAP,
+        ELEMENT_MAP
+    } from '$lib/consts/game-terms'
     import Icon from '@iconify/svelte'
 
     interface Props {
@@ -135,35 +140,14 @@
                 case '治疗加成':
                     healBonus += value
                     break
-                case '冷凝伤害加成':
-                    elementDmg['冷凝'] = (elementDmg['冷凝'] ?? 0) + value
-                    break
-                case '热熔伤害加成':
-                    elementDmg['热熔'] = (elementDmg['热熔'] ?? 0) + value
-                    break
-                case '导电伤害加成':
-                    elementDmg['导电'] = (elementDmg['导电'] ?? 0) + value
-                    break
-                case '气动伤害加成':
-                    elementDmg['气动'] = (elementDmg['气动'] ?? 0) + value
-                    break
-                case '衍射伤害加成':
-                    elementDmg['衍射'] = (elementDmg['衍射'] ?? 0) + value
-                    break
-                case '湮灭伤害加成':
-                    elementDmg['湮灭'] = (elementDmg['湮灭'] ?? 0) + value
-                    break
-                case '普攻伤害加成':
-                    typeDmg['普攻'] = (typeDmg['普攻'] ?? 0) + value
-                    break
-                case '重击伤害加成':
-                    typeDmg['重击'] = (typeDmg['重击'] ?? 0) + value
-                    break
-                case '共鸣技能伤害加成':
-                    typeDmg['共鸣技能'] = (typeDmg['共鸣技能'] ?? 0) + value
-                    break
-                case '共鸣解放伤害加成':
-                    typeDmg['共鸣解放'] = (typeDmg['共鸣解放'] ?? 0) + value
+                default:
+                    if (type in ELEMENT_BONUS_MAP) {
+                        const el = ELEMENT_BONUS_MAP[type]
+                        elementDmg[el] = (elementDmg[el] ?? 0) + value
+                    } else if (type in TYPE_BONUS_MAP) {
+                        const t = TYPE_BONUS_MAP[type]
+                        typeDmg[t] = (typeDmg[t] ?? 0) + value
+                    }
                     break
             }
         }
@@ -260,13 +244,13 @@
     <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         onclick={onclose}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border bg-[var(--theme-modal-bg)] p-8 shadow-2xl"
-            style="border-color: var(--theme-divider-border);"
+            class="rounded-xl border p-8 shadow-2xl"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <span class="text-xs text-[var(--theme-modal-text)]/40">加载中…</span>
@@ -276,13 +260,13 @@
     <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         onclick={onclose}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
-            class="mx-4 max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-xl border bg-[var(--theme-modal-bg)] p-6 shadow-2xl"
-            style="border-color: var(--theme-divider-border);"
+            class="mx-4 max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-xl border p-6 shadow-2xl"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <!-- Header -->

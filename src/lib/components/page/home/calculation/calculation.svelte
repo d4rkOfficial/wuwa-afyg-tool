@@ -13,7 +13,8 @@
         getDamageTypesForEntry,
         toggleDamageTypeForEntry,
         init,
-        getGlobalBuffSetIds
+        getGlobalBuffSetIds,
+        getBuffDiffMode
     } from './calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { ZONE_MAP, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from './calculation.consts'
@@ -68,6 +69,90 @@
             : buffSets.filter((b) => b.scope === 'all')
         ).filter((b) => !globalBuffSetIds.includes(b.id))
     )
+
+    let buffDiffMode = $derived(getBuffDiffMode())
+
+    interface BuffDiffItem {
+        setId: string
+        name: string
+        type: 'added' | 'removed' | 'same' | 'global'
+    }
+
+    let entryBuffDiff = $derived.by(() => {
+        if (!buffDiffMode) return {} as Record<string, BuffDiffItem[]>
+
+        const result: Record<string, BuffDiffItem[]> = {}
+        for (let i = 0; i < damageEntries.length; i++) {
+            const e = damageEntries[i]
+
+            const globalItems = (entryBuffSetIdMap[e.id] ?? [])
+                .filter((sid) => globalBuffSetIds.includes(sid))
+                .map((sid) => ({
+                    setId: sid,
+                    name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                    type: 'global' as const
+                }))
+
+            if (e.isTuneBreak || e.isTuneResponse) {
+                result[e.id] = [
+                    ...globalItems,
+                    ...(entryBuffSetIdMap[e.id] ?? [])
+                        .filter((sid) => !globalBuffSetIds.includes(sid))
+                        .map((sid) => ({
+                            setId: sid,
+                            name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                            type: 'same' as const
+                        }))
+                ]
+                continue
+            }
+
+            let prevId: string | null = null
+            if (e.isEffect) {
+                for (let j = i - 1; j >= 0; j--) {
+                    const p = damageEntries[j]
+                    if (p.isEffect && p.hitName === e.hitName) {
+                        prevId = p.id
+                        break
+                    }
+                }
+            } else {
+                for (let j = i - 1; j >= 0; j--) {
+                    const p = damageEntries[j]
+                    if (!p.isEffect && !p.isTuneBreak && !p.isTuneResponse && p.character === e.character) {
+                        prevId = p.id
+                        break
+                    }
+                }
+            }
+
+            if (!prevId) {
+                result[e.id] = [
+                    ...globalItems,
+                    ...(entryBuffSetIdMap[e.id] ?? [])
+                        .filter((sid) => !globalBuffSetIds.includes(sid))
+                        .map((sid) => ({
+                            setId: sid,
+                            name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                            type: 'added' as const
+                        }))
+                ]
+                continue
+            }
+
+            const curr = new Set(entryBuffSetIdMap[e.id] ?? [])
+            const prev = new Set(entryBuffSetIdMap[prevId] ?? [])
+            const items: BuffDiffItem[] = []
+            for (const id of curr)
+                if (!prev.has(id))
+                    items.push({ setId: id, name: buffSets.find((b) => b.id === id)?.name ?? '', type: 'added' })
+            for (const id of prev)
+                if (!curr.has(id))
+                    items.push({ setId: id, name: buffSets.find((b) => b.id === id)?.name ?? '', type: 'removed' })
+            result[e.id] = items
+        }
+        return result
+    })
 
     function handleToggleExpand(id: string) {
         expandedEntryId = expandedEntryId === id ? null : id
@@ -132,6 +217,53 @@
         }
 
         expandedEntryId = null
+        addToast('已经是本角色最后一段直伤', 'info')
+    }
+
+    function handleCopyFromPrevEffect(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.isEffect) return
+
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        if (entryIndex <= 0) {
+            addToast('未找到上一个同名效应', 'info')
+            return
+        }
+
+        for (let i = entryIndex - 1; i >= 0; i--) {
+            const prev = damageEntries[i]
+            if (prev.isEffect && prev.hitName === entry.hitName) {
+                const prevSetIds = getBuffSetIdsForEntry(prev.id)
+                if (!setBuffSetIdsForEntry(entryId, prevSetIds)) return
+                onupdate(getCalcState())
+                addToast('已复制前段效应的增益', 'success')
+                return
+            }
+        }
+
+        addToast('未找到上一个同名效应', 'info')
+    }
+
+    function handleCopyToNextEffect(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.isEffect) return
+
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        const currentSetIds = getBuffSetIdsForEntry(entryId)
+
+        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
+            const next = damageEntries[i]
+            if (next.isEffect && next.hitName === entry.hitName) {
+                if (!setBuffSetIdsForEntry(next.id, [...currentSetIds])) return
+                onupdate(getCalcState())
+                expandedEntryId = next.id
+                addToast('已复制增益到下一段效应', 'success')
+                return
+            }
+        }
+
+        expandedEntryId = null
+        addToast('已经是本效应最后一次伤害结算', 'info')
     }
 
     function handleClearAllBuffs(entryId: string) {
@@ -234,17 +366,48 @@
                     </td>
                     <td class="py-1.5 px-3">
                         <div class="flex flex-wrap gap-1">
-                            {#each entryBuffSetIdMap[damageEntry.id] ?? [] as setId}
-                                {@const buffSet = buffSets.find((s) => s.id === setId)}
-                                {#if buffSet && !globalBuffSetIds.includes(setId)}
-                                    <span
-                                        class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
-                                        style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
-                                    >
-                                        {buffSet.name}
-                                    </span>
-                                {/if}
-                            {/each}
+                            {#if buffDiffMode}
+                                {#each entryBuffDiff[damageEntry.id] ?? [] as diff}
+                                    {#if diff.type === 'global'}
+                                        <span
+                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-500/15 text-yellow-500"
+                                        >
+                                            <Icon icon="mdi:crown" class="size-3" />{diff.name}
+                                        </span>
+                                    {:else if diff.type === 'added'}
+                                        <span
+                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-green-500/15 text-green-500"
+                                        >
+                                            <Icon icon="mdi:plus" class="size-3" />{diff.name}
+                                        </span>
+                                    {:else if diff.type === 'removed'}
+                                        <span
+                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-500/15 text-red-500"
+                                        >
+                                            <Icon icon="mdi:minus" class="size-3" />{diff.name}
+                                        </span>
+                                    {:else}
+                                        <span
+                                            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
+                                        >
+                                            {diff.name}
+                                        </span>
+                                    {/if}
+                                {/each}
+                            {:else}
+                                {#each entryBuffSetIdMap[damageEntry.id] ?? [] as setId}
+                                    {@const buffSet = buffSets.find((s) => s.id === setId)}
+                                    {#if buffSet && !globalBuffSetIds.includes(setId)}
+                                        <span
+                                            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
+                                        >
+                                            {buffSet.name}
+                                        </span>
+                                    {/if}
+                                {/each}
+                            {/if}
                         </div>
                     </td>
                 </tr>
@@ -313,6 +476,27 @@
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段直伤
+                                                </button>
+                                            {:else if damageEntry.isEffect}
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyFromPrevEffect(damageEntry.id)
+                                                    }}
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)]"
+                                                >
+                                                    <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
+                                                    复制前段效应
+                                                </button>
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyToNextEffect(damageEntry.id)
+                                                    }}
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-[var(--theme-input-bg)] text-[var(--theme-input-text)] border border-[var(--theme-input-border)] hover:bg-[var(--theme-input-bg-focused)]"
+                                                >
+                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
+                                                    复制到下段效应
                                                 </button>
                                             {/if}
                                             <button

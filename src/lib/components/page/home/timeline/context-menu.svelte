@@ -70,6 +70,7 @@
 {#if getContextMenu()}
     {@const cm = getContextMenu()!}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         class="fixed z-50 min-w-44 rounded-lg border bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1 shadow-xl backdrop-blur-lg"
         style="left: {cm.x}px; top: {cm.y}px; border-color: var(--theme-divider-border);"
@@ -206,6 +207,7 @@
 {/if}
 
 {#if confirmAction}
+    {@const action = confirmAction}
     <Modal open={true} onclose={() => (confirmAction = null)}>
         {#snippet title()}
             <div class="flex items-center gap-2 text-red-400">
@@ -215,10 +217,10 @@
         {/snippet}
         {#snippet children()}
             <p class="text-sm leading-relaxed">
-                {#if confirmAction.type === 'clear'}
-                    这将清空 参考线{confirmAction.prevLabel} 到 参考线{confirmAction.curLabel} 之间的操作块，是否确认？
+                {#if action.type === 'clear'}
+                    这将清空 参考线{action.prevLabel} 到 参考线{action.curLabel} 之间的操作块，是否确认？
                 {:else}
-                    这将重置 参考线{confirmAction.prevLabel} 到 参考线{confirmAction.curLabel} 之间的伤害绑定，是否确认？
+                    这将重置 参考线{action.prevLabel} 到 参考线{action.curLabel} 之间的伤害绑定，是否确认？
                 {/if}
             </p>
             <div class="flex justify-end gap-2 mt-5">
@@ -231,10 +233,10 @@
                 </button>
                 <button
                     onclick={() => {
-                        if (confirmAction.type === 'clear') {
-                            clearLeftOpBlocks(confirmAction.refId)
+                        if (action.type === 'clear') {
+                            clearLeftOpBlocks(action.refId)
                         } else {
-                            resetLeftDamageBindings(confirmAction.refId)
+                            resetLeftDamageBindings(action.refId)
                         }
                         confirmAction = null
                     }}
@@ -251,6 +253,7 @@
 {#if getBlockMenu()}
     {@const bm = getBlockMenu()!}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         class="fixed z-50 min-w-44 rounded-lg border bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1 shadow-xl backdrop-blur-lg"
         style="left: {bm.x}px; top: {bm.y}px; border-color: var(--theme-divider-border);"
@@ -374,6 +377,7 @@
 {#if getTrackMenu()}
     {@const tm = getTrackMenu()!}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         class="fixed z-50 rounded-lg border bg-[var(--theme-context-menu-bg)] text-[var(--theme-context-menu-text)] py-1.5 px-2 shadow-xl backdrop-blur-lg"
         style="left: {tm.x}px; top: {tm.y}px; border-color: var(--theme-divider-border);"

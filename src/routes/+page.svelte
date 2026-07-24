@@ -22,10 +22,12 @@
         importProjects,
         createProjectData
     } from '$lib/data/project.svelte'
+    import { getWWVersion, ensureVersion } from '$lib/api/consts'
     import type { PhaseKey, CharSlot, Project } from '$lib/data/types'
     import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
     import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
     import type { ConfigState } from '$lib/components/page/home/config/config.types'
+    import { PHASE_LABELS } from '$lib/consts/game-terms'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         loadIcons,
@@ -35,6 +37,8 @@
     } from '$lib/components/page/home/timeline/timeline.store.svelte'
     import {
         setShowBuffModal,
+        getBuffDiffMode,
+        toggleBuffDiffMode,
         syncGlobalBuffs,
         getCalcState,
         init as initCalculation
@@ -50,13 +54,6 @@
     import PhaseTabs from '$lib/components/page/home/phase-tabs.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
     import Icon from '@iconify/svelte'
-
-    const PHASE_LABELS: Record<PhaseKey, string> = {
-        team: '队伍配置',
-        timeline: '排轴',
-        calculation: '拉表',
-        config: '词条/环境配置'
-    }
 
     let showNewModal = $state(false)
     let newName = $state('')
@@ -115,6 +112,7 @@
     let activePhase = $state<PhaseKey>('team')
 
     onMount(() => {
+        ensureVersion()
         loadThemes()
         loadProjects()
         loadIcons()
@@ -242,12 +240,13 @@
         const data: Record<string, unknown> = { id: p.id, name: p.name, createdAt: p.createdAt }
         if (selected.includes('team')) data.team = p.team
         data.customSkillHits = p.customSkillHits ?? {}
-        data.phases = {}
+        const phases: Record<string, { locked: boolean; data: unknown }> = {}
         for (const ph of getPhaseOrder()) {
             if (selected.includes(ph)) {
-                data.phases[ph] = { locked: p.phases[ph]?.locked ?? false, data: p.phases[ph]?.data ?? null }
+                phases[ph] = { locked: p.phases[ph]?.locked ?? false, data: p.phases[ph]?.data ?? null }
             }
         }
+        data.phases = phases
         const blob = new Blob([JSON.stringify({ version: 1, exportedAt: Date.now(), project: data }, null, 2)], {
             type: 'application/json'
         })
@@ -430,6 +429,7 @@
         onselect={handleSelectProject}
     />
     <button
+        aria-label="调整侧栏宽度"
         class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-indigo-500/50"
         style="background: transparent;"
         onmousedown={(e) => {
@@ -455,7 +455,9 @@
                         />
                     </svg>
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
-                    <p class="mb-6 text-sm text-zinc-500">鸣潮社区公益工具喵~ 公测中，即将开源！</p>
+                    <p class="mb-6 text-sm text-zinc-500">
+                        鸣潮社区公益工具喵~ 公测中，即将开源！游戏数据版本:{getWWVersion()}
+                    </p>
                     <button
                         onclick={() => {
                             newName = ''
@@ -567,6 +569,21 @@
                         >
                             <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
                             BUFF配置
+                        </button>
+                        <button
+                            onclick={toggleBuffDiffMode}
+                            class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getBuffDiffMode()
+                                ? 'border-[var(--theme-accent-bg)]'
+                                : 'border-[var(--theme-sidebar-text)]/20'}"
+                            style="color: {getBuffDiffMode()
+                                ? 'var(--theme-accent-text)'
+                                : 'var(--theme-sidebar-text)'}"
+                        >
+                            <Icon
+                                icon={getBuffDiffMode() ? 'mdi:swap-vertical-bold' : 'mdi:swap-vertical'}
+                                class="size-4 shrink-0"
+                            />
+                            {getBuffDiffMode() ? 'Buff: DIFF' : 'Buff: ALL'}
                         </button>
                     {/if}
                     {#if activePhase === 'config'}

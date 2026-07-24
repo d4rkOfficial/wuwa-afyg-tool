@@ -90,13 +90,14 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         onkeydown={(e) => {
             if (e.key === 'Escape') onclose()
         }}
     >
         <div
-            class="relative flex max-h-[75vh] min-h-[50vh] w-[680px] max-w-[90vw] flex-col rounded-xl bg-[var(--theme-modal-bg)] text-[var(--theme-modal-text)] shadow-2xl"
+            class="relative flex max-h-[75vh] min-h-[50vh] w-[680px] max-w-[90vw] flex-col rounded-xl text-[var(--theme-modal-text)] shadow-2xl"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent);"
             role="dialog"
             aria-modal="true"
         >

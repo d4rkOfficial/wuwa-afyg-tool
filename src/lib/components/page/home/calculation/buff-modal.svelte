@@ -164,13 +164,13 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && onclose()}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[95vh] h-full max-w-3xl rounded-xl border bg-(--theme-modal-bg) text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
-            style="border-color: var(--theme-divider-border);"
+            class="w-full max-h-[95vh] h-full max-w-3xl rounded-xl border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
@@ -313,8 +313,9 @@
                                 </button>
                                 {#if showAddZone}
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <div
-                                        class="absolute left-0 top-full z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                        class="rounded-xl border bg-(--theme-modal-bg) p-5 shadow-xl w-80"
                                         style="border-color: var(--theme-divider-border);"
                                         onclick={(e) => e.stopPropagation()}
                                     >
@@ -482,13 +483,13 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-60 flex items-center justify-center bg-black/40"
+        class="fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && (showRename = false)}
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border bg-(--theme-modal-bg) p-5 shadow-xl w-80"
-            style="border-color: var(--theme-divider-border);"
+            class="rounded-xl border p-5 shadow-xl w-80"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-3">编辑名称</h3>
@@ -520,12 +521,13 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && (showRefModal = false)}
     >
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border bg-[var(--theme-modal-bg)] p-5 shadow-xl w-80"
-            style="border-color: var(--theme-divider-border);"
+            class="rounded-xl border p-5 shadow-xl w-80"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-4">引用配置</h3>
@@ -533,7 +535,8 @@
             <div class="space-y-3">
                 <!-- Character selector -->
                 <div>
-                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1.5">引用角色</label>
+                    <!-- svelte-ignore a11y_label_has_associated_control -->
+                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用角色</label>
                     <div class="flex gap-1.5">
                         {#each team as slot, i}
                             <button
@@ -541,8 +544,8 @@
                                 class={[
                                     'size-9 rounded-full overflow-hidden border-2 transition-all',
                                     refCharacterIdx === i
-                                        ? 'border-[var(--theme-accent-bg)] ring-2'
-                                        : 'border-[var(--theme-divider-border)] grayscale opacity-30 hover:opacity-60'
+                                        ? 'border-(--theme-accent-bg) ring-2'
+                                        : 'border-(--theme-divider-border) grayscale opacity-30 hover:opacity-60'
                                 ].join(' ')}
                             >
                                 {#if slot.character && charIconMap[slot.character]}
@@ -554,7 +557,7 @@
                                     />
                                 {:else}
                                     <span
-                                        class="w-full h-full flex items-center justify-center text-xs font-bold text-[var(--theme-modal-text)]/50"
+                                        class="w-full h-full flex items-center justify-center text-xs font-bold text-(--theme-modal-text)/50"
                                         >{slot.character?.charAt(0) ?? '?'}</span
                                     >
                                 {/if}
@@ -565,17 +568,19 @@
 
                 <!-- Zone selector (custom dropdown) -->
                 <div>
-                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">引用乘区</label>
+                    <!-- svelte-ignore a11y_label_has_associated_control -->
+                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1">引用乘区</label>
                     <div class="relative">
                         <button
                             onclick={() => (showRefZoneMenu = !showRefZoneMenu)}
-                            class="w-full flex items-center justify-between rounded border px-2 py-1.5 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                            class="w-full flex items-center justify-between rounded border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/10"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <span>{refTargetDef?.label ?? refTargetZoneId}</span>
-                            <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
+                            <Icon icon="mdi:chevron-down" class="size-3 text-(--theme-modal-text)/40" />
                         </button>
                         {#if showRefZoneMenu}
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <div
                                 class="absolute left-0 top-full z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
                                 style="border-color: var(--theme-divider-border);"
@@ -605,6 +610,7 @@
 
                 <!-- Threshold & Pct -->
                 <div>
+                    <!-- svelte-ignore a11y_label_has_associated_control -->
                     <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">阈值 × 百分比</label>
                     <div class="flex items-center gap-1.5">
                         <input
@@ -629,6 +635,7 @@
 
                 <!-- Lower & Upper -->
                 <div>
+                    <!-- svelte-ignore a11y_label_has_associated_control -->
                     <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">下限 ~ 上限</label>
                     <div class="flex items-center gap-1.5">
                         <input

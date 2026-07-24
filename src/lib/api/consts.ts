@@ -16,10 +16,9 @@ export async function ensureVersion() {
     if (!_versionPromise) {
         _versionPromise = (async () => {
             try {
-                const res = await fetch(`${NANOKA_BASE}/manifest.json`)
-                const json: Record<string, unknown> = await res.json()
-                const ww = json.ww as { latest?: string } | undefined
-                if (ww?.latest) _wwVersion = ww.latest
+                const res = await fetch('/api/v1/version/latest')
+                const text = await res.text()
+                if (text) _wwVersion = JSON.parse(text)
             } catch {
                 // keep fallback
             }
@@ -33,21 +32,4 @@ export const ASSET_BASE = `${NANOKA_BASE}/assets/ww`
 
 export const CACHE_CONTROL = 'public, s-maxage=600, stale-while-revalidate=86400'
 
-export const ELEMENT_MAP = {
-    1: '冷凝',
-    2: '热熔',
-    3: '导电',
-    4: '气动',
-    5: '衍射',
-    6: '湮灭'
-} as const
-
-export const WEAPON_TYPE_MAP = {
-    1: '长刃',
-    2: '迅刀',
-    3: '佩枪',
-    4: '臂铠',
-    5: '音感仪'
-} as const
-
-export const COST_MAP = { 0: 1, 1: 3, 2: 4, 3: 4 } as const
+export { ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP } from '$lib/consts/game-terms'

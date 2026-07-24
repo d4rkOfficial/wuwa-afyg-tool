@@ -4,7 +4,7 @@ import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry } from './result.types'
 import type { CharSlot } from '$lib/data/types'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
-import { NON_DIRECT_ELEMENT } from '../timeline/timeline.consts'
+import { NON_DIRECT_ELEMENT, TYPE_BONUS_MAP, ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
 
 // ── helpers ──
 
@@ -35,22 +35,6 @@ function resolveRefValue(ref: ZoneRef, allCharStats: CharacterComputed[]): numbe
     if (ref.lower !== undefined) value = Math.max(ref.lower, value)
     if (ref.upper !== undefined) value = Math.min(ref.upper, value)
     return value
-}
-
-const ELEMENT_BONUS_MAP: Record<string, string> = {
-    冷凝伤害加成: '冷凝',
-    热熔伤害加成: '热熔',
-    导电伤害加成: '导电',
-    气动伤害加成: '气动',
-    衍射伤害加成: '衍射',
-    湮灭伤害加成: '湮灭'
-}
-
-const TYPE_BONUS_MAP: Record<string, string> = {
-    普攻伤害加成: '普攻',
-    重击伤害加成: '重击',
-    共鸣技能伤害加成: '共鸣技能',
-    共鸣解放伤害加成: '共鸣解放'
 }
 
 function isElementBonus(label: string): boolean {

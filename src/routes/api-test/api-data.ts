@@ -15,7 +15,18 @@ export const WEAPON_INFO = '/api/v1/info/weapon/{name}'
 export const ECHO_INFO = '/api/v1/info/echo/{name}'
 export const SET_INFO = '/api/v1/info/echo-set/{name}'
 
+const VERSION_LATEST = '/api/v1/version/latest'
+const VERSION_AVAILABLE = '/api/v1/version/available'
+
 export const endpointGroups: EndpointGroup[] = [
+    {
+        name: 'system',
+        label: '游戏版本',
+        endpoints: [
+            { method: 'GET', path: VERSION_LATEST, summary: '获取最新游戏版本' },
+            { method: 'GET', path: VERSION_AVAILABLE, summary: '获取所有可用游戏版本' }
+        ]
+    },
     {
         name: 'list',
         label: '列表',
@@ -52,6 +63,14 @@ export const endpointGroups: EndpointGroup[] = [
 ]
 
 export const typeMap: Record<string, { name: string; code: string }> = {
+    [VERSION_LATEST]: {
+        name: 'version',
+        code: 'type version = string'
+    },
+    [VERSION_AVAILABLE]: {
+        name: 'versions',
+        code: 'type versions = string[]'
+    },
     '/api/v1/list/character': {
         name: 'Character',
         code: 'interface Character {\n    name: string;\n    star: number;\n    element: string;\n    weaponType: string;\n}'

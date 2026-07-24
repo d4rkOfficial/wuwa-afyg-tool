@@ -30,3 +30,6 @@ vite.config.ts.timestamp-*
 
 # Log
 *.log
+
+# Secret
+AGENTS.md

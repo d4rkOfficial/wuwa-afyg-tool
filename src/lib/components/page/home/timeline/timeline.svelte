@@ -206,6 +206,7 @@
 
                 <!-- Track rows -->
                 {#each getTRACKS() as name, i}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         class="relative shrink-0 {i < 3 ? 'h-14' : 'flex-1'}"
                         style="border-bottom: 1px solid color-mix(in srgb, {TRACK_COLORS[i]} 15%, transparent);"
@@ -250,6 +251,7 @@
                         {#if i < 3}
                             <div class="absolute pointer-events-none" style="left: 5rem; top: 0; right: 0; bottom: 0;">
                                 {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
+                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
                                         class="absolute inset-y-0 flex items-center pointer-events-auto cursor-grab active:cursor-grabbing select-none"
                                         style="left: {block.pos}px; transform: translateX(-50%) {getDragBlockId() ===
@@ -448,6 +450,7 @@
             <!-- Drag hot zone overlay -->
             <div class="absolute pointer-events-none" style="top: 2rem; left: 5rem; right: 0; bottom: 0; z-index: 30;">
                 {#each getRefLines() as rl}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         class="absolute inset-y-0 pointer-events-auto cursor-col-resize"
                         style="left: {vx(rl.id, rl.pos) - 10}px; width: 20px;"
