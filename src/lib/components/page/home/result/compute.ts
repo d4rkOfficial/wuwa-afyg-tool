@@ -89,50 +89,43 @@ function applyZoneToAccum(zoneId: string, value: number, acc: CharAccum) {
 }
 
 function applyEntryStatToAccum(label: string, value: number, acc: CharAccum) {
-    // normalize weapon substat name (API short form → canonical)
-    const canonicalLabel = WEAPON_SUBSTAT_NAME_MAP[label] ?? label
-    let canonicalValue = value
-    if (SUBSTAT_DECIMAL_TO_PCT.has(canonicalLabel) && value < 1) {
-        canonicalValue = value * 100
-    }
-
-    if (isElementBonus(canonicalLabel)) {
-        const el = ELEMENT_BONUS_MAP[canonicalLabel]
-        acc.elementBonus[el] = (acc.elementBonus[el] ?? 0) + canonicalValue
+    if (isElementBonus(label)) {
+        const el = ELEMENT_BONUS_MAP[label]
+        acc.elementBonus[el] = (acc.elementBonus[el] ?? 0) + value
         return
     }
-    if (isTypeBonus(canonicalLabel)) {
-        const t = TYPE_BONUS_MAP[canonicalLabel]
-        acc.typeBonus[t] = (acc.typeBonus[t] ?? 0) + canonicalValue
+    if (isTypeBonus(label)) {
+        const t = TYPE_BONUS_MAP[label]
+        acc.typeBonus[t] = (acc.typeBonus[t] ?? 0) + value
         return
     }
-    switch (canonicalLabel) {
+    switch (label) {
         case '攻击':
-            acc.flatAtk += canonicalValue
+            acc.flatAtk += value
             break
         case '生命':
-            acc.flatHp += canonicalValue
+            acc.flatHp += value
             break
         case '防御':
-            acc.flatDef += canonicalValue
+            acc.flatDef += value
             break
         case '攻击%':
-            acc.pctAtk += canonicalValue
+            acc.pctAtk += value
             break
         case '生命%':
-            acc.pctHp += canonicalValue
+            acc.pctHp += value
             break
         case '防御%':
-            acc.pctDef += canonicalValue
+            acc.pctDef += value
             break
         case '暴击率':
-            acc.critRate += canonicalValue
+            acc.critRate += value
             break
         case '暴击伤害':
-            acc.critDmg += canonicalValue
+            acc.critDmg += value
             break
         case '共鸣效率':
-            acc.recharge += canonicalValue
+            acc.recharge += value
             break
         case '治疗加成':
             break // not used in damage formula
@@ -261,7 +254,16 @@ function computeCharacterStats(
     acc.tune = baseTune
 
     const wSubValue = weaponInfo?.substat ? parseFloat(weaponInfo.substat.value) : 0
-    accumulateEchoes(echoes, wSubValue, weaponInfo?.substat?.name, acc)
+    const wSubName = weaponInfo?.substat?.name
+    let wSubCanonicalName: string | undefined
+    let wSubCanonicalValue = wSubValue
+    if (wSubName) {
+        wSubCanonicalName = WEAPON_SUBSTAT_NAME_MAP[wSubName] ?? wSubName
+        if (SUBSTAT_DECIMAL_TO_PCT.has(wSubCanonicalName) && wSubValue < 1) {
+            wSubCanonicalValue = wSubValue * 100
+        }
+    }
+    accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, acc)
 
     // buff multipliers (separate from base stat accum)
     let bonusDmg = 0,

@@ -39,15 +39,19 @@
         </div>
         <div class="flex gap-2">
             {#each ['BOSS', '精英怪', '小怪'] as t}
+                {@const icon = t === 'BOSS' ? 'mdi:skull' : t === '精英怪' ? 'mdi:sword' : 'mdi:bug'}
                 <button
                     onclick={() => handleTypeChange(t as 'BOSS' | '精英怪' | '小怪')}
                     class={[
-                        'rounded-lg px-4 py-2 text-xs font-medium transition-colors',
+                        'rounded-lg px-4 py-2 text-xs font-medium transition-colors inline-flex items-center gap-1.5',
                         config.enemy.type === t
                             ? 'bg-[var(--theme-accent-bg)]/15 text-[var(--theme-accent-text)] ring-1 ring-[var(--theme-accent-bg)]/30'
                             : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/10'
-                    ].join(' ')}>{t}</button
+                    ].join(' ')}
                 >
+                    <Icon {icon} class="size-3.5" />
+                    {t}
+                </button>
             {/each}
         </div>
     </div>
@@ -124,40 +128,50 @@
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
         <span class="text-xs font-medium text-[var(--theme-modal-text)]/70 block mb-3">抗性</span>
-        <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+        <div class="grid grid-cols-3 gap-2">
             {#each sortedResistanceKeys as el}
                 {@const val = config.enemy.resistances[el]}
+                {@const color = elementColor(el)}
                 <div
-                    class="flex items-center gap-1.5 rounded-md px-2 py-1.5"
-                    style="background: var(--theme-modal-text)/[0.03];"
+                    class="flex flex-col gap-1.5 rounded-lg border p-2.5"
+                    style="background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, {color} 15%, transparent) 100%); border-color: color-mix(in srgb, {color} 25%, transparent);"
                 >
-                    <span class="text-xs font-medium w-7 shrink-0" style="color: {elementColor(el)}">{el}</span>
-                    <input
-                        type="number"
-                        value={val}
-                        min="-100"
-                        max="100"
-                        oninput={(e) =>
-                            updateResistance(
-                                el,
-                                Math.min(100, Math.max(-100, parseInt((e.target as HTMLInputElement).value) || 0))
-                            )}
-                        class="w-12 rounded border px-1.5 py-0.5 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                    />
-                    <span class="text-[10px] text-[var(--theme-modal-text)]/20 w-2.5 shrink-0">%</span>
-                    <button
-                        onclick={() => updateResistance(el, Math.max(-100, val - STEP))}
-                        class="rounded p-0.5 text-[var(--theme-modal-text)]/20 transition-colors hover:text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/5"
-                    >
-                        <Icon icon="mdi:minus" class="size-3.5" />
-                    </button>
-                    <button
-                        onclick={() => updateResistance(el, Math.min(100, val + STEP))}
-                        class="rounded p-0.5 text-[var(--theme-modal-text)]/20 transition-colors hover:text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/5"
-                    >
-                        <Icon icon="mdi:plus" class="size-3.5" />
-                    </button>
+                    <span class="text-xs font-medium" style="color: {color}">{el}</span>
+                    <div class="flex items-stretch gap-1">
+                        <div class="flex items-center gap-1 flex-1 min-w-0">
+                            <input
+                                type="number"
+                                value={val}
+                                min="-100"
+                                max="100"
+                                oninput={(e) =>
+                                    updateResistance(
+                                        el,
+                                        Math.min(
+                                            100,
+                                            Math.max(-100, parseInt((e.target as HTMLInputElement).value) || 0)
+                                        )
+                                    )}
+                                class="w-12 rounded border px-1.5 py-0.5 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            />
+                            <span class="text-[10px] text-[var(--theme-modal-text)]/20 w-2.5 shrink-0">%</span>
+                        </div>
+                        <div class="flex flex-col gap-px rounded bg-[var(--theme-input-bg)] p-px">
+                            <button
+                                onclick={() => updateResistance(el, Math.min(100, val + STEP))}
+                                class="rounded px-1 py-0.5 text-[var(--theme-modal-text)]/20 transition-colors hover:text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/5"
+                            >
+                                <Icon icon="mdi:plus" class="size-3" />
+                            </button>
+                            <button
+                                onclick={() => updateResistance(el, Math.max(-100, val - STEP))}
+                                class="rounded px-1 py-0.5 text-[var(--theme-modal-text)]/20 transition-colors hover:text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/5"
+                            >
+                                <Icon icon="mdi:minus" class="size-3" />
+                            </button>
+                        </div>
+                    </div>
                 </div>
             {/each}
         </div>

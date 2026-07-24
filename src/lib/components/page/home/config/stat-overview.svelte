@@ -111,50 +111,44 @@
         let bonusDmg = 0
 
         function add(type: string, value: number) {
-            const canonicalLabel = WEAPON_SUBSTAT_NAME_MAP[type] ?? type
-            let canonicalValue = value
-            if (SUBSTAT_DECIMAL_TO_PCT.has(canonicalLabel) && value < 1) {
-                canonicalValue = value * 100
-            }
-
-            switch (canonicalLabel) {
+            switch (type) {
                 case '攻击':
-                    flatAtk += canonicalValue
+                    flatAtk += value
                     break
                 case '生命':
-                    flatHp += canonicalValue
+                    flatHp += value
                     break
                 case '防御':
-                    flatDef += canonicalValue
+                    flatDef += value
                     break
                 case '攻击%':
-                    pctAtk += canonicalValue
+                    pctAtk += value
                     break
                 case '生命%':
-                    pctHp += canonicalValue
+                    pctHp += value
                     break
                 case '防御%':
-                    pctDef += canonicalValue
+                    pctDef += value
                     break
                 case '暴击率':
-                    critRate += canonicalValue
+                    critRate += value
                     break
                 case '暴击伤害':
-                    critDmg += canonicalValue
+                    critDmg += value
                     break
                 case '共鸣效率':
-                    recharge += canonicalValue
+                    recharge += value
                     break
                 case '治疗加成':
-                    healBonus += canonicalValue
+                    healBonus += value
                     break
                 default:
-                    if (canonicalLabel in ELEMENT_BONUS_MAP) {
-                        const el = ELEMENT_BONUS_MAP[canonicalLabel]
-                        elementDmg[el] = (elementDmg[el] ?? 0) + canonicalValue
-                    } else if (canonicalLabel in TYPE_BONUS_MAP) {
-                        const t = TYPE_BONUS_MAP[canonicalLabel]
-                        typeDmg[t] = (typeDmg[t] ?? 0) + canonicalValue
+                    if (type in ELEMENT_BONUS_MAP) {
+                        const el = ELEMENT_BONUS_MAP[type]
+                        elementDmg[el] = (elementDmg[el] ?? 0) + value
+                    } else if (type in TYPE_BONUS_MAP) {
+                        const t = TYPE_BONUS_MAP[type]
+                        typeDmg[t] = (typeDmg[t] ?? 0) + value
                     }
                     break
             }
@@ -162,7 +156,10 @@
 
         if (weaponInfo?.substat?.name) {
             const sv = parseFloat(weaponInfo.substat.value)
-            add(weaponInfo.substat.name, sv)
+            const wName = weaponInfo.substat.name
+            const canonicalName = WEAPON_SUBSTAT_NAME_MAP[wName] ?? wName
+            const canonicalValue = SUBSTAT_DECIMAL_TO_PCT.has(canonicalName) && sv < 1 ? sv * 100 : sv
+            add(canonicalName, canonicalValue)
         }
 
         for (const echo of echoes) {

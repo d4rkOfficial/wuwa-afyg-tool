@@ -32,9 +32,20 @@
         showResult?: boolean
         resultEnabled?: boolean
         onresult?: () => void
+        onunlock?: (key: PhaseKey) => void
+        onlock?: (key: PhaseKey) => void
     }
 
-    let { project, active, onchange, showResult = false, resultEnabled = false, onresult }: Props = $props()
+    let {
+        project,
+        active,
+        onchange,
+        showResult = false,
+        resultEnabled = false,
+        onresult,
+        onunlock,
+        onlock
+    }: Props = $props()
 
     let tabs = $derived<PhaseTab[]>(
         getPhaseOrder().map((key) => ({
@@ -69,11 +80,47 @@
             ].join(' ')}
         >
             {#if tab.locked}
-                <Icon icon="mdi:lock" class="size-3.5 text-emerald-600" />
+                <span
+                    onclick={(e) => {
+                        e.stopPropagation()
+                        onunlock?.(tab.key)
+                    }}
+                    onkeydown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.stopPropagation()
+                            onunlock?.(tab.key)
+                        }
+                    }}
+                    role="button"
+                    tabindex="0"
+                    class="cursor-pointer"
+                    title="点击解锁"
+                >
+                    <Icon icon="mdi:lock" class="size-3.5 text-emerald-600" />
+                </span>
             {:else if tab.disabled}
                 <Icon icon="mdi:lock-outline" class="size-3.5 opacity-30" />
             {:else}
-                <Icon icon="mdi:lock-open-outline" class="size-3.5 opacity-50" />
+                <span
+                    onclick={(e) => {
+                        if (active === tab.key) {
+                            e.stopPropagation()
+                            onlock?.(tab.key)
+                        }
+                    }}
+                    onkeydown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && active === tab.key) {
+                            e.stopPropagation()
+                            onlock?.(tab.key)
+                        }
+                    }}
+                    role="button"
+                    tabindex="0"
+                    class="cursor-pointer"
+                    title="点击锁定"
+                >
+                    <Icon icon="mdi:lock-open-outline" class="size-3.5 opacity-50" />
+                </span>
             {/if}
             {tab.label}
             {#if !showResult && active === tab.key}
@@ -88,7 +135,7 @@
             'relative flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors',
             showResult || resultEnabled ? 'text-[var(--theme-accent-text)]' : 'opacity-30 cursor-not-allowed'
         ].join(' ')}
-        title={resultEnabled ? '' : '请先锁定全部阶段'}
+        title={resultEnabled ? '' : '请先锁定队伍配置'}
     >
         <Icon icon="mdi:chart-box-outline" class="size-3.5" />
         结果

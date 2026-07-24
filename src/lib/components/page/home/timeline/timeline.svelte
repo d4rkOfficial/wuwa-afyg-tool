@@ -199,7 +199,7 @@
                 <!-- Header row -->
                 <div class="relative shrink-0 h-8 border-b" style="border-bottom-color: var(--theme-divider-border);">
                     <div
-                        class="sticky left-0 z-35 w-20 h-full bg-[var(--theme-timeline-bg)] border-r"
+                        class="sticky left-0 z-35 w-20 h-full bg-[var(--theme-timeline-bg)]/80 border-r backdrop-blur-sm"
                         style="border-right-color: var(--theme-divider-border);"
                     ></div>
                 </div>
@@ -217,7 +217,7 @@
                     >
                         <!-- Sticky label column -->
                         <div
-                            class="sticky left-0 z-[35] w-20 h-full bg-[var(--theme-timeline-bg)] border-r flex items-center justify-center"
+                            class="sticky left-0 z-[35] w-20 h-full bg-[var(--theme-timeline-bg)]/80 border-r backdrop-blur-sm flex items-center justify-center"
                             style="border-right-color: var(--theme-divider-border);"
                         >
                             {#if i < 3}
@@ -240,9 +240,14 @@
                                 </div>
                             {:else}
                                 <div
-                                    class="[writing-mode:vertical-rl] text-[11px] font-medium text-[var(--theme-timeline-text)]/60"
+                                    class="flex items-center justify-center w-full h-full overflow-hidden"
+                                    style="border-right: 3px dashed color-mix(in srgb, var(--theme-timeline-text) 50%, transparent); margin-right: 4px; width: calc(100% - 4px);"
                                 >
-                                    伤害绑定
+                                    <div
+                                        class="[writing-mode:vertical-rl] text-[11px] font-medium text-[var(--theme-timeline-text)]/60"
+                                    >
+                                        伤害绑定
+                                    </div>
                                 </div>
                             {/if}
                         </div>

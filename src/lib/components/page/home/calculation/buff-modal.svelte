@@ -315,7 +315,7 @@
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <div
-                                        class="rounded-xl border bg-(--theme-modal-bg) p-5 shadow-xl w-80"
+                                        class="absolute left-0 top-full z-10 mt-1 rounded-xl border bg-(--theme-modal-bg) p-5 shadow-xl min-w-full w-full max-h-60 overflow-y-auto overscroll-contain"
                                         style="border-color: var(--theme-divider-border);"
                                         onclick={(e) => e.stopPropagation()}
                                     >

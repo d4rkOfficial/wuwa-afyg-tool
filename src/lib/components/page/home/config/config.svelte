@@ -54,6 +54,11 @@
     const TAB_LABELS = ['角色1', '角色2', '角色3', '敌人配置']
     const COST_OPTIONS = [4, 3, 1]
 
+    function costColor(cost: number): string {
+        if (cost === 4) return '#ef4444'
+        if (cost === 3) return '#ca8a04'
+        return '#22c55e'
+    }
     function costBorder(cost: number): string {
         if (cost === 4) return 'border-red-500/40'
         if (cost === 3) return 'border-yellow-600/40'
@@ -187,7 +192,9 @@
                     {@const second = SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT]}
                     <div
                         class={['rounded-xl border p-4', costBorder(slot.cost)].join(' ')}
-                        style="background: var(--theme-input-bg);"
+                        style="background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, {costColor(
+                            slot.cost
+                        )} 15%, transparent) 100%);"
                     >
                         <!-- Cost selector -->
                         <div class="flex items-center justify-between mb-3">
@@ -249,8 +256,8 @@
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
-                                        class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
-                                        style="border-color: var(--theme-divider-border);"
+                                        class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
+                                        style="background: color-mix(in srgb, var(--theme-modal-bg) 85%, transparent); border-color: var(--theme-divider-border);"
                                         onclick={(e) => e.stopPropagation()}
                                     >
                                         <button
@@ -362,7 +369,7 @@
                                     </button>
                                     <button
                                         onclick={() => (showEnhanceModal = { ci, si })}
-                                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-fuchsia-500 transition-colors hover:bg-[var(--theme-input-bg)]"
+                                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-emerald-600 transition-colors hover:bg-[var(--theme-input-bg)]"
                                     >
                                         <Icon icon="mdi:dice-5" class="size-3" />
                                         随机强化
@@ -404,7 +411,7 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-                class="w-72 max-h-80 rounded-xl border p-4 shadow-2xl"
+                class="w-72 max-h-80 rounded-xl border p-4 shadow-2xl backdrop-blur-lg"
                 style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
                 onclick={(e) => e.stopPropagation()}
             >

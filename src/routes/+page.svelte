@@ -391,6 +391,11 @@
         updateTeam(team)
     }
 
+    function handleResetTeam() {
+        if (!activeProject) return
+        unlockPhase(activeProject.id, 'team')
+    }
+
     function handleLockPhase() {
         if (!activeProject) return
         lockPhase(activePhase)
@@ -408,6 +413,30 @@
         if (!activeProject) return
         unlockPhase(activeProject.id, activePhase)
         addToast(`${PHASE_LABELS[activePhase]} 已解锁`, 'info')
+    }
+
+    function handleUnlockTab(phase: PhaseKey) {
+        if (!activeProject) return
+        unlockPhase(activeProject.id, phase)
+        activePhase = phase
+        showResult = false
+        addToast(`${PHASE_LABELS[phase]} 已解锁`, 'info')
+    }
+
+    function handleLockTab(phase: PhaseKey) {
+        if (!activeProject) return
+        const idx = getPhaseOrder().indexOf(phase)
+        if (idx === 0 && !isTeamComplete(activeProject.team)) return
+        if (idx > 0 && !activeProject.phases[getPhaseOrder()[idx - 1]]?.locked) return
+        lockPhase(phase)
+        if (phase === 'timeline') {
+            syncGlobalBuffs(activeProject.team.map((s) => s.character))
+            updateCalculation(getCalcState())
+        }
+        if (phase === 'config') {
+            updateConfig(getConfig())
+        }
+        addToast(`${PHASE_LABELS[phase]} 已锁定`, 'success')
     }
 </script>
 
@@ -480,8 +509,10 @@
                     activePhase = k
                     showResult = false
                 }}
-                resultEnabled={allPhasesLocked}
+                resultEnabled={teamPhaseLocked}
                 onresult={() => (showResult = true)}
+                onunlock={handleUnlockTab}
+                onlock={handleLockTab}
             />
 
             <div class="flex-1 overflow-hidden relative">
@@ -493,7 +524,12 @@
                         refreshKey={resultRefreshKey}
                     />
                 {:else if activePhase === 'team'}
-                    <TeamConfig team={activeProject.team} onupdate={handleUpdateTeam} locked={teamPhaseLocked} />
+                    <TeamConfig
+                        team={activeProject.team}
+                        onupdate={handleUpdateTeam}
+                        onreset={handleResetTeam}
+                        locked={teamPhaseLocked}
+                    />
                 {:else if activePhase === 'timeline'}
                     <Timeline
                         team={activeProject.team}

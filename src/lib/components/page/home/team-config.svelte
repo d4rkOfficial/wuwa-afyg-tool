@@ -25,9 +25,10 @@
         team: [CharSlot, CharSlot, CharSlot]
         onupdate: (team: [CharSlot, CharSlot, CharSlot]) => void
         locked?: boolean
+        onreset?: () => void
     }
 
-    let { team: _team, onupdate, locked = false }: Props = $props()
+    let { team: _team, onupdate, locked = false, onreset }: Props = $props()
 
     function makeSlot(): CharSlot {
         return {
@@ -128,6 +129,7 @@
         }
         if (name) addToast(`角色 ${name} 已重置`, 'success')
         onupdate(localTeam)
+        onreset?.()
     }
 
     async function handleSelectCharacter(item: unknown) {
