@@ -8,16 +8,19 @@
   <a href="https://wuwa-afyg-tool.200503.xyz/"><img src="https://img.shields.io/badge/Live-Demo-22c55e?logo=internetexplorer&logoColor=white" alt="Live Demo"></a>
 </p>
 
-《鸣潮》（Wuthering Waves）声骸配装 & 伤害计算工具。声骸 Cost 管理、词条筛选、Buff 配置、排轴伤害模拟一站式完成。
+适合所有人的《鸣潮》拉表、排轴、配装对比计算工具。
+
+主站：[https://wuwa-藕粉椰果-tool.200503.xyz/](https://wuwa-afyg-tool.200503.xyz/)
+
+副站：[https://wuwa-活泼椰果-tool.200503.xyz/](https://wuwa-hpyg-tool.200503.xyz/)
 
 ## 功能
 
-- **队伍配置** — 选择角色、武器，自动推荐配装
-- **声骸配装** — Cost 分配、主词条/副词条配置、随机强化模拟
-- **排轴** — 技能序列编排，直观的伤害时间轴
-- **拉表计算** — Buff 叠加、伤害乘区计算、伤害期望分析
-- **词条/环境配置** — 声骸副词条管理、怪物属性与抗性设置
-- **数据分析** — 多维度伤害构成分析
+- **队伍配置** — 选择角色、武器、首位声骸、套装
+- **排轴** — 序列编排操作块和时间参考线，准确的二合一排轴
+- **拉表** — 支持 Buff-全览、Buff-差异 模式，给每一段伤害配置 Buff
+- **词条/环境配置** — 声骸主副词条配置、敌怪环境设置
+- **结果：数据分析** — 具体、分段、清晰的伤害计算过程及DPS、伤害占比
 
 ## 技术栈
 
@@ -30,14 +33,16 @@
 | 样式 | TailwindCSS                                                                       |
 | 图标 | [Iconify](https://iconify.design/) (`@iconify/svelte` + Material Design Icons)    |
 
-## 本地开发
+## 本地
+
+### 开发
 
 ```bash
 pnpm install
 pnpm run dev
 ```
 
-## 构建 & 预览
+### 构建 & 预览
 
 ```bash
 pnpm run build
@@ -46,13 +51,11 @@ pnpm run preview
 
 ## 部署
 
-项目支持 **Vercel** 与 **Cloudflare Pages** 双平台部署。构建时通过 `DEPLOY_TARGET` 环境变量切换适配器。
+项目直接支持 **Vercel** 与 **Cloudflare Pages** 双平台部署。构建时通过 `DEPLOY_TARGET` 环境变量切换适配器。
 
 ### Vercel
 
 默认适配器，push 到 `main` 分支后 Vercel 自动部署（无需额外配置）。
-
-在线地址：[https://wuwa-afyg-tool.200503.xyz/](https://wuwa-afyg-tool.200503.xyz/)
 
 ### Cloudflare Pages
 
@@ -64,6 +67,47 @@ pnpm run preview
 | 构建命令     | `DEPLOY_TARGET=cloudflare pnpm run build` |
 | 构建输出目录 | `.svelte-kit/cloudflare`                  |
 | 环境变量     | `DEPLOY_TARGET` = `cloudflare`            |
+
+## API
+
+API 基于 [Nanoka.cc](https://nanoka.cc) 精简提纯，随版本自动更新。
+
+### 列表
+
+```
+GET /api/v1/list/character
+GET /api/v1/list/weapon
+GET /api/v1/list/echo
+GET /api/v1/list/echo-set
+```
+
+### 图标
+
+```
+GET /api/v1/icons/character
+GET /api/v1/icons/weapon
+GET /api/v1/icons/echo
+GET /api/v1/icons/element
+GET /api/v1/icons/weapon-type
+GET /api/v1/icons/echo-set
+GET /api/v1/icons/ui-btn
+```
+
+### 详情
+
+```
+GET /api/v1/info/character/:name
+GET /api/v1/info/weapon/:name
+GET /api/v1/info/echo/:name
+GET /api/v1/info/echo-set/:name
+```
+
+### 推荐
+
+```
+GET /api/v1/recommend/:character
+GET /api/v1/recommend-weapon/:character
+```
 
 ## 声明
 

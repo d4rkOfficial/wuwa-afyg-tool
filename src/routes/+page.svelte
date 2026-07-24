@@ -490,7 +490,7 @@
                     </svg>
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
                     <p class="mb-6 text-sm text-zinc-500">
-                        鸣潮社区公益工具喵~ 公测中，即将开源！游戏数据版本:{getWWVersion()}
+                        鸣潮社区公益工具！ 游戏数据版本:{getWWVersion()}
                     </p>
                     <button
                         onclick={() => {
