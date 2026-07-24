@@ -88,6 +88,15 @@ export function updateResistance(element: string, value: number) {
     _config.enemy.resistances[element] = value
 }
 
+export function moveSubstat(charIndex: number, slotIndex: number, fromIdx: number, toIdx: number) {
+    if (!assertUnlocked()) return
+    const slots = _config.characters[charIndex].echoes[slotIndex]
+    const item = slots.substats[fromIdx]
+    const arr = slots.substats.filter((_, i) => i !== fromIdx)
+    arr.splice(toIdx, 0, item)
+    slots.substats = arr
+}
+
 export function getCalcState(): ConfigState {
     return JSON.parse(JSON.stringify(_config))
 }

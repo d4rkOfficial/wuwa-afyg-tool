@@ -308,7 +308,24 @@
                                     style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                     onclick={(e) => e.stopPropagation()}
                                 />
+
                                 <span class="text-[10px] opacity-40">秒</span>
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 16)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+16s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 20)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+20s</button
+                                >
                                 <button
                                     onclick={(e) => {
                                         e.stopPropagation()
@@ -320,10 +337,34 @@
                                 <button
                                     onclick={(e) => {
                                         e.stopPropagation()
+                                        setQuickSeconds(rl.id, 28)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+28s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
                                         setQuickSeconds(rl.id, 30)
                                     }}
                                     class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
                                     style="background: var(--theme-accent-bg); color: white;">+30s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 32)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+32s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 35)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+35s</button
                                 >
                                 {#if selIdx > 0}
                                     <span class="text-[10px]" style="color: var(--theme-accent-text); opacity: 0.6;"

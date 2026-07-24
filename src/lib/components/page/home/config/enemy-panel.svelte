@@ -6,12 +6,25 @@
 
     let config = $derived(getConfig())
 
+    function computeDefense(lv: number): number {
+        return 792 + 8 * lv
+    }
+
     function handleTypeChange(type: 'BOSS' | '精英怪' | '小怪') {
         updateEnemy('type', type)
-        updateEnemy('defense', 1592)
+        updateEnemy('defense', computeDefense(config.enemy.level))
+        updateEnemy('defenseLocked', false)
     }
 
     const LEVEL_PRESETS = [70, 80, 90, 100, 110, 120]
+
+    function handleLevelChange(lv: number) {
+        const clamped = Math.min(150, Math.max(0, lv))
+        updateEnemy('level', clamped)
+        if (!config.enemy.defenseLocked) {
+            updateEnemy('defense', computeDefense(clamped))
+        }
+    }
 
     function elementColor(el: string): string {
         return (ELEMENT_COLORS as Record<string, string>)[el] ?? '#888'
@@ -29,93 +42,89 @@
 </script>
 
 <div class="space-y-4">
-    <!-- Type card -->
+    <!-- Enemy card (type + level + defense) -->
     <div
         class="rounded-lg border p-3.5"
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
-        <div class="flex items-center justify-between mb-2.5">
-            <span class="text-xs font-medium text-[var(--theme-modal-text)]/70">类型</span>
-        </div>
-        <div class="flex gap-2">
+        <span class="text-xs font-medium text-[var(--theme-modal-text)]/70 block mb-3">怪物属性</span>
+
+        <div class="flex items-center gap-1 min-w-0">
             {#each ['BOSS', '精英怪', '小怪'] as t}
                 {@const icon = t === 'BOSS' ? 'mdi:skull' : t === '精英怪' ? 'mdi:sword' : 'mdi:bug'}
                 <button
                     onclick={() => handleTypeChange(t as 'BOSS' | '精英怪' | '小怪')}
                     class={[
-                        'rounded-lg px-4 py-2 text-xs font-medium transition-colors inline-flex items-center gap-1.5',
+                        'rounded-lg text-[10px] font-medium transition-colors flex flex-col items-center justify-center gap-0.5 w-12 aspect-square',
                         config.enemy.type === t
                             ? 'bg-[var(--theme-accent-bg)]/15 text-[var(--theme-accent-text)] ring-1 ring-[var(--theme-accent-bg)]/30'
                             : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/10'
                     ].join(' ')}
                 >
-                    <Icon {icon} class="size-3.5" />
+                    <Icon {icon} class="size-4 shrink-0" />
                     {t}
                 </button>
             {/each}
-        </div>
-    </div>
 
-    <!-- Stats card -->
-    <div
-        class="rounded-lg border p-3.5"
-        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-    >
-        <span class="text-xs font-medium text-[var(--theme-modal-text)]/70 block mb-3">基础属性</span>
+            <!-- Divider -->
+            <div
+                class="border-l border-dashed self-stretch mx-2"
+                style="border-color: var(--theme-divider-border);"
+            ></div>
 
-        <div class="space-y-3">
-            <!-- Level -->
-            <div>
-                <span class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1.5">等级</span>
+            <!-- Right: level + defense -->
+            <div class="flex flex-col gap-2 min-w-0 flex-1">
+                <!-- Level -->
                 <div class="flex items-center gap-1.5">
-                    {#each LEVEL_PRESETS as lv}
-                        <button
-                            onclick={() => updateEnemy('level', lv)}
-                            class={[
-                                'min-w-9 h-7 rounded-md text-xs font-medium transition-colors',
-                                config.enemy.level === lv
-                                    ? 'bg-[var(--theme-accent-bg)]/15 text-[var(--theme-accent-text)] ring-1 ring-[var(--theme-accent-bg)]/30'
-                                    : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/50 hover:bg-[var(--theme-modal-text)]/10'
-                            ].join(' ')}>{lv}</button
-                        >
-                    {/each}
-                    <div class="relative ml-1">
+                    <span class="text-[10px] text-[var(--theme-modal-text)]/50 shrink-0 w-6">等级</span>
+                    <div class="relative">
                         <input
                             type="number"
                             value={config.enemy.level}
                             min="0"
                             max="150"
-                            oninput={(e) =>
-                                updateEnemy(
-                                    'level',
-                                    Math.min(150, Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0))
-                                )}
-                            class="w-14 rounded-md border px-2 py-1 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
+                            oninput={(e) => handleLevelChange(parseInt((e.target as HTMLInputElement).value) || 0)}
+                            disabled={config.enemy.defenseLocked}
+                            class="w-28 h-6 rounded-md border px-2 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            class:opacity-70={config.enemy.defenseLocked}
                         />
                     </div>
+                    <div class="flex items-center gap-1.5">
+                        {#each LEVEL_PRESETS as lv}
+                            <button
+                                onclick={() => handleLevelChange(lv)}
+                                disabled={config.enemy.defenseLocked}
+                                class={[
+                                    'min-w-7 h-6 rounded-md text-xs font-medium transition-colors',
+                                    config.enemy.level === lv
+                                        ? 'bg-[var(--theme-accent-bg)]/15 text-[var(--theme-accent-text)] ring-1 ring-[var(--theme-accent-bg)]/30'
+                                        : 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]/50 hover:bg-[var(--theme-modal-text)]/10'
+                                ].join(' ')}>{lv}</button
+                            >
+                        {/each}
+                    </div>
                 </div>
-            </div>
 
-            <!-- Defense -->
-            <div>
-                <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-[10px] text-[var(--theme-modal-text)]/50">防御</span>
-                    <span class="text-[9px] text-[var(--theme-modal-text)]/30">切换类型自动推荐 1592</span>
-                </div>
-                <div class="flex items-center gap-2">
+                <!-- Defense -->
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] text-[var(--theme-modal-text)]/50 shrink-0 w-6">防御</span>
                     <input
                         type="number"
                         value={config.enemy.defense}
                         min="0"
                         max="5000"
-                        oninput={(e) =>
+                        oninput={(e) => {
                             updateEnemy(
                                 'defense',
                                 Math.min(5000, Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0))
-                            )}
-                        class="flex-1 rounded-md border px-3 py-1.5 text-xs tabular-nums text-[var(--theme-modal-text)] outline-none"
+                            )
+                            updateEnemy('defenseLocked', true)
+                        }}
+                        disabled={config.enemy.defenseLocked}
+                        class="w-28 h-6 rounded-md border px-2 text-xs text-right tabular-nums text-[var(--theme-modal-text)] outline-none"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                        class:opacity-70={config.enemy.defenseLocked}
                     />
                 </div>
             </div>

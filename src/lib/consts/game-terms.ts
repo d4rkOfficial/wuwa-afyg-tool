@@ -99,6 +99,7 @@ export const BASE_STAT_FIXED = '固定'
 // ── Enemy ──
 export const ENEMY_TYPES = ['BOSS', '精英怪', '小怪'] as const
 export type EnemyType = (typeof ENEMY_TYPES)[number]
+export const CHAR_LEVEL = 90
 
 // ── Phase ──
 export const PHASE_KEYS = ['team', 'timeline', 'calculation', 'config'] as const

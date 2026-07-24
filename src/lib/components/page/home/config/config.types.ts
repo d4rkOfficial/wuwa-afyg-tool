@@ -15,6 +15,7 @@ export interface EnemyConfig {
     type: 'BOSS' | '精英怪' | '小怪'
     level: number
     defense: number
+    defenseLocked?: boolean
     resistances: Record<string, number>
     dmgReduction: number
 }

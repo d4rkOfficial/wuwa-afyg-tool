@@ -208,7 +208,9 @@ export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
     const skills: SkillEntry[] = []
     const statNodes: StatNode[] = []
     const elementName = (ELEMENT_MAP[data.element] ?? '') as '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'
-    const hasTune = Object.values(data.tag ?? {}).some((t) => t.name === '震谐响应' || t.name === '集谐响应')
+    const hasTune = Object.values(data.tag ?? {}).some(
+        (t) => t.name === '震谐响应' || t.name === '集谐响应' || t.name === '骇破响应'
+    )
     baseStats.tune = hasTune ? 10 : 0
 
     for (const node of Object.values(data.skill_trees)) {

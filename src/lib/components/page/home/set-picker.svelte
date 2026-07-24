@@ -18,7 +18,7 @@
     let selected = $state<SelectedSet[]>([])
 
     $effect(() => {
-        if (open) selected = structuredClone(initialSets)
+        if (open) selected = initialSets.map((s) => ({ ...s }))
     })
 
     let totalPieces = $derived.by(() => {

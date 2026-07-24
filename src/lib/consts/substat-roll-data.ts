@@ -162,13 +162,15 @@ function rollTier(pool: SubstatRollPool): number {
     return pool.tierPools[pool.tierPools.length - 1].value
 }
 
-// ── roll one substat ──
+// ── shuffle (Fisher-Yates) ──
 
-function rollOneSubstat(): EchoStat {
-    const type = ROLLABLE_TYPES[Math.floor(Math.random() * ROLLABLE_TYPES.length)]
-    const pool = POOLS[type]
-    const value = rollTier(pool)
-    return { type, value, unit: pool.unit }
+function shuffle<T>(arr: T[]): T[] {
+    const a = [...arr]
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[a[i], a[j]] = [a[j], a[i]]
+    }
+    return a
 }
 
 // ── check if array contains all target types ──
@@ -184,9 +186,7 @@ export function simulateEnhancement(targetTypes: string[]): { substats: EchoStat
     let attempts = 0
     while (true) {
         attempts++
-        // pick 5 distinct types
-        const shuffled = [...ROLLABLE_TYPES].sort(() => Math.random() - 0.5)
-        const picked = shuffled.slice(0, 5)
+        const picked = shuffle(ROLLABLE_TYPES).slice(0, 5)
         const substats: EchoStat[] = picked.map((type) => {
             const pool = POOLS[type]
             const value = rollTier(pool)

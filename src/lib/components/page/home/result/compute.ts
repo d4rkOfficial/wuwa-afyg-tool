@@ -9,13 +9,24 @@ import {
     TYPE_BONUS_MAP,
     ELEMENT_BONUS_MAP,
     WEAPON_SUBSTAT_NAME_MAP,
-    SUBSTAT_DECIMAL_TO_PCT
+    SUBSTAT_DECIMAL_TO_PCT,
+    CHAR_LEVEL
 } from '$lib/consts/game-terms'
 
 // ── helpers ──
 
 function clamp(v: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, v))
+}
+
+import type { EnemyConfig } from '../config/config.types'
+
+function computeDefMulti(enemy: EnemyConfig, defPen: number, defDown: number): number {
+    const defBase = enemy.defense
+    const totalCut = (defPen + defDown) / 100
+    const defEff = Math.max(defBase * (1 - totalCut), 0)
+    const charTerm = 800 + 8 * CHAR_LEVEL
+    return Math.max(charTerm / (defEff + charTerm), 0.01)
 }
 
 const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
@@ -439,8 +450,7 @@ function computeResultEntry(
     const critAvg = 1 + critDecimal * (critDmgDecimal - 1)
 
     // defense zone
-    const defFactor = 792 + enemy.level * 8
-    const defMulti = enemy.defense / (defFactor * (1 - stats.defPen / 100) * (1 - stats.defDown / 100) + enemy.defense)
+    const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
 
     // resistance zone
     const baseResist = (enemy.resistances[entry.damageElement] ?? 0) / 100
@@ -586,8 +596,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
     const harmonyZone = 1 + stats.totalTune / 100
 
     // defense zone (same as direct damage)
-    const defFactor = 792 + enemy.level * 8
-    const defMulti = enemy.defense / (defFactor * (1 - stats.defPen / 100) * (1 - stats.defDown / 100) + enemy.defense)
+    const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
 
     // resistance zone (element from entry)
     const baseResist = (enemy.resistances[entry.damageElement] ?? 0) / 100
@@ -697,8 +706,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
     const baseValue = Math.round(EFFECT_BASE_VALUE * ratioNum)
 
     // defense zone
-    const defFactor = 792 + enemy.level * 8
-    const defMulti = enemy.defense / (defFactor * (1 - stats.defPen / 100) * (1 - stats.defDown / 100) + enemy.defense)
+    const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
 
     // resistance zone
     const baseResist = (enemy.resistances[element] ?? 0) / 100

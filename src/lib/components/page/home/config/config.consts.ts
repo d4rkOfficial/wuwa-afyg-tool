@@ -16,7 +16,8 @@ export function defaultEnemy(): EnemyConfig {
     return {
         type: '精英怪',
         level: 90,
-        defense: 1592,
+        defense: 792 + 8 * 90,
+        defenseLocked: false,
         resistances: Object.fromEntries(RESISTANCE_KEYS.map((k) => [k, 0])),
         dmgReduction: 0
     }
