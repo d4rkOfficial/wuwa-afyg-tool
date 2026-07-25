@@ -212,7 +212,7 @@
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
-    class="fixed inset-0 z-50 flex items-start justify-center pt-12 pb-8 backdrop-blur-sm"
+    class="fixed inset-0 z-50 flex items-start justify-center pt-12 pb-8 overflow-hidden backdrop-blur-sm"
     style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
     onclick={handleClose}
     role="dialog"
@@ -221,265 +221,257 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="w-185 max-h-[85vh] rounded-xl border shadow-2xl"
+        class="w-185 max-h-[85vh] overflow-y-auto rounded-xl border shadow-2xl"
         style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
-        <div class="h-full overflow-y-auto rounded-xl">
-            <!-- Header -->
-            <div
-                class="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b"
-                style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); backdrop-filter: blur(8px); border-color: var(--theme-divider-border);"
-            >
-                <div class="flex items-center gap-2">
-                    <Icon icon="mdi:chart-box-outline" class="size-4" style="color: var(--theme-accent-text);" />
-                    <span class="text-sm font-medium" style="color: var(--theme-modal-text);">数据分析</span>
-                </div>
-                <button
-                    onclick={handleClose}
-                    class="rounded p-0.5 transition-colors hover:opacity-70"
-                    style="color: var(--theme-modal-text); opacity: 0.4;"
-                >
-                    <Icon icon="mdi:close" class="size-4" />
-                </button>
+        <!-- Header -->
+        <div
+            class="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); backdrop-filter: blur(8px); border-color: var(--theme-divider-border);"
+        >
+            <div class="flex items-center gap-2">
+                <Icon icon="mdi:chart-box-outline" class="size-4" style="color: var(--theme-accent-text);" />
+                <span class="text-sm font-medium" style="color: var(--theme-modal-text);">数据分析</span>
             </div>
+            <button
+                onclick={handleClose}
+                class="rounded p-0.5 transition-colors hover:opacity-70"
+                style="color: var(--theme-modal-text); opacity: 0.4;"
+            >
+                <Icon icon="mdi:close" class="size-4" />
+            </button>
+        </div>
 
-            <!-- Damage numbers -->
-            <div class="px-6 py-4 border-b" style="border-color: var(--theme-divider-border);">
-                <div class="grid grid-cols-4 gap-4">
-                    {#each charSummaries as cs, i}
-                        {@const el = charElements[cs.character]}
-                        {@const color = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'}
-                        <div>
-                            <div class="text-[10px] mb-1" style="color: {color};">{cs.character || '—'}</div>
-                            <div class="text-xs tabular-nums" style="color: var(--theme-modal-text);">
-                                {Math.round(cs.totalDamage).toLocaleString()}
-                            </div>
-                            <div class="text-[10px] tabular-nums" style="color: var(--theme-modal-text); opacity: 0.4;">
-                                {((cs.totalDamage / totalDamage) * 100).toFixed(1)}%
-                            </div>
+        <!-- Damage numbers -->
+        <div class="px-6 py-4 border-b" style="border-color: var(--theme-divider-border);">
+            <div class="grid grid-cols-4 gap-4">
+                {#each charSummaries as cs, i}
+                    {@const el = charElements[cs.character]}
+                    {@const color = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'}
+                    <div>
+                        <div class="text-[10px] mb-1" style="color: {color};">{cs.character || '—'}</div>
+                        <div class="text-xs tabular-nums" style="color: var(--theme-modal-text);">
+                            {Math.round(cs.totalDamage).toLocaleString()}
+                        </div>
+                        <div class="text-[10px] tabular-nums" style="color: var(--theme-modal-text); opacity: 0.4;">
+                            {((cs.totalDamage / totalDamage) * 100).toFixed(1)}%
+                        </div>
+                    </div>
+                {/each}
+                <div>
+                    <div class="text-[10px] mb-1 font-semibold" style="color: var(--theme-accent-text);">总伤害</div>
+                    <div class="text-xs tabular-nums font-bold" style="color: var(--theme-accent-text);">
+                        {Math.round(totalDamage).toLocaleString()}
+                    </div>
+                    <div
+                        class="text-[10px] tabular-nums font-semibold"
+                        style="color: var(--theme-accent-text); opacity: 0.6;"
+                    >
+                        100%
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timing configuration -->
+        <div class="px-6 py-4 border-b" style="border-color: var(--theme-divider-border);">
+            <div class="text-xs font-medium mb-3" style="color: var(--theme-modal-text);">时间记点配置</div>
+            {#if refLines.length === 0}
+                <div class="text-[11px]" style="color: var(--theme-modal-text); opacity: 0.4;">暂无时间参考线</div>
+            {:else}
+                <div class="space-y-1.5">
+                    {#each refLines as rl}
+                        {@const isSelected = timings.some((t) => t.refLineId === rl.id)}
+                        {@const selIdx = sortedTimings.findIndex((t) => t.refLineId === rl.id)}
+                        {@const prevSeconds = selIdx > 0 ? sortedTimings[selIdx - 1].seconds : 0}
+                        <div
+                            class="flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer text-xs select-none transition-colors"
+                            style="border-color: {isSelected
+                                ? 'var(--theme-accent-bg)'
+                                : 'var(--theme-divider-border)'}; background: {isSelected
+                                ? 'color-mix(in srgb, var(--theme-accent-bg) 8%, transparent)'
+                                : 'transparent'}; color: var(--theme-modal-text);"
+                            onclick={() => toggleRefLine(rl.id)}
+                            role="button"
+                            tabindex="0"
+                        >
+                            <span class="w-16 truncate opacity-60">{rl.time || '—'}</span>
+                            {#if isSelected}
+                                <input
+                                    type="number"
+                                    value={timings.find((t) => t.refLineId === rl.id)?.seconds ?? 0}
+                                    oninput={(e) => updateSeconds(rl.id, (e.target as HTMLInputElement).value)}
+                                    min={prevSeconds}
+                                    step="0.1"
+                                    class="w-20 rounded border px-2 py-1 text-xs text-right tabular-nums outline-none"
+                                    style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                                    onclick={(e) => e.stopPropagation()}
+                                />
+
+                                <span class="text-[10px] opacity-40">秒</span>
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 16)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+16s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 20)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+20s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 25)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+25s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 28)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+28s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 30)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+30s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 32)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+32s</button
+                                >
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        setQuickSeconds(rl.id, 35)
+                                    }}
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                                    style="background: var(--theme-accent-bg); color: white;">+35s</button
+                                >
+                                {#if selIdx > 0}
+                                    <span class="text-[10px]" style="color: var(--theme-accent-text); opacity: 0.6;"
+                                        >(≥ {prevSeconds.toFixed(1)}s)</span
+                                    >
+                                {/if}
+                            {/if}
                         </div>
                     {/each}
-                    <div>
-                        <div class="text-[10px] mb-1 font-semibold" style="color: var(--theme-accent-text);">
-                            总伤害
-                        </div>
-                        <div class="text-xs tabular-nums font-bold" style="color: var(--theme-accent-text);">
-                            {Math.round(totalDamage).toLocaleString()}
-                        </div>
-                        <div
-                            class="text-[10px] tabular-nums font-semibold"
-                            style="color: var(--theme-accent-text); opacity: 0.6;"
-                        >
-                            100%
-                        </div>
-                    </div>
                 </div>
-            </div>
+            {/if}
+        </div>
 
-            <!-- Timing configuration -->
-            <div class="px-6 py-4 border-b" style="border-color: var(--theme-divider-border);">
-                <div class="text-xs font-medium mb-3" style="color: var(--theme-modal-text);">时间记点配置</div>
-                {#if refLines.length === 0}
-                    <div class="text-[11px]" style="color: var(--theme-modal-text); opacity: 0.4;">暂无时间参考线</div>
-                {:else}
-                    <div class="space-y-1.5">
-                        {#each refLines as rl}
-                            {@const isSelected = timings.some((t) => t.refLineId === rl.id)}
-                            {@const selIdx = sortedTimings.findIndex((t) => t.refLineId === rl.id)}
-                            {@const prevSeconds = selIdx > 0 ? sortedTimings[selIdx - 1].seconds : 0}
-                            <div
-                                class="flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer text-xs select-none transition-colors"
-                                style="border-color: {isSelected
-                                    ? 'var(--theme-accent-bg)'
-                                    : 'var(--theme-divider-border)'}; background: {isSelected
-                                    ? 'color-mix(in srgb, var(--theme-accent-bg) 8%, transparent)'
-                                    : 'transparent'}; color: var(--theme-modal-text);"
-                                onclick={() => toggleRefLine(rl.id)}
-                                role="button"
-                                tabindex="0"
-                            >
-                                <span class="w-16 truncate opacity-60">{rl.time || '—'}</span>
-                                {#if isSelected}
-                                    <input
-                                        type="number"
-                                        value={timings.find((t) => t.refLineId === rl.id)?.seconds ?? 0}
-                                        oninput={(e) => updateSeconds(rl.id, (e.target as HTMLInputElement).value)}
-                                        min={prevSeconds}
-                                        step="0.1"
-                                        class="w-20 rounded border px-2 py-1 text-xs text-right tabular-nums outline-none"
-                                        style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
-                                        onclick={(e) => e.stopPropagation()}
-                                    />
-
-                                    <span class="text-[10px] opacity-40">秒</span>
-                                    <button
-                                        onclick={(e) => {
-                                            e.stopPropagation()
-                                            setQuickSeconds(rl.id, 16)
-                                        }}
-                                        class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                        style="background: var(--theme-accent-bg); color: white;">+16s</button
-                                    >
-                                    <button
-                                        onclick={(e) => {
-                                            e.stopPropagation()
-                                            setQuickSeconds(rl.id, 20)
-                                        }}
-                                        class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                        style="background: var(--theme-accent-bg); color: white;">+20s</button
-                                    >
-                                    <button
-                                        onclick={(e) => {
-                                            e.stopPropagation()
-                                            setQuickSeconds(rl.id, 25)
-                                        }}
-                                        class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                        style="background: var(--theme-accent-bg); color: white;">+25s</button
-                                    >
-                                    <button
-                                        onclick={(e) => {
-                                            e.stopPropagation()
-                                            setQuickSeconds(rl.id, 28)
-                                        }}
-                                        class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                        style="background: var(--theme-accent-bg); color: white;">+28s</button
-                                    >
-                                    <button
-                                        onclick={(e) => {
-                                            e.stopPropagation()
-                                            setQuickSeconds(rl.id, 30)
-                                        }}
-                                        class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                        style="background: var(--theme-accent-bg); color: white;">+30s</button
-                                    >
-                                    <button
-                                        onclick={(e) => {
-                                            e.stopPropagation()
-                                            setQuickSeconds(rl.id, 32)
-                                        }}
-                                        class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                        style="background: var(--theme-accent-bg); color: white;">+32s</button
-                                    >
-                                    <button
-                                        onclick={(e) => {
-                                            e.stopPropagation()
-                                            setQuickSeconds(rl.id, 35)
-                                        }}
-                                        class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                        style="background: var(--theme-accent-bg); color: white;">+35s</button
-                                    >
-                                    {#if selIdx > 0}
-                                        <span class="text-[10px]" style="color: var(--theme-accent-text); opacity: 0.6;"
-                                            >(≥ {prevSeconds.toFixed(1)}s)</span
-                                        >
+        <!-- DPS table -->
+        <div class="px-6 py-4 border-b" style="border-color: var(--theme-divider-border);">
+            <div class="text-xs font-medium mb-3" style="color: var(--theme-modal-text);">分段 DPS</div>
+            {#if segments.length === 0}
+                <div class="text-xs" style="color: var(--theme-modal-text); opacity: 0.4;">请先在上方选择时间记点</div>
+            {:else}
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr style="color: var(--theme-modal-text); opacity: 0.5;">
+                                <th class="text-left font-medium py-1.5 pr-2">时段</th>
+                                <th class="text-right font-medium py-1.5 px-2">跨度</th>
+                                <th class="text-right font-medium py-1.5 px-2">总伤</th>
+                                <th class="text-right font-medium py-1.5 pl-2">总 DPS</th>
+                                {#each team as slot}
+                                    {#if slot.character}
+                                        <th class="text-right font-medium py-1.5 pl-2">{slot.character}</th>
                                     {/if}
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                {/if}
-            </div>
-
-            <!-- DPS table -->
-            <div class="px-6 py-4 border-b" style="border-color: var(--theme-divider-border);">
-                <div class="text-xs font-medium mb-3" style="color: var(--theme-modal-text);">分段 DPS</div>
-                {#if segments.length === 0}
-                    <div class="text-xs" style="color: var(--theme-modal-text); opacity: 0.4;">
-                        请先在上方选择时间记点
-                    </div>
-                {:else}
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs">
-                            <thead>
-                                <tr style="color: var(--theme-modal-text); opacity: 0.5;">
-                                    <th class="text-left font-medium py-1.5 pr-2">时段</th>
-                                    <th class="text-right font-medium py-1.5 px-2">跨度</th>
-                                    <th class="text-right font-medium py-1.5 px-2">总伤</th>
-                                    <th class="text-right font-medium py-1.5 pl-2">总 DPS</th>
+                                {/each}
+                                <th class="text-right font-medium py-1.5 pl-2">其他</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {#each segments as seg}
+                                {@const span = seg.endSeconds - seg.startSeconds}
+                                <tr
+                                    class="border-t"
+                                    style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                                >
+                                    <td class="py-1.5 pr-2 tabular-nums opacity-60">
+                                        {seg.startSeconds.toFixed(1)}s — {seg.endSeconds.toFixed(1)}s
+                                    </td>
+                                    <td class="text-right py-1.5 px-2 tabular-nums">{span.toFixed(1)}s</td>
+                                    <td class="text-right py-1.5 px-2 tabular-nums"
+                                        >{Math.round(seg.totalDamage).toLocaleString()}</td
+                                    >
+                                    <td
+                                        class="text-right py-1.5 pl-2 tabular-nums font-medium"
+                                        style="color: var(--theme-accent-text);"
+                                    >
+                                        {Math.round(seg.totalDamage / span).toLocaleString()}
+                                    </td>
                                     {#each team as slot}
                                         {#if slot.character}
-                                            <th class="text-right font-medium py-1.5 pl-2">{slot.character}</th>
+                                            {@const cd = seg.charDamages[slot.character] ?? 0}
+                                            <td class="text-right py-1.5 pl-2 tabular-nums">
+                                                {cd > 0 ? Math.round(cd / span).toLocaleString() : '—'}
+                                            </td>
                                         {/if}
                                     {/each}
-                                    <th class="text-right font-medium py-1.5 pl-2">其他</th>
+                                    <td class="text-right py-1.5 pl-2 tabular-nums">
+                                        {seg.otherDamage > 0
+                                            ? Math.round(seg.otherDamage / span).toLocaleString()
+                                            : '—'}
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {#each segments as seg}
-                                    {@const span = seg.endSeconds - seg.startSeconds}
-                                    <tr
-                                        class="border-t"
-                                        style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
-                                    >
-                                        <td class="py-1.5 pr-2 tabular-nums opacity-60">
-                                            {seg.startSeconds.toFixed(1)}s — {seg.endSeconds.toFixed(1)}s
-                                        </td>
-                                        <td class="text-right py-1.5 px-2 tabular-nums">{span.toFixed(1)}s</td>
-                                        <td class="text-right py-1.5 px-2 tabular-nums"
-                                            >{Math.round(seg.totalDamage).toLocaleString()}</td
-                                        >
-                                        <td
-                                            class="text-right py-1.5 pl-2 tabular-nums font-medium"
-                                            style="color: var(--theme-accent-text);"
-                                        >
-                                            {Math.round(seg.totalDamage / span).toLocaleString()}
-                                        </td>
-                                        {#each team as slot}
-                                            {#if slot.character}
-                                                {@const cd = seg.charDamages[slot.character] ?? 0}
-                                                <td class="text-right py-1.5 pl-2 tabular-nums">
-                                                    {cd > 0 ? Math.round(cd / span).toLocaleString() : '—'}
-                                                </td>
-                                            {/if}
-                                        {/each}
-                                        <td class="text-right py-1.5 pl-2 tabular-nums">
-                                            {seg.otherDamage > 0
-                                                ? Math.round(seg.otherDamage / span).toLocaleString()
-                                                : '—'}
-                                        </td>
-                                    </tr>
-                                {/each}
-                            </tbody>
-                        </table>
-                    </div>
-                {/if}
-            </div>
-
-            <!-- Pie chart (at bottom) -->
-            <div class="px-6 py-4">
-                <div class="text-xs font-medium mb-3" style="color: var(--theme-modal-text);">伤害占比</div>
-                <div class="flex items-center gap-6">
-                    <div class="shrink-0 w-48 h-48" bind:this={pieContainer}>
-                        <canvas bind:this={pieCanvas}></canvas>
-                    </div>
-                    <div class="space-y-2">
-                        {#each charSummaries as cs, i}
-                            {@const el = charElements[cs.character]}
-                            {@const baseColor = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'}
-                            <div class="flex items-center gap-2 text-xs" style="color: var(--theme-modal-text);">
-                                <span
-                                    class="size-2.5 rounded-full shrink-0"
-                                    style="background: {fadedColor(baseColor, i)};"
-                                ></span>
-                                <span class="tabular-nums">
-                                    {cs.character || '—'}
-                                    <span style="opacity: 0.5;">
-                                        {Math.round(cs.totalDamage).toLocaleString()} ({(
-                                            (cs.totalDamage / totalDamage) *
-                                            100
-                                        ).toFixed(1)}%)
-                                    </span>
-                                </span>
-                            </div>
-                        {/each}
-                    </div>
+                            {/each}
+                        </tbody>
+                    </table>
                 </div>
-                <div
-                    class="sticky bottom-0 h-10 pointer-events-none"
-                    style="background: linear-gradient(to top, var(--theme-modal-bg), transparent);"
-                ></div>
+            {/if}
+        </div>
+
+        <!-- Pie chart (at bottom) -->
+        <div class="px-6 py-4">
+            <div class="text-xs font-medium mb-3" style="color: var(--theme-modal-text);">伤害占比</div>
+            <div class="flex items-center gap-6">
+                <div class="shrink-0 w-48 h-48" bind:this={pieContainer}>
+                    <canvas bind:this={pieCanvas}></canvas>
+                </div>
+                <div class="space-y-2">
+                    {#each charSummaries as cs, i}
+                        {@const el = charElements[cs.character]}
+                        {@const baseColor = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'}
+                        <div class="flex items-center gap-2 text-xs" style="color: var(--theme-modal-text);">
+                            <span class="size-2.5 rounded-full shrink-0" style="background: {fadedColor(baseColor, i)};"
+                            ></span>
+                            <span class="tabular-nums">
+                                {cs.character || '—'}
+                                <span style="opacity: 0.5;">
+                                    {Math.round(cs.totalDamage).toLocaleString()} ({(
+                                        (cs.totalDamage / totalDamage) *
+                                        100
+                                    ).toFixed(1)}%)
+                                </span>
+                            </span>
+                        </div>
+                    {/each}
+                </div>
             </div>
+            <div
+                class="sticky bottom-0 h-10 pointer-events-none"
+                style="background: linear-gradient(to top, var(--theme-modal-bg), transparent);"
+            ></div>
         </div>
     </div>
 </div>

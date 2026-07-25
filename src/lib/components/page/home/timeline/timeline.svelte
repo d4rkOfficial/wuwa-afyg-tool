@@ -299,9 +299,7 @@
                                                     class="size-10 object-contain shrink-0"
                                                 />
                                             {:else}
-                                                <span class="font-bold text-(--theme-timeline-text)"
-                                                    >{block.key}</span
-                                                >
+                                                <span class="font-bold text-(--theme-timeline-text)">{block.key}</span>
                                             {/if}
                                             {#if getEditingBlockId() === block.id}
                                                 <input
