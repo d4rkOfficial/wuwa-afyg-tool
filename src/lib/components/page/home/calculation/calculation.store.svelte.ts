@@ -256,8 +256,10 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                 })
             } else if (nd.category === '效应') {
                 if (nd.name === '电磁爆发') continue
-                const burstND = db.nonDirectEntries.find((n) => n.name === '电磁爆发' && n.category === '效应')
-                const burstLayers = burstND?.layers ?? 0
+                const isDianci = nd.name === '电磁效应'
+                const burstLayers = isDianci
+                    ? (db.nonDirectEntries.find((n) => n.name === '电磁爆发' && n.category === '效应')?.layers ?? 0)
+                    : 0
                 const id = `${db.id}-nd|${nd.name}`
                 temp.push({
                     item: {
@@ -266,7 +268,7 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         skillType: '效应结算',
                         hitName: nd.name,
                         displayName:
-                            burstLayers > 0
+                            isDianci && burstLayers > 0
                                 ? nd.name + nd.layers + '层+爆发' + burstLayers + '层'
                                 : nd.name + nd.layers + '层',
                         isEffect: true,
@@ -277,7 +279,7 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         damageBaseType: '效应系数',
                         damageElement: NON_DIRECT_ELEMENT[nd.name] ?? '',
                         sourceTimelineBlockId: db.sourceId,
-                        burstLayers,
+                        burstLayers: isDianci ? burstLayers : 0,
                         hits: 1
                     },
                     pos,
