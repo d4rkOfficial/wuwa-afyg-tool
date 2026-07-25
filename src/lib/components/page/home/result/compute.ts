@@ -493,7 +493,7 @@ function computeResultEntry(
         finalDmg *
         customMult
     const nonCritPerHit = Math.round(nonCritRaw)
-    const critPerHit = Math.round(nonCritRaw * (1 + critDmgDecimal))
+    const critPerHit = Math.round(nonCritRaw * critDmgDecimal)
 
     const expectedPerHit = Math.round(
         baseValue *

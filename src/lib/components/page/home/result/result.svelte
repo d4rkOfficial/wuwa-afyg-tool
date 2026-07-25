@@ -413,9 +413,9 @@
                                                 <div class="font-sans space-y-0.5 flex-1">
                                                     <div>不暴击 = {entry.nonCritPerHit.toLocaleString()}</div>
                                                     <div>
-                                                        暴击 = {entry.nonCritPerHit.toLocaleString()} × (1 + {(
+                                                        暴击 = {entry.nonCritPerHit.toLocaleString()} × {(
                                                             entry.critDmg * 100
-                                                        ).toFixed(1)}%) = {entry.critPerHit.toLocaleString()}
+                                                        ).toFixed(1)}% = {entry.critPerHit.toLocaleString()}
                                                     </div>
                                                     <div
                                                         class="font-bold"
