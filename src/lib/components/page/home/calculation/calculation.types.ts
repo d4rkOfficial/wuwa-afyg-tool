@@ -31,6 +31,9 @@ export interface ZoneRef {
     pct: number
     lower?: number
     upper?: number
+    discrete?: boolean
+    divisor?: number
+    multiplier?: number
 }
 
 export type BuffValue = number | ZoneRef

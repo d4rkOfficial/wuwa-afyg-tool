@@ -41,6 +41,7 @@ const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
     totalDef: 'totalDef',
     recharge: 'recharge',
     tuneBreakBoost: 'totalTuneBreakBoost',
+    offTuneBuildupRate: 'offTuneBuildupRate',
     critRate: 'critRate',
     critDmg: 'critDmg'
 }
@@ -51,7 +52,17 @@ function resolveRefValue(ref: ZoneRef, allCharStats: CharacterComputed[]): numbe
     const key = REF_STAT_MAP[ref.zoneId]
     if (!key) return 0
     const statValue = stats[key] as number
-    let value = ((statValue - ref.threshold) * ref.pct) / 100
+    const excess = statValue - ref.threshold
+    let value: number
+    if (ref.discrete) {
+        if (excess <= 0) return 0
+        const divisor = ref.divisor ?? 1
+        const multiplier = ref.multiplier ?? 0
+        const steps = Math.floor(excess / divisor)
+        value = steps * multiplier
+    } else {
+        value = (excess * ref.pct) / 100
+    }
     if (ref.lower !== undefined) value = Math.max(ref.lower, value)
     if (ref.upper !== undefined) value = Math.min(ref.upper, value)
     return value
@@ -98,6 +109,9 @@ function applyZoneToAccum(zoneId: string, value: number, acc: CharAccum) {
             break
         case 'tuneBreakBoost':
             acc.tuneBreakBoost += value
+            break
+        case 'offTuneBuildupRate':
+            acc.offTuneBuildupRate += value
             break
     }
 }
@@ -157,6 +171,7 @@ interface CharAccum {
     critDmg: number
     recharge: number
     tuneBreakBoost: number
+    offTuneBuildupRate: number
     elementBonus: Record<string, number>
     typeBonus: Record<string, number>
 }
@@ -173,6 +188,7 @@ function emptyAccum(): CharAccum {
         critDmg: 150,
         recharge: 100,
         tuneBreakBoost: 0,
+        offTuneBuildupRate: 100,
         elementBonus: {},
         typeBonus: {}
     }
@@ -213,6 +229,7 @@ interface CharacterComputed {
     totalHp: number
     totalDef: number
     totalTuneBreakBoost: number
+    offTuneBuildupRate: number
     recharge: number
     atkPctSum: number
     atkFlatSum: number
@@ -229,7 +246,7 @@ interface CharacterComputed {
     defPen: number
     defDown: number
     resDown: number
-    tuneStrain: number
+    tuneStrainLayer: number
     finalDmg: number
     dmgTakenInc: number
     customMult: number
@@ -287,7 +304,7 @@ function computeCharacterStats(
         defPen = 0,
         defDown = 0
     let resDown = 0,
-        tuneStrain = 0
+        tuneStrainLayer = 0
     let finalDmg = 0,
         dmgTakenInc = 0
     let customMult = 0,
@@ -319,7 +336,7 @@ function computeCharacterStats(
                     resDown += value
                     break
                 case 'tuneStrainLayer':
-                    tuneStrain += value
+                    tuneStrainLayer += value
                     break
                 case 'finalDmg':
                     finalDmg += value
@@ -356,6 +373,7 @@ function computeCharacterStats(
         totalHp: baseHp + hpGreen,
         totalDef: baseDef + defGreen,
         totalTuneBreakBoost,
+        offTuneBuildupRate: acc.offTuneBuildupRate,
         recharge: acc.recharge,
         atkPctSum: acc.pctAtk,
         atkFlatSum: acc.flatAtk,
@@ -371,7 +389,7 @@ function computeCharacterStats(
         defPen,
         defDown,
         resDown,
-        tuneStrain,
+        tuneStrainLayer,
         finalDmg,
         dmgTakenInc,
         customMult,
@@ -452,7 +470,7 @@ function computeResultEntry(
     const vulnerability = 1 + stats.dmgTakenInc / 100
     const finalDmg = 1 + stats.finalDmg / 100
     const customMult = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
-    const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * stats.tuneStrain
+    const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * stats.tuneStrainLayer
 
     // crit (cap at 100%)
     const critDecimal = Math.min(stats.critRate, 100) / 100
@@ -527,7 +545,9 @@ function computeResultEntry(
             label: '集谐区',
             value: tuneStrainMulti,
             detail:
-                stats.tuneStrain > 0 ? `(1 + ${((tuneStrainMulti - 1) * 100).toFixed(1)}%)` : tuneStrainMulti.toFixed(4)
+                stats.tuneStrainLayer > 0
+                    ? `(1 + ${((tuneStrainMulti - 1) * 100).toFixed(1)}%)`
+                    : tuneStrainMulti.toFixed(4)
         },
         { label: '终伤区', value: finalDmg, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
         { label: '特殊乘区', value: customMult, detail: customMult.toFixed(4) }
@@ -568,7 +588,7 @@ function computeResultEntry(
         resMulti,
         dmgRedMulti,
         finalDmg: stats.finalDmg / 100,
-        finalTuneStrainMulti: stats.tuneStrain > 0 ? tuneStrainMulti - 1 : 0,
+        finalTuneStrainMulti: stats.tuneStrainLayer > 0 ? tuneStrainMulti - 1 : 0,
         finalTuneBreakZone: 0,
         customMult,
         vulnerability: stats.dmgTakenInc / 100,
@@ -762,6 +782,7 @@ function emptyCharacterStats(): CharacterComputed {
         totalHp: 0,
         totalDef: 0,
         totalTuneBreakBoost: 0,
+        offTuneBuildupRate: 100,
         extraRatio: 0,
         recharge: 100,
         atkPctSum: 0,
@@ -778,7 +799,7 @@ function emptyCharacterStats(): CharacterComputed {
         defPen: 0,
         defDown: 0,
         resDown: 0,
-        tuneStrain: 0,
+        tuneStrainLayer: 0,
         finalDmg: 0,
         dmgTakenInc: 0,
         customMult: 0,
@@ -902,7 +923,7 @@ function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number
             stats.resDown += value
             break
         case 'tuneStrainLayer':
-            stats.tuneStrain += value
+            stats.tuneStrainLayer += value
             break
         case 'finalDmg':
             stats.finalDmg += value
@@ -945,6 +966,9 @@ function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number
             break
         case 'tuneBreakBoost':
             stats.totalTuneBreakBoost += value
+            break
+        case 'offTuneBuildupRate':
+            stats.offTuneBuildupRate += value
             break
     }
     stats.totalAtk = stats.baseAtk + Math.round(stats.atkFlatSum + (stats.baseAtk * stats.atkPctSum) / 100)
