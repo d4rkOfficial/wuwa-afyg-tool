@@ -21,10 +21,13 @@ function clamp(v: number, min: number, max: number): number {
 
 import type { EnemyConfig } from '../config/config.types'
 
+/**
+ * 实战对比验证：鸣潮减防与穿防为独立乘算 (1-减防)×(1-穿防)，
+ * 非加算 (1-减防-穿防)，原算法（加算）低估了减防/穿防收益
+ */
 function computeDefMulti(enemy: EnemyConfig, defPen: number, defDown: number): number {
     const defBase = enemy.defense
-    const totalCut = (defPen + defDown) / 100
-    const defEff = Math.max(defBase * (1 - totalCut), 0)
+    const defEff = Math.max(defBase * (1 - defDown / 100) * (1 - defPen / 100), 0)
     const charTerm = 800 + 8 * CHAR_LEVEL
     return Math.max(charTerm / (defEff + charTerm), 0.01)
 }
