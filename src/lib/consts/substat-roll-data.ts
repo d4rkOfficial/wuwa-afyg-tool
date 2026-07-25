@@ -52,7 +52,7 @@ const POOLS: Record<string, SubstatRollPool> = {
         { value: 7.9, prob: 20.39 },
         { value: 8.6, prob: 24.27 },
         { value: 9.4, prob: 17.48 },
-        { value: 10.2, prob: 14.56 },
+        { value: 10.1, prob: 14.56 },
         { value: 10.9, prob: 5.83 },
         { value: 11.6, prob: 2.91 }
     ]),
@@ -62,7 +62,7 @@ const POOLS: Record<string, SubstatRollPool> = {
         { value: 7.9, prob: 20.39 },
         { value: 8.6, prob: 24.27 },
         { value: 9.4, prob: 17.48 },
-        { value: 10.2, prob: 14.56 },
+        { value: 10.1, prob: 14.56 },
         { value: 10.9, prob: 5.83 },
         { value: 11.6, prob: 2.91 }
     ]),
@@ -82,7 +82,7 @@ const POOLS: Record<string, SubstatRollPool> = {
         { value: 7.9, prob: 20.39 },
         { value: 8.6, prob: 24.27 },
         { value: 9.4, prob: 17.48 },
-        { value: 10.2, prob: 14.56 },
+        { value: 10.1, prob: 14.56 },
         { value: 10.9, prob: 5.83 },
         { value: 11.6, prob: 2.91 }
     ]),
@@ -92,7 +92,7 @@ const POOLS: Record<string, SubstatRollPool> = {
         { value: 7.9, prob: 20.39 },
         { value: 8.6, prob: 24.27 },
         { value: 9.4, prob: 17.48 },
-        { value: 10.2, prob: 14.56 },
+        { value: 10.1, prob: 14.56 },
         { value: 10.9, prob: 5.83 },
         { value: 11.6, prob: 2.91 }
     ]),
@@ -102,7 +102,7 @@ const POOLS: Record<string, SubstatRollPool> = {
         { value: 7.9, prob: 20.39 },
         { value: 8.6, prob: 24.27 },
         { value: 9.4, prob: 17.48 },
-        { value: 10.2, prob: 14.56 },
+        { value: 10.1, prob: 14.56 },
         { value: 10.9, prob: 5.83 },
         { value: 11.6, prob: 2.91 }
     ]),
@@ -112,7 +112,7 @@ const POOLS: Record<string, SubstatRollPool> = {
         { value: 7.9, prob: 20.39 },
         { value: 8.6, prob: 24.27 },
         { value: 9.4, prob: 17.48 },
-        { value: 10.2, prob: 14.56 },
+        { value: 10.1, prob: 14.56 },
         { value: 10.9, prob: 5.83 },
         { value: 11.6, prob: 2.91 }
     ]),

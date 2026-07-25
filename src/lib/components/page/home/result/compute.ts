@@ -1,7 +1,7 @@
 import type { DamageEntry, BuffSet, ZoneRef } from '../calculation/calculation.types'
 import type { ConfigState, EchoSlotConfig } from '../config/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { ResultEntry } from './result.types'
+import type { ResultEntry, MultiplierZone } from './result.types'
 import type { CharSlot } from '$lib/data/types'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
@@ -477,6 +477,21 @@ function computeResultEntry(
         dmgRedMulti *
         critAvg
 
+    // non-crit and crit per hit (all zones except crit)
+    const nonCritRaw =
+        baseValue *
+        deepen *
+        bonus *
+        vulnerability *
+        resMulti *
+        dmgRedMulti *
+        defMulti *
+        tuneStrainMulti *
+        finalDmg *
+        customMult
+    const nonCritPerHit = Math.round(nonCritRaw)
+    const critPerHit = Math.round(nonCritRaw * (1 + critDmgDecimal))
+
     const expectedPerHit = Math.round(
         baseValue *
             deepen *
@@ -490,6 +505,23 @@ function computeResultEntry(
             finalDmg *
             customMult
     )
+
+    const multZones: MultiplierZone[] = [
+        { label: '加深区', value: deepen, detail: `(1 + ${stats.deepenDmg.toFixed(1)}%)` },
+        { label: '增伤区', value: bonus, detail: `(1 + ${totalDmgBonus.toFixed(1)}%)` },
+        { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
+        { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
+        { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
+        { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
+        {
+            label: '集谐区',
+            value: tuneStrainMulti,
+            detail:
+                stats.tuneStrain > 0 ? `(1 + ${((tuneStrainMulti - 1) * 100).toFixed(1)}%)` : tuneStrainMulti.toFixed(4)
+        },
+        { label: '终伤区', value: finalDmg, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
+        { label: '特殊乘区', value: customMult, detail: customMult.toFixed(4) }
+    ]
 
     return {
         id: entry.id,
@@ -508,9 +540,11 @@ function computeResultEntry(
         totalAtk: stats.totalAtk,
         atkPctSum: stats.atkPctSum,
         atkFlatSum: stats.atkFlatSum,
+        baseHp: stats.baseHp,
         totalHp: stats.totalHp,
         hpPctSum: stats.hpPctSum,
         hpFlatSum: stats.hpFlatSum,
+        baseDef: stats.baseDef,
         totalDef: stats.totalDef,
         defPctSum: stats.defPctSum,
         defFlatSum: stats.defFlatSum,
@@ -531,7 +565,10 @@ function computeResultEntry(
             baseValue * deepen * bonus * resMulti * dmgRedMulti * defMulti * tuneStrainMulti * finalDmg * customMult
         ),
         expectedPerHit: Math.round(expectedPerHit),
-        totalDamage: Math.round(expectedPerHit)
+        totalDamage: Math.round(expectedPerHit),
+        nonCritPerHit,
+        critPerHit,
+        multiplierZones: multZones
     }
 }
 
@@ -553,9 +590,11 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         totalAtk: 0,
         atkPctSum: 0,
         atkFlatSum: 0,
+        baseHp: 0,
         totalHp: 0,
         hpPctSum: 0,
         hpFlatSum: 0,
+        baseDef: 0,
         totalDef: 0,
         defPctSum: 0,
         defFlatSum: 0,
@@ -574,7 +613,10 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         vulnerability: 0,
         rawPerHit: 0,
         expectedPerHit: 0,
-        totalDamage: 0
+        totalDamage: 0,
+        nonCritPerHit: 0,
+        critPerHit: 0,
+        multiplierZones: []
     }
 }
 
@@ -619,6 +661,15 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         baseValue * defMulti * resMulti * dmgRedMulti * tuneBreakZone * (1 + finalDmgDec) * customMultVal
     const expectedPerHit = Math.round(totalPerHit)
 
+    const multZones: MultiplierZone[] = [
+        { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
+        { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
+        { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
+        { label: '谐度增幅区', value: tuneBreakZone, detail: `(1 + ${stats.totalTuneBreakBoost.toFixed(1)}%)` },
+        { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
+        { label: '特殊乘区', value: customMultVal, detail: customMultVal.toFixed(4) }
+    ]
+
     return {
         id: entry.id,
         character: entry.character ?? '',
@@ -637,9 +688,11 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         totalAtk: 0,
         atkPctSum: 0,
         atkFlatSum: 0,
+        baseHp: 0,
         totalHp: 0,
         hpPctSum: 0,
         hpFlatSum: 0,
+        baseDef: 0,
         totalDef: 0,
         defPctSum: 0,
         defFlatSum: 0,
@@ -658,7 +711,10 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         vulnerability: 0,
         rawPerHit: expectedPerHit,
         expectedPerHit,
-        totalDamage: expectedPerHit
+        totalDamage: expectedPerHit,
+        nonCritPerHit: expectedPerHit,
+        critPerHit: expectedPerHit,
+        multiplierZones: multZones
     }
 }
 
@@ -729,6 +785,14 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
     const totalPerHit = baseValue * defMulti * resMulti * dmgRedMulti * (1 + finalDmgDec) * customMultVal
     const expectedPerHit = Math.round(totalPerHit)
 
+    const multZones: MultiplierZone[] = [
+        { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
+        { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
+        { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
+        { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
+        { label: '特殊乘区', value: customMultVal, detail: customMultVal.toFixed(4) }
+    ]
+
     return {
         id: entry.id,
         character: entry.character ?? '',
@@ -746,9 +810,11 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         totalAtk: 0,
         atkPctSum: 0,
         atkFlatSum: 0,
+        baseHp: 0,
         totalHp: 0,
         hpPctSum: 0,
         hpFlatSum: 0,
+        baseDef: 0,
         totalDef: 0,
         defPctSum: 0,
         defFlatSum: 0,
@@ -767,7 +833,10 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         vulnerability: 0,
         rawPerHit: expectedPerHit,
         expectedPerHit,
-        totalDamage: expectedPerHit
+        totalDamage: expectedPerHit,
+        nonCritPerHit: expectedPerHit,
+        critPerHit: expectedPerHit,
+        multiplierZones: multZones
     }
 }
 

@@ -19,7 +19,6 @@ import type {
     CustomHit
 } from './timeline.types'
 import {
-    ELEMENT_COLORS,
     PPS,
     SIDE_PAD,
     RIGHT_EXTRA,
@@ -35,6 +34,7 @@ import {
 import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$lib/consts/tune-data'
 import { parseValueString, sumRatioNum } from '$lib/consts/parse-value-string'
 import { addToast } from '$lib/data/toast.svelte'
+import { setCharElements } from '$lib/data/char-elements.svelte'
 
 // ── Core Data ──
 let _refLines = $state<RefLine[]>([
@@ -122,6 +122,7 @@ async function loadCharElements() {
         }
     }
     _charElementMap = elemMap
+    setCharElements(elemMap)
     _charWeaponTypeMap = weapMap
     Object.assign(_skillCache, skillsMap)
 }
@@ -434,7 +435,7 @@ export function elementColor(name: string): string {
     const char = _team.find((s) => s.character === name)
     if (!char) return '#71717a'
     const el = elementNameForChar(char)
-    return (ELEMENT_COLORS as Record<string, string>)[el] ?? '#71717a'
+    return el ? `var(--theme-element-${el})` : '#71717a'
 }
 
 function elementNameForChar(slot: CharSlot): string {

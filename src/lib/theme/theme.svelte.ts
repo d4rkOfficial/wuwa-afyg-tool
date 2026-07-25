@@ -26,7 +26,14 @@ function applyThemeCSS() {
         setCSSVar(root, key, 'border-focused', comp.borderColorFocused)
     }
 
+    if (theme.elementColors) {
+        for (const [name, color] of Object.entries(theme.elementColors)) {
+            root.style.setProperty(`--theme-element-${name}`, color)
+        }
+    }
+
     root.style.setProperty('--theme-layout-scheme', theme.id === 'light' ? 'light' : 'dark')
+    root.style.setProperty('--theme-rigcrit-text', theme.id === 'light' ? '#dc2626' : '#ef4444')
 }
 
 function setCSSVar(root: HTMLElement, key: string, prop: string, value?: string) {

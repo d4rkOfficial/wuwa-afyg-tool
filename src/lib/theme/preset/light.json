@@ -1,6 +1,14 @@
 {
     "id": "light",
     "name": "白天",
+    "elementColors": {
+        "冷凝": "#0284c7",
+        "热熔": "#ea580c",
+        "导电": "#7c3aed",
+        "气动": "#059669",
+        "衍射": "#ca8a04",
+        "湮灭": "#db2777"
+    },
     "components": {
         "avatar": {
             "backgroundImage": "#e2e8f0",

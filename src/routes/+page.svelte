@@ -29,6 +29,7 @@
     import type { ConfigState } from '$lib/components/page/home/config/config.types'
     import { PHASE_LABELS } from '$lib/consts/game-terms'
     import { addToast } from '$lib/data/toast.svelte'
+    import { preloadCharElements } from '$lib/data/char-elements.svelte'
     import {
         loadIcons,
         setShowDamageList,
@@ -66,7 +67,7 @@
     $effect(() => {
         if (!sidebarDragging) return
         const onMove = (e: MouseEvent) => {
-            sidebarWidth = Math.max(160, Math.min(400, e.clientX))
+            sidebarWidth = e.clientX <= 144 ? 52 : Math.max(200, Math.min(400, e.clientX))
         }
         const onUp = () => {
             sidebarDragging = false
@@ -94,6 +95,7 @@
         calculation: false,
         config: false
     })
+    let cloneResult = $state(false)
 
     let deleteModal = $state(false)
     let deleteId = $state('')
@@ -107,6 +109,7 @@
         calculation: false,
         config: false
     })
+    let exportResult = $state(false)
 
     let importInput = $state<HTMLInputElement | undefined>()
 
@@ -125,6 +128,21 @@
 
     $effect(() => {
         if (activeProject) loadCustomHits(activeProject.customSkillHits ?? {})
+    })
+
+    $effect(() => {
+        const names = new Set<string>()
+        for (const p of projects) {
+            for (const s of p.team) {
+                if (s.character) names.add(s.character)
+            }
+            if (p.lockedTeamNames) {
+                for (const n of p.lockedTeamNames) names.add(n)
+            }
+        }
+        if (names.size > 0) {
+            preloadCharElements([...names])
+        }
     })
 
     function handleCreate(name: string) {
@@ -170,12 +188,14 @@
         }
         cloneSelections = selections
 
+        cloneResult = false
         cloneModal = true
     }
 
     async function handleClone() {
         if (!cloneName.trim()) return
         const selected = (Object.entries(cloneSelections) as [PhaseKey, boolean][]).filter(([, v]) => v).map(([k]) => k)
+        if (cloneResult) selected.push('result' as never)
         const p = await cloneProject(cloneId, cloneName.trim(), selected)
         if (p) {
             cloneModal = false
@@ -215,6 +235,7 @@
         }
         for (let i = 0; i < order.length; i++) selections[order[i]] = i <= order.indexOf(activePhase)
         exportSelections = selections
+        exportResult = false
         exportModal = true
     }
 
@@ -239,7 +260,11 @@
             .filter(([, v]) => v)
             .map(([k]) => k)
         const data: Record<string, unknown> = { id: p.id, name: p.name, createdAt: p.createdAt }
-        if (selected.includes('team')) data.team = p.team
+        if (selected.includes('team')) {
+            data.team = p.team
+            if (p.lockedTeamKey) data.lockedTeamKey = p.lockedTeamKey
+            if (p.lockedTeamNames) data.lockedTeamNames = p.lockedTeamNames
+        }
         data.customSkillHits = p.customSkillHits ?? {}
         const phases: Record<string, { locked: boolean; data: unknown }> = {}
         for (const ph of getPhaseOrder()) {
@@ -248,6 +273,9 @@
             }
         }
         data.phases = phases
+        if (exportResult) {
+            data.resultAnalysis = p.resultAnalysis ?? null
+        }
         const blob = new Blob([JSON.stringify({ version: 1, exportedAt: Date.now(), project: data })], {
             type: 'application/json'
         })
@@ -451,6 +479,7 @@
         {projects}
         {activeId}
         width={sidebarWidth}
+        dragging={sidebarDragging}
         oncreate={() => {
             newName = ''
             showNewModal = true
@@ -469,6 +498,7 @@
         style="background: transparent;"
         onmousedown={(e) => {
             e.preventDefault()
+            if (sidebarWidth === 52) sidebarWidth = 200
             sidebarDragging = true
         }}
     ></button>
@@ -775,6 +805,12 @@
                     </label>
                 {/each}
             </div>
+            <label
+                class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
+            >
+                <input type="checkbox" bind:checked={exportResult} class="size-4 accent-indigo-500" />
+                <span>结果页（凹暴击配置、时间记点、DPS 数据）</span>
+            </label>
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (exportModal = false)}
@@ -827,6 +863,12 @@
                     {/each}
                 </div>
             </div>
+            <label
+                class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
+            >
+                <input type="checkbox" bind:checked={cloneResult} class="size-4 accent-indigo-500" />
+                <span>结果页（凹暴击配置、时间记点、DPS 数据）</span>
+            </label>
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (cloneModal = false)}
@@ -852,7 +894,7 @@
         {/snippet}
         <div class="space-y-4">
             <p class="text-sm text-zinc-400">
-                确认删除「<span class="text-zinc-200">{deleteName}</span>」？此操作不可撤销。
+                确认删除「<span class="font-semibold text-(--theme-layout-text)">{deleteName}</span>」？此操作不可撤销。
             </p>
             <div class="flex justify-end gap-2">
                 <button

@@ -5,12 +5,13 @@
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/data/api'
     import { getCharElementMap } from '../timeline/timeline.store.svelte'
-    import { ELEMENT_COLORS } from '../timeline/timeline.consts'
     import { getAllDamageEntries, getCalcState } from '../calculation/calculation.store.svelte'
     import { getConfig } from '../config/config.store.svelte'
     import { getActiveProject, updateResultAnalysis } from '$lib/data/project.svelte'
     import { computeAll as computeAllDamage } from './compute'
     import type { ResultEntry } from './result.types'
+    import { tick } from 'svelte'
+    import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import DataAnalysisModal from './data-analysis-modal.svelte'
 
@@ -27,10 +28,12 @@
     let weaponInfoMap = $state<Record<string, WeaponInfo>>({})
     let charIcons = $state<Record<string, string>>({})
     let weaponIcons = $state<Record<string, string>>({})
+    let cleanEntries = $state<ResultEntry[]>([])
     let entries = $state<ResultEntry[]>([])
     let loading = $state(true)
     let charElements = $derived(getCharElementMap())
     let resultAnalysis = $derived(getActiveProject()?.resultAnalysis)
+    let rigCritEntryIds = $state<string[]>([])
 
     $effect(() => {
         calcState
@@ -69,6 +72,7 @@
         } catch {
             /* ignore */
         }
+        rigCritEntryIds = getActiveProject()?.resultAnalysis?.rigCritEntryIds ?? []
         computeAll()
         loading = false
     }
@@ -78,10 +82,11 @@
         const config = getConfig()
         const dmgEntries = getAllDamageEntries()
         if (dmgEntries.length === 0) {
+            cleanEntries = []
             entries = []
             return
         }
-        entries = computeAllDamage(
+        cleanEntries = computeAllDamage(
             dmgEntries,
             calc.buffSets,
             calc.damageEntryBuffSetIds,
@@ -91,6 +96,24 @@
             charInfoMap,
             weaponInfoMap
         )
+        applyRigCrit()
+    }
+
+    function applyRigCrit() {
+        const ids = new Set(rigCritEntryIds)
+        entries = cleanEntries.map((e) => {
+            if (ids.has(e.id)) {
+                return { ...e, expectedPerHit: e.critPerHit, totalDamage: e.critPerHit }
+            }
+            return e
+        })
+    }
+
+    function toggleRigCrit(id: string) {
+        const next = rigCritEntryIds.includes(id) ? rigCritEntryIds.filter((i) => i !== id) : [...rigCritEntryIds, id]
+        rigCritEntryIds = next
+        updateResultAnalysis({ timings: resultAnalysis?.timings ?? [], rigCritEntryIds: next })
+        applyRigCrit()
     }
 
     let charSummaries = $derived.by(() => {
@@ -108,9 +131,19 @@
 
     let expandedEntry = $state<string | null>(null)
     let showDataAnalysis = $state(false)
+    let tableContainer = $state<HTMLDivElement | undefined>()
 
-    function toggleExpand(id: string) {
-        expandedEntry = expandedEntry === id ? null : id
+    function toggleExpand(id: string, index: number) {
+        const expanding = expandedEntry !== id
+        expandedEntry = expanding ? id : null
+        if (expanding) {
+            const total = entries.length
+            if (total - index <= 3) {
+                tick().then(() => {
+                    tableContainer?.scrollTo({ top: tableContainer.scrollHeight, behavior: 'smooth' })
+                })
+            }
+        }
     }
 </script>
 
@@ -134,7 +167,7 @@
                         <div
                             class="text-[10px] text-(--theme-modal-text)/40 mb-1"
                             style="color: {cs.character
-                                ? ((ELEMENT_COLORS as Record<string, string>)[charElements[cs.character]] ?? '#888')
+                                ? `var(--theme-element-${charElements[cs.character]}, #888)`
                                 : 'var(--theme-modal-text)'}"
                         >
                             {cs.character || '—'}
@@ -156,7 +189,7 @@
         </div>
 
         <!-- Detail table -->
-        <div class="flex-1 overflow-y-auto">
+        <div class="flex-1 overflow-y-auto pb-48" bind:this={tableContainer}>
             <table class="w-full text-xs">
                 <thead>
                     <tr
@@ -168,29 +201,29 @@
                         <th class="text-right font-medium py-2 px-3">基础值</th>
                         <th class="text-right font-medium py-2 px-3">单位</th>
                         <th class="text-right font-medium py-2 px-3">倍率</th>
-                        <th class="text-right font-medium py-2 px-3">翻倍数</th>
+                        <th class="text-right font-medium py-2 px-3">暴击</th>
+                        <th class="text-right font-medium py-2 px-3">不暴击</th>
                         <th class="text-right font-medium py-2 px-3">期望</th>
                         <th class="text-right font-medium py-2 px-3 w-8"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    {#each entries as entry}
+                    {#each entries as entry, i}
                         <tr
-                            onclick={() => toggleExpand(entry.id)}
+                            onclick={() => toggleExpand(entry.id, i)}
                             class="cursor-pointer border-b transition-colors hover:bg-(--theme-modal-text)/3"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <td
                                 class="py-1.5 px-3"
                                 style="color: {entry.character
-                                    ? ((ELEMENT_COLORS as Record<string, string>)[charElements[entry.character]] ??
-                                      '#888')
+                                    ? `var(--theme-element-${charElements[entry.character]}, #888)`
                                     : 'var(--theme-modal-text)'}">{entry.character || '—'}</td
                             >
                             <td
                                 class="py-1.5 px-3 max-w-48 truncate"
                                 title={entry.displayName}
-                                style="color: {(ELEMENT_COLORS as Record<string, string>)[entry.element] ?? '#888'}"
+                                style="color: var(--theme-element-{entry.element}, #888)"
                             >
                                 {entry.displayName}
                             </td>
@@ -203,209 +236,215 @@
                                     ×{entry.hits}{/if}</td
                             >
                             <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
-                                >{(entry.totalMultiplier * 100).toFixed(1)}%</td
+                                >{entry.critPerHit.toLocaleString()}</td
                             >
-                            <td class="py-1.5 px-3 text-right tabular-nums font-medium text-(--theme-accent-text)"
-                                >{Math.round(entry.expectedPerHit).toLocaleString()}</td
+                            <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
+                                >{entry.nonCritPerHit.toLocaleString()}</td
+                            >
+                            <td
+                                class="py-1.5 px-3 text-right tabular-nums font-medium"
+                                style="color: {rigCritEntryIds.includes(entry.id)
+                                    ? 'var(--theme-rigcrit-text)'
+                                    : 'var(--theme-accent-text)'}">{entry.expectedPerHit.toLocaleString()}</td
                             >
                             <td class="py-1.5 w-8"></td>
                         </tr>
                         {#if expandedEntry === entry.id}
-                            {@const s2 = entry.baseValue * (1 + entry.deepen) * (1 + entry.dmgBonus)}
-                            {@const s3 = s2 * (1 + entry.critRate * (entry.critDmg - 1)) * (1 + entry.vulnerability)}
-                            {@const s4 = s3 * entry.resMulti * entry.dmgRedMulti * entry.defMulti}
-                            {@const tuneBreakMulti = 1 + entry.finalTuneBreakZone + entry.finalTuneStrainMulti}
-                            {@const s5 = s4 * tuneBreakMulti * (1 + entry.finalDmg) * entry.customMult}
                             <tr style="background: var(--theme-input-bg);">
-                                <td colspan="8" class="p-0">
+                                <td colspan="9" class="p-0">
                                     <div
-                                        class="border-b px-6 py-3 space-y-3 text-xs text-(--theme-modal-text)/60 font-mono"
+                                        transition:slide|local={{ duration: 200 }}
+                                        class="border-b px-6 py-3 space-y-3 text-xs text-(--theme-modal-text)/60"
                                         style="border-color: var(--theme-divider-border);"
                                     >
-                                        {#if entry.baseUnit.startsWith('偏谐系数')}
-                                            <!-- Tune entry (处决/响应) -->
+                                        {#if entry.baseUnit === '固定'}
                                             <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                ① 基础属性
+                                                固定值为 {entry.baseValue.toLocaleString()}
                                             </div>
-                                            <div class="pl-3 space-y-0.5">
-                                                <div>
-                                                    基础{entry.baseUnit} = {Math.round(entry.baseAtk).toLocaleString()}
-                                                </div>
-                                                <div>
-                                                    × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
-                                                        2
-                                                    )}%{#if entry.hits > 1}
-                                                        ×{entry.hits}{/if} = {Math.round(
-                                                        entry.baseValue
-                                                    ).toLocaleString()}
-                                                </div>
+                                            <div class="font-bold font-sans text-(--theme-accent-text)">
+                                                最终 = {entry.baseValue.toLocaleString()}
                                             </div>
-
+                                        {:else if entry.baseUnit.startsWith('偏谐系数')}
                                             <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                ② 敌人减免
+                                                基础值 = 偏谐系数 {entry.baseAtk.toLocaleString()} × {(
+                                                    (entry.ratioNum / entry.hits) *
+                                                    100
+                                                ).toFixed(2)}%{#if entry.hits > 1}
+                                                    ×{entry.hits}{/if} = {entry.baseValue.toLocaleString()}
                                             </div>
-                                            <div class="pl-3 space-y-0.5">
-                                                <div>抗性区 = {entry.resMulti.toFixed(4)}</div>
-                                                <div>免伤区 = {entry.dmgRedMulti.toFixed(4)}</div>
-                                                <div>防御区 = {entry.defMulti.toFixed(4)}</div>
-                                                <div>
-                                                    {Math.round(s3).toLocaleString()} × {entry.resMulti.toFixed(4)} × {entry.dmgRedMulti.toFixed(
-                                                        4
-                                                    )} × {entry.defMulti.toFixed(4)}
-                                                    = {Math.round(s4).toLocaleString()}
+                                            {#if entry.multiplierZones.length}
+                                                <div
+                                                    class="grid gap-x-6 gap-y-1"
+                                                    style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));"
+                                                >
+                                                    {#each entry.multiplierZones as zone}
+                                                        <div
+                                                            class="grid grid-cols-[auto_1fr_auto] gap-x-1 items-center"
+                                                        >
+                                                            <span
+                                                                class="font-sans text-right text-(--theme-modal-text)/40"
+                                                                >{zone.label}</span
+                                                            >
+                                                            <span class="text-center font-mono">{zone.detail}</span>
+                                                            <span
+                                                                class="text-right font-mono text-(--theme-accent-text)"
+                                                                >= {zone.value.toFixed(4)}</span
+                                                            >
+                                                        </div>
+                                                    {/each}
                                                 </div>
+                                            {/if}
+                                            <div
+                                                class="text-center font-mono text-(--theme-accent-text) font-sans pt-1 border-t border-(--theme-divider-border)/30"
+                                            >
+                                                {entry.baseValue.toLocaleString()}
+                                                {#each entry.multiplierZones as zone}
+                                                    × {zone.value.toFixed(4)}
+                                                {/each}
+                                                = {entry.expectedPerHit.toLocaleString()}
                                             </div>
-
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                ③ 谐度增幅区 × 终伤 × 特殊
-                                            </div>
-                                            <div class="pl-3">
-                                                {Math.round(s4).toLocaleString()} ×
-                                                {(1 + entry.finalTuneBreakZone).toFixed(4)}(谐度增幅区) × (1 + {(
-                                                    entry.finalDmg * 100
-                                                ).toFixed(1)}%)(终伤) ×
-                                                {entry.customMult.toFixed(4)}(特殊) = {Math.round(s5).toLocaleString()}
-                                            </div>
-                                            <div class="pl-3 font-bold text-(--theme-accent-text)">
-                                                最终期望 = {Math.round(s5).toLocaleString()}
+                                            <div class="font-bold font-sans text-(--theme-accent-text)">
+                                                最终 = {entry.expectedPerHit.toLocaleString()}
                                             </div>
                                         {:else if entry.baseUnit === '效应系数'}
-                                            <!-- Effect damage entry -->
                                             <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                ① 基础属性
+                                                基础值 = 效应系数 {entry.baseAtk.toLocaleString()} × {(
+                                                    (entry.ratioNum / entry.hits) *
+                                                    100
+                                                ).toFixed(2)}%{#if entry.hits > 1}
+                                                    ×{entry.hits}{/if} = {entry.baseValue.toLocaleString()}
                                             </div>
-                                            <div class="pl-3 space-y-0.5">
-                                                <div>效应系数 = {entry.baseAtk}</div>
-                                                <div>
-                                                    × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
-                                                        2
-                                                    )}%{#if entry.hits > 1}
-                                                        ×{entry.hits}{/if} = {Math.round(
-                                                        entry.baseValue
-                                                    ).toLocaleString()}
+                                            {#if entry.multiplierZones.length}
+                                                <div
+                                                    class="grid gap-x-6 gap-y-1"
+                                                    style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));"
+                                                >
+                                                    {#each entry.multiplierZones as zone}
+                                                        <div
+                                                            class="grid grid-cols-[auto_1fr_auto] gap-x-1 items-center"
+                                                        >
+                                                            <span
+                                                                class="font-sans text-right text-(--theme-modal-text)/40"
+                                                                >{zone.label}</span
+                                                            >
+                                                            <span class="text-center font-mono">{zone.detail}</span>
+                                                            <span
+                                                                class="text-right font-mono text-(--theme-accent-text)"
+                                                                >= {zone.value.toFixed(4)}</span
+                                                            >
+                                                        </div>
+                                                    {/each}
                                                 </div>
+                                            {/if}
+                                            <div
+                                                class="text-center font-mono text-(--theme-accent-text) font-sans pt-1 border-t border-(--theme-divider-border)/30"
+                                            >
+                                                {entry.baseValue.toLocaleString()}
+                                                {#each entry.multiplierZones as zone}
+                                                    × {zone.value.toFixed(4)}
+                                                {/each}
+                                                = {entry.expectedPerHit.toLocaleString()}
                                             </div>
-
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                ② 敌人减免
-                                            </div>
-                                            <div class="pl-3 space-y-0.5">
-                                                <div>抗性区 = {entry.resMulti.toFixed(4)}</div>
-                                                <div>免伤区 = {entry.dmgRedMulti.toFixed(4)}</div>
-                                                <div>防御区 = {entry.defMulti.toFixed(4)}</div>
-                                                <div>
-                                                    {Math.round(s3).toLocaleString()} × {entry.resMulti.toFixed(4)} × {entry.dmgRedMulti.toFixed(
-                                                        4
-                                                    )} × {entry.defMulti.toFixed(4)}
-                                                    = {Math.round(s4).toLocaleString()}
-                                                </div>
-                                            </div>
-
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                ③ 终伤 × 特殊
-                                            </div>
-                                            <div class="pl-3">
-                                                {Math.round(s4).toLocaleString()} × (1 + {(
-                                                    entry.finalDmg * 100
-                                                ).toFixed(1)}%)(终伤) ×
-                                                {entry.customMult.toFixed(4)}(特殊) = {Math.round(s5).toLocaleString()}
-                                            </div>
-                                            <div class="pl-3 font-bold text-(--theme-accent-text)">
-                                                最终期望 = {Math.round(s5).toLocaleString()}
+                                            <div class="font-bold font-sans text-(--theme-accent-text)">
+                                                最终 = {entry.expectedPerHit.toLocaleString()}
                                             </div>
                                         {:else}
                                             <!-- Direct damage entry -->
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                ① 基础属性
-                                            </div>
-                                            <div class="pl-3 space-y-0.5">
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">基础值</div>
+                                            <div class="font-mono space-y-0.5 pl-3 text-(--theme-modal-text)/60">
                                                 {#if entry.baseUnit === '攻击'}
                                                     <div>
-                                                        总ATK = {entry.baseAtk} × (1 + {entry.atkPctSum.toFixed(1)}%) + {entry.atkFlatSum}
-                                                        = {entry.totalAtk}
+                                                        基础ATK {entry.baseAtk.toLocaleString()} × (1 + {entry.atkPctSum.toFixed(
+                                                            1
+                                                        )}%) + {entry.atkFlatSum.toLocaleString()} = {entry.totalAtk.toLocaleString()}
                                                     </div>
                                                 {:else if entry.baseUnit === '生命'}
                                                     <div>
-                                                        总HP = {entry.totalHp}
+                                                        基础HP {entry.baseHp.toLocaleString()} × (1 + {entry.hpPctSum.toFixed(
+                                                            1
+                                                        )}%) + {entry.hpFlatSum.toLocaleString()} = {entry.totalHp.toLocaleString()}
                                                     </div>
                                                 {:else if entry.baseUnit === '防御'}
                                                     <div>
-                                                        总DEF = {entry.totalDef}
-                                                    </div>
-                                                {:else if entry.baseUnit === '固定'}
-                                                    <div>固定值 {Math.round(entry.baseValue)}</div>
-                                                {/if}
-                                                {#if entry.baseUnit !== '固定'}
-                                                    <div>
-                                                        × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
-                                                            2
-                                                        )}%{#if entry.hits > 1}
-                                                            ×{entry.hits}{/if} = {Math.round(
-                                                            entry.baseValue
-                                                        ).toLocaleString()}
+                                                        基础DEF {entry.baseDef.toLocaleString()} × (1 + {entry.defPctSum.toFixed(
+                                                            1
+                                                        )}%) + {entry.defFlatSum.toLocaleString()} = {entry.totalDef.toLocaleString()}
                                                     </div>
                                                 {/if}
+                                                <div>
+                                                    × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
+                                                        2
+                                                    )}%{#if entry.hits > 1}
+                                                        ×{entry.hits}{/if} = {entry.baseValue.toLocaleString()}
+                                                </div>
                                             </div>
-
-                                            {#if entry.baseUnit === '固定'}
-                                                <div class="pl-3 font-bold text-(--theme-accent-text)">
-                                                    最终期望 = {Math.round(entry.baseValue).toLocaleString()}
-                                                </div>
-                                            {:else}
-                                                <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                    ② 加深 × 加成
-                                                </div>
-                                                <div class="pl-3">
-                                                    {Math.round(entry.baseValue).toLocaleString()} × (1 + {(
-                                                        entry.deepen * 100
-                                                    ).toFixed(1)}%)(加深) × (1 + {(entry.dmgBonus * 100).toFixed(
-                                                        1
-                                                    )}%)(加成) = {Math.round(s2).toLocaleString()}
-                                                </div>
-
-                                                <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                    ③ 暴击期望 × 易伤
-                                                </div>
-                                                <div class="pl-3">
-                                                    {Math.round(s2).toLocaleString()} × ((1 - {(
-                                                        entry.critRate * 100
-                                                    ).toFixed(1)}%) + {(entry.critRate * 100).toFixed(1)}% × {(
-                                                        entry.critDmg * 100
-                                                    ).toFixed(1)}%)(暴击) × (1 + {(entry.vulnerability * 100).toFixed(
-                                                        1
-                                                    )}%)(易伤) = {Math.round(s3).toLocaleString()}
-                                                </div>
-
-                                                <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                    ④ 抗性区 × 免伤区 × 防御区
-                                                </div>
-                                                <div class="pl-3 space-y-0.5">
-                                                    <div>抗性区 = {entry.resMulti.toFixed(4)}</div>
-                                                    <div>免伤区 = {entry.dmgRedMulti.toFixed(4)}</div>
-                                                    <div>防御区 = {entry.defMulti.toFixed(4)}</div>
-                                                    <div>
-                                                        {Math.round(s3).toLocaleString()} × {entry.resMulti.toFixed(4)} ×
-                                                        {entry.dmgRedMulti.toFixed(4)} × {entry.defMulti.toFixed(4)}
-                                                        = {Math.round(s4).toLocaleString()}
-                                                    </div>
-                                                </div>
-
-                                                <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                    ⑤ 集谐区 × 终伤 × 特殊
-                                                </div>
-                                                <div class="pl-3">
-                                                    {Math.round(s4).toLocaleString()} ×
-                                                    {(1 + entry.finalTuneStrainMulti).toFixed(4)}(集谐区) × (1 + {(
-                                                        entry.finalDmg * 100
-                                                    ).toFixed(1)}%)(终伤) ×
-                                                    {entry.customMult.toFixed(4)}(特殊) = {Math.round(
-                                                        s5
-                                                    ).toLocaleString()}
-                                                </div>
-                                                <div class="pl-3 font-bold text-(--theme-accent-text)">
-                                                    最终期望 = {Math.round(s5).toLocaleString()}
+                                            {#if entry.multiplierZones.length}
+                                                <div
+                                                    class="grid gap-x-6 gap-y-1"
+                                                    style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));"
+                                                >
+                                                    {#each entry.multiplierZones as zone}
+                                                        <div
+                                                            class="grid grid-cols-[auto_1fr_auto] gap-x-1 items-center"
+                                                        >
+                                                            <span
+                                                                class="font-sans text-right text-(--theme-modal-text)/40"
+                                                                >{zone.label}</span
+                                                            >
+                                                            <span class="text-center font-mono">{zone.detail}</span>
+                                                            <span
+                                                                class="text-right font-mono text-(--theme-accent-text)"
+                                                                >= {zone.value.toFixed(4)}</span
+                                                            >
+                                                        </div>
+                                                    {/each}
                                                 </div>
                                             {/if}
+                                            <div
+                                                class="text-center font-mono text-(--theme-accent-text) font-sans pt-1 border-t border-(--theme-divider-border)/30"
+                                            >
+                                                {entry.baseValue.toLocaleString()}
+                                                {#each entry.multiplierZones as zone}
+                                                    × {zone.value.toFixed(4)}
+                                                {/each}
+                                                = {entry.nonCritPerHit.toLocaleString()}
+                                            </div>
+                                            <div class="flex items-start gap-4">
+                                                <div class="font-sans space-y-0.5 flex-1">
+                                                    <div>不暴击 = {entry.nonCritPerHit.toLocaleString()}</div>
+                                                    <div>
+                                                        暴击 = {entry.nonCritPerHit.toLocaleString()} × (1 + {(
+                                                            entry.critDmg * 100
+                                                        ).toFixed(1)}%) = {entry.critPerHit.toLocaleString()}
+                                                    </div>
+                                                    <div
+                                                        class="font-bold"
+                                                        style="color: {rigCritEntryIds.includes(entry.id)
+                                                            ? 'var(--theme-rigcrit-text)'
+                                                            : 'var(--theme-accent-text)'}"
+                                                    >
+                                                        期望 = {entry.nonCritPerHit.toLocaleString()} × (1 + {(
+                                                            entry.critRate * 100
+                                                        ).toFixed(1)}% × {((entry.critDmg - 1) * 100).toFixed(1)}%) = {entry.expectedPerHit.toLocaleString()}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        toggleRigCrit(entry.id)
+                                                    }}
+                                                    class="shrink-0 self-start rounded px-3 py-1.5 text-xs font-medium transition-colors"
+                                                    style="background: {rigCritEntryIds.includes(entry.id)
+                                                        ? 'var(--theme-accent-bg)'
+                                                        : 'transparent'}; color: {rigCritEntryIds.includes(entry.id)
+                                                        ? 'white'
+                                                        : 'var(--theme-modal-text)/40'}; border: 1px solid {rigCritEntryIds.includes(
+                                                        entry.id
+                                                    )
+                                                        ? 'transparent'
+                                                        : 'var(--theme-divider-border)'}">凹暴</button
+                                                >
+                                            </div>
                                         {/if}
                                     </div>
                                 </td>

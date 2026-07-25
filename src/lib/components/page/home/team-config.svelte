@@ -3,7 +3,6 @@
     import type { Character, Weapon, Echo, EchoSetItem } from '$lib/api/types'
     import { addToast } from '$lib/data/toast.svelte'
     import Icon from '@iconify/svelte'
-    import { ELEMENT_COLORS } from '$lib/consts/game-terms'
     import {
         getCharacterList,
         getWeaponList,
@@ -284,7 +283,7 @@
     <div class="flex flex-1 gap-4">
         {#each localTeam as slot, i}
             {@const charData = characterMap.get(slot.character ?? '')}
-            {@const eColor = charData ? ((ELEMENT_COLORS as Record<string, string>)[charData.element] ?? '') : ''}
+            {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
                 class="group relative flex flex-1 flex-col overflow-hidden rounded-xl border p-6"
                 style={slot.character && eColor

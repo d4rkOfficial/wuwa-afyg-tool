@@ -18,7 +18,7 @@
         applyNonDirectEntries
     } from './timeline.store.svelte'
     import { getCharIconMap } from './timeline.store.svelte'
-    import { NON_DIRECT_CONFIGS, ELEMENT_COLORS } from './timeline.consts'
+    import { NON_DIRECT_CONFIGS } from './timeline.consts'
 </script>
 
 {#if getNonDirectPickerBlockId() !== null}

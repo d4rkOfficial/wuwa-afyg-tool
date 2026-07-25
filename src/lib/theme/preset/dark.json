@@ -1,6 +1,14 @@
 {
     "id": "dark",
     "name": "黑夜",
+    "elementColors": {
+        "冷凝": "#38bdf8",
+        "热熔": "#fb923c",
+        "导电": "#a855f7",
+        "气动": "#34d399",
+        "衍射": "#facc15",
+        "湮灭": "#f472b6"
+    },
     "components": {
         "avatar": {
             "backgroundImage": "#2a2a32",

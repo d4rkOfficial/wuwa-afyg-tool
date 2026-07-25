@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte'
     import Chart from 'chart.js/auto'
-    import { PPS, ELEMENT_COLORS } from '../timeline/timeline.consts'
+    import { PPS } from '../timeline/timeline.consts'
     import { getCharElementMap, getRefLines, getOpBlocks } from '../timeline/timeline.store.svelte'
     import type { ResultEntry, CharSummary } from './result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/data/types'
@@ -166,7 +166,7 @@
         const data = charSummaries.map((cs) => cs.totalDamage)
         const colors = charSummaries.map((cs, i) => {
             const el = charElements[cs.character]
-            const base = el ? ((ELEMENT_COLORS as Record<string, string>)[el] ?? '#6366f1') : '#6366f1'
+            const base = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'
             return fadedColor(base, i)
         })
 
@@ -248,7 +248,7 @@
             <div class="grid grid-cols-4 gap-4">
                 {#each charSummaries as cs, i}
                     {@const el = charElements[cs.character]}
-                    {@const color = el ? ((ELEMENT_COLORS as Record<string, string>)[el] ?? '#6366f1') : '#6366f1'}
+                    {@const color = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'}
                     <div>
                         <div class="text-[10px] mb-1" style="color: {color};">{cs.character || '—'}</div>
                         <div class="text-xs tabular-nums" style="color: var(--theme-modal-text);">
@@ -451,9 +451,7 @@
                 <div class="space-y-2">
                     {#each charSummaries as cs, i}
                         {@const el = charElements[cs.character]}
-                        {@const baseColor = el
-                            ? ((ELEMENT_COLORS as Record<string, string>)[el] ?? '#6366f1')
-                            : '#6366f1'}
+                        {@const baseColor = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'}
                         <div class="flex items-center gap-2 text-xs" style="color: var(--theme-modal-text);">
                             <span class="size-2.5 rounded-full shrink-0" style="background: {fadedColor(baseColor, i)};"
                             ></span>

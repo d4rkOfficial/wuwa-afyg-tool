@@ -36,6 +36,8 @@ export interface Project {
     team: [CharSlot, CharSlot, CharSlot]
     customSkillHits: Record<string, CustomHit[]>
     resultAnalysis?: ResultAnalysisData
+    lockedTeamKey?: string
+    lockedTeamNames?: string[]
     phases: {
         team: PhaseState
         timeline: PhaseState
@@ -48,4 +50,5 @@ export type { PhaseKey } from '$lib/consts/game-terms'
 
 export interface ResultAnalysisData {
     timings: { refLineId: string; seconds: number }[]
+    rigCritEntryIds?: string[]
 }

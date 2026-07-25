@@ -59,6 +59,8 @@ function normalizeProject(p: Partial<Project>): Project {
         team: p.team ?? [emptyCharSlot(), emptyCharSlot(), emptyCharSlot()],
         customSkillHits: p.customSkillHits ?? {},
         resultAnalysis: p.resultAnalysis,
+        lockedTeamKey: p.lockedTeamKey,
+        lockedTeamNames: p.lockedTeamNames,
         phases: {
             team: phases.team ?? emptyPhaseState(),
             timeline: phases.timeline ?? emptyPhaseState(),
@@ -78,6 +80,14 @@ export function createProjectData(name: string): Project {
         name,
         createdAt: Date.now()
     })
+}
+
+export function getTeamKeyFromTeam(team: [CharSlot, CharSlot, CharSlot]): string {
+    return team
+        .map((s) => s.character)
+        .filter((c): c is string => c !== null)
+        .sort()
+        .join(',')
 }
 
 let projects = $state<Project[]>([])
@@ -134,6 +144,10 @@ export async function cloneProject(id: string, newName: string, selectedPhases: 
 
     if (selectedPhases.includes('team')) {
         newProject.team = deepCloneTeam(source.team)
+        if (source.lockedTeamKey) {
+            newProject.lockedTeamKey = source.lockedTeamKey
+            newProject.lockedTeamNames = source.lockedTeamNames
+        }
     }
 
     for (const phase of PHASE_ORDER) {
@@ -144,7 +158,11 @@ export async function cloneProject(id: string, newName: string, selectedPhases: 
     }
 
     newProject.customSkillHits = JSON.parse(JSON.stringify(source.customSkillHits ?? {}))
-    newProject.resultAnalysis = source.resultAnalysis ? JSON.parse(JSON.stringify(source.resultAnalysis)) : undefined
+    if ((selectedPhases as string[]).includes('result')) {
+        newProject.resultAnalysis = source.resultAnalysis
+            ? JSON.parse(JSON.stringify(source.resultAnalysis))
+            : undefined
+    }
 
     projects = [...projects, newProject]
     activeId = newProject.id
@@ -165,7 +183,13 @@ export async function deleteProject(id: string) {
 export async function updateTeam(team: [CharSlot, CharSlot, CharSlot]) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
+    const oldKey = getTeamKeyFromTeam(project.team)
     project.team = team
+    const newKey = getTeamKeyFromTeam(team)
+    if (project.lockedTeamKey && oldKey !== newKey) {
+        project.lockedTeamKey = undefined
+        project.lockedTeamNames = undefined
+    }
     await persist()
 }
 
@@ -225,7 +249,12 @@ export function importProjects(imported: Project[]) {
     const toAdd: Project[] = []
     for (const item of imported) {
         if (existingIds.has(item.id)) item.id = crypto.randomUUID()
-        toAdd.push(normalizeProject(item))
+        const normalized = normalizeProject(item)
+        if (normalized.phases.team.locked && !normalized.lockedTeamKey) {
+            normalized.lockedTeamKey = getTeamKeyFromTeam(normalized.team)
+            normalized.lockedTeamNames = normalized.team.map((s) => s.character).filter((c): c is string => c !== null)
+        }
+        toAdd.push(normalized)
     }
     projects = [...projects, ...toAdd]
     persist()
@@ -236,6 +265,10 @@ export async function lockPhase(phase: PhaseKey) {
     if (!project) return
     if (!project.phases[phase]) return
     project.phases[phase].locked = true
+    if (phase === 'team') {
+        project.lockedTeamKey = getTeamKeyFromTeam(project.team)
+        project.lockedTeamNames = project.team.map((s) => s.character).filter((c): c is string => c !== null)
+    }
     await persist()
 }
 

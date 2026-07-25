@@ -10,6 +10,7 @@ export interface ComponentTheme {
 export interface Theme {
     id: string
     name: string
+    elementColors?: Record<string, string>
     components: Record<string, ComponentTheme>
 }
 

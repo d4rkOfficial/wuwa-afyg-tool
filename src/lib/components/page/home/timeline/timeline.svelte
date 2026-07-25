@@ -55,7 +55,6 @@
         MIN_TIME,
         MAX_TIME,
         MAX_POS,
-        ELEMENT_COLORS,
         NON_DIRECT_ELEMENT,
         TRACK_COLORS
     } from './timeline.consts'
@@ -347,11 +346,7 @@
                                                         ?.echoes?.[0]?.name}
                                                     <span
                                                         class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
-                                                        style="color: {(ELEMENT_COLORS as Record<string, string>)[
-                                                            hit.element
-                                                        ] ?? '#ef4444'}; border-color: {(
-                                                            ELEMENT_COLORS as Record<string, string>
-                                                        )[hit.element] ?? '#ef4444'};"
+                                                        style="color: var(--theme-element-{hit.element}, #ef4444); border-color: var(--theme-element-{hit.element}, #ef4444);"
                                                     >
                                                         {(dmg.sourceType === 'ref' && hit.character
                                                             ? `[${hit.character}]`
@@ -373,11 +368,7 @@
                                                             : nd.category === '处决'
                                                               ? '#ffffff'
                                                               : (NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]
-                                                                ? (ELEMENT_COLORS as Record<string, string>)[
-                                                                      (NON_DIRECT_ELEMENT as Record<string, string>)[
-                                                                          nd.name
-                                                                      ]
-                                                                  ]
+                                                                ? `var(--theme-element-${(NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]}, #ef4444)`
                                                                 : '#ef4444'}
                                                     <span
                                                         class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"

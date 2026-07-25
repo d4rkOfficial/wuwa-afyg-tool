@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { untrack } from 'svelte'
+    import { untrack, tick } from 'svelte'
+    import { slide } from 'svelte/transition'
     import {
         getAllDamageEntries,
         getAllBuffSets,
@@ -18,7 +19,6 @@
     } from './calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { ZONE_MAP, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from './calculation.consts'
-    import { ELEMENT_COLORS } from '../timeline/timeline.consts'
     import type { CharSlot } from '$lib/data/types'
     import type { TimelineData } from '../timeline/timeline.types'
     import type { CalcState } from './calculation.types'
@@ -36,6 +36,7 @@
     let { team, timelineData, calcState, locked = false, onupdate }: Props = $props()
 
     let expandedEntryId = $state<string | null>(null)
+    let calcContainer = $state<HTMLDivElement | undefined>()
 
     $effect(() => {
         team
@@ -158,8 +159,17 @@
         return result
     })
 
-    function handleToggleExpand(id: string) {
-        expandedEntryId = expandedEntryId === id ? null : id
+    function handleToggleExpand(id: string, index: number) {
+        const expanding = expandedEntryId !== id
+        expandedEntryId = expanding ? id : null
+        if (expanding) {
+            const total = damageEntries.length
+            if (total - index <= 3) {
+                tick().then(() => {
+                    calcContainer?.scrollTo({ top: calcContainer.scrollHeight, behavior: 'smooth' })
+                })
+            }
+        }
     }
 
     function handleToggleBuffSetForEntry(setId: string) {
@@ -285,7 +295,8 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="h-full overflow-auto"
+    class="h-full overflow-auto pb-48"
+    bind:this={calcContainer}
     onwheel={(e) => {
         if (e.ctrlKey) {
             e.preventDefault()
@@ -315,11 +326,11 @@
             </tr>
         </thead>
         <tbody>
-            {#each damageEntries as damageEntry}
+            {#each damageEntries as damageEntry, i}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <tr
-                    onclick={() => handleToggleExpand(damageEntry.id)}
+                    onclick={() => handleToggleExpand(damageEntry.id, i)}
                     class={[
                         'cursor-pointer border-b transition-colors',
                         expandedEntryId === damageEntry.id ? '' : 'hover:bg-(--theme-modal-text)/5',
@@ -334,11 +345,7 @@
                         class="py-1.5 px-3 w-20 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
                         style="border-color: var(--theme-divider-border);"
                     >
-                        <span
-                            style="color: {(ELEMENT_COLORS as Record<string, string>)[
-                                calcElementMap[damageEntry.character ?? '']
-                            ] ?? '#888'}"
-                        >
+                        <span style="color: var(--theme-element-{calcElementMap[damageEntry.character ?? '']}, #888)">
                             {damageEntry.character ?? '—'}
                         </span>
                     </td>
@@ -347,8 +354,7 @@
                         style="border-color: var(--theme-divider-border);"
                     >
                         <span
-                            style="color: {(ELEMENT_COLORS as Record<string, string>)[damageEntry.damageElement] ??
-                                '#888'}"
+                            style="color: var(--theme-element-{damageEntry.damageElement}, #888)"
                             title={damageEntry.displayName}
                         >
                             {damageEntry.displayName}
@@ -419,6 +425,7 @@
                     <tr style="background: var(--theme-input-bg);">
                         <td colspan="4" class="p-0">
                             <div
+                                transition:slide|local={{ duration: 200 }}
                                 class="border-b px-6 py-3 space-y-3"
                                 style="border-color: var(--theme-divider-border);"
                             >

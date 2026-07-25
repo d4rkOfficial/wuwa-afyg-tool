@@ -1,6 +1,5 @@
 <script lang="ts">
     import { getShowDamageList, setShowDamageList, getDamageList } from './timeline.store.svelte'
-    import { ELEMENT_COLORS } from './timeline.consts'
 </script>
 
 {#if getShowDamageList()}
@@ -55,10 +54,8 @@
                                         title={entry.name}>{entry.name}</td
                                     >
                                     <td class="py-1.5 pr-3 text-[var(--theme-modal-text)]/60">{entry.baseType}</td>
-                                    <td
-                                        class="py-1.5 pr-3"
-                                        style="color: {(ELEMENT_COLORS as Record<string, string>)[entry.element] ??
-                                            '#888'}">{entry.element || '物理'}</td
+                                    <td class="py-1.5 pr-3" style="color: var(--theme-element-{entry.element}, #888)"
+                                        >{entry.element || '物理'}</td
                                     >
                                     <td
                                         class="py-1.5 text-[var(--theme-modal-text)]/60 max-w-36 truncate"

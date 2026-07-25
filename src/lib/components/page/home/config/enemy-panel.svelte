@@ -1,7 +1,6 @@
 <script lang="ts">
     import { getConfig, updateEnemy, updateResistance } from './config.store.svelte'
     import { RESISTANCE_KEYS } from './config.consts'
-    import { ELEMENT_COLORS } from '../timeline/timeline.consts'
     import Icon from '@iconify/svelte'
 
     let config = $derived(getConfig())
@@ -27,7 +26,7 @@
     }
 
     function elementColor(el: string): string {
-        return (ELEMENT_COLORS as Record<string, string>)[el] ?? '#888'
+        return `var(--theme-element-${el}, #888)`
     }
 
     const STEP = 5

@@ -22,7 +22,7 @@
         applySkillHits,
         switchRefSkillPickerTab
     } from './timeline.store.svelte'
-    import { ELEMENT_COLORS, ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
+    import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
     import type { CustomHit } from './timeline.types'
     import { addToast } from '$lib/data/toast.svelte'
     import QuickLookup from '../calculation/quick-lookup.svelte'
@@ -258,9 +258,8 @@
                                     <span class="text-[var(--theme-modal-text)]/50"
                                         >{hit.ratio}{#if hit.element}<span
                                                 class="ml-1"
-                                                style="color: {(ELEMENT_COLORS as Record<string, string>)[
-                                                    hit.element
-                                                ] ?? '#888'}">{hit.element}</span
+                                                style="color: var(--theme-element-{hit.element}, #888)"
+                                                >{hit.element}</span
                                             >{/if}</span
                                     >
                                     {#if getSkillPickerSelected().has(key) && group.type !== '谐度破坏' && !isResponseHit}

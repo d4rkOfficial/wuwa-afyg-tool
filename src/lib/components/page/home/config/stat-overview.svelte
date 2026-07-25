@@ -6,7 +6,6 @@
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/data/api'
     import {
-        ELEMENT_COLORS,
         ELEMENT_ORDER,
         ELEMENT_BONUS_MAP,
         TYPE_BONUS_MAP,
@@ -60,7 +59,7 @@
         const info = charInfoMap[name]
         if (!info) return '#71717a'
         const el = (ELEMENT_MAP as any)[info.element] ?? ''
-        return (ELEMENT_COLORS as Record<string, string>)[el] ?? '#71717a'
+        return el ? `var(--theme-element-${el})` : '#71717a'
     }
 
     interface CharStats {
@@ -407,10 +406,7 @@
                                 {#if v && v > 0}
                                     <div class="flex items-center justify-between">
                                         <span class="text-(--theme-modal-text)/50">{el}伤害加成</span>
-                                        <span
-                                            class="tabular-nums"
-                                            style="color: {(ELEMENT_COLORS as Record<string, string>)[el]}">+{v}%</span
-                                        >
+                                        <span class="tabular-nums" style="color: var(--theme-element-{el})">+{v}%</span>
                                     </div>
                                 {/if}
                             {/each}

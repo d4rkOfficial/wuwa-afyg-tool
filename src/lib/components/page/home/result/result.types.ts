@@ -1,3 +1,9 @@
+export interface MultiplierZone {
+    label: string
+    value: number
+    detail: string
+}
+
 export interface ResultEntry {
     id: string
     character: string
@@ -17,9 +23,11 @@ export interface ResultEntry {
     totalAtk: number
     atkPctSum: number
     atkFlatSum: number
+    baseHp: number
     totalHp: number
     hpPctSum: number
     hpFlatSum: number
+    baseDef: number
     totalDef: number
     defPctSum: number
     defFlatSum: number
@@ -41,6 +49,11 @@ export interface ResultEntry {
     rawPerHit: number
     expectedPerHit: number
     totalDamage: number
+
+    // new: crit/non-crit columns
+    nonCritPerHit: number
+    critPerHit: number
+    multiplierZones: MultiplierZone[]
 }
 
 export interface CharSummary {
