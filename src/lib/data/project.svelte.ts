@@ -84,8 +84,8 @@ export function createProjectData(name: string): Project {
 
 export function getTeamKeyFromTeam(team: [CharSlot, CharSlot, CharSlot]): string {
     return team
-        .map((s) => s.character)
-        .filter((c): c is string => c !== null)
+        .filter((s) => s.character !== null && s.weapon !== null)
+        .map((s) => s.character as string)
         .sort()
         .join(',')
 }
@@ -252,7 +252,9 @@ export function importProjects(imported: Project[]) {
         const normalized = normalizeProject(item)
         if (normalized.phases.team.locked && !normalized.lockedTeamKey) {
             normalized.lockedTeamKey = getTeamKeyFromTeam(normalized.team)
-            normalized.lockedTeamNames = normalized.team.map((s) => s.character).filter((c): c is string => c !== null)
+            normalized.lockedTeamNames = normalized.team
+                .filter((s) => s.character !== null && s.weapon !== null)
+                .map((s) => s.character as string)
         }
         toAdd.push(normalized)
     }
@@ -267,7 +269,9 @@ export async function lockPhase(phase: PhaseKey) {
     project.phases[phase].locked = true
     if (phase === 'team') {
         project.lockedTeamKey = getTeamKeyFromTeam(project.team)
-        project.lockedTeamNames = project.team.map((s) => s.character).filter((c): c is string => c !== null)
+        project.lockedTeamNames = project.team
+            .filter((s) => s.character !== null && s.weapon !== null)
+            .map((s) => s.character as string)
     }
     await persist()
 }

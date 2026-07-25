@@ -416,9 +416,7 @@
     })
 
     function isTeamComplete(team: [CharSlot, CharSlot, CharSlot]): boolean {
-        return team.every(
-            (s) => s.character !== null && s.weapon !== null && s.echoes[0].name !== null && s.triggerSets.length > 0
-        )
+        return team.some((s) => s.character !== null && s.weapon !== null)
     }
 
     function handleUpdateTeam(team: [CharSlot, CharSlot, CharSlot]) {

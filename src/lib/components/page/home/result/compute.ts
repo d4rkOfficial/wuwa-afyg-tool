@@ -568,6 +568,7 @@ function computeResultEntry(
         totalDamage: Math.round(expectedPerHit),
         nonCritPerHit,
         critPerHit,
+        canCrit: entry.damageBaseType !== '偏谐系数',
         multiplierZones: multZones
     }
 }
@@ -616,6 +617,7 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         totalDamage: 0,
         nonCritPerHit: 0,
         critPerHit: 0,
+        canCrit: false,
         multiplierZones: []
     }
 }
@@ -657,8 +659,18 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
     const finalDmgDec = stats.finalDmg / 100
     const customMultVal = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
 
+    // vulnerability zone (易伤区)
+    const vulnerability = 1 + stats.dmgTakenInc / 100
+
     const totalPerHit =
-        baseValue * defMulti * resMulti * dmgRedMulti * tuneBreakZone * (1 + finalDmgDec) * customMultVal
+        baseValue *
+        vulnerability *
+        defMulti *
+        resMulti *
+        dmgRedMulti *
+        tuneBreakZone *
+        (1 + finalDmgDec) *
+        customMultVal
     const expectedPerHit = Math.round(totalPerHit)
 
     const multZones: MultiplierZone[] = [
@@ -666,6 +678,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
         { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
         { label: '谐度增幅区', value: tuneBreakZone, detail: `(1 + ${stats.totalTuneBreakBoost.toFixed(1)}%)` },
+        { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
         { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
         { label: '特殊乘区', value: customMultVal, detail: customMultVal.toFixed(4) }
     ]
@@ -683,7 +696,14 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         baseValue: Math.round(baseValue),
         baseUnit,
         totalMultiplier:
-            ratioNum * defMulti * resMulti * dmgRedMulti * tuneBreakZone * (1 + finalDmgDec) * customMultVal,
+            ratioNum *
+            vulnerability *
+            defMulti *
+            resMulti *
+            dmgRedMulti *
+            tuneBreakZone *
+            (1 + finalDmgDec) *
+            customMultVal,
         baseAtk: tuneCoeff,
         totalAtk: 0,
         atkPctSum: 0,
@@ -708,12 +728,13 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         finalTuneStrainMulti: 0,
         finalTuneBreakZone: tuneBreakZone - 1,
         customMult: customMultVal,
-        vulnerability: 0,
+        vulnerability: stats.dmgTakenInc / 100,
         rawPerHit: expectedPerHit,
         expectedPerHit,
         totalDamage: expectedPerHit,
         nonCritPerHit: expectedPerHit,
         critPerHit: expectedPerHit,
+        canCrit: false,
         multiplierZones: multZones
     }
 }
@@ -836,6 +857,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         totalDamage: expectedPerHit,
         nonCritPerHit: expectedPerHit,
         critPerHit: expectedPerHit,
+        canCrit: false,
         multiplierZones: multZones
     }
 }
@@ -987,8 +1009,8 @@ export function computeAll(
         }
         if (!charName || !charInfo || charIndex < 0) return makeStubEntry(entry)
 
-        // tune damage (处决/响应)
-        if (entry.isTuneBreak || entry.isTuneResponse) {
+        // tune damage (处决/响应) + 偏谐系数直伤按响应公式计算
+        if (entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数') {
             return computeTuneEntry(entry, stats, enemy)
         }
 

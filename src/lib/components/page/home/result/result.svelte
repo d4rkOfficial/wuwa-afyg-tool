@@ -10,7 +10,7 @@
     import { getActiveProject, updateResultAnalysis } from '$lib/data/project.svelte'
     import { computeAll as computeAllDamage } from './compute'
     import type { ResultEntry } from './result.types'
-    import { tick } from 'svelte'
+    import { tick, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import DataAnalysisModal from './data-analysis-modal.svelte'
@@ -42,7 +42,7 @@
     })
 
     $effect(() => {
-        if (refreshKey > 0) computeAll()
+        if (refreshKey > 0) untrack(() => computeAll())
     })
 
     async function loadData() {
@@ -96,12 +96,12 @@
             charInfoMap,
             weaponInfoMap
         )
-        applyRigCrit()
+        applyRigCrit(cleanEntries)
     }
 
-    function applyRigCrit() {
+    function applyRigCrit(sourceEntries: ResultEntry[]) {
         const ids = new Set(rigCritEntryIds)
-        entries = cleanEntries.map((e) => {
+        entries = sourceEntries.map((e) => {
             if (ids.has(e.id)) {
                 return { ...e, expectedPerHit: e.critPerHit, totalDamage: e.critPerHit }
             }
@@ -113,7 +113,7 @@
         const next = rigCritEntryIds.includes(id) ? rigCritEntryIds.filter((i) => i !== id) : [...rigCritEntryIds, id]
         rigCritEntryIds = next
         updateResultAnalysis({ timings: resultAnalysis?.timings ?? [], rigCritEntryIds: next })
-        applyRigCrit()
+        applyRigCrit(cleanEntries)
     }
 
     let charSummaries = $derived.by(() => {
@@ -236,10 +236,10 @@
                                     ×{entry.hits}{/if}</td
                             >
                             <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
-                                >{entry.critPerHit.toLocaleString()}</td
+                                >{entry.canCrit ? entry.critPerHit.toLocaleString() : '—'}</td
                             >
                             <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
-                                >{entry.nonCritPerHit.toLocaleString()}</td
+                                >{entry.canCrit ? entry.nonCritPerHit.toLocaleString() : '—'}</td
                             >
                             <td
                                 class="py-1.5 px-3 text-right tabular-nums font-medium"

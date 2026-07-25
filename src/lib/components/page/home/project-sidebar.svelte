@@ -300,7 +300,7 @@
                         oncontextmenu={(e) => handleContextMenu(e, project.id)}
                         class={[
                             'flex w-full cursor-pointer items-center text-sm transition-colors rounded-lg',
-                            compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5',
+                            compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
                             project.id === activeId
                                 ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
                                 : 'text-(--theme-sidebar-text)/60 hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90'

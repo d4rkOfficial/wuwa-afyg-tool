@@ -50,9 +50,10 @@ export interface ResultEntry {
     expectedPerHit: number
     totalDamage: number
 
-    // new: crit/non-crit columns
+    // crit/non-crit columns
     nonCritPerHit: number
     critPerHit: number
+    canCrit: boolean
     multiplierZones: MultiplierZone[]
 }
 

@@ -174,7 +174,7 @@ export async function loadIcons() {
 }
 
 export function getTeamCharNames() {
-    return _team.map((s) => s.character).filter(Boolean) as string[]
+    return _team.filter((s) => s.character !== null && s.weapon !== null).map((s) => s.character as string)
 }
 
 // ── Ref Line State ──
@@ -485,8 +485,9 @@ export function estimateDamageHeight(d: DamageBlock): number {
 }
 
 export function getDamageBlocksStacked(): { block: DamageBlock; top: number; left: number }[] {
+    const lastTrackIdx = getTRACKS().length - 1
     const blocks = _damageBlocks
-        .filter((d) => d.trackIndex === 3 && (d.skillHits.length > 0 || d.nonDirectEntries.length > 0))
+        .filter((d) => d.trackIndex === lastTrackIdx && (d.skillHits.length > 0 || d.nonDirectEntries.length > 0))
         .map((d) => ({ block: d, left: damageBlockLeft(d) }))
         .sort((a, b) => a.left - b.left)
 
@@ -752,8 +753,10 @@ export function removeBlock(blockId: string) {
 
 export function canSetIntro(blockId: string): boolean {
     const block = _opBlocks.find((b) => b.id === blockId)
-    if (!block || block.intro || block.trackIndex >= 3) return false
-    const sorted = _opBlocks.filter((b) => b.trackIndex < 3).sort((a, b) => a.pos - b.pos)
+    if (!block || block.intro) return false
+    const lastTrackIdx = getTRACKS().length - 1
+    if (block.trackIndex >= lastTrackIdx) return false
+    const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
     const idx = sorted.findIndex((b) => b.id === blockId)
     if (idx <= 0) return true
     const prev = sorted[idx - 1]
@@ -772,7 +775,8 @@ export function toggleIntro(blockId: string) {
 }
 
 function enforceIntro() {
-    const sorted = _opBlocks.filter((b) => b.trackIndex < 3).sort((a, b) => a.pos - b.pos)
+    const lastTrackIdx = getTRACKS().length - 1
+    const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
     let changed = false
     const updated = _opBlocks.map((b) => {
         if (!b.intro) return b
@@ -808,7 +812,9 @@ export function confirmBlockDesc() {
                 const oldRight = edited.pos + oldW / 2
                 const shift = dw / 2
                 _opBlocks = _opBlocks.map((b) => {
-                    if (b.id === _editingBlockId || b.trackIndex >= 3) return b
+                    if (b.id === _editingBlockId) return b
+                    const lastTrackIdx = getTRACKS().length - 1
+                    if (b.trackIndex >= lastTrackIdx) return b
                     const bl = b.pos - (_blockWidths[b.id] ?? 0) / 2
                     if (bl >= oldRight) return { ...b, pos: Math.max(0, Math.min(MAX_POS, b.pos + shift)) }
                     return b
@@ -892,7 +898,7 @@ export function reflowTrack(trackIndex: number) {
 // ── Damage Block Functions ──
 export function addDamageBlock(sourceType: 'op' | 'ref', sourceId: string) {
     if (!assertUnlocked()) return
-    const trackIndex = 3
+    const trackIndex = getTRACKS().length - 1
     const exists = _damageBlocks.some((d) => d.sourceId === sourceId && d.trackIndex === trackIndex)
     if (exists) return
     _damageBlocks = [
@@ -911,7 +917,9 @@ export function removeDamageBySource(sourceId: string, type: 'skillHits' | 'nonD
     if (!assertUnlocked()) return
     _damageBlocks = _damageBlocks
         .map((d) => {
-            if (d.sourceId !== sourceId || d.trackIndex !== 3) return d
+            if (d.sourceId !== sourceId) return d
+            const lastTrackIdx = getTRACKS().length - 1
+            if (d.trackIndex !== lastTrackIdx) return d
             if (type === 'all') return { ...d, skillHits: [], nonDirectEntries: [] }
             if (type === 'skillHits') return { ...d, skillHits: [] }
             return { ...d, nonDirectEntries: [] }
@@ -920,7 +928,7 @@ export function removeDamageBySource(sourceId: string, type: 'skillHits' | 'nonD
             (d) =>
                 !(
                     d.sourceId === sourceId &&
-                    d.trackIndex === 3 &&
+                    d.trackIndex === getTRACKS().length - 1 &&
                     d.skillHits.length === 0 &&
                     d.nonDirectEntries.length === 0
                 )
@@ -963,8 +971,9 @@ async function loadEchoSkill(echoName: string): Promise<{ values: [string, strin
 export async function openSkillPicker(blockId: string) {
     const op = _opBlocks.find((b) => b.id === blockId)
     if (!assertUnlocked()) return
-    if (!op || op.trackIndex >= 3) return
-    const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
+    const lastTrackIdx = getTRACKS().length - 1
+    if (!op || op.trackIndex >= lastTrackIdx) return
+    const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!dmg) return
     _skillPickerBlockId = dmg.id
     _skillPickerIsRef = false
@@ -1061,9 +1070,10 @@ export function applySkillHits() {
 
 export async function openRefSkillPicker(blockId: string) {
     if (!assertUnlocked()) return
-    const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
+    const lastTrackIdx = getTRACKS().length - 1
+    const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!dmg) addDamageBlock('ref', blockId)
-    const block = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
+    const block = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!block) return
     _skillPickerBlockId = block.id
     _skillPickerIsRef = true
@@ -1158,9 +1168,10 @@ export async function switchRefSkillPickerTab(charName: string) {
 // ── Non-Direct Picker Functions ──
 export function openNonDirectPicker(sourceType: 'op' | 'ref', blockId: string) {
     if (!assertUnlocked()) return
-    const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
+    const lastTrackIdx = getTRACKS().length - 1
+    const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!dmg) addDamageBlock(sourceType, blockId)
-    const block = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === 3)
+    const block = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!block) return
     _nonDirectPickerBlockId = block.id
     _nonDirectPickerData = NON_DIRECT_CONFIGS.map((cfg) => {
@@ -1176,7 +1187,7 @@ export function openNonDirectPicker(sourceType: 'op' | 'ref', blockId: string) {
     )
     const existingTune = block.nonDirectEntries.find((e) => e.name === '谐度破坏')
     const op = _opBlocks.find((b) => b.id === blockId)
-    const sourceChar = op && op.trackIndex < 3 ? (_team[op.trackIndex]?.character ?? null) : null
+    const sourceChar = op && op.trackIndex < getTRACKS().length - 1 ? (_team[op.trackIndex]?.character ?? null) : null
     _nonDirectPickerTuneTrigger = existingTune?.responders?.[0] ?? sourceChar ?? null
     const burstEntry = block.nonDirectEntries.find((e) => e.name === '电磁爆发')
     _nonDirectPickerBurstLayers = burstEntry ? { burst: burstEntry.layers } : {}
@@ -1233,7 +1244,7 @@ function buildDamageList() {
             const sourceChar =
                 d.sourceType === 'ref'
                     ? '无'
-                    : op && op.trackIndex < 3
+                    : op && op.trackIndex < getTRACKS().length - 1
                       ? (_team[op.trackIndex]?.character ?? '无')
                       : '无'
             const entries: {

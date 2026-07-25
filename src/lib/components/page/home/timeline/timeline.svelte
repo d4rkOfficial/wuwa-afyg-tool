@@ -165,7 +165,7 @@
     }
 
     function onTrackContextMenu(e: MouseEvent, i: number) {
-        if (i >= 3 || !timelineEl || getLocked()) return
+        if (i >= getTRACKS().length - 1 || !timelineEl || getLocked()) return
         const rect = timelineEl.getBoundingClientRect()
         const scrollL = timelineEl.scrollLeft
         const x = e.clientX - rect.left + scrollL - 80
@@ -207,7 +207,7 @@
                 {#each getTRACKS() as name, i}
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
-                        class="relative shrink-0 {i < 3 ? 'h-14' : 'flex-1'}"
+                        class="relative shrink-0 {i < getTRACKS().length - 1 ? 'h-14' : 'flex-1'}"
                         style="border-bottom: 1px solid color-mix(in srgb, {TRACK_COLORS[i]} 15%, transparent);"
                         oncontextmenu={(e) => {
                             e.preventDefault()
@@ -219,7 +219,7 @@
                             class="sticky left-0 z-[35] w-20 h-full bg-[var(--theme-timeline-bg)]/80 border-r backdrop-blur-sm flex items-center justify-center"
                             style="border-right-color: var(--theme-divider-border);"
                         >
-                            {#if i < 3}
+                            {#if i < getTRACKS().length - 1}
                                 <div
                                     class="flex items-center justify-center w-full h-full overflow-hidden"
                                     style="border-right: 3px solid {elementColor(
@@ -252,7 +252,7 @@
                         </div>
 
                         <!-- Op blocks overlay -->
-                        {#if i < 3}
+                        {#if i < getTRACKS().length - 1}
                             <div class="absolute pointer-events-none" style="left: 5rem; top: 0; right: 0; bottom: 0;">
                                 {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
