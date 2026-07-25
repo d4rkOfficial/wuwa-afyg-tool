@@ -234,6 +234,7 @@ interface CharacterComputed {
     dmgTakenInc: number
     customMult: number
     dmgRedPen: number
+    extraRatio: number
     elementBonus: Record<string, number>
     typeBonus: Record<string, number>
 }
@@ -290,7 +291,8 @@ function computeCharacterStats(
     let finalDmg = 0,
         dmgTakenInc = 0
     let customMult = 0,
-        dmgRedPen = 0
+        dmgRedPen = 0,
+        extraRatio = 0
 
     for (const bs of boundBuffSets) {
         for (const z of bs.zones) {
@@ -330,6 +332,9 @@ function computeCharacterStats(
                     break
                 case 'dmgRedPen':
                     dmgRedPen += value
+                    break
+                case 'extraRatio':
+                    extraRatio += value
                     break
                 default:
                     applyZoneToAccum(z.zoneId, value, acc)
@@ -371,6 +376,7 @@ function computeCharacterStats(
         dmgTakenInc,
         customMult,
         dmgRedPen,
+        extraRatio,
         elementBonus: acc.elementBonus,
         typeBonus: acc.typeBonus
     }
@@ -385,6 +391,7 @@ function computeResultEntry(
     damageTypes: string[]
 ): ResultEntry {
     const ratioNum = entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue
+    const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
 
     // determine base stat and baseValue
     let totalStat = 0
@@ -414,7 +421,7 @@ function computeResultEntry(
                 baseUnit = '攻击'
                 break
         }
-        baseValue = totalStat * ratioNum
+        baseValue = totalStat * effectiveRatio
     } else {
         baseValue = entry.ratioValue
         // fixed damage: skip all multipliers, show 100%
@@ -468,7 +475,7 @@ function computeResultEntry(
 
     // total multiplier (for display)
     const totalMultiplier =
-        ratioNum *
+        effectiveRatio *
         bonus *
         deepen *
         vulnerability *
@@ -539,6 +546,7 @@ function computeResultEntry(
         baseValue: Math.round(baseValue),
         baseUnit,
         totalMultiplier,
+        extraRatio: stats.extraRatio,
         baseAtk: stats.baseAtk,
         totalAtk: stats.totalAtk,
         atkPctSum: stats.atkPctSum,
@@ -614,6 +622,7 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         finalTuneStrainMulti: 0,
         finalTuneBreakZone: 0,
         customMult: 1,
+        extraRatio: 0,
         vulnerability: 0,
         rawPerHit: 0,
         expectedPerHit: 0,
@@ -637,9 +646,10 @@ const TUNE_BASE_UNIT = '偏谐系数'
 
 function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: ConfigState['enemy']): ResultEntry {
     const ratioNum = entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue
+    const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
     const tuneCoeff = TUNE_COEFF_MAP[enemy.type] ?? 716.2
     const baseUnit = TUNE_BASE_UNIT
-    const baseValue = tuneCoeff * ratioNum
+    const baseValue = tuneCoeff * effectiveRatio
 
     // tune break zone: 1 + tuneBreakBoost / 100
     const tuneBreakZone = 1 + stats.totalTuneBreakBoost / 100
@@ -693,13 +703,13 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         skillType: entry.skillType ?? '',
         displayName: entry.displayName,
         element: entry.damageElement,
-        ratioNum,
+        ratioNum: effectiveRatio,
         hits: entry.hits,
         sourceTimelineBlockId: entry.sourceTimelineBlockId,
         baseValue: Math.round(baseValue),
         baseUnit,
         totalMultiplier:
-            ratioNum *
+            effectiveRatio *
             vulnerability *
             defMulti *
             resMulti *
@@ -731,6 +741,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         finalTuneStrainMulti: 0,
         finalTuneBreakZone: tuneBreakZone - 1,
         customMult: customMultVal,
+        extraRatio: stats.extraRatio,
         vulnerability: stats.dmgTakenInc / 100,
         rawPerHit: expectedPerHit,
         expectedPerHit,
@@ -751,6 +762,7 @@ function emptyCharacterStats(): CharacterComputed {
         totalHp: 0,
         totalDef: 0,
         totalTuneBreakBoost: 0,
+        extraRatio: 0,
         recharge: 100,
         atkPctSum: 0,
         atkFlatSum: 0,
@@ -785,10 +797,11 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
     const burstMult = getEffectBurstMultiplier(entry.hitName, burstLayers)
     const multiplier = effectMult + burstMult
     const ratioNum = multiplier
+    const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
     const element = (NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? ''
 
     const baseUnit = '效应系数'
-    const baseValue = Math.round(EFFECT_BASE_VALUE * ratioNum)
+    const baseValue = Math.round(EFFECT_BASE_VALUE * effectiveRatio)
 
     // defense zone
     const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
@@ -824,12 +837,12 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         skillType: entry.skillType ?? '',
         displayName: entry.displayName,
         element,
-        ratioNum,
+        ratioNum: effectiveRatio,
         hits: entry.hits,
         sourceTimelineBlockId: entry.sourceTimelineBlockId,
         baseValue,
         baseUnit,
-        totalMultiplier: ratioNum * defMulti * resMulti * dmgRedMulti * (1 + finalDmgDec) * customMultVal,
+        totalMultiplier: effectiveRatio * defMulti * resMulti * dmgRedMulti * (1 + finalDmgDec) * customMultVal,
         baseAtk: EFFECT_BASE_VALUE,
         totalAtk: 0,
         atkPctSum: 0,
@@ -854,6 +867,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         finalTuneStrainMulti: 0,
         finalTuneBreakZone: 0,
         customMult: customMultVal,
+        extraRatio: stats.extraRatio,
         vulnerability: 0,
         rawPerHit: expectedPerHit,
         expectedPerHit,

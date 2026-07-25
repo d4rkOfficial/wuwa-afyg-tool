@@ -1,22 +1,14 @@
-import { CACHE_CONTROL, NANOKA_BASE } from '$lib/api/consts'
+import { CACHE_CONTROL } from '$lib/api/consts'
 import { fetchData, createJsonResponse } from '$lib/api/fetch'
 import { transformCharacterList, transformWeaponList, transformEchoList, transformEchoSetList } from '$lib/api/utils'
 import type { NanokaCharacter, NanokaWeapon, NanokaEcho, NanokaSonata } from '$lib/api/types'
 
 let sonataCache: NanokaSonata | null = null
-let versionCache: string | null = null
 
 async function getSonata(): Promise<NanokaSonata> {
     if (sonataCache) return sonataCache
     sonataCache = await fetchData<NanokaSonata>('/sonata.json')
     return sonataCache
-}
-
-async function getVersion(): Promise<string> {
-    if (versionCache) return versionCache
-    const manifest: { ww: { latest: string } } = await fetch(`${NANOKA_BASE}/manifest.json`).then((r) => r.json())
-    versionCache = manifest.ww.latest
-    return versionCache
 }
 
 type HandlerFn = (url: URL) => Promise<Response>

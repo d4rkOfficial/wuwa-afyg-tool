@@ -8,6 +8,8 @@
         getElementIcons,
         getWeaponTypeIcons
     } from '$lib/data/api'
+    import { richTextToHtml, colorizeNumbers } from '$lib/utils/rich-text'
+    import { ELEMENT_COLORS } from '$lib/consts/game-terms'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import type { CharSlot } from '$lib/data/types'
     import Icon from '@iconify/svelte'
@@ -33,8 +35,6 @@
     }: Props = $props()
 
     let charIndex = $state(0)
-    let activeAccordion = $state<string | null>(null)
-    let openSkillName = $state<string | null>(null)
     let charData = $state<CharacterInfo | null>(null)
     let weaponData = $state<WeaponInfo | null>(null)
     let echoSkillData = $state<{ desc: string; values: [string, string, string][] } | null>(null)
@@ -49,6 +49,7 @@
     let ctxShow = $state(false)
     let ctxX = $state(0)
     let ctxY = $state(0)
+    let scrollContainer = $state<HTMLDivElement | null>(null)
 
     let charNames = $derived(team.map((s) => s.character).filter((c): c is string => c !== null))
     let currentSlot = $derived(team[charIndex])
@@ -96,8 +97,6 @@
         weaponData = null
         echoSkillData = null
         setBonuses = null
-        activeAccordion = null
-        openSkillName = null
         try {
             const ci = await getCharacterInfo(slot.character)
             charData = ci
@@ -124,15 +123,6 @@
             /* ignore */
         }
         loading = false
-    }
-
-    function handleAccordion(name: string) {
-        activeAccordion = activeAccordion === name ? null : name
-        openSkillName = null
-    }
-
-    function handleSkillToggle(name: string) {
-        openSkillName = openSkillName === name ? null : name
     }
 
     function handleCtxMenu(e: MouseEvent) {
@@ -166,8 +156,23 @@
         ctxShow = false
     }
 
+    function handleScrollTop() {
+        scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' })
+        ctxShow = false
+    }
+
+    function handleScrollBottom() {
+        if (scrollContainer) scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' })
+        ctxShow = false
+    }
+
     const img = (p: string) => p || ''
-    const rd = (s: string) => s.replace(/\n/g, '<br>')
+    const rd = (s: string) => colorizeNumbers(richTextToHtml(s))
+    const fmtSubVal = (v: string) => {
+        const n = parseFloat(v)
+        if (isNaN(n) || n >= 1) return v
+        return (n * 100).toFixed(1) + '%'
+    }
 </script>
 
 {#if open}
@@ -184,378 +189,375 @@
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <div
-                class="flex items-center justify-between border-b px-5 py-3"
-                style="border-color: var(--theme-divider-border);"
-            >
-                <h2 class="text-sm font-semibold">速查</h2>
-                <button
-                    onclick={onclose}
-                    class="flex size-7 items-center justify-center rounded-md text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
-                    ><Icon icon="mdi:close" class="size-4" /></button
+            <div bind:this={scrollContainer} class="flex-1 overflow-y-auto rounded-xl hide-scrollbar">
+                <div
+                    class="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-3"
+                    style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); backdrop-filter: blur(8px); border-color: var(--theme-divider-border);"
                 >
-            </div>
-            <div class="flex gap-1 border-b px-5 py-2" style="border-color: var(--theme-divider-border);">
-                {#each charNames as name, i}
+                    <h2 class="text-base font-semibold">速查</h2>
                     <button
-                        onclick={() => {
-                            charIndex = i
-                        }}
-                        class={[
-                            'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                            i === charIndex
-                                ? 'text-(--theme-accent-text)'
-                                : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
-                        ].join(' ')}
-                        style={i === charIndex
-                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent);'
-                            : ''}
+                        onclick={onclose}
+                        class="flex size-7 items-center justify-center rounded-md text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                        ><Icon icon="mdi:close" class="size-4" /></button
                     >
-                        {#if img(charIcons[name])}<img
-                                src={img(charIcons[name])}
-                                alt={name}
-                                class="inline size-4 mr-1 rounded-full object-cover"
-                            />{/if}{name}
-                    </button>
-                {/each}
-            </div>
-            <div class="flex-1 overflow-y-auto px-5 py-4">
-                {#if loading}
-                    <div class="flex items-center justify-center py-16 text-xs text-(--theme-modal-text)/50">
-                        加载中...
-                    </div>
-                {:else if charData}
-                    <div class="space-y-5">
-                        <div class="flex items-center gap-3">
-                            {#if img(charIcons[currentSlot.character ?? ''])}<img
-                                    src={img(charIcons[currentSlot.character ?? ''])}
-                                    alt=""
-                                    class="size-10 rounded-md object-contain"
-                                    style="background: var(--theme-input-bg);"
-                                />{/if}
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="text-sm font-semibold">{currentSlot.character}</span>
-                                <span class="text-xs text-yellow-400">{'★'.repeat(charData.rarity)}</span>
-                                {#if img(elementIcons[charData.element])}<img
-                                        src={img(elementIcons[charData.element])}
-                                        alt={charData.element}
-                                        class="size-4"
-                                        title={charData.element}
-                                    />{:else}
-                                    <span
-                                        class="rounded px-1.5 py-0.5 text-[10px]"
-                                        style="background: var(--theme-input-bg);">{charData.element}</span
-                                    >{/if}
-                                {#if img(weaponTypeIcons[charData.weaponType])}<img
-                                        src={img(weaponTypeIcons[charData.weaponType])}
-                                        alt={charData.weaponType}
-                                        class="size-4"
-                                        title={charData.weaponType}
-                                    />{:else}
-                                    <span
-                                        class="rounded px-1.5 py-0.5 text-[10px]"
-                                        style="background: var(--theme-input-bg);">{charData.weaponType}</span
-                                    >{/if}
-                            </div>
+                </div>
+                <div
+                    class="sticky top-[52px] z-10 flex gap-1 border-b px-5 py-2"
+                    style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); backdrop-filter: blur(8px); border-color: var(--theme-divider-border);"
+                >
+                    {#each charNames as name, i}
+                        <button
+                            onclick={() => {
+                                charIndex = i
+                            }}
+                            class={[
+                                'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                                i === charIndex
+                                    ? 'text-(--theme-accent-text)'
+                                    : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
+                            ].join(' ')}
+                            style={i === charIndex
+                                ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent);'
+                                : ''}
+                        >
+                            {#if img(charIcons[name])}<img
+                                    src={img(charIcons[name])}
+                                    alt={name}
+                                    class="inline size-4 mr-1 rounded-full object-cover"
+                                />{/if}{name}
+                        </button>
+                    {/each}
+                </div>
+                <div class="px-5 py-4">
+                    {#if loading}
+                        <div class="flex items-center justify-center py-16 text-sm text-(--theme-modal-text)/50">
+                            加载中...
                         </div>
-                        <section>
-                            <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                基础属性 (Lv90)
-                            </h3>
-                            <div class="grid grid-cols-4 gap-2">
-                                <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                    <div class="text-[10px] text-(--theme-modal-text)/50">基础生命</div>
-                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
-                                        {charData.lv90BaseStats.hp}
-                                    </div>
-                                </div>
-                                <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                    <div class="text-[10px] text-(--theme-modal-text)/50">基础攻击</div>
-                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
-                                        {charData.lv90BaseStats.atk}
-                                    </div>
-                                </div>
-                                <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                    <div class="text-[10px] text-(--theme-modal-text)/50">基础防御</div>
-                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
-                                        {charData.lv90BaseStats.def}
-                                    </div>
-                                </div>
-                                <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                    <div class="text-[10px] text-(--theme-modal-text)/50">谐度破坏增幅</div>
-                                    <div class="mt-0.5 text-xs font-semibold tabular-nums">
-                                        {charData.lv90BaseStats.tuneBreakBoost}
-                                    </div>
+                    {:else if charData}
+                        <div class="space-y-5">
+                            <div class="flex items-center gap-3">
+                                {#if img(charIcons[currentSlot.character ?? ''])}<img
+                                        src={img(charIcons[currentSlot.character ?? ''])}
+                                        alt=""
+                                        class="size-10 rounded-md object-contain"
+                                        style="background: var(--theme-input-bg);"
+                                    />{/if}
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-base font-semibold">{currentSlot.character}</span>
+                                    <span class="text-sm text-yellow-400">{'★'.repeat(charData.rarity)}</span>
+                                    {#if img(elementIcons[charData.element])}<img
+                                            src={img(elementIcons[charData.element])}
+                                            alt={charData.element}
+                                            class="size-4"
+                                            title={charData.element}
+                                        />{:else}
+                                        <span
+                                            class="rounded px-1.5 py-0.5 text-sm"
+                                            style="background: var(--theme-input-bg);">{charData.element}</span
+                                        >{/if}
+                                    {#if img(weaponTypeIcons[charData.weaponType])}<img
+                                            src={img(weaponTypeIcons[charData.weaponType])}
+                                            alt={charData.weaponType}
+                                            class="size-4 w-icon"
+                                            title={charData.weaponType}
+                                        />{:else}
+                                        <span
+                                            class="rounded px-1.5 py-0.5 text-sm"
+                                            style="background: var(--theme-input-bg);">{charData.weaponType}</span
+                                        >{/if}
                                 </div>
                             </div>
-                        </section>
-                        {#if currentSlot.weapon}
                             <section>
-                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                    武器
+                                <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
+                                    基础属性 (Lv90)
                                 </h3>
-                                <div class="rounded-lg p-3 space-y-2" style="background: var(--theme-input-bg);">
-                                    <div class="flex items-center gap-2">
-                                        {#if img(weaponIcons[currentSlot.weapon])}<img
-                                                src={img(weaponIcons[currentSlot.weapon])}
-                                                alt=""
-                                                class="size-8 rounded object-contain"
-                                                style="background: var(--theme-input-bg);"
-                                            />{/if}
-                                        <div>
-                                            <div class="flex items-center gap-1.5 text-xs font-medium">
-                                                <span>{currentSlot.weapon}</span>{#if weaponData}<span
-                                                        class="text-yellow-400 text-[10px]"
-                                                        >{'★'.repeat(weaponData.rarity)}</span
-                                                    >{/if}
-                                            </div>
-                                            {#if weaponData}<div
-                                                    class="text-[10px] text-(--theme-modal-text)/50 mt-0.5"
-                                                >
-                                                    基础攻击 {weaponData.lv90BaseAtk}
-                                                </div>{/if}
+                                <div class="grid grid-cols-4 gap-2">
+                                    <div
+                                        class="rounded-lg p-2.5 text-center"
+                                        style="background: var(--theme-input-bg);"
+                                    >
+                                        <div class="text-sm text-(--theme-modal-text)/50">基础生命</div>
+                                        <div class="mt-0.5 text-sm font-semibold tabular-nums">
+                                            {charData.lv90BaseStats.hp}
                                         </div>
                                     </div>
-                                    {#if weaponData}<div
-                                            class="text-[10px] text-(--theme-modal-text)/70 border-t pt-2"
-                                            style="border-color: var(--theme-divider-border);"
-                                        >
-                                            <span class="text-cyan-400">{weaponData.substat.name}</span>
-                                            {weaponData.substat.value}
-                                        </div>
-                                        <div class="mt-1 text-[10px] text-(--theme-modal-text)/60 leading-relaxed">
-                                            {@html rd(weaponData.effect.desc)}
-                                        </div>{/if}
-                                </div>
-                            </section>
-                        {/if}
-                        {#if currentSlot.echoes[0]?.name}
-                            <section>
-                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                    首位声骸
-                                </h3>
-                                <div class="rounded-lg p-3" style="background: var(--theme-input-bg);">
-                                    <div class="flex items-center gap-2">
-                                        {#if img(echoIcons[currentSlot.echoes[0].name])}<img
-                                                src={img(echoIcons[currentSlot.echoes[0].name])}
-                                                alt=""
-                                                class="size-8 rounded object-contain"
-                                                style="background: var(--theme-input-bg);"
-                                            />{/if}
-                                        <div class="text-xs font-medium">
-                                            {currentSlot.echoes[0].name}<span class="text-(--theme-modal-text)/50 ml-1"
-                                                >(C{currentSlot.echoes[0].cost})</span
-                                            >{#if currentSlot.triggerSets.length > 0}<span
-                                                    class="text-[10px] text-(--theme-accent-text) ml-1.5"
-                                                    >[{currentSlot.triggerSets[0].name}]</span
-                                                >{/if}
+                                    <div
+                                        class="rounded-lg p-2.5 text-center"
+                                        style="background: var(--theme-input-bg);"
+                                    >
+                                        <div class="text-sm text-(--theme-modal-text)/50">基础攻击</div>
+                                        <div class="mt-0.5 text-sm font-semibold tabular-nums">
+                                            {charData.lv90BaseStats.atk}
                                         </div>
                                     </div>
-                                    {#if echoSkillData}<div
-                                            class="mt-2 text-[10px] text-(--theme-modal-text)/60 leading-relaxed border-t pt-2"
-                                            style="border-color: var(--theme-divider-border);"
-                                        >
-                                            {@html rd(echoSkillData.desc)}
-                                        </div>{/if}
-                                </div>
-                            </section>
-                        {/if}
-                        {#if setBonuses}
-                            <section>
-                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                    套装加成
-                                </h3>
-                                <div class="space-y-2">
-                                    {#each setBonuses as set}
-                                        <div class="rounded-lg p-3" style="background: var(--theme-input-bg);">
-                                            <div class="flex items-center gap-2 mb-2">
-                                                {#if img(setIcons[set.name])}<img
-                                                        src={img(setIcons[set.name])}
-                                                        alt=""
-                                                        class="size-6 rounded object-contain"
-                                                        style="background: var(--theme-input-bg);"
-                                                    />{/if}
-                                                <span class="text-xs font-medium">{set.name}</span>
-                                                <span class="text-[10px] text-(--theme-modal-text)/50"
-                                                    >({set.pieces}件)</span
-                                                >
-                                            </div>
-                                            <div class="space-y-0.5">
-                                                {#each Object.entries(set.bonuses) as [pieces, desc]}
-                                                    <div class="text-xs">
-                                                        <span class="text-(--theme-accent-text) font-medium"
-                                                            >{pieces}件套</span
-                                                        ><span class="text-(--theme-modal-text)/70 ml-1">{desc}</span>
-                                                    </div>
-                                                {/each}
-                                            </div>
+                                    <div
+                                        class="rounded-lg p-2.5 text-center"
+                                        style="background: var(--theme-input-bg);"
+                                    >
+                                        <div class="text-sm text-(--theme-modal-text)/50">基础防御</div>
+                                        <div class="mt-0.5 text-sm font-semibold tabular-nums">
+                                            {charData.lv90BaseStats.def}
                                         </div>
-                                    {/each}
+                                    </div>
+                                    <div
+                                        class="rounded-lg p-2.5 text-center"
+                                        style="background: var(--theme-input-bg);"
+                                    >
+                                        <div class="text-sm text-(--theme-modal-text)/50">谐度破坏增幅</div>
+                                        <div class="mt-0.5 text-sm font-semibold tabular-nums">
+                                            {charData.lv90BaseStats.tuneBreakBoost}
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
-                        {/if}
-                        <section>
-                            <button
-                                onclick={() => handleAccordion('skills')}
-                                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/70 transition-colors hover:bg-(--theme-modal-text)/10"
-                                style="background: var(--theme-input-bg);"
-                            >
-                                <Icon
-                                    icon={activeAccordion === 'skills' ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-                                    class="size-3.5"
-                                />
-                                技能
-                            </button>
-                            {#if activeAccordion === 'skills'}
-                                <div class="mt-2 space-y-1">
-                                    {#each charData.skills as skill}
-                                        <div
-                                            class="rounded-lg border overflow-hidden"
-                                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                        >
-                                            <button
-                                                onclick={() => handleSkillToggle(skill.name)}
-                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
-                                            >
-                                                <span
-                                                    class="rounded px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/50"
-                                                    style="background: var(--theme-input-bg);">{skill.type}</span
-                                                >
-                                                <span class="flex-1 text-left">{skill.name}</span>
-                                                <Icon
-                                                    icon={openSkillName === skill.name
-                                                        ? 'mdi:chevron-down'
-                                                        : 'mdi:chevron-right'}
-                                                    class="size-3.5 text-(--theme-modal-text)/30"
-                                                />
-                                            </button>
-                                            {#if openSkillName === skill.name}
-                                                <div
-                                                    class="border-t px-3 py-2 text-[10px] text-(--theme-modal-text)/60 leading-relaxed"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    {@html rd(skill.desc)}
+                            {#if currentSlot.weapon}
+                                <section>
+                                    <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
+                                        武器
+                                    </h3>
+                                    <div class="rounded-lg p-3 space-y-2" style="background: var(--theme-input-bg);">
+                                        <div class="flex items-center gap-2">
+                                            {#if img(weaponIcons[currentSlot.weapon])}<img
+                                                    src={img(weaponIcons[currentSlot.weapon])}
+                                                    alt=""
+                                                    class="size-8 rounded object-contain"
+                                                    style="background: var(--theme-input-bg);"
+                                                />{/if}
+                                            <div>
+                                                <div class="flex items-center gap-1.5 text-sm font-medium">
+                                                    <span>{currentSlot.weapon}</span>{#if weaponData}<span
+                                                            class="text-yellow-400 text-sm"
+                                                            >{'★'.repeat(weaponData.rarity)}</span
+                                                        >{/if}
                                                 </div>
-                                                {#if skill.values.length > 0}
+                                                {#if weaponData}
                                                     <div
-                                                        class="border-t px-3 py-2 space-y-0.5"
-                                                        style="border-color: var(--theme-divider-border);"
+                                                        class="text-sm text-(--theme-modal-text)/50 mt-0.5 flex items-center gap-2 flex-wrap"
                                                     >
-                                                        {#each skill.values as [vname, vvalue, velement]}
-                                                            <div
-                                                                class="flex justify-between gap-2 text-[10px] even:bg-(--theme-input-bg) px-1 py-0.5 text-(--theme-modal-text)/70"
-                                                            >
-                                                                <span class="text-(--theme-modal-text)/50">{vname}</span
-                                                                >
-                                                                <span class="tabular-nums whitespace-nowrap"
-                                                                    >{vvalue}{#if velement}<span
-                                                                            class="text-(--theme-modal-text)/30"
-                                                                        >
-                                                                            {velement}</span
-                                                                        >{/if}</span
-                                                                >
-                                                            </div>
-                                                        {/each}
+                                                        <span>基础攻击</span>
+                                                        <span class="text-(--theme-accent-text)"
+                                                            >{weaponData.lv90BaseAtk}</span
+                                                        >
+                                                        <span class="text-(--theme-modal-text)/20">|</span>
+                                                        <span>{weaponData.substat.name}</span>
+                                                        <span class="text-(--theme-accent-text)"
+                                                            >{fmtSubVal(weaponData.substat.value)}</span
+                                                        >
                                                     </div>
                                                 {/if}
+                                            </div>
+                                        </div>
+                                        {#if weaponData}<div
+                                                class="border-t pt-2 mt-2 text-sm text-(--theme-modal-text)/60 leading-relaxed"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                {@html rd(weaponData.effect.desc)}
+                                            </div>{/if}
+                                    </div>
+                                </section>
+                            {/if}
+                            {#if currentSlot.echoes[0]?.name}
+                                <section>
+                                    <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
+                                        首位声骸
+                                    </h3>
+                                    <div class="rounded-lg p-3" style="background: var(--theme-input-bg);">
+                                        <div class="flex items-center gap-2">
+                                            {#if img(echoIcons[currentSlot.echoes[0].name])}<img
+                                                    src={img(echoIcons[currentSlot.echoes[0].name])}
+                                                    alt=""
+                                                    class="size-8 rounded object-contain"
+                                                    style="background: var(--theme-input-bg);"
+                                                />{/if}
+                                            <div class="text-sm font-medium">
+                                                {currentSlot.echoes[0].name}<span
+                                                    class="text-(--theme-modal-text)/50 ml-1"
+                                                    >(C{currentSlot.echoes[0].cost})</span
+                                                >{#if currentSlot.triggerSets.length > 0}<span
+                                                        class="text-sm text-(--theme-accent-text) ml-1.5"
+                                                        >[{currentSlot.triggerSets[0].name}]</span
+                                                    >{/if}
+                                            </div>
+                                        </div>
+                                        {#if echoSkillData}<div
+                                                class="mt-2 text-sm text-(--theme-modal-text)/60 leading-relaxed border-t pt-2"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                {@html rd(echoSkillData.desc)}
+                                            </div>{/if}
+                                    </div>
+                                </section>
+                            {/if}
+                            {#if setBonuses}
+                                <section>
+                                    <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
+                                        套装加成
+                                    </h3>
+                                    <div class="space-y-3">
+                                        {#each setBonuses as set}
+                                            <div class="rounded-lg p-3" style="background: var(--theme-input-bg);">
+                                                <div class="flex items-center gap-2 mb-2">
+                                                    {#if img(setIcons[set.name])}<img
+                                                            src={img(setIcons[set.name])}
+                                                            alt=""
+                                                            class="size-6 rounded object-contain"
+                                                            style="background: var(--theme-input-bg);"
+                                                        />{/if}
+                                                    <span class="text-sm font-medium">{set.name}</span>
+                                                    <span class="text-sm text-(--theme-modal-text)/50"
+                                                        >({set.pieces}件)</span
+                                                    >
+                                                </div>
+                                                <div class="space-y-0.5">
+                                                    {#each Object.entries(set.bonuses) as [pieces, desc]}
+                                                        <div class="text-sm">
+                                                            <span class="text-(--theme-accent-text) font-medium"
+                                                                >{pieces}件套</span
+                                                            ><span class="text-(--theme-modal-text)/70 ml-1"
+                                                                >{@html rd(desc)}</span
+                                                            >
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </section>
+                            {/if}
+                            <section class="border-t pt-4 mt-4" style="border-color: var(--theme-divider-border);">
+                                <h3 class="mb-2 text-base font-semibold tracking-wider text-(--theme-modal-text)/50">
+                                    技能
+                                </h3>
+                                <div class="space-y-3">
+                                    {#each charData.skills as skill}
+                                        <div
+                                            class="rounded-lg border"
+                                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                        >
+                                            <div
+                                                class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-(--theme-modal-text)"
+                                            >
+                                                <span
+                                                    class="rounded px-1.5 py-0.5 text-sm text-(--theme-modal-text)/50"
+                                                    style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);"
+                                                    >{skill.type}</span
+                                                >
+                                                <span>{skill.name}</span>
+                                            </div>
+                                            <div
+                                                class="border-t px-3 py-2 text-sm text-(--theme-modal-text)/60 leading-relaxed"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                {@html rd(skill.desc)}
+                                            </div>
+                                            {#if skill.values.length > 0}
+                                                <div
+                                                    class="border-t px-3 py-2 space-y-0.5"
+                                                    style="border-color: var(--theme-divider-border);"
+                                                >
+                                                    {#each skill.values as [vname, vvalue, velement]}
+                                                        <div
+                                                            class="grid grid-cols-[1fr_auto_auto] gap-2 text-sm even:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,transparent)] px-1 py-0.5 text-(--theme-modal-text)/70"
+                                                        >
+                                                            <span class="text-(--theme-modal-text)/50 truncate"
+                                                                >{vname}</span
+                                                            >
+                                                            <span class="tabular-nums whitespace-nowrap">{vvalue}</span>
+                                                            {#if velement}
+                                                                <span
+                                                                    class="tabular-nums whitespace-nowrap"
+                                                                    style="color: {ELEMENT_COLORS[velement] ??
+                                                                        'var(--theme-modal-text)'}">{velement}</span
+                                                                >
+                                                            {/if}
+                                                        </div>
+                                                    {/each}
+                                                </div>
                                             {/if}
                                         </div>
                                     {/each}
                                     {#each inherentSkills as skill}
                                         <div
-                                            class="rounded-lg border overflow-hidden"
+                                            class="rounded-lg border"
                                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                         >
-                                            <button
-                                                onclick={() => handleSkillToggle(skill.name)}
-                                                class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                                            <div
+                                                class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-(--theme-modal-text)"
                                             >
                                                 <span
-                                                    class="rounded px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/50"
-                                                    style="background: var(--theme-input-bg);">固有技能</span
+                                                    class="rounded px-1.5 py-0.5 text-sm text-(--theme-modal-text)/50"
+                                                    style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);"
+                                                    >固有技能</span
                                                 >
-                                                <span class="flex-1 text-left">{skill.name}</span>
-                                                <Icon
-                                                    icon={openSkillName === skill.name
-                                                        ? 'mdi:chevron-down'
-                                                        : 'mdi:chevron-right'}
-                                                    class="size-3.5 text-(--theme-modal-text)/30"
-                                                />
-                                            </button>
-                                            {#if openSkillName === skill.name}
-                                                <div
-                                                    class="border-t px-3 py-2 text-[10px] text-(--theme-modal-text)/60 leading-relaxed"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    {@html rd(skill.desc)}
-                                                </div>
-                                            {/if}
-                                        </div>
-                                    {/each}
-                                </div>
-                            {/if}
-                        </section>
-                        {#if statAttrs.length > 0}
-                            <section>
-                                <h3 class="mb-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                    固有属性
-                                </h3>
-                                <div class="grid grid-cols-2 gap-2">
-                                    {#each sortedStatAttrs as attr}
-                                        <div class="rounded-lg p-2.5" style="background: var(--theme-input-bg);">
-                                            <div class="text-[10px] text-(--theme-modal-text)/50">{attr.name}</div>
-                                            {#if attr.desc}
-                                                <div class="mt-0.5 text-xs font-semibold tabular-nums leading-relaxed">
-                                                    {@html rd(attr.desc)}
-                                                </div>
-                                            {/if}
+                                                <span>{skill.name}</span>
+                                            </div>
+                                            <div
+                                                class="border-t px-3 py-2 text-sm text-(--theme-modal-text)/60 leading-relaxed"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                {@html rd(skill.desc)}
+                                            </div>
                                         </div>
                                     {/each}
                                 </div>
                             </section>
-                        {/if}
-                        {#if charData.chains.length > 0}
-                            <section>
-                                <button
-                                    onclick={() => handleAccordion('chains')}
-                                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold tracking-wider text-(--theme-modal-text)/70 transition-colors hover:bg-(--theme-modal-text)/10"
-                                    style="background: var(--theme-input-bg);"
-                                >
-                                    <Icon
-                                        icon={activeAccordion === 'chains' ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-                                        class="size-3.5"
-                                    />
-                                    共鸣链
-                                </button>
-                                {#if activeAccordion === 'chains'}
-                                    <div class="mt-2 space-y-2">
+                            {#if statAttrs.length > 0}
+                                <section>
+                                    <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
+                                        固有属性
+                                    </h3>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        {#each sortedStatAttrs as attr}
+                                            <div class="rounded-lg p-2.5" style="background: var(--theme-input-bg);">
+                                                <div class="text-sm text-(--theme-modal-text)/50">{attr.name}</div>
+                                                {#if attr.desc}
+                                                    <div
+                                                        class="mt-0.5 text-sm font-semibold tabular-nums leading-relaxed"
+                                                    >
+                                                        {@html rd(attr.desc)}
+                                                    </div>
+                                                {/if}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </section>
+                            {/if}
+                            {#if charData.chains.length > 0}
+                                <section class="border-t pt-4 mt-4" style="border-color: var(--theme-divider-border);">
+                                    <h3
+                                        class="mb-2 text-base font-semibold tracking-wider text-(--theme-modal-text)/50"
+                                    >
+                                        共鸣链
+                                    </h3>
+                                    <div class="space-y-3">
                                         {#each charData.chains as chain, i}
                                             <div
                                                 class="rounded-lg border px-3 py-2"
                                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                             >
-                                                <div class="flex items-center gap-2 text-xs font-medium">
-                                                    <span class="text-[10px] text-(--theme-modal-text)/40"
-                                                        >C{i + 1}</span
+                                                <div class="flex items-center gap-2 text-sm font-medium">
+                                                    <span class="text-sm text-(--theme-modal-text)/40">C{i + 1}</span
                                                     ><span>{chain.name}</span>
                                                 </div>
-                                                <div
-                                                    class="mt-1 text-[10px] text-(--theme-modal-text)/60 leading-relaxed"
-                                                >
+                                                <div class="mt-1 text-sm text-(--theme-modal-text)/60 leading-relaxed">
                                                     {@html rd(chain.desc)}
                                                 </div>
                                             </div>
                                         {/each}
                                     </div>
-                                {/if}
-                            </section>
-                        {/if}
-                    </div>
-                {:else}
-                    <div class="flex items-center justify-center py-16 text-xs text-(--theme-modal-text)/40">
-                        选择角色查看详情
-                    </div>
-                {/if}
+                                </section>
+                            {/if}
+                        </div>
+                    {:else}
+                        <div class="flex items-center justify-center py-16 text-sm text-(--theme-modal-text)/40">
+                            选择角色查看详情
+                        </div>
+                    {/if}
+                </div>
+                <div
+                    class="sticky bottom-0 h-10 pointer-events-none"
+                    style="background: linear-gradient(to top, var(--theme-modal-bg), transparent);"
+                ></div>
             </div>
         </div>
     </div>
@@ -571,23 +573,37 @@
         >
             <button
                 onclick={handleCopy}
-                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                 ><Icon icon="mdi:content-copy" class="size-3.5 shrink-0" /> 复制</button
             >
+            {#if showBuffOption || showCustomHitOption}
+                <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            {/if}
             {#if showBuffOption}
                 <button
                     onclick={handleCreateBuffFromSel}
-                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                     ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</button
                 >
             {/if}
             {#if showCustomHitOption}
                 <button
                     onclick={handleCreateCustomHit}
-                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-amber-400 transition-colors hover:bg-(--theme-modal-text)/5"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-amber-400 transition-colors hover:bg-(--theme-modal-text)/5"
                     ><Icon icon="mdi:plus-circle-outline" class="size-3.5 shrink-0" /> 创建自定义直伤</button
                 >
             {/if}
+            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            <button
+                onclick={handleScrollTop}
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                ><Icon icon="mdi:arrow-up-bold-outline" class="size-3.5 shrink-0" /> 跳转到顶部</button
+            >
+            <button
+                onclick={handleScrollBottom}
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                ><Icon icon="mdi:arrow-down-bold-outline" class="size-3.5 shrink-0" /> 跳转到底部</button
+            >
         </div>
     </div>
 {/if}
@@ -596,5 +612,57 @@
     :global(.select-text) ::selection {
         background: var(--theme-modal-text);
         color: var(--theme-modal-bg);
+    }
+    :global(.rich-color-title) {
+        color: var(--theme-layout-text);
+        font-weight: 700;
+    }
+    :global(.rich-color-highlight) {
+        color: #818cf8;
+        font-weight: 600;
+    }
+    :global(.rich-color-ice) {
+        color: #38bdf8;
+    }
+    :global(.rich-color-fire) {
+        color: #fb923c;
+    }
+    :global(.rich-color-thunder) {
+        color: #a78bfa;
+    }
+    :global(.rich-color-wind) {
+        color: #34d399;
+    }
+    :global(.rich-color-light) {
+        color: #facc15;
+    }
+    :global(.rich-color-dark) {
+        color: #f472b6;
+    }
+    :global(.rich-size-xl) {
+        font-size: 1.125rem;
+    }
+    :global(.rich-size-xs) {
+        font-size: 0.625rem;
+        opacity: 0.3;
+    }
+    :global(.rich-te) {
+        color: #818cf8;
+        border-bottom: 1px dashed #818cf8;
+    }
+    :global(.rich-highlight) {
+        background: rgba(129, 140, 248, 0.15);
+        padding: 0 0.25em;
+        border-radius: 2px;
+    }
+    :global(.rich-num) {
+        color: var(--theme-num, #ca8a04);
+    }
+    :global(.hide-scrollbar) {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    :global(.hide-scrollbar::-webkit-scrollbar) {
+        display: none;
     }
 </style>

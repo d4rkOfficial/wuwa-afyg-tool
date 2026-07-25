@@ -262,6 +262,81 @@ export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
     }
 }
 
+export function transformCharacterInfoRich(data: ZhCharacterDetail): CharacterInfo {
+    let baseStats: { hp: number; atk: number; def: number; tuneBreakBoost: number } = {
+        hp: 0,
+        atk: 0,
+        def: 0,
+        tuneBreakBoost: 0
+    }
+    for (const ascStr of Object.keys(data.stats)) {
+        const asc = Number(ascStr)
+        const levelMap = data.stats[ascStr]
+        for (const lvStr of Object.keys(levelMap)) {
+            const lv = Number(lvStr)
+            if (lv === 90 && asc === 6) {
+                baseStats = {
+                    hp: levelMap[lvStr].life,
+                    atk: levelMap[lvStr].atk,
+                    def: levelMap[lvStr].def,
+                    tuneBreakBoost: 0
+                }
+            }
+        }
+    }
+
+    const skills: SkillEntry[] = []
+    const statNodes: StatNode[] = []
+    const elementName = (ELEMENT_MAP[data.element] ?? '') as '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'
+    const hasTune = Object.values(data.tag ?? {}).some(
+        (t) => t.name === '震谐响应' || t.name === '集谐响应' || t.name === '骇破响应'
+    )
+    baseStats.tuneBreakBoost = hasTune ? 10 : 0
+
+    for (const node of Object.values(data.skill_trees)) {
+        const s = node.skill
+        const nt = node.node_type
+        const st = s.type ?? ''
+
+        if (nt === 1 || nt === 2) {
+            skills.push({
+                name: s.name ?? '',
+                type: st as SkillEntry['type'],
+                desc: interpolate(s.desc ?? '', s.param ?? []),
+                values: makeSkillValues(s)
+            })
+        } else if (nt === 3 && (st === '延奏技能' || st === '谐度破坏')) {
+            skills.push({
+                name: s.name ?? '',
+                type: st as SkillEntry['type'],
+                desc: interpolate(s.desc ?? '', s.param ?? []),
+                values: makeSkillValues(s)
+            })
+        } else {
+            const sd = s.desc ?? ''
+            statNodes.push({
+                name: s.name ?? '',
+                desc: sd ? interpolate(sd, s.param ?? []) : ''
+            })
+        }
+    }
+
+    const chains: ResonanceChain[] = Object.entries(data.chains ?? {}).map(([, c]) => ({
+        name: c.name,
+        desc: interpolate(c.desc, c.param ?? [])
+    }))
+
+    return {
+        rarity: data.rarity as 4 | 5,
+        element: elementName,
+        weaponType: (WEAPON_TYPE_MAP[data.weapon] ?? '') as '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪',
+        lv90BaseStats: baseStats,
+        skills,
+        statNodes,
+        chains
+    }
+}
+
 export function transformWeaponInfo(data: ZhWeaponDetail): WeaponInfo {
     const arr = data.stats?.['6']?.['90'] ?? data.stats?.['5']?.['90'] ?? data.stats?.['6']?.['80']
     const atkStat = arr?.[0] ?? { value: 0 }
@@ -274,7 +349,7 @@ export function transformWeaponInfo(data: ZhWeaponDetail): WeaponInfo {
         desc = desc.replace(/\{(\d+)\}/g, (_, idx) => {
             const p = data.param[Number(idx)]
             if (!p) return `{${idx}}`
-            return `(${p.join(', ')})`
+            return p.join('/')
         })
     }
 

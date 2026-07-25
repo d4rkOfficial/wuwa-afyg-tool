@@ -354,7 +354,7 @@
                                                 <img
                                                     src={weaponTypeIcons[charData.weaponType]}
                                                     alt={charData.weaponType}
-                                                    class="size-4 shrink-0"
+                                                    class="size-4 shrink-0 w-icon"
                                                 />
                                             {/if}
                                             {charData.weaponType}

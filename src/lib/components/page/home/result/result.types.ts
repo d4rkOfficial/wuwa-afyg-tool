@@ -43,6 +43,7 @@ export interface ResultEntry {
     finalTuneStrainMulti: number
     finalTuneBreakZone: number
     customMult: number
+    extraRatio: number
     vulnerability: number
 
     // per hit and total

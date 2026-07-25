@@ -22,7 +22,9 @@
         importProjects,
         createProjectData
     } from '$lib/data/project.svelte'
-    import { getWWVersion, ensureVersion } from '$lib/api/consts'
+    import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/consts'
+    import { clearCache } from '$lib/data/api'
+    import { browser } from '$app/environment'
     import type { PhaseKey, CharSlot, Project } from '$lib/data/types'
     import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
     import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
@@ -42,6 +44,7 @@
         toggleBuffDiffMode,
         syncGlobalBuffs,
         getCalcState,
+        createBuffSet,
         init as initCalculation
     } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
@@ -54,6 +57,7 @@
     import StatOverview from '$lib/components/page/home/config/stat-overview.svelte'
     import Result from '$lib/components/page/home/result/result.svelte'
     import PhaseTabs from '$lib/components/page/home/phase-tabs.svelte'
+    import QuickLookup from '$lib/components/page/home/calculation/quick-lookup.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
     import Icon from '@iconify/svelte'
 
@@ -80,6 +84,7 @@
         }
     })
 
+    let showLookup = $state(false)
     let showStatOverview = $state(false)
     let resultRefreshKey = $state(0)
     let renameModal = $state(false)
@@ -115,8 +120,15 @@
 
     let activePhase = $state<PhaseKey>('team')
 
-    onMount(() => {
-        ensureVersion()
+    onMount(async () => {
+        await ensureVersion()
+        if (browser) {
+            const prev = localStorage.getItem('wuwa-afyg:version')
+            if (prev && prev !== getWWVersion()) {
+                clearCache()
+            }
+            localStorage.setItem('wuwa-afyg:version', getWWVersion())
+        }
         loadThemes()
         loadProjects()
         loadIcons()
@@ -615,6 +627,14 @@
                 style="background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)"
             >
                 {#if !showResult}
+                    <button
+                        onclick={() => (showLookup = true)}
+                        disabled={!teamPhaseLocked}
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                        <Icon icon="mdi:book-search-outline" class="size-4 shrink-0" />
+                        速查
+                    </button>
                     {#if activePhase === 'timeline'}
                         <button
                             onclick={() => setShowDamageList(true)}
@@ -696,6 +716,21 @@
         {/if}
     </div>
 </div>
+
+{#if activeProject}
+    <QuickLookup
+        open={showLookup}
+        team={activeProject.team}
+        showBuffOption={activePhase === 'calculation'}
+        showCustomHitOption={false}
+        onCreateBuff={(name) => {
+            createBuffSet(name)
+            showLookup = false
+            setShowBuffModal(true)
+        }}
+        onclose={() => (showLookup = false)}
+    />
+{/if}
 
 <svelte:head><title>椰果工具箱</title></svelte:head>
 
@@ -807,7 +842,7 @@
                 class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
             >
                 <input type="checkbox" bind:checked={exportResult} class="size-4 accent-indigo-500" />
-                <span>结果页（凹暴击配置、时间记点、DPS 数据）</span>
+                <span>结果页配置（不必需）</span>
             </label>
             <div class="flex justify-end gap-2">
                 <button

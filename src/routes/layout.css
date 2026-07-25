@@ -72,4 +72,8 @@
     *::-webkit-scrollbar-corner {
         background: transparent;
     }
+    .w-icon {
+        filter: var(--theme-w-icon-filter, none);
+        transition: filter 0.2s;
+    }
 }

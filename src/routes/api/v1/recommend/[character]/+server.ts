@@ -1,4 +1,4 @@
-import { NANOKA_BASE, CACHE_CONTROL, ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP } from '$lib/api/consts'
+import { CACHE_CONTROL, ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP, ensureVersion, getWWVersion } from '$lib/api/consts'
 import { fetchData, fetchZhData, createJsonResponse } from '$lib/api/fetch'
 import { findEntryByName } from '$lib/api/utils'
 import type {
@@ -12,15 +12,6 @@ import type {
 } from '$lib/api/types'
 
 const EFFECT_NAMES = ['光噪效应', '风蚀效应', '聚爆效应', '霜渐效应', '虚湮效应', '电磁效应', '骇破', '震谐', '集谐']
-
-let versionCache: string | null = null
-
-async function getVersion(): Promise<string> {
-    if (versionCache) return versionCache
-    const manifest: { ww: { latest: string } } = await fetch(`${NANOKA_BASE}/manifest.json`).then((r) => r.json())
-    versionCache = manifest.ww.latest
-    return versionCache
-}
 
 interface CharProfile {
     element: string
@@ -132,7 +123,8 @@ export const GET = async ({ params }: { params: { character: string } }) => {
     if (!character) return createJsonResponse({ error: 'Missing character name' }, 400)
 
     try {
-        const version = await getVersion()
+        await ensureVersion()
+        const version = getWWVersion()
 
         // ── 1. Fetch character raw data ──
         const charList = await fetchData<Record<string, NanokaCharacter>>('/character.json')

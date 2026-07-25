@@ -11,6 +11,7 @@ export interface EndpointGroup {
 }
 
 export const CHAR_INFO = '/api/v1/info/character/{name}'
+export const CHAR_INFO_V2 = '/api/v2/info/character/{name}'
 export const WEAPON_INFO = '/api/v1/info/weapon/{name}'
 export const ECHO_INFO = '/api/v1/info/echo/{name}'
 export const SET_INFO = '/api/v1/info/echo-set/{name}'
@@ -72,6 +73,9 @@ export const endpointGroups: EndpointGroup[] = [
     }
 ]
 
+const CHAR_INFO_TYPE_CODE =
+    "interface CharacterInfo {\n    rarity: 4 | 5\n    element: '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'\n    weaponType: '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪'\n    lv90BaseStats: {\n        hp: number\n        atk: number\n        def: number\n        tuneBreakBoost: number\n    }\n    skills: SkillEntry[]\n    statNodes: StatNode[]\n    chains: ResonanceChain[]\n}"
+
 export const typeMap: Record<string, { name: string; code: string }> = {
     [VERSION_LATEST]: {
         name: 'version',
@@ -127,7 +131,11 @@ export const typeMap: Record<string, { name: string; code: string }> = {
     },
     [CHAR_INFO]: {
         name: 'CharacterInfo',
-        code: "interface CharacterInfo {\n    rarity: 4 | 5\n    element: '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'\n    weaponType: '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪'\n    lv90BaseStats: {\n        hp: number\n        atk: number\n        def: number\n        tuneBreakBoost: number\n    }\n    skills: SkillEntry[]\n    statNodes: StatNode[]\n    chains: ResonanceChain[]\n}"
+        code: CHAR_INFO_TYPE_CODE
+    },
+    [CHAR_INFO_V2]: {
+        name: 'CharacterInfoV2',
+        code: '// desc 字段包含富文本标签（<color=> <size=> <highlight> <te>）\n' + CHAR_INFO_TYPE_CODE
     },
     [WEAPON_INFO]: {
         name: 'WeaponInfo',
@@ -151,8 +159,17 @@ export const typeMap: Record<string, { name: string; code: string }> = {
     }
 }
 
+export const v2EndpointGroups: EndpointGroup[] = [
+    {
+        name: 'info',
+        label: '详情v2',
+        endpoints: [{ method: 'GET', path: CHAR_INFO_V2, summary: '角色详情（技能+共鸣链含富文本）' }]
+    }
+]
+
 export const DEFAULTS: Record<string, string> = {
     [CHAR_INFO]: '散华',
+    [CHAR_INFO_V2]: '散华',
     [WEAPON_INFO]: '裁竹',
     [ECHO_INFO]: '无常凶鹭',
     [SET_INFO]: '轻云出月',

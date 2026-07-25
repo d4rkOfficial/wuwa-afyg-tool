@@ -14,7 +14,7 @@ import type {
 const PREFIX = 'wuwa-afyg:'
 const LIST_TTL = 24 * 60 * 60 * 1000
 const INFO_TTL = 24 * 60 * 60 * 1000
-const ICON_TTL = 7 * 24 * 60 * 60 * 1000
+const ICON_TTL = Infinity
 
 const memoryCache = new Map<string, unknown>()
 const inFlight = new Map<string, Promise<unknown>>()
@@ -186,8 +186,8 @@ export function getUiBtnIcons(): Promise<Record<string, string>> {
 
 export function getCharacterInfo(name: string): Promise<CharacterInfo> {
     return fetchJSON<CharacterInfo>(
-        `/api/v1/info/character/${encodeURIComponent(name)}`,
-        cacheKey('info', 'character', name),
+        `/api/v2/info/character/${encodeURIComponent(name)}`,
+        cacheKey('info', 'character-v2', name),
         INFO_TTL
     )
 }

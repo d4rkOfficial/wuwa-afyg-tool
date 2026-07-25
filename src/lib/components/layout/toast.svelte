@@ -19,12 +19,6 @@
 
     let toasts = $derived(getToasts())
 
-    let typeIcons: Record<string, string> = {
-        info: 'mdi:information',
-        success: 'mdi:check-circle',
-        error: 'mdi:alert-circle'
-    }
-
     let typeStyles: Record<string, string> = {
         info: 'border-l-2 border-l-sky-500',
         success: 'border-l-2 border-l-emerald-500',
@@ -56,7 +50,13 @@
                 style={mergedStyle}
                 role="alert"
             >
-                <Icon icon={typeIcons[toast.type] || typeIcons.info} class="shrink-0 size-5" />
+                {#if toast.type === 'success'}
+                    <Icon icon="mdi:check-circle" class="shrink-0 size-5" />
+                {:else if toast.type === 'error'}
+                    <Icon icon="mdi:alert-circle" class="shrink-0 size-5" />
+                {:else}
+                    <Icon icon="mdi:information" class="shrink-0 size-5" />
+                {/if}
                 <span class="flex-1">{toast.message}</span>
                 <button
                     onclick={() => removeToast(toast.id)}

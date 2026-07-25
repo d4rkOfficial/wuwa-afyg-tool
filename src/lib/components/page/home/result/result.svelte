@@ -266,11 +266,32 @@
                                             </div>
                                         {:else if entry.baseUnit.startsWith('偏谐系数')}
                                             <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                基础值 = 偏谐系数 {entry.baseAtk.toLocaleString()} × {(
-                                                    (entry.ratioNum / entry.hits) *
-                                                    100
-                                                ).toFixed(2)}%{#if entry.hits > 1}
-                                                    ×{entry.hits}{/if} = {entry.baseValue.toLocaleString()}
+                                                基础值 = {entry.baseValue.toLocaleString()}
+                                            </div>
+                                            <div class="font-mono space-y-0.5 pl-3 text-(--theme-modal-text)/60">
+                                                <div>
+                                                    偏谐系数 {entry.baseAtk.toLocaleString()}
+                                                </div>
+                                                {#if entry.extraRatio > 0}
+                                                    <div>
+                                                        × 倍率 ({((entry.ratioNum / entry.hits) * 100).toFixed(2)}% + {entry.extraRatio}%(额外)){#if entry.hits > 1}
+                                                            × {entry.hits}
+                                                        {/if}
+                                                        = {(
+                                                            entry.ratioNum * 100 +
+                                                            entry.extraRatio * entry.hits
+                                                        ).toFixed(2)}% = {entry.baseValue.toLocaleString()}
+                                                    </div>
+                                                {:else}
+                                                    <div>
+                                                        × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
+                                                            2
+                                                        )}%{#if entry.hits > 1}
+                                                            × {entry.hits}
+                                                        {/if}
+                                                        = {entry.baseValue.toLocaleString()}
+                                                    </div>
+                                                {/if}
                                             </div>
                                             {#if entry.multiplierZones.length}
                                                 <div
@@ -308,11 +329,32 @@
                                             </div>
                                         {:else if entry.baseUnit === '效应系数'}
                                             <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                基础值 = 效应系数 {entry.baseAtk.toLocaleString()} × {(
-                                                    (entry.ratioNum / entry.hits) *
-                                                    100
-                                                ).toFixed(2)}%{#if entry.hits > 1}
-                                                    ×{entry.hits}{/if} = {entry.baseValue.toLocaleString()}
+                                                基础值 = {entry.baseValue.toLocaleString()}
+                                            </div>
+                                            <div class="font-mono space-y-0.5 pl-3 text-(--theme-modal-text)/60">
+                                                <div>
+                                                    效应系数 {entry.baseAtk.toLocaleString()}
+                                                </div>
+                                                {#if entry.extraRatio > 0}
+                                                    <div>
+                                                        × 倍率 ({((entry.ratioNum / entry.hits) * 100).toFixed(2)}% + {entry.extraRatio}%(额外)){#if entry.hits > 1}
+                                                            × {entry.hits}
+                                                        {/if}
+                                                        = {(
+                                                            entry.ratioNum * 100 +
+                                                            entry.extraRatio * entry.hits
+                                                        ).toFixed(2)}% = {entry.baseValue.toLocaleString()}
+                                                    </div>
+                                                {:else}
+                                                    <div>
+                                                        × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
+                                                            2
+                                                        )}%{#if entry.hits > 1}
+                                                            × {entry.hits}
+                                                        {/if}
+                                                        = {entry.baseValue.toLocaleString()}
+                                                    </div>
+                                                {/if}
                                             </div>
                                             {#if entry.multiplierZones.length}
                                                 <div
@@ -350,7 +392,9 @@
                                             </div>
                                         {:else}
                                             <!-- Direct damage entry -->
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">基础值</div>
+                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
+                                                基础值 = {entry.baseValue.toLocaleString()}
+                                            </div>
                                             <div class="font-mono space-y-0.5 pl-3 text-(--theme-modal-text)/60">
                                                 {#if entry.baseUnit === '攻击'}
                                                     <div>
@@ -371,12 +415,26 @@
                                                         )}%) + {entry.defFlatSum.toLocaleString()} = {entry.totalDef.toLocaleString()}
                                                     </div>
                                                 {/if}
-                                                <div>
-                                                    × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
-                                                        2
-                                                    )}%{#if entry.hits > 1}
-                                                        ×{entry.hits}{/if} = {entry.baseValue.toLocaleString()}
-                                                </div>
+                                                {#if entry.extraRatio > 0}
+                                                    <div>
+                                                        × 倍率 ({((entry.ratioNum / entry.hits) * 100).toFixed(2)}% + {entry.extraRatio}%(额外)){#if entry.hits > 1}
+                                                            × {entry.hits}
+                                                        {/if}
+                                                        = {(
+                                                            entry.ratioNum * 100 +
+                                                            entry.extraRatio * entry.hits
+                                                        ).toFixed(2)}% = {entry.baseValue.toLocaleString()}
+                                                    </div>
+                                                {:else}
+                                                    <div>
+                                                        × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
+                                                            2
+                                                        )}%{#if entry.hits > 1}
+                                                            × {entry.hits}
+                                                        {/if}
+                                                        = {entry.baseValue.toLocaleString()}
+                                                    </div>
+                                                {/if}
                                             </div>
                                             {#if entry.multiplierZones.length}
                                                 <div
@@ -411,29 +469,31 @@
                                             </div>
                                             <div class="flex items-start gap-4">
                                                 <div class="font-sans space-y-0.5 flex-1">
-                                                    <div>不暴击 = {entry.nonCritPerHit.toLocaleString()}</div>
-                                                    <div>
-                                                        暴击 = {entry.nonCritPerHit.toLocaleString()} × {(
-                                                            entry.critDmg * 100
-                                                        ).toFixed(1)}% = {entry.critPerHit.toLocaleString()}
-                                                    </div>
-                                                    <div
-                                                        class="font-bold"
-                                                        style="color: {rigCritEntryIds.includes(entry.id)
-                                                            ? 'var(--theme-rigcrit-text)'
-                                                            : 'var(--theme-accent-text)'}"
-                                                    >
-                                                        期望 = {entry.nonCritPerHit.toLocaleString()} × (1 + {(
-                                                            entry.critRate * 100
-                                                        ).toFixed(1)}% × {((entry.critDmg - 1) * 100).toFixed(1)}%) = {entry.expectedPerHit.toLocaleString()}
-                                                    </div>
+                                                    {#if rigCritEntryIds.includes(entry.id)}
+                                                        <div class="font-bold" style="color: var(--theme-rigcrit-text)">
+                                                            期望 = 暴击 = {entry.critPerHit.toLocaleString()}
+                                                        </div>
+                                                    {:else}
+                                                        <div>不暴击 = {entry.nonCritPerHit.toLocaleString()}</div>
+                                                        <div>
+                                                            暴击 = {entry.nonCritPerHit.toLocaleString()} × {(
+                                                                entry.critDmg * 100
+                                                            ).toFixed(1)}% = {entry.critPerHit.toLocaleString()}
+                                                        </div>
+                                                        <div class="font-bold" style="color: var(--theme-accent-text)">
+                                                            期望 = {entry.nonCritPerHit.toLocaleString()} × (1 + {(
+                                                                entry.critRate * 100
+                                                            ).toFixed(1)}% × {((entry.critDmg - 1) * 100).toFixed(1)}%)
+                                                            = {entry.expectedPerHit.toLocaleString()}
+                                                        </div>
+                                                    {/if}
                                                 </div>
                                                 <button
                                                     onclick={(e) => {
                                                         e.stopPropagation()
                                                         toggleRigCrit(entry.id)
                                                     }}
-                                                    class="shrink-0 self-start rounded px-3 py-1.5 text-xs font-medium transition-colors"
+                                                    class="shrink-0 self-start inline-flex items-center gap-1 rounded px-3 py-2 text-sm font-medium transition-colors"
                                                     style="background: {rigCritEntryIds.includes(entry.id)
                                                         ? 'var(--theme-accent-bg)'
                                                         : 'transparent'}; color: {rigCritEntryIds.includes(entry.id)
@@ -442,8 +502,11 @@
                                                         entry.id
                                                     )
                                                         ? 'transparent'
-                                                        : 'var(--theme-divider-border)'}">凹暴</button
+                                                        : 'var(--theme-divider-border)'}"
                                                 >
+                                                    <Icon icon="mdi:target" class="size-4" />
+                                                    凹暴
+                                                </button>
                                             </div>
                                         {/if}
                                     </div>

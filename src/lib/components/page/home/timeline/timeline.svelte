@@ -198,7 +198,7 @@
                 <!-- Header row -->
                 <div class="relative shrink-0 h-8 border-b" style="border-bottom-color: var(--theme-divider-border);">
                     <div
-                        class="sticky left-0 z-35 w-20 h-full bg-[var(--theme-timeline-bg)]/80 border-r backdrop-blur-sm"
+                        class="sticky left-0 z-35 w-20 h-full bg-(--theme-timeline-bg)/80 border-r backdrop-blur-sm"
                         style="border-right-color: var(--theme-divider-border);"
                     ></div>
                 </div>
@@ -216,7 +216,7 @@
                     >
                         <!-- Sticky label column -->
                         <div
-                            class="sticky left-0 z-[35] w-20 h-full bg-[var(--theme-timeline-bg)]/80 border-r backdrop-blur-sm flex items-center justify-center"
+                            class="sticky left-0 z-35 w-20 h-full bg-(--theme-timeline-bg)/80 border-r backdrop-blur-sm flex items-center justify-center"
                             style="border-right-color: var(--theme-divider-border);"
                         >
                             {#if i < getTRACKS().length - 1}
@@ -243,7 +243,7 @@
                                     style="border-right: 3px dashed color-mix(in srgb, var(--theme-timeline-text) 50%, transparent); margin-right: 4px; width: calc(100% - 4px);"
                                 >
                                     <div
-                                        class="[writing-mode:vertical-rl] text-[11px] font-medium text-[var(--theme-timeline-text)]/60"
+                                        class="[writing-mode:vertical-rl] text-[16px] font-medium text-(--theme-timeline-text)/60"
                                     >
                                         伤害绑定
                                     </div>
@@ -280,7 +280,7 @@
                                             class="flex items-center gap-1 h-full rounded-md {getEditingBlockId() ===
                                             block.id
                                                 ? ''
-                                                : 'px-2.5'} text-sm bg-[var(--theme-timeline-bg)]/80 border whitespace-nowrap shadow-sm min-w-[56px]"
+                                                : 'px-2.5'} text-sm bg-(--theme-timeline-bg)/80 border whitespace-nowrap shadow-sm min-w-14"
                                             style="border-color: {getDragBlockId() === block.id
                                                 ? 'var(--theme-accent-bg)'
                                                 : 'var(--theme-divider-border)'};{getDragBlockId() === block.id
@@ -299,7 +299,7 @@
                                                     class="size-10 object-contain shrink-0"
                                                 />
                                             {:else}
-                                                <span class="font-bold text-[var(--theme-timeline-text)]"
+                                                <span class="font-bold text-(--theme-timeline-text)"
                                                     >{block.key}</span
                                                 >
                                             {/if}
@@ -315,11 +315,11 @@
                                                         if (e.key === 'Escape') setEditingBlockId(null)
                                                     }}
                                                     size={Math.max(6, (getEditingBlockDesc()?.length || 0) + 3)}
-                                                    class="bg-[var(--theme-timeline-bg)]/60 text-[var(--theme-timeline-text)] text-xs text-left rounded outline-none border px-1"
+                                                    class="bg-(--theme-timeline-bg)/60 text-(--theme-timeline-text) text-xs text-left rounded outline-none border px-1"
                                                     style="border-color: color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);"
                                                 />
                                             {:else}
-                                                <span class="text-[var(--theme-timeline-text)]/60 max-w-24 truncate"
+                                                <span class="text-(--theme-timeline-text)/60 max-w-24 truncate"
                                                     >{block.desc}</span
                                                 >
                                             {/if}
@@ -345,7 +345,7 @@
                                                     {@const echoName = team.find((s) => s.character === hit.character)
                                                         ?.echoes?.[0]?.name}
                                                     <span
-                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
+                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-px"
                                                         style="color: var(--theme-element-{hit.element}, #ef4444); border-color: var(--theme-element-{hit.element}, #ef4444);"
                                                     >
                                                         {(dmg.sourceType === 'ref' && hit.character
@@ -371,7 +371,7 @@
                                                                 ? `var(--theme-element-${(NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]}, #ef4444)`
                                                                 : '#ef4444'}
                                                     <span
-                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-[1px]"
+                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-px"
                                                         style="color: {c}; border-color: {c}; opacity: {nd.category ===
                                                         '效应'
                                                             ? 0.75
@@ -424,12 +424,12 @@
                                     if (e.key === 'Escape') setEditingId(null)
                                 }}
                                 size={Math.max(5, (getEditValue()?.length || 0) + 2)}
-                                class="bg-[var(--theme-timeline-bg)]/60 text-[9px] text-[var(--theme-timeline-text)] text-left rounded outline-none border tabular-nums"
+                                class="bg-(--theme-timeline-bg)/60 text-[9px] text-(--theme-timeline-text) text-left rounded outline-none border tabular-nums"
                                 style="border-color: color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);"
                             />
                         {:else}
                             <span
-                                class="text-[9px] tabular-nums text-[var(--theme-timeline-text)]/50 cursor-pointer hover:text-[var(--theme-timeline-text)]/80"
+                                class="text-[9px] tabular-nums text-(--theme-timeline-text)/50 cursor-pointer hover:text-(--theme-timeline-text)/80"
                                 oncontextmenu={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()

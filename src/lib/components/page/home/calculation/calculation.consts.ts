@@ -34,7 +34,9 @@ export const ZONE_DEFS = [
 
     { id: 'dmgTakenInc', label: '伤害提升(易伤区)', unit: '%' },
 
-    { id: 'customFinalDmg', label: '倍率/其它', unit: '%' }
+    { id: 'customFinalDmg', label: '倍率/其它', unit: '%' },
+
+    { id: 'extraRatio', label: '额外倍率', unit: '%' }
 ] as const satisfies readonly ZoneDef[]
 
 export type ZoneId = (typeof ZONE_DEFS)[number]['id']

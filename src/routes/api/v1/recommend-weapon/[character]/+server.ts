@@ -1,23 +1,15 @@
-import { NANOKA_BASE, CACHE_CONTROL } from '$lib/api/consts'
+import { CACHE_CONTROL, ensureVersion, getWWVersion } from '$lib/api/consts'
 import { fetchData, fetchZhData, createJsonResponse } from '$lib/api/fetch'
 import { findEntryByName } from '$lib/api/utils'
 import type { NanokaCharacter, NanokaWeapon, ZhCharacterDetail } from '$lib/api/types'
-
-let versionCache: string | null = null
-
-async function getVersion(): Promise<string> {
-    if (versionCache) return versionCache
-    const manifest: { ww: { latest: string } } = await fetch(`${NANOKA_BASE}/manifest.json`).then((r) => r.json())
-    versionCache = manifest.ww.latest
-    return versionCache
-}
 
 export const GET = async ({ params }: { params: { character: string } }) => {
     const { character } = params
     if (!character) return createJsonResponse({ error: 'Missing character name' }, 400)
 
     try {
-        const version = await getVersion()
+        await ensureVersion()
+        const version = getWWVersion()
         const charList = await fetchData<Record<string, NanokaCharacter>>('/character.json')
         const found = findEntryByName(charList, character)
         if (!found) return createJsonResponse({ error: 'Character not found' }, 404)

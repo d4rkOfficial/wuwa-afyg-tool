@@ -76,8 +76,14 @@
                         'focus-visible:outline-none'
                     ].join(' ')}
                 >
-                    {#if item.icon}
-                        <Icon icon={item.icon} class="size-4 shrink-0" />
+                    {#if item.icon === 'mdi:rename-outline'}
+                        <Icon icon="mdi:rename-outline" class="size-4 shrink-0" />
+                    {:else if item.icon === 'mdi:content-copy'}
+                        <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
+                    {:else if item.icon === 'mdi:file-export'}
+                        <Icon icon="mdi:file-export" class="size-4 shrink-0" />
+                    {:else if item.icon === 'mdi:delete-outline'}
+                        <Icon icon="mdi:delete-outline" class="size-4 shrink-0" />
                     {/if}
                     {item.label}
                 </button>
