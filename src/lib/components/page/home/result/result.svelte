@@ -49,9 +49,9 @@
         loading = true
         try {
             const charNames = team.map((s) => s.character).filter((c): c is string => c !== null)
-            const [ci, wi] = await Promise.all([getCharacterIcons(), getWeaponIcons()])
-            charIcons = ci
-            weaponIcons = wi
+            const iconResults = await Promise.allSettled([getCharacterIcons(), getWeaponIcons()])
+            if (iconResults[0].status === 'fulfilled') charIcons = iconResults[0].value
+            if (iconResults[1].status === 'fulfilled') weaponIcons = iconResults[1].value
 
             const infoPromises = charNames.map((n) => getCharacterInfo(n).catch(() => null))
             const infos = await Promise.all(infoPromises)

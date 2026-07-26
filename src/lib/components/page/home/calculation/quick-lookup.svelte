@@ -74,7 +74,7 @@
     })
 
     async function loadIcons() {
-        const [ci, wi, ei, si, eli, wti] = await Promise.all([
+        const results = await Promise.allSettled([
             getCharacterIcons(),
             getWeaponIcons(),
             getEchoIcons(),
@@ -82,12 +82,13 @@
             getElementIcons(),
             getWeaponTypeIcons()
         ])
-        charIcons = ci
-        weaponIcons = wi
-        echoIcons = ei
-        setIcons = si
-        elementIcons = eli
-        weaponTypeIcons = wti
+        const [ci, wi, ei, si, eli, wti] = results
+        if (ci.status === 'fulfilled') charIcons = ci.value
+        if (wi.status === 'fulfilled') weaponIcons = wi.value
+        if (ei.status === 'fulfilled') echoIcons = ei.value
+        if (si.status === 'fulfilled') setIcons = si.value
+        if (eli.status === 'fulfilled') elementIcons = eli.value
+        if (wti.status === 'fulfilled') weaponTypeIcons = wti.value
     }
 
     async function fetchData(slot: CharSlot) {

@@ -70,7 +70,7 @@
     })
 
     $effect(() => {
-        Promise.all([
+        Promise.allSettled([
             getCharacterList(),
             getWeaponList(),
             getEchoList(),
@@ -81,17 +81,18 @@
             getEchoSetIcons(),
             getElementIcons(),
             getWeaponTypeIcons()
-        ]).then(([cl, wl, el, esl, ci, wi, ei, esi, eli, wti]) => {
-            characters = cl
-            weapons = wl
-            echoes = el
-            echoSets = esl
-            characterIcons = ci
-            weaponIcons = wi
-            echoIcons = ei
-            echoSetIcons = esi
-            elementIcons = eli
-            weaponTypeIcons = wti
+        ]).then((results) => {
+            const [cl, wl, el, esl, ci, wi, ei, esi, eli, wti] = results
+            if (cl.status === 'fulfilled') characters = cl.value
+            if (wl.status === 'fulfilled') weapons = wl.value
+            if (el.status === 'fulfilled') echoes = el.value
+            if (esl.status === 'fulfilled') echoSets = esl.value
+            if (ci.status === 'fulfilled') characterIcons = ci.value
+            if (wi.status === 'fulfilled') weaponIcons = wi.value
+            if (ei.status === 'fulfilled') echoIcons = ei.value
+            if (esi.status === 'fulfilled') echoSetIcons = esi.value
+            if (eli.status === 'fulfilled') elementIcons = eli.value
+            if (wti.status === 'fulfilled') weaponTypeIcons = wti.value
         })
     })
 

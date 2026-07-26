@@ -34,9 +34,9 @@
         const charNames = team.map((s) => s.character).filter((c): c is string => c !== null)
         const weaponNames = team.map((s) => s.weapon).filter((w): w is string => w !== null)
 
-        const [ci, wi] = await Promise.all([getCharacterIcons(), getWeaponIcons()])
-        charIcons = ci
-        weaponIcons = wi
+        const iconResults = await Promise.allSettled([getCharacterIcons(), getWeaponIcons()])
+        if (iconResults[0].status === 'fulfilled') charIcons = iconResults[0].value
+        if (iconResults[1].status === 'fulfilled') weaponIcons = iconResults[1].value
 
         const infos = await Promise.all(charNames.map((n) => getCharacterInfo(n).catch(() => null)))
         const cmap: Record<string, CharacterInfo> = {}
