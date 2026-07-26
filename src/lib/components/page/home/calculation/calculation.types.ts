@@ -51,6 +51,7 @@ export interface BuffSet {
     name: string
     zones: BuffZoneValue[]
     scope: 'all' | number[]
+    starred?: boolean
 }
 
 export interface CalcState {

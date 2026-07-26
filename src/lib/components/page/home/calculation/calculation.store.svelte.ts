@@ -322,6 +322,23 @@ export function createBuffSet(name: string) {
     _buffSets = [..._buffSets, buffSet]
 }
 
+export function duplicateBuffSet(id: string, customName?: string): string | undefined {
+    if (!assertUnlocked()) return
+    const source = _buffSets.find((s) => s.id === id)
+    if (!source) return
+    const newId = `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    const buffSet: BuffSet = {
+        ...source,
+        id: newId,
+        name: customName ?? source.name + ' 复制'
+    }
+    const idx = _buffSets.findIndex((s) => s.id === id)
+    const next = [..._buffSets]
+    next.splice(idx + 1, 0, buffSet)
+    _buffSets = next
+    return newId
+}
+
 export function setBuffSetScope(setId: string, scope: 'all' | number[]) {
     if (!assertUnlocked()) return
     if (_globalBuffSetIds.includes(setId)) return
@@ -335,6 +352,11 @@ export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./
             ? { ...s, zones: s.zones.map((z) => (z.zoneId === zoneId ? { ...z, ref: ref ?? undefined } : z)) }
             : s
     )
+}
+
+export function toggleBuffSetStarred(id: string) {
+    if (!assertUnlocked()) return
+    _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, starred: !s.starred } : s))
 }
 
 export function deleteBuffSet(id: string) {
@@ -429,6 +451,15 @@ export function getBuffDiffMode(): boolean {
 }
 export function toggleBuffDiffMode() {
     _buffDiffMode = !_buffDiffMode
+}
+
+export function reorderNonGlobalBuffSets(orderedIds: string[]) {
+    if (!assertUnlocked()) return
+    const global = _buffSets.filter((bs) => _globalBuffSetIds.includes(bs.id))
+    const nonGlobalMap = new Map(_buffSets.filter((bs) => !_globalBuffSetIds.includes(bs.id)).map((bs) => [bs.id, bs]))
+    const reordered = orderedIds.map((id) => nonGlobalMap.get(id)).filter(Boolean) as BuffSet[]
+    const remaining = _buffSets.filter((bs) => !_globalBuffSetIds.includes(bs.id) && !orderedIds.includes(bs.id))
+    _buffSets = [...global, ...reordered, ...remaining]
 }
 
 // ── Persistence ──

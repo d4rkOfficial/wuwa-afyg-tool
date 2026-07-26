@@ -18,7 +18,8 @@
         getBuffDiffMode
     } from './calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
-    import { ZONE_MAP, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from './calculation.consts'
+    import { ZONE_MAP, DAMAGE_TYPES, DAMAGE_TYPE_SHORT, groupBuffSets } from './calculation.consts'
+    import type { GroupedBuffSetItem } from './calculation.consts'
     import type { CharSlot } from '$lib/data/types'
     import type { TimelineData } from '../timeline/timeline.types'
     import type { CalcState } from './calculation.types'
@@ -70,6 +71,9 @@
             : buffSets.filter((b) => b.scope === 'all')
         ).filter((b) => !globalBuffSetIds.includes(b.id))
     )
+    let groupedVisibleSets = $derived(groupBuffSets(visibleBuffSets))
+    let groupedFolderItems = $derived(groupedVisibleSets.filter((g) => g.type === 'folder'))
+    let groupedStandaloneItems = $derived(groupedVisibleSets.filter((g) => g.type !== 'folder'))
 
     let buffDiffMode = $derived(getBuffDiffMode())
 
@@ -175,6 +179,20 @@
     function handleToggleBuffSetForEntry(setId: string) {
         if (!expandedEntryId) return
         toggleBuffSetForEntry(expandedEntryId, setId)
+        onupdate(getCalcState())
+    }
+
+    function handleToggleFolder(folder: GroupedBuffSetItem) {
+        if (!expandedEntryId || !folder.children) return
+        const childIds = folder.children.map((c) => c.id)
+        const allSelected = childIds.every((id) => selectedEntrySetIds.includes(id))
+        const currentSet = new Set(selectedEntrySetIds)
+        if (allSelected) {
+            for (const id of childIds) currentSet.delete(id)
+        } else {
+            for (const id of childIds) currentSet.add(id)
+        }
+        setBuffSetIdsForEntry(expandedEntryId, [...currentSet])
         onupdate(getCalcState())
     }
 
@@ -307,7 +325,7 @@
     <table class="w-full text-xs table-fixed">
         <thead>
             <tr
-                class="text-(--theme-modal-text)/50 sticky top-0 bg-(--theme-modal-bg) opacity-100!"
+                class="text-(--theme-modal-text)/50 sticky top-0 bg-(--theme-modal-bg)/80 backdrop-blur-md opacity-100!"
                 style="border-bottom: 1px solid var(--theme-divider-border);"
             >
                 <th
@@ -522,34 +540,93 @@
                                                 清除所有增益
                                             </button>
                                         </div>
-                                        <div class="flex flex-wrap gap-1">
-                                            {#each visibleBuffSets as buffSet}
-                                                {@const checked = selectedEntrySetIds.includes(buffSet.id)}
-                                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                <button
-                                                    onclick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleToggleBuffSetForEntry(buffSet.id)
-                                                    }}
-                                                    class={[
-                                                        'px-2 py-1 text-xs rounded transition-colors inline-flex items-center gap-1 border',
-                                                        checked
-                                                            ? ''
-                                                            : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
-                                                    ].join(' ')}
-                                                    style={checked
-                                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
-                                                        : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
-                                                >
-                                                    <Icon
-                                                        icon={checked ? 'mdi:check' : 'mdi:close'}
-                                                        class="size-3 shrink-0"
-                                                    />
-                                                    {buffSet.name}
-                                                </button>
-                                            {/each}
-                                        </div>
+                                        {#if groupedFolderItems.length > 0}
+                                            <div class="flex flex-wrap gap-1 mb-2">
+                                                {#each groupedFolderItems as item (item.key)}
+                                                    {@const folderActive = item.children!.some((c) =>
+                                                        selectedEntrySetIds.includes(c.id)
+                                                    )}
+                                                    <div
+                                                        class="flex items-center gap-1 rounded border px-2 py-1 text-xs transition-colors"
+                                                        style={folderActive
+                                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
+                                                            : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                    >
+                                                        <button
+                                                            onclick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleToggleFolder(item)
+                                                            }}
+                                                            class="shrink-0 transition-colors"
+                                                            class:text-(--theme-accent-text)={item.children!.some((c) =>
+                                                                selectedEntrySetIds.includes(c.id)
+                                                            )}
+                                                        >
+                                                            <Icon
+                                                                icon={item.children!.some((c) =>
+                                                                    selectedEntrySetIds.includes(c.id)
+                                                                )
+                                                                    ? 'mdi:check'
+                                                                    : 'mdi:close'}
+                                                                class="size-3"
+                                                            />
+                                                        </button>
+                                                        <span class="text-(--theme-modal-text)/70 whitespace-nowrap"
+                                                            >{item.prefixText}</span
+                                                        >
+                                                        <div class="flex gap-0.5">
+                                                            {#each item.children! as child}
+                                                                {@const childChecked = selectedEntrySetIds.includes(
+                                                                    child.id
+                                                                )}
+                                                                <button
+                                                                    onclick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleToggleBuffSetForEntry(child.id)
+                                                                    }}
+                                                                    class={[
+                                                                        'rounded px-2 py-1 text-[10px] font-medium tabular-nums transition-colors min-w-[1.2em] text-center',
+                                                                        childChecked
+                                                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/30'
+                                                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-accent-bg)/10'
+                                                                    ].join(' ')}
+                                                                >
+                                                                    {child.name}
+                                                                </button>
+                                                            {/each}
+                                                        </div>
+                                                    </div>
+                                                {/each}
+                                            </div>
+                                        {/if}
+                                        {#if groupedStandaloneItems.length > 0}
+                                            <div class="flex flex-wrap gap-1">
+                                                {#each groupedStandaloneItems as item (item.key)}
+                                                    {@const checked = selectedEntrySetIds.includes(item.buffSet!.id)}
+                                                    <button
+                                                        onclick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleToggleBuffSetForEntry(item.buffSet!.id)
+                                                        }}
+                                                        class={[
+                                                            'px-2 py-1 text-xs rounded transition-colors inline-flex items-center gap-1 border',
+                                                            checked
+                                                                ? ''
+                                                                : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
+                                                        ].join(' ')}
+                                                        style={checked
+                                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
+                                                            : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                    >
+                                                        <Icon
+                                                            icon={checked ? 'mdi:check' : 'mdi:close'}
+                                                            class="size-3 shrink-0"
+                                                        />
+                                                        {item.buffSet!.name}
+                                                    </button>
+                                                {/each}
+                                            </div>
+                                        {/if}
                                     {:else}
                                         <div class="text-xs text-(--theme-modal-text)/30">
                                             无可用 BUFF 块，点击底栏【BUFF配置】按钮进行配置

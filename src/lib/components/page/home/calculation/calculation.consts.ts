@@ -1,4 +1,4 @@
-import type { ZoneDef } from './calculation.types'
+import type { ZoneDef, BuffSet } from './calculation.types'
 
 export const ZONE_DEFS = [
     { id: 'atkFlat', label: '攻击固定值', unit: 'flat' },
@@ -64,3 +64,62 @@ export function parseRatio(r: string): number {
 }
 
 export { DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
+
+export const LAYERED_BUFF_PATTERN = /^(.+?)(\d+)([^\d]*)$/
+
+export interface GroupedBuffSetItem {
+    key: string
+    type: 'item' | 'folder'
+    buffSet?: BuffSet
+    prefix?: string
+    name?: string
+    prefixText?: string
+    suffixText?: string
+    children?: BuffSet[]
+}
+
+export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
+    const result: GroupedBuffSetItem[] = []
+    const pattern = LAYERED_BUFF_PATTERN
+    const prefixGroups = new Map<string, { suffix: string; items: BuffSet[] }>()
+
+    for (const bs of buffSets) {
+        const m = bs.name.match(pattern)
+        if (m) {
+            const key = m[1] + m[3]
+            if (!prefixGroups.has(key)) prefixGroups.set(key, { suffix: m[3], items: [] })
+            prefixGroups.get(key)!.items.push(bs)
+        }
+    }
+
+    const folderKeys = new Set<string>()
+    for (const [key, g] of prefixGroups) {
+        if (g.items.length >= 2) folderKeys.add(key)
+    }
+
+    const seenFolders = new Set<string>()
+    for (const bs of buffSets) {
+        const m = bs.name.match(pattern)
+        if (m) {
+            const key = m[1] + m[3]
+            if (folderKeys.has(key) && !seenFolders.has(key)) {
+                seenFolders.add(key)
+                result.push({
+                    key: 'folder:' + key,
+                    type: 'folder',
+                    name: m[1] + 'N' + m[3],
+                    prefix: key,
+                    prefixText: m[1],
+                    suffixText: m[3],
+                    children: prefixGroups.get(key)!.items
+                })
+            } else if (!folderKeys.has(key)) {
+                result.push({ key: bs.id, type: 'item', buffSet: bs })
+            }
+        } else {
+            result.push({ key: bs.id, type: 'item', buffSet: bs })
+        }
+    }
+
+    return result
+}

@@ -3,21 +3,25 @@
         getAllBuffSets,
         createBuffSet,
         deleteBuffSet,
+        duplicateBuffSet,
         renameBuffSet,
         addZoneToBuffSet,
         removeZoneFromBuffSet,
         setBuffSetZoneValue,
         setBuffSetScope,
         setBuffSetZoneRef,
-        getGlobalBuffSetIds
+        getGlobalBuffSetIds,
+        reorderNonGlobalBuffSets,
+        toggleBuffSetStarred
     } from './calculation.store.svelte'
-    import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from './calculation.consts'
-    import type { ZoneId } from './calculation.consts'
+    import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP, groupBuffSets } from './calculation.consts'
+    import type { ZoneId, GroupedBuffSetItem } from './calculation.consts'
     import type { CharSlot } from '$lib/data/types'
-    import type { ZoneRef } from './calculation.types'
+    import type { ZoneRef, BuffSet } from './calculation.types'
     import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
     import Icon from '@iconify/svelte'
     import QuickLookup from './quick-lookup.svelte'
+    import { slide } from 'svelte/transition'
 
     interface Props {
         open: boolean
@@ -30,6 +34,21 @@
     let showLookup = $state(false)
     let showRefLookup = $state(false)
 
+    type DragState = {
+        id: string
+        idx: number
+        dropIdx: number
+        outside: boolean
+        mode: 'item' | 'folder' | 'child'
+        folderPrefix?: string
+    }
+    let dragState = $state<DragState | null>(null)
+    let collapsedFolders = $state(new Set<string>())
+    let savedCollapsedState: Set<string> | null = null
+    let showDeleteFolderConfirm = $state(false)
+    let deleteFolderPrefix = $state('')
+    let deleteFolderCount = $state(0)
+
     function globalBuffColor(buffSet: { scope: number[] | 'all' }): string {
         if (!Array.isArray(buffSet.scope) || buffSet.scope.length === 0) return '#eab308'
         const idx = buffSet.scope[0]
@@ -40,9 +59,13 @@
 
     let selectedBuffSetId = $state<string | null>(null)
     let newName = $state('')
-    let showAddZone = $state(false)
-    let showRename = $state(false)
     let renameValue = $state('')
+    let isEditingName = $state(false)
+    $effect(() => {
+        selectedBuffSetId
+        isEditingName = false
+        if (selectedBuffSet) renameValue = selectedBuffSet.name
+    })
 
     // ZoneRef modal state
     let showRefModal = $state(false)
@@ -78,6 +101,8 @@
         return { divisor: 100 / g, multiplier: num / g }
     }
 
+    // groupBuffSets imported from calculation.consts
+
     let buffSets = $derived(getAllBuffSets())
     let globalBuffSetIds = $derived(getGlobalBuffSetIds())
     let charIconMap = $derived(getCharIconMap())
@@ -89,6 +114,27 @@
         })
     )
 
+    let groupedBuffSets = $derived.by(() => {
+        const globalItems = sortedBuffSets
+            .filter((bs) => globalBuffSetIds.includes(bs.id))
+            .map((bs) => ({ key: bs.id, type: 'item' as const, buffSet: bs }))
+        const nonGlobalItems = groupBuffSets(sortedBuffSets.filter((bs) => !globalBuffSetIds.includes(bs.id)))
+        return [...globalItems, ...nonGlobalItems] as GroupedBuffSetItem[]
+    })
+    let topLevelFlatItems = $derived.by(() => {
+        const result: Array<{ key: string; type: 'item' | 'folder' }> = []
+        for (const item of groupedBuffSets) {
+            if (item.type === 'folder') {
+                result.push({ key: item.prefix!, type: 'folder' })
+            } else if (!globalBuffSetIds.includes(item.buffSet!.id)) {
+                result.push({ key: item.buffSet!.id, type: 'item' })
+            }
+        }
+        return result
+    })
+    let topLevelIdxMap = $derived(new Map(topLevelFlatItems.map((x, i) => [x.key, i])))
+    let topLevelCount = $derived(topLevelFlatItems.length)
+
     let selectedBuffSet = $derived(buffSets.find((s) => s.id === selectedBuffSetId) ?? null)
 
     let scopeChars = $derived.by(() => {
@@ -98,20 +144,14 @@
     })
 
     let refTargetDef = $derived(ZONE_REF_MAP.get(refTargetZoneId) ?? ZONE_MAP.get(refTargetZoneId as any) ?? null)
-    let refTargetDefUnit = $derived(refTargetDef?.unit === '%' ? '%' : '')
+    let refTargetDefUnit = $derived(refTargetDef?.unit === '%' ? '%' : '点')
     let currentZoneDef = $derived(ZONE_MAP.get(refZoneId as ZoneId) ?? null)
-    let currentZoneUnit = $derived(currentZoneDef?.unit === '%' ? '%' : '')
+    let currentZoneUnit = $derived(currentZoneDef?.unit === '%' ? '%' : '点')
 
     function handleCreateBuffSet() {
         const name = newName.trim() || '未命名BUFF块'
         createBuffSet(name)
         newName = ''
-    }
-
-    function handleAddZoneToBuffSet(zoneId: string) {
-        if (!selectedBuffSetId) return
-        addZoneToBuffSet(selectedBuffSetId, zoneId)
-        showAddZone = false
     }
 
     function handleDeleteBuffSet() {
@@ -120,16 +160,23 @@
         selectedBuffSetId = null
     }
 
-    function openRename() {
-        if (!selectedBuffSet) return
-        renameValue = selectedBuffSet.name
-        showRename = true
+    function handleCopyBuffSet() {
+        if (!selectedBuffSetId) return
+        let copyName: string | undefined
+        for (const item of groupedBuffSets) {
+            if (item.type === 'folder' && item.children?.some((c) => c.id === selectedBuffSetId)) {
+                copyName = (item.prefixText ?? '') + '0' + (item.suffixText ?? '')
+                break
+            }
+        }
+        const newId = duplicateBuffSet(selectedBuffSetId, copyName)
+        if (newId) selectedBuffSetId = newId
     }
 
-    function handleRename() {
+    function handleRenameInline() {
         if (!selectedBuffSetId) return
-        renameBuffSet(selectedBuffSetId, renameValue || '未命名BUFF块')
-        showRename = false
+        renameBuffSet(selectedBuffSetId, renameValue.trim() || '未命名BUFF块')
+        isEditingName = false
     }
 
     function handleToggleChar(idx: number) {
@@ -200,6 +247,190 @@
         showRefModal = false
     }
 
+    function toggleFolder(prefix: string) {
+        const next = new Set(collapsedFolders)
+        if (next.has(prefix)) {
+            next.delete(prefix)
+        } else {
+            next.add(prefix)
+        }
+        collapsedFolders = next
+    }
+
+    function startDrag(e: PointerEvent, id: string, mode: 'item' | 'folder' | 'child', folderPrefix?: string) {
+        if ((e.target as HTMLElement).closest('input')) return
+        if (!(e.target as HTMLElement).closest('.drag-handle')) return
+        const el = e.currentTarget as HTMLElement
+        el.setPointerCapture(e.pointerId)
+        savedCollapsedState = new Set(collapsedFolders)
+        collapsedFolders = new Set()
+
+        let idx = -1
+        if (mode === 'child' && folderPrefix) {
+            const container = el.closest('.buff-list-container') as HTMLElement | null
+            if (container) {
+                const items = container.querySelectorAll(`[data-folder-child="${folderPrefix}"]`)
+                const ids = [...items].map((item) => (item as HTMLElement).dataset.buffsetId!)
+                idx = ids.indexOf(id)
+            }
+        } else if (mode === 'item' || mode === 'folder') {
+            idx = topLevelIdxMap.get(id) ?? -1
+        }
+        dragState = { id, idx, dropIdx: idx, outside: false, mode, folderPrefix }
+    }
+
+    function onDragMove(e: PointerEvent) {
+        if (!dragState) return
+        const container = (e.currentTarget as HTMLElement).closest('.buff-list-container') as HTMLElement | null
+        if (!container) return
+
+        const cr = container.getBoundingClientRect()
+        const margin = 30
+        const outside =
+            e.clientX < cr.left - margin ||
+            e.clientX > cr.right + margin ||
+            e.clientY < cr.top - margin ||
+            e.clientY > cr.bottom + margin
+
+        if (outside) {
+            dragState = { ...dragState, outside: true, dropIdx: -1 }
+            return
+        }
+
+        let items: NodeListOf<HTMLElement>
+        if (dragState.mode === 'child' && dragState.folderPrefix) {
+            items = container.querySelectorAll(`[data-folder-child="${dragState.folderPrefix}"]`)
+        } else {
+            items = container.querySelectorAll('[data-buffset-id]:not([data-folder-child]), [data-folder-prefix]')
+        }
+        let dropIdx = items.length
+        items.forEach((item, i) => {
+            const r = item.getBoundingClientRect()
+            if (e.clientY < r.top + r.height / 2 && dropIdx === items.length) dropIdx = i
+        })
+        dragState = { ...dragState, outside: false, dropIdx }
+    }
+
+    function onDragEnd(e: PointerEvent) {
+        if (!dragState) return
+
+        if (dragState.outside) {
+            if (dragState.mode === 'folder') {
+                const folder = groupedBuffSets.find((g) => g.type === 'folder' && g.prefix === dragState!.id)
+                if (folder?.children && folder.children.length > 0) {
+                    deleteFolderPrefix = dragState!.id
+                    deleteFolderCount = folder.children.length
+                    showDeleteFolderConfirm = true
+                }
+                if (savedCollapsedState !== null) {
+                    collapsedFolders = savedCollapsedState
+                    savedCollapsedState = null
+                }
+                dragState = null
+                return
+            }
+            deleteBuffSet(dragState.id)
+            if (selectedBuffSetId === dragState.id) selectedBuffSetId = null
+        } else if (dragState.dropIdx !== dragState.idx || dragState.mode === 'folder') {
+            const container = (e.currentTarget as HTMLElement).closest('.buff-list-container') as HTMLElement | null
+            if (container && (dragState.dropIdx !== dragState.idx || dragState.mode === 'folder')) {
+                const reordered = computeNewOrder(container, dragState)
+                if (reordered) reorderNonGlobalBuffSets(reordered)
+            }
+        } else {
+            selectedBuffSetId = dragState.id
+        }
+
+        if (savedCollapsedState !== null) {
+            collapsedFolders = savedCollapsedState
+            savedCollapsedState = null
+        }
+        dragState = null
+    }
+
+    function computeNewOrder(container: HTMLElement, state: DragState): string[] | null {
+        if (state.mode === 'folder') {
+            const prefix = state.id
+            const draggedChildIds = [...container.querySelectorAll(`[data-folder-child="${prefix}"]`)]
+                .map((el) => (el as HTMLElement).dataset.buffsetId!)
+                .filter(Boolean)
+            const allIds = [...container.querySelectorAll('[data-buffset-id]')]
+                .map((el) => (el as HTMLElement).dataset.buffsetId!)
+                .filter(Boolean)
+            const withoutDragged = allIds.filter((id) => !draggedChildIds.includes(id))
+
+            const topLevel = container.querySelectorAll(
+                '[data-buffset-id]:not([data-folder-child]), [data-folder-prefix]'
+            )
+            let insertAt = 0
+            let counted = 0
+            for (const el of topLevel) {
+                const htmlEl = el as HTMLElement
+                if (counted === state.dropIdx) break
+                const p = htmlEl.dataset.folderPrefix
+                if (p) {
+                    if (p !== prefix) {
+                        insertAt += container.querySelectorAll(`[data-folder-child="${p}"]`).length
+                    }
+                } else {
+                    insertAt += 1
+                }
+                counted++
+            }
+
+            withoutDragged.splice(insertAt, 0, ...draggedChildIds)
+            return withoutDragged
+        }
+
+        if (state.mode === 'child' && state.folderPrefix) {
+            const prefix = state.folderPrefix
+            const childIds = [...container.querySelectorAll(`[data-folder-child="${prefix}"]`)]
+                .map((el) => (el as HTMLElement).dataset.buffsetId!)
+                .filter(Boolean)
+            const reorderedChildren = childIds.filter((id) => id !== state.id)
+            reorderedChildren.splice(state.dropIdx, 0, state.id)
+
+            const allIds = [...container.querySelectorAll('[data-buffset-id]')]
+                .map((el) => (el as HTMLElement).dataset.buffsetId!)
+                .filter(Boolean)
+            const result: string[] = []
+            let replaced = false
+            for (const id of allIds) {
+                if (childIds.includes(id)) {
+                    if (!replaced) {
+                        result.push(...reorderedChildren)
+                        replaced = true
+                    }
+                } else {
+                    result.push(id)
+                }
+            }
+            return result
+        }
+
+        const allIds = [...container.querySelectorAll('[data-buffset-id]')]
+            .map((el) => (el as HTMLElement).dataset.buffsetId!)
+            .filter(Boolean)
+        const withoutDragged = allIds.filter((id) => id !== state.id)
+        withoutDragged.splice(state.dropIdx, 0, state.id)
+        return withoutDragged
+    }
+
+    function confirmDeleteFolder() {
+        const folder = groupedBuffSets.find((g) => g.type === 'folder' && g.prefix === deleteFolderPrefix)
+        if (folder?.children) {
+            for (const child of folder.children) {
+                deleteBuffSet(child.id)
+            }
+        }
+        if (selectedBuffSetId && folder?.children?.some((c) => c.id === selectedBuffSetId)) {
+            selectedBuffSetId = null
+        }
+        showDeleteFolderConfirm = false
+        deleteFolderPrefix = ''
+        deleteFolderCount = 0
+    }
+
     let teamNames = $derived(team.map((s) => s.character ?? '?'))
 </script>
 
@@ -212,7 +443,7 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[95vh] h-full max-w-3xl rounded-xl border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
+            class="w-full max-h-[95vh] h-full max-w-6xl rounded-xl border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
@@ -234,44 +465,173 @@
             <div class="flex flex-1 overflow-hidden">
                 <!-- Left column: block list -->
                 <div
-                    class="w-56 shrink-0 border-r flex flex-col"
+                    class="w-64 shrink-0 border-r flex flex-col"
                     style="border-right: 1px solid var(--theme-divider-border);"
                 >
-                    <div class="flex-1 overflow-y-auto p-2 space-y-1">
-                        {#each sortedBuffSets as buffSet}
-                            {@const isGlobal = globalBuffSetIds.includes(buffSet.id)}
-                            <button
-                                onclick={() => {
-                                    selectedBuffSetId = buffSet.id
-                                    showAddZone = false
-                                }}
-                                class={[
-                                    'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
-                                    selectedBuffSetId === buffSet.id
-                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                        : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                ].join(' ')}
-                            >
-                                <Icon
-                                    icon={isGlobal ? 'mdi:crown' : 'mdi:widgets'}
-                                    class="size-4 shrink-0 opacity-60"
-                                />
-                                <span class="truncate flex-1">{buffSet.name}</span>
+                    <div class="flex-1 overflow-y-auto p-2 space-y-1 buff-list-container">
+                        {#each groupedBuffSets as item (item.key)}
+                            {#if item.type === 'folder'}
+                                {@const topIdx = topLevelIdxMap.get(item.prefix!)}
+                                {@const folderHasStar = item.children!.some((c) => c.starred)}
+                                {#if dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
+                                    <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+                                {/if}
+                                <button
+                                    data-folder-prefix={item.prefix}
+                                    onclick={() => toggleFolder(item.prefix!)}
+                                    onpointerdown={(e) => startDrag(e, item.prefix!, 'folder')}
+                                    onpointermove={onDragMove}
+                                    onpointerup={onDragEnd}
+                                    class={[
+                                        'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
+                                        'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
+                                        dragState?.id === item.prefix &&
+                                            !dragState!.outside &&
+                                            'ring-2 ring-(--theme-accent-bg)',
+                                        dragState?.id === item.prefix &&
+                                            dragState!.outside &&
+                                            'ring-2 ring-red-500 opacity-50'
+                                    ].join(' ')}
+                                    transition:slide={{ duration: 200 }}
+                                >
+                                    <Icon
+                                        icon={collapsedFolders.has(item.prefix!) ? 'mdi:folder' : 'mdi:folder-open'}
+                                        class="drag-handle touch-none select-none cursor-grab active:cursor-grabbing size-4 shrink-0 {folderHasStar
+                                            ? 'text-amber-400'
+                                            : 'opacity-60'}"
+                                    />
+                                    <span class="truncate flex-1">{item.name}</span>
+                                    <span class="text-[10px] text-(--theme-modal-text)/30"
+                                        >({item.children!.length}项)</span
+                                    >
+                                </button>
+                                {#if !collapsedFolders.has(item.prefix!)}
+                                    <div
+                                        class="ml-3 space-y-1 border-l pl-2"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        {#each item.children! as child, ci (child.id)}
+                                            {#if dragState && dragState.mode === 'child' && dragState.folderPrefix === item.prefix && !dragState.outside && dragState.dropIdx === ci}
+                                                <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+                                            {/if}
+                                            <button
+                                                data-buffset-id={child.id}
+                                                data-folder-child={item.prefix}
+                                                onclick={() => {
+                                                    selectedBuffSetId = child.id
+                                                }}
+                                                onpointerdown={(e) => startDrag(e, child.id, 'child', item.prefix)}
+                                                onpointermove={onDragMove}
+                                                onpointerup={onDragEnd}
+                                                class={[
+                                                    'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
+                                                    selectedBuffSetId === child.id
+                                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                        : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5',
+                                                    dragState?.id === child.id &&
+                                                        !dragState.outside &&
+                                                        'ring-2 ring-(--theme-accent-bg)',
+                                                    dragState?.id === child.id &&
+                                                        dragState.outside &&
+                                                        'ring-2 ring-red-500 opacity-50'
+                                                ].join(' ')}
+                                                transition:slide={{ duration: 200 }}
+                                            >
+                                                <Icon
+                                                    icon={child.starred ? 'mdi:star' : 'mdi:widgets'}
+                                                    class="drag-handle touch-none select-none cursor-grab active:cursor-grabbing size-4 shrink-0 {child.starred
+                                                        ? 'text-amber-400'
+                                                        : 'opacity-60'}"
+                                                />
+                                                <span class="truncate flex-1">{child.name}</span>
+                                                {#if child.scope === 'all'}
+                                                    <span
+                                                        class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
+                                                        >(通用)</span
+                                                    >
+                                                {:else}
+                                                    <span
+                                                        class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
+                                                        >({teamNames
+                                                            .filter((_, i) => (child.scope as number[]).includes(i))
+                                                            .join(', ')})</span
+                                                    >
+                                                {/if}
+                                            </button>
+                                        {/each}
+                                        {#if dragState && dragState.mode === 'child' && dragState.folderPrefix === item.prefix && !dragState.outside && dragState.dropIdx === item.children!.length}
+                                            <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+                                        {/if}
+                                    </div>
+                                {/if}
+                            {:else}
+                                {@const isGlobal = globalBuffSetIds.includes(item.buffSet!.id)}
                                 {#if !isGlobal}
-                                    {#if buffSet.scope === 'all'}
-                                        <span class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                            >(通用)</span
-                                        >
-                                    {:else}
-                                        <span class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                            >({teamNames
-                                                .filter((_, i) => (buffSet.scope as number[]).includes(i))
-                                                .join(', ')})</span
-                                        >
+                                    {@const topIdx = topLevelIdxMap.get(item.buffSet!.id)}
+                                    {#if dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
+                                        <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
                                     {/if}
                                 {/if}
-                            </button>
+                                <button
+                                    data-buffset-id={isGlobal ? undefined : item.buffSet!.id}
+                                    onclick={() => {
+                                        selectedBuffSetId = item.buffSet!.id
+                                    }}
+                                    onpointerdown={isGlobal ? undefined : (e) => startDrag(e, item.buffSet!.id, 'item')}
+                                    onpointermove={isGlobal ? undefined : onDragMove}
+                                    onpointerup={isGlobal ? undefined : onDragEnd}
+                                    class={[
+                                        'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
+                                        selectedBuffSetId === item.buffSet!.id
+                                            ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                            : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5',
+                                        !isGlobal &&
+                                            dragState?.id === item.buffSet!.id &&
+                                            !dragState.outside &&
+                                            'ring-2 ring-(--theme-accent-bg)',
+                                        !isGlobal &&
+                                            dragState?.id === item.buffSet!.id &&
+                                            dragState.outside &&
+                                            'ring-2 ring-red-500 opacity-50'
+                                    ].join(' ')}
+                                    transition:slide={{ duration: 200 }}
+                                >
+                                    <Icon
+                                        icon={isGlobal
+                                            ? 'mdi:crown'
+                                            : item.buffSet!.starred
+                                              ? 'mdi:star'
+                                              : 'mdi:widgets'}
+                                        class={[
+                                            'size-4 shrink-0',
+                                            !isGlobal && item.buffSet!.starred ? 'text-amber-400' : 'opacity-60',
+                                            isGlobal
+                                                ? ''
+                                                : 'drag-handle touch-none select-none cursor-grab active:cursor-grabbing'
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' ')}
+                                    />
+                                    <span class="truncate flex-1">{item.buffSet!.name}</span>
+                                    {#if !isGlobal}
+                                        {#if item.buffSet!.scope === 'all'}
+                                            <span class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
+                                                >(通用)</span
+                                            >
+                                        {:else}
+                                            <span class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
+                                                >({teamNames
+                                                    .filter((_, i) => (item.buffSet!.scope as number[]).includes(i))
+                                                    .join(', ')})</span
+                                            >
+                                        {/if}
+                                    {/if}
+                                </button>
+                            {/if}
                         {/each}
+                        {#if dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topLevelCount}
+                            <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+                        {/if}
                         {#if buffSets.length === 0}
                             <div class="text-xs text-(--theme-modal-text)/30 text-center py-4">暂无 BUFF 块</div>
                         {/if}
@@ -300,13 +660,78 @@
                 <!-- Right column: block editor -->
                 <div class="flex-1 flex flex-col">
                     {#if selectedBuffSet}
+                        <!-- Buff name header -->
+                        <div
+                            class="shrink-0 px-3 py-2.5 border-b flex items-center gap-2"
+                            style="border-bottom: 1px solid var(--theme-divider-border);"
+                        >
+                            {#if globalBuffSetIds.includes(selectedBuffSet.id)}
+                                <button disabled class="shrink-0 rounded p-1 text-amber-400/40 cursor-not-allowed">
+                                    <Icon
+                                        icon={selectedBuffSet.starred ? 'mdi:star' : 'mdi:star-outline'}
+                                        class="size-4"
+                                    />
+                                </button>
+                                <input
+                                    type="text"
+                                    value={selectedBuffSet.name}
+                                    readonly
+                                    class="flex-1 min-w-0 rounded border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text) cursor-default"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                />
+                            {:else}
+                                <button
+                                    onclick={() => toggleBuffSetStarred(selectedBuffSet.id)}
+                                    class="shrink-0 rounded p-1 transition-colors text-amber-400 hover:text-amber-300"
+                                >
+                                    <Icon
+                                        icon={selectedBuffSet.starred ? 'mdi:star' : 'mdi:star-outline'}
+                                        class="size-4"
+                                    />
+                                </button>
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <input
+                                    type="text"
+                                    bind:value={renameValue}
+                                    readonly={!isEditingName}
+                                    ondblclick={() => {
+                                        if (!isEditingName) {
+                                            renameValue = selectedBuffSet.name
+                                            isEditingName = true
+                                        }
+                                    }}
+                                    onkeydown={(e) => e.key === 'Enter' && handleRenameInline()}
+                                    onblur={handleRenameInline}
+                                    class="flex-1 min-w-0 rounded border px-2 py-1.5 text-xs font-medium outline-none cursor-default text-(--theme-modal-text)"
+                                    style={isEditingName
+                                        ? 'border-color: var(--theme-accent-bg); background: var(--theme-input-bg);'
+                                        : 'border-color: var(--theme-divider-border); background: var(--theme-input-bg);'}
+                                />
+                                <button
+                                    onclick={handleCopyBuffSet}
+                                    class="shrink-0 flex items-center gap-1 rounded border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <Icon icon="mdi:content-copy" class="size-3.5" />
+                                    复制
+                                </button>
+                                <button
+                                    onclick={handleDeleteBuffSet}
+                                    class="shrink-0 flex items-center gap-1 rounded border border-red-500 px-2 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/20"
+                                >
+                                    <Icon icon="mdi:delete-outline" class="size-3.5" />
+                                    删除
+                                </button>
+                            {/if}
+                        </div>
+
                         <!-- Character scope -->
                         <div
-                            class="shrink-0 px-3 pt-3 pb-1 border-b"
+                            class="shrink-0 px-3 pt-3 pb-2.5 border-b"
                             style="border-bottom: 1px solid var(--theme-divider-border);"
                         >
                             <div class="flex items-center gap-1.5">
-                                <span class="text-[10px] text-(--theme-modal-text)/50 mr-1">角色</span>
+                                <span class="text-xs text-(--theme-modal-text)/50 mr-1">这些角色可以吃到：</span>
                                 {#each team as slot, i}
                                     {@const globalDisabled =
                                         selectedBuffSet && globalBuffSetIds.includes(selectedBuffSet.id)}
@@ -315,7 +740,7 @@
                                         class={[
                                             'size-8 rounded-full overflow-hidden border-2 transition-all',
                                             scopeChars[i]
-                                                ? 'border-(--theme-accent-bg)' + ' ring-2'
+                                                ? 'border-(--theme-accent-bg)'
                                                 : globalDisabled
                                                   ? 'border-(--theme-divider-border)'
                                                   : 'border-(--theme-divider-border) grayscale opacity-30 hover:opacity-60',
@@ -337,52 +762,6 @@
                                         {/if}
                                     </button>
                                 {/each}
-                            </div>
-                        </div>
-
-                        <!-- Add zone button -->
-                        <div
-                            class="shrink-0 p-3 border-b"
-                            style="border-bottom: 1px solid var(--theme-divider-border);"
-                        >
-                            <div class="relative w-full">
-                                <button
-                                    onclick={() => (showAddZone = !showAddZone)}
-                                    class="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
-                                    style="border-color: var(--theme-divider-border);"
-                                >
-                                    <Icon icon="mdi:plus" class="size-3.5" />
-                                    添加乘区
-                                </button>
-                                {#if showAddZone}
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <div
-                                        class="absolute left-0 top-full z-10 mt-1 rounded-xl border bg-(--theme-modal-bg) p-5 shadow-xl min-w-full w-full max-h-60 overflow-y-auto overscroll-contain"
-                                        style="border-color: var(--theme-divider-border);"
-                                        onclick={(e) => e.stopPropagation()}
-                                    >
-                                        {#each ZONE_DEFS as def}
-                                            {@const exists = selectedBuffSet.zones.some((z) => z.zoneId === def.id)}
-                                            <button
-                                                onclick={() => !exists && handleAddZoneToBuffSet(def.id)}
-                                                disabled={exists}
-                                                class={[
-                                                    'flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
-                                                    exists
-                                                        ? 'text-(--theme-modal-text)/20 cursor-not-allowed'
-                                                        : 'text-(--theme-modal-text) hover:bg-(--theme-modal-text)/5'
-                                                ].join(' ')}
-                                            >
-                                                <span class="flex-1">{def.label}</span>
-                                                <span class="text-[10px] text-(--theme-modal-text)/40">{def.unit}</span>
-                                                {#if exists}
-                                                    <Icon icon="mdi:check" class="size-3 text-(--theme-accent-text)" />
-                                                {/if}
-                                            </button>
-                                        {/each}
-                                    </div>
-                                {/if}
                             </div>
                         </div>
 
@@ -456,21 +835,11 @@
                                         {/if}
                                         <button
                                             onclick={() => openRefModal(zone.zoneId)}
-                                            class={[
-                                                'shrink-0 rounded p-0.5 transition-colors',
-                                                zone.ref
-                                                    ? 'text-(--theme-accent-text) hover:text-(--theme-accent-text)'
-                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-accent-text)'
-                                            ].join(' ')}
-                                            title={zone.ref ? '编辑引用' : '设置引用'}
+                                            class="shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5"
+                                            style="border-color: var(--theme-divider-border);"
                                         >
-                                            <Icon icon="mdi:link-variant" class="size-3.5" />
-                                        </button>
-                                        <button
-                                            onclick={() => removeZoneFromBuffSet(selectedBuffSet.id, zone.zoneId)}
-                                            class="shrink-0 rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
-                                        >
-                                            <Icon icon="mdi:close" class="size-3.5" />
+                                            <Icon icon="mdi:link-variant" class="size-3" />
+                                            引用
                                         </button>
                                     </div>
                                 {/if}
@@ -485,77 +854,51 @@
                         </div>
                     {/if}
                 </div>
+                {#if selectedBuffSet}
+                    <div
+                        class="w-52 shrink-0 border-l flex flex-col"
+                        style="border-left: 1px solid var(--theme-divider-border);"
+                    >
+                        <div class="flex-1 overflow-y-auto p-3">
+                            <div class="flex flex-col gap-0.5">
+                                {#each ZONE_DEFS as def}
+                                    {@const exists = selectedBuffSet.zones.some((z) => z.zoneId === def.id)}
+                                    <button
+                                        onclick={() => {
+                                            if (exists) {
+                                                removeZoneFromBuffSet(selectedBuffSet.id, def.id)
+                                            } else {
+                                                addZoneToBuffSet(selectedBuffSet.id, def.id)
+                                            }
+                                        }}
+                                        class={[
+                                            'w-full text-left rounded px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5',
+                                            exists
+                                                ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
+                                                : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
+                                        ].join(' ')}
+                                    >
+                                        <Icon
+                                            icon={exists ? 'mdi:check' : 'mdi:circle-outline'}
+                                            class="size-3.5 shrink-0"
+                                        />
+                                        {def.label}
+                                    </button>
+                                {/each}
+                            </div>
+                        </div>
+                    </div>
+                {/if}
             </div>
 
             <div
-                class="flex items-center justify-between gap-2 border-t px-5 py-3"
+                class="flex items-center justify-end gap-2 border-t px-5 py-3"
                 style="border-top: 1px solid var(--theme-divider-border);"
             >
-                <div class="flex items-center gap-2">
-                    {#if selectedBuffSet}
-                        {@const isGlobal = globalBuffSetIds.includes(selectedBuffSet.id)}
-                        {#if !isGlobal}
-                            <button
-                                onclick={openRename}
-                                class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
-                                style="background: var(--theme-input-bg);"
-                            >
-                                <Icon icon="mdi:rename-outline" class="size-3.5 inline mr-1" />
-                                编辑名称
-                            </button>
-                            <button
-                                onclick={handleDeleteBuffSet}
-                                class="h-7 rounded-md px-3 text-xs text-red-500 transition-colors hover:bg-red-500/30"
-                                style="background: var(--theme-input-bg);"
-                            >
-                                <Icon icon="mdi:delete-outline" class="size-3.5 inline mr-1" />
-                                删除
-                            </button>
-                        {/if}
-                    {/if}
-                </div>
                 <button
                     onclick={onclose}
                     class="h-7 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);">保存并关闭</button
-                >
-            </div>
-        </div>
-    </div>
-{/if}
-
-{#if showRename}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-        onkeydown={(e) => e.key === 'Escape' && (showRename = false)}
-    >
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div
-            class="rounded-xl border p-5 shadow-xl w-80"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
-            onclick={(e) => e.stopPropagation()}
-        >
-            <h3 class="text-sm font-semibold mb-3">编辑名称</h3>
-            <input
-                type="text"
-                bind:value={renameValue}
-                placeholder="输入新名称"
-                onkeydown={(e) => e.key === 'Enter' && handleRename()}
-                class="w-full rounded-lg border px-3 py-2 text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 mb-4"
-                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-            />
-            <div class="flex justify-end gap-2">
-                <button
-                    onclick={() => (showRename = false)}
-                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
-                    style="background: var(--theme-input-bg);">取消</button
-                >
-                <button
-                    onclick={handleRename}
-                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
-                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">确认</button
                 >
             </div>
         </div>
@@ -873,6 +1216,39 @@
                         style="background: var(--theme-accent-bg);">确认</button
                     >
                 </div>
+            </div>
+        </div>
+    </div>
+{/if}
+
+{#if showDeleteFolderConfirm}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-70 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        onkeydown={(e) => e.key === 'Escape' && (showDeleteFolderConfirm = false)}
+    >
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div
+            class="rounded-xl border p-5 shadow-xl w-80"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <h3 class="text-sm font-semibold mb-2">确认删除文件夹</h3>
+            <p class="text-xs text-(--theme-modal-text)/60 mb-4">
+                将删除该文件夹内的所有 <strong>{deleteFolderCount}</strong> 条 BUFF，确定吗？
+            </p>
+            <div class="flex justify-end gap-2">
+                <button
+                    onclick={() => (showDeleteFolderConfirm = false)}
+                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    style="background: var(--theme-input-bg);">取消</button
+                >
+                <button
+                    onclick={confirmDeleteFolder}
+                    class="h-7 rounded-md px-3 text-xs text-white transition-all hover:brightness-125"
+                    style="background: var(--theme-accent-bg);">确认删除</button
+                >
             </div>
         </div>
     </div>

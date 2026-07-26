@@ -9,10 +9,13 @@ const needed = [
     'arrow-left',
     'arrow-left-bold',
     'arrow-right-bold',
+    'arrow-up-bold-outline',
+    'arrow-down-bold-outline',
     'chart-box-outline',
     'check',
     'chevron-down',
     'circle',
+    'circle-outline',
     'clock-edit',
     'close',
     'close-circle-outline',
@@ -20,12 +23,15 @@ const needed = [
     'comment-edit',
     'content-copy',
     'content-paste',
+    'crown',
     'database-outline',
     'delete',
     'delete-outline',
     'delete-sweep',
     'file-document-outline',
     'file-import-outline',
+    'folder',
+    'folder-open',
     'link-variant',
     'lock',
     'lock-open-outline',
@@ -42,9 +48,12 @@ const needed = [
     'restore',
     'send',
     'send-circle-outline',
+    'star',
+    'star-outline',
     'stop-circle',
     'theme-light-dark',
-    'tune-variant'
+    'tune-variant',
+    'widgets'
 ]
 
 const filtered = {
