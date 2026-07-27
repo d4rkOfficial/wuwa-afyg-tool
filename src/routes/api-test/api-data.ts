@@ -66,10 +66,7 @@ export const endpointGroups: EndpointGroup[] = [
     {
         name: 'recommend',
         label: '推荐',
-        endpoints: [
-            { method: 'GET', path: RECOMMEND, summary: '根据角色推荐（武器+声骸套装+首位声骸）' },
-            { method: 'GET', path: RECOMMEND_WEAPON, summary: '仅推荐武器数组' }
-        ]
+        endpoints: [{ method: 'GET', path: RECOMMEND_WEAPON, summary: '仅推荐武器数组' }]
     }
 ]
 
@@ -152,10 +149,6 @@ export const typeMap: Record<string, { name: string; code: string }> = {
     [RECOMMEND_WEAPON]: {
         name: 'WeaponNames',
         code: 'type WeaponNames = string[]'
-    },
-    [RECOMMEND]: {
-        name: 'Recommendation',
-        code: 'interface Recommendation {\n    weapons: string[]\n    echoSets: string[]\n    primaryEchoes: string[]\n}'
     }
 }
 

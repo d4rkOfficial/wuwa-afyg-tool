@@ -13,12 +13,19 @@
         getCalcElementMap,
         getDamageTypesForEntry,
         toggleDamageTypeForEntry,
+        setDamageTypesForEntry,
         init,
         getGlobalBuffSetIds,
         getBuffDiffMode
     } from './calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
-    import { ZONE_MAP, DAMAGE_TYPES, DAMAGE_TYPE_SHORT, groupBuffSets } from './calculation.consts'
+    import {
+        ZONE_MAP,
+        DAMAGE_TYPES,
+        DAMAGE_TYPE_SHORT,
+        groupBuffSets,
+        LAYERED_BUFF_PATTERN
+    } from './calculation.consts'
     import type { GroupedBuffSetItem } from './calculation.consts'
     import type { CharSlot } from '$lib/data/types'
     import type { TimelineData } from '../timeline/timeline.types'
@@ -163,16 +170,15 @@
         return result
     })
 
-    function handleToggleExpand(id: string, index: number) {
+    function handleToggleExpand(id: string, _index: number) {
         const expanding = expandedEntryId !== id
         expandedEntryId = expanding ? id : null
         if (expanding) {
-            const total = damageEntries.length
-            if (total - index <= 3) {
-                tick().then(() => {
-                    calcContainer?.scrollTo({ top: calcContainer.scrollHeight, behavior: 'smooth' })
-                })
-            }
+            tick().then(() => {
+                calcContainer
+                    ?.querySelector<HTMLElement>(`[data-entry-id="${id}"]`)
+                    ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+            })
         }
     }
 
@@ -199,6 +205,26 @@
     function handleToggleDamageType(entryId: string, damageType: string) {
         toggleDamageTypeForEntry(entryId, damageType)
         onupdate(getCalcState())
+    }
+
+    function handleCopyDamageTypeToNext(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.character) return
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        if (entryIndex < 0) return
+        const char = entry.character
+        const currentTypes = getDamageTypesForEntry(entryId)
+        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
+            const next = damageEntries[i]
+            if (next.character === char && isDirectDamage(next)) {
+                setDamageTypesForEntry(next.id, [...currentTypes])
+                onupdate(getCalcState())
+                expandedEntryId = next.id
+                addToast('已复制伤害类型到下一段直伤', 'success')
+                return
+            }
+        }
+        addToast('已经是本角色最后一段直伤', 'info')
     }
 
     function isDirectDamage(e: { isEffect: boolean; isTuneBreak: boolean; isTuneResponse: boolean }): boolean {
@@ -311,6 +337,37 @@
 
 <BuffModal open={showBuffModal} {team} onclose={handleCloseBuffModal} />
 
+<svelte:window
+    onkeydown={(e) => {
+        const el = e.target as HTMLElement
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'BUTTON') return
+        if (e.key === ' ' && expandedEntryId !== null) {
+            e.preventDefault()
+            const idx = damageEntries.findIndex((de) => de.id === expandedEntryId)
+            if (idx >= 0) {
+                const nextIdx = idx + 1 < damageEntries.length ? idx + 1 : 0
+                handleToggleExpand(damageEntries[nextIdx].id, nextIdx)
+            }
+        }
+        if (e.key === 'Enter' && e.shiftKey && expandedEntryId !== null) {
+            e.preventDefault()
+            handleCopyDamageTypeToNext(expandedEntryId)
+        }
+        if (e.key === 'Z' && e.shiftKey && expandedEntryId !== null) {
+            e.preventDefault()
+            handleCopyFromPrevDirect(expandedEntryId)
+        }
+        if (e.key === 'X' && e.shiftKey && expandedEntryId !== null) {
+            e.preventDefault()
+            handleCopyToNextDirect(expandedEntryId)
+        }
+        if (e.key === 'C' && e.shiftKey && expandedEntryId !== null) {
+            e.preventDefault()
+            handleClearAllBuffs(expandedEntryId)
+        }
+    }}
+/>
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="h-full overflow-auto pb-48"
@@ -349,6 +406,7 @@
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <tr
                     onclick={() => handleToggleExpand(damageEntry.id, i)}
+                    data-entry-id={damageEntry.id}
                     class={[
                         'cursor-pointer border-b transition-colors',
                         expandedEntryId === damageEntry.id ? '' : 'hover:bg-(--theme-modal-text)/5',
@@ -450,6 +508,21 @@
                                 {#if !damageEntry.isEffect && !damageEntry.isTuneBreak && !damageEntry.isTuneResponse}
                                     <div>
                                         <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">伤害类型</div>
+                                        {#if isDirectDamage(damageEntry) && damageEntry.character}
+                                            <div class="mb-1.5">
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyDamageTypeToNext(damageEntry.id)
+                                                    }}
+                                                    title="Shift+Enter"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                >
+                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
+                                                    复制到下段直伤
+                                                </button>
+                                            </div>
+                                        {/if}
                                         <div class="flex flex-wrap gap-1">
                                             {#each DAMAGE_TYPES as dt}
                                                 {@const selected = (entryDamageTypeMap[damageEntry.id] ?? []).includes(
@@ -491,6 +564,7 @@
                                                         e.stopPropagation()
                                                         handleCopyFromPrevDirect(damageEntry.id)
                                                     }}
+                                                    title="Shift+Z"
                                                     class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
@@ -501,6 +575,7 @@
                                                         e.stopPropagation()
                                                         handleCopyToNextDirect(damageEntry.id)
                                                     }}
+                                                    title="Shift+X"
                                                     class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
@@ -534,10 +609,24 @@
                                                     e.stopPropagation()
                                                     handleClearAllBuffs(damageEntry.id)
                                                 }}
+                                                title="Shift+C"
                                                 class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40 disabled:pointer-events-none"
                                             >
                                                 <Icon icon="mdi:close-circle-outline" class="size-3 shrink-0" />
                                                 清除所有增益
+                                            </button>
+                                            <div class="flex-1"></div>
+                                            <button
+                                                onclick={(e) => {
+                                                    e.stopPropagation()
+                                                    const nextIdx = i + 1 < damageEntries.length ? i + 1 : 0
+                                                    handleToggleExpand(damageEntries[nextIdx].id, nextIdx)
+                                                }}
+                                                title="Space"
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-accent-bg)/20 text-(--theme-accent-text) border border-(--theme-accent-bg)/30 hover:bg-(--theme-accent-bg)/30"
+                                            >
+                                                <Icon icon="mdi:arrow-down" class="size-3 shrink-0" />
+                                                下一条
                                             </button>
                                         </div>
                                         {#if groupedFolderItems.length > 0}
@@ -591,7 +680,10 @@
                                                                             : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-accent-bg)/10'
                                                                     ].join(' ')}
                                                                 >
-                                                                    {child.name}
+                                                                    {child.name
+                                                                        .match(LAYERED_BUFF_PATTERN)
+                                                                        ?.slice(2)
+                                                                        .join('') ?? child.name}
                                                                 </button>
                                                             {/each}
                                                         </div>

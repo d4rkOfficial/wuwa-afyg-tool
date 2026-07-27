@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { onMount } from 'svelte'
+    import { onMount, untrack } from 'svelte'
     import Chart from 'chart.js/auto'
     import { PPS } from '../timeline/timeline.consts'
     import { getCharElementMap, getRefLines, getOpBlocks } from '../timeline/timeline.store.svelte'
-    import type { ResultEntry, CharSummary } from './result.types'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis } from './result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/data/types'
     import Icon from '@iconify/svelte'
 
@@ -13,13 +13,24 @@
         team: [CharSlot, CharSlot, CharSlot]
         totalDamage: number
         resultAnalysis: ResultAnalysisData | undefined
+        substatAnalysis: CharSubstatAnalysis[]
         onUpdateResultAnalysis: (data: ResultAnalysisData) => void
         onclose: () => void
     }
 
-    let { entries, charSummaries, team, totalDamage, resultAnalysis, onUpdateResultAnalysis, onclose }: Props = $props()
+    let {
+        entries,
+        charSummaries,
+        team,
+        totalDamage,
+        resultAnalysis,
+        substatAnalysis,
+        onUpdateResultAnalysis,
+        onclose
+    }: Props = $props()
 
     let charElements = $derived(getCharElementMap())
+    let selectedSubstatChar = $state(0)
 
     // ── pie chart refs ──
     let pieCanvas: HTMLCanvasElement | null = $state(null)
@@ -202,9 +213,112 @@
         })
     }
 
+    // ── bar chart (substat aggregation) ──
+    let barCharts: Chart<'bar'>[] = []
+    const barCanvasMap = new Map<string, HTMLCanvasElement>()
+
+    function registerBarCanvas(node: HTMLCanvasElement, charName: string) {
+        barCanvasMap.set(charName, node)
+        return {
+            destroy() {
+                barCanvasMap.delete(charName)
+            }
+        }
+    }
+
+    function drawBarCharts() {
+        for (const c of barCharts) c.destroy()
+        barCharts = []
+
+        const textColor = cssVar('--theme-modal-text', '#e2e8f0')
+        const accentColor = cssVar('--theme-accent-bg', '#6366f1')
+        const dividerColor = cssVar('--theme-divider-border', '#334155')
+
+        for (const sa of substatAnalysis) {
+            const canvas = barCanvasMap.get(sa.character)
+            if (!canvas || sa.aggregated.length === 0) continue
+
+            const labels = sa.aggregated.map((a) => a.type).reverse()
+            const normData = sa.aggregated.map((a) => +a.contribPctNorm.toFixed(1)).reverse()
+            const rigData = sa.aggregated.map((a) => +a.contribPctRig.toFixed(1)).reverse()
+            const hasRig = sa.totalDamageRig !== sa.totalDamageNorm
+
+            const chart = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: '期望',
+                            data: normData,
+                            backgroundColor: hexToRgba(accentColor, 0.85),
+                            borderColor: 'transparent',
+                            borderRadius: 3
+                        },
+                        ...(hasRig
+                            ? [
+                                  {
+                                      label: '凹暴',
+                                      data: rigData,
+                                      backgroundColor: hexToRgba(cssVar('--theme-rigcrit-bg', '#ef4444'), 0.85),
+                                      borderColor: 'transparent',
+                                      borderRadius: 3
+                                  }
+                              ]
+                            : [])
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: { padding: { top: 4, bottom: 4 } },
+                    scales: {
+                        x: {
+                            stacked: false,
+                            beginAtZero: true,
+                            max: Math.max(...normData, ...rigData) * 1.3 || 10,
+                            grid: { color: hexToRgba(dividerColor, 0.3) },
+                            ticks: { color: textColor, font: { size: 9 }, callback: (v) => v + '%' }
+                        },
+                        y: {
+                            stacked: false,
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 10 } }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: hasRig,
+                            labels: { color: textColor, font: { size: 9 }, boxWidth: 10, padding: 8 }
+                        },
+                        tooltip: {
+                            bodyColor: textColor,
+                            backgroundColor: cssVar('--theme-modal-bg', '#1e293b'),
+                            borderColor: dividerColor,
+                            borderWidth: 1,
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x}%`
+                            }
+                        }
+                    }
+                }
+            })
+            barCharts.push(chart)
+        }
+    }
+
+    $effect(() => {
+        substatAnalysis
+        untrack(() => drawBarCharts())
+    })
+
     onMount(() => {
         drawChart()
-        return () => pieChart?.destroy()
+        return () => {
+            pieChart?.destroy()
+            for (const c of barCharts) c.destroy()
+        }
     })
 </script>
 
@@ -222,7 +336,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         class="w-185 max-h-[85vh] overflow-y-auto rounded-xl border shadow-2xl"
-        style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+        style="scrollbar-width: none; background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
         <!-- Header -->
@@ -468,10 +582,244 @@
                     {/each}
                 </div>
             </div>
-            <div
-                class="sticky bottom-0 h-10 pointer-events-none"
-                style="background: linear-gradient(to top, var(--theme-modal-bg), transparent);"
-            ></div>
         </div>
+
+        {#if substatAnalysis.length > 0}
+            <div class="px-6 py-4 border-t" style="border-color: var(--theme-divider-border);">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <Icon icon="mdi:chart-bar" class="size-4" style="color: var(--theme-accent-text);" />
+                        <span class="text-sm font-medium" style="color: var(--theme-modal-text);">声骸词条贡献分析</span
+                        >
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="flex items-center gap-1 rounded-lg border px-1 py-1"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                        >
+                            {#each substatAnalysis as sa, i}
+                                <button
+                                    onclick={() => (selectedSubstatChar = i)}
+                                    class={[
+                                        'rounded-md px-2.5 py-1 text-[11px] font-medium transition-all',
+                                        selectedSubstatChar === i
+                                            ? 'text-white shadow-sm'
+                                            : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
+                                    ].join(' ')}
+                                    style="background: {selectedSubstatChar === i
+                                        ? 'var(--theme-accent-bg)'
+                                        : 'transparent'};"
+                                >
+                                    {sa.character}
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    {#each substatAnalysis as charSA, ci}
+                        {#if ci === selectedSubstatChar}
+                            <div
+                                class="rounded-xl border backdrop-blur-lg relative overflow-hidden"
+                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
+                            >
+                                <!-- overlay score -->
+                                <div
+                                    class="pointer-events-none absolute inset-0 flex select-none items-center justify-end overflow-hidden pr-3"
+                                >
+                                    <span
+                                        class="text-[140px] font-black leading-none opacity-[0.05] text-(--theme-accent-text)"
+                                    >
+                                        {charSA.substatTotalPctNorm.toFixed(0)}
+                                    </span>
+                                </div>
+                                <div class="relative z-1 px-4 py-3">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex flex-col gap-0.5">
+                                            <div class="flex items-center gap-3">
+                                                <span
+                                                    class="text-xs font-semibold"
+                                                    style="color: var(--theme-modal-text);">{charSA.character}</span
+                                                >
+                                                <span
+                                                    class="text-[10px] tabular-nums"
+                                                    style="color: var(--theme-modal-text); opacity: 0.5;"
+                                                >
+                                                    总伤: {Math.round(charSA.totalDamageNorm).toLocaleString()}
+                                                </span>
+                                                {#if charSA.totalDamageRig !== charSA.totalDamageNorm}
+                                                    <span
+                                                        class="text-[10px] tabular-nums"
+                                                        style="color: var(--theme-accent-text); opacity: 0.6;"
+                                                    >
+                                                        [凹暴 {Math.round(charSA.totalDamageRig).toLocaleString()}]
+                                                    </span>
+                                                {/if}
+                                            </div>
+                                            <div
+                                                class="text-[10px]"
+                                                style="color: var(--theme-modal-text); opacity: 0.6;"
+                                            >
+                                                副词条总贡献:
+                                                <span class="font-medium text-(--theme-accent-text)"
+                                                    >+{Math.round(charSA.substatTotalNorm).toLocaleString()} ({charSA.substatTotalPctNorm.toFixed(
+                                                        1
+                                                    )}%)</span
+                                                >
+                                                {#if charSA.substatTotalRig !== charSA.substatTotalNorm}
+                                                    <span class="text-(--theme-accent-text)">
+                                                        [凹暴 +{Math.round(charSA.substatTotalRig).toLocaleString()} ({charSA.substatTotalPctRig.toFixed(
+                                                            1
+                                                        )}%)]</span
+                                                    >
+                                                {/if}
+                                            </div>
+                                        </div>
+                                        <div class="text-right flex flex-col items-end gap-0.5">
+                                            <div
+                                                class="text-xl font-bold tabular-nums leading-none"
+                                                style="color: var(--theme-accent-text);"
+                                            >
+                                                {charSA.substatTotalPctNorm.toFixed(1)}
+                                            </div>
+                                            <div
+                                                class="text-[9px]"
+                                                style="color: var(--theme-modal-text); opacity: 0.35;"
+                                            >
+                                                总分
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="space-y-1.5 ml-2 mt-2">
+                                        {#each charSA.echoes as echo}
+                                            <div
+                                                class="rounded-lg border backdrop-blur-md relative overflow-hidden"
+                                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 50%, transparent);"
+                                            >
+                                                <!-- overlay score number -->
+                                                <div
+                                                    class="pointer-events-none absolute inset-0 flex select-none items-center justify-end overflow-hidden pr-2"
+                                                >
+                                                    <span
+                                                        class="text-[120px] font-black leading-none opacity-[0.06] text-(--theme-accent-text)"
+                                                    >
+                                                        {echo.totalPctNorm.toFixed(0)}
+                                                    </span>
+                                                </div>
+                                                <div class="relative z-1 px-3 py-2">
+                                                    <div class="flex items-center justify-between mb-1.5">
+                                                        <span
+                                                            class="text-[10px] font-medium"
+                                                            style="color: var(--theme-modal-text); opacity: 0.6;"
+                                                        >
+                                                            Cost{echo.cost}{echo.mainStat ? ' · ' + echo.mainStat : ''}
+                                                        </span>
+                                                        <span
+                                                            class="text-sm font-bold tabular-nums"
+                                                            style="color: var(--theme-accent-text);"
+                                                        >
+                                                            {echo.totalPctNorm.toFixed(1)}<span
+                                                                class="text-[9px] font-normal opacity-70 ml-0.5"
+                                                                >分</span
+                                                            >
+                                                        </span>
+                                                    </div>
+                                                    <div class="space-y-0.5">
+                                                        {#each echo.substats as sub}
+                                                            <div
+                                                                class="flex items-center gap-2 text-[10px]"
+                                                                style="color: var(--theme-modal-text);"
+                                                            >
+                                                                <span class="tabular-nums shrink-0"
+                                                                    >{sub.type} {sub.value}{sub.unit}</span
+                                                                >
+                                                                <span
+                                                                    class="tabular-nums shrink-0"
+                                                                    style="color: var(--theme-accent-text);"
+                                                                >
+                                                                    → +{Math.round(
+                                                                        sub.contributionNorm
+                                                                    ).toLocaleString()} ({sub.contribPctNorm.toFixed(
+                                                                        1
+                                                                    )}%)
+                                                                </span>
+                                                                {#if sub.contributionRig !== sub.contributionNorm}
+                                                                    <span
+                                                                        class="tabular-nums shrink-0"
+                                                                        style="color: var(--theme-accent-text); opacity: 0.6;"
+                                                                    >
+                                                                        [凹暴 +{Math.round(
+                                                                            sub.contributionRig
+                                                                        ).toLocaleString()} ({sub.contribPctRig.toFixed(
+                                                                            1
+                                                                        )}%)]
+                                                                    </span>
+                                                                {/if}
+                                                            </div>
+                                                        {/each}
+                                                    </div>
+                                                    <div
+                                                        class="flex items-center justify-between text-[10px] mt-1.5 pt-1.5 border-t"
+                                                        style="border-color: var(--theme-divider-border); color: var(--theme-modal-text); opacity: 0.6;"
+                                                    >
+                                                        <span>
+                                                            小计:
+                                                            <span
+                                                                class="tabular-nums"
+                                                                style="color: var(--theme-accent-text);"
+                                                                >+{Math.round(echo.totalNorm).toLocaleString()} ({echo.totalPctNorm.toFixed(
+                                                                    1
+                                                                )}%)</span
+                                                            >
+                                                            {#if echo.totalRig !== echo.totalNorm}
+                                                                <span
+                                                                    class="tabular-nums"
+                                                                    style="color: var(--theme-accent-text); opacity: 0.7;"
+                                                                >
+                                                                    [凹暴 +{Math.round(echo.totalRig).toLocaleString()} ({echo.totalPctRig.toFixed(
+                                                                        1
+                                                                    )}%)]
+                                                                </span>
+                                                            {/if}
+                                                        </span>
+                                                        <span
+                                                            class="font-bold tabular-nums"
+                                                            style="color: var(--theme-accent-text);"
+                                                        >
+                                                            {echo.totalPctNorm.toFixed(1)}<span
+                                                                class="text-[9px] font-normal opacity-70 ml-0.5"
+                                                                >分</span
+                                                            >
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
+
+                                    {#if charSA.aggregated.length > 0}
+                                        <div
+                                            class="mt-3 pt-2 border-t"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            <div
+                                                class="text-[10px] font-medium mb-1"
+                                                style="color: var(--theme-modal-text); opacity: 0.5;"
+                                            >
+                                                词条类型汇总
+                                            </div>
+                                            <div class="w-full h-40">
+                                                <canvas use:registerBarCanvas={charSA.character}></canvas>
+                                            </div>
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/if}
+                    {/each}
+                </div>
+            </div>
+        {/if}
     </div>
 </div>

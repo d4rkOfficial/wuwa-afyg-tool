@@ -45,7 +45,16 @@
         setContextMenu,
         setTrackMenu,
         setBlockMenu,
-        reflowTrack
+        getMultiBlockMenu,
+        setMultiBlockMenu,
+        reflowTrack,
+        getSelectedBlockIds,
+        getSelectionRect,
+        toggleBlockSelection,
+        clearBlockSelection,
+        startSelectionRect,
+        updateSelectionRect,
+        endSelectionRect
     } from './timeline.store.svelte'
     import {
         SIDE_PAD,
@@ -101,8 +110,24 @@
     const onWindowMouseDown = (e: MouseEvent) => {
         const target = e.target as HTMLElement
         if (getContextMenu() && !target.closest('[data-context-menu]')) setContextMenu(null)
+        if (getMultiBlockMenu() && !target.closest('[data-context-menu]')) setMultiBlockMenu(null)
         if (getTrackMenu() && !target.closest('[data-track-menu]')) setTrackMenu(null)
         if (getBlockMenu() && !target.closest('[data-block-menu]')) setBlockMenu(null)
+        const trackEl = target.closest<HTMLElement>('[data-track-index]')
+        if (getLocked()) return
+        if (timelineEl && target.closest('[data-block]')) {
+            if (e.button === 0 && !e.ctrlKey) {
+                const clickedId = (target.closest('[data-block]') as HTMLElement)?.dataset.block ?? ''
+                if (!getSelectedBlockIds()[clickedId]) clearBlockSelection()
+            }
+            return
+        }
+        if (timelineEl && trackEl && !target.closest('.sticky') && !e.ctrlKey) {
+            const rect = timelineEl.getBoundingClientRect()
+            const scrollL = timelineEl.scrollLeft
+            const mx = e.clientX - rect.left + scrollL - 80
+            if (mx >= 0) startSelectionRect(mx)
+        }
     }
 
     const onWindowMouseMove = (e: MouseEvent) => {
@@ -110,11 +135,15 @@
         const rect = timelineEl.getBoundingClientRect()
         const scrollL = timelineEl.scrollLeft
         const rawX = e.clientX - rect.left + scrollL - 80
+        if (getSelectionRect()) {
+            updateSelectionRect(rawX)
+        }
         onDrag(rawX)
         onBlockDrag(rawX)
     }
 
     const onWindowMouseUp = () => {
+        endSelectionRect()
         stopDrag()
         stopBlockDrag()
     }
@@ -177,7 +206,13 @@
         if (getLocked()) return
         e.preventDefault()
         e.stopPropagation()
-        setBlockMenu({ x: e.clientX, y: e.clientY, blockId })
+        const selected = getSelectedBlockIds()
+        if (Object.keys(selected).length > 1 && selected[blockId]) {
+            setMultiBlockMenu({ x: e.clientX, y: e.clientY })
+        } else {
+            clearBlockSelection()
+            setBlockMenu({ x: e.clientX, y: e.clientY, blockId })
+        }
     }
 </script>
 
@@ -208,6 +243,7 @@
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         class="relative shrink-0 {i < getTRACKS().length - 1 ? 'h-14' : 'flex-1'}"
+                        data-track-index={i}
                         style="border-bottom: 1px solid color-mix(in srgb, {TRACK_COLORS[i]} 15%, transparent);"
                         oncontextmenu={(e) => {
                             e.preventDefault()
@@ -255,15 +291,31 @@
                         {#if i < getTRACKS().length - 1}
                             <div class="absolute pointer-events-none" style="left: 5rem; top: 0; right: 0; bottom: 0;">
                                 {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
+                                    {@const isHighlighted =
+                                        getDragBlockId() === block.id ||
+                                        (getSelectedBlockIds()[block.id] &&
+                                            getDragBlockId() !== null &&
+                                            Object.keys(getSelectedBlockIds()).length > 1)}
+                                    {@const isSelected = getSelectedBlockIds()[block.id] !== undefined}
+                                    {@const isOtherBlockDimmed =
+                                        getDragBlockId() !== null &&
+                                        block.id !== getDragBlockId() &&
+                                        !getSelectedBlockIds()[block.id]}
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
                                         class="absolute inset-y-0 flex items-center pointer-events-auto cursor-grab active:cursor-grabbing select-none"
-                                        style="left: {block.pos}px; transform: translateX(-50%) {getDragBlockId() ===
-                                        block.id
+                                        style="left: {block.pos}px; transform: translateX(-50%) {isHighlighted
                                             ? 'translateY(-4px)'
-                                            : ''}; z-index: {getDragBlockId() === block.id ? 20 : 5};"
+                                            : ''}; z-index: {isHighlighted ? 20 : 5}; opacity: {isOtherBlockDimmed
+                                            ? 0.4
+                                            : 1}; transition: opacity 150ms ease;"
                                         data-block={block.id}
                                         onmousedown={(e) => {
+                                            if (e.ctrlKey) {
+                                                e.stopPropagation()
+                                                toggleBlockSelection(block.id, true)
+                                                return
+                                            }
                                             if (!timelineEl) return
                                             const rect = timelineEl.getBoundingClientRect()
                                             const scrollL2 = timelineEl.scrollLeft
@@ -281,10 +333,10 @@
                                             block.id
                                                 ? ''
                                                 : 'px-2.5'} text-sm bg-(--theme-timeline-bg)/80 border whitespace-nowrap shadow-sm min-w-14"
-                                            style="border-color: {getDragBlockId() === block.id
+                                            style="border-color: {isHighlighted || isSelected
                                                 ? 'var(--theme-accent-bg)'
-                                                : 'var(--theme-divider-border)'};{getDragBlockId() === block.id
-                                                ? ' box-shadow: 0 1px 3px color-mix(in srgb, var(--theme-accent-bg) 20%, transparent);'
+                                                : 'var(--theme-divider-border)'};{isHighlighted || isSelected
+                                                ? ' box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);'
                                                 : ''}"
                                             use:measureWidth={block.id}
                                         >
@@ -334,7 +386,21 @@
                             >
                                 <div class="relative" style="height: {damageStackHeight}px; width: 100%;">
                                     {#each damageStack as { block: dmg, top, left } (dmg.id)}
-                                        <div class="absolute cursor-default" style="left: {left}px; top: {top}px;">
+                                        {@const isParentDragged =
+                                            getDragBlockId() !== null &&
+                                            dmg.sourceType === 'op' &&
+                                            (Object.keys(getSelectedBlockIds()).length > 1
+                                                ? getSelectedBlockIds()[dmg.sourceId]
+                                                : getDragBlockId() === dmg.sourceId)}
+                                        {@const isDimmed = getDragBlockId() !== null && !isParentDragged}
+                                        <div
+                                            class="absolute cursor-default"
+                                            style="left: {left}px; top: {top}px; transform: scale({isParentDragged
+                                                ? 1.2
+                                                : 1}); opacity: {isDimmed
+                                                ? 0.4
+                                                : 1}; transform-origin: left center; transition: transform 150ms ease, opacity 150ms ease;"
+                                        >
                                             <div
                                                 class="flex flex-col items-start gap-0.5 px-1 py-0.5"
                                                 use:measureDamageWidth={dmg.id}
@@ -396,10 +462,10 @@
             <div class="absolute pointer-events-none" style="left: 5rem; top: 2rem; right: 0; bottom: 0; z-index: 10;">
                 {#each getRefLines() as rl}
                     <div
-                        class="absolute top-0 bottom-0 border-l border-dashed"
+                        class="absolute top-0 bottom-0 border-l-2 border-dashed"
                         style="left: {vx(rl.id, rl.pos)}px; border-left-color: {getDraggingId() === rl.id
                             ? 'var(--theme-accent-bg)'
-                            : 'var(--theme-divider-border)'};"
+                            : 'color-mix(in srgb, var(--theme-timeline-text) 30%, transparent)'};"
                     ></div>
                 {/each}
             </div>
@@ -427,7 +493,12 @@
                             />
                         {:else}
                             <span
-                                class="text-[9px] tabular-nums text-(--theme-timeline-text)/50 cursor-pointer hover:text-(--theme-timeline-text)/80"
+                                class="text-[9px] tabular-nums cursor-pointer"
+                                style="color: {getDraggingId() === rl.id
+                                    ? 'var(--theme-accent-bg)'
+                                    : 'var(--theme-timeline-text)'}; transform: scale({getDraggingId() === rl.id
+                                    ? 1.2
+                                    : 1}); transition: color 150ms ease, transform 150ms ease;"
                                 oncontextmenu={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
@@ -441,6 +512,17 @@
                 {/each}
             </div>
 
+            <!-- Selection rect overlay -->
+            {#if getSelectionRect()}
+                {@const sr = getSelectionRect()!}
+                {@const rectLeft = Math.min(sr.startX, sr.currentX)}
+                {@const rectWidth = Math.abs(sr.currentX - sr.startX)}
+                <div
+                    class="absolute pointer-events-none"
+                    style="top: 2rem; left: {5 * 16 +
+                        rectLeft}px; width: {rectWidth}px; bottom: 0; z-index: 7; background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent); border-left: 1px solid color-mix(in srgb, var(--theme-accent-bg) 40%, transparent); border-right: 1px solid color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);"
+                ></div>
+            {/if}
             <!-- Drag hot zone overlay -->
             <div class="absolute pointer-events-none" style="top: 2rem; left: 5rem; right: 0; bottom: 0; z-index: 30;">
                 {#each getRefLines() as rl}

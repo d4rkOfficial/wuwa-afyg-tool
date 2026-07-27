@@ -435,6 +435,10 @@ export function toggleDamageTypeForEntry(entryId: string, damageType: string) {
     }
 }
 
+export function setDamageTypesForEntry(entryId: string, types: string[]) {
+    _damageEntryDamageTypes = { ..._damageEntryDamageTypes, [entryId]: types }
+}
+
 // ── Buff Modal State ──
 
 export function getShowBuffModal(): boolean {

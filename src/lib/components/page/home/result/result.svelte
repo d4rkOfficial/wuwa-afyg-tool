@@ -8,8 +8,8 @@
     import { getAllDamageEntries, getCalcState } from '../calculation/calculation.store.svelte'
     import { getConfig } from '../config/config.store.svelte'
     import { getActiveProject, updateResultAnalysis } from '$lib/data/project.svelte'
-    import { computeAll as computeAllDamage } from './compute'
-    import type { ResultEntry } from './result.types'
+    import { computeAll as computeAllDamage, computeSubstatContributions } from './compute'
+    import type { ResultEntry, CharSubstatAnalysis } from './result.types'
     import { tick, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
@@ -129,20 +129,37 @@
 
     let totalDamage = $derived(charSummaries.reduce((s, c) => s + c.totalDamage, 0))
 
+    let substatAnalysis = $derived.by(() => {
+        const calc = getCalcState()
+        const config = getConfig()
+        const dmgEntries = getAllDamageEntries()
+        if (dmgEntries.length === 0) return []
+        return computeSubstatContributions(
+            dmgEntries,
+            calc.buffSets,
+            calc.damageEntryBuffSetIds,
+            calc.damageEntryDamageTypes,
+            config,
+            team,
+            charInfoMap,
+            weaponInfoMap,
+            new Set(rigCritEntryIds)
+        )
+    })
+
     let expandedEntry = $state<string | null>(null)
     let showDataAnalysis = $state(false)
     let tableContainer = $state<HTMLDivElement | undefined>()
 
-    function toggleExpand(id: string, index: number) {
+    function toggleExpand(id: string, _index: number) {
         const expanding = expandedEntry !== id
         expandedEntry = expanding ? id : null
         if (expanding) {
-            const total = entries.length
-            if (total - index <= 3) {
-                tick().then(() => {
-                    tableContainer?.scrollTo({ top: tableContainer.scrollHeight, behavior: 'smooth' })
-                })
-            }
+            tick().then(() => {
+                tableContainer
+                    ?.querySelector<HTMLElement>(`[data-entry-id="${id}"]`)
+                    ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+            })
         }
     }
 </script>
@@ -211,6 +228,7 @@
                     {#each entries as entry, i}
                         <tr
                             onclick={() => toggleExpand(entry.id, i)}
+                            data-entry-id={entry.id}
                             class="cursor-pointer border-b transition-colors hover:bg-(--theme-modal-text)/3"
                             style="border-color: var(--theme-divider-border);"
                         >
@@ -527,6 +545,7 @@
         {team}
         {totalDamage}
         {resultAnalysis}
+        {substatAnalysis}
         onUpdateResultAnalysis={(data) => updateResultAnalysis(data)}
         onclose={() => (showDataAnalysis = false)}
     />

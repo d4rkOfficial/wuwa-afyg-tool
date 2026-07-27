@@ -34,6 +34,7 @@ function applyThemeCSS() {
 
     root.style.setProperty('--theme-layout-scheme', theme.id === 'light' ? 'light' : 'dark')
     root.style.setProperty('--theme-rigcrit-text', theme.id === 'light' ? '#dc2626' : '#ef4444')
+    root.style.setProperty('--theme-rigcrit-bg', theme.id === 'light' ? '#dc2626' : '#ef4444')
     root.style.setProperty('--theme-w-icon-filter', theme.id === 'light' ? 'invert(1)' : 'none')
 }
 

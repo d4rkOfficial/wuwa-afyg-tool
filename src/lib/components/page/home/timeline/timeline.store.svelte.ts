@@ -224,6 +224,8 @@ let _dragBlockStartPos = $state(0)
 let _blockWidths = $state<Record<string, number>>({})
 let _damageWidths = $state<Record<string, number>>({})
 let _blockMenu = $state<{ x: number; y: number; blockId: string } | null>(null)
+let _selectedBlockIds = $state<Record<string, boolean>>({})
+let _selectionRect = $state<{ startX: number; currentX: number } | null>(null)
 
 export function getTrackMenu() {
     return _trackMenu
@@ -257,6 +259,72 @@ export function getBlockMenu() {
 }
 export function setBlockMenu(v: { x: number; y: number; blockId: string } | null) {
     _blockMenu = v
+}
+
+let _multiBlockMenu = $state<{ x: number; y: number } | null>(null)
+
+export function getMultiBlockMenu() {
+    return _multiBlockMenu
+}
+export function setMultiBlockMenu(v: { x: number; y: number } | null) {
+    _multiBlockMenu = v
+}
+
+// ── Block Selection ──
+export function getSelectedBlockIds() {
+    return _selectedBlockIds
+}
+export function getSelectionRect() {
+    return _selectionRect
+}
+
+export function toggleBlockSelection(blockId: string, ctrl: boolean) {
+    if (ctrl) {
+        const next = { ..._selectedBlockIds }
+        if (next[blockId]) {
+            delete next[blockId]
+        } else {
+            next[blockId] = true
+        }
+        _selectedBlockIds = next
+    } else {
+        _selectedBlockIds = { [blockId]: true }
+    }
+}
+
+export function clearBlockSelection() {
+    _selectedBlockIds = {}
+}
+
+export function startSelectionRect(x: number) {
+    _selectionRect = { startX: x, currentX: x }
+    _selectedBlockIds = {}
+}
+
+export function updateSelectionRect(x: number) {
+    if (!_selectionRect) return
+    _selectionRect = { ..._selectionRect, currentX: x }
+}
+
+export function endSelectionRect() {
+    if (!_selectionRect) return
+    const minX = Math.min(_selectionRect.startX, _selectionRect.currentX)
+    const maxX = Math.max(_selectionRect.startX, _selectionRect.currentX)
+    _selectionRect = null
+    if (maxX - minX <= 5) {
+        _selectedBlockIds = {}
+        return
+    }
+    const selected: Record<string, boolean> = {}
+    for (const block of _opBlocks) {
+        const bw = _blockWidths[block.id] ?? 56
+        const left = block.pos - bw / 2
+        const right = block.pos + bw / 2
+        if (left < maxX && right > minX) {
+            selected[block.id] = true
+        }
+    }
+    _selectedBlockIds = selected
 }
 
 // ── Damage / Picker State ──
@@ -689,6 +757,7 @@ export function addOpBlock(trackIndex: number, pos: number, key: string) {
 }
 
 let _dragBlockOffset = $state(0)
+let _dragBlockInitialPositions = $state<Record<string, number>>({})
 
 export function startBlockDrag(e: MouseEvent, blockId: string, mouseContentX?: number) {
     if (!assertUnlocked()) return
@@ -701,6 +770,16 @@ export function startBlockDrag(e: MouseEvent, blockId: string, mouseContentX?: n
             _dragBlockOffset = mouseContentX - block.pos
         }
     }
+    if (Object.keys(_selectedBlockIds).length > 1 && _selectedBlockIds[blockId]) {
+        const init: Record<string, number> = {}
+        for (const id of Object.keys(_selectedBlockIds)) {
+            const b = _opBlocks.find((ob) => ob.id === id)
+            if (b) init[id] = b.pos
+        }
+        _dragBlockInitialPositions = init
+    } else {
+        _dragBlockInitialPositions = {}
+    }
 }
 
 export function onBlockDrag(rawX: number) {
@@ -709,11 +788,25 @@ export function onBlockDrag(rawX: number) {
     if (idx < 0) return
     const centerX = rawX - _dragBlockOffset
     const pos = snapBlockX(centerX, _opBlocks[idx].trackIndex, _dragBlockId, _blockWidths[_dragBlockId] ?? 0)
-    _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: Math.max(0, Math.min(MAX_POS, pos)) } : b))
+    const clampedPos = Math.max(0, Math.min(MAX_POS, pos))
+    const initPositions = _dragBlockInitialPositions
+    if (Object.keys(initPositions).length > 0) {
+        const delta = clampedPos - _dragBlockStartPos
+        _opBlocks = _opBlocks.map((b) => {
+            const initPos = initPositions[b.id]
+            if (initPos !== undefined) {
+                return { ...b, pos: Math.max(0, Math.min(MAX_POS, initPos + delta)) }
+            }
+            return b.id === _dragBlockId ? { ...b, pos: clampedPos } : b
+        })
+    } else {
+        _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: clampedPos } : b))
+    }
 }
 
 export function stopBlockDrag() {
     if (!_dragBlockId) {
+        _dragBlockInitialPositions = {}
         _dragBlockId = null
         return
     }
@@ -739,6 +832,7 @@ export function stopBlockDrag() {
             save()
         }
     }
+    _dragBlockInitialPositions = {}
     _dragBlockId = null
 }
 
@@ -748,6 +842,36 @@ export function removeBlock(blockId: string) {
     _damageBlocks = _damageBlocks.filter((d) => !(d.sourceId === blockId && d.sourceType === 'op'))
     _blockMenu = null
     enforceIntro()
+    save()
+}
+
+export function removeBlocks(ids: string[]) {
+    if (!assertUnlocked()) return
+    const idSet = new Set(ids)
+    const affectedTracks = new Set<number>()
+    for (const b of _opBlocks) {
+        if (idSet.has(b.id)) affectedTracks.add(b.trackIndex)
+    }
+    _opBlocks = _opBlocks.filter((b) => !idSet.has(b.id))
+    _damageBlocks = _damageBlocks.filter((d) => !(d.sourceType === 'op' && idSet.has(d.sourceId)))
+    _selectedBlockIds = {}
+    _multiBlockMenu = null
+    enforceIntro()
+    save()
+}
+
+export function resetDamageBindingsForBlocks(ids: string[]) {
+    if (!assertUnlocked()) return
+    const idSet = new Set(ids)
+    _damageBlocks = _damageBlocks
+        .map((d) => {
+            if (d.sourceType === 'op' && idSet.has(d.sourceId)) {
+                return { ...d, skillHits: [], nonDirectEntries: [] }
+            }
+            return d
+        })
+        .filter((d) => !(d.skillHits.length === 0 && d.nonDirectEntries.length === 0))
+    _multiBlockMenu = null
     save()
 }
 

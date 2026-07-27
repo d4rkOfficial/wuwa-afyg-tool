@@ -33,28 +33,33 @@
     let customName = $state('')
     let customFlat = $state('')
     let customPct = $state('')
-    let customPctUnit = $state('攻击百分比')
+    let customPctUnit = $state('攻击%')
     let customElement = $state('物理')
     let showUnitMenu = $state(false)
     let showElementMenu = $state(false)
+    let elementMenuUp = $state(false)
+    let hasFlat = $state(false)
+    let hasPct = $state(false)
 
     function openAddCustom(charName: string) {
         customName = ''
         customFlat = ''
         customPct = ''
-        customPctUnit = '攻击百分比'
+        customPctUnit = '攻击%'
         customElement = '物理'
+        hasFlat = false
+        hasPct = false
         showCustomModal = true
     }
 
     function confirmAddCustom(charName: string) {
-        const flat = parseFloat(customFlat)
-        const pct = parseFloat(customPct)
+        const flat = hasFlat ? parseFloat(customFlat) : 0
+        const pct = hasPct ? parseFloat(customPct) : 0
         if (!customName.trim()) {
             addToast('请输入直伤名称', 'info')
             return
         }
-        if ((isNaN(flat) || flat <= 0) && (isNaN(pct) || pct <= 0)) {
+        if (!hasFlat && !hasPct) {
             addToast('请填写固定值或百分比值', 'info')
             return
         }
@@ -74,8 +79,10 @@
         customName = name
         customFlat = ''
         customPct = ''
-        customPctUnit = '攻击百分比'
+        customPctUnit = '攻击%'
         customElement = '物理'
+        hasFlat = false
+        hasPct = false
         showCustomModal = true
     }
 </script>
@@ -347,109 +354,152 @@
         class="fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && (showCustomModal = false)}
     >
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border p-5 shadow-xl w-96"
+            class="rounded-xl border p-5 shadow-xl w-[28rem]"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <h3 class="text-sm font-semibold mb-4">自定义直伤</h3>
-            <div class="space-y-3">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-sm font-semibold">自定义直伤</h3>
+            </div>
+
+            <div class="space-y-4">
                 <div>
-                    <!-- svelte-ignore a11y_label_has_associated_control -->
-                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">名称</label>
+                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">名称</label>
                     <input
                         type="text"
                         bind:value={customName}
                         placeholder="输入名称"
-                        class="w-full rounded border px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
+                        class="w-full rounded-lg border px-3 py-2 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     />
                 </div>
+
                 <div>
-                    <!-- svelte-ignore a11y_label_has_associated_control -->
-                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">固定值</label>
-                    <input
-                        type="number"
-                        bind:value={customFlat}
-                        placeholder="0"
-                        class="w-full rounded border px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                    />
-                </div>
-                <div class="flex gap-2">
-                    <div class="flex-1">
-                        <!-- svelte-ignore a11y_label_has_associated_control -->
-                        <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">百分比值</label>
-                        <input
-                            type="number"
-                            bind:value={customPct}
-                            placeholder="0"
-                            class="w-full rounded border px-2 py-1 text-xs outline-none text-[var(--theme-modal-text)] placeholder:text-[var(--theme-modal-text)]/30"
-                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                        />
-                    </div>
-                    <div class="w-32 relative">
-                        <!-- svelte-ignore a11y_label_has_associated_control -->
-                        <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">单位</label>
+                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">固定值</label>
+                    <div class="flex items-center rounded-md border" style="border-color: var(--theme-divider-border);">
                         <button
-                            onclick={() => {
-                                showUnitMenu = !showUnitMenu
-                                showElementMenu = false
-                            }}
-                            class="w-full flex items-center justify-between rounded border px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                            onclick={() => (hasFlat = !hasFlat)}
+                            class={[
+                                'rounded-l-md px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
+                                hasFlat
+                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                    : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
+                            ].join(' ')}
+                        >
+                            固定值
+                        </button>
+                        <div
+                            class="flex items-center flex-1 px-3 py-1.5 border-x"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
-                            <span>{customPctUnit}</span>
-                            <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
-                        </button>
-                        {#if showUnitMenu}
-                            <!-- svelte-ignore a11y_no_static_element_interactions -->
-                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                            <div
-                                class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
-                                style="border-color: var(--theme-divider-border);"
-                                onclick={(e) => e.stopPropagation()}
-                            >
-                                {#each PCT_UNITS as u}
-                                    <button
-                                        onclick={() => {
-                                            customPctUnit = u
-                                            showUnitMenu = false
-                                        }}
-                                        class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
-                                    >
-                                        <span class="flex-1">{u}</span>
-                                        {#if u === customPctUnit}<Icon
-                                                icon="mdi:check"
-                                                class="size-3 text-[var(--theme-accent-text)]"
-                                            />{/if}
-                                    </button>
-                                {/each}
-                            </div>
-                        {/if}
+                            <input
+                                type="number"
+                                bind:value={customFlat}
+                                disabled={!hasFlat}
+                                placeholder="0"
+                                class="w-full min-w-0 text-xs outline-none tabular-nums text-center bg-transparent disabled:text-(--theme-modal-text)/20"
+                                class:text-(--theme-modal-text)={hasFlat}
+                            />
+                        </div>
+                        <span class="w-24 text-xs text-(--theme-modal-text)/40 px-3 py-1.5 text-left">点</span>
                     </div>
                 </div>
+
+                <div>
+                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">百分比值</label>
+                    <div class="flex items-center rounded-md border" style="border-color: var(--theme-divider-border);">
+                        <button
+                            onclick={() => (hasPct = !hasPct)}
+                            class={[
+                                'rounded-l-md px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
+                                hasPct
+                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                    : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
+                            ].join(' ')}
+                        >
+                            百分比
+                        </button>
+                        <div
+                            class="flex items-center flex-1 px-3 py-1.5 border-x"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                        >
+                            <input
+                                type="number"
+                                bind:value={customPct}
+                                disabled={!hasPct}
+                                placeholder="0"
+                                class="w-full min-w-0 text-xs outline-none tabular-nums text-center bg-transparent disabled:text-(--theme-modal-text)/20"
+                                class:text-(--theme-modal-text)={hasPct}
+                            />
+                        </div>
+                        <div class="relative shrink-0 w-24">
+                            <button
+                                onclick={() => {
+                                    showUnitMenu = !showUnitMenu
+                                    showElementMenu = false
+                                }}
+                                class="flex w-full items-center justify-between rounded-r-md px-3 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                            >
+                                <span class="text-left">{customPctUnit}</span>
+                                <Icon icon="mdi:chevron-down" class="size-3 text-(--theme-modal-text)/40 shrink-0" />
+                            </button>
+                            {#if showUnitMenu}
+                                <div
+                                    class="absolute right-0 top-full z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                    style="border-color: var(--theme-divider-border);"
+                                    onclick={(e) => e.stopPropagation()}
+                                >
+                                    {#each PCT_UNITS as u}
+                                        <button
+                                            onclick={() => {
+                                                customPctUnit = u
+                                                showUnitMenu = false
+                                            }}
+                                            class={[
+                                                'flex w-full items-center gap-2 px-3 py-2 text-xs text-left transition-colors',
+                                                u === customPctUnit
+                                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                    : 'text-(--theme-modal-text) hover:bg-(--theme-modal-text)/5'
+                                            ].join(' ')}
+                                        >
+                                            <span class="flex-1">{u}</span>
+                                            {#if u === customPctUnit}
+                                                <Icon icon="mdi:check" class="size-3 text-(--theme-accent-text)" />
+                                            {/if}
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+
                 <div class="relative">
-                    <!-- svelte-ignore a11y_label_has_associated_control -->
-                    <label class="text-[10px] text-[var(--theme-modal-text)]/50 block mb-1">属性</label>
+                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">属性</label>
                     <button
-                        onclick={() => {
-                            showElementMenu = !showElementMenu
+                        onclick={(e) => {
                             showUnitMenu = false
+                            showElementMenu = !showElementMenu
+                            if (showElementMenu) {
+                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                                const spaceBelow = window.innerHeight - rect.bottom
+                                elementMenuUp = spaceBelow < 120 && rect.top > spaceBelow
+                            }
                         }}
-                        class="w-full flex items-center justify-between rounded border px-2 py-1 text-xs text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                        class="w-full flex items-center justify-between rounded-lg border px-3 py-2 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
                         <span>{customElement}</span>
-                        <Icon icon="mdi:chevron-down" class="size-3 text-[var(--theme-modal-text)]/40" />
+                        <Icon icon="mdi:chevron-down" class="size-3.5 shrink-0 text-(--theme-modal-text)/40" />
                     </button>
                     {#if showElementMenu}
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <div
-                            class="absolute left-0 top-full z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-[var(--theme-modal-bg)] py-1 shadow-xl backdrop-blur-lg"
+                            class={[
+                                'absolute left-0 z-10 w-full max-h-48 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg',
+                                elementMenuUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+                            ].join(' ')}
                             style="border-color: var(--theme-divider-border);"
                             onclick={(e) => e.stopPropagation()}
                         >
@@ -459,30 +509,41 @@
                                         customElement = el
                                         showElementMenu = false
                                     }}
-                                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--theme-modal-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                                    class={[
+                                        'flex w-full items-center gap-2 px-3 py-2 text-xs text-left transition-colors',
+                                        el === customElement
+                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                            : 'text-(--theme-modal-text) hover:bg-(--theme-modal-text)/5'
+                                    ].join(' ')}
                                 >
                                     <span class="flex-1">{el}</span>
-                                    {#if el === customElement}<Icon
-                                            icon="mdi:check"
-                                            class="size-3 text-[var(--theme-accent-text)]"
-                                        />{/if}
+                                    {#if el === customElement}
+                                        <Icon icon="mdi:check" class="size-3 text-(--theme-accent-text)" />
+                                    {/if}
                                 </button>
                             {/each}
                         </div>
                     {/if}
                 </div>
             </div>
-            <div class="flex justify-end gap-2 mt-5">
-                <button
-                    onclick={() => (showCustomModal = false)}
-                    class="h-7 rounded-md px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
-                    style="background: var(--theme-input-bg);">取消</button
-                >
-                <button
-                    onclick={() => confirmAddCustom(getSkillPickerCharacter())}
-                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
-                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">确认</button
-                >
+
+            <div
+                class="flex items-center justify-between mt-5 pt-4 border-t"
+                style="border-color: var(--theme-divider-border);"
+            >
+                <div></div>
+                <div class="flex items-center gap-2">
+                    <button
+                        onclick={() => (showCustomModal = false)}
+                        class="rounded-md px-3 py-1.5 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10"
+                        >取消</button
+                    >
+                    <button
+                        onclick={() => confirmAddCustom(getSkillPickerCharacter())}
+                        class="rounded-md px-4 py-1.5 text-xs text-white transition-all hover:brightness-125 shadow-sm"
+                        style="background: var(--theme-accent-bg);">确认</button
+                    >
+                </div>
             </div>
         </div>
     </div>

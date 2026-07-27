@@ -1,7 +1,13 @@
 import type { DamageEntry, BuffSet, ZoneRef } from '../calculation/calculation.types'
 import type { ConfigState, EchoSlotConfig } from '../config/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { ResultEntry, MultiplierZone } from './result.types'
+import type {
+    ResultEntry,
+    MultiplierZone,
+    CharSubstatAnalysis,
+    SubstatContribution,
+    EchoContribution
+} from './result.types'
 import type { CharSlot } from '$lib/data/types'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
@@ -1058,5 +1064,269 @@ export function computeAll(
         // direct damage
         const damageTypes = damageEntryDamageTypes[entry.id] ?? []
         return computeResultEntry(entry, stats, enemy, damageTypes)
+    })
+}
+
+// ── substat contribution analysis ──
+
+function getCharFullStatsForChar(
+    charIndex: number,
+    echoes: EchoSlotConfig[],
+    damageEntries: DamageEntry[],
+    buffSets: BuffSet[],
+    damageEntryBuffSetIds: Record<string, string[]>,
+    charInfoMap: Record<string, CharacterInfo>,
+    team: CharSlot[],
+    weaponInfoMap: Record<string, WeaponInfo>
+): CharacterComputed {
+    const slot = team[charIndex]
+    if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats()
+
+    const charBuffSetIds = new Set<string>()
+    for (const entry of damageEntries) {
+        if (entry.character !== slot.character) continue
+        const boundIds = damageEntryBuffSetIds[entry.id] ?? []
+        for (const id of boundIds) charBuffSetIds.add(id)
+    }
+
+    const charBoundBuffSets = buffSets.filter((bs) => {
+        if (!charBuffSetIds.has(bs.id)) return false
+        if (bs.scope === 'all') return true
+        return (bs.scope as number[]).includes(charIndex)
+    })
+
+    return computeCharacterStats(
+        charInfoMap[slot.character],
+        slot.weapon,
+        weaponInfoMap[slot.weapon ?? ''] ?? null,
+        echoes,
+        charBoundBuffSets
+    )
+}
+
+function computeOneEntry(
+    entry: DamageEntry,
+    charIndex: number,
+    echoes: EchoSlotConfig[],
+    fullStats: CharacterComputed[],
+    buffSets: BuffSet[],
+    damageEntryBuffSetIds: Record<string, string[]>,
+    damageEntryDamageTypes: Record<string, string[]>,
+    configState: ConfigState,
+    team: CharSlot[],
+    charInfoMap: Record<string, CharacterInfo>,
+    weaponInfoMap: Record<string, WeaponInfo>
+): ResultEntry {
+    const enemy = configState.enemy
+    const charName = entry.character
+    const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
+    const wInfo = weaponInfoMap[weaponName ?? ''] ?? null
+    const charInfo = charName ? charInfoMap[charName] : undefined
+    const boundBuffSets = charIndex >= 0 ? getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds) : []
+
+    // partial stats (echo+weapon + non-ref buffs)
+    const partialStats = charInfo
+        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, boundBuffSets)
+        : emptyCharacterStats()
+
+    // resolve ref zones
+    const stats = { ...partialStats }
+    for (const bs of boundBuffSets) {
+        for (const z of bs.zones) {
+            if (!z.ref) continue
+            const resolved = resolveRefValue(z.ref, fullStats)
+            if (resolved === 0) continue
+            applyRefToStats(stats, z.zoneId, resolved)
+        }
+    }
+
+    if (entry.isEffect) {
+        return computeEffectEntry(entry, stats, enemy)
+    }
+    if (!charName || !charInfo || charIndex < 0) return makeStubEntry(entry)
+    if (entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数') {
+        return computeTuneEntry(entry, stats, enemy)
+    }
+    const damageTypes = damageEntryDamageTypes[entry.id] ?? []
+    return computeResultEntry(entry, stats, enemy, damageTypes)
+}
+
+function cloneEchoesWithoutSubstat(echoes: EchoSlotConfig[], echoIdx: number, substatIdx: number): EchoSlotConfig[] {
+    return echoes.map((echo, ei) => {
+        if (ei !== echoIdx) return echo
+        return {
+            ...echo,
+            substats: echo.substats.filter((_, si) => si !== substatIdx)
+        }
+    })
+}
+
+export function computeSubstatContributions(
+    damageEntries: DamageEntry[],
+    buffSets: BuffSet[],
+    damageEntryBuffSetIds: Record<string, string[]>,
+    damageEntryDamageTypes: Record<string, string[]>,
+    configState: ConfigState,
+    team: CharSlot[],
+    charInfoMap: Record<string, CharacterInfo>,
+    weaponInfoMap: Record<string, WeaponInfo>,
+    rigCritEntryIds: Set<string>
+): CharSubstatAnalysis[] {
+    // baseline
+    const allEntries = computeAll(
+        damageEntries,
+        buffSets,
+        damageEntryBuffSetIds,
+        damageEntryDamageTypes,
+        configState,
+        team,
+        charInfoMap,
+        weaponInfoMap
+    )
+
+    const charNames = team.map((s) => s.character).filter((c): c is string => c !== null)
+
+    return charNames.map((charName, ci) => {
+        const charEntries = allEntries.filter((e) => e.character === charName)
+        const charDmgEntries = damageEntries.filter((e) => e.character === charName)
+
+        const baselineNorm = charEntries.reduce((s, e) => s + e.totalDamage, 0)
+        const baselineRig = charEntries.reduce((s, e) => {
+            return s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamage)
+        }, 0)
+
+        const echoes = configState.characters[ci]?.echoes ?? []
+
+        const info: EchoContribution[] = []
+        const allSubstats: SubstatContribution[] = []
+
+        // precompute fullStats for baseline ZoneRef resolution
+        const baseFullStats = team.map((_, i) => {
+            const echos = i === ci ? echoes : (configState.characters[i]?.echoes ?? [])
+            return getCharFullStatsForChar(
+                i,
+                echos,
+                damageEntries,
+                buffSets,
+                damageEntryBuffSetIds,
+                charInfoMap,
+                team,
+                weaponInfoMap
+            )
+        })
+
+        for (let ei = 0; ei < echoes.length; ei++) {
+            const echo = echoes[ei]
+            if (echo.substats.length === 0) continue
+
+            const echoSubstats: SubstatContribution[] = []
+
+            for (let si = 0; si < echo.substats.length; si++) {
+                const sub = echo.substats[si]
+                const modified = cloneEchoesWithoutSubstat(echoes, ei, si)
+
+                // rebuild fullStats with modified echoes for this char
+                const modFullStats = baseFullStats.map((fs, i) => {
+                    if (i !== ci) return fs
+                    return getCharFullStatsForChar(
+                        ci,
+                        modified,
+                        damageEntries,
+                        buffSets,
+                        damageEntryBuffSetIds,
+                        charInfoMap,
+                        team,
+                        weaponInfoMap
+                    )
+                })
+
+                // recompute entries for this character
+                let reducedNorm = 0
+                let reducedRig = 0
+                for (const de of charDmgEntries) {
+                    const re = computeOneEntry(
+                        de,
+                        ci,
+                        modified,
+                        modFullStats,
+                        buffSets,
+                        damageEntryBuffSetIds,
+                        damageEntryDamageTypes,
+                        configState,
+                        team,
+                        charInfoMap,
+                        weaponInfoMap
+                    )
+                    reducedNorm += re.totalDamage
+                    reducedRig += rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamage
+                }
+
+                const contribNorm = baselineNorm - reducedNorm
+                const contribRig = baselineRig - reducedRig
+
+                echoSubstats.push({
+                    type: sub.type,
+                    value: sub.value,
+                    unit: sub.unit,
+                    contributionNorm: contribNorm,
+                    contributionRig: contribRig,
+                    contribPctNorm: baselineNorm > 0 ? (contribNorm / baselineNorm) * 100 : 0,
+                    contribPctRig: baselineRig > 0 ? (contribRig / baselineRig) * 100 : 0
+                })
+            }
+
+            // sort substats by contributionNorm descending
+            echoSubstats.sort((a, b) => b.contributionNorm - a.contributionNorm)
+
+            const echoTotalNorm = echoSubstats.reduce((s, sub) => s + sub.contributionNorm, 0)
+            const echoTotalRig = echoSubstats.reduce((s, sub) => s + sub.contributionRig, 0)
+
+            const mainStat = echo.mainStat?.type ?? ''
+            info.push({
+                cost: echo.cost,
+                mainStat,
+                substats: echoSubstats,
+                totalNorm: echoTotalNorm,
+                totalRig: echoTotalRig,
+                totalPctNorm: baselineNorm > 0 ? (echoTotalNorm / baselineNorm) * 100 : 0,
+                totalPctRig: baselineRig > 0 ? (echoTotalRig / baselineRig) * 100 : 0
+            })
+
+            allSubstats.push(...echoSubstats)
+        }
+
+        // aggregate by type
+        const aggMap = new Map<string, SubstatContribution>()
+        for (const s of allSubstats) {
+            const existing = aggMap.get(s.type)
+            if (existing) {
+                existing.contributionNorm += s.contributionNorm
+                existing.contributionRig += s.contributionRig
+                existing.value += s.value
+            } else {
+                aggMap.set(s.type, { ...s })
+            }
+        }
+        const aggregated = [...aggMap.values()].map((s) => ({
+            ...s,
+            contribPctNorm: baselineNorm > 0 ? (s.contributionNorm / baselineNorm) * 100 : 0,
+            contribPctRig: baselineRig > 0 ? (s.contributionRig / baselineRig) * 100 : 0
+        }))
+        aggregated.sort((a, b) => b.contributionNorm - a.contributionNorm)
+
+        const substatTotalNorm = allSubstats.reduce((s, sub) => s + sub.contributionNorm, 0)
+        const substatTotalRig = allSubstats.reduce((s, sub) => s + sub.contributionRig, 0)
+
+        return {
+            character: charName,
+            totalDamageNorm: baselineNorm,
+            totalDamageRig: baselineRig,
+            substatTotalNorm,
+            substatTotalRig,
+            substatTotalPctNorm: baselineNorm > 0 ? (substatTotalNorm / baselineNorm) * 100 : 0,
+            substatTotalPctRig: baselineRig > 0 ? (substatTotalRig / baselineRig) * 100 : 0,
+            echoes: info,
+            aggregated
+        }
     })
 }

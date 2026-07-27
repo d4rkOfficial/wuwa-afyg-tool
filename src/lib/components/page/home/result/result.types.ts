@@ -63,3 +63,35 @@ export interface CharSummary {
     totalDamage: number
     entryCount: number
 }
+
+export interface SubstatContribution {
+    type: string
+    value: number
+    unit: string
+    contributionNorm: number
+    contributionRig: number
+    contribPctNorm: number
+    contribPctRig: number
+}
+
+export interface EchoContribution {
+    cost: number
+    mainStat: string
+    substats: SubstatContribution[]
+    totalNorm: number
+    totalRig: number
+    totalPctNorm: number
+    totalPctRig: number
+}
+
+export interface CharSubstatAnalysis {
+    character: string
+    totalDamageNorm: number
+    totalDamageRig: number
+    substatTotalNorm: number
+    substatTotalRig: number
+    substatTotalPctNorm: number
+    substatTotalPctRig: number
+    echoes: EchoContribution[]
+    aggregated: SubstatContribution[]
+}

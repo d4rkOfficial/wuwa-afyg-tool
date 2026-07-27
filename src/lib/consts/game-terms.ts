@@ -90,7 +90,7 @@ export const ELEMENT_BONUS_MAP: Record<string, string> = {
 export const BASE_STATS = ['攻击', '生命', '防御'] as const
 export type BaseStat = (typeof BASE_STATS)[number]
 
-export const PCT_UNITS = ['攻击百分比', '生命百分比', '防御百分比', '偏谐系数'] as const
+export const PCT_UNITS = ['攻击%', '生命%', '防御%', '偏谐系数'] as const
 
 export const BASE_STAT_TUNE = '偏谐系数'
 export const BASE_STAT_EFFECT = '效应系数'

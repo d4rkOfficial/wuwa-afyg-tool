@@ -8,11 +8,12 @@
         setTrackMenu,
         getBlockMenu,
         setBlockMenu,
+        getMultiBlockMenu,
+        setMultiBlockMenu,
         getOpBlocks,
         getDamageBlocks,
         getRefLines,
         getUiBtnIcons,
-        getTeam,
         canAddBefore,
         canAddAfter,
         addBefore,
@@ -22,36 +23,20 @@
         canSetIntro,
         toggleIntro,
         removeBlock,
+        removeBlocks,
+        resetDamageBindingsForBlocks,
         openRefSkillPicker,
         openSkillPicker,
         openNonDirectPicker,
         addDamageBlock,
         removeDamageBySource,
         addOpBlock,
-        isBoundary,
         canDelete,
-        setEditingBlockId,
-        setEditingBlockDesc,
         handleBlockDblclick,
-        clearLeftOpBlocks,
-        resetLeftDamageBindings
+        getSelectedBlockIds
     } from './timeline.store.svelte'
 
-    let confirmAction = $state<{
-        type: 'clear' | 'reset'
-        refId: string
-        prevLabel: string
-        curLabel: string
-    } | null>(null)
-
-    function openConfirm(type: 'clear' | 'reset', refId: string) {
-        const refLines = getRefLines()
-        const idx = refLines.findIndex((r) => r.id === refId)
-        if (idx <= 0) return
-        const prevLabel = refLines[idx - 1].time || '(起始)'
-        const curLabel = refLines[idx].time || '(未命名)'
-        confirmAction = { type, refId, prevLabel, curLabel }
-    }
+    let confirmMultiAction = $state<'delete' | 'reset' | null>(null)
 
     function clampMenu(node: HTMLElement, pos: { x: number; y: number }) {
         node.style.left = pos.x + 'px'
@@ -185,68 +170,7 @@
                 重置伤害绑定
             </button>
         {/if}
-        {#if getRefLines().findIndex((r) => r.id === cm.id) > 0}
-            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
-            <div class="px-3 py-1 text-xs font-semibold text-red-400/70 uppercase tracking-wider">危险操作</div>
-            <button
-                onclick={() => openConfirm('clear', cm.id)}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-            >
-                <Icon icon="mdi:playlist-remove" class="size-4 shrink-0" />
-                清空左侧操作块
-            </button>
-            <button
-                onclick={() => openConfirm('reset', cm.id)}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-            >
-                <Icon icon="mdi:delete-sweep" class="size-4 shrink-0" />
-                重置左侧伤害绑定
-            </button>
-        {/if}
     </div>
-{/if}
-
-{#if confirmAction}
-    {@const action = confirmAction}
-    <Modal open={true} onclose={() => (confirmAction = null)}>
-        {#snippet title()}
-            <div class="flex items-center gap-2 text-red-400">
-                <Icon icon="mdi:alert-circle" class="size-5" />
-                危险操作
-            </div>
-        {/snippet}
-        {#snippet children()}
-            <p class="text-sm leading-relaxed">
-                {#if action.type === 'clear'}
-                    这将清空 参考线{action.prevLabel} 到 参考线{action.curLabel} 之间的操作块，是否确认？
-                {:else}
-                    这将重置 参考线{action.prevLabel} 到 参考线{action.curLabel} 之间的伤害绑定，是否确认？
-                {/if}
-            </p>
-            <div class="flex justify-end gap-2 mt-5">
-                <button
-                    onclick={() => (confirmAction = null)}
-                    class="h-8 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
-                    style="background: var(--theme-input-bg);"
-                >
-                    取消
-                </button>
-                <button
-                    onclick={() => {
-                        if (action.type === 'clear') {
-                            clearLeftOpBlocks(action.refId)
-                        } else {
-                            resetLeftDamageBindings(action.refId)
-                        }
-                        confirmAction = null
-                    }}
-                    class="h-8 rounded-md bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
-                >
-                    确认
-                </button>
-            </div>
-        {/snippet}
-    </Modal>
 {/if}
 
 <!-- Block Context Menu -->
@@ -371,6 +295,109 @@
             </button>
         {/if}
     </div>
+{/if}
+
+<!-- Multi-Block Context Menu -->
+{#if getMultiBlockMenu()}
+    {@const mm = getMultiBlockMenu()!}
+    {@const count = Object.keys(getSelectedBlockIds()).length}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div
+        class="fixed z-50 min-w-44 rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        style="left: {mm.x}px; top: {mm.y}px; border-color: var(--theme-divider-border);"
+        data-context-menu="true"
+        use:clampMenu={{ x: mm.x, y: mm.y }}
+        onclick={() => setMultiBlockMenu(null)}
+    >
+        <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
+            操作块 (已选 {count} 个)
+        </div>
+        <button
+            onclick={() => (confirmMultiAction = 'delete')}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+        >
+            <Icon icon="mdi:delete" class="size-4 shrink-0" />
+            删除操作块 ({count} 个)
+        </button>
+        <button
+            onclick={() => (confirmMultiAction = 'reset')}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+        >
+            <Icon icon="mdi:restore" class="size-4 shrink-0" />
+            重置伤害绑定 ({count} 个)
+        </button>
+    </div>
+{/if}
+
+{#if confirmMultiAction === 'delete'}
+    {@const ids = Object.keys(getSelectedBlockIds())}
+    <Modal open={true} onclose={() => (confirmMultiAction = null)}>
+        {#snippet title()}
+            <div class="flex items-center gap-2 text-red-400">
+                <Icon icon="mdi:alert-circle" class="size-5" />
+                危险操作
+            </div>
+        {/snippet}
+        {#snippet children()}
+            <p class="text-sm leading-relaxed">
+                确认删除选中的 {ids.length} 个操作块？该操作不可撤销。
+            </p>
+            <div class="flex justify-end gap-2 mt-5">
+                <button
+                    onclick={() => (confirmMultiAction = null)}
+                    class="h-8 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    style="background: var(--theme-input-bg);"
+                >
+                    取消
+                </button>
+                <button
+                    onclick={() => {
+                        removeBlocks(ids)
+                        confirmMultiAction = null
+                    }}
+                    class="h-8 rounded-md bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
+                >
+                    确认
+                </button>
+            </div>
+        {/snippet}
+    </Modal>
+{/if}
+
+{#if confirmMultiAction === 'reset'}
+    {@const ids = Object.keys(getSelectedBlockIds())}
+    <Modal open={true} onclose={() => (confirmMultiAction = null)}>
+        {#snippet title()}
+            <div class="flex items-center gap-2 text-red-400">
+                <Icon icon="mdi:alert-circle" class="size-5" />
+                危险操作
+            </div>
+        {/snippet}
+        {#snippet children()}
+            <p class="text-sm leading-relaxed">
+                确认重置选中的 {ids.length} 个操作块的伤害绑定？
+            </p>
+            <div class="flex justify-end gap-2 mt-5">
+                <button
+                    onclick={() => (confirmMultiAction = null)}
+                    class="h-8 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    style="background: var(--theme-input-bg);"
+                >
+                    取消
+                </button>
+                <button
+                    onclick={() => {
+                        resetDamageBindingsForBlocks(ids)
+                        confirmMultiAction = null
+                    }}
+                    class="h-8 rounded-md bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
+                >
+                    确认
+                </button>
+            </div>
+        {/snippet}
+    </Modal>
 {/if}
 
 <!-- Track Key Picker Menu -->
