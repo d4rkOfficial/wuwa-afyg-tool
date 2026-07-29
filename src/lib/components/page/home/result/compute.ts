@@ -1,13 +1,7 @@
 import type { DamageEntry, BuffSet, ZoneRef } from '../calculation/calculation.types'
 import type { ConfigState, EchoSlotConfig } from '../config/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type {
-    ResultEntry,
-    MultiplierZone,
-    CharSubstatAnalysis,
-    SubstatContribution,
-    EchoContribution
-} from './result.types'
+import type { ResultEntry, MultiplierZone } from './result.types'
 import type { CharSlot } from '$lib/data/types'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
@@ -18,6 +12,7 @@ import {
     SUBSTAT_DECIMAL_TO_PCT,
     CHAR_LEVEL
 } from '$lib/consts/game-terms'
+import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
 
 // ── helpers ──
 
@@ -218,6 +213,12 @@ function accumulateEchoes(
         if (echo.secondMainStat) {
             if (echo.secondMainStat.type === '攻击') acc.flatAtk += echo.secondMainStat.value
             else if (echo.secondMainStat.type === '生命') acc.flatHp += echo.secondMainStat.value
+        } else {
+            const secData = SECOND_MAIN_STAT[echo.cost as keyof typeof SECOND_MAIN_STAT]
+            if (secData) {
+                if (secData.label === '攻击') acc.flatAtk += secData.value
+                else if (secData.label === '生命') acc.flatHp += secData.value
+            }
         }
         for (const sub of echo.substats) {
             applyEntryStatToAccum(sub.type, sub.value, acc)
@@ -319,7 +320,7 @@ function computeCharacterStats(
 
     for (const bs of boundBuffSets) {
         for (const z of bs.zones) {
-            if (z.ref) continue
+            if (z.ref || z.override) continue
             if (z.value === 0) continue
             const value = z.value
             switch (z.zoneId) {
@@ -488,7 +489,7 @@ function computeResultEntry(
 
     // resistance zone
     const baseResist = (enemy.resistances[entry.damageElement] ?? 0) / 100
-    let combinedResist = (1 - baseResist) * (1 - stats.resPen / 100) + stats.resDown / 100
+    let combinedResist = 1 - baseResist * (1 - stats.resPen / 100) + stats.resDown / 100
     if (combinedResist > 1) {
         combinedResist = 1 + (combinedResist - 1) / 2
     }
@@ -526,19 +527,19 @@ function computeResultEntry(
     const nonCritPerHit = Math.round(nonCritRaw)
     const critPerHit = Math.round(nonCritRaw * critDmgDecimal)
 
-    const expectedPerHit = Math.round(
+    const expectedRaw =
         baseValue *
-            deepen *
-            bonus *
-            critAvg *
-            vulnerability *
-            resMulti *
-            dmgRedMulti *
-            defMulti *
-            tuneStrainMulti *
-            finalDmg *
-            customMult
-    )
+        deepen *
+        bonus *
+        critAvg *
+        vulnerability *
+        resMulti *
+        dmgRedMulti *
+        defMulti *
+        tuneStrainMulti *
+        finalDmg *
+        customMult
+    const expectedPerHit = Math.round(expectedRaw)
 
     const multZones: MultiplierZone[] = [
         { label: '加深区', value: deepen, detail: `(1 + ${stats.deepenDmg.toFixed(1)}%)` },
@@ -601,8 +602,9 @@ function computeResultEntry(
         rawPerHit: Math.round(
             baseValue * deepen * bonus * resMulti * dmgRedMulti * defMulti * tuneStrainMulti * finalDmg * customMult
         ),
-        expectedPerHit: Math.round(expectedPerHit),
-        totalDamage: Math.round(expectedPerHit),
+        expectedPerHit,
+        totalDamage: expectedPerHit,
+        totalDamageRaw: expectedRaw,
         nonCritPerHit,
         critPerHit,
         canCrit: entry.damageBaseType !== '偏谐系数',
@@ -653,6 +655,7 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         rawPerHit: 0,
         expectedPerHit: 0,
         totalDamage: 0,
+        totalDamageRaw: 0,
         nonCritPerHit: 0,
         critPerHit: 0,
         canCrit: false,
@@ -685,7 +688,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
 
     // resistance zone (element from entry)
     const baseResist = (enemy.resistances[entry.damageElement] ?? 0) / 100
-    let combinedResist = (1 - baseResist) * (1 - stats.resPen / 100) + stats.resDown / 100
+    let combinedResist = 1 - baseResist * (1 - stats.resPen / 100) + stats.resDown / 100
     if (combinedResist > 1) {
         combinedResist = 1 + (combinedResist - 1) / 2
     }
@@ -769,6 +772,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         customMult: customMultVal,
         extraRatio: stats.extraRatio,
         vulnerability: stats.dmgTakenInc / 100,
+        totalDamageRaw: totalPerHit,
         rawPerHit: expectedPerHit,
         expectedPerHit,
         totalDamage: expectedPerHit,
@@ -835,24 +839,33 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
 
     // resistance zone
     const baseResist = (enemy.resistances[element] ?? 0) / 100
-    let combinedResist = (1 - baseResist) * (1 - stats.resPen / 100) + stats.resDown / 100
+    let combinedResist = 1 - baseResist * (1 - stats.resPen / 100) + stats.resDown / 100
     if (combinedResist > 1) combinedResist = 1 + (combinedResist - 1) / 2
     const resMulti = combinedResist
 
     // damage reduction zone
     const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
 
+    // deepen zone
+    const deepen = 1 + stats.deepenDmg / 100
+
+    // vulnerability / dmg taken inc
+    const vulnerability = 1 + stats.dmgTakenInc / 100
+
     // final dmg & custom mult
     const finalDmgDec = stats.finalDmg / 100
     const customMultVal = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
 
-    const totalPerHit = baseValue * defMulti * resMulti * dmgRedMulti * (1 + finalDmgDec) * customMultVal
+    const totalPerHit =
+        baseValue * defMulti * resMulti * dmgRedMulti * deepen * vulnerability * (1 + finalDmgDec) * customMultVal
     const expectedPerHit = Math.round(totalPerHit)
 
     const multZones: MultiplierZone[] = [
+        { label: '加深区', value: deepen, detail: `(1 + ${stats.deepenDmg.toFixed(1)}%)` },
         { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
         { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
         { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
+        { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
         { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
         { label: '特殊乘区', value: customMultVal, detail: customMultVal.toFixed(4) }
     ]
@@ -869,7 +882,15 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         sourceTimelineBlockId: entry.sourceTimelineBlockId,
         baseValue,
         baseUnit,
-        totalMultiplier: effectiveRatio * defMulti * resMulti * dmgRedMulti * (1 + finalDmgDec) * customMultVal,
+        totalMultiplier:
+            effectiveRatio *
+            defMulti *
+            resMulti *
+            dmgRedMulti *
+            deepen *
+            vulnerability *
+            (1 + finalDmgDec) *
+            customMultVal,
         baseAtk: EFFECT_BASE_VALUE,
         totalAtk: 0,
         atkPctSum: 0,
@@ -884,7 +905,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         defFlatSum: 0,
         totalTuneBreakBoost: stats.totalTuneBreakBoost,
         dmgBonus: 0,
-        deepen: 0,
+        deepen: stats.deepenDmg,
         critRate: 0,
         critDmg: 0,
         defMulti,
@@ -895,7 +916,8 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         finalTuneBreakZone: 0,
         customMult: customMultVal,
         extraRatio: stats.extraRatio,
-        vulnerability: 0,
+        vulnerability: stats.dmgTakenInc,
+        totalDamageRaw: totalPerHit,
         rawPerHit: expectedPerHit,
         expectedPerHit,
         totalDamage: expectedPerHit,
@@ -982,6 +1004,71 @@ function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number
     stats.totalDef = stats.baseDef + Math.round(stats.defFlatSum + (stats.baseDef * stats.defPctSum) / 100)
 }
 
+function applyOverrideToStats(stats: CharacterComputed, zoneId: string, value: number): void {
+    switch (zoneId) {
+        case 'bonusDmg':
+            stats.bonusDmg = value
+            break
+        case 'deepenDmg':
+            stats.deepenDmg = value
+            break
+        case 'resPen':
+            stats.resPen = value
+            break
+        case 'defPen':
+            stats.defPen = value
+            break
+        case 'defDown':
+            stats.defDown = value
+            break
+        case 'resDown':
+            stats.resDown = value
+            break
+        case 'tuneStrainLayer':
+            stats.tuneStrainLayer = value
+            break
+        case 'finalDmg':
+            stats.finalDmg = value
+            break
+        case 'dmgTakenInc':
+            stats.dmgTakenInc = value
+            break
+        case 'customFinalDmg':
+            stats.customMult = value
+            break
+        case 'dmgRedPen':
+            stats.dmgRedPen = value
+            break
+        case 'extraRatio':
+            stats.extraRatio = value
+            break
+        case 'atkFlat':
+            stats.totalAtk = value
+            break
+        case 'hpFlat':
+            stats.totalHp = value
+            break
+        case 'defFlat':
+            stats.totalDef = value
+            break
+        case 'critRate':
+            stats.critRate = value
+            break
+        case 'critDmg':
+            stats.critDmg = value
+            break
+        case 'recharge':
+            stats.recharge = value
+            break
+        case 'tuneBreakBoost':
+            stats.totalTuneBreakBoost = value
+            break
+        case 'offTuneBuildupRate':
+            stats.offTuneBuildupRate = value
+            break
+    }
+}
+
 // ── main entry point ──
 
 export function computeAll(
@@ -1030,16 +1117,24 @@ export function computeAll(
         const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
         const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
         const echoes = charIndex >= 0 ? (configState.characters[charIndex]?.echoes ?? []) : []
-        const boundBuffSets =
-            charIndex >= 0 ? getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds) : []
+        const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds)
         const charInfo = charName ? charInfoMap[charName] : undefined
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
-        const partialStats = charInfo
-            ? computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, boundBuffSets)
-            : emptyCharacterStats()
+        let partialStats: CharacterComputed
+        if (charInfo) {
+            partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, boundBuffSets)
+        } else {
+            partialStats = emptyCharacterStats()
+            for (const bs of boundBuffSets) {
+                for (const z of bs.zones) {
+                    if (z.ref || z.override || z.value === 0) continue
+                    applyRefToStats(partialStats, z.zoneId, z.value)
+                }
+            }
+        }
 
-        // Resolve ref zones and apply to stats (final step)
+        // Resolve ref zones and apply to stats
         const stats = { ...partialStats }
         for (const bs of boundBuffSets) {
             for (const z of bs.zones) {
@@ -1047,6 +1142,14 @@ export function computeAll(
                 const resolved = resolveRefValue(z.ref, charFullStats)
                 if (resolved === 0) continue
                 applyRefToStats(stats, z.zoneId, resolved)
+            }
+        }
+
+        // Apply override zones (set value directly, takes precedence over everything)
+        for (const bs of boundBuffSets) {
+            for (const z of bs.zones) {
+                if (!z.override || z.value === 0 || z.ref) continue
+                applyOverrideToStats(stats, z.zoneId, z.value)
             }
         }
 
@@ -1067,9 +1170,7 @@ export function computeAll(
     })
 }
 
-// ── substat contribution analysis ──
-
-function getCharFullStatsForChar(
+export function getCharFullStatsForChar(
     charIndex: number,
     echoes: EchoSlotConfig[],
     damageEntries: DamageEntry[],
@@ -1104,7 +1205,7 @@ function getCharFullStatsForChar(
     )
 }
 
-function computeOneEntry(
+export function computeOneEntry(
     entry: DamageEntry,
     charIndex: number,
     echoes: EchoSlotConfig[],
@@ -1151,182 +1252,16 @@ function computeOneEntry(
     return computeResultEntry(entry, stats, enemy, damageTypes)
 }
 
-function cloneEchoesWithoutSubstat(echoes: EchoSlotConfig[], echoIdx: number, substatIdx: number): EchoSlotConfig[] {
+export function cloneEchoesWithoutSubstat(
+    echoes: EchoSlotConfig[],
+    echoIdx: number,
+    substatIdx: number
+): EchoSlotConfig[] {
     return echoes.map((echo, ei) => {
         if (ei !== echoIdx) return echo
         return {
             ...echo,
             substats: echo.substats.filter((_, si) => si !== substatIdx)
-        }
-    })
-}
-
-export function computeSubstatContributions(
-    damageEntries: DamageEntry[],
-    buffSets: BuffSet[],
-    damageEntryBuffSetIds: Record<string, string[]>,
-    damageEntryDamageTypes: Record<string, string[]>,
-    configState: ConfigState,
-    team: CharSlot[],
-    charInfoMap: Record<string, CharacterInfo>,
-    weaponInfoMap: Record<string, WeaponInfo>,
-    rigCritEntryIds: Set<string>
-): CharSubstatAnalysis[] {
-    // baseline
-    const allEntries = computeAll(
-        damageEntries,
-        buffSets,
-        damageEntryBuffSetIds,
-        damageEntryDamageTypes,
-        configState,
-        team,
-        charInfoMap,
-        weaponInfoMap
-    )
-
-    const charNames = team.map((s) => s.character).filter((c): c is string => c !== null)
-
-    return charNames.map((charName, ci) => {
-        const charEntries = allEntries.filter((e) => e.character === charName)
-        const charDmgEntries = damageEntries.filter((e) => e.character === charName)
-
-        const baselineNorm = charEntries.reduce((s, e) => s + e.totalDamage, 0)
-        const baselineRig = charEntries.reduce((s, e) => {
-            return s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamage)
-        }, 0)
-
-        const echoes = configState.characters[ci]?.echoes ?? []
-
-        const info: EchoContribution[] = []
-        const allSubstats: SubstatContribution[] = []
-
-        // precompute fullStats for baseline ZoneRef resolution
-        const baseFullStats = team.map((_, i) => {
-            const echos = i === ci ? echoes : (configState.characters[i]?.echoes ?? [])
-            return getCharFullStatsForChar(
-                i,
-                echos,
-                damageEntries,
-                buffSets,
-                damageEntryBuffSetIds,
-                charInfoMap,
-                team,
-                weaponInfoMap
-            )
-        })
-
-        for (let ei = 0; ei < echoes.length; ei++) {
-            const echo = echoes[ei]
-            if (echo.substats.length === 0) continue
-
-            const echoSubstats: SubstatContribution[] = []
-
-            for (let si = 0; si < echo.substats.length; si++) {
-                const sub = echo.substats[si]
-                const modified = cloneEchoesWithoutSubstat(echoes, ei, si)
-
-                // rebuild fullStats with modified echoes for this char
-                const modFullStats = baseFullStats.map((fs, i) => {
-                    if (i !== ci) return fs
-                    return getCharFullStatsForChar(
-                        ci,
-                        modified,
-                        damageEntries,
-                        buffSets,
-                        damageEntryBuffSetIds,
-                        charInfoMap,
-                        team,
-                        weaponInfoMap
-                    )
-                })
-
-                // recompute entries for this character
-                let reducedNorm = 0
-                let reducedRig = 0
-                for (const de of charDmgEntries) {
-                    const re = computeOneEntry(
-                        de,
-                        ci,
-                        modified,
-                        modFullStats,
-                        buffSets,
-                        damageEntryBuffSetIds,
-                        damageEntryDamageTypes,
-                        configState,
-                        team,
-                        charInfoMap,
-                        weaponInfoMap
-                    )
-                    reducedNorm += re.totalDamage
-                    reducedRig += rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamage
-                }
-
-                const contribNorm = baselineNorm - reducedNorm
-                const contribRig = baselineRig - reducedRig
-
-                echoSubstats.push({
-                    type: sub.type,
-                    value: sub.value,
-                    unit: sub.unit,
-                    contributionNorm: contribNorm,
-                    contributionRig: contribRig,
-                    contribPctNorm: baselineNorm > 0 ? (contribNorm / baselineNorm) * 100 : 0,
-                    contribPctRig: baselineRig > 0 ? (contribRig / baselineRig) * 100 : 0
-                })
-            }
-
-            // sort substats by contributionNorm descending
-            echoSubstats.sort((a, b) => b.contributionNorm - a.contributionNorm)
-
-            const echoTotalNorm = echoSubstats.reduce((s, sub) => s + sub.contributionNorm, 0)
-            const echoTotalRig = echoSubstats.reduce((s, sub) => s + sub.contributionRig, 0)
-
-            const mainStat = echo.mainStat?.type ?? ''
-            info.push({
-                cost: echo.cost,
-                mainStat,
-                substats: echoSubstats,
-                totalNorm: echoTotalNorm,
-                totalRig: echoTotalRig,
-                totalPctNorm: baselineNorm > 0 ? (echoTotalNorm / baselineNorm) * 100 : 0,
-                totalPctRig: baselineRig > 0 ? (echoTotalRig / baselineRig) * 100 : 0
-            })
-
-            allSubstats.push(...echoSubstats)
-        }
-
-        // aggregate by type
-        const aggMap = new Map<string, SubstatContribution>()
-        for (const s of allSubstats) {
-            const existing = aggMap.get(s.type)
-            if (existing) {
-                existing.contributionNorm += s.contributionNorm
-                existing.contributionRig += s.contributionRig
-                existing.value += s.value
-            } else {
-                aggMap.set(s.type, { ...s })
-            }
-        }
-        const aggregated = [...aggMap.values()].map((s) => ({
-            ...s,
-            contribPctNorm: baselineNorm > 0 ? (s.contributionNorm / baselineNorm) * 100 : 0,
-            contribPctRig: baselineRig > 0 ? (s.contributionRig / baselineRig) * 100 : 0
-        }))
-        aggregated.sort((a, b) => b.contributionNorm - a.contributionNorm)
-
-        const substatTotalNorm = allSubstats.reduce((s, sub) => s + sub.contributionNorm, 0)
-        const substatTotalRig = allSubstats.reduce((s, sub) => s + sub.contributionRig, 0)
-
-        return {
-            character: charName,
-            totalDamageNorm: baselineNorm,
-            totalDamageRig: baselineRig,
-            substatTotalNorm,
-            substatTotalRig,
-            substatTotalPctNorm: baselineNorm > 0 ? (substatTotalNorm / baselineNorm) * 100 : 0,
-            substatTotalPctRig: baselineRig > 0 ? (substatTotalRig / baselineRig) * 100 : 0,
-            echoes: info,
-            aggregated
         }
     })
 }

@@ -349,7 +349,28 @@ export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) =>
         s.id === setId
-            ? { ...s, zones: s.zones.map((z) => (z.zoneId === zoneId ? { ...z, ref: ref ?? undefined } : z)) }
+            ? {
+                  ...s,
+                  zones: s.zones.map((z) =>
+                      z.zoneId === zoneId ? { ...z, ref: ref ?? undefined, override: ref ? undefined : z.override } : z
+                  )
+              }
+            : s
+    )
+}
+
+export function setBuffSetZoneOverride(setId: string, zoneId: string, override: boolean) {
+    if (!assertUnlocked()) return
+    _buffSets = _buffSets.map((s) =>
+        s.id === setId
+            ? {
+                  ...s,
+                  zones: s.zones.map((z) =>
+                      z.zoneId === (zoneId as any)
+                          ? { ...z, override: override || undefined, ref: override ? undefined : z.ref }
+                          : z
+                  )
+              }
             : s
     )
 }

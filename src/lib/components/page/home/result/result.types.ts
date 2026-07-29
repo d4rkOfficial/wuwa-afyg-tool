@@ -50,6 +50,7 @@ export interface ResultEntry {
     rawPerHit: number
     expectedPerHit: number
     totalDamage: number
+    totalDamageRaw: number
 
     // crit/non-crit columns
     nonCritPerHit: number

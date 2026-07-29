@@ -343,6 +343,9 @@
                                             {#if block.intro}
                                                 <span class="text-xs text-yellow-400 font-semibold shrink-0">变奏</span>
                                             {/if}
+                                            {#if block.switchback}
+                                                <span class="text-xs text-cyan-400 font-semibold shrink-0">切回</span>
+                                            {/if}
                                             {#if uiBtnIconMap.get(block.key)}
                                                 <img
                                                     src={uiBtnIconMap.get(block.key)}

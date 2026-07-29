@@ -11,6 +11,7 @@ export interface OpBlock {
     key: string
     desc: string
     intro: boolean
+    switchback: boolean
 }
 
 export interface SkillHit {

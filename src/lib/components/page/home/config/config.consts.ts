@@ -1,11 +1,18 @@
 import type { EchoStat } from '$lib/types/game-data'
 import type { EchoSlotConfig, CharEchoConfig, EnemyConfig, ConfigState } from './config.types'
 import { ELEMENTS } from '$lib/consts/game-terms'
+import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
 
 export const RESISTANCE_KEYS = ELEMENTS
 
 function emptySlot(cost = 1): EchoSlotConfig {
-    return { cost, mainStat: null, secondMainStat: null, substats: [] }
+    const sec = SECOND_MAIN_STAT[cost as keyof typeof SECOND_MAIN_STAT]
+    return {
+        cost,
+        mainStat: null,
+        secondMainStat: sec ? { type: sec.label, value: sec.value, unit: sec.unit } : null,
+        substats: []
+    }
 }
 
 function emptyChar(): CharEchoConfig {

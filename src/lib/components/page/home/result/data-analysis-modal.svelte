@@ -5,7 +5,9 @@
     import { getCharElementMap, getRefLines, getOpBlocks } from '../timeline/timeline.store.svelte'
     import type { ResultEntry, CharSummary, CharSubstatAnalysis } from './result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/data/types'
+    import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
     import Icon from '@iconify/svelte'
+    import { ALGORITHM_HELP } from './consts'
 
     interface Props {
         entries: ResultEntry[]
@@ -14,6 +16,10 @@
         totalDamage: number
         resultAnalysis: ResultAnalysisData | undefined
         substatAnalysis: CharSubstatAnalysis[]
+        analysisComputing: boolean
+        algorithmsInfo: AlgorithmInfo[]
+        selectedAlgorithm: AlgorithmId
+        onSelectAlgorithm: (id: AlgorithmId) => void
         onUpdateResultAnalysis: (data: ResultAnalysisData) => void
         onclose: () => void
     }
@@ -25,12 +31,17 @@
         totalDamage,
         resultAnalysis,
         substatAnalysis,
+        analysisComputing,
+        algorithmsInfo,
+        selectedAlgorithm,
+        onSelectAlgorithm,
         onUpdateResultAnalysis,
         onclose
     }: Props = $props()
 
     let charElements = $derived(getCharElementMap())
     let selectedSubstatChar = $state(0)
+    let showAlgorithmHelp = $state(false)
 
     // ── pie chart refs ──
     let pieCanvas: HTMLCanvasElement | null = $state(null)
@@ -272,19 +283,24 @@
                     indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
-                    layout: { padding: { top: 4, bottom: 4 } },
+                    layout: { padding: { top: 4, bottom: 4, left: 4, right: 8 } },
                     scales: {
                         x: {
                             stacked: false,
                             beginAtZero: true,
                             max: Math.max(...normData, ...rigData) * 1.3 || 10,
                             grid: { color: hexToRgba(dividerColor, 0.3) },
-                            ticks: { color: textColor, font: { size: 9 }, callback: (v) => v + '%' }
+                            ticks: {
+                                color: textColor,
+                                font: { size: 9 },
+                                padding: 6,
+                                callback: (v) => (+v).toFixed(1) + '%'
+                            }
                         },
                         y: {
                             stacked: false,
                             grid: { display: false },
-                            ticks: { color: textColor, font: { size: 10 } }
+                            ticks: { color: textColor, font: { size: 10 }, padding: 8 }
                         }
                     },
                     plugins: {
@@ -298,7 +314,7 @@
                             borderColor: dividerColor,
                             borderWidth: 1,
                             callbacks: {
-                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x}%`
+                                label: (ctx) => `${ctx.dataset.label}: ${(ctx.parsed.x ?? 0).toFixed(1)}%`
                             }
                         }
                     }
@@ -322,15 +338,11 @@
     })
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_interactive_supports_focus -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
     class="fixed inset-0 z-50 flex items-start justify-center pt-12 pb-8 overflow-hidden backdrop-blur-sm"
     style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-    onclick={handleClose}
-    role="dialog"
-    tabindex="-1"
+    role="presentation"
 >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -584,38 +596,70 @@
             </div>
         </div>
 
-        {#if substatAnalysis.length > 0}
-            <div class="px-6 py-4 border-t" style="border-color: var(--theme-divider-border);">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <Icon icon="mdi:chart-bar" class="size-4" style="color: var(--theme-accent-text);" />
-                        <span class="text-sm font-medium" style="color: var(--theme-modal-text);">声骸词条贡献分析</span
+        <div class="px-6 py-4 border-t" style="border-color: var(--theme-divider-border);">
+            <div class="flex items-center flex-wrap gap-2 mb-3">
+                <div class="flex items-center gap-2 shrink-0">
+                    <Icon icon="mdi:chart-bar" class="size-4" style="color: var(--theme-accent-text);" />
+                    <span class="text-sm font-medium" style="color: var(--theme-modal-text);">声骸词条贡献分析</span>
+                    <button
+                        onclick={() => (showAlgorithmHelp = true)}
+                        class="flex items-center justify-center rounded-full w-5 h-5 text-xs font-bold transition-colors hover:bg-white/10"
+                        style="color: var(--theme-accent-text);"
+                        title="算法说明"
+                    >
+                        ?
+                    </button>
+                </div>
+                <div
+                    class="flex items-center gap-1 rounded-lg border px-1 py-1 shrink-0"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                >
+                    {#each algorithmsInfo as algo}
+                        <button
+                            onclick={() => onSelectAlgorithm(algo.id)}
+                            class={[
+                                'rounded-md px-2 py-1 text-[11px] font-medium transition-all',
+                                selectedAlgorithm === algo.id
+                                    ? 'text-white shadow-sm'
+                                    : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
+                            ].join(' ')}
+                            style="background: {selectedAlgorithm === algo.id
+                                ? 'var(--theme-accent-bg)'
+                                : 'transparent'};"
+                            title={algo.description}
                         >
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="flex items-center gap-1 rounded-lg border px-1 py-1"
-                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                        >
-                            {#each substatAnalysis as sa, i}
-                                <button
-                                    onclick={() => (selectedSubstatChar = i)}
-                                    class={[
-                                        'rounded-md px-2.5 py-1 text-[11px] font-medium transition-all',
-                                        selectedSubstatChar === i
-                                            ? 'text-white shadow-sm'
-                                            : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
-                                    ].join(' ')}
-                                    style="background: {selectedSubstatChar === i
-                                        ? 'var(--theme-accent-bg)'
-                                        : 'transparent'};"
-                                >
-                                    {sa.character}
-                                </button>
-                            {/each}
-                        </div>
+                            {algo.name}
+                        </button>
+                    {/each}
+                </div>
+                <div class="ml-auto flex items-center gap-3">
+                    {#if analysisComputing}
+                        <span class="text-[10px] text-(--theme-accent-text)/60">计算中…</span>
+                    {/if}
+                    <div
+                        class="flex items-center gap-1 rounded-lg border px-1 py-1"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                    >
+                        {#each substatAnalysis as sa, i}
+                            <button
+                                onclick={() => (selectedSubstatChar = i)}
+                                class={[
+                                    'rounded-md px-2.5 py-1 text-[11px] font-medium transition-all',
+                                    selectedSubstatChar === i
+                                        ? 'text-white shadow-sm'
+                                        : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
+                                ].join(' ')}
+                                style="background: {selectedSubstatChar === i
+                                    ? 'var(--theme-accent-bg)'
+                                    : 'transparent'};"
+                            >
+                                {sa.character}
+                            </button>
+                        {/each}
                     </div>
                 </div>
+            </div>
+            {#if substatAnalysis.length > 0}
                 <div class="space-y-4">
                     {#each substatAnalysis as charSA, ci}
                         {#if ci === selectedSubstatChar}
@@ -623,16 +667,6 @@
                                 class="rounded-xl border backdrop-blur-lg relative overflow-hidden"
                                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
                             >
-                                <!-- overlay score -->
-                                <div
-                                    class="pointer-events-none absolute inset-0 flex select-none items-center justify-end overflow-hidden pr-3"
-                                >
-                                    <span
-                                        class="text-[140px] font-black leading-none opacity-[0.05] text-(--theme-accent-text)"
-                                    >
-                                        {charSA.substatTotalPctNorm.toFixed(0)}
-                                    </span>
-                                </div>
                                 <div class="relative z-1 px-4 py-3">
                                     <div class="flex items-center justify-between">
                                         <div class="flex flex-col gap-0.5">
@@ -691,7 +725,24 @@
                                         </div>
                                     </div>
 
-                                    <div class="space-y-1.5 ml-2 mt-2">
+                                    {#if charSA.aggregated.length > 0}
+                                        <div class="px-2 pt-1 pb-3">
+                                            <div
+                                                class="text-[10px] font-medium mb-1"
+                                                style="color: var(--theme-modal-text); opacity: 0.5;"
+                                            >
+                                                词条类型汇总
+                                            </div>
+                                            <div
+                                                class="w-full"
+                                                style="height: {Math.max(160, charSA.aggregated.length * 28)}px"
+                                            >
+                                                <canvas use:registerBarCanvas={charSA.character}></canvas>
+                                            </div>
+                                        </div>
+                                    {/if}
+
+                                    <div class="space-y-1.5 ml-2">
                                         {#each charSA.echoes as echo}
                                             <div
                                                 class="rounded-lg border backdrop-blur-md relative overflow-hidden"
@@ -797,29 +848,47 @@
                                             </div>
                                         {/each}
                                     </div>
-
-                                    {#if charSA.aggregated.length > 0}
-                                        <div
-                                            class="mt-3 pt-2 border-t"
-                                            style="border-color: var(--theme-divider-border);"
-                                        >
-                                            <div
-                                                class="text-[10px] font-medium mb-1"
-                                                style="color: var(--theme-modal-text); opacity: 0.5;"
-                                            >
-                                                词条类型汇总
-                                            </div>
-                                            <div class="w-full h-40">
-                                                <canvas use:registerBarCanvas={charSA.character}></canvas>
-                                            </div>
-                                        </div>
-                                    {/if}
                                 </div>
                             </div>
                         {/if}
                     {/each}
                 </div>
-            </div>
-        {/if}
+            {:else}
+                <div class="text-xs text-center py-8" style="color: var(--theme-modal-text); opacity: 0.4;">
+                    {analysisComputing ? '计算中…' : '暂无数据'}
+                </div>
+            {/if}
+        </div>
     </div>
+
+    {#if showAlgorithmHelp}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+            class="fixed inset-0 z-60 flex items-center justify-center backdrop-blur-sm"
+            style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+            role="presentation"
+        >
+            <div
+                class="relative max-h-[85vh] w-[90vw] max-w-4xl overflow-y-auto rounded-xl p-6 shadow-2xl"
+                style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); color: var(--theme-modal-text);"
+            >
+                <button
+                    onclick={() => (showAlgorithmHelp = false)}
+                    class="absolute right-3 top-3 rounded p-1 transition-colors hover:bg-white/10"
+                    style="color: var(--theme-modal-text); opacity: 0.4;"
+                    aria-label="关闭"
+                >
+                    <Icon icon="mdi:close" class="size-[18px]" />
+                </button>
+                <div class="mb-4 pr-6 text-base font-semibold">算法说明</div>
+                {#each algorithmsInfo as algo}
+                    <div class="mb-5 last:mb-0">
+                        <div class="text-sm font-semibold mb-0.5">{algo.name}</div>
+                        <div class="text-xs opacity-70 mb-1">{algo.description}</div>
+                        <div class="text-xs opacity-50 leading-relaxed">{ALGORITHM_HELP[algo.id]}</div>
+                    </div>
+                {/each}
+            </div>
+        </div>
+    {/if}
 </div>

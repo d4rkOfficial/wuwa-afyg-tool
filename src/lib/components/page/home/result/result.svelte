@@ -8,8 +8,10 @@
     import { getAllDamageEntries, getCalcState } from '../calculation/calculation.store.svelte'
     import { getConfig } from '../config/config.store.svelte'
     import { getActiveProject, updateResultAnalysis } from '$lib/data/project.svelte'
-    import { computeAll as computeAllDamage, computeSubstatContributions } from './compute'
+    import { computeAll as computeAllDamage } from './compute'
     import type { ResultEntry, CharSubstatAnalysis } from './result.types'
+    import { getAlgorithm, ALGORITHMS_INFO } from './substat-algorithms'
+    import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
     import { tick, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
@@ -129,22 +131,46 @@
 
     let totalDamage = $derived(charSummaries.reduce((s, c) => s + c.totalDamage, 0))
 
-    let substatAnalysis = $derived.by(() => {
-        const calc = getCalcState()
-        const config = getConfig()
-        const dmgEntries = getAllDamageEntries()
-        if (dmgEntries.length === 0) return []
-        return computeSubstatContributions(
-            dmgEntries,
-            calc.buffSets,
-            calc.damageEntryBuffSetIds,
-            calc.damageEntryDamageTypes,
-            config,
-            team,
-            charInfoMap,
-            weaponInfoMap,
-            new Set(rigCritEntryIds)
-        )
+    let selectedAlgorithm = $state<AlgorithmId>('single-loss')
+    let substatAnalysis = $state<CharSubstatAnalysis[]>([])
+    let analysisComputing = $state(false)
+    let analysisTimeoutId: ReturnType<typeof setTimeout> | null = null
+
+    function scheduleAnalysis() {
+        if (analysisTimeoutId) clearTimeout(analysisTimeoutId)
+        analysisComputing = true
+        analysisTimeoutId = setTimeout(() => {
+            const calc = getCalcState()
+            const config = getConfig()
+            const dmgEntries = getAllDamageEntries()
+            if (dmgEntries.length === 0) {
+                analysisComputing = false
+                return
+            }
+            const algo = getAlgorithm(selectedAlgorithm)
+            substatAnalysis = algo(
+                dmgEntries,
+                calc.buffSets,
+                calc.damageEntryBuffSetIds,
+                calc.damageEntryDamageTypes,
+                config,
+                team,
+                charInfoMap,
+                weaponInfoMap,
+                new Set(rigCritEntryIds)
+            )
+            analysisComputing = false
+        }, 0)
+    }
+
+    function handleOpenAnalysis() {
+        scheduleAnalysis()
+        showDataAnalysis = true
+    }
+
+    $effect(() => {
+        const _ = selectedAlgorithm
+        if (showDataAnalysis) untrack(() => scheduleAnalysis())
     })
 
     let expandedEntry = $state<string | null>(null)
@@ -195,7 +221,7 @@
                     </div>
                 {/each}
                 <button
-                    onclick={() => (showDataAnalysis = true)}
+                    onclick={handleOpenAnalysis}
                     class="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
                     style="background: var(--theme-input-bg); color: var(--theme-accent-text);"
                 >
@@ -546,6 +572,10 @@
         {totalDamage}
         {resultAnalysis}
         {substatAnalysis}
+        {analysisComputing}
+        algorithmsInfo={ALGORITHMS_INFO}
+        {selectedAlgorithm}
+        onSelectAlgorithm={(id: AlgorithmId) => (selectedAlgorithm = id)}
         onUpdateResultAnalysis={(data) => updateResultAnalysis(data)}
         onclose={() => (showDataAnalysis = false)}
     />

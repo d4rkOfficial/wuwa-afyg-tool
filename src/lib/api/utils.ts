@@ -185,6 +185,46 @@ export const transformWeaponTypeIcons = (): IconPair[] => [
     ['音感仪', `${ASSET_BASE}/Static/SP_IconNorMagic.webp`]
 ]
 
+// ── Preprocess skill entries (shared between transforms) ──
+
+function preprocessSkills(skills: SkillEntry[], elementName: string) {
+    for (const skill of skills) {
+        for (const v of skill.values) {
+            const [name] = v
+            if (skill.type === '共鸣技能' && name === '技能伤害') v[0] = '共鸣技能伤害'
+            else if (skill.type === '变奏技能' && name === '技能伤害') v[0] = '变奏技能伤害'
+            else if (skill.type === '共鸣解放' && name === '技能伤害') v[0] = '共鸣解放伤害'
+            else if (skill.type === '延奏技能' && name === '技能伤害') v[0] = '延奏技能伤害'
+            else if (skill.type === '常态攻击') {
+                const m = name.match(/^第(\d+)段(伤害)?$/)
+                if (m) v[0] = `常态攻击第${m[1]}段伤害`
+            }
+            if (skill.type === '延奏技能' && !v[2] && elementName) v[2] = elementName
+        }
+        if (skill.type === '延奏技能' && elementName) {
+            const hasElement = skill.values.some(([, , el]) => el)
+            if (!hasElement) {
+                const causeIdx = skill.desc.indexOf('造成')
+                const dmgIdx = skill.desc.indexOf('伤害', causeIdx + 1)
+                if (causeIdx >= 0 && dmgIdx > causeIdx) {
+                    const between = skill.desc.slice(causeIdx + 2, dmgIdx)
+                    const ratioMatch = between.match(/[\d+%]+/)
+                    if (ratioMatch) {
+                        const ratioPart = ratioMatch[0]
+                        const after = between.slice(ratioMatch.index! + ratioPart.length)
+                        const unitMatch = after.match(/^(攻击|生命|防御|偏谐系数)/)
+                        const unit = unitMatch ? unitMatch[1] : ''
+                        const finalValue = ratioPart + (unit === '攻击' ? '' : unit)
+                        const foundElement = between.match(/物理|冷凝|热熔|导电|气动|衍射|湮灭/)
+                        const el = foundElement ? foundElement[0] : elementName
+                        skill.values.push(['延奏技能伤害', finalValue, el])
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ── Info transforms ──
 
 export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
@@ -245,6 +285,8 @@ export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
             })
         }
     }
+
+    preprocessSkills(skills, elementName)
 
     const chains: ResonanceChain[] = Object.entries(data.chains ?? {}).map(([, c]) => ({
         name: c.name,
@@ -320,6 +362,8 @@ export function transformCharacterInfoRich(data: ZhCharacterDetail): CharacterIn
             })
         }
     }
+
+    preprocessSkills(skills, elementName)
 
     const chains: ResonanceChain[] = Object.entries(data.chains ?? {}).map(([, c]) => ({
         name: c.name,

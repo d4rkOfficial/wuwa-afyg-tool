@@ -750,9 +750,13 @@ export function stopDrag() {
 // ── Op Block Functions ──
 export function addOpBlock(trackIndex: number, pos: number, key: string) {
     if (!assertUnlocked()) return
-    _opBlocks = [..._opBlocks, { id: `b${Date.now()}`, trackIndex, pos, key, desc: '', intro: false }]
+    _opBlocks = [
+        ..._opBlocks,
+        { id: `b${Date.now()}`, trackIndex, pos, key, desc: '', intro: false, switchback: false }
+    ]
     _trackMenu = null
     enforceIntro()
+    enforceSwitchback()
     save()
 }
 
@@ -842,6 +846,7 @@ export function removeBlock(blockId: string) {
     _damageBlocks = _damageBlocks.filter((d) => !(d.sourceId === blockId && d.sourceType === 'op'))
     _blockMenu = null
     enforceIntro()
+    enforceSwitchback()
     save()
 }
 
@@ -857,6 +862,7 @@ export function removeBlocks(ids: string[]) {
     _selectedBlockIds = {}
     _multiBlockMenu = null
     enforceIntro()
+    enforceSwitchback()
     save()
 }
 
@@ -911,6 +917,60 @@ function enforceIntro() {
             changed = true
             return { ...b, intro: false }
         }
+        return b
+    })
+    if (changed) _opBlocks = updated
+}
+
+export function canSetSwitchback(blockId: string): boolean {
+    const block = _opBlocks.find((b) => b.id === blockId)
+    if (!block || block.switchback) return false
+    const lastTrackIdx = getTRACKS().length - 1
+    if (block.trackIndex >= lastTrackIdx) return false
+
+    const sameTrack = _opBlocks
+        .filter((b) => b.trackIndex === block.trackIndex && b.trackIndex < lastTrackIdx)
+        .sort((a, b) => a.pos - b.pos)
+    const sameTrackIdx = sameTrack.findIndex((b) => b.id === blockId)
+    if (sameTrackIdx <= 0) return false
+
+    const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
+    const globalIdx = sorted.findIndex((b) => b.id === blockId)
+    if (globalIdx <= 0) return false
+    return sorted[globalIdx - 1].trackIndex !== block.trackIndex
+}
+
+export function toggleSwitchback(blockId: string) {
+    if (!assertUnlocked()) return
+    const block = _opBlocks.find((b) => b.id === blockId)
+    if (!block) return
+    if (block.switchback) {
+        _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, switchback: false } : b))
+    } else if (canSetSwitchback(blockId)) {
+        _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, switchback: true } : b))
+    }
+}
+
+function enforceSwitchback() {
+    const lastTrackIdx = getTRACKS().length - 1
+    const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
+    let changed = false
+    const updated = _opBlocks.map((b) => {
+        if (!b.switchback || b.trackIndex >= lastTrackIdx) return b
+
+        const sameTrack = sorted.filter((s) => s.trackIndex === b.trackIndex)
+        const sameTrackIdx = sameTrack.findIndex((s) => s.id === b.id)
+        if (sameTrackIdx <= 0) {
+            changed = true
+            return { ...b, switchback: false }
+        }
+
+        const globalIdx = sorted.findIndex((s) => s.id === b.id)
+        if (globalIdx > 0 && sorted[globalIdx - 1].trackIndex === b.trackIndex) {
+            changed = true
+            return { ...b, switchback: false }
+        }
+
         return b
     })
     if (changed) _opBlocks = updated
@@ -1017,6 +1077,7 @@ export function reflowTrack(trackIndex: number) {
     })
     _opBlocks = updated
     enforceIntro()
+    enforceSwitchback()
 }
 
 // ── Damage Block Functions ──
@@ -1074,7 +1135,7 @@ function buildSkillGroups(skills: SkillEntry[]): SkillPickerGroup[] {
     for (const skill of skills) {
         const hits: { name: string; ratio: string; element: string }[] = []
         for (const [name, value, element] of skill.values) {
-            if (value && (name.endsWith('伤害') || element)) hits.push({ name, ratio: value, element })
+            if (value && element) hits.push({ name, ratio: value, element })
         }
         if (hits.length > 0) groups.push({ type: skill.type, hits })
     }

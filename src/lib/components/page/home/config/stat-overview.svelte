@@ -13,6 +13,7 @@
         WEAPON_SUBSTAT_NAME_MAP,
         SUBSTAT_DECIMAL_TO_PCT
     } from '$lib/consts/game-terms'
+    import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
     import Icon from '@iconify/svelte'
 
     interface Props {
@@ -166,6 +167,12 @@
             if (echo.secondMainStat) {
                 if (echo.secondMainStat.type === '攻击') flatAtk += echo.secondMainStat.value
                 else if (echo.secondMainStat.type === '生命') flatHp += echo.secondMainStat.value
+            } else {
+                const secData = SECOND_MAIN_STAT[echo.cost as keyof typeof SECOND_MAIN_STAT]
+                if (secData) {
+                    if (secData.label === '攻击') flatAtk += secData.value
+                    else if (secData.label === '生命') flatHp += secData.value
+                }
             }
             for (const sub of echo.substats) add(sub.type, sub.value)
         }

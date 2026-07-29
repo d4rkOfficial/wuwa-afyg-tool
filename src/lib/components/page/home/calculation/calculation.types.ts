@@ -44,6 +44,7 @@ export interface BuffZoneValue {
     zoneId: ZoneId
     value: number
     ref?: ZoneRef
+    override?: boolean
 }
 
 export interface BuffSet {

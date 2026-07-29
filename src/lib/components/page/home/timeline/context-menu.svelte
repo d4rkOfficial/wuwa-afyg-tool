@@ -22,6 +22,8 @@
         startEdit,
         canSetIntro,
         toggleIntro,
+        canSetSwitchback,
+        toggleSwitchback,
         removeBlock,
         removeBlocks,
         resetDamageBindingsForBlocks,
@@ -208,7 +210,7 @@
         </button>
         <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
         <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
-            变奏
+            特殊切人
         </div>
         {#if canSetIntro(bm.blockId)}
             <button
@@ -230,6 +232,28 @@
             >
                 <Icon icon="mdi:stop-circle" class="size-4 shrink-0" />
                 取消变奏入场
+            </button>
+        {/if}
+        {#if canSetSwitchback(bm.blockId)}
+            <button
+                onclick={() => {
+                    toggleSwitchback(bm.blockId)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:play-circle" class="size-4 shrink-0" />
+                设置为切回
+            </button>
+        {/if}
+        {#if getOpBlocks().some((b) => b.id === bm.blockId && b.switchback)}
+            <button
+                onclick={() => {
+                    toggleSwitchback(bm.blockId)
+                }}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:close-circle-outline" class="size-4 shrink-0" />
+                取消切回
             </button>
         {/if}
         <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>

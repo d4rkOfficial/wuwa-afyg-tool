@@ -36,8 +36,6 @@
     let customPctUnit = $state('攻击%')
     let customElement = $state('物理')
     let showUnitMenu = $state(false)
-    let showElementMenu = $state(false)
-    let elementMenuUp = $state(false)
     let hasFlat = $state(false)
     let hasPct = $state(false)
 
@@ -436,10 +434,7 @@
                         </div>
                         <div class="relative shrink-0 w-24">
                             <button
-                                onclick={() => {
-                                    showUnitMenu = !showUnitMenu
-                                    showElementMenu = false
-                                }}
+                                onclick={() => (showUnitMenu = !showUnitMenu)}
                                 class="flex w-full items-center justify-between rounded-r-md px-3 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                             >
                                 <span class="text-left">{customPctUnit}</span>
@@ -476,54 +471,26 @@
                     </div>
                 </div>
 
-                <div class="relative">
+                <div>
                     <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">属性</label>
-                    <button
-                        onclick={(e) => {
-                            showUnitMenu = false
-                            showElementMenu = !showElementMenu
-                            if (showElementMenu) {
-                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                                const spaceBelow = window.innerHeight - rect.bottom
-                                elementMenuUp = spaceBelow < 120 && rect.top > spaceBelow
-                            }
-                        }}
-                        class="w-full flex items-center justify-between rounded-lg border px-3 py-2 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                    >
-                        <span>{customElement}</span>
-                        <Icon icon="mdi:chevron-down" class="size-3.5 shrink-0 text-(--theme-modal-text)/40" />
-                    </button>
-                    {#if showElementMenu}
-                        <div
-                            class={[
-                                'absolute left-0 z-10 w-full max-h-48 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg',
-                                elementMenuUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-                            ].join(' ')}
-                            style="border-color: var(--theme-divider-border);"
-                            onclick={(e) => e.stopPropagation()}
-                        >
-                            {#each ELEMENTS as el}
-                                <button
-                                    onclick={() => {
-                                        customElement = el
-                                        showElementMenu = false
-                                    }}
-                                    class={[
-                                        'flex w-full items-center gap-2 px-3 py-2 text-xs text-left transition-colors',
-                                        el === customElement
-                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                            : 'text-(--theme-modal-text) hover:bg-(--theme-modal-text)/5'
-                                    ].join(' ')}
-                                >
-                                    <span class="flex-1">{el}</span>
-                                    {#if el === customElement}
-                                        <Icon icon="mdi:check" class="size-3 text-(--theme-accent-text)" />
-                                    {/if}
-                                </button>
-                            {/each}
-                        </div>
-                    {/if}
+                    <div class="flex flex-wrap gap-1.5">
+                        {#each ELEMENTS as el}
+                            <button
+                                onclick={() => (customElement = el)}
+                                class={[
+                                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
+                                    el === customElement
+                                        ? 'shadow-sm'
+                                        : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text) bg-transparent hover:bg-(--theme-modal-text)/5 border-transparent'
+                                ].join(' ')}
+                                style={el === customElement
+                                    ? `color: var(--theme-element-${el}, #71717a); background: color-mix(in srgb, var(--theme-element-${el}, #71717a) 15%, transparent); border-color: var(--theme-element-${el}, #71717a)`
+                                    : undefined}
+                            >
+                                {el}
+                            </button>
+                        {/each}
+                    </div>
                 </div>
             </div>
 

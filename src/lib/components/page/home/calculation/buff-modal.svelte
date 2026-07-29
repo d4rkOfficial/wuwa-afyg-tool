@@ -10,6 +10,7 @@
         setBuffSetZoneValue,
         setBuffSetScope,
         setBuffSetZoneRef,
+        setBuffSetZoneOverride,
         getGlobalBuffSetIds,
         reorderNonGlobalBuffSets,
         toggleBuffSetStarred
@@ -143,6 +144,13 @@
         return team.map((_, i) => s.includes(i))
     })
 
+    let isNonCharBuff = $derived(
+        !!selectedBuffSet &&
+            selectedBuffSet.scope !== 'all' &&
+            Array.isArray(selectedBuffSet.scope) &&
+            selectedBuffSet.scope.length === 0
+    )
+
     let refTargetDef = $derived(ZONE_REF_MAP.get(refTargetZoneId) ?? ZONE_MAP.get(refTargetZoneId as any) ?? null)
     let refTargetDefUnit = $derived(refTargetDef?.unit === '%' ? '%' : '点')
     let currentZoneDef = $derived(ZONE_MAP.get(refZoneId as ZoneId) ?? null)
@@ -184,6 +192,11 @@
         const current: number[] = selectedBuffSet.scope === 'all' ? [0, 1, 2] : (selectedBuffSet.scope as number[])
         const next = current.includes(idx) ? current.filter((i) => i !== idx) : [...current, idx].sort()
         setBuffSetScope(selectedBuffSetId, next.length === 3 ? 'all' : next)
+    }
+
+    function handleToggleNonChar() {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        setBuffSetScope(selectedBuffSetId, isNonCharBuff ? 'all' : [])
     }
 
     function openRefModal(zoneId: string) {
@@ -549,6 +562,11 @@
                                                         class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
                                                         >(通用)</span
                                                     >
+                                                {:else if Array.isArray(child.scope) && child.scope.length === 0}
+                                                    <span
+                                                        class="text-[10px] text-(--theme-accent-text)/50 whitespace-nowrap"
+                                                        >(效应)</span
+                                                    >
                                                 {:else}
                                                     <span
                                                         class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
@@ -617,6 +635,10 @@
                                         {#if item.buffSet!.scope === 'all'}
                                             <span class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
                                                 >(通用)</span
+                                            >
+                                        {:else if Array.isArray(item.buffSet!.scope) && item.buffSet!.scope.length === 0}
+                                            <span class="text-[10px] text-(--theme-accent-text)/50 whitespace-nowrap"
+                                                >(效应)</span
                                             >
                                         {:else}
                                             <span class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
@@ -731,20 +753,19 @@
                             style="border-bottom: 1px solid var(--theme-divider-border);"
                         >
                             <div class="flex items-center gap-1.5">
-                                <span class="text-xs text-(--theme-modal-text)/50 mr-1">这些角色可以吃到：</span>
+                                <span class="text-xs text-(--theme-modal-text)/50 mr-0.5">这些角色可以吃到：</span>
                                 {#each team as slot, i}
                                     {@const globalDisabled =
                                         selectedBuffSet && globalBuffSetIds.includes(selectedBuffSet.id)}
+                                    {@const disabled = globalDisabled || isNonCharBuff}
                                     <button
-                                        onclick={() => !globalDisabled && handleToggleChar(i)}
+                                        onclick={() => !disabled && handleToggleChar(i)}
                                         class={[
                                             'size-8 rounded-full overflow-hidden border-2 transition-all',
                                             scopeChars[i]
                                                 ? 'border-(--theme-accent-bg)'
-                                                : globalDisabled
-                                                  ? 'border-(--theme-divider-border)'
-                                                  : 'border-(--theme-divider-border) grayscale opacity-30 hover:opacity-60',
-                                            globalDisabled ? 'pointer-events-none' : ''
+                                                : 'border-(--theme-divider-border) grayscale opacity-30',
+                                            disabled ? 'pointer-events-none' : 'hover:opacity-60'
                                         ].join(' ')}
                                     >
                                         {#if slot.character && charIconMap[slot.character]}
@@ -762,6 +783,31 @@
                                         {/if}
                                     </button>
                                 {/each}
+                                <div class="w-px h-5 mx-1" style="background: var(--theme-divider-border);"></div>
+                                <button
+                                    onclick={handleToggleNonChar}
+                                    class={[
+                                        'flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-all whitespace-nowrap',
+                                        isNonCharBuff
+                                            ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                            : 'border-transparent text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
+                                    ].join(' ')}
+                                >
+                                    <svg viewBox="0 0 24 24" class="size-3.5 shrink-0">
+                                        {#if isNonCharBuff}
+                                            <path d="M7 2v11h3v9l7-12h-4l4-8H7z" fill="currentColor" />
+                                        {:else}
+                                            <path
+                                                d="M7 2v11h3v9l7-12h-4l4-8H7z"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="1.5"
+                                                stroke-linejoin="round"
+                                            />
+                                        {/if}
+                                    </svg>
+                                    效应专属
+                                </button>
                             </div>
                         </div>
 
@@ -832,6 +878,25 @@
                                                     >{def.unit === '%' ? '%' : ''}</span
                                                 >
                                             </div>
+                                        {/if}
+                                        {#if zone.zoneId !== 'atkPct' && zone.zoneId !== 'hpPct' && zone.zoneId !== 'defPct'}
+                                            <button
+                                                onclick={() =>
+                                                    setBuffSetZoneOverride(
+                                                        selectedBuffSet.id,
+                                                        zone.zoneId,
+                                                        !zone.override
+                                                    )}
+                                                class={[
+                                                    'shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                                    zone.override
+                                                        ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                                                        : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
+                                                ].join(' ')}
+                                            >
+                                                <Icon icon="mdi:swap-horizontal-bold" class="size-3" />
+                                                {zone.override ? '覆盖' : '追加'}
+                                            </button>
                                         {/if}
                                         <button
                                             onclick={() => openRefModal(zone.zoneId)}
