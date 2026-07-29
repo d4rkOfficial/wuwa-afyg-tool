@@ -894,7 +894,7 @@
                     style="color: var(--theme-modal-text); opacity: 0.4;"
                     aria-label="关闭"
                 >
-                    <Icon icon="mdi:close" class="size-[18px]" />
+                    <Icon icon="mdi:close" class="size-4.5" />
                 </button>
                 <div class="mb-4 pr-6 text-base font-semibold">算法说明</div>
                 {#each algorithmsInfo as algo}

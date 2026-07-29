@@ -204,7 +204,7 @@
                     >
                 </div>
                 <div
-                    class="sticky top-[52px] z-10 flex gap-1 border-b px-5 py-2"
+                    class="sticky top-13 z-10 flex gap-1 border-b px-5 py-2"
                     style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); backdrop-filter: blur(8px); border-color: var(--theme-divider-border);"
                 >
                     {#each charNames as name, i}

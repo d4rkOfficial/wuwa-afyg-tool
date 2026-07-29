@@ -240,7 +240,7 @@
                     onmouseenter={() => (hoveredHeaderKey = group.key)}
                     onmouseleave={() => (hoveredHeaderKey = null)}
                 >
-                    <svg viewBox="0 0 42 16" class="size-[18px] shrink-0">
+                    <svg viewBox="0 0 42 16" class="size-4.5 shrink-0">
                         {#each [0, 1, 2] as i}
                             {@const name = group.displayNames[i] ?? ''}
                             <rect
@@ -302,7 +302,7 @@
                 <div
                     class="flex w-full cursor-default items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--theme-sidebar-text)/60"
                 >
-                    <svg viewBox="0 0 42 16" class="size-[18px] shrink-0">
+                    <svg viewBox="0 0 42 16" class="size-4.5 shrink-0">
                         {#each [0, 1, 2] as i}
                             <rect x={i * 14 + 1} y="0" width="10" height="16" rx="2.5" fill="#555" />
                         {/each}

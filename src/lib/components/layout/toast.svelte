@@ -41,7 +41,7 @@
             <div
                 class={[
                     'pointer-events-auto flex items-center gap-3 rounded-xl px-5 py-3 text-sm shadow-xl',
-                    'bg-[var(--theme-toast-bg)] text-[var(--theme-toast-text)] backdrop-blur-lg',
+                    'bg-(--theme-toast-bg) text-(--theme-toast-text) backdrop-blur-lg',
                     typeStyles[toast.type] || typeStyles.info,
                     typeBgStyles[toast.type] || '',
                     'min-w-72 max-w-md',

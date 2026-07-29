@@ -181,13 +181,13 @@
 
 <div class="flex h-dvh flex-col" style="background: var(--theme-layout-bg); color: var(--theme-layout-text)">
     <header
-        class="shrink-0 flex items-center justify-between border-b border-[var(--theme-divider-border)] px-5 py-3"
+        class="shrink-0 flex items-center justify-between border-b border-(--theme-divider-border) px-5 py-3"
         style="background: var(--theme-modal-bg)"
     >
         <h1 class="text-sm font-semibold">API 测试</h1>
         <button
             onclick={() => goto('/')}
-            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-[var(--theme-card-bg-focused)]"
+            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-card-bg-focused)"
         >
             <Icon icon="mdi:arrow-left" class="size-3.5" />
             返回主页
@@ -197,15 +197,15 @@
     <div class="flex-1 min-h-0 flex">
         <!-- Sidebar -->
         <aside
-            class="shrink-0 border-r border-[var(--theme-divider-border)] flex flex-col relative"
+            class="shrink-0 border-r border-(--theme-divider-border) flex flex-col relative"
             style="width: {sidebarWidth}px; background: var(--theme-modal-bg)"
         >
-            <div class="flex gap-1 px-3 pt-3 pb-2 border-b border-[var(--theme-divider-border)]">
+            <div class="flex gap-1 px-3 pt-3 pb-2 border-b border-(--theme-divider-border)">
                 <button
                     onclick={() => switchVersion('v1')}
                     class="flex-1 h-7 rounded-md text-xs font-semibold transition-colors {version === 'v1'
                         ? 'bg-indigo-500/20 text-indigo-600'
-                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/60 hover:bg-[var(--theme-card-bg-focused)]'}"
+                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/60 hover:bg-(--theme-card-bg-focused)'}"
                 >
                     v1
                 </button>
@@ -213,7 +213,7 @@
                     onclick={() => switchVersion('v2')}
                     class="flex-1 h-7 rounded-md text-xs font-semibold transition-colors {version === 'v2'
                         ? 'bg-indigo-500/20 text-indigo-600'
-                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/60 hover:bg-[var(--theme-card-bg-focused)]'}"
+                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/60 hover:bg-(--theme-card-bg-focused)'}"
                 >
                     v2
                 </button>
@@ -234,7 +234,7 @@
                                 class="relative w-full flex items-center gap-2.5 pl-3 pr-4 py-2 text-left text-xs transition-colors {ep ===
                                 sel
                                     ? 'bg-indigo-500/10 text-(--theme-modal-text)'
-                                    : 'text-(--theme-modal-text)/50 hover:bg-[var(--theme-card-bg-focused)] hover:text-(--theme-modal-text)/80'}"
+                                    : 'text-(--theme-modal-text)/50 hover:bg-(--theme-card-bg-focused) hover:text-(--theme-modal-text)/80'}"
                             >
                                 {#if ep === sel}
                                     <div
@@ -263,7 +263,7 @@
             <div class="flex-1 p-5 flex flex-col min-h-0 gap-4">
                 {#if sel}
                     <div
-                        class="shrink-0 rounded-xl border border-[var(--theme-card-border)] p-5"
+                        class="shrink-0 rounded-xl border border-(--theme-card-border) p-5"
                         style="background: var(--theme-modal-bg)"
                     >
                         <div class="flex items-start justify-between gap-4">
@@ -285,7 +285,7 @@
                             </div>
                             <button
                                 onclick={copyUrl}
-                                class="shrink-0 h-7 px-2.5 rounded-lg border border-[var(--theme-card-border)] text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-[var(--theme-card-bg-focused)] inline-flex items-center gap-1.5"
+                                class="shrink-0 h-7 px-2.5 rounded-lg border border-(--theme-card-border) text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-card-bg-focused) inline-flex items-center gap-1.5"
                             >
                                 <Icon icon={urlCopied ? 'mdi:check' : 'mdi:content-copy'} class="size-3.5" />
                                 {urlCopied ? '已复制' : '复制'}
@@ -293,7 +293,7 @@
                         </div>
 
                         <div
-                            class="flex items-center gap-2 mt-3 text-xs font-mono text-(--theme-modal-text)/40 bg-[var(--theme-input-bg)] rounded-lg px-3 py-2"
+                            class="flex items-center gap-2 mt-3 text-xs font-mono text-(--theme-modal-text)/40 bg-(--theme-input-bg) rounded-lg px-3 py-2"
                         >
                             <Icon icon="mdi:link-variant" class="size-3.5 shrink-0" />
                             <span class="truncate">{resolveUrl()}</span>
@@ -307,7 +307,7 @@
                                             value={idVal}
                                             oninput={(e) => (idVal = (e.target as HTMLInputElement).value)}
                                             placeholder={inputPlaceholder}
-                                            class="h-9 w-full px-3 rounded-lg bg-[var(--theme-input-bg)] border-[var(--theme-input-border)] text-xs text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 outline-none transition-colors focus:border-indigo-500/50"
+                                            class="h-9 w-full px-3 rounded-lg bg-(--theme-input-bg) border-(--theme-input-border) text-xs text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 outline-none transition-colors focus:border-indigo-500/50"
                                         />
                                     </div>
                                 {/if}
@@ -332,9 +332,9 @@
                 {/if}
 
                 <!-- Response Panel -->
-                <div class="flex-1 min-h-0 rounded-xl border border-[var(--theme-card-border)] flex flex-col">
+                <div class="flex-1 min-h-0 rounded-xl border border-(--theme-card-border) flex flex-col">
                     <div
-                        class="flex items-center justify-between shrink-0 px-5 border-b border-[var(--theme-divider-border)]"
+                        class="flex items-center justify-between shrink-0 px-5 border-b border-(--theme-divider-border)"
                     >
                         <div class="flex gap-0">
                             <button
@@ -366,7 +366,7 @@
                             {#if showType && currentType}
                                 <button
                                     onclick={copyType}
-                                    class="h-7 px-2.5 rounded-lg border border-[var(--theme-card-border)] text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-[var(--theme-card-bg-focused)] inline-flex items-center gap-1.5"
+                                    class="h-7 px-2.5 rounded-lg border border-(--theme-card-border) text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-card-bg-focused) inline-flex items-center gap-1.5"
                                 >
                                     <Icon icon={typeCopied ? 'mdi:check' : 'mdi:content-copy'} class="size-3" />
                                     {typeCopied ? '已复制' : '复制'}
@@ -374,14 +374,14 @@
                             {:else if !showType && res}
                                 <button
                                     onclick={copyData}
-                                    class="h-7 px-2.5 rounded-lg border border-[var(--theme-card-border)] text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-[var(--theme-card-bg-focused)] inline-flex items-center gap-1.5"
+                                    class="h-7 px-2.5 rounded-lg border border-(--theme-card-border) text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-card-bg-focused) inline-flex items-center gap-1.5"
                                 >
                                     <Icon icon={dataCopied ? 'mdi:check' : 'mdi:content-copy'} class="size-3" />
                                     {dataCopied ? '已复制' : '复制'}
                                 </button>
                                 <button
                                     onclick={clearRes}
-                                    class="h-7 px-2.5 rounded-lg border border-[var(--theme-card-border)] text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-[var(--theme-card-bg-focused)] inline-flex items-center gap-1.5"
+                                    class="h-7 px-2.5 rounded-lg border border-(--theme-card-border) text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-card-bg-focused) inline-flex items-center gap-1.5"
                                 >
                                     <Icon icon="mdi:close" class="size-3" />
                                     清除

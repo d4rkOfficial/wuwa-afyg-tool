@@ -78,51 +78,6 @@ pnpm run preview
 API 基于 [nanoka](https://ww.nanoka.cc) 精简提纯，随版本自动更新。
 详情见 [API测试页(afyg)](https://wuwa-afyg-tool.200503.xyz/api-test) 或者 [API测试页(hpyg)](https://wuwa-hpyg-tool.200503.xyz/api-test)。
 
-### 列表
-
-直接获取 Nanoka 的各种资源列表。
-
-```
-GET /api/v1/list/character
-GET /api/v1/list/weapon
-GET /api/v1/list/echo
-GET /api/v1/list/echo-set
-```
-
-### 图标
-
-直接获取 Nanoka 的各种图标资源列表。
-
-```
-GET /api/v1/icons/character
-GET /api/v1/icons/weapon
-GET /api/v1/icons/echo
-GET /api/v1/icons/element
-GET /api/v1/icons/weapon-type
-GET /api/v1/icons/echo-set
-GET /api/v1/icons/ui-btn
-```
-
-### 详情
-
-传角色/武器/声骸/套装中文名，返回详情。
-
-```
-GET /api/v1/info/character/:name
-GET /api/v1/info/weapon/:name
-GET /api/v1/info/echo/:name
-GET /api/v1/info/echo-set/:name
-```
-
-### 推荐
-
-传角色中文名，返回声骸推荐。
-
-```
-GET /api/v1/recommend/:character
-GET /api/v1/recommend-weapon/:character
-```
-
 ## 声明
 
 本项目基于 [MIT 许可](LICENSE) 开源，并附有原作者的补充声明，详情请参阅 LICENSE 文件。

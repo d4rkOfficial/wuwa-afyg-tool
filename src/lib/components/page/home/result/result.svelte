@@ -360,7 +360,7 @@
                                                 </div>
                                             {/if}
                                             <div
-                                                class="text-center font-mono text-(--theme-accent-text) font-sans pt-1 border-t border-(--theme-divider-border)/30"
+                                                class="text-center font-mono text-(--theme-accent-text) pt-1 border-t border-(--theme-divider-border)/30"
                                             >
                                                 {entry.baseValue.toLocaleString()}
                                                 {#each entry.multiplierZones as zone}
@@ -423,7 +423,7 @@
                                                 </div>
                                             {/if}
                                             <div
-                                                class="text-center font-mono text-(--theme-accent-text) font-sans pt-1 border-t border-(--theme-divider-border)/30"
+                                                class="text-center font-mono text-(--theme-accent-text) pt-1 border-t border-(--theme-divider-border)/30"
                                             >
                                                 {entry.baseValue.toLocaleString()}
                                                 {#each entry.multiplierZones as zone}
@@ -503,7 +503,7 @@
                                                 </div>
                                             {/if}
                                             <div
-                                                class="text-center font-mono text-(--theme-accent-text) font-sans pt-1 border-t border-(--theme-divider-border)/30"
+                                                class="text-center font-mono text-(--theme-accent-text) pt-1 border-t border-(--theme-divider-border)/30"
                                             >
                                                 {entry.baseValue.toLocaleString()}
                                                 {#each entry.multiplierZones as zone}
