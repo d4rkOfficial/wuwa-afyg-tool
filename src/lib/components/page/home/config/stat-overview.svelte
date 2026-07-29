@@ -15,6 +15,7 @@
     } from '$lib/consts/game-terms'
     import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
     import Icon from '@iconify/svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         team: [CharSlot, CharSlot, CharSlot]
@@ -308,7 +309,12 @@
                             >
                                 <div class="flex items-center gap-2 shrink-0">
                                     {#if charIcons[s.name]}
-                                        <img src={charIcons[s.name]} alt={s.name} class="size-10 rounded-full" />
+                                        <img
+                                            src={charIcons[s.name]}
+                                            alt={s.name}
+                                            use:fallbackIcon={'/icons/placeholder-character.svg'}
+                                            class="size-10 rounded-full"
+                                        />
                                     {:else}
                                         <div
                                             class="size-10 rounded-full bg-(--theme-modal-text)/10 flex items-center justify-center text-sm"
@@ -336,7 +342,12 @@
                                         </div>
                                     </div> -->
                                         {#if weaponIcons[s.weapon]}
-                                            <img src={weaponIcons[s.weapon]} alt="" class="size-7" />
+                                            <img
+                                                src={weaponIcons[s.weapon]}
+                                                alt=""
+                                                use:fallbackIcon={'/icons/placeholder-weapon.svg'}
+                                                class="size-7"
+                                            />
                                         {/if}
                                     </div>
                                 {/if}

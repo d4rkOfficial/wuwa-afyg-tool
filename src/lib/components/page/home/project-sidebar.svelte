@@ -7,6 +7,7 @@
     import { addToast } from '$lib/data/toast.svelte'
     import { getCharElementMap } from '$lib/data/char-elements.svelte'
     import { shortName } from '$lib/utils/character'
+    import ThemeCustomizer from '$lib/components/layout/theme-customizer.svelte'
     import { slide } from 'svelte/transition'
     import favicon from '$lib/assets/favicon.svg'
 
@@ -89,6 +90,7 @@
     ])
 
     let currentTheme = $derived(getActiveThemeId())
+    let showThemeCustomizer = $state(false)
 
     function selectProject(id: string) {
         onselect(id)
@@ -172,7 +174,7 @@
     class="flex h-full shrink-0 flex-col border-r"
     style="width: {width}px;{dragging
         ? ''
-        : ' transition: width 0.15s ease;'} background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text); border-color: var(--theme-divider-border, rgba(255,255,255,0.1))"
+        : ' transition: width 0.15s ease;'} background: color-mix(in srgb, var(--theme-sidebar-bg) 80%, transparent); color: var(--theme-sidebar-text); border-color: var(--theme-divider-border, rgba(255,255,255,0.1))"
     oncontextmenu={(e) => e.preventDefault()}
 >
     <div
@@ -185,15 +187,32 @@
         <div class="flex-1"></div>
         {#if !compact}
             <button
-                onclick={async (e: MouseEvent) => {
+                onclick={(e) => e.stopPropagation()}
+                onpointerdown={(e: PointerEvent) => {
+                    const LONG_PRESS_MS = 600
                     e.stopPropagation()
-                    const next = currentTheme === 'dark' ? 'light' : 'dark'
-                    await setActiveTheme(next)
-                    const t = getThemes().find((th) => th.id === next)
-                    addToast(`已切换至「${t?.name ?? next}」`, 'success')
+                    let cancelled = false
+                    const timer = setTimeout(() => {
+                        cancelled = true
+                        showThemeCustomizer = true
+                    }, LONG_PRESS_MS)
+                    const onup = () => {
+                        clearTimeout(timer)
+                        window.removeEventListener('pointerup', onup)
+                        window.removeEventListener('pointerleave', onup)
+                        if (!cancelled) {
+                            const next = currentTheme === 'dark' ? 'light' : 'dark'
+                            setActiveTheme(next).then(() => {
+                                const t = getThemes().find((th) => th.id === next)
+                                addToast(`已切换至「${t?.name ?? next}」`, 'success')
+                            })
+                        }
+                    }
+                    window.addEventListener('pointerup', onup)
+                    window.addEventListener('pointerleave', onup)
                 }}
                 class="rounded p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-white/5"
-                title="切换主题"
+                title="长按定制主题"
             >
                 <Icon icon="mdi:theme-light-dark" class="size-4" />
             </button>
@@ -350,3 +369,4 @@
 </aside>
 
 <ContextMenu x={ctxX} y={ctxY} items={ctxMenuItems} open={ctxMenuOpen} onclose={() => (ctxMenuOpen = false)} />
+<ThemeCustomizer open={showThemeCustomizer} onclose={() => (showThemeCustomizer = false)} />

@@ -19,6 +19,7 @@
     import WeaponPicker from './pickers/weapon-picker.svelte'
     import EchoPicker from './pickers/echo-picker.svelte'
     import SetPicker from './set-picker.svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         team: [CharSlot, CharSlot, CharSlot]
@@ -329,6 +330,7 @@
                                 <img
                                     src={characterIcons[slot.character]}
                                     alt={slot.character}
+                                    use:fallbackIcon={'/icons/placeholder-character.svg'}
                                     class="size-14 shrink-0 rounded-full object-cover"
                                 />
                             {/if}
@@ -387,6 +389,7 @@
                                 <img
                                     src={weaponIcons[slot.weapon]}
                                     alt={slot.weapon}
+                                    use:fallbackIcon={'/icons/placeholder-weapon.svg'}
                                     class="size-14 shrink-0 rounded-lg object-contain bg-(--theme-card-bg)"
                                 />
                             {/if}
@@ -435,6 +438,7 @@
                                 <img
                                     src={echoIcons[slot.echoes[0].name]}
                                     alt={slot.echoes[0].name}
+                                    use:fallbackIcon={'/icons/placeholder-echo.svg'}
                                     class="size-14 shrink-0 rounded-lg object-contain bg-(--theme-card-bg)"
                                 />
                             {/if}
@@ -481,6 +485,7 @@
                                                 <img
                                                     src={echoSetIcons[set.name]}
                                                     alt={set.name}
+                                                    use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
                                                     class="size-5 shrink-0 rounded"
                                                 />
                                             {/if}

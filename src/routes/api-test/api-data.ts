@@ -15,7 +15,6 @@ export const CHAR_INFO_V2 = '/api/v2/info/character/{name}'
 export const WEAPON_INFO = '/api/v1/info/weapon/{name}'
 export const ECHO_INFO = '/api/v1/info/echo/{name}'
 export const SET_INFO = '/api/v1/info/echo-set/{name}'
-export const RECOMMEND = '/api/v1/recommend/{character}'
 export const RECOMMEND_WEAPON = '/api/v1/recommend-weapon/{character}'
 
 const VERSION_LATEST = '/api/v1/version/latest'
@@ -44,13 +43,10 @@ export const endpointGroups: EndpointGroup[] = [
         name: 'icons',
         label: '图标',
         endpoints: [
-            { method: 'GET', path: '/api/v1/icons/character', summary: '角色名称和头像图标' },
-            { method: 'GET', path: '/api/v1/icons/weapon', summary: '武器名称和图标' },
-            { method: 'GET', path: '/api/v1/icons/echo', summary: '声骸名称和图标' },
-            { method: 'GET', path: '/api/v1/icons/element', summary: '6 种属性图标' },
-            { method: 'GET', path: '/api/v1/icons/weapon-type', summary: '5 种武器类型图标' },
-            { method: 'GET', path: '/api/v1/icons/echo-set', summary: '声骸套装图标' },
-            { method: 'GET', path: '/api/v1/icons/ui-btn', summary: '操作键鼠图标' }
+            { method: 'GET', path: '/api/v1/batch-icons/character', summary: '角色名称→头像CDN URL' },
+            { method: 'GET', path: '/api/v1/batch-icons/weapon', summary: '武器名称→图标CDN URL' },
+            { method: 'GET', path: '/api/v1/batch-icons/echo', summary: '声骸名称→图标CDN URL' },
+            { method: 'GET', path: '/api/v1/batch-icons/echo-set', summary: '套装名称→图标CDN URL' }
         ]
     },
     {
@@ -98,33 +94,21 @@ export const typeMap: Record<string, { name: string; code: string }> = {
         name: 'EchoSetItem',
         code: 'interface EchoSetItem {\n    name: string;\n    pieces: number[];\n}'
     },
-    '/api/v1/icons/character': {
+    '/api/v1/batch-icons/character': {
         name: 'CharacterIcons',
         code: 'type CharacterIcons = Record<string, string>;'
     },
-    '/api/v1/icons/weapon': {
+    '/api/v1/batch-icons/weapon': {
         name: 'WeaponIcons',
         code: 'type WeaponIcons = Record<string, string>;'
     },
-    '/api/v1/icons/echo': {
+    '/api/v1/batch-icons/echo': {
         name: 'EchoIcons',
         code: 'type EchoIcons = Record<string, string>;'
     },
-    '/api/v1/icons/element': {
-        name: 'ElementIcons',
-        code: 'type ElementIcons = Record<string, string>;'
-    },
-    '/api/v1/icons/weapon-type': {
-        name: 'WeaponTypeIcons',
-        code: 'type WeaponTypeIcons = Record<string, string>;'
-    },
-    '/api/v1/icons/echo-set': {
+    '/api/v1/batch-icons/echo-set': {
         name: 'EchoSetIcons',
         code: 'type EchoSetIcons = Record<string, string>;'
-    },
-    '/api/v1/icons/ui-btn': {
-        name: 'UiBtnIcons',
-        code: 'type UiBtnIcons = Record<string, string>;'
     },
     [CHAR_INFO]: {
         name: 'CharacterInfo',
@@ -166,6 +150,5 @@ export const DEFAULTS: Record<string, string> = {
     [WEAPON_INFO]: '裁竹',
     [ECHO_INFO]: '无常凶鹭',
     [SET_INFO]: '轻云出月',
-    [RECOMMEND]: '珂莱塔',
     [RECOMMEND_WEAPON]: '珂莱塔'
 }

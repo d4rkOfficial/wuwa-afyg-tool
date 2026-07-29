@@ -19,6 +19,7 @@
     } from './timeline.store.svelte'
     import { getCharIconMap } from './timeline.store.svelte'
     import { NON_DIRECT_CONFIGS } from './timeline.consts'
+    import { fallbackIcon } from '$lib/utils/icons'
 </script>
 
 {#if getNonDirectPickerBlockId() !== null}
@@ -117,6 +118,7 @@
                                                     src={getCharIconMap()[name]}
                                                     alt={name}
                                                     draggable="false"
+                                                    use:fallbackIcon={'/icons/placeholder-character.svg'}
                                                     class="size-full object-cover"
                                                 />
                                             {:else}

@@ -11,7 +11,12 @@ export const MAX_TIME = 150
 export const MAX_POS = SIDE_PAD + MAX_TIME * PPS
 export const BLOCK_H_PAD = 18.6
 
-export const TRACK_COLORS = ['#3b82f6', '#7c3aed', '#db2777', '#16a34a'] as const
+export const TRACK_COLORS = [
+    'var(--theme-track-1, #3b82f6)',
+    'var(--theme-track-2, #7c3aed)',
+    'var(--theme-track-3, #db2777)',
+    'var(--theme-track-4, #16a34a)'
+] as const
 
 export const BUTTON_KEY_ORDER = ['MouseLeft', 'MouseRight', 'Q', 'E', 'R', 'F', 'T', 'SpaceBar', 'MouseMiddle'] as const
 

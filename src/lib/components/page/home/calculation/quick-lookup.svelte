@@ -13,6 +13,7 @@
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import type { CharSlot } from '$lib/data/types'
     import Icon from '@iconify/svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         open: boolean
@@ -224,6 +225,7 @@
                             {#if img(charIcons[name])}<img
                                     src={img(charIcons[name])}
                                     alt={name}
+                                    use:fallbackIcon={'/icons/placeholder-character.svg'}
                                     class="inline size-4 mr-1 rounded-full object-cover"
                                 />{/if}{name}
                         </button>
@@ -240,6 +242,7 @@
                                 {#if img(charIcons[currentSlot.character ?? ''])}<img
                                         src={img(charIcons[currentSlot.character ?? ''])}
                                         alt=""
+                                        use:fallbackIcon={'/icons/placeholder-character.svg'}
                                         class="size-10 rounded-md object-contain"
                                         style="background: var(--theme-input-bg);"
                                     />{/if}
@@ -321,6 +324,7 @@
                                             {#if img(weaponIcons[currentSlot.weapon])}<img
                                                     src={img(weaponIcons[currentSlot.weapon])}
                                                     alt=""
+                                                    use:fallbackIcon={'/icons/placeholder-weapon.svg'}
                                                     class="size-8 rounded object-contain"
                                                     style="background: var(--theme-input-bg);"
                                                 />{/if}
@@ -367,6 +371,7 @@
                                             {#if img(echoIcons[currentSlot.echoes[0].name])}<img
                                                     src={img(echoIcons[currentSlot.echoes[0].name])}
                                                     alt=""
+                                                    use:fallbackIcon={'/icons/placeholder-echo.svg'}
                                                     class="size-8 rounded object-contain"
                                                     style="background: var(--theme-input-bg);"
                                                 />{/if}
@@ -401,6 +406,7 @@
                                                     {#if img(setIcons[set.name])}<img
                                                             src={img(setIcons[set.name])}
                                                             alt=""
+                                                            use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
                                                             class="size-6 rounded object-contain"
                                                             style="background: var(--theme-input-bg);"
                                                         />{/if}
@@ -619,26 +625,26 @@
         font-weight: 700;
     }
     :global(.rich-color-highlight) {
-        color: #818cf8;
+        color: var(--theme-accent-bg, #818cf8);
         font-weight: 600;
     }
     :global(.rich-color-ice) {
-        color: #38bdf8;
+        color: var(--theme-element-冷凝, #888);
     }
     :global(.rich-color-fire) {
-        color: #fb923c;
+        color: var(--theme-element-热熔, #888);
     }
     :global(.rich-color-thunder) {
-        color: #a78bfa;
+        color: var(--theme-element-导电, #888);
     }
     :global(.rich-color-wind) {
-        color: #34d399;
+        color: var(--theme-element-气动, #888);
     }
     :global(.rich-color-light) {
-        color: #facc15;
+        color: var(--theme-element-衍射, #888);
     }
     :global(.rich-color-dark) {
-        color: #f472b6;
+        color: var(--theme-element-湮灭, #888);
     }
     :global(.rich-size-xl) {
         font-size: 1.125rem;
@@ -648,11 +654,11 @@
         opacity: 0.3;
     }
     :global(.rich-te) {
-        color: #818cf8;
-        border-bottom: 1px dashed #818cf8;
+        color: var(--theme-accent-bg, #818cf8);
+        border-bottom: 1px dashed var(--theme-accent-bg, #818cf8);
     }
     :global(.rich-highlight) {
-        background: rgba(129, 140, 248, 0.15);
+        background: color-mix(in srgb, var(--theme-accent-bg, #818cf8) 25%, transparent);
         padding: 0 0.25em;
         border-radius: 2px;
     }

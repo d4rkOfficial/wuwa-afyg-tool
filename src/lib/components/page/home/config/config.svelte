@@ -22,6 +22,7 @@
     import RandomEnhanceModal from './random-enhance-modal.svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         team: [CharSlot, CharSlot, CharSlot]
@@ -37,9 +38,15 @@
     let showSubstatModal = $state<{ ci: number; si: number } | null>(null)
     let showEnhanceModal = $state<{ ci: number; si: number } | null>(null)
     let dragState = $state<{ ci: number; si: number; idx: number; dropIdx: number; outside: boolean } | null>(null)
+    let echoScrollEl = $state<HTMLDivElement | undefined>()
 
     $effect(() => {
         init(data, locked)
+    })
+
+    $effect(() => {
+        activeTab
+        if (echoScrollEl) echoScrollEl.scrollLeft = 0
     })
 
     let config = $derived(getConfig())
@@ -57,15 +64,10 @@
     const TAB_LABELS = ['角色1', '角色2', '角色3', '敌人配置']
     const COST_OPTIONS = [4, 3, 1]
 
-    function costColor(cost: number): string {
-        if (cost === 4) return '#ef4444'
-        if (cost === 3) return '#ca8a04'
-        return '#22c55e'
-    }
     function costBtnCls(cost: number): string {
-        if (cost === 4) return 'bg-red-500/15 text-red-500'
-        if (cost === 3) return 'bg-yellow-500/15 text-yellow-600'
-        return 'bg-green-500/15 text-green-600'
+        if (cost === 4) return 'bg-fuchsia-500/15 text-fuchsia-500'
+        if (cost === 3) return 'bg-indigo-500/15 text-indigo-500'
+        return 'bg-sky-500/15 text-sky-500'
     }
 
     function handleSetCost(ci: number, si: number, cost: number) {
@@ -245,7 +247,12 @@
             >
                 {#if i < 3 && charNames[i]}
                     {#if charIcons[charNames[i]]}
-                        <img src={charIcons[charNames[i]]} alt="" class="size-5 rounded-full shrink-0" />
+                        <img
+                            src={charIcons[charNames[i]]}
+                            alt=""
+                            use:fallbackIcon={'/icons/placeholder-character.svg'}
+                            class="size-5 rounded-full shrink-0"
+                        />
                     {:else}
                         <div
                             class="size-5 rounded-full bg-(--theme-modal-text)/10 flex items-center justify-center text-[10px] shrink-0"
@@ -275,16 +282,7 @@
         <div class="flex flex-col flex-1 min-h-0">
             <div class="relative flex-1 min-h-0">
                 <div
-                    class="pointer-events-none absolute inset-y-0 left-0 w-8 z-10"
-                    style="background: linear-gradient(to right, var(--theme-modal-bg), transparent);"
-                    data-shadow="left"
-                ></div>
-                <div
-                    class="pointer-events-none absolute inset-y-0 right-0 w-8 z-10"
-                    style="background: linear-gradient(to left, var(--theme-modal-bg), transparent);"
-                    data-shadow="right"
-                ></div>
-                <div
+                    bind:this={echoScrollEl}
                     class="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 items-start scale-y-[-1] hide-scrollbar absolute inset-0"
                     use:horizontalScroll
                 >
@@ -464,7 +462,7 @@
                                                         </div>
                                                         <div
                                                             class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap pointer-events-none z-10"
-                                                            style="left: {pct}%; background: var(--theme-accent-bg); color: var(--theme-btn-text);"
+                                                            style="left: {pct}%; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                                                         >
                                                             {sub.value}{opt.unit}
                                                         </div>

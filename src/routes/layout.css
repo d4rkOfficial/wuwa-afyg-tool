@@ -3,6 +3,7 @@
 @font-face {
     font-family: 'FangXinShu';
     src: url('/fonts/fang-xin-shu.ttf') format('truetype');
+    font-display: swap;
 }
 
 @font-face {
@@ -33,19 +34,30 @@
         background: rgba(39, 39, 42, 0.3);
         color: #d4d4d8;
     }
-    .card-bg {
-        background: #111111;
+    .font-sans {
+        font-family: 'FangXinShu', system-ui, sans-serif;
     }
 }
 
 @layer base {
     html {
-        background: var(--theme-layout-bg, #0e0e10);
+        background:
+            var(--theme-bg-image, none) center/cover fixed,
+            var(--theme-layout-bg, #0e0e10);
         color: var(--theme-layout-text, #e4e4e7);
         color-scheme: var(--theme-layout-scheme, dark);
-        font-family: 'FangXinShu', 'Inter', system-ui, sans-serif;
+        font-family: 'FangXinShu', system-ui, sans-serif;
         user-select: none;
         -webkit-user-select: none;
+    }
+    html::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        backdrop-filter: blur(var(--theme-bg-blur, 0px));
+        -webkit-backdrop-filter: blur(var(--theme-bg-blur, 0px));
+        pointer-events: none;
+        z-index: -1;
     }
     .font-mono {
         font-family: 'JetBrains Mono', ui-monospace, monospace;

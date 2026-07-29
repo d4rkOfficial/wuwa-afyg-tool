@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Character } from '$lib/api/types'
     import Icon from '@iconify/svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface GroupData {
         rover: Character[]
@@ -144,7 +145,12 @@
                                     >
                                         <div class="size-14 overflow-hidden rounded-full bg-(--theme-modal-text)/10">
                                             {#if icons[c.name]}
-                                                <img src={icons[c.name]} alt={c.name} class="size-full object-cover" />
+                                                <img
+                                                    src={icons[c.name]}
+                                                    alt={c.name}
+                                                    use:fallbackIcon={'/icons/placeholder-character.svg'}
+                                                    class="size-full object-cover"
+                                                />
                                             {:else}
                                                 <div
                                                     class="flex size-full items-center justify-center text-xs text-(--theme-muted-text)"
@@ -196,6 +202,7 @@
                                                         <img
                                                             src={icons[c.name]}
                                                             alt={c.name}
+                                                            use:fallbackIcon={'/icons/placeholder-character.svg'}
                                                             class="size-full object-cover"
                                                         />
                                                     {:else}

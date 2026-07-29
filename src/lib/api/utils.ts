@@ -4,7 +4,6 @@ import type {
     Character,
     Weapon,
     Echo,
-    IconPair,
     EchoSetItem,
     CharacterInfo,
     SkillEntry,
@@ -145,45 +144,6 @@ export const transformEchoSetList = (sonata: NanokaSonata): EchoSetItem[] =>
                 .sort((a, b) => a - b)
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
-
-// ── Icon transforms ──
-
-export const transformCharacterIcons = (data: Record<string, NanokaCharacter>): IconPair[] =>
-    Object.values(data)
-        .filter((c) => c.zh && c.icon)
-        .map((c) => [c.zh, ueToCdn(c.icon)])
-
-export const transformWeaponIcons = (data: Record<string, NanokaWeapon>): IconPair[] =>
-    Object.values(data)
-        .filter((w) => w.zh && w.icon)
-        .map((w) => [w.zh, ueToCdn(w.icon)])
-
-export const transformEchoIcons = (data: Record<string, NanokaEcho>): IconPair[] =>
-    Object.values(data)
-        .filter((e) => e.zh && e.icon)
-        .map((e) => [e.zh, ueToCdn(e.icon)])
-
-export const transformEchoSetIcons = (sonata: NanokaSonata): IconPair[] =>
-    Object.values(sonata)
-        .filter((s) => s.name?.zh && s.icon)
-        .map((s) => [s.name.zh, ueToCdn(s.icon)])
-
-export const transformElementIcons = (sonata: NanokaSonata): IconPair[] => {
-    const ELEMENT_SET_IDS = [1, 2, 3, 4, 5, 6]
-    const names = ['冷凝', '热熔', '导电', '气动', '衍射', '湮灭']
-    return ELEMENT_SET_IDS.map((sid, i) => {
-        const s = sonata[String(sid)]
-        return [names[i], s?.icon ? ueToCdn(s.icon) : ''] as IconPair
-    })
-}
-
-export const transformWeaponTypeIcons = (): IconPair[] => [
-    ['长刃', `${ASSET_BASE}/Static/SP_IconNorSword.webp`],
-    ['迅刀', `${ASSET_BASE}/Static/SP_IconNorKnife.webp`],
-    ['佩枪', `${ASSET_BASE}/Static/SP_IconNorGun.webp`],
-    ['臂铠', `${ASSET_BASE}/Static/SP_IconNorFist.webp`],
-    ['音感仪', `${ASSET_BASE}/Static/SP_IconNorMagic.webp`]
-]
 
 // ── Preprocess skill entries (shared between transforms) ──
 

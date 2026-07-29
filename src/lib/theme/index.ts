@@ -7,7 +7,9 @@ export {
     getComponentTheme,
     updateComponentTheme,
     addTheme,
-    removeTheme
+    removeTheme,
+    getOverrides,
+    updateOverride
 } from './theme.svelte.js'
 
-export type { Theme, ComponentTheme, ThemeComponentKey } from './types.js'
+export type { Theme, ComponentTheme, ThemeComponentKey, ThemeOverrides } from './types.js'

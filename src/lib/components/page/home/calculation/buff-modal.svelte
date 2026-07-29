@@ -23,6 +23,7 @@
     import Icon from '@iconify/svelte'
     import QuickLookup from './quick-lookup.svelte'
     import { slide } from 'svelte/transition'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         open: boolean
@@ -773,6 +774,7 @@
                                                 src={charIconMap[slot.character]}
                                                 alt={slot.character}
                                                 draggable="false"
+                                                use:fallbackIcon={'/icons/placeholder-character.svg'}
                                                 class="h-full w-full object-cover"
                                             />
                                         {:else}
@@ -1014,6 +1016,7 @@
                                         src={charIconMap[slot.character]}
                                         alt={slot.character}
                                         draggable="false"
+                                        use:fallbackIcon={'/icons/placeholder-character.svg'}
                                         class="h-full w-full object-cover"
                                     />
                                 {:else}

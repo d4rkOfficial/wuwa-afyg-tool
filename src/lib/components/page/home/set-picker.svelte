@@ -2,6 +2,7 @@
     import type { SelectedSet } from '$lib/data/types'
     import type { EchoSetItem } from '$lib/api/types'
     import Icon from '@iconify/svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         open: boolean
@@ -173,6 +174,7 @@
                                         <img
                                             src={icons[set.name]}
                                             alt={set.name}
+                                            use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
                                             class="size-8 shrink-0 rounded object-contain"
                                         />
                                     {/if}

@@ -25,7 +25,7 @@ export default defineConfig({
                 ]
             },
             workbox: {
-                globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+                globPatterns: ['**/*.{js,css,html,svg,png,woff2,webp}'],
                 maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
                 runtimeCaching: [
                     {
@@ -34,6 +34,15 @@ export default defineConfig({
                         options: {
                             cacheName: 'api-cache',
                             expiration: { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 }
+                        }
+                    },
+                    {
+                        urlPattern: /^https:\/\/static\.nanoka\.cc\/assets\/ww\//,
+                        handler: 'StaleWhileRevalidate',
+                        options: {
+                            cacheName: 'nanoka-cdn',
+                            expiration: { maxEntries: 2000, maxAgeSeconds: 30 * 24 * 60 * 60 },
+                            cacheableResponse: { statuses: [0, 200] }
                         }
                     }
                 ]

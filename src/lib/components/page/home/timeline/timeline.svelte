@@ -72,6 +72,7 @@
     import SkillPicker from './skill-picker.svelte'
     import NonDirectPicker from './non-direct-picker.svelte'
     import DamageList from './damage-list.svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         team: [CharSlot, CharSlot, CharSlot]
@@ -252,7 +253,7 @@
                     >
                         <!-- Sticky label column -->
                         <div
-                            class="sticky left-0 z-35 w-20 h-full bg-(--theme-timeline-bg)/80 border-r backdrop-blur-sm flex items-center justify-center"
+                            class="sticky left-0 z-35 w-20 h-full bg-(--theme-timeline-bg)/60 border-r backdrop-blur-sm flex items-center justify-center"
                             style="border-right-color: var(--theme-divider-border);"
                         >
                             {#if i < getTRACKS().length - 1}
@@ -269,6 +270,7 @@
                                             src={getCharIconMap()[name]}
                                             alt={name}
                                             draggable="false"
+                                            use:fallbackIcon={'/icons/placeholder-character.svg'}
                                             class="h-full w-full object-cover"
                                         />
                                     {/if}
@@ -413,7 +415,7 @@
                                                         ?.echoes?.[0]?.name}
                                                     <span
                                                         class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-px"
-                                                        style="color: var(--theme-element-{hit.element}, #ef4444); border-color: var(--theme-element-{hit.element}, #ef4444);"
+                                                        style="color: var(--theme-element-{hit.element}, #888); border-color: var(--theme-element-{hit.element}, #888);"
                                                     >
                                                         {(dmg.sourceType === 'ref' && hit.character
                                                             ? `[${hit.character}]`
@@ -431,12 +433,12 @@
                                                 }) as nd}
                                                     {@const c =
                                                         nd.category === '响应'
-                                                            ? '#22c55e'
+                                                            ? 'var(--theme-accent-bg)'
                                                             : nd.category === '处决'
-                                                              ? '#ffffff'
+                                                              ? 'var(--theme-accent-text)'
                                                               : (NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]
-                                                                ? `var(--theme-element-${(NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]}, #ef4444)`
-                                                                : '#ef4444'}
+                                                                ? `var(--theme-element-${(NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]}, #888)`
+                                                                : 'var(--theme-accent-bg)'}
                                                     <span
                                                         class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-px"
                                                         style="color: {c}; border-color: {c}; opacity: {nd.category ===

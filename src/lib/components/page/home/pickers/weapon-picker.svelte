@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Weapon } from '$lib/api/types'
     import Icon from '@iconify/svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         open: boolean
@@ -121,7 +122,12 @@
                                 >
                                     <div class="size-14 overflow-hidden rounded-lg bg-(--theme-modal-text)/10 p-1">
                                         {#if icons[w.name]}
-                                            <img src={icons[w.name]} alt={w.name} class="size-full object-contain" />
+                                            <img
+                                                src={icons[w.name]}
+                                                alt={w.name}
+                                                use:fallbackIcon={'/icons/placeholder-weapon.svg'}
+                                                class="size-full object-contain"
+                                            />
                                         {:else}
                                             <div
                                                 class="flex size-full items-center justify-center text-xs text-(--theme-muted-text)"
@@ -163,6 +169,7 @@
                                                 <img
                                                     src={icons[w.name]}
                                                     alt={w.name}
+                                                    use:fallbackIcon={'/icons/placeholder-weapon.svg'}
                                                     class="size-full object-contain"
                                                 />
                                             {:else}

@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Echo } from '$lib/api/types'
     import Icon from '@iconify/svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
         open: boolean
@@ -120,7 +121,12 @@
                                 >
                                     <div class="size-14 overflow-hidden rounded-lg bg-(--theme-modal-text)/10 p-1">
                                         {#if icons[e.name]}
-                                            <img src={icons[e.name]} alt={e.name} class="size-full object-contain" />
+                                            <img
+                                                src={icons[e.name]}
+                                                alt={e.name}
+                                                use:fallbackIcon={'/icons/placeholder-echo.svg'}
+                                                class="size-full object-contain"
+                                            />
                                         {:else}
                                             <div
                                                 class="flex size-full items-center justify-center text-xs text-(--theme-muted-text)"
@@ -163,6 +169,7 @@
                                                     <img
                                                         src={icons[e.name]}
                                                         alt={e.name}
+                                                        use:fallbackIcon={'/icons/placeholder-echo.svg'}
                                                         class="size-full object-contain"
                                                     />
                                                 {:else}

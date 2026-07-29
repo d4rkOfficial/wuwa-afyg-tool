@@ -27,6 +27,7 @@
     import { addToast } from '$lib/data/toast.svelte'
     import QuickLookup from '../calculation/quick-lookup.svelte'
     import Icon from '@iconify/svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
 
     let showLookup = $state(false)
     let showCustomModal = $state(false)
@@ -131,6 +132,7 @@
                                             src={getCharIconMap()[name]}
                                             alt={name}
                                             draggable="false"
+                                            use:fallbackIcon={'/icons/placeholder-character.svg'}
                                             class="size-full object-cover"
                                         />
                                     {:else}
@@ -154,6 +156,7 @@
                                         src={getCharIconMap()[name]}
                                         alt={name}
                                         draggable="false"
+                                        use:fallbackIcon={'/icons/placeholder-character.svg'}
                                         class="size-full object-cover"
                                     />
                                 </div>

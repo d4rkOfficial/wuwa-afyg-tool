@@ -67,3 +67,17 @@ const filtered = {
 export function registerIcons() {
     addCollection(filtered)
 }
+
+export function fallbackIcon(node: HTMLImageElement, placeholder: string) {
+    const orig = node.onerror
+    function handler() {
+        node.src = placeholder
+        node.onerror = null
+    }
+    node.onerror = handler
+    return {
+        destroy() {
+            if (node.onerror === handler) node.onerror = orig
+        }
+    }
+}

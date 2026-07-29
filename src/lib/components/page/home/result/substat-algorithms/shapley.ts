@@ -3,7 +3,13 @@ import type { ConfigState, EchoSlotConfig } from '../../config/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/data/types'
 import type { CharSubstatAnalysis, SubstatContribution, EchoContribution } from '../result.types'
-import { computeAll, getCharFullStatsForChar, computeOneEntry, cloneEchoesWithoutSubstat } from '../compute'
+import {
+    computeAll,
+    getCharFullStatsForChar,
+    computeOneEntry,
+    cloneEchoesWithoutSubstat,
+    cloneEchoesWithoutAllSubstats
+} from '../compute'
 
 function factorial(n: number): number {
     let r = 1
@@ -110,6 +116,9 @@ export function computeSubstatContributions(
         const info: EchoContribution[] = []
         const allSubstats: SubstatContribution[] = []
 
+        const emptyEchoes = cloneEchoesWithoutAllSubstats(echoes)
+        const emptyDamage = computeDamageForEchoes(emptyEchoes, true)
+
         for (let ei = 0; ei < echoes.length; ei++) {
             const echo = echoes[ei]
             const k = echo.substats.length
@@ -201,8 +210,8 @@ export function computeSubstatContributions(
         }))
         aggregated.sort((a, b) => b.contributionNorm - a.contributionNorm)
 
-        const substatTotalNorm = allSubstats.reduce((s, sub) => s + sub.contributionNorm, 0)
-        const substatTotalRig = allSubstats.reduce((s, sub) => s + sub.contributionRig, 0)
+        const substatTotalNorm = baselineNorm - emptyDamage.norm
+        const substatTotalRig = baselineRig - emptyDamage.rigVal
 
         return {
             character: charName,

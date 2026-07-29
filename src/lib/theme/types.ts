@@ -14,6 +14,13 @@ export interface Theme {
     components: Record<string, ComponentTheme>
 }
 
+export interface ThemeOverrides {
+    accentHue: number | 'mono' | null
+    backgroundImage: string
+    bgOpacity: number
+    bgBlur: number
+}
+
 export type ThemeComponentKey =
     | 'btn'
     | 'search-box'

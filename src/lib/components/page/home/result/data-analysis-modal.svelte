@@ -166,10 +166,13 @@
     }
 
     function hexToRgba(hex: string, alpha: number): string {
-        const r = parseInt(hex.slice(1, 3), 16)
-        const g = parseInt(hex.slice(3, 5), 16)
-        const b = parseInt(hex.slice(5, 7), 16)
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`
+        if (hex.startsWith('#')) {
+            const r = parseInt(hex.slice(1, 3), 16)
+            const g = parseInt(hex.slice(3, 5), 16)
+            const b = parseInt(hex.slice(5, 7), 16)
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`
+        }
+        return hex
     }
 
     function fadedColor(hex: string, index: number): string {
@@ -188,7 +191,7 @@
         const data = charSummaries.map((cs) => cs.totalDamage)
         const colors = charSummaries.map((cs, i) => {
             const el = charElements[cs.character]
-            const base = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'
+            const base = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'
             return fadedColor(base, i)
         })
 
@@ -208,6 +211,7 @@
                     legend: { display: false },
                     tooltip: {
                         bodyColor: textColor,
+                        titleColor: textColor,
                         backgroundColor: cssVar('--theme-modal-bg', '#1e293b'),
                         borderColor: cssVar('--theme-divider-border', '#334155'),
                         borderWidth: 1,
@@ -310,6 +314,7 @@
                         },
                         tooltip: {
                             bodyColor: textColor,
+                            titleColor: textColor,
                             backgroundColor: cssVar('--theme-modal-bg', '#1e293b'),
                             borderColor: dividerColor,
                             borderWidth: 1,
@@ -374,7 +379,7 @@
             <div class="grid grid-cols-4 gap-4">
                 {#each charSummaries as cs, i}
                     {@const el = charElements[cs.character]}
-                    {@const color = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'}
+                    {@const color = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'}
                     <div>
                         <div class="text-[10px] mb-1" style="color: {color};">{cs.character || '—'}</div>
                         <div class="text-xs tabular-nums" style="color: var(--theme-modal-text);">
@@ -442,7 +447,8 @@
                                         setQuickSeconds(rl.id, 16)
                                     }}
                                     class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                    style="background: var(--theme-accent-bg); color: white;">+16s</button
+                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                                    >+16s</button
                                 >
                                 <button
                                     onclick={(e) => {
@@ -450,7 +456,8 @@
                                         setQuickSeconds(rl.id, 20)
                                     }}
                                     class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                    style="background: var(--theme-accent-bg); color: white;">+20s</button
+                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                                    >+20s</button
                                 >
                                 <button
                                     onclick={(e) => {
@@ -458,7 +465,8 @@
                                         setQuickSeconds(rl.id, 25)
                                     }}
                                     class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                    style="background: var(--theme-accent-bg); color: white;">+25s</button
+                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                                    >+25s</button
                                 >
                                 <button
                                     onclick={(e) => {
@@ -466,7 +474,8 @@
                                         setQuickSeconds(rl.id, 28)
                                     }}
                                     class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                    style="background: var(--theme-accent-bg); color: white;">+28s</button
+                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                                    >+28s</button
                                 >
                                 <button
                                     onclick={(e) => {
@@ -474,7 +483,8 @@
                                         setQuickSeconds(rl.id, 30)
                                     }}
                                     class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                    style="background: var(--theme-accent-bg); color: white;">+30s</button
+                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                                    >+30s</button
                                 >
                                 <button
                                     onclick={(e) => {
@@ -482,7 +492,8 @@
                                         setQuickSeconds(rl.id, 32)
                                     }}
                                     class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                    style="background: var(--theme-accent-bg); color: white;">+32s</button
+                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                                    >+32s</button
                                 >
                                 <button
                                     onclick={(e) => {
@@ -490,7 +501,8 @@
                                         setQuickSeconds(rl.id, 35)
                                     }}
                                     class="rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                                    style="background: var(--theme-accent-bg); color: white;">+35s</button
+                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                                    >+35s</button
                                 >
                                 {#if selIdx > 0}
                                     <span class="text-[10px]" style="color: var(--theme-accent-text); opacity: 0.6;"
@@ -577,7 +589,7 @@
                 <div class="space-y-2">
                     {#each charSummaries as cs, i}
                         {@const el = charElements[cs.character]}
-                        {@const baseColor = el ? cssVar(`--theme-element-${el}`, '#6366f1') : '#6366f1'}
+                        {@const baseColor = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'}
                         <div class="flex items-center gap-2 text-xs" style="color: var(--theme-modal-text);">
                             <span class="size-2.5 rounded-full shrink-0" style="background: {fadedColor(baseColor, i)};"
                             ></span>
@@ -620,12 +632,14 @@
                             class={[
                                 'rounded-md px-2 py-1 text-[11px] font-medium transition-all',
                                 selectedAlgorithm === algo.id
-                                    ? 'text-white shadow-sm'
+                                    ? 'shadow-sm'
                                     : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
                             ].join(' ')}
                             style="background: {selectedAlgorithm === algo.id
                                 ? 'var(--theme-accent-bg)'
-                                : 'transparent'};"
+                                : 'transparent'}; color: {selectedAlgorithm === algo.id
+                                ? 'var(--theme-accent-text-on-bg, #ffffff)'
+                                : ''};"
                             title={algo.description}
                         >
                             {algo.name}
@@ -646,12 +660,14 @@
                                 class={[
                                     'rounded-md px-2.5 py-1 text-[11px] font-medium transition-all',
                                     selectedSubstatChar === i
-                                        ? 'text-white shadow-sm'
+                                        ? 'shadow-sm'
                                         : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
                                 ].join(' ')}
                                 style="background: {selectedSubstatChar === i
                                     ? 'var(--theme-accent-bg)'
-                                    : 'transparent'};"
+                                    : 'transparent'}; color: {selectedSubstatChar === i
+                                    ? 'var(--theme-accent-text-on-bg, #ffffff)'
+                                    : ''};"
                             >
                                 {sa.character}
                             </button>

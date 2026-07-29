@@ -1252,6 +1252,13 @@ export function computeOneEntry(
     return computeResultEntry(entry, stats, enemy, damageTypes)
 }
 
+export function cloneEchoesWithoutAllSubstats(echoes: EchoSlotConfig[]): EchoSlotConfig[] {
+    return echoes.map((echo) => ({
+        ...echo,
+        substats: []
+    }))
+}
+
 export function cloneEchoesWithoutSubstat(
     echoes: EchoSlotConfig[],
     echoIdx: number,

@@ -101,7 +101,7 @@
                 <Icon icon="mdi:close" class="size-[18px]" />
             </button>
             <div
-                class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 transition-colors hover:bg-indigo-500/50 rounded-r-xl"
+                class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 transition-colors hover:bg-(--theme-accent-bg)/50 rounded-r-xl"
                 onmousedown={handleResizeStart}
             ></div>
             {#if title}

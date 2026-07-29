@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onMount, tick } from 'svelte'
     import { goto } from '$app/navigation'
-    import { loadThemes } from '$lib/theme'
     import {
         loadProjects,
         getProjects,
@@ -129,7 +128,6 @@
             }
             localStorage.setItem('wuwa-afyg:version', getWWVersion())
         }
-        loadThemes()
         loadProjects()
         loadIcons()
     })
@@ -504,7 +502,7 @@
     />
     <button
         aria-label="调整侧栏宽度"
-        class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-indigo-500/50"
+        class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-(--theme-accent-bg)/50"
         style="background: transparent;"
         onmousedown={(e) => {
             e.preventDefault()
@@ -758,7 +756,7 @@
                     id="project-name"
                     bind:value={newName}
                     placeholder="输入项目名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-indigo-500/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleCreate(newName)}
                 />
@@ -793,7 +791,7 @@
                     id="rename-name"
                     bind:value={renameValue}
                     placeholder="输入新名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-indigo-500/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleRename()}
                 />
@@ -832,7 +830,8 @@
                             type="checkbox"
                             checked={exportSelections[phase]}
                             onchange={() => toggleExportPhase(phase)}
-                            class="size-4 accent-indigo-500"
+                            class="size-4"
+                            style="accent-color: var(--theme-accent-bg, #6366f1)"
                         />
                         <span>{PHASE_LABELS[phase]}</span>
                     </label>
@@ -841,7 +840,12 @@
             <label
                 class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
             >
-                <input type="checkbox" bind:checked={exportResult} class="size-4 accent-indigo-500" />
+                <input
+                    type="checkbox"
+                    bind:checked={exportResult}
+                    class="size-4"
+                    style="accent-color: var(--theme-accent-bg, #6366f1)"
+                />
                 <span>结果页配置（不必需）</span>
             </label>
             <div class="flex justify-end gap-2">
@@ -873,7 +877,7 @@
                     id="clone-name"
                     bind:value={cloneName}
                     placeholder="输入新项目名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-indigo-500/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleClone()}
                 />
@@ -889,7 +893,8 @@
                                 type="checkbox"
                                 checked={cloneSelections[phase]}
                                 onchange={() => toggleClonePhase(phase)}
-                                class="size-4 accent-indigo-500"
+                                class="size-4"
+                                style="accent-color: var(--theme-accent-bg, #6366f1)"
                             />
                             <span>{PHASE_LABELS[phase]}</span>
                         </label>
@@ -899,7 +904,12 @@
             <label
                 class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
             >
-                <input type="checkbox" bind:checked={cloneResult} class="size-4 accent-indigo-500" />
+                <input
+                    type="checkbox"
+                    bind:checked={cloneResult}
+                    class="size-4"
+                    style="accent-color: var(--theme-accent-bg, #6366f1)"
+                />
                 <span>结果页（凹暴击配置、时间记点、DPS 数据）</span>
             </label>
             <div class="flex justify-end gap-2">

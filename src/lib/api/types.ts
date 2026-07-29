@@ -24,8 +24,6 @@ export interface EchoSetItem {
     pieces: number[]
 }
 
-export type IconPair = [name: string, url: string]
-
 export interface NanokaCharacter {
     icon: string
     rank: number

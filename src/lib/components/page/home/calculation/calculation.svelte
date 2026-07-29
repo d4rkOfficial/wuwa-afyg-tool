@@ -371,6 +371,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="h-full overflow-auto pb-48"
+    style="background: var(--theme-modal-bg);"
     bind:this={calcContainer}
     onwheel={(e) => {
         if (e.ctrlKey) {
