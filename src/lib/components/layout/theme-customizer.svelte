@@ -162,7 +162,10 @@
                 <span class="mb-3 block text-xs font-medium text-(--theme-modal-text)/60">背景图</span>
 
                 {#if overrides.backgroundImage}
-                    <div class="mb-3 overflow-hidden rounded-lg border" style="border-color: var(--theme-divider-border);">
+                    <div
+                        class="mb-3 overflow-hidden rounded-lg border"
+                        style="border-color: var(--theme-divider-border);"
+                    >
                         <img src={overrides.backgroundImage} alt="背景预览" class="h-32 w-full object-cover" />
                         <div class="flex items-center justify-end gap-2 px-3 py-2 bg-(--theme-modal-text)/5">
                             <button
@@ -194,13 +197,7 @@
                     </div>
                 {/if}
 
-                <input
-                    type="file"
-                    accept="image/*"
-                    bind:this={fileInput}
-                    onchange={handleFileSelect}
-                    class="hidden"
-                />
+                <input type="file" accept="image/*" bind:this={fileInput} onchange={handleFileSelect} class="hidden" />
 
                 <div
                     class="flex items-center gap-2 rounded-lg border px-3 py-2"

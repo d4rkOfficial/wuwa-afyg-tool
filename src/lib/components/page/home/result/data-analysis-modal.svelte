@@ -8,6 +8,7 @@
     import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
     import Icon from '@iconify/svelte'
     import { ALGORITHM_HELP } from './consts'
+    import { openHelp } from '$lib/data/help.svelte'
 
     interface Props {
         entries: ResultEntry[]
@@ -41,7 +42,13 @@
 
     let charElements = $derived(getCharElementMap())
     let selectedSubstatChar = $state(0)
-    let showAlgorithmHelp = $state(false)
+    let helpItems = $derived(
+        algorithmsInfo.map((algo) => ({
+            name: algo.name,
+            description: algo.description,
+            content: ALGORITHM_HELP[algo.id]
+        }))
+    )
 
     // ── pie chart refs ──
     let pieCanvas: HTMLCanvasElement | null = $state(null)
@@ -614,7 +621,7 @@
                     <Icon icon="mdi:chart-bar" class="size-4" style="color: var(--theme-accent-text);" />
                     <span class="text-sm font-medium" style="color: var(--theme-modal-text);">声骸词条贡献分析</span>
                     <button
-                        onclick={() => (showAlgorithmHelp = true)}
+                        onclick={() => openHelp('算法说明', helpItems)}
                         class="flex items-center justify-center rounded-full w-5 h-5 text-xs font-bold transition-colors hover:bg-white/10"
                         style="color: var(--theme-accent-text);"
                         title="算法说明"
@@ -876,35 +883,4 @@
             {/if}
         </div>
     </div>
-
-    {#if showAlgorithmHelp}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-            class="fixed inset-0 z-60 flex items-center justify-center backdrop-blur-sm"
-            style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-            role="presentation"
-        >
-            <div
-                class="relative max-h-[85vh] w-[90vw] max-w-4xl overflow-y-auto rounded-xl p-6 shadow-2xl"
-                style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); color: var(--theme-modal-text);"
-            >
-                <button
-                    onclick={() => (showAlgorithmHelp = false)}
-                    class="absolute right-3 top-3 rounded p-1 transition-colors hover:bg-white/10"
-                    style="color: var(--theme-modal-text); opacity: 0.4;"
-                    aria-label="关闭"
-                >
-                    <Icon icon="mdi:close" class="size-4.5" />
-                </button>
-                <div class="mb-4 pr-6 text-base font-semibold">算法说明</div>
-                {#each algorithmsInfo as algo}
-                    <div class="mb-5 last:mb-0">
-                        <div class="text-sm font-semibold mb-0.5">{algo.name}</div>
-                        <div class="text-xs opacity-70 mb-1">{algo.description}</div>
-                        <div class="text-xs opacity-50 leading-relaxed">{ALGORITHM_HELP[algo.id]}</div>
-                    </div>
-                {/each}
-            </div>
-        </div>
-    {/if}
 </div>

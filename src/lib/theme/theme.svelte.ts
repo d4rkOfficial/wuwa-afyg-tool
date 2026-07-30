@@ -15,6 +15,8 @@ let overrides = $state<ThemeOverrides>({ accentHue: null, backgroundImage: '', b
 
 let bgOriginals = new Map<string, string>()
 
+const toPlain = <T>(value: T): T => JSON.parse(JSON.stringify(value))
+
 function applyThemeCSS() {
     if (!browser) return
     const root = document.documentElement
@@ -206,7 +208,7 @@ export function getOverrides(): ThemeOverrides {
 
 export async function updateOverride<K extends keyof ThemeOverrides>(key: K, value: ThemeOverrides[K]) {
     overrides = { ...overrides, [key]: value }
-    await dbSet(OVERRIDES_KEY, overrides)
+    await dbSet(OVERRIDES_KEY, toPlain(overrides))
     const root = document.documentElement
     applyAccentOverride(root)
     if (key === 'backgroundImage' || key === 'bgOpacity' || key === 'bgBlur') applyBgBlend(root)

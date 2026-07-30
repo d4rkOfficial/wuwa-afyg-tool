@@ -541,7 +541,7 @@
                                                     style="background: {rigCritEntryIds.includes(entry.id)
                                                         ? 'var(--theme-accent-bg)'
                                                         : 'transparent'}; color: {rigCritEntryIds.includes(entry.id)
-                                                        ? 'white'
+                                                        ? 'var(--theme-accent-text-on-bg, #ffffff)'
                                                         : 'var(--theme-modal-text)/40'}; border: 1px solid {rigCritEntryIds.includes(
                                                         entry.id
                                                     )
