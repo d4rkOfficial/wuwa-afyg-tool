@@ -262,6 +262,70 @@ export function importProjects(imported: Project[]) {
     persist()
 }
 
+/** 构建与导出/导入一致的工程文件（{ version, exportedAt, project }） */
+export function buildExportFile(
+    project: Project,
+    selected: PhaseKey[],
+    includeResult = false
+): Record<string, unknown> {
+    const data: Record<string, unknown> = { id: project.id, name: project.name, createdAt: project.createdAt }
+    if (selected.includes('team')) {
+        data.team = project.team
+        if (project.lockedTeamKey) data.lockedTeamKey = project.lockedTeamKey
+        if (project.lockedTeamNames) data.lockedTeamNames = project.lockedTeamNames
+    }
+    data.customSkillHits = project.customSkillHits ?? {}
+    const phases: Record<string, { locked: boolean; data: unknown }> = {}
+    for (const ph of PHASE_ORDER) {
+        if (selected.includes(ph)) {
+            phases[ph] = { locked: project.phases[ph]?.locked ?? false, data: project.phases[ph]?.data ?? null }
+        }
+    }
+    data.phases = phases
+    if (includeResult) {
+        data.resultAnalysis = project.resultAnalysis ?? null
+    }
+    return { version: 1, exportedAt: Date.now(), project: data }
+}
+
+/** 解析导出的工程文件文本为项目数组（导入/下载共用） */
+export function parseImportFile(text: string): Project[] {
+    const raw = JSON.parse(text) as Record<string, unknown>
+    const rawProjects: Record<string, unknown>[] = raw?.version
+        ? Array.isArray(raw.project)
+            ? (raw.project as Record<string, unknown>[])
+            : [raw.project as Record<string, unknown>]
+        : Array.isArray(raw)
+          ? (raw as Record<string, unknown>[])
+          : [raw]
+    return rawProjects.map((item) => ({
+        id: (item.id as string) || crypto.randomUUID(),
+        name: (item.name as string) || '导入的项目',
+        createdAt: (item.createdAt as number) || Date.now(),
+        team: (item.team as never) || [
+            {
+                character: null,
+                weapon: null,
+                triggerSets: [],
+                echoes: [
+                    { name: null, cost: 0 },
+                    { name: null, cost: 0 },
+                    { name: null, cost: 0 },
+                    { name: null, cost: 0 },
+                    { name: null, cost: 0 }
+                ]
+            }
+        ],
+        phases: {
+            team: (item.phases as Record<string, unknown>)?.team ?? { locked: false, data: null },
+            timeline: (item.phases as Record<string, unknown>)?.timeline ?? { locked: false, data: null },
+            calculation: (item.phases as Record<string, unknown>)?.calculation ?? { locked: false, data: null },
+            config: (item.phases as Record<string, unknown>)?.config ?? { locked: false, data: null }
+        },
+        customSkillHits: (item.customSkillHits as Record<string, unknown[]>) ?? {}
+    })) as unknown as Project[]
+}
+
 export async function lockPhase(phase: PhaseKey) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return

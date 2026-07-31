@@ -10,6 +10,7 @@
     import ThemeCustomizer from '$lib/components/layout/theme-customizer.svelte'
     import { slide } from 'svelte/transition'
     import favicon from '$lib/assets/favicon.svg'
+    import { getShareState } from '$lib/data/share.svelte'
 
     interface Props {
         projects: Project[]
@@ -19,6 +20,8 @@
         oncreate: () => void
         onimport: () => void
         onhome: () => void
+        onworkshop: () => void
+        onshare: (id: string) => void
         onrename: (id: string) => void
         onclone: (id: string) => void
         onexport: (id: string) => void
@@ -34,6 +37,8 @@
         oncreate,
         onimport,
         onhome,
+        onworkshop,
+        onshare,
         onrename,
         onclone,
         onexport,
@@ -80,6 +85,17 @@
                 if (ctxTargetId) onexport(ctxTargetId)
             }
         },
+        ...(getShareState().available
+            ? [
+                  {
+                      label: '分享(10分钟)',
+                      icon: 'mdi:share-variant',
+                      action: () => {
+                          if (ctxTargetId) onshare(ctxTargetId)
+                      }
+                  }
+              ]
+            : []),
         {
             label: '删除',
             icon: 'mdi:delete-outline',
@@ -365,6 +381,19 @@
             <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
             {#if !compact}<span>导入项目</span>{/if}
         </button>
+        {#if getShareState().available}
+            <button
+                onclick={onworkshop}
+                class={[
+                    'flex w-full items-center rounded-lg text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90',
+                    compact ? 'justify-center py-1' : 'gap-2 px-3 py-2'
+                ].join(' ')}
+                title="椰果工坊"
+            >
+                <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+                {#if !compact}<span>椰果工坊</span>{/if}
+            </button>
+        {/if}
     </div>
 </aside>
 

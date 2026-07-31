@@ -19,12 +19,15 @@
         lockPhase,
         unlockPhase,
         importProjects,
-        createProjectData
+        createProjectData,
+        buildExportFile,
+        parseImportFile
     } from '$lib/data/project.svelte'
+    import { checkShare, shareProject } from '$lib/data/share.svelte'
     import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/consts'
     import { clearCache } from '$lib/data/api'
     import { browser } from '$app/environment'
-    import type { PhaseKey, CharSlot, Project } from '$lib/data/types'
+    import type { PhaseKey, CharSlot } from '$lib/data/types'
     import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
     import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
     import type { ConfigState } from '$lib/components/page/home/config/config.types'
@@ -49,6 +52,7 @@
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
     import favicon from '$lib/assets/favicon.svg'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
+    import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
@@ -130,6 +134,7 @@
         }
         loadProjects()
         loadIcons()
+        checkShare()
     })
 
     let projects = $derived(getProjects())
@@ -269,26 +274,8 @@
         const selected = (Object.entries(exportSelections) as [PhaseKey, boolean][])
             .filter(([, v]) => v)
             .map(([k]) => k)
-        const data: Record<string, unknown> = { id: p.id, name: p.name, createdAt: p.createdAt }
-        if (selected.includes('team')) {
-            data.team = p.team
-            if (p.lockedTeamKey) data.lockedTeamKey = p.lockedTeamKey
-            if (p.lockedTeamNames) data.lockedTeamNames = p.lockedTeamNames
-        }
-        data.customSkillHits = p.customSkillHits ?? {}
-        const phases: Record<string, { locked: boolean; data: unknown }> = {}
-        for (const ph of getPhaseOrder()) {
-            if (selected.includes(ph)) {
-                phases[ph] = { locked: p.phases[ph]?.locked ?? false, data: p.phases[ph]?.data ?? null }
-            }
-        }
-        data.phases = phases
-        if (exportResult) {
-            data.resultAnalysis = p.resultAnalysis ?? null
-        }
-        const blob = new Blob([JSON.stringify({ version: 1, exportedAt: Date.now(), project: data })], {
-            type: 'application/json'
-        })
+        const file = buildExportFile(p, selected, exportResult)
+        const blob = new Blob([JSON.stringify(file)], { type: 'application/json' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
@@ -305,43 +292,7 @@
         const reader = new FileReader()
         reader.onload = () => {
             try {
-                const raw = JSON.parse(reader.result as string)
-                const rawProjects = raw?.version
-                    ? Array.isArray(raw.project)
-                        ? raw.project
-                        : [raw.project]
-                    : Array.isArray(raw)
-                      ? raw
-                      : [raw]
-                const normalized = rawProjects.map((item: Record<string, unknown>) => ({
-                    id: (item.id as string) || crypto.randomUUID(),
-                    name: (item.name as string) || '导入的项目',
-                    createdAt: (item.createdAt as number) || Date.now(),
-                    team: (item.team as never) || [
-                        {
-                            character: null,
-                            weapon: null,
-                            triggerSets: [],
-                            echoes: [
-                                { name: null, cost: 0 },
-                                { name: null, cost: 0 },
-                                { name: null, cost: 0 },
-                                { name: null, cost: 0 },
-                                { name: null, cost: 0 }
-                            ]
-                        }
-                    ],
-                    phases: {
-                        team: (item.phases as Record<string, unknown>)?.team ?? { locked: false, data: null },
-                        timeline: (item.phases as Record<string, unknown>)?.timeline ?? { locked: false, data: null },
-                        calculation: (item.phases as Record<string, unknown>)?.calculation ?? {
-                            locked: false,
-                            data: null
-                        },
-                        config: (item.phases as Record<string, unknown>)?.config ?? { locked: false, data: null }
-                    },
-                    customSkillHits: (item.customSkillHits as Record<string, unknown[]>) ?? {}
-                })) as Project[]
+                const normalized = parseImportFile(reader.result as string)
                 importProjects(normalized)
                 addToast(`成功导入 ${normalized.length} 个项目`, 'success')
             } catch {
@@ -355,6 +306,24 @@
     function handleSelectProject(id: string) {
         setActiveProject(id)
         initForActiveProject()
+    }
+
+    let showWorkshop = $state(false)
+
+    async function handleShare(id: string) {
+        const p = projects.find((pr) => pr.id === id)
+        if (!p) return
+        const res = await shareProject(p)
+        if (!res.ok || !res.url) {
+            addToast(res.error ?? '分享失败', 'error')
+            return
+        }
+        try {
+            await navigator.clipboard.writeText(res.url)
+            addToast(`已分享(10分钟)：${res.url}（链接已复制）`, 'success')
+        } catch {
+            addToast(`已分享(10分钟)：${res.url}`, 'success')
+        }
     }
 
     function initForActiveProject() {
@@ -495,6 +464,8 @@
         }}
         onimport={() => importInput?.click()}
         onhome={goHome}
+        onworkshop={() => (showWorkshop = true)}
+        onshare={handleShare}
         onrename={openRename}
         onclone={openClone}
         onexport={openExport}
@@ -732,6 +703,8 @@
 {/if}
 
 <svelte:head><title>椰果工具箱</title></svelte:head>
+
+<WorkshopModal open={showWorkshop} onclose={() => (showWorkshop = false)} />
 
 <svelte:window
     onkeydown={(e) => {

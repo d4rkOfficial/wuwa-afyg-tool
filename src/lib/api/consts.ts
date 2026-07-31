@@ -1,6 +1,7 @@
 import { browser } from '$app/environment'
 
 export const NANOKA_BASE = 'https://static.nanoka.cc'
+export const SHARE_BASE = 'https://wuwa-afyg-share.200503.xyz'
 
 let _wwVersion = '3.5'
 
