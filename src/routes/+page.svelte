@@ -24,7 +24,7 @@
         parseImportFile
     } from '$lib/data/project.svelte'
     import { checkShare, shareProject } from '$lib/data/share.svelte'
-    import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/consts'
+    import { getWWVersion, ensureVersion, resetVersionPromise, SHARE_BASE } from '$lib/api/consts'
     import { clearCache } from '$lib/data/api'
     import { browser } from '$app/environment'
     import type { PhaseKey, CharSlot } from '$lib/data/types'
@@ -518,16 +518,18 @@
                             <span class="text-sm text-(--theme-muted-text)">调试游戏数据接口与工具 API</span>
                         </div>
                     </button>
-                    <button
-                        onclick={() => (showWorkshop = true)}
+                    <a
+                        href={SHARE_BASE}
+                        target="_blank"
+                        rel="noreferrer"
                         class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
                         <Icon icon="mdi:storefront-outline" class="size-8 text-(--theme-accent-text)" />
                         <div class="flex flex-col gap-1">
                             <span class="text-base font-semibold text-(--theme-card-text)">椰果工坊</span>
-                            <span class="text-sm text-(--theme-muted-text)">浏览社区分享的拉表排轴工程并导入</span>
+                            <span class="text-sm text-(--theme-muted-text)">前往社区站点浏览、分享与下载工程</span>
                         </div>
-                    </button>
+                    </a>
                 </div>
             </div>
         {:else if activeProject}

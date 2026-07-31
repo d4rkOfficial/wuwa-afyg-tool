@@ -2,7 +2,17 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import { getShareState, refreshProjects, downloadProject } from '$lib/data/share.svelte'
+    import Avatar from '$lib/components/ui/avatar.svelte'
+    import {
+        getShareState,
+        refreshProjects,
+        downloadProject,
+        setSearch,
+        setSort,
+        setPage,
+        SHARE_SORT_LABELS
+    } from '$lib/data/share.svelte'
+    import { getCharIconMap } from './timeline/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { shortName } from '$lib/utils/character'
 
@@ -24,9 +34,11 @@
     )
 
     const share = getShareState()
+    let charIconMap = $derived(getCharIconMap())
 
     let downloading = $state<string | null>(null)
     let prevOpen = $state(open)
+    let keyword = $state(share.query)
 
     $effect(() => {
         if (open && !prevOpen) {
@@ -34,6 +46,18 @@
         }
         prevOpen = open
     })
+
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined
+    $effect(() => {
+        const value = keyword
+        clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(() => {
+            setSearch(value)
+        }, 350)
+        return () => clearTimeout(debounceTimer)
+    })
+
+    let totalPages = $derived(Math.max(1, Math.ceil(share.total / share.perPage)))
 
     async function handleDownload(code: string, title: string) {
         if (downloading) return
@@ -57,7 +81,7 @@
     }
 </script>
 
-<Modal {open} {onclose} class={className} style={mergedStyle}>
+<Modal {open} {onclose} class={className} style="width: min(90vw, 640px); {mergedStyle}">
     {#snippet title()}
         椰果工坊 · 社区工程
     {/snippet}
@@ -72,6 +96,37 @@
             <Icon icon="mdi:refresh" class="size-3.5" />
             刷新
         </button>
+    </div>
+
+    <div class="mt-3 flex items-center gap-2">
+        <div class="relative flex-1">
+            <Icon
+                icon="mdi:magnify"
+                class="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-(--theme-muted-text)"
+            />
+            <input
+                bind:value={keyword}
+                placeholder="搜索标题 / 作者"
+                class="w-full rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) py-1.5 pl-8 pr-3 text-sm text-(--theme-layout-text) outline-none transition-colors placeholder:text-(--theme-muted-text) focus:border-(--theme-accent-bg)/50"
+            />
+        </div>
+        <div
+            class="flex shrink-0 items-center rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5"
+        >
+            {#each SHARE_SORT_LABELS as opt}
+                <button
+                    onclick={() => setSort(opt.value)}
+                    class={[
+                        'rounded-md px-2.5 py-1 text-xs transition-colors',
+                        share.sort === opt.value
+                            ? 'font-medium text-(--theme-accent-text)'
+                            : 'text-(--theme-muted-text) hover:text-(--theme-layout-text)'
+                    ].join(' ')}
+                >
+                    {opt.label}
+                </button>
+            {/each}
+        </div>
     </div>
 
     <div class="mt-3 space-y-2">
@@ -94,13 +149,25 @@
         {:else if share.projects.length === 0}
             <div class="flex flex-col items-center gap-2 py-10 text-sm text-(--theme-muted-text)">
                 <Icon icon="mdi:storefront-outline" class="size-8" />
-                还没有人分享工程
+                {share.query.trim() ? '没有匹配的工程' : '还没有人分享工程'}
             </div>
         {:else}
             {#each share.projects as item (item.id)}
                 <div
                     class="flex items-center gap-3 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2.5 transition-colors hover:bg-(--theme-card-bg-focused)"
                 >
+                    {#if item.teamPreview?.names?.length}
+                        <div class="flex shrink-0 -space-x-1.5">
+                            {#each item.teamPreview.names.slice(0, 3) as name}
+                                <Avatar
+                                    src={charIconMap[name] || undefined}
+                                    alt={name}
+                                    size="sm"
+                                    class="ring-2 ring-(--theme-card-bg)"
+                                />
+                            {/each}
+                        </div>
+                    {/if}
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
                             <span class="truncate text-sm font-medium text-(--theme-layout-text)">
@@ -119,6 +186,10 @@
                                 <span class="truncate">
                                     {item.teamPreview.names.map((n) => shortName(n)).join(' / ')}
                                 </span>
+                                <span>·</span>
+                            {/if}
+                            {#if item.downloads > 0}
+                                <span class="shrink-0">{item.downloads} 下载</span>
                                 <span>·</span>
                             {/if}
                             <span class="shrink-0">{item.authorName}</span>
@@ -142,4 +213,29 @@
             {/each}
         {/if}
     </div>
+
+    {#if share.total > 0}
+        <div
+            class="mt-3 flex items-center justify-between gap-2 border-t border-(--theme-card-border) pt-3 text-xs text-(--theme-muted-text)"
+        >
+            <span class="shrink-0">共 {share.total} 条</span>
+            <div class="flex items-center gap-2">
+                <button
+                    onclick={() => setPage(share.page - 1)}
+                    disabled={share.page <= 1}
+                    class="rounded-md px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
+                >
+                    上一页
+                </button>
+                <span class="shrink-0">第 {share.page} / {totalPages} 页</span>
+                <button
+                    onclick={() => setPage(share.page + 1)}
+                    disabled={share.page >= totalPages}
+                    class="rounded-md px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
+                >
+                    下一页
+                </button>
+            </div>
+        </div>
+    {/if}
 </Modal>

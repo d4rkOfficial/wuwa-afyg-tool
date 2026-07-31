@@ -17,8 +17,16 @@ export interface ShareProject {
     tags: string[]
     gameVersion: string | null
     teamPreview: ShareTeamPreview | null
+    downloads: number
     createdAt: string
 }
+
+export type ShareSort = 'heat' | 'newest'
+
+export const SHARE_SORT_LABELS: { value: ShareSort; label: string }[] = [
+    { value: 'heat', label: '热度' },
+    { value: 'newest', label: '最新' }
+]
 
 export interface ShareResult {
     ok: boolean
@@ -32,34 +40,75 @@ export const shareState = $state({
     checked: false,
     loading: false,
     projects: [] as ShareProject[],
-    error: null as string | null
+    error: null as string | null,
+    query: '',
+    sort: 'newest' as ShareSort,
+    page: 1,
+    total: 0,
+    perPage: 12
 })
 
 export function getShareState() {
     return shareState
 }
 
+let _seq = 0
+
 export async function checkShare(force = false) {
     if (!browser) return
     if (shareState.checked && !force) return
+    const seq = ++_seq
     shareState.loading = true
     shareState.error = null
     try {
-        const res = await fetch(`${SHARE_BASE}/api/public/projects`)
+        const params = new URLSearchParams({
+            page: String(shareState.page),
+            perPage: String(shareState.perPage),
+            sort: shareState.sort
+        })
+        if (shareState.query.trim()) params.set('q', shareState.query.trim())
+        const res = await fetch(`${SHARE_BASE}/api/public/projects?${params}`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const json = (await res.json()) as { projects: ShareProject[] }
+        const json = (await res.json()) as { projects: ShareProject[]; total?: number }
+        if (seq !== _seq) return
         shareState.projects = json.projects ?? []
+        shareState.total = json.total ?? 0
         shareState.available = true
     } catch (e) {
+        if (seq !== _seq) return
         shareState.available = false
         shareState.error = e instanceof Error ? e.message : '连接失败'
     } finally {
-        shareState.checked = true
-        shareState.loading = false
+        if (seq === _seq) {
+            shareState.checked = true
+            shareState.loading = false
+        }
     }
 }
 
 export function refreshProjects() {
+    return checkShare(true)
+}
+
+export function setSearch(query: string) {
+    if (shareState.query === query) return
+    shareState.query = query
+    shareState.page = 1
+    return checkShare(true)
+}
+
+export function setSort(sort: ShareSort) {
+    if (shareState.sort === sort) return
+    shareState.sort = sort
+    shareState.page = 1
+    return checkShare(true)
+}
+
+export function setPage(page: number) {
+    const maxPage = Math.max(1, Math.ceil(shareState.total / shareState.perPage))
+    const next = Math.min(maxPage, Math.max(1, page))
+    if (shareState.page === next) return
+    shareState.page = next
     return checkShare(true)
 }
 

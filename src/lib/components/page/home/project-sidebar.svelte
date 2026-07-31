@@ -365,10 +365,10 @@
                 'flex w-full items-center rounded-lg text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90',
                 compact ? 'justify-center py-1' : 'gap-2 px-3 py-2'
             ].join(' ')}
-            title="新建项目"
+            title="新建工程"
         >
             <Icon icon="mdi:plus" class="size-4 shrink-0" />
-            {#if !compact}<span>新建项目</span>{/if}
+            {#if !compact}<span>新建工程</span>{/if}
         </button>
         <button
             onclick={onimport}
@@ -376,10 +376,10 @@
                 'flex w-full items-center rounded-lg text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90',
                 compact ? 'justify-center py-1' : 'gap-2 px-3 py-2'
             ].join(' ')}
-            title="导入项目"
+            title="从本地导入"
         >
             <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
-            {#if !compact}<span>导入项目</span>{/if}
+            {#if !compact}<span>从本地导入</span>{/if}
         </button>
         {#if getShareState().available}
             <button
@@ -388,10 +388,10 @@
                     'flex w-full items-center rounded-lg text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90',
                     compact ? 'justify-center py-1' : 'gap-2 px-3 py-2'
                 ].join(' ')}
-                title="椰果工坊"
+                title="从工坊导入"
             >
                 <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
-                {#if !compact}<span>椰果工坊</span>{/if}
+                {#if !compact}<span>从工坊导入</span>{/if}
             </button>
         {/if}
     </div>
