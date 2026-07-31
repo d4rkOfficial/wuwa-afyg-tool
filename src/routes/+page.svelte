@@ -486,33 +486,48 @@
 
     <div class="flex flex-1 flex-col overflow-hidden">
         {#if !activeProject}
-            <div class="flex flex-1 items-center justify-center">
+            <div class="flex flex-1 flex-col items-center justify-center gap-6 px-8">
                 <div class="text-center">
                     <img src={favicon} alt="椰果工具箱" class="mx-auto mb-4 size-12" />
                     <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
-                    <p class="mb-6 text-sm text-zinc-500">
+                    <p class="text-sm text-(--theme-muted-text)">
                         鸣潮社区公益工具！ 游戏数据版本:{getWWVersion()}
                     </p>
-                    <div class="flex justify-center gap-3">
-                        <button
-                            onclick={() => {
-                                newName = ''
-                                showNewModal = true
-                            }}
-                            class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                            style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
-                        >
-                            <Icon icon="mdi:plus" class="size-4" />
-                            新建项目
-                        </button>
-                        <button
-                            onclick={() => goto('/api-test')}
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-4 py-2 text-sm font-medium text-(--theme-card-text) transition-colors hover:bg-(--theme-card-bg-focused)"
-                        >
-                            <Icon icon="mdi:api" class="size-4" />
-                            接口测试
-                        </button>
-                    </div>
+                </div>
+                <div class="grid w-full max-w-2xl gap-4 sm:grid-cols-3">
+                    <button
+                        onclick={() => {
+                            newName = ''
+                            showNewModal = true
+                        }}
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                    >
+                        <Icon icon="mdi:plus" class="size-8 text-(--theme-accent-text)" />
+                        <div class="flex flex-col gap-1">
+                            <span class="text-base font-semibold text-(--theme-card-text)">创建工程</span>
+                            <span class="text-sm text-(--theme-muted-text)">从空白开始，配置配队、排轴与伤害计算</span>
+                        </div>
+                    </button>
+                    <button
+                        onclick={() => goto('/api-test')}
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                    >
+                        <Icon icon="mdi:api" class="size-8 text-(--theme-accent-text)" />
+                        <div class="flex flex-col gap-1">
+                            <span class="text-base font-semibold text-(--theme-card-text)">接口测试</span>
+                            <span class="text-sm text-(--theme-muted-text)">调试游戏数据接口与工具 API</span>
+                        </div>
+                    </button>
+                    <button
+                        onclick={() => (showWorkshop = true)}
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                    >
+                        <Icon icon="mdi:storefront-outline" class="size-8 text-(--theme-accent-text)" />
+                        <div class="flex flex-col gap-1">
+                            <span class="text-base font-semibold text-(--theme-card-text)">椰果工坊</span>
+                            <span class="text-sm text-(--theme-muted-text)">浏览社区分享的拉表排轴工程并导入</span>
+                        </div>
+                    </button>
                 </div>
             </div>
         {:else if activeProject}

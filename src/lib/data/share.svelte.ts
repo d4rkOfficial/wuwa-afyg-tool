@@ -27,33 +27,35 @@ export interface ShareResult {
     error?: string
 }
 
-let available = $state(false)
-let checked = $state(false)
-let loading = $state(false)
-let projects = $state<ShareProject[]>([])
-let error = $state<string | null>(null)
+export const shareState = $state({
+    available: false,
+    checked: false,
+    loading: false,
+    projects: [] as ShareProject[],
+    error: null as string | null
+})
 
 export function getShareState() {
-    return { available, checked, loading, projects, error }
+    return shareState
 }
 
 export async function checkShare(force = false) {
     if (!browser) return
-    if (checked && !force) return
-    loading = true
-    error = null
+    if (shareState.checked && !force) return
+    shareState.loading = true
+    shareState.error = null
     try {
         const res = await fetch(`${SHARE_BASE}/api/public/projects`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const json = (await res.json()) as { projects: ShareProject[] }
-        projects = json.projects ?? []
-        available = true
+        shareState.projects = json.projects ?? []
+        shareState.available = true
     } catch (e) {
-        available = false
-        error = e instanceof Error ? e.message : '连接失败'
+        shareState.available = false
+        shareState.error = e instanceof Error ? e.message : '连接失败'
     } finally {
-        checked = true
-        loading = false
+        shareState.checked = true
+        shareState.loading = false
     }
 }
 
