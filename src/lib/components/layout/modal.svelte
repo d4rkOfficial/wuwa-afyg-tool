@@ -97,7 +97,7 @@
         >
             <button
                 onclick={onclose}
-                class="absolute right-3 top-3 rounded p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                class="absolute right-3 top-3 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                 aria-label="Close"
             >
                 <Icon icon="mdi:close" class="size-4.5" />
