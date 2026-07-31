@@ -67,7 +67,16 @@
         pasteSelection,
         selectAll,
         setPointerX,
-        hasClipboard
+        hasClipboard,
+        getQuickMode,
+        getQuickCharIndex,
+        toggleQuickMode,
+        quickInput,
+        quickCycleChar,
+        quickUndoLast,
+        getSkillPickerBlockId,
+        getNonDirectPickerBlockId,
+        getBlockKeyPickerId
     } from './timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
     import {
@@ -79,7 +88,8 @@
         MAX_TIME,
         MAX_POS,
         NON_DIRECT_ELEMENT,
-        TRACK_COLORS
+        TRACK_COLORS,
+        QUICK_CHAR_MARKER
     } from './timeline.consts'
     import type { OpBlock, DamageBlock } from './timeline.types'
     import ContextMenu from './context-menu.svelte'
@@ -223,7 +233,7 @@
     }
 
     function onTrackContextMenu(e: MouseEvent, i: number) {
-        if (i >= getTRACKS().length - 1 || !timelineEl || getLocked()) return
+        if (getQuickMode() || i >= getTRACKS().length - 1 || !timelineEl || getLocked()) return
         const rect = timelineEl.getBoundingClientRect()
         const scrollL = timelineEl.scrollLeft
         const x = e.clientX - rect.left + scrollL - 80
@@ -232,7 +242,7 @@
     }
 
     function onBlockContextMenu(e: MouseEvent, blockId: string) {
-        if (getLocked()) return
+        if (getQuickMode() || getLocked()) return
         const target = e.target as HTMLElement
         if (target.closest('input, textarea, [contenteditable]')) return
         e.preventDefault()
@@ -247,7 +257,7 @@
     }
 
     function onRefContextMenu(e: MouseEvent, refId: string) {
-        if (getLocked()) return
+        if (getQuickMode() || getLocked()) return
         e.preventDefault()
         e.stopPropagation()
         const selectedRefs = getSelectedRefLineIds()
@@ -258,6 +268,19 @@
         } else {
             toggleRefLineSelection(refId, false)
             setContextMenu({ x: e.clientX, y: e.clientY, id: refId })
+        }
+    }
+
+    function scrollQuickBlockIntoView(id: string) {
+        if (!timelineEl) return
+        const block = getOpBlocks().find((b) => b.id === id)
+        if (!block) return
+        const width = getBlockWidths()[id] ?? 56
+        const x = 80 + block.pos - width / 2
+        const left = timelineEl.scrollLeft
+        const right = left + timelineEl.clientWidth
+        if (x < left + 12 || x + width > right - 12) {
+            timelineEl.scrollTo({ left: Math.max(0, x - 24), behavior: 'smooth' })
         }
     }
 </script>
@@ -311,6 +334,40 @@
             else undo()
             return
         }
+        if (e.key === 'Shift' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            toggleQuickMode()
+            return
+        }
+        if (
+            getQuickMode() &&
+            !e.ctrlKey &&
+            !e.metaKey &&
+            !e.altKey &&
+            !getSkillPickerBlockId() &&
+            !getNonDirectPickerBlockId() &&
+            !getBlockKeyPickerId() &&
+            !getContextMenu() &&
+            !getTrackMenu() &&
+            !getBlockMenu() &&
+            !getMultiBlockMenu()
+        ) {
+            if (key === 'enter') {
+                e.preventDefault()
+                quickCycleChar()
+                return
+            }
+            if (key === 'backspace') {
+                e.preventDefault()
+                quickUndoLast()
+                return
+            }
+            const res = quickInput(key)
+            if (res !== null) {
+                e.preventDefault()
+                if (res !== QUICK_CHAR_MARKER) scrollQuickBlockIntoView(res)
+                return
+            }
+        }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace')) {
             e.preventDefault()
             removeSelection()
@@ -336,7 +393,11 @@
                     <div
                         class="relative shrink-0 {i < getTRACKS().length - 1 ? 'h-14' : 'flex-1'}"
                         data-track-index={i}
-                        style="border-bottom: 1px solid color-mix(in srgb, {TRACK_COLORS[i]} 15%, transparent);"
+                        style="border-bottom: 1px solid color-mix(in srgb, {TRACK_COLORS[
+                            i
+                        ]} 15%, transparent);{getQuickMode() && i < getTRACKS().length - 1 && i === getQuickCharIndex()
+                            ? ` background: color-mix(in srgb, ${elementColor(name)} 18%, transparent);`
+                            : ''}"
                         oncontextmenu={(e) => {
                             e.preventDefault()
                             onTrackContextMenu(e, i)

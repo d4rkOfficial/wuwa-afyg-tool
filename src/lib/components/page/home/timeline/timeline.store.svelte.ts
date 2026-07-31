@@ -29,6 +29,9 @@ import {
     NON_DIRECT_CONFIGS,
     NON_DIRECT_ELEMENT,
     BUTTON_KEY_ORDER,
+    QUICK_KEY_MAP,
+    QUICK_DESC_MAP,
+    QUICK_CHAR_MARKER,
     BLOCK_H_PAD
 } from './timeline.consts'
 import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$lib/consts/tune-data'
@@ -252,6 +255,77 @@ export function getTeamCharNames() {
     return _team.filter((s) => s.character !== null && s.weapon !== null).map((s) => s.character as string)
 }
 
+// ── Quick Input Mode ──
+export function getQuickMode() {
+    return _quickMode
+}
+
+export function getQuickCharIndex() {
+    return _quickCharIndex
+}
+
+export function setQuickCharIndex(i: number) {
+    const count = getTeamCharNames().length
+    if (i >= 0 && i < count) _quickCharIndex = i
+}
+
+export function toggleQuickMode() {
+    _quickMode = !_quickMode
+    _quickCharIndex = 0
+    if (_quickMode) {
+        _quickStack = []
+        _contextMenu = null
+        _trackMenu = null
+        _blockMenu = null
+        _multiBlockMenu = null
+        _blockKeyPickerId = null
+    }
+    addToast(_quickMode ? '快速排轴模式已开启' : '快速排轴模式已关闭', _quickMode ? 'success' : 'info')
+}
+
+export function quickCycleChar() {
+    const count = getTeamCharNames().length
+    if (count === 0) return
+    _quickCharIndex = (_quickCharIndex + 1) % count
+}
+
+export function quickUndoLast() {
+    const id = _quickStack.pop()
+    if (id) removeBlock(id)
+}
+
+function quickBlockWidth(key: string, desc: string): number {
+    for (const b of _opBlocks) {
+        if (b.key === key && b.desc === desc && _blockWidths[b.id]) return _blockWidths[b.id]
+    }
+    const hasIcon = _uiBtnIcons.some(([n, url]) => n === key && url)
+    const inner = (hasIcon ? 40 : key.length * 8) + (desc ? 6 + desc.length * 18 : 0)
+    return Math.max(56, inner + 24)
+}
+
+export function quickInput(rawKey: string): string | null {
+    if (!_quickMode) return null
+    if (rawKey === '1' || rawKey === '2' || rawKey === '3') {
+        setQuickCharIndex(Number(rawKey) - 1)
+        return QUICK_CHAR_MARKER
+    }
+    const names = getTeamCharNames()
+    if (names.length === 0 || _quickCharIndex >= names.length) return null
+    const mapped = QUICK_KEY_MAP[rawKey]
+    if (!mapped) return null
+    const desc = QUICK_DESC_MAP[rawKey] ?? ''
+    const newWidth = quickBlockWidth(mapped, desc)
+    let maxRight = 0
+    for (const b of _opBlocks) {
+        const bw = _blockWidths[b.id] ?? 56
+        maxRight = Math.max(maxRight, b.pos + bw / 2)
+    }
+    const pos = maxRight > 0 ? maxRight + newWidth / 2 : SIDE_PAD + newWidth / 2
+    const id = addOpBlock(_quickCharIndex, pos, mapped, desc)
+    if (id) _quickStack.push(id)
+    return id
+}
+
 // ── Ref Line State ──
 let _editingId = $state<string | null>(null)
 let _editValue = $state('')
@@ -305,6 +379,10 @@ let _blockMenu = $state<{ x: number; y: number; blockId: string } | null>(null)
 let _selectedBlockIds = $state<Record<string, boolean>>({})
 let _selectedRefLineIds = $state<Record<string, boolean>>({})
 let _selectionRect = $state<{ startX: number; currentX: number } | null>(null)
+let _quickMode = $state(false)
+let _quickCharIndex = $state(0)
+let _quickStack: string[] = []
+let _quickPendingRight: Record<string, number> = {}
 
 export function getTrackMenu() {
     return _trackMenu
@@ -335,6 +413,18 @@ export function getBlockWidths() {
 }
 export function setBlockWidths(v: Record<string, number>) {
     _blockWidths = v
+    let corrected = false
+    for (const id of Object.keys(_quickPendingRight)) {
+        const width = v[id]
+        if (!width) continue
+        const right = _quickPendingRight[id]
+        _opBlocks = _opBlocks.map((b) =>
+            b.id === id ? { ...b, pos: Math.max(0, Math.min(MAX_POS, right + width / 2)) } : b
+        )
+        delete _quickPendingRight[id]
+        corrected = true
+    }
+    if (corrected) save()
 }
 export function getBlockMenu() {
     return _blockMenu
@@ -981,16 +1071,15 @@ function resetGroupDrag() {
 }
 
 // ── Op Block Functions ──
-export function addOpBlock(trackIndex: number, pos: number, key: string) {
-    if (!assertUnlocked()) return
-    _opBlocks = [
-        ..._opBlocks,
-        { id: `b${Date.now()}`, trackIndex, pos, key, desc: '', intro: false, switchback: false }
-    ]
+export function addOpBlock(trackIndex: number, pos: number, key: string, desc = '') {
+    if (!assertUnlocked()) return null
+    const block = { id: `b${Date.now()}`, trackIndex, pos, key, desc, intro: false, switchback: false }
+    _opBlocks = [..._opBlocks, block]
     _trackMenu = null
     enforceIntro()
     enforceSwitchback()
     save()
+    return block.id
 }
 
 let _dragBlockOffset = $state(0)
@@ -1675,6 +1764,9 @@ export async function openSkillPicker(blockId: string) {
     if (!assertUnlocked()) return
     const lastTrackIdx = getTRACKS().length - 1
     if (!op || op.trackIndex >= lastTrackIdx) return
+    if (!_damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)) {
+        addDamageBlock('op', blockId)
+    }
     const dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!dmg) return
     _skillPickerBlockId = dmg.id

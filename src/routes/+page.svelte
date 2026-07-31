@@ -39,6 +39,8 @@
         loadIcons,
         setShowDamageList,
         loadCustomHits,
+        getQuickMode,
+        toggleQuickMode,
         init as initTimeline
     } from '$lib/components/page/home/timeline/timeline.store.svelte'
     import {
@@ -649,6 +651,27 @@
                             <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
                             查看所有伤害
                         </button>
+                        <div class="relative group">
+                            <button
+                                onclick={toggleQuickMode}
+                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getQuickMode()
+                                    ? 'border-(--theme-accent-bg)'
+                                    : 'border-(--theme-sidebar-text)/20'}"
+                                style="color: {getQuickMode()
+                                    ? 'var(--theme-accent-text)'
+                                    : 'var(--theme-sidebar-text)'}"
+                            >
+                                <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" />
+                                {getQuickMode() ? '快速排轴(关闭)' : '快速排轴(开启)'}
+                            </button>
+                            <div
+                                class="pointer-events-none absolute bottom-full left-0 mb-2 hidden whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-lg group-hover:block"
+                                style="background: var(--theme-context-menu-bg); color: var(--theme-context-menu-text); border-color: var(--theme-divider-border); z-index: 40;"
+                            >
+                                Shift 切换 · 1/2/3 选角色 · Enter 下一角色 · Backspace 撤销 · Q/E/R/T/F/空格 技能 · A
+                                左键 / S 右键 / Z 重击(左键)
+                            </div>
+                        </div>
                     {/if}
                     {#if activePhase === 'calculation'}
                         <button

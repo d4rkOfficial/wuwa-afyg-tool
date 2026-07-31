@@ -20,4 +20,22 @@ export const TRACK_COLORS = [
 
 export const BUTTON_KEY_ORDER = ['MouseLeft', 'MouseRight', 'Q', 'E', 'R', 'F', 'T', 'SpaceBar', 'MouseMiddle'] as const
 
+export const QUICK_KEY_MAP: Record<string, string> = {
+    q: 'Q',
+    e: 'E',
+    r: 'R',
+    t: 'T',
+    f: 'F',
+    ' ': 'SpaceBar',
+    a: 'MouseLeft',
+    s: 'MouseRight',
+    z: 'MouseLeft'
+}
+
+export const QUICK_DESC_MAP: Record<string, string> = {
+    z: '重击'
+}
+
+export const QUICK_CHAR_MARKER = '__char__'
+
 export { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from '$lib/consts/game-terms'
