@@ -384,51 +384,44 @@
                     <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
                 </button>
             {/if}
-        {:else if actionsCollapsed}
-            <button
-                onclick={() => (actionsCollapsed = false)}
-                class="flex w-full items-center justify-center rounded-lg py-1.5 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                title="展开操作"
-            >
-                <Icon icon="mdi:plus" class="size-4 shrink-0" />
-            </button>
         {:else}
             <button
-                onclick={() => (actionsCollapsed = true)}
-                class="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                title="收起操作"
+                onclick={() => (actionsCollapsed = !actionsCollapsed)}
+                class="flex w-full shrink-0 items-center justify-center rounded-md py-1 text-(--theme-sidebar-text)/40 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/80"
+                title={actionsCollapsed ? '展开操作' : '收起操作'}
             >
-                <Icon icon="mdi:chevron-down" class="size-4 shrink-0" />
-                <span class="flex-1 text-left">新建 / 导入</span>
+                <Icon icon={actionsCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="size-3.5 shrink-0" />
             </button>
-            <div transition:slide|local={{ duration: 200 }} class="space-y-0.5">
-                <button
-                    onclick={oncreate}
-                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                    title="新建工程"
-                >
-                    <Icon icon="mdi:plus" class="size-4 shrink-0" />
-                    <span>新建工程</span>
-                </button>
-                <button
-                    onclick={onimport}
-                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                    title="从本地导入"
-                >
-                    <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
-                    <span>从本地导入</span>
-                </button>
-                {#if getShareState().available}
+            {#if !actionsCollapsed}
+                <div transition:slide|local={{ duration: 200 }} class="space-y-0.5">
                     <button
-                        onclick={onworkshop}
+                        onclick={oncreate}
                         class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                        title="从工坊导入"
+                        title="新建工程"
                     >
-                        <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
-                        <span>从工坊导入</span>
+                        <Icon icon="mdi:plus" class="size-4 shrink-0" />
+                        <span>新建工程</span>
                     </button>
-                {/if}
-            </div>
+                    <button
+                        onclick={onimport}
+                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                        title="从本地导入"
+                    >
+                        <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
+                        <span>从本地导入</span>
+                    </button>
+                    {#if getShareState().available}
+                        <button
+                            onclick={onworkshop}
+                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            title="从工坊导入"
+                        >
+                            <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+                            <span>从工坊导入</span>
+                        </button>
+                    {/if}
+                </div>
+            {/if}
         {/if}
     </div>
 </aside>
