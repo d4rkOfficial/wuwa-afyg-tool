@@ -225,6 +225,7 @@ let _blockWidths = $state<Record<string, number>>({})
 let _damageWidths = $state<Record<string, number>>({})
 let _blockMenu = $state<{ x: number; y: number; blockId: string } | null>(null)
 let _selectedBlockIds = $state<Record<string, boolean>>({})
+let _selectedRefLineIds = $state<Record<string, boolean>>({})
 let _selectionRect = $state<{ startX: number; currentX: number } | null>(null)
 
 export function getTrackMenu() {
@@ -270,9 +271,12 @@ export function setMultiBlockMenu(v: { x: number; y: number } | null) {
     _multiBlockMenu = v
 }
 
-// ── Block Selection ──
+// ── Block / RefLine Selection ──
 export function getSelectedBlockIds() {
     return _selectedBlockIds
+}
+export function getSelectedRefLineIds() {
+    return _selectedRefLineIds
 }
 export function getSelectionRect() {
     return _selectionRect
@@ -289,16 +293,35 @@ export function toggleBlockSelection(blockId: string, ctrl: boolean) {
         _selectedBlockIds = next
     } else {
         _selectedBlockIds = { [blockId]: true }
+        _selectedRefLineIds = {}
+    }
+}
+
+export function toggleRefLineSelection(refId: string, ctrl: boolean) {
+    if (isBoundary(refId)) return
+    if (ctrl) {
+        const next = { ..._selectedRefLineIds }
+        if (next[refId]) {
+            delete next[refId]
+        } else {
+            next[refId] = true
+        }
+        _selectedRefLineIds = next
+    } else {
+        _selectedRefLineIds = { [refId]: true }
+        _selectedBlockIds = {}
     }
 }
 
 export function clearBlockSelection() {
     _selectedBlockIds = {}
+    _selectedRefLineIds = {}
 }
 
 export function startSelectionRect(x: number) {
     _selectionRect = { startX: x, currentX: x }
     _selectedBlockIds = {}
+    _selectedRefLineIds = {}
 }
 
 export function updateSelectionRect(x: number) {
@@ -313,6 +336,7 @@ export function endSelectionRect() {
     _selectionRect = null
     if (maxX - minX <= 5) {
         _selectedBlockIds = {}
+        _selectedRefLineIds = {}
         return
     }
     const selected: Record<string, boolean> = {}
@@ -325,6 +349,14 @@ export function endSelectionRect() {
         }
     }
     _selectedBlockIds = selected
+    const selectedRefs: Record<string, boolean> = {}
+    for (const rl of _refLines) {
+        if (isBoundary(rl.id)) continue
+        if (rl.pos > minX && rl.pos < maxX) {
+            selectedRefs[rl.id] = true
+        }
+    }
+    _selectedRefLineIds = selectedRefs
 }
 
 // ── Damage / Picker State ──
@@ -658,6 +690,8 @@ export function removeLine(id: string) {
     _damageBlocks = _damageBlocks.filter((d) => !(d.sourceId === id && d.sourceType === 'ref'))
     const { [id]: _, ...rest } = _dragVisualPositions
     _dragVisualPositions = rest
+    const { [id]: __, ...restSel } = _selectedRefLineIds
+    _selectedRefLineIds = restSel
     _contextMenu = null
     save()
 }
@@ -860,6 +894,7 @@ export function removeBlocks(ids: string[]) {
     _opBlocks = _opBlocks.filter((b) => !idSet.has(b.id))
     _damageBlocks = _damageBlocks.filter((d) => !(d.sourceType === 'op' && idSet.has(d.sourceId)))
     _selectedBlockIds = {}
+    _selectedRefLineIds = {}
     _multiBlockMenu = null
     enforceIntro()
     enforceSwitchback()
@@ -879,6 +914,170 @@ export function resetDamageBindingsForBlocks(ids: string[]) {
         .filter((d) => !(d.skillHits.length === 0 && d.nonDirectEntries.length === 0))
     _multiBlockMenu = null
     save()
+}
+
+export function removeSelection() {
+    if (!assertUnlocked()) return
+    const blockIds = Object.keys(_selectedBlockIds)
+    const refIds = Object.keys(_selectedRefLineIds)
+    const blockSet = new Set(blockIds)
+    const refSet = new Set(refIds)
+    if (blockSet.size === 0 && refSet.size === 0) return
+    _opBlocks = _opBlocks.filter((b) => !blockSet.has(b.id))
+    _refLines = _refLines.filter((r) => !refSet.has(r.id))
+    _damageBlocks = _damageBlocks.filter(
+        (d) =>
+            !(d.sourceType === 'op' && blockSet.has(d.sourceId)) && !(d.sourceType === 'ref' && refSet.has(d.sourceId))
+    )
+    for (const id of refIds) {
+        if (!(id in _dragVisualPositions)) continue
+        const { [id]: _, ...rest } = _dragVisualPositions
+        _dragVisualPositions = rest
+    }
+    _selectedBlockIds = {}
+    _selectedRefLineIds = {}
+    _multiBlockMenu = null
+    enforceIntro()
+    enforceSwitchback()
+    save()
+}
+
+export function resetSelectionDamage() {
+    if (!assertUnlocked()) return
+    const blockSet = new Set(Object.keys(_selectedBlockIds))
+    const refSet = new Set(Object.keys(_selectedRefLineIds))
+    if (blockSet.size === 0 && refSet.size === 0) return
+    _damageBlocks = _damageBlocks
+        .map((d) => {
+            const inSelection =
+                (d.sourceType === 'op' && blockSet.has(d.sourceId)) ||
+                (d.sourceType === 'ref' && refSet.has(d.sourceId))
+            if (!inSelection) return d
+            return { ...d, skillHits: [], nonDirectEntries: [] }
+        })
+        .filter((d) => !(d.skillHits.length === 0 && d.nonDirectEntries.length === 0))
+    _multiBlockMenu = null
+    save()
+}
+
+export function duplicateSelectionToRight(): Record<string, string> {
+    if (!assertUnlocked()) return {}
+    const selectedBlocks = Object.keys(_selectedBlockIds)
+        .map((id) => _opBlocks.find((b) => b.id === id))
+        .filter((b): b is OpBlock => Boolean(b))
+    const selectedRefs = Object.keys(_selectedRefLineIds)
+        .map((id) => _refLines.find((r) => r.id === id))
+        .filter((r): r is RefLine => Boolean(r))
+    if (selectedBlocks.length === 0 && selectedRefs.length === 0) return {}
+
+    let groupLeft = Infinity
+    let anchor = -Infinity
+    for (const b of selectedBlocks) {
+        const w = _blockWidths[b.id] ?? 56
+        groupLeft = Math.min(groupLeft, b.pos - w / 2)
+        anchor = Math.max(anchor, b.pos + w / 2)
+    }
+    for (const r of selectedRefs) {
+        groupLeft = Math.min(groupLeft, r.pos)
+        anchor = Math.max(anchor, r.pos)
+    }
+    const blockOffsets = new Map(selectedBlocks.map((b) => [b.id, b.pos - (_blockWidths[b.id] ?? 56) / 2 - groupLeft]))
+    const refOffsets = new Map(selectedRefs.map((r) => [r.id, r.pos - groupLeft]))
+    const sortedRefs = _refLines.slice().sort((a, b) => a.pos - b.pos)
+
+    let shift = anchor
+    for (let iter = 0; iter < 200; iter++) {
+        let nextShift = shift
+        for (const b of selectedBlocks) {
+            const o = blockOffsets.get(b.id)!
+            const w = _blockWidths[b.id] ?? 56
+            for (const u of _opBlocks) {
+                if (u.id === b.id || u.trackIndex !== b.trackIndex) continue
+                const uw = _blockWidths[u.id] ?? 56
+                if (u.pos - uw / 2 < shift + o + w && u.pos + uw / 2 > shift + o) {
+                    nextShift = Math.max(nextShift, u.pos + uw / 2 - o)
+                }
+            }
+        }
+        for (const r of selectedRefs) {
+            const o = refOffsets.get(r.id)!
+            const copyPos = shift + o
+            let idx = sortedRefs.length
+            for (let i = 0; i < sortedRefs.length; i++) {
+                if (sortedRefs[i].pos > copyPos) {
+                    idx = i
+                    break
+                }
+            }
+            if (idx < sortedRefs.length) {
+                const next = sortedRefs[idx]
+                if (next.pos - copyPos < MIN_GAP) nextShift = Math.max(nextShift, next.pos + MIN_GAP - o)
+            }
+            if (idx > 0) {
+                const prev = sortedRefs[idx - 1]
+                if (copyPos - prev.pos < MIN_GAP) nextShift = Math.max(nextShift, prev.pos + MIN_GAP - o)
+            }
+        }
+        if (nextShift === shift) break
+        shift = nextShift
+        if (shift > MAX_POS) break
+    }
+    const groupW = anchor - groupLeft
+    if (shift > MAX_POS - groupW) {
+        shift = Math.max(anchor, Math.min(MAX_POS - groupW, shift))
+    }
+
+    const now = Date.now()
+    let counter = 0
+    const newBlocks = selectedBlocks.map((b) => {
+        const w = _blockWidths[b.id] ?? 56
+        const o = blockOffsets.get(b.id)!
+        return { ...b, id: `b${now}-${counter++}`, pos: Math.max(0, Math.min(MAX_POS, shift + o + w / 2)) }
+    })
+    const newRefs = selectedRefs.map((r) => {
+        const o = refOffsets.get(r.id)!
+        return { ...r, id: `c${now}-${counter++}`, pos: Math.max(0, Math.min(MAX_POS - MIN_GAP, shift + o)) }
+    })
+    const newBlockIds = newBlocks.map((b) => b.id)
+    const newRefIds = newRefs.map((r) => r.id)
+
+    const oldToNew = new Map<string, string>()
+    for (let i = 0; i < selectedBlocks.length; i++) oldToNew.set(selectedBlocks[i].id, newBlockIds[i])
+    for (let i = 0; i < selectedRefs.length; i++) oldToNew.set(selectedRefs[i].id, newRefIds[i])
+
+    const damageMap: Record<string, string> = {}
+    const newDamageBlocks: DamageBlock[] = []
+    for (const d of _damageBlocks) {
+        const newSourceId = oldToNew.get(d.sourceId)
+        if (!newSourceId) continue
+        if (d.sourceType === 'op' && !_selectedBlockIds[d.sourceId]) continue
+        if (d.sourceType === 'ref' && !_selectedRefLineIds[d.sourceId]) continue
+        damageMap[d.id] = `d${now}-${counter++}`
+        newDamageBlocks.push({
+            ...d,
+            id: damageMap[d.id],
+            sourceId: newSourceId,
+            skillHits: d.skillHits.map((h) => ({ ...h })),
+            nonDirectEntries: d.nonDirectEntries.map((n) => ({
+                ...n,
+                responders: n.responders ? [...n.responders] : undefined
+            }))
+        })
+    }
+
+    if (newBlocks.length > 0) _opBlocks = [..._opBlocks, ...newBlocks]
+    if (newRefs.length > 0) _refLines = [..._refLines, ...newRefs].sort((a, b) => a.pos - b.pos)
+    if (newDamageBlocks.length > 0) _damageBlocks = [..._damageBlocks, ...newDamageBlocks]
+
+    _selectedBlockIds = Object.fromEntries(newBlockIds.map((id) => [id, true]))
+    _selectedRefLineIds = Object.fromEntries(newRefIds.map((id) => [id, true]))
+    _multiBlockMenu = null
+    _blockMenu = null
+    _contextMenu = null
+    enforceIntro()
+    enforceSwitchback()
+    save()
+    return damageMap
 }
 
 export function canSetIntro(blockId: string): boolean {

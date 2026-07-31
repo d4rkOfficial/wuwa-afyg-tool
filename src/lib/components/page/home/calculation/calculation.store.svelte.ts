@@ -28,14 +28,17 @@ let _initTeam: [CharSlot, CharSlot, CharSlot] | null = null
 let _initTimelineData: TimelineData | null = null
 let _globalBuffSetIds = $state<string[]>([])
 let _fetchPromise: Promise<void> | null = null
+let _onupdate: ((state: CalcState) => void) | undefined = $state()
 
 export function init(
     team: [CharSlot, CharSlot, CharSlot],
     timelineData: TimelineData | null,
     savedState: CalcState | null,
-    locked = false
+    locked = false,
+    onupdate?: (state: CalcState) => void
 ) {
     _locked = locked
+    _onupdate = onupdate
     _initTeam = team
     _initTimelineData = timelineData
 
@@ -505,6 +508,29 @@ export function getCalcState(): CalcState {
             damageEntryDamageTypes: _damageEntryDamageTypes
         })
     )
+}
+
+export function remapDuplicatedDamageBuffs(damageMap: Record<string, string>) {
+    const pairs = Object.entries(damageMap).filter(([, newId]) => Boolean(newId))
+    if (pairs.length === 0) return
+
+    const remapTable = (table: Record<string, string[]>): Record<string, string[]> => {
+        const next: Record<string, string[]> = { ...table }
+        for (const [oldId, newId] of pairs) {
+            for (const [key, value] of Object.entries(table)) {
+                if (!key.startsWith(oldId + '-')) continue
+                const newKey = newId + key.slice(oldId.length)
+                const existing = next[newKey]
+                next[newKey] = existing ? [...new Set([...existing, ...value])] : [...value]
+            }
+        }
+        return next
+    }
+
+    _damageEntryBuffSetIds = remapTable(_damageEntryBuffSetIds)
+    _damageEntryDamageTypes = remapTable(_damageEntryDamageTypes)
+    syncGlobalBuffs((_initTeam ?? []).map((s) => s.character))
+    if (_onupdate) _onupdate(getCalcState())
 }
 
 export function syncGlobalBuffs(charNames: (string | null)[]) {

@@ -374,7 +374,8 @@
             p.team,
             p.phases.timeline.data as TimelineData | null,
             p.phases.calculation.data as CalcState | null,
-            p.phases.calculation?.locked ?? false
+            p.phases.calculation?.locked ?? false,
+            (state) => updateCalculation(state)
         )
         initConfig(p.phases.config.data as ConfigState | null, p.phases.config?.locked ?? false)
         const order = getPhaseOrder()

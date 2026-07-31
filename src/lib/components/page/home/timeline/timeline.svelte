@@ -49,8 +49,10 @@
         setMultiBlockMenu,
         reflowTrack,
         getSelectedBlockIds,
+        getSelectedRefLineIds,
         getSelectionRect,
         toggleBlockSelection,
+        toggleRefLineSelection,
         clearBlockSelection,
         startSelectionRect,
         updateSelectionRect,
@@ -120,6 +122,13 @@
             if (e.button === 0 && !e.ctrlKey) {
                 const clickedId = (target.closest('[data-block]') as HTMLElement)?.dataset.block ?? ''
                 if (!getSelectedBlockIds()[clickedId]) clearBlockSelection()
+            }
+            return
+        }
+        if (timelineEl && target.closest('[data-ref-line]')) {
+            if (e.button === 0 && !e.ctrlKey) {
+                const clickedId = (target.closest('[data-ref-line]') as HTMLElement)?.dataset.refLine ?? ''
+                if (!getSelectedRefLineIds()[clickedId]) clearBlockSelection()
             }
             return
         }
@@ -213,6 +222,21 @@
         } else {
             clearBlockSelection()
             setBlockMenu({ x: e.clientX, y: e.clientY, blockId })
+        }
+    }
+
+    function onRefContextMenu(e: MouseEvent, refId: string) {
+        if (getLocked()) return
+        e.preventDefault()
+        e.stopPropagation()
+        const selectedRefs = getSelectedRefLineIds()
+        const selectedBlocks = getSelectedBlockIds()
+        const totalSelected = Object.keys(selectedRefs).length + Object.keys(selectedBlocks).length
+        if (totalSelected > 1 && selectedRefs[refId]) {
+            setMultiBlockMenu({ x: e.clientX, y: e.clientY })
+        } else {
+            clearBlockSelection()
+            setContextMenu({ x: e.clientX, y: e.clientY, id: refId })
         }
     }
 </script>
@@ -468,7 +492,8 @@
                 {#each getRefLines() as rl}
                     <div
                         class="absolute top-0 bottom-0 border-l-2 border-dashed"
-                        style="left: {vx(rl.id, rl.pos)}px; border-left-color: {getDraggingId() === rl.id
+                        style="left: {vx(rl.id, rl.pos)}px; border-left-color: {getDraggingId() === rl.id ||
+                        getSelectedRefLineIds()[rl.id]
                             ? 'var(--theme-accent-bg)'
                             : 'color-mix(in srgb, var(--theme-timeline-text) 30%, transparent)'};"
                     ></div>
@@ -499,16 +524,20 @@
                         {:else}
                             <span
                                 class="text-[9px] tabular-nums cursor-pointer"
-                                style="color: {getDraggingId() === rl.id
+                                style="color: {getDraggingId() === rl.id || getSelectedRefLineIds()[rl.id]
                                     ? 'var(--theme-accent-bg)'
                                     : 'var(--theme-timeline-text)'}; transform: scale({getDraggingId() === rl.id
                                     ? 1.2
                                     : 1}); transition: color 150ms ease, transform 150ms ease;"
-                                oncontextmenu={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    setContextMenu({ x: e.clientX, y: e.clientY, id: rl.id })
+                                data-ref-line={rl.id}
+                                onmousedown={(e) => {
+                                    if (e.ctrlKey) {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        toggleRefLineSelection(rl.id, true)
+                                    }
                                 }}
+                                oncontextmenu={(e) => onRefContextMenu(e, rl.id)}
                                 role="button"
                                 tabindex="-1">{rl.time || ''}</span
                             >
@@ -535,14 +564,17 @@
                     <div
                         class="absolute inset-y-0 pointer-events-auto cursor-col-resize"
                         style="left: {vx(rl.id, rl.pos) - 10}px; width: 20px;"
+                        data-ref-line={rl.id}
                         onmousedown={(e) => {
+                            if (e.ctrlKey) {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                toggleRefLineSelection(rl.id, true)
+                                return
+                            }
                             startDrag(e, rl.id)
                         }}
-                        oncontextmenu={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setContextMenu({ x: e.clientX, y: e.clientY, id: rl.id })
-                        }}
+                        oncontextmenu={(e) => onRefContextMenu(e, rl.id)}
                     ></div>
                 {/each}
             </div>

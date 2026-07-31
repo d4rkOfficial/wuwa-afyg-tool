@@ -25,8 +25,6 @@
         canSetSwitchback,
         toggleSwitchback,
         removeBlock,
-        removeBlocks,
-        resetDamageBindingsForBlocks,
         openRefSkillPicker,
         openSkillPicker,
         openNonDirectPicker,
@@ -35,10 +33,22 @@
         addOpBlock,
         canDelete,
         handleBlockDblclick,
-        getSelectedBlockIds
+        getSelectedBlockIds,
+        getSelectedRefLineIds,
+        toggleBlockSelection,
+        toggleRefLineSelection,
+        removeSelection,
+        resetSelectionDamage,
+        duplicateSelectionToRight
     } from './timeline.store.svelte'
+    import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
 
     let confirmMultiAction = $state<'delete' | 'reset' | null>(null)
+
+    function duplicateToRight() {
+        const damageMap = duplicateSelectionToRight()
+        if (Object.keys(damageMap).length > 0) remapDuplicatedDamageBuffs(damageMap)
+    }
 
     function clampMenu(node: HTMLElement, pos: { x: number; y: number }) {
         node.style.left = pos.x + 'px'
@@ -90,6 +100,16 @@
                 右侧添加参考线
             </button>
         {/if}
+        <button
+            onclick={() => {
+                toggleRefLineSelection(cm.id, false)
+                duplicateToRight()
+            }}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+        >
+            <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
+            复制到右侧空位
+        </button>
         {#if canDelete(cm.id)}
             <button
                 onclick={() => {
@@ -208,6 +228,16 @@
             <Icon icon="mdi:delete" class="size-4 shrink-0" />
             删除操作块
         </button>
+        <button
+            onclick={() => {
+                toggleBlockSelection(bm.blockId, false)
+                duplicateToRight()
+            }}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
+            复制到右侧空位
+        </button>
         <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
         <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
             特殊切人
@@ -324,7 +354,9 @@
 <!-- Multi-Block Context Menu -->
 {#if getMultiBlockMenu()}
     {@const mm = getMultiBlockMenu()!}
-    {@const count = Object.keys(getSelectedBlockIds()).length}
+    {@const blockCount = Object.keys(getSelectedBlockIds()).length}
+    {@const refCount = Object.keys(getSelectedRefLineIds()).length}
+    {@const totalCount = blockCount + refCount}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
@@ -335,27 +367,38 @@
         onclick={() => setMultiBlockMenu(null)}
     >
         <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
-            操作块 (已选 {count} 个)
+            多选 (操作块 {blockCount} · 参考线 {refCount})
         </div>
         <button
+            onclick={() => {
+                duplicateToRight()
+            }}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
+            复制到右侧空位
+        </button>
+        <button
             onclick={() => (confirmMultiAction = 'delete')}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:delete" class="size-4 shrink-0" />
-            删除操作块 ({count} 个)
+            删除 ({totalCount} 项)
         </button>
         <button
             onclick={() => (confirmMultiAction = 'reset')}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:restore" class="size-4 shrink-0" />
-            重置伤害绑定 ({count} 个)
+            重置伤害绑定 ({totalCount} 项)
         </button>
     </div>
 {/if}
 
 {#if confirmMultiAction === 'delete'}
-    {@const ids = Object.keys(getSelectedBlockIds())}
+    {@const blockCount = Object.keys(getSelectedBlockIds()).length}
+    {@const refCount = Object.keys(getSelectedRefLineIds()).length}
+    {@const totalCount = blockCount + refCount}
     <Modal open={true} onclose={() => (confirmMultiAction = null)}>
         {#snippet title()}
             <div class="flex items-center gap-2 text-red-400">
@@ -365,7 +408,7 @@
         {/snippet}
         {#snippet children()}
             <p class="text-sm leading-relaxed">
-                确认删除选中的 {ids.length} 个操作块？该操作不可撤销。
+                确认删除选中的 {totalCount} 项（操作块 {blockCount} · 参考线 {refCount}）？该操作不可撤销。
             </p>
             <div class="flex justify-end gap-2 mt-5">
                 <button
@@ -377,7 +420,7 @@
                 </button>
                 <button
                     onclick={() => {
-                        removeBlocks(ids)
+                        removeSelection()
                         confirmMultiAction = null
                     }}
                     class="h-8 rounded-md bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
@@ -390,7 +433,9 @@
 {/if}
 
 {#if confirmMultiAction === 'reset'}
-    {@const ids = Object.keys(getSelectedBlockIds())}
+    {@const blockCount = Object.keys(getSelectedBlockIds()).length}
+    {@const refCount = Object.keys(getSelectedRefLineIds()).length}
+    {@const totalCount = blockCount + refCount}
     <Modal open={true} onclose={() => (confirmMultiAction = null)}>
         {#snippet title()}
             <div class="flex items-center gap-2 text-red-400">
@@ -400,7 +445,7 @@
         {/snippet}
         {#snippet children()}
             <p class="text-sm leading-relaxed">
-                确认重置选中的 {ids.length} 个操作块的伤害绑定？
+                确认重置选中的 {totalCount} 项的伤害绑定？
             </p>
             <div class="flex justify-end gap-2 mt-5">
                 <button
@@ -412,7 +457,7 @@
                 </button>
                 <button
                     onclick={() => {
-                        resetDamageBindingsForBlocks(ids)
+                        resetSelectionDamage()
                         confirmMultiAction = null
                     }}
                     class="h-8 rounded-md bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
