@@ -81,7 +81,7 @@
     }
 </script>
 
-<Modal {open} {onclose} class={className} style="width: min(90vw, 640px); {mergedStyle}">
+<Modal {open} {onclose} backdropClose={false} class={className} style="width: min(90vw, 640px); {mergedStyle}">
     {#snippet title()}
         椰果工坊 · 社区工程
     {/snippet}
@@ -201,7 +201,7 @@
                         onclick={() => handleDownload(item.code, item.title)}
                         disabled={downloading !== null}
                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all hover:brightness-125 disabled:opacity-40"
-                        style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
+                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                     >
                         <Icon
                             icon={downloading === item.code ? 'mdi:loading' : 'mdi:download'}

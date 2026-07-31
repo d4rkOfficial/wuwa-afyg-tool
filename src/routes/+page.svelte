@@ -21,9 +21,10 @@
         importProjects,
         createProjectData,
         buildExportFile,
-        parseImportFile
+        parseProjectFile,
+        ProjectParseError
     } from '$lib/data/project.svelte'
-    import { checkShare, shareProject } from '$lib/data/share.svelte'
+    import { checkShare, shareProject, importFromShareUrl } from '$lib/data/share.svelte'
     import { getWWVersion, ensureVersion, resetVersionPromise, SHARE_BASE } from '$lib/api/consts'
     import { clearCache } from '$lib/data/api'
     import { browser } from '$app/environment'
@@ -135,6 +136,7 @@
         loadProjects()
         loadIcons()
         checkShare()
+        await handleImportFromHash()
     })
 
     let projects = $derived(getProjects())
@@ -292,11 +294,11 @@
         const reader = new FileReader()
         reader.onload = () => {
             try {
-                const normalized = parseImportFile(reader.result as string)
+                const normalized = parseProjectFile(reader.result as string)
                 importProjects(normalized)
                 addToast(`成功导入 ${normalized.length} 个项目`, 'success')
-            } catch {
-                addToast('导入失败：文件格式错误', 'error')
+            } catch (e) {
+                addToast(e instanceof ProjectParseError ? `导入失败：${e.message}` : '导入失败：文件格式错误', 'error')
             }
         }
         reader.readAsText(file)
@@ -314,15 +316,32 @@
         const p = projects.find((pr) => pr.id === id)
         if (!p) return
         const res = await shareProject(p)
-        if (!res.ok || !res.url) {
+        if (!res.ok || !res.code) {
             addToast(res.error ?? '分享失败', 'error')
             return
         }
+        const link = `${location.origin}#import_project=${encodeURIComponent(`${SHARE_BASE}/share/${res.code}/download`)}`
         try {
-            await navigator.clipboard.writeText(res.url)
-            addToast(`已分享(10分钟)：${res.url}（链接已复制）`, 'success')
+            await navigator.clipboard.writeText(link)
+            addToast(`已分享(10分钟)：${link}（链接已复制）`, 'success')
         } catch {
-            addToast(`已分享(10分钟)：${res.url}`, 'success')
+            addToast(`已分享(10分钟)：${link}`, 'success')
+        }
+    }
+
+    async function handleImportFromHash() {
+        const m = location.hash.match(/#import_project=([^&#]+)/)
+        if (!m) return
+        history.replaceState(null, '', location.pathname + location.search)
+        const url = decodeURIComponent(m[1])
+        if (!url) return
+        const res = await importFromShareUrl(url)
+        if (res.ok && res.project) {
+            await setActiveProject(res.project.id)
+            initForActiveProject()
+            addToast(`已从工坊导入「${res.project.name}」`, 'success')
+        } else {
+            addToast(res.error ?? '分享已失效', 'error')
         }
     }
 

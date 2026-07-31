@@ -6,6 +6,7 @@
     interface Props extends ComponentsProps {
         open: boolean
         onclose?: () => void
+        backdropClose?: boolean
         children?: Snippet
         title?: Snippet
     }
@@ -13,6 +14,7 @@
     let {
         open,
         onclose,
+        backdropClose = true,
         backgroundImage,
         textColor,
         class: className,
@@ -61,7 +63,7 @@
     }
 
     function handleBackdropClick(e: MouseEvent) {
-        if (e.target === e.currentTarget) onclose?.()
+        if (backdropClose && e.target === e.currentTarget) onclose?.()
     }
 
     function handleKeydown(e: KeyboardEvent) {

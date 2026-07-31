@@ -81,7 +81,7 @@
         }}
     >
         <div
-            class="relative w-full max-w-sm rounded-xl p-6 shadow-2xl"
+            class="relative max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-xl p-6 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
@@ -214,7 +214,7 @@
                         onclick={handleUrlApply}
                         disabled={!bgUrl.trim()}
                         class="shrink-0 rounded px-2.5 py-1 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
-                        style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
+                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                     >
                         加载
                     </button>

@@ -286,16 +286,42 @@ export function buildExportFile(
     return { version: 1, exportedAt: Date.now(), project: data }
 }
 
-/** 解析导出的工程文件文本为项目数组（导入/下载共用） */
-export function parseImportFile(text: string): Project[] {
-    const raw = JSON.parse(text) as Record<string, unknown>
-    const rawProjects: Record<string, unknown>[] = raw?.version
-        ? Array.isArray(raw.project)
-            ? (raw.project as Record<string, unknown>[])
-            : [raw.project as Record<string, unknown>]
-        : Array.isArray(raw)
-          ? (raw as Record<string, unknown>[])
-          : [raw]
+export class ProjectParseError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = 'ProjectParseError'
+    }
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+    return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+/** 解析前先校验为 JSON 且不超过尺寸上限 */
+export function safeJsonParse(text: string): unknown {
+    const bytes = new TextEncoder().encode(text).length
+    if (bytes > 1024 * 1024) throw new ProjectParseError('文件超过 1MB 限制')
+    try {
+        return JSON.parse(text)
+    } catch {
+        throw new ProjectParseError('不是合法的 JSON 文件')
+    }
+}
+
+/** 解析导出的工程文件文本为项目数组（导入/下载共用），结构无法识别时抛 ProjectParseError */
+export function parseProjectFile(text: string): Project[] {
+    const raw = safeJsonParse(text)
+    const rawProjects: Record<string, unknown>[] = []
+    if (isRecord(raw)) {
+        if (isRecord(raw.project) || Array.isArray(raw.project)) {
+            rawProjects.push(...(Array.isArray(raw.project) ? raw.project.filter(isRecord) : [raw.project]))
+        } else if ('team' in raw || 'name' in raw) {
+            rawProjects.push(raw)
+        }
+    } else if (Array.isArray(raw)) {
+        rawProjects.push(...raw.filter(isRecord))
+    }
+    if (!rawProjects.length) throw new ProjectParseError('无法识别的工程文件结构')
     return rawProjects.map((item) => ({
         id: (item.id as string) || crypto.randomUUID(),
         name: (item.name as string) || '导入的项目',

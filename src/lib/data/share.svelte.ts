@@ -1,6 +1,12 @@
 import { browser } from '$app/environment'
 import { SHARE_BASE } from '$lib/api/consts'
-import { buildExportFile, getPhaseOrder, importProjects, parseImportFile } from '$lib/data/project.svelte'
+import {
+    buildExportFile,
+    getPhaseOrder,
+    importProjects,
+    parseProjectFile,
+    ProjectParseError
+} from '$lib/data/project.svelte'
 import type { Project } from '$lib/data/types'
 
 export interface ShareTeamPreview {
@@ -64,7 +70,8 @@ export async function checkShare(force = false) {
         const params = new URLSearchParams({
             page: String(shareState.page),
             perPage: String(shareState.perPage),
-            sort: shareState.sort
+            sort: shareState.sort,
+            excludeAnon: '1'
         })
         if (shareState.query.trim()) params.set('q', shareState.query.trim())
         const res = await fetch(`${SHARE_BASE}/api/public/projects?${params}`)
@@ -137,10 +144,39 @@ export async function downloadProject(code: string): Promise<DownloadResult> {
     try {
         const res = await fetch(`${SHARE_BASE}/share/${code}/download`)
         if (!res.ok) return { ok: false, error: `下载失败（HTTP ${res.status}）` }
-        const imported = parseImportFile(await res.text())
+        const imported = parseProjectFile(await res.text())
         importProjects(imported)
         return { ok: true }
     } catch (e) {
-        return { ok: false, error: e instanceof Error ? e.message : '下载失败' }
+        return {
+            ok: false,
+            error: e instanceof ProjectParseError ? e.message : e instanceof Error ? e.message : '下载失败'
+        }
     }
+}
+
+export interface ImportResult {
+    ok: boolean
+    error?: string
+    project?: Project
+}
+
+export async function importFromShareUrl(url: string): Promise<ImportResult> {
+    let text: string
+    try {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        text = await res.text()
+    } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : '网络错误' }
+    }
+    let imported: Project[]
+    try {
+        imported = parseProjectFile(text)
+    } catch (e) {
+        return { ok: false, error: e instanceof ProjectParseError ? e.message : '导入失败：链接内容格式错误' }
+    }
+    if (!imported.length) return { ok: false, error: '链接内容为空' }
+    importProjects(imported)
+    return { ok: true, project: imported[0] }
 }
