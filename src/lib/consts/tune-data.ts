@@ -7,4 +7,4 @@ export function getTuneDamage(
     return []
 }
 
-export const EFFECT_BASE_DAMAGE: Record<string, number[]> = {}
+export const EFFECT_BASE_DAMAGE: Record<string, number[]> = {} as const

@@ -20,6 +20,7 @@
     import EchoPicker from './pickers/echo-picker.svelte'
     import SetPicker from './set-picker.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { HECATE_ECHO } from '$lib/consts/game-terms'
 
     interface Props {
         team: [CharSlot, CharSlot, CharSlot]
@@ -201,8 +202,8 @@
         if (!echo) {
             slot.triggerSets = []
         } else if (getEffectiveTotal(slot.triggerSets) === 5) {
-            // 赫卡忒特殊处理：该声骸可属于任何套装
-            if (echo.name !== '赫卡忒') {
+            // 该声骸可属于任何套装
+            if (echo.name !== HECATE_ECHO) {
                 const setNames = new Set(slot.triggerSets.map((s) => s.name))
                 const echoData = echoMap.get(echo.name)
                 if (echoData && !echoData.sets.some((sn) => setNames.has(sn))) {
@@ -221,8 +222,8 @@
 
             if (getEffectiveTotal(sets) === 5) {
                 const slot = localTeam[pickerSlot]
-                // 赫卡忒特殊处理：该声骸可属于任何套装
-                if (slot.echoes[0].name !== '赫卡忒') {
+                // 该声骸可属于任何套装
+                if (slot.echoes[0].name !== HECATE_ECHO) {
                     const echoData = slot.echoes[0].name ? echoMap.get(slot.echoes[0].name) : null
                     if (echoData) {
                         const setNames = new Set(sets.map((s) => s.name))

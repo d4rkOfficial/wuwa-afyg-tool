@@ -1,5 +1,5 @@
 import type { EchoStat } from '$lib/types/game-data'
-import { SUBSTAT_OPTIONS } from './stat-data'
+import type { SubstatLabel } from './stat-data'
 
 // ── tier probability pool ──
 
@@ -25,7 +25,7 @@ function makePool(tiers: TierPool[]): SubstatRollPool {
 }
 
 // all 13 substat types with their tier probability pools
-const POOLS: Record<string, SubstatRollPool> = {
+const POOLS: Record<SubstatLabel, SubstatRollPool> = {
     暴击率: makePool([
         { value: 6.3, prob: 23.33 },
         { value: 6.9, prob: 23.33 },
@@ -148,9 +148,9 @@ const POOLS: Record<string, SubstatRollPool> = {
         { value: 60, prob: 32.04 },
         { value: 70, prob: 8.74 }
     ])
-}
+} as const
 
-export const ROLLABLE_TYPES = Object.keys(POOLS)
+export const ROLLABLE_TYPES: SubstatLabel[] = Object.keys(POOLS) as SubstatLabel[]
 
 // ── weighted tier roll ──
 

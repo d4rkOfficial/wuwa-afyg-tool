@@ -2,6 +2,7 @@
     import type { Character } from '$lib/api/types'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { ELEMENT_ORDER } from '$lib/consts/game-terms'
 
     interface GroupData {
         rover: Character[]
@@ -20,8 +21,6 @@
     }
 
     let { open, onclose, onselect, characters, icons, elementIcons = {}, currentName }: Props = $props()
-
-    const ELEMENT_ORDER = ['冷凝', '热熔', '导电', '气动', '衍射', '湮灭']
 
     let query = $state('')
     let groupRefs: Record<string, HTMLDivElement | null> = {}

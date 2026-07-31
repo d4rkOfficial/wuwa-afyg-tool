@@ -12,7 +12,7 @@
     let { existingTypes, onclose, onresult }: Props = $props()
 
     const available = ROLLABLE_TYPES.filter((t) => !existingTypes.includes(t))
-    const PRESELECT = ['暴击率', '暴击伤害'].filter((t) => available.includes(t))
+    const PRESELECT = available.filter((t) => t === '暴击率' || t === '暴击伤害')
     let selected = $state<string[]>(PRESELECT)
     let running = $state(false)
 

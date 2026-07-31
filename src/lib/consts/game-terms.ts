@@ -2,8 +2,6 @@
 export const ELEMENTS = ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭'] as const
 export type Element = (typeof ELEMENTS)[number]
 
-export const ELEMENT_NAMES = ['冷凝', '热熔', '导电', '气动', '衍射', '湮灭'] as const
-
 export const ELEMENT_MAP: Record<number, string> = {
     1: '冷凝',
     2: '热熔',
@@ -11,7 +9,7 @@ export const ELEMENT_MAP: Record<number, string> = {
     4: '气动',
     5: '衍射',
     6: '湮灭'
-}
+} as const
 
 export const ELEMENT_COLORS: Record<string, string> = {
     冷凝: '#0284c7',
@@ -20,7 +18,7 @@ export const ELEMENT_COLORS: Record<string, string> = {
     气动: '#059669',
     衍射: '#ca8a04',
     湮灭: '#db2777'
-}
+} as const
 
 export const ELEMENT_ORDER = ['冷凝', '热熔', '导电', '气动', '衍射', '湮灭'] as const
 
@@ -34,7 +32,7 @@ export const WEAPON_TYPE_MAP: Record<number, string> = {
     3: '佩枪',
     4: '臂铠',
     5: '音感仪'
-}
+} as const
 
 // ── Skill Types ──
 export const SKILL_TYPES = ['常态攻击', '共鸣技能', '共鸣解放', '共鸣回路', '变奏技能', '延奏技能'] as const
@@ -66,7 +64,7 @@ export const DAMAGE_TYPE_SHORT: Record<string, string> = {
     声骸技能伤害: '声骸',
     变奏技能伤害: '变奏',
     延奏技能伤害: '延奏'
-}
+} as const
 
 export const DAMAGE_BONUS_LABELS = ['普攻伤害加成', '重击伤害加成', '共鸣技能伤害加成', '共鸣解放伤害加成'] as const
 
@@ -75,24 +73,21 @@ export const TYPE_BONUS_MAP: Record<string, string> = {
     重击伤害加成: '重击',
     共鸣技能伤害加成: '共鸣技能',
     共鸣解放伤害加成: '共鸣解放'
-}
+} as const
 
-export const ELEMENT_BONUS_MAP: Record<string, string> = {
-    冷凝伤害加成: '冷凝',
-    热熔伤害加成: '热熔',
-    导电伤害加成: '导电',
-    气动伤害加成: '气动',
-    衍射伤害加成: '衍射',
-    湮灭伤害加成: '湮灭'
-}
+export const ELEMENT_BONUS_MAP = Object.fromEntries(ELEMENT_ORDER.map((el) => [`${el}伤害加成`, el])) satisfies Record<
+    string,
+    string
+>
 
 // ── Base Stat Types ──
 export const BASE_STATS = ['攻击', '生命', '防御'] as const
 export type BaseStat = (typeof BASE_STATS)[number]
 
-export const PCT_UNITS = ['攻击%', '生命%', '防御%', '偏谐系数'] as const
+const TUNE_UNIT = '偏谐系数'
+export const PCT_UNITS = ['攻击%', '生命%', '防御%', TUNE_UNIT] as const
 
-export const BASE_STAT_TUNE = '偏谐系数'
+export const BASE_STAT_TUNE = TUNE_UNIT
 export const BASE_STAT_EFFECT = '效应系数'
 export const BASE_STAT_FIXED = '固定'
 
@@ -113,7 +108,10 @@ export const PHASE_LABELS: Record<PhaseKey, string> = {
 }
 
 // ── Echo Cost ──
-export const COST_MAP: Record<number, number> = { 0: 1, 1: 3, 2: 4, 3: 4 }
+export const COST_MAP: Record<number, number> = { 0: 1, 1: 3, 2: 4, 3: 4 } as const
+
+// 该声骸可属于任何套装（特殊处理）
+export const HECATE_ECHO = '赫卡忒'
 
 // ── Weapon Substat Name Mapping (API short form → canonical form) ──
 export const WEAPON_SUBSTAT_NAME_MAP: Record<string, string> = {
@@ -121,30 +119,28 @@ export const WEAPON_SUBSTAT_NAME_MAP: Record<string, string> = {
     攻击: '攻击%',
     生命: '生命%',
     防御: '防御%'
-}
+} as const
 
 /** Substat names where the API raw value is a decimal fraction needing ×100 */
 export const SUBSTAT_DECIMAL_TO_PCT = new Set(['攻击%', '生命%', '防御%'])
 
 // ── Non-direct Configs (effect / tune) ──
 export const NON_DIRECT_CONFIGS = [
-    { name: '谐度破坏', category: '处决' as const, max: 0 },
+    { name: SKILL_TYPE_TUNE_BREAK, category: '处决' as const, max: 0 },
     { name: '震谐响应', category: '响应' as const, max: 0 },
     { name: '骇破响应', category: '响应' as const, max: 0 },
-    { name: '光噪效应', category: '效应' as const, max: 19 },
-    { name: '风蚀效应', category: '效应' as const, max: 12 },
-    { name: '霜渐效应', category: '效应' as const, max: 19 },
-    { name: '聚爆效应', category: '效应' as const, max: 19 },
-    { name: '电磁效应', category: '效应' as const, max: 19 },
-    { name: '虚湮效应', category: '效应' as const, max: 6 }
+    { name: '光噪效应', category: '效应' as const, max: 19, element: '衍射' },
+    { name: '风蚀效应', category: '效应' as const, max: 12, element: '气动' },
+    { name: '霜渐效应', category: '效应' as const, max: 19, element: '冷凝' },
+    { name: '聚爆效应', category: '效应' as const, max: 19, element: '热熔' },
+    { name: '电磁效应', category: '效应' as const, max: 19, element: '导电' },
+    { name: '虚湮效应', category: '效应' as const, max: 6, element: '湮灭' }
 ] as const
 
-export const NON_DIRECT_ELEMENT: Record<string, string> = {
-    光噪效应: '衍射',
-    风蚀效应: '气动',
-    霜渐效应: '冷凝',
-    聚爆效应: '热熔',
-    电磁效应: '导电',
-    电磁爆发: '导电',
-    虚湮效应: '湮灭'
-}
+export const NON_DIRECT_ELEMENT = NON_DIRECT_CONFIGS.reduce<Record<string, string>>(
+    (acc, cfg) => {
+        if ('element' in cfg) acc[cfg.name] = cfg.element
+        return acc
+    },
+    { 电磁爆发: '导电' }
+)
