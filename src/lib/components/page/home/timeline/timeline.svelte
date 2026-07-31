@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { untrack } from 'svelte'
     import type { CharSlot } from '$lib/data/types'
     import type { TimelineData } from './timeline.types'
     import {
@@ -14,6 +15,7 @@
         setEditValue,
         getDraggingId,
         getDragBlockId,
+        getIsGroupDrag,
         getBlockWidths,
         getCharIconMap,
         getBlockMenu,
@@ -56,8 +58,18 @@
         clearBlockSelection,
         startSelectionRect,
         updateSelectionRect,
-        endSelectionRect
+        endSelectionRect,
+        removeSelection,
+        undo,
+        redo,
+        copySelection,
+        cutSelection,
+        pasteSelection,
+        selectAll,
+        setPointerX,
+        hasClipboard
     } from './timeline.store.svelte'
+    import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
     import {
         SIDE_PAD,
         PPS,
@@ -100,7 +112,11 @@
     })
 
     $effect(() => {
-        init(data, onupdate, team, locked)
+        data
+        onupdate
+        team
+        locked
+        untrack(() => init(data, onupdate, team, locked))
     })
 
     $effect(() => {
@@ -145,6 +161,9 @@
         const rect = timelineEl.getBoundingClientRect()
         const scrollL = timelineEl.scrollLeft
         const rawX = e.clientX - rect.left + scrollL - 80
+        if (e.clientX >= rect.left && e.clientX <= rect.right) {
+            setPointerX(rawX)
+        }
         if (getSelectionRect()) {
             updateSelectionRect(rawX)
         }
@@ -214,13 +233,15 @@
 
     function onBlockContextMenu(e: MouseEvent, blockId: string) {
         if (getLocked()) return
+        const target = e.target as HTMLElement
+        if (target.closest('input, textarea, [contenteditable]')) return
         e.preventDefault()
         e.stopPropagation()
         const selected = getSelectedBlockIds()
         if (Object.keys(selected).length > 1 && selected[blockId]) {
             setMultiBlockMenu({ x: e.clientX, y: e.clientY })
         } else {
-            clearBlockSelection()
+            toggleBlockSelection(blockId, false)
             setBlockMenu({ x: e.clientX, y: e.clientY, blockId })
         }
     }
@@ -235,7 +256,7 @@
         if (totalSelected > 1 && selectedRefs[refId]) {
             setMultiBlockMenu({ x: e.clientX, y: e.clientY })
         } else {
-            clearBlockSelection()
+            toggleRefLineSelection(refId, false)
             setContextMenu({ x: e.clientX, y: e.clientY, id: refId })
         }
     }
@@ -246,9 +267,55 @@
     onmousemove={onWindowMouseMove}
     onmouseup={onWindowMouseUp}
     onmouseleave={onWindowMouseLeave}
-    oncontextmenu={(e) => e.preventDefault()}
-    oncopy={(e) => e.preventDefault()}
-    oncut={(e) => e.preventDefault()}
+    oncontextmenu={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('input, textarea, [contenteditable]')) return
+        e.preventDefault()
+    }}
+    oncopy={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('input, textarea, [contenteditable]')) return
+        if (Object.keys(getSelectedBlockIds()).length > 0 || Object.keys(getSelectedRefLineIds()).length > 0) {
+            e.preventDefault()
+            copySelection()
+        }
+    }}
+    oncut={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('input, textarea, [contenteditable]')) return
+        if (Object.keys(getSelectedBlockIds()).length > 0 || Object.keys(getSelectedRefLineIds()).length > 0) {
+            e.preventDefault()
+            cutSelection()
+        }
+    }}
+    onpaste={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('input, textarea, [contenteditable]')) return
+        if (!hasClipboard()) return
+        e.preventDefault()
+        const damageMap = pasteSelection()
+        if (Object.keys(damageMap).length > 0) remapDuplicatedDamageBuffs(damageMap)
+    }}
+    onkeydown={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('input, textarea, [contenteditable]')) return
+        const key = e.key.toLowerCase()
+        if ((e.ctrlKey || e.metaKey) && key === 'a') {
+            e.preventDefault()
+            selectAll()
+            return
+        }
+        if ((e.ctrlKey || e.metaKey) && (key === 'z' || key === 'y')) {
+            e.preventDefault()
+            if (key === 'y' || e.shiftKey) redo()
+            else undo()
+            return
+        }
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace')) {
+            e.preventDefault()
+            removeSelection()
+        }
+    }}
 />
 
 <div class="flex h-full flex-col bg-(--theme-timeline-bg) text-(--theme-timeline-text)">
@@ -317,16 +384,16 @@
                         {#if i < getTRACKS().length - 1}
                             <div class="absolute pointer-events-none" style="left: 5rem; top: 0; right: 0; bottom: 0;">
                                 {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
+                                    {@const isGroupDrag = getIsGroupDrag()}
                                     {@const isHighlighted =
                                         getDragBlockId() === block.id ||
-                                        (getSelectedBlockIds()[block.id] &&
-                                            getDragBlockId() !== null &&
-                                            Object.keys(getSelectedBlockIds()).length > 1)}
+                                        (getSelectedBlockIds()[block.id] && isGroupDrag)}
                                     {@const isSelected = getSelectedBlockIds()[block.id] !== undefined}
                                     {@const isOtherBlockDimmed =
-                                        getDragBlockId() !== null &&
-                                        block.id !== getDragBlockId() &&
-                                        !getSelectedBlockIds()[block.id]}
+                                        (getDragBlockId() !== null &&
+                                            block.id !== getDragBlockId() &&
+                                            !getSelectedBlockIds()[block.id]) ||
+                                        (isGroupDrag && !getSelectedBlockIds()[block.id])}
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
                                         class="absolute inset-y-0 flex items-center pointer-events-auto cursor-grab active:cursor-grabbing select-none"
@@ -415,13 +482,18 @@
                             >
                                 <div class="relative" style="height: {damageStackHeight}px; width: 100%;">
                                     {#each damageStack as { block: dmg, top, left } (dmg.id)}
-                                        {@const isParentDragged =
-                                            getDragBlockId() !== null &&
-                                            dmg.sourceType === 'op' &&
-                                            (Object.keys(getSelectedBlockIds()).length > 1
+                                        {@const isGroupDrag = getIsGroupDrag()}
+                                        {@const isParentDragged = isGroupDrag
+                                            ? dmg.sourceType === 'op'
                                                 ? getSelectedBlockIds()[dmg.sourceId]
-                                                : getDragBlockId() === dmg.sourceId)}
-                                        {@const isDimmed = getDragBlockId() !== null && !isParentDragged}
+                                                : getSelectedRefLineIds()[dmg.sourceId]
+                                            : getDragBlockId() !== null &&
+                                              dmg.sourceType === 'op' &&
+                                              (Object.keys(getSelectedBlockIds()).length > 1
+                                                  ? getSelectedBlockIds()[dmg.sourceId]
+                                                  : getDragBlockId() === dmg.sourceId)}
+                                        {@const isDimmed =
+                                            (getDragBlockId() !== null || isGroupDrag) && !isParentDragged}
                                         <div
                                             class="absolute cursor-default"
                                             style="left: {left}px; top: {top}px; transform: scale({isParentDragged

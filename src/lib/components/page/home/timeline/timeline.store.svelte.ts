@@ -48,12 +48,23 @@ let _locked = $state(false)
 
 function assertUnlocked(): boolean {
     if (_locked) {
-        addToast('本环节已锁定，请先解锁后编辑。编辑产生的副作用需您来承担。', 'info')
+        addToast('本环节已锁定，请先解锁', 'info')
         return false
     }
     return true
 }
 let _onupdate: ((data: TimelineData) => void) | undefined = $state()
+const MAX_HISTORY = 100
+let _undoStack: TimelineData[] = []
+let _redoStack: TimelineData[] = []
+let _lastCommitted: TimelineData | null = null
+let _clipboard: {
+    refLines: RefLine[]
+    opBlocks: OpBlock[]
+    damageBlocks: DamageBlock[]
+    blockWidths: Record<string, number>
+} | null = null
+let _lastPointerX: number | null = null
 let _team = $state<[CharSlot, CharSlot, CharSlot]>([{}, {}, {}] as unknown as [CharSlot, CharSlot, CharSlot])
 let _uiBtnIcons = $state<[string, string][]>([])
 let _charIconMap = $state<Record<string, string>>({})
@@ -100,10 +111,39 @@ export function init(
     _contextMenu = null
     _trackMenu = null
     _blockMenu = null
+    _blockKeyPickerId = null
+    _clipboard = null
+    _lastPointerX = null
     _showDamageList = false
     _dragVisualPositions = {}
     _blockWidths = {}
+    _isGroupDrag = false
+    _dragRefInitialPositions = {}
+    _dragBlockInitialPositions = {}
+    const snap = cloneData()
+    const incoming = data ? JSON.parse(JSON.stringify(data)) : null
+    if (!incoming || JSON.stringify(incoming) !== JSON.stringify(snap)) {
+        _undoStack = []
+        _redoStack = []
+    }
+    _lastCommitted = snap
     loadCharElements()
+}
+
+function cloneData(): TimelineData {
+    return JSON.parse(JSON.stringify({ refLines: _refLines, opBlocks: _opBlocks, damageBlocks: _damageBlocks }))
+}
+
+function applyData(d: TimelineData) {
+    _refLines = d.refLines
+    _opBlocks = d.opBlocks
+    _damageBlocks = d.damageBlocks
+    _selectedBlockIds = {}
+    _selectedRefLineIds = {}
+    _multiBlockMenu = null
+    _blockMenu = null
+    _contextMenu = null
+    _dragVisualPositions = {}
 }
 
 async function loadCharElements() {
@@ -128,9 +168,44 @@ async function loadCharElements() {
 }
 
 function save() {
-    if (_onupdate) {
-        _onupdate({ refLines: _refLines, opBlocks: _opBlocks, damageBlocks: _damageBlocks })
+    const snap = cloneData()
+    if (!_lastCommitted || JSON.stringify(_lastCommitted) !== JSON.stringify(snap)) {
+        if (_lastCommitted) {
+            _undoStack.push(_lastCommitted)
+            if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
+            _redoStack = []
+        }
+        _lastCommitted = snap
     }
+    if (_onupdate) {
+        _onupdate(snap)
+    }
+}
+
+export function undo() {
+    if (!assertUnlocked()) return
+    const prev = _undoStack.pop()
+    if (!prev) {
+        addToast('没有可撤销的操作', 'info')
+        return
+    }
+    _redoStack.push(cloneData())
+    _lastCommitted = prev
+    applyData(prev)
+    if (_onupdate) _onupdate(prev)
+}
+
+export function redo() {
+    if (!assertUnlocked()) return
+    const next = _redoStack.pop()
+    if (!next) {
+        addToast('没有可重做的操作', 'info')
+        return
+    }
+    _undoStack.push(cloneData())
+    _lastCommitted = next
+    applyData(next)
+    if (_onupdate) _onupdate(next)
 }
 
 // ── Getters ──
@@ -221,6 +296,9 @@ let _editingBlockId = $state<string | null>(null)
 let _editingBlockDesc = $state('')
 let _dragBlockId = $state<string | null>(null)
 let _dragBlockStartPos = $state(0)
+let _isGroupDrag = $state(false)
+let _dragRefInitialPositions = $state<Record<string, number>>({})
+let _dragRefStartPos = $state(0)
 let _blockWidths = $state<Record<string, number>>({})
 let _damageWidths = $state<Record<string, number>>({})
 let _blockMenu = $state<{ x: number; y: number; blockId: string } | null>(null)
@@ -249,6 +327,9 @@ export function setEditingBlockDesc(v: string) {
 export function getDragBlockId() {
     return _dragBlockId
 }
+export function getIsGroupDrag() {
+    return _isGroupDrag
+}
 export function getBlockWidths() {
     return _blockWidths
 }
@@ -260,6 +341,15 @@ export function getBlockMenu() {
 }
 export function setBlockMenu(v: { x: number; y: number; blockId: string } | null) {
     _blockMenu = v
+}
+
+let _blockKeyPickerId = $state<string | null>(null)
+
+export function getBlockKeyPickerId() {
+    return _blockKeyPickerId
+}
+export function setBlockKeyPickerId(v: string | null) {
+    _blockKeyPickerId = v
 }
 
 let _multiBlockMenu = $state<{ x: number; y: number } | null>(null)
@@ -316,6 +406,14 @@ export function toggleRefLineSelection(refId: string, ctrl: boolean) {
 export function clearBlockSelection() {
     _selectedBlockIds = {}
     _selectedRefLineIds = {}
+}
+
+export function setPointerX(x: number) {
+    _lastPointerX = x
+}
+
+export function hasClipboard(): boolean {
+    return _clipboard !== null && (_clipboard.opBlocks.length > 0 || _clipboard.refLines.length > 0)
 }
 
 export function startSelectionRect(x: number) {
@@ -683,6 +781,25 @@ export function addAfter(id: string) {
     startEdit(nid, '')
 }
 
+export function addRefLineAt(x: number) {
+    if (!assertUnlocked()) return
+    const cx = Math.max(SIDE_PAD, Math.min(MAX_POS, x))
+    const i = _refLines.findIndex((r) => r.pos > cx)
+    const insertIdx = i === -1 ? _refLines.length : i
+    const prevX = i > 0 ? _refLines[i - 1].pos : -Infinity
+    const nextX = i >= 0 ? _refLines[i].pos : Infinity
+    if (cx - prevX < MIN_GAP || nextX - cx < MIN_GAP) {
+        addToast('空间不足，无法创建参考线', 'error')
+        return
+    }
+    const nid = `c${Date.now()}`
+    _dragVisualPositions = { ..._dragVisualPositions, [nid]: cx }
+    _refLines = [..._refLines.slice(0, insertIdx), { id: nid, time: '', pos: cx }, ..._refLines.slice(insertIdx)]
+    _trackMenu = null
+    save()
+    startEdit(nid, '')
+}
+
 export function removeLine(id: string) {
     if (!assertUnlocked()) return
     if (!canDelete(id)) return
@@ -760,25 +877,107 @@ export function startDrag(e: MouseEvent, id: string) {
     if (!assertUnlocked()) return
     if (e.button !== 0 || id === 'left') return
     _draggingId = id
+    const ref = _refLines.find((r) => r.id === id)
+    if (!ref) return
+    const totalSelected = Object.keys(_selectedBlockIds).length + Object.keys(_selectedRefLineIds).length
+    if (_selectedRefLineIds[id] && totalSelected > 1) {
+        _isGroupDrag = true
+        _dragRefStartPos = ref.pos
+        _dragRefInitialPositions = snapshotRefPositions()
+        _dragBlockInitialPositions = snapshotBlockPositions()
+    } else {
+        _isGroupDrag = false
+        _dragRefInitialPositions = {}
+        _dragBlockInitialPositions = {}
+    }
 }
 
 export function onDrag(rawX: number) {
     if (!_draggingId) return
+    if (_isGroupDrag) {
+        const delta = Math.max(0, Math.min(MAX_POS, rawX)) - _dragRefStartPos
+        applyGroupDelta(delta)
+        return
+    }
     _dragVisualPositions = { ..._dragVisualPositions, [_draggingId]: clampDragPos(rawX, _draggingId) }
 }
 
 export function stopDrag() {
     if (!_draggingId) {
         _draggingId = null
+        resetGroupDrag()
         return
     }
     const id = _draggingId
-    const newX = _dragVisualPositions[id]
-    if (newX !== undefined) {
-        _refLines = _refLines.map((r) => (r.id === id ? { ...r, pos: newX } : r))
+    if (_isGroupDrag) {
         save()
+    } else {
+        const newX = _dragVisualPositions[id]
+        if (newX !== undefined) {
+            _refLines = _refLines.map((r) => (r.id === id ? { ...r, pos: newX } : r))
+            save()
+        }
     }
     _draggingId = null
+    resetGroupDrag()
+}
+
+function snapshotBlockPositions(): Record<string, number> {
+    const init: Record<string, number> = {}
+    for (const id of Object.keys(_selectedBlockIds)) {
+        const b = _opBlocks.find((ob) => ob.id === id)
+        if (b) init[id] = b.pos
+    }
+    return init
+}
+
+function snapshotRefPositions(): Record<string, number> {
+    const init: Record<string, number> = {}
+    for (const id of Object.keys(_selectedRefLineIds)) {
+        const r = _refLines.find((rr) => rr.id === id)
+        if (r) init[id] = r.pos
+    }
+    return init
+}
+
+function applyGroupDelta(delta: number) {
+    const initBlocks = _dragBlockInitialPositions
+    if (Object.keys(initBlocks).length > 0) {
+        _opBlocks = _opBlocks.map((b) =>
+            initBlocks[b.id] !== undefined
+                ? { ...b, pos: Math.max(0, Math.min(MAX_POS, initBlocks[b.id]! + delta)) }
+                : b
+        )
+    }
+    const initRefs = _dragRefInitialPositions
+    const initRefIds = Object.keys(initRefs)
+    if (initRefIds.length > 0) {
+        const walls = _refLines.filter((r) => initRefIds.indexOf(r.id) < 0).sort((a, b) => a.pos - b.pos)
+        _refLines = _refLines
+            .map((r) => {
+                const initPos = initRefs[r.id]
+                if (initPos === undefined) return r
+                let prevWall = -Infinity
+                let nextWall = Infinity
+                for (const w of walls) {
+                    if (w.pos < initPos) prevWall = Math.max(prevWall, w.pos)
+                    else if (w.pos > initPos) {
+                        nextWall = Math.min(nextWall, w.pos)
+                        break
+                    }
+                }
+                const p = initPos + delta
+                const clamped = Math.max(0, prevWall + MIN_GAP, Math.min(MAX_POS, nextWall - MIN_GAP, p))
+                return { ...r, pos: clamped }
+            })
+            .sort((a, b) => a.pos - b.pos)
+    }
+}
+
+function resetGroupDrag() {
+    _isGroupDrag = false
+    _dragRefInitialPositions = {}
+    _dragBlockInitialPositions = {}
 }
 
 // ── Op Block Functions ──
@@ -808,15 +1007,15 @@ export function startBlockDrag(e: MouseEvent, blockId: string, mouseContentX?: n
             _dragBlockOffset = mouseContentX - block.pos
         }
     }
-    if (Object.keys(_selectedBlockIds).length > 1 && _selectedBlockIds[blockId]) {
-        const init: Record<string, number> = {}
-        for (const id of Object.keys(_selectedBlockIds)) {
-            const b = _opBlocks.find((ob) => ob.id === id)
-            if (b) init[id] = b.pos
-        }
-        _dragBlockInitialPositions = init
+    const totalSelected = Object.keys(_selectedBlockIds).length + Object.keys(_selectedRefLineIds).length
+    if (_selectedBlockIds[blockId] && totalSelected > 1) {
+        _isGroupDrag = true
+        _dragBlockInitialPositions = snapshotBlockPositions()
+        _dragRefInitialPositions = snapshotRefPositions()
     } else {
+        _isGroupDrag = false
         _dragBlockInitialPositions = {}
+        _dragRefInitialPositions = {}
     }
 }
 
@@ -827,31 +1026,27 @@ export function onBlockDrag(rawX: number) {
     const centerX = rawX - _dragBlockOffset
     const pos = snapBlockX(centerX, _opBlocks[idx].trackIndex, _dragBlockId, _blockWidths[_dragBlockId] ?? 0)
     const clampedPos = Math.max(0, Math.min(MAX_POS, pos))
-    const initPositions = _dragBlockInitialPositions
-    if (Object.keys(initPositions).length > 0) {
-        const delta = clampedPos - _dragBlockStartPos
-        _opBlocks = _opBlocks.map((b) => {
-            const initPos = initPositions[b.id]
-            if (initPos !== undefined) {
-                return { ...b, pos: Math.max(0, Math.min(MAX_POS, initPos + delta)) }
-            }
-            return b.id === _dragBlockId ? { ...b, pos: clampedPos } : b
-        })
-    } else {
-        _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: clampedPos } : b))
+    if (_isGroupDrag) {
+        applyGroupDelta(clampedPos - _dragBlockStartPos)
+        return
     }
+    _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: clampedPos } : b))
 }
 
 export function stopBlockDrag() {
     if (!_dragBlockId) {
         _dragBlockInitialPositions = {}
+        _dragRefInitialPositions = {}
+        _isGroupDrag = false
         _dragBlockId = null
         return
     }
     const idx = _opBlocks.findIndex((b) => b.id === _dragBlockId)
     if (idx >= 0) {
         const dragged = _opBlocks[idx]
-        if (Math.abs(dragged.pos - _dragBlockStartPos) > 1) {
+        if (_isGroupDrag) {
+            save()
+        } else if (Math.abs(dragged.pos - _dragBlockStartPos) > 1) {
             const dw = _blockWidths[_dragBlockId] ?? 0
             const dLeft = dragged.pos - dw / 2
             for (const b of _opBlocks) {
@@ -871,6 +1066,8 @@ export function stopBlockDrag() {
         }
     }
     _dragBlockInitialPositions = {}
+    _dragRefInitialPositions = {}
+    _isGroupDrag = false
     _dragBlockId = null
 }
 
@@ -916,7 +1113,7 @@ export function resetDamageBindingsForBlocks(ids: string[]) {
     save()
 }
 
-export function removeSelection() {
+export function removeSelection(showToast = true) {
     if (!assertUnlocked()) return
     const blockIds = Object.keys(_selectedBlockIds)
     const refIds = Object.keys(_selectedRefLineIds)
@@ -940,6 +1137,7 @@ export function removeSelection() {
     enforceIntro()
     enforceSwitchback()
     save()
+    if (showToast) addToast(`已删除 ${blockIds.length + refIds.length} 项`, 'success')
 }
 
 export function resetSelectionDamage() {
@@ -960,46 +1158,51 @@ export function resetSelectionDamage() {
     save()
 }
 
-export function duplicateSelectionToRight(): Record<string, string> {
-    if (!assertUnlocked()) return {}
-    const selectedBlocks = Object.keys(_selectedBlockIds)
-        .map((id) => _opBlocks.find((b) => b.id === id))
-        .filter((b): b is OpBlock => Boolean(b))
-    const selectedRefs = Object.keys(_selectedRefLineIds)
-        .map((id) => _refLines.find((r) => r.id === id))
-        .filter((r): r is RefLine => Boolean(r))
-    if (selectedBlocks.length === 0 && selectedRefs.length === 0) return {}
+interface InsertGroupResult {
+    damageMap: Record<string, string>
+    newBlockIds: string[]
+    newRefIds: string[]
+    count: number
+}
 
+function insertGroupAt(
+    blocks: OpBlock[],
+    refs: RefLine[],
+    damageToCopy: DamageBlock[],
+    widths: Record<string, number>,
+    baseShift: number
+): InsertGroupResult | null {
+    if (blocks.length === 0 && refs.length === 0) return null
     let groupLeft = Infinity
     let anchor = -Infinity
-    for (const b of selectedBlocks) {
-        const w = _blockWidths[b.id] ?? 56
+    for (const b of blocks) {
+        const w = widths[b.id] ?? 56
         groupLeft = Math.min(groupLeft, b.pos - w / 2)
         anchor = Math.max(anchor, b.pos + w / 2)
     }
-    for (const r of selectedRefs) {
+    for (const r of refs) {
         groupLeft = Math.min(groupLeft, r.pos)
         anchor = Math.max(anchor, r.pos)
     }
-    const blockOffsets = new Map(selectedBlocks.map((b) => [b.id, b.pos - (_blockWidths[b.id] ?? 56) / 2 - groupLeft]))
-    const refOffsets = new Map(selectedRefs.map((r) => [r.id, r.pos - groupLeft]))
+    const blockOffsets = new Map(blocks.map((b) => [b.id, b.pos - (widths[b.id] ?? 56) / 2 - groupLeft]))
+    const refOffsets = new Map(refs.map((r) => [r.id, r.pos - groupLeft]))
     const sortedRefs = _refLines.slice().sort((a, b) => a.pos - b.pos)
 
-    let shift = anchor
+    let shift = baseShift
     for (let iter = 0; iter < 200; iter++) {
         let nextShift = shift
-        for (const b of selectedBlocks) {
+        for (const b of blocks) {
             const o = blockOffsets.get(b.id)!
-            const w = _blockWidths[b.id] ?? 56
+            const w = widths[b.id] ?? 56
             for (const u of _opBlocks) {
                 if (u.id === b.id || u.trackIndex !== b.trackIndex) continue
-                const uw = _blockWidths[u.id] ?? 56
+                const uw = widths[u.id] ?? 56
                 if (u.pos - uw / 2 < shift + o + w && u.pos + uw / 2 > shift + o) {
                     nextShift = Math.max(nextShift, u.pos + uw / 2 - o)
                 }
             }
         }
-        for (const r of selectedRefs) {
+        for (const r of refs) {
             const o = refOffsets.get(r.id)!
             const copyPos = shift + o
             let idx = sortedRefs.length
@@ -1024,17 +1227,17 @@ export function duplicateSelectionToRight(): Record<string, string> {
     }
     const groupW = anchor - groupLeft
     if (shift > MAX_POS - groupW) {
-        shift = Math.max(anchor, Math.min(MAX_POS - groupW, shift))
+        return null
     }
 
     const now = Date.now()
     let counter = 0
-    const newBlocks = selectedBlocks.map((b) => {
-        const w = _blockWidths[b.id] ?? 56
+    const newBlocks = blocks.map((b) => {
+        const w = widths[b.id] ?? 56
         const o = blockOffsets.get(b.id)!
         return { ...b, id: `b${now}-${counter++}`, pos: Math.max(0, Math.min(MAX_POS, shift + o + w / 2)) }
     })
-    const newRefs = selectedRefs.map((r) => {
+    const newRefs = refs.map((r) => {
         const o = refOffsets.get(r.id)!
         return { ...r, id: `c${now}-${counter++}`, pos: Math.max(0, Math.min(MAX_POS - MIN_GAP, shift + o)) }
     })
@@ -1042,16 +1245,14 @@ export function duplicateSelectionToRight(): Record<string, string> {
     const newRefIds = newRefs.map((r) => r.id)
 
     const oldToNew = new Map<string, string>()
-    for (let i = 0; i < selectedBlocks.length; i++) oldToNew.set(selectedBlocks[i].id, newBlockIds[i])
-    for (let i = 0; i < selectedRefs.length; i++) oldToNew.set(selectedRefs[i].id, newRefIds[i])
+    for (let i = 0; i < blocks.length; i++) oldToNew.set(blocks[i].id, newBlockIds[i])
+    for (let i = 0; i < refs.length; i++) oldToNew.set(refs[i].id, newRefIds[i])
 
     const damageMap: Record<string, string> = {}
     const newDamageBlocks: DamageBlock[] = []
-    for (const d of _damageBlocks) {
+    for (const d of damageToCopy) {
         const newSourceId = oldToNew.get(d.sourceId)
         if (!newSourceId) continue
-        if (d.sourceType === 'op' && !_selectedBlockIds[d.sourceId]) continue
-        if (d.sourceType === 'ref' && !_selectedRefLineIds[d.sourceId]) continue
         damageMap[d.id] = `d${now}-${counter++}`
         newDamageBlocks.push({
             ...d,
@@ -1068,16 +1269,123 @@ export function duplicateSelectionToRight(): Record<string, string> {
     if (newBlocks.length > 0) _opBlocks = [..._opBlocks, ...newBlocks]
     if (newRefs.length > 0) _refLines = [..._refLines, ...newRefs].sort((a, b) => a.pos - b.pos)
     if (newDamageBlocks.length > 0) _damageBlocks = [..._damageBlocks, ...newDamageBlocks]
+    for (let i = 0; i < newBlocks.length; i++) {
+        const w = widths[blocks[i].id]
+        if (w !== undefined) _blockWidths[newBlockIds[i]] = w
+    }
+    return { damageMap, newBlockIds, newRefIds, count: newBlockIds.length + newRefIds.length }
+}
 
-    _selectedBlockIds = Object.fromEntries(newBlockIds.map((id) => [id, true]))
-    _selectedRefLineIds = Object.fromEntries(newRefIds.map((id) => [id, true]))
+function selectInsertedGroup(result: InsertGroupResult) {
+    _selectedBlockIds = Object.fromEntries(result.newBlockIds.map((id) => [id, true]))
+    _selectedRefLineIds = Object.fromEntries(result.newRefIds.map((id) => [id, true]))
     _multiBlockMenu = null
     _blockMenu = null
     _contextMenu = null
     enforceIntro()
     enforceSwitchback()
+}
+
+export function copySelection(silent = false): boolean {
+    if (!assertUnlocked()) return false
+    const selectedBlocks = Object.keys(_selectedBlockIds)
+        .map((id) => _opBlocks.find((b) => b.id === id))
+        .filter((b): b is OpBlock => Boolean(b))
+    const selectedRefs = Object.keys(_selectedRefLineIds)
+        .map((id) => _refLines.find((r) => r.id === id))
+        .filter((r): r is RefLine => Boolean(r))
+    if (selectedBlocks.length === 0 && selectedRefs.length === 0) {
+        if (!silent) addToast('没有可复制的选中项', 'info')
+        return false
+    }
+    const selectedIds = new Set([...Object.keys(_selectedBlockIds), ...Object.keys(_selectedRefLineIds)])
+    const blockWidths: Record<string, number> = {}
+    for (const b of selectedBlocks) {
+        if (_blockWidths[b.id] !== undefined) blockWidths[b.id] = _blockWidths[b.id]
+    }
+    _clipboard = {
+        opBlocks: selectedBlocks.map((b) => ({ ...b })),
+        refLines: selectedRefs.map((r) => ({ ...r })),
+        damageBlocks: _damageBlocks
+            .filter((d) => selectedIds.has(d.sourceId))
+            .map((d) => ({
+                ...d,
+                skillHits: d.skillHits.map((h) => ({ ...h })),
+                nonDirectEntries: d.nonDirectEntries.map((n) => ({
+                    ...n,
+                    responders: n.responders ? [...n.responders] : undefined
+                }))
+            })),
+        blockWidths
+    }
+    if (!silent) addToast(`已复制 ${selectedBlocks.length + selectedRefs.length} 项`, 'success')
+    return true
+}
+
+export function cutSelection(): boolean {
+    if (!assertUnlocked()) return false
+    const count = Object.keys(_selectedBlockIds).length + Object.keys(_selectedRefLineIds).length
+    if (count === 0) {
+        addToast('没有可剪切的选中项', 'info')
+        return false
+    }
+    if (!copySelection(true)) return false
+    removeSelection(false)
+    addToast(`已剪切 ${count} 项`, 'success')
+    return true
+}
+
+export function pasteSelection(): Record<string, string> {
+    if (!assertUnlocked()) return {}
+    if (!hasClipboard()) {
+        addToast('剪贴板为空', 'info')
+        return {}
+    }
+    const clip = _clipboard!
+    let anchor = -Infinity
+    for (const b of clip.opBlocks) anchor = Math.max(anchor, b.pos + (clip.blockWidths[b.id] ?? 56) / 2)
+    for (const r of clip.refLines) anchor = Math.max(anchor, r.pos)
+    let groupLeft = Infinity
+    for (const b of clip.opBlocks) groupLeft = Math.min(groupLeft, b.pos - (clip.blockWidths[b.id] ?? 56) / 2)
+    for (const r of clip.refLines) groupLeft = Math.min(groupLeft, r.pos)
+    const baseShift = _lastPointerX !== null ? _lastPointerX + (anchor - groupLeft) : anchor
+    const result = insertGroupAt(
+        clip.opBlocks,
+        clip.refLines,
+        clip.damageBlocks,
+        { ..._blockWidths, ...clip.blockWidths },
+        baseShift
+    )
+    if (!result) {
+        addToast('空间不足，无法粘贴在此处', 'error')
+        return {}
+    }
+    selectInsertedGroup(result)
     save()
-    return damageMap
+    addToast(`已粘贴 ${result.count} 项`, 'success')
+    return result.damageMap
+}
+
+export function selectAll(): void {
+    const blocks: Record<string, boolean> = {}
+    const lastTrackIdx = getTRACKS().length - 1
+    for (const b of _opBlocks) {
+        if (b.trackIndex >= lastTrackIdx) continue
+        blocks[b.id] = true
+    }
+    const refs: Record<string, boolean> = {}
+    for (const r of _refLines) {
+        if (isBoundary(r.id)) continue
+        refs[r.id] = true
+    }
+    const total = Object.keys(blocks).length + Object.keys(refs).length
+    if (total === 0) {
+        addToast('没有可全选的内容', 'info')
+        return
+    }
+    _selectedBlockIds = blocks
+    _selectedRefLineIds = refs
+    addToast(`已全选 ${total} 项`, 'success')
 }
 
 export function canSetIntro(blockId: string): boolean {
@@ -1092,15 +1400,27 @@ export function canSetIntro(blockId: string): boolean {
     return prev.trackIndex !== block.trackIndex
 }
 
-export function toggleIntro(blockId: string) {
+export function setBlockSpecial(blockId: string, kind: 'none' | 'intro' | 'switchback') {
     if (!assertUnlocked()) return
     const block = _opBlocks.find((b) => b.id === blockId)
     if (!block) return
-    if (block.intro) {
-        _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, intro: false } : b))
-    } else if (canSetIntro(blockId)) {
-        _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, intro: true } : b))
+    if (block.intro && kind === 'intro') kind = 'none'
+    if (block.switchback && kind === 'switchback') kind = 'none'
+    if (kind === 'intro' && !block.intro && !canSetIntro(blockId)) {
+        addToast('当前位置不能设置变奏入场', 'info')
+        return
     }
+    if (kind === 'switchback' && !block.switchback && !canSetSwitchback(blockId)) {
+        addToast('当前位置不能设置为切回', 'info')
+        return
+    }
+    _opBlocks = _opBlocks.map((b) =>
+        b.id === blockId ? { ...b, intro: kind === 'intro', switchback: kind === 'switchback' } : b
+    )
+    save()
+    if (kind === 'intro') addToast('已设置变奏入场', 'success')
+    if (kind === 'switchback') addToast('已设置为切回', 'success')
+    if (kind === 'none') addToast('已取消特殊切人', 'success')
 }
 
 function enforceIntro() {
@@ -1139,15 +1459,13 @@ export function canSetSwitchback(blockId: string): boolean {
     return sorted[globalIdx - 1].trackIndex !== block.trackIndex
 }
 
-export function toggleSwitchback(blockId: string) {
+export function setBlockKey(blockId: string, key: string) {
     if (!assertUnlocked()) return
     const block = _opBlocks.find((b) => b.id === blockId)
-    if (!block) return
-    if (block.switchback) {
-        _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, switchback: false } : b))
-    } else if (canSetSwitchback(blockId)) {
-        _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, switchback: true } : b))
-    }
+    if (!block || block.key === key) return
+    _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, key } : b))
+    save()
+    addToast(`已更换按键为「${key}」`, 'success')
 }
 
 function enforceSwitchback() {

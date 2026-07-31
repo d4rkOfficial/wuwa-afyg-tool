@@ -8,7 +8,7 @@ let _locked = $state(false)
 
 function assertUnlocked(): boolean {
     if (_locked) {
-        addToast('本环节已锁定，请先解锁后编辑。编辑产生的副作用需您来承担。', 'info')
+        addToast('本环节已锁定，请先解锁', 'info')
         return false
     }
     return true

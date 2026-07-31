@@ -18,12 +18,10 @@
         canAddAfter,
         addBefore,
         addAfter,
+        addRefLineAt,
         removeLine,
         startEdit,
-        canSetIntro,
-        toggleIntro,
-        canSetSwitchback,
-        toggleSwitchback,
+        setBlockSpecial,
         removeBlock,
         openRefSkillPicker,
         openSkillPicker,
@@ -35,18 +33,32 @@
         handleBlockDblclick,
         getSelectedBlockIds,
         getSelectedRefLineIds,
-        toggleBlockSelection,
-        toggleRefLineSelection,
         removeSelection,
         resetSelectionDamage,
-        duplicateSelectionToRight
+        copySelection,
+        pasteSelection,
+        selectAll,
+        hasClipboard,
+        setBlockKey,
+        getBlockKeyPickerId,
+        setBlockKeyPickerId
     } from './timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
 
     let confirmMultiAction = $state<'delete' | 'reset' | null>(null)
 
-    function duplicateToRight() {
-        const damageMap = duplicateSelectionToRight()
+    const specialOptions = [
+        { value: 'none', label: '无' },
+        { value: 'intro', label: '变奏' },
+        { value: 'switchback', label: '切回' }
+    ] as const
+
+    function copyToClipboard() {
+        copySelection()
+    }
+
+    function pasteFromClipboard() {
+        const damageMap = pasteSelection()
         if (Object.keys(damageMap).length > 0) remapDuplicatedDamageBuffs(damageMap)
     }
 
@@ -63,13 +75,73 @@
     }
 </script>
 
+{#snippet shortcut(label: string)}
+    <span class="ml-auto pl-3 text-[10px] text-(--theme-context-menu-text)/30">{label}</span>
+{/snippet}
+
+{#snippet damageBinding(id: string, sourceType: 'op' | 'ref')}
+    <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+    <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
+        伤害绑定
+    </div>
+    <div class="px-3 py-0.5 text-[9px] text-(--theme-context-menu-text)/40">直伤</div>
+    {#if getDamageBlocks().some((d) => d.sourceId === id && d.trackIndex === 3 && d.skillHits.length > 0)}
+        <button
+            onclick={() => (sourceType === 'op' ? openSkillPicker(id) : openRefSkillPicker(id))}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:pencil" class="size-4 shrink-0" />
+            编辑直伤
+        </button>
+    {:else}
+        <button
+            onclick={() => (sourceType === 'op' ? openSkillPicker(id) : openRefSkillPicker(id))}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
+            绑定直伤
+        </button>
+    {/if}
+    <div class="px-3 py-0.5 text-[9px] text-(--theme-context-menu-text)/40">效应/处决</div>
+    {#if getDamageBlocks().some((d) => d.sourceId === id && d.trackIndex === 3 && d.nonDirectEntries.length > 0)}
+        <button
+            onclick={() => openNonDirectPicker(sourceType, id)}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:pencil" class="size-4 shrink-0" />
+            编辑效应/处决
+        </button>
+    {:else}
+        <button
+            onclick={() => {
+                addDamageBlock(sourceType, id)
+                openNonDirectPicker(sourceType, id)
+            }}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
+            绑定效应/处决
+        </button>
+    {/if}
+    {#if getDamageBlocks().some((d) => d.sourceId === id && d.trackIndex === 3)}
+        <div class="border-t mt-1 mb-0" style="border-color: var(--theme-divider-border);"></div>
+        <button
+            onclick={() => removeDamageBySource(id, 'all')}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:restore" class="size-4 shrink-0" />
+            重置伤害绑定
+        </button>
+    {/if}
+{/snippet}
+
 <!-- Ref Line Context Menu -->
 {#if getContextMenu()}
     {@const cm = getContextMenu()!}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed z-50 min-w-44 rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {cm.x}px; top: {cm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: cm.x, y: cm.y }}
@@ -100,16 +172,6 @@
                 右侧添加参考线
             </button>
         {/if}
-        <button
-            onclick={() => {
-                toggleRefLineSelection(cm.id, false)
-                duplicateToRight()
-            }}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-        >
-            <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
-            复制到右侧空位
-        </button>
         {#if canDelete(cm.id)}
             <button
                 onclick={() => {
@@ -125,83 +187,37 @@
                 onclick={() => {
                     removeLine(cm.id)
                 }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
             >
                 <Icon icon="mdi:delete" class="size-4 shrink-0" />
                 删除参考线
+                {@render shortcut('Del')}
+            </button>
+            <button
+                onclick={copyToClipboard}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
+                复制
+                {@render shortcut('Ctrl+C')}
             </button>
         {/if}
-        <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
-        <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
-            伤害绑定
-        </div>
-        <div class="px-3 py-0.5 text-[9px] text-(--theme-context-menu-text)/40">直伤</div>
-        {#if getDamageBlocks().some((d) => d.sourceId === cm.id && d.trackIndex === 3 && d.skillHits.length > 0)}
-            <button
-                onclick={() => {
-                    openRefSkillPicker(cm.id)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-            >
-                <Icon icon="mdi:pencil" class="size-4 shrink-0" />
-                编辑直伤
-            </button>
-        {:else}
-            <button
-                onclick={() => {
-                    openRefSkillPicker(cm.id)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-            >
-                <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
-                绑定直伤
-            </button>
-        {/if}
-        <div class="px-3 py-0.5 text-[9px] text-(--theme-context-menu-text)/40">效应/处决</div>
-        {#if getDamageBlocks().some((d) => d.sourceId === cm.id && d.trackIndex === 3 && d.nonDirectEntries.length > 0)}
-            <button
-                onclick={() => {
-                    openNonDirectPicker('ref', cm.id)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-            >
-                <Icon icon="mdi:pencil" class="size-4 shrink-0" />
-                编辑效应/处决
-            </button>
-        {:else}
-            <button
-                onclick={() => {
-                    addDamageBlock('ref', cm.id)
-                    openNonDirectPicker('ref', cm.id)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-            >
-                <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
-                绑定效应/处决
-            </button>
-        {/if}
-        {#if getDamageBlocks().some((d) => d.sourceId === cm.id && d.trackIndex === 3)}
-            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
-            <button
-                onclick={() => {
-                    removeDamageBySource(cm.id, 'all')
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-            >
-                <Icon icon="mdi:restore" class="size-4 shrink-0" />
-                重置伤害绑定
-            </button>
-        {/if}
+        {@render damageBinding(cm.id, 'ref')}
     </div>
 {/if}
 
 <!-- Block Context Menu -->
 {#if getBlockMenu()}
     {@const bm = getBlockMenu()!}
+    {@const special = getOpBlocks().some((b) => b.id === bm.blockId && b.intro)
+        ? 'intro'
+        : getOpBlocks().some((b) => b.id === bm.blockId && b.switchback)
+          ? 'switchback'
+          : 'none'}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed z-50 min-w-44 rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {bm.x}px; top: {bm.y}px; border-color: var(--theme-divider-border);"
         data-block-menu="true"
         use:clampMenu={{ x: bm.x, y: bm.y }}
@@ -220,6 +236,13 @@
             修改备注
         </button>
         <button
+            onclick={() => setBlockKeyPickerId(bm.blockId)}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" />
+            更换按键
+        </button>
+        <button
             onclick={() => {
                 removeBlock(bm.blockId)
             }}
@@ -227,127 +250,33 @@
         >
             <Icon icon="mdi:delete" class="size-4 shrink-0" />
             删除操作块
+            {@render shortcut('Del')}
         </button>
         <button
-            onclick={() => {
-                toggleBlockSelection(bm.blockId, false)
-                duplicateToRight()
-            }}
+            onclick={copyToClipboard}
             class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
-            <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
-            复制到右侧空位
+            <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
+            复制
+            {@render shortcut('Ctrl+C')}
         </button>
         <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
         <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
             特殊切人
         </div>
-        {#if canSetIntro(bm.blockId)}
-            <button
-                onclick={() => {
-                    toggleIntro(bm.blockId)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:play-circle" class="size-4 shrink-0" />
-                设置变奏入场
-            </button>
-        {/if}
-        {#if getOpBlocks().some((b) => b.id === bm.blockId && b.intro)}
-            <button
-                onclick={() => {
-                    toggleIntro(bm.blockId)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:stop-circle" class="size-4 shrink-0" />
-                取消变奏入场
-            </button>
-        {/if}
-        {#if canSetSwitchback(bm.blockId)}
-            <button
-                onclick={() => {
-                    toggleSwitchback(bm.blockId)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:play-circle" class="size-4 shrink-0" />
-                设置为切回
-            </button>
-        {/if}
-        {#if getOpBlocks().some((b) => b.id === bm.blockId && b.switchback)}
-            <button
-                onclick={() => {
-                    toggleSwitchback(bm.blockId)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:close-circle-outline" class="size-4 shrink-0" />
-                取消切回
-            </button>
-        {/if}
-        <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
-        <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
-            伤害绑定
+        <div class="flex gap-1 px-3 py-1.5">
+            {#each specialOptions as opt}
+                <button
+                    onclick={() => setBlockSpecial(bm.blockId, opt.value)}
+                    class="flex-1 rounded px-2 py-1 text-xs font-medium transition-colors {special === opt.value
+                        ? 'bg-(--theme-accent-bg) text-white'
+                        : 'text-(--theme-context-menu-text)/70 hover:bg-(--theme-context-menu-bg-focused)'}"
+                >
+                    {opt.label}
+                </button>
+            {/each}
         </div>
-        <div class="px-3 py-0.5 text-[9px] text-(--theme-context-menu-text)/40">直伤</div>
-        {#if getDamageBlocks().some((d) => d.sourceId === bm.blockId && d.trackIndex === 3 && d.skillHits.length > 0)}
-            <button
-                onclick={() => {
-                    openSkillPicker(bm.blockId)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:pencil" class="size-4 shrink-0" />
-                编辑直伤
-            </button>
-        {:else}
-            <button
-                onclick={() => {
-                    addDamageBlock('op', bm.blockId)
-                    openSkillPicker(bm.blockId)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
-                绑定直伤
-            </button>
-        {/if}
-        <div class="px-3 py-0.5 text-[9px] text-(--theme-context-menu-text)/40">效应/处决</div>
-        {#if getDamageBlocks().some((d) => d.sourceId === bm.blockId && d.trackIndex === 3 && d.nonDirectEntries.length > 0)}
-            <button
-                onclick={() => {
-                    openNonDirectPicker('op', bm.blockId)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:pencil" class="size-4 shrink-0" />
-                编辑效应/处决
-            </button>
-        {:else}
-            <button
-                onclick={() => {
-                    addDamageBlock('op', bm.blockId)
-                    openNonDirectPicker('op', bm.blockId)
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
-                绑定效应/处决
-            </button>
-        {/if}
-        {#if getDamageBlocks().some((d) => d.sourceId === bm.blockId && d.trackIndex === 3)}
-            <div class="border-t mt-1 mb-0" style="border-color: var(--theme-divider-border);"></div>
-            <button
-                onclick={() => {
-                    removeDamageBySource(bm.blockId, 'all')
-                }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:restore" class="size-4 shrink-0" />
-                重置伤害绑定
-            </button>
-        {/if}
+        {@render damageBinding(bm.blockId, 'op')}
     </div>
 {/if}
 
@@ -360,7 +289,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed z-50 min-w-44 rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {mm.x}px; top: {mm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: mm.x, y: mm.y }}
@@ -371,12 +300,21 @@
         </div>
         <button
             onclick={() => {
-                duplicateToRight()
+                selectAll()
             }}
             class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
-            <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
-            复制到右侧空位
+            <Icon icon="mdi:select-all" class="size-4 shrink-0" />
+            全选
+            {@render shortcut('Ctrl+A')}
+        </button>
+        <button
+            onclick={copyToClipboard}
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+        >
+            <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
+            复制
+            {@render shortcut('Ctrl+C')}
         </button>
         <button
             onclick={() => (confirmMultiAction = 'delete')}
@@ -384,6 +322,7 @@
         >
             <Icon icon="mdi:delete" class="size-4 shrink-0" />
             删除 ({totalCount} 项)
+            {@render shortcut('Del')}
         </button>
         <button
             onclick={() => (confirmMultiAction = 'reset')}
@@ -408,7 +347,7 @@
         {/snippet}
         {#snippet children()}
             <p class="text-sm leading-relaxed">
-                确认删除选中的 {totalCount} 项（操作块 {blockCount} · 参考线 {refCount}）？该操作不可撤销。
+                确认删除选中的 {totalCount} 项（操作块 {blockCount} · 参考线 {refCount}）？该操作可通过 Ctrl+Z 撤销。
             </p>
             <div class="flex justify-end gap-2 mt-5">
                 <button
@@ -445,7 +384,7 @@
         {/snippet}
         {#snippet children()}
             <p class="text-sm leading-relaxed">
-                确认重置选中的 {totalCount} 项的伤害绑定？
+                确认重置选中的 {totalCount} 项的伤害绑定？该操作可通过 Ctrl+Z 撤销。
             </p>
             <div class="flex justify-end gap-2 mt-5">
                 <button
@@ -475,36 +414,110 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed z-50 rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 shadow-xl backdrop-blur-lg"
+        class="fixed z-50 max-w-[80vw] overflow-x-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 shadow-xl backdrop-blur-lg"
         style="left: {tm.x}px; top: {tm.y}px; border-color: var(--theme-divider-border);"
         data-track-menu="true"
         use:clampMenu={{ x: tm.x, y: tm.y }}
         onclick={() => setTrackMenu(null)}
     >
-        <div class="flex items-center gap-1">
-            {#each getUiBtnIcons() as [name, url]}
+        <div class="flex flex-col">
+            <div class="flex items-center gap-1">
+                {#each getUiBtnIcons() as [name, url]}
+                    <button
+                        class="size-7 flex items-center justify-center rounded hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+                        onclick={() => addOpBlock(tm.trackIndex, tm.pos, name)}
+                        title={name}
+                    >
+                        {#if url}
+                            <img
+                                src={url}
+                                alt={name}
+                                draggable="false"
+                                class="size-5 object-contain pointer-events-none"
+                            />
+                        {:else}
+                            <span class="text-[10px] font-bold text-(--theme-context-menu-text)"
+                                >{name === 'SpaceBar'
+                                    ? '⎵'
+                                    : name === 'MouseLeft'
+                                      ? 'L'
+                                      : name === 'MouseRight'
+                                        ? 'R'
+                                        : name === 'MouseMiddle'
+                                          ? 'M'
+                                          : name}</span
+                            >
+                        {/if}
+                    </button>
+                {/each}
+            </div>
+            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            <button
+                onclick={() => addRefLineAt(tm.pos)}
+                class="w-full flex items-center gap-2 px-1 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:timeline-plus-outline" class="size-4 shrink-0" />
+                创建参考线
+            </button>
+            {#if hasClipboard()}
+                <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
                 <button
-                    class="size-7 flex items-center justify-center rounded hover:bg-(--theme-context-menu-bg-focused) transition-colors"
-                    onclick={() => addOpBlock(tm.trackIndex, tm.pos, name)}
-                    title={name}
+                    onclick={pasteFromClipboard}
+                    class="w-full flex items-center gap-2 px-1 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
                 >
-                    {#if url}
-                        <img src={url} alt={name} draggable="false" class="size-5 object-contain pointer-events-none" />
-                    {:else}
-                        <span class="text-[10px] font-bold text-(--theme-context-menu-text)"
-                            >{name === 'SpaceBar'
-                                ? '⎵'
-                                : name === 'MouseLeft'
-                                  ? 'L'
-                                  : name === 'MouseRight'
-                                    ? 'R'
-                                    : name === 'MouseMiddle'
-                                      ? 'M'
-                                      : name}</span
-                        >
-                    {/if}
+                    <Icon icon="mdi:clipboard-arrow-left" class="size-4 shrink-0" />
+                    粘贴
+                    {@render shortcut('Ctrl+V')}
                 </button>
-            {/each}
+            {/if}
         </div>
     </div>
+{/if}
+
+{#if getBlockKeyPickerId()}
+    {@const pickerBlockId = getBlockKeyPickerId()!}
+    <Modal open={true} onclose={() => setBlockKeyPickerId(null)}>
+        {#snippet title()}
+            <div class="flex items-center gap-2">
+                <Icon icon="mdi:keyboard-outline" class="size-5" />
+                更换按键
+            </div>
+        {/snippet}
+        {#snippet children()}
+            <div class="flex flex-wrap gap-1.5">
+                {#each getUiBtnIcons() as [name, url]}
+                    <button
+                        onclick={() => {
+                            setBlockKey(pickerBlockId, name)
+                            setBlockKeyPickerId(null)
+                        }}
+                        class="size-10 flex items-center justify-center rounded-md border transition-colors hover:bg-(--theme-modal-text)/10"
+                        style="border-color: var(--theme-divider-border);"
+                        title={name}
+                    >
+                        {#if url}
+                            <img
+                                src={url}
+                                alt={name}
+                                draggable="false"
+                                class="size-6 object-contain pointer-events-none"
+                            />
+                        {:else}
+                            <span class="text-xs font-bold text-(--theme-modal-text)"
+                                >{name === 'SpaceBar'
+                                    ? '⎵'
+                                    : name === 'MouseLeft'
+                                      ? 'L'
+                                      : name === 'MouseRight'
+                                        ? 'R'
+                                        : name === 'MouseMiddle'
+                                          ? 'M'
+                                          : name}</span
+                            >
+                        {/if}
+                    </button>
+                {/each}
+            </div>
+        {/snippet}
+    </Modal>
 {/if}

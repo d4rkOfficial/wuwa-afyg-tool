@@ -18,7 +18,7 @@ let _locked = $state(false)
 
 function assertUnlocked(): boolean {
     if (_locked) {
-        addToast('本环节已锁定，请先解锁后编辑。编辑产生的副作用需您来承担。', 'info')
+        addToast('本环节已锁定，请先解锁', 'info')
         return false
     }
     return true
@@ -76,6 +76,28 @@ export function init(
     }
     _globalBuffSetIds = _buffSets.filter((bs) => bs.id.startsWith('global-')).map((bs) => bs.id)
     syncGlobalBuffs(team.map((s) => s.character))
+    if (pruneOrphanedBindings()) {
+        if (_onupdate) _onupdate(getCalcState())
+    }
+}
+
+function pruneOrphanedBindings(): boolean {
+    const validIds = new Set(_entries.map((e) => e.id))
+    let changed = false
+    const prune = (table: Record<string, string[]>): Record<string, string[]> | null => {
+        const entries = Object.entries(table)
+        const kept = entries.filter(([id]) => validIds.has(id))
+        if (kept.length !== entries.length) {
+            changed = true
+            return Object.fromEntries(kept)
+        }
+        return null
+    }
+    const buff = prune(_damageEntryBuffSetIds)
+    const types = prune(_damageEntryDamageTypes)
+    if (buff) _damageEntryBuffSetIds = buff
+    if (types) _damageEntryDamageTypes = types
+    return changed
 }
 
 async function queueElementFetch(names: string[]) {

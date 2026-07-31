@@ -51,7 +51,7 @@
         timelineData
         calcState
         locked
-        untrack(() => init(team, timelineData, calcState, locked))
+        untrack(() => init(team, timelineData, calcState, locked, onupdate))
     })
 
     let damageEntries = $derived(getAllDamageEntries())
