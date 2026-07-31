@@ -146,13 +146,17 @@
                     max="20"
                     step="1"
                     value={overrides.bgBlur}
+                    disabled={!overrides.backgroundImage}
                     oninput={(e) => updateOverride('bgBlur', Number((e.target as HTMLInputElement).value))}
-                    class="w-full h-2 rounded-full appearance-none cursor-pointer touch-none bg-(--theme-modal-text)/10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-(--theme-accent-bg) [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white/80 [&::-moz-range-thumb]:bg-(--theme-accent-bg) [&::-moz-range-thumb]:shadow-md"
+                    class="w-full h-2 rounded-full appearance-none cursor-pointer touch-none bg-(--theme-modal-text)/10 disabled:cursor-not-allowed disabled:opacity-40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-(--theme-accent-bg) [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white/80 [&::-moz-range-thumb]:bg-(--theme-accent-bg) [&::-moz-range-thumb]:shadow-md"
                 />
                 <div class="mt-1 flex justify-between text-[10px] text-(--theme-modal-text)/30">
                     <span>无</span>
                     <span>强</span>
                 </div>
+                {#if !overrides.backgroundImage}
+                    <div class="mt-1 text-[10px] text-(--theme-modal-text)/40">需先设置背景图才能生效</div>
+                {/if}
             </div>
 
             <hr class="mb-5" style="border-color: var(--theme-divider-border);" />

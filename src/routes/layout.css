@@ -41,9 +41,7 @@
 
 @layer base {
     html {
-        background:
-            var(--theme-bg-image, none) center/cover fixed,
-            var(--theme-layout-bg, #0e0e10);
+        background: var(--theme-layout-bg, #0e0e10);
         color: var(--theme-layout-text, #e4e4e7);
         color-scheme: var(--theme-layout-scheme, dark);
         font-family: 'FangXinShu', system-ui, sans-serif;
@@ -54,8 +52,9 @@
         content: '';
         position: fixed;
         inset: 0;
-        backdrop-filter: blur(var(--theme-bg-blur, 0px));
-        -webkit-backdrop-filter: blur(var(--theme-bg-blur, 0px));
+        background: var(--theme-bg-image, none) center/cover;
+        filter: blur(var(--theme-bg-blur, 0px));
+        -webkit-filter: blur(var(--theme-bg-blur, 0px));
         pointer-events: none;
         z-index: -1;
     }
