@@ -27,10 +27,10 @@
             "textColor": "#e4e4e7"
         },
         "btn": {
-            "backgroundImage": "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            "backgroundImageFocused": "#818cf8",
-            "textColor": "#ffffff",
-            "textColorFocused": "#ffffff"
+            "backgroundImage": "linear-gradient(135deg, #e4e4e7, #a1a1aa)",
+            "backgroundImageFocused": "#f4f4f5",
+            "textColor": "#18181b",
+            "textColorFocused": "#18181b"
         },
         "search-box": {
             "backgroundImage": "#1e1e24",

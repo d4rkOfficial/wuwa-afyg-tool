@@ -97,13 +97,11 @@ export async function loadProjects() {
     if (!browser) return
 
     const saved = await dbGet<Project[]>(PROJECTS_KEY)
-    const activeSaved = await dbGet<string>(ACTIVE_KEY)
 
     if (saved && saved.data.length > 0) {
         projects = saved.data.map(normalizeProject)
-        const found = activeSaved?.data && projects.find((p) => p.id === activeSaved.data)
-        activeId = found ? activeSaved!.data : projects[0].id
-        await dbSet(ACTIVE_KEY, activeId)
+        activeId = ''
+        await dbSet(ACTIVE_KEY, '')
         await persist()
     }
 }

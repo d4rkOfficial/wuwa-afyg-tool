@@ -27,8 +27,8 @@
             "textColor": "#1e293b"
         },
         "btn": {
-            "backgroundImage": "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            "backgroundImageFocused": "#818cf8",
+            "backgroundImage": "linear-gradient(135deg, #18181b, #3f3f46)",
+            "backgroundImageFocused": "#27272a",
             "textColor": "#ffffff",
             "textColorFocused": "#ffffff"
         },

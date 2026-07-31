@@ -11,8 +11,8 @@
     </div>
     <button
         onclick={() => goto('/')}
-        class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
-        style="background: var(--theme-btn-bg, linear-gradient(135deg, #6366f1, #8b5cf6))"
+        class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+        style="background: var(--theme-btn-bg, linear-gradient(135deg, #e4e4e7, #a1a1aa)); color: var(--theme-btn-text, #18181b)"
     >
         <Icon icon="mdi:arrow-left" class="size-4" />
         返回首页
