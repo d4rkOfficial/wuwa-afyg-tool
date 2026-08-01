@@ -1071,7 +1071,10 @@
                     </div>
                     <div class="flex items-center gap-4 px-4 pb-4">
                         <div class="size-36 shrink-0">
-                            <canvas use:registerTypeChartCanvas={activeTypeAgg.character} class="size-full"></canvas>
+                            {#key activeTypeAgg.character}
+                                <canvas use:registerTypeChartCanvas={activeTypeAgg.character} class="size-full"
+                                ></canvas>
+                            {/key}
                         </div>
                         <div class="space-y-1.5 min-w-0 flex-1">
                             {#each DAMAGE_TYPE_CATEGORIES as cat}
