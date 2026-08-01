@@ -18,7 +18,7 @@
         applyNonDirectEntries
     } from './timeline.store.svelte'
     import { getCharIconMap } from './timeline.store.svelte'
-    import { NON_DIRECT_CONFIGS } from './timeline.consts'
+    import { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from './timeline.consts'
     import { fallbackIcon } from '$lib/utils/icons'
 </script>
 
@@ -57,7 +57,7 @@
                                 class={[
                                     'h-7 rounded-md px-3 text-xs font-medium transition-colors whitespace-nowrap',
                                     getNonDirectPickerSelected().has(cfg.name)
-                                        ? 'text-white'
+                                        ? 'text-[var(--theme-accent-text-on-bg)]'
                                         : disabled
                                           ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
                                           : 'text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/[0.1]'
@@ -138,18 +138,56 @@
                     <div class="text-[11px] font-semibold text-[var(--theme-modal-text)]/60 tracking-wider mb-3">
                         效应结算
                     </div>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                    <div class="flex flex-col gap-2">
                         {#each NON_DIRECT_CONFIGS.filter((c) => c.category === '效应') as cfg}
                             {@const idx = getNonDirectPickerData().findIndex((d) => d.name === cfg.name)}
+                            {@const effectElement = NON_DIRECT_ELEMENT[cfg.name]}
+                            {@const effectColor = effectElement
+                                ? `var(--theme-element-${effectElement}, #888)`
+                                : 'var(--theme-accent-bg)'}
                             {#if idx >= 0}
                                 {@const layers = getNonDirectPickerData()[idx].layers}
+                                {@const hits = getNonDirectPickerData()[idx].hits}
                                 {@const pct = cfg.max > 0 ? (layers / cfg.max) * 100 : 0}
-                                <div class="flex flex-col gap-1 min-w-0">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-[var(--theme-modal-text)] truncate">{cfg.name}</span>
-                                        <span class="text-[var(--theme-modal-text)]/50 tabular-nums shrink-0"
-                                            >{layers}/{cfg.max}</span
-                                        >
+                                <div
+                                    class="flex flex-col gap-2 rounded-md border p-2.5"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-xs text-[var(--theme-modal-text)] truncate">{cfg.name}</span>
+                                        <span class="flex items-center gap-3 shrink-0">
+                                            <span class="text-xs text-[var(--theme-modal-text)]/50 tabular-nums"
+                                                >层数 {layers}/{cfg.max}</span
+                                            >
+                                            <span class="flex items-center gap-1.5">
+                                                <span class="text-xs text-[var(--theme-modal-text)]/50">段数</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="20"
+                                                    value={hits}
+                                                    disabled={layers < 1}
+                                                    oninput={(e) => {
+                                                        const v = parseInt((e.target as HTMLInputElement).value)
+                                                        setNonDirectPickerData(
+                                                            getNonDirectPickerData().map((d, i) =>
+                                                                i === idx
+                                                                    ? {
+                                                                          ...d,
+                                                                          hits: Math.min(
+                                                                              20,
+                                                                              Math.max(1, isNaN(v) ? 1 : v)
+                                                                          )
+                                                                      }
+                                                                    : d
+                                                            )
+                                                        )
+                                                    }}
+                                                    class="w-12 h-6 bg-[var(--theme-modal-bg)]/60 text-xs text-[var(--theme-modal-text)] text-center rounded outline-none border tabular-nums disabled:opacity-30"
+                                                    style="border-color: var(--theme-divider-border);"
+                                                />
+                                            </span>
+                                        </span>
                                     </div>
                                     <input
                                         type="range"
@@ -164,31 +202,38 @@
                                                 )
                                             )
                                         }}
-                                        class="w-full h-2 appearance-none cursor-pointer rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--theme-accent-bg)] [&::-webkit-slider-thumb]:shadow-md"
-                                        style="background: linear-gradient(to right, var(--theme-accent-bg) 0%, var(--theme-accent-bg) {pct}%, rgba(255,255,255,0.1) {pct}%, rgba(255,255,255,0.1) 100%);"
+                                        class="w-full h-2 appearance-none cursor-pointer rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-(--slider-color) [&::-webkit-slider-thumb]:shadow-md"
+                                        style="--slider-color: {effectColor}; background: linear-gradient(to right, var(--slider-color) 0%, var(--slider-color) {pct}%, rgba(255,255,255,0.1) {pct}%, rgba(255,255,255,0.1) 100%);"
                                     />
                                     {#if cfg.name === '电磁效应'}
                                         {@const burstLayers = getNonDirectPickerBurstLayers()['burst'] ?? 0}
                                         {@const burstPct = cfg.max > 0 ? (burstLayers / cfg.max) * 100 : 0}
-                                        <div class="flex items-center justify-between text-xs mt-1">
-                                            <span class="text-[var(--theme-modal-text)]/60 truncate">电磁爆发</span>
-                                            <span class="text-[var(--theme-modal-text)]/50 tabular-nums shrink-0"
-                                                >{burstLayers}/{cfg.max}</span
-                                            >
+                                        <div
+                                            class="flex flex-col gap-1.5 rounded px-2 py-1.5"
+                                            style="background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
+                                        >
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-xs text-[var(--theme-modal-text)]/60 truncate"
+                                                    >电磁爆发</span
+                                                >
+                                                <span class="text-[10px] text-[var(--theme-modal-text)]/40 shrink-0"
+                                                    >随电磁段数 ×{hits}</span
+                                                >
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max={cfg.max}
+                                                value={burstLayers}
+                                                disabled={layers < 1}
+                                                oninput={(e) => {
+                                                    const v = parseInt((e.target as HTMLInputElement).value)
+                                                    setNonDirectPickerBurstLayers({ burst: v })
+                                                }}
+                                                class="w-full h-2 appearance-none cursor-pointer rounded-full disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-(--slider-color) [&::-webkit-slider-thumb]:shadow-md"
+                                                style="--slider-color: {effectColor}; background: linear-gradient(to right, var(--slider-color) 0%, var(--slider-color) {burstPct}%, rgba(255,255,255,0.1) {burstPct}%, rgba(255,255,255,0.1) 100%);"
+                                            />
                                         </div>
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            max={cfg.max}
-                                            value={burstLayers}
-                                            disabled={layers < 1}
-                                            oninput={(e) => {
-                                                const v = parseInt((e.target as HTMLInputElement).value)
-                                                setNonDirectPickerBurstLayers({ burst: v })
-                                            }}
-                                            class="w-full h-2 appearance-none cursor-pointer rounded-full disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--theme-accent-bg)] [&::-webkit-slider-thumb]:shadow-md"
-                                            style="background: linear-gradient(to right, var(--theme-accent-bg) 0%, var(--theme-accent-bg) {burstPct}%, rgba(255,255,255,0.1) {burstPct}%, rgba(255,255,255,0.1) 100%);"
-                                        />
                                     {/if}
                                 </div>
                             {/if}
@@ -207,7 +252,7 @@
                 >
                 <button
                     class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
-                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                     onclick={applyNonDirectEntries}>确认</button
                 >
             </div>

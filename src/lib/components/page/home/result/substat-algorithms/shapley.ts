@@ -36,7 +36,8 @@ export function computeSubstatContributions(
     team: CharSlot[],
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
-    rigCritEntryIds: Set<string>
+    rigCritEntryIds: Set<string>,
+    noCritEntryIds: Set<string>
 ): CharSubstatAnalysis[] {
     const allEntries = computeAll(
         damageEntries,
@@ -59,6 +60,9 @@ export function computeSubstatContributions(
         const baselineRig = charEntries.reduce((s, e) => {
             return s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamageRaw)
         }, 0)
+        const baselineNoCrit = charEntries.reduce((s, e) => {
+            return s + (noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw)
+        }, 0)
 
         const echoes = configState.characters[ci]?.echoes ?? []
 
@@ -76,7 +80,14 @@ export function computeSubstatContributions(
             )
         })
 
-        function computeDamageForEchoes(modEchoes: EchoSlotConfig[], rig: boolean): { norm: number; rigVal: number } {
+        function computeDamageForEchoes(
+            modEchoes: EchoSlotConfig[],
+            rig: boolean
+        ): {
+            norm: number
+            rigVal: number
+            noCritVal: number
+        } {
             const modFullStats = baseFullStats.map((fs, i) => {
                 if (i !== ci) return fs
                 return getCharFullStatsForChar(
@@ -93,6 +104,7 @@ export function computeSubstatContributions(
 
             let norm = 0
             let rigVal = 0
+            let noCritVal = 0
             for (const de of charDmgEntries) {
                 const re = computeOneEntry(
                     de,
@@ -109,8 +121,9 @@ export function computeSubstatContributions(
                 )
                 norm += re.totalDamageRaw
                 rigVal += rig && rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamageRaw
+                noCritVal += noCritEntryIds.has(re.id) ? re.nonCritPerHit : re.totalDamageRaw
             }
-            return { norm, rigVal }
+            return { norm, rigVal, noCritVal }
         }
 
         const info: EchoContribution[] = []
@@ -125,7 +138,7 @@ export function computeSubstatContributions(
             if (k === 0) continue
 
             // precompute v(S) for all 2^k subsets
-            const subsetCache = new Map<string, { norm: number; rigVal: number }>()
+            const subsetCache = new Map<string, { norm: number; rigVal: number; noCritVal: number }>()
             for (let mask = 0; mask < 1 << k; mask++) {
                 const keep: number[] = []
                 for (let i = 0; i < k; i++) {
@@ -148,6 +161,7 @@ export function computeSubstatContributions(
                 const sub = echo.substats[si]
                 let shapleyNorm = 0
                 let shapleyRig = 0
+                let shapleyNoCrit = 0
 
                 for (let mask = 0; mask < 1 << k; mask++) {
                     if (mask & (1 << si)) continue
@@ -160,6 +174,7 @@ export function computeSubstatContributions(
 
                     shapleyNorm += weights[s] * (vSwith.norm - vS.norm)
                     shapleyRig += weights[s] * (vSwith.rigVal - vS.rigVal)
+                    shapleyNoCrit += weights[s] * (vSwith.noCritVal - vS.noCritVal)
                 }
 
                 echoSubstats.push({
@@ -169,7 +184,9 @@ export function computeSubstatContributions(
                     contributionNorm: shapleyNorm,
                     contributionRig: shapleyRig,
                     contribPctNorm: baselineNorm > 0 ? (shapleyNorm / baselineNorm) * 100 : 0,
-                    contribPctRig: baselineRig > 0 ? (shapleyRig / baselineRig) * 100 : 0
+                    contribPctRig: baselineRig > 0 ? (shapleyRig / baselineRig) * 100 : 0,
+                    contributionNoCrit: shapleyNoCrit,
+                    contribPctNoCrit: baselineNoCrit > 0 ? (shapleyNoCrit / baselineNoCrit) * 100 : 0
                 })
             }
 
@@ -177,6 +194,7 @@ export function computeSubstatContributions(
 
             const echoTotalNorm = echoSubstats.reduce((s, sub) => s + sub.contributionNorm, 0)
             const echoTotalRig = echoSubstats.reduce((s, sub) => s + sub.contributionRig, 0)
+            const echoTotalNoCrit = echoSubstats.reduce((s, sub) => s + sub.contributionNoCrit, 0)
 
             const mainStat = echo.mainStat?.type ?? ''
             info.push({
@@ -186,7 +204,9 @@ export function computeSubstatContributions(
                 totalNorm: echoTotalNorm,
                 totalRig: echoTotalRig,
                 totalPctNorm: baselineNorm > 0 ? (echoTotalNorm / baselineNorm) * 100 : 0,
-                totalPctRig: baselineRig > 0 ? (echoTotalRig / baselineRig) * 100 : 0
+                totalPctRig: baselineRig > 0 ? (echoTotalRig / baselineRig) * 100 : 0,
+                totalNoCrit: echoTotalNoCrit,
+                totalPctNoCrit: baselineNoCrit > 0 ? (echoTotalNoCrit / baselineNoCrit) * 100 : 0
             })
 
             allSubstats.push(...echoSubstats)
@@ -198,6 +218,7 @@ export function computeSubstatContributions(
             if (existing) {
                 existing.contributionNorm += s.contributionNorm
                 existing.contributionRig += s.contributionRig
+                existing.contributionNoCrit += s.contributionNoCrit
                 existing.value += s.value
             } else {
                 aggMap.set(s.type, { ...s })
@@ -206,21 +227,26 @@ export function computeSubstatContributions(
         const aggregated = [...aggMap.values()].map((s) => ({
             ...s,
             contribPctNorm: baselineNorm > 0 ? (s.contributionNorm / baselineNorm) * 100 : 0,
-            contribPctRig: baselineRig > 0 ? (s.contributionRig / baselineRig) * 100 : 0
+            contribPctRig: baselineRig > 0 ? (s.contributionRig / baselineRig) * 100 : 0,
+            contribPctNoCrit: baselineNoCrit > 0 ? (s.contributionNoCrit / baselineNoCrit) * 100 : 0
         }))
         aggregated.sort((a, b) => b.contributionNorm - a.contributionNorm)
 
         const substatTotalNorm = baselineNorm - emptyDamage.norm
         const substatTotalRig = baselineRig - emptyDamage.rigVal
+        const substatTotalNoCrit = baselineNoCrit - emptyDamage.noCritVal
 
         return {
             character: charName,
             totalDamageNorm: baselineNorm,
             totalDamageRig: baselineRig,
+            totalDamageNoCrit: baselineNoCrit,
             substatTotalNorm,
             substatTotalRig,
             substatTotalPctNorm: baselineNorm > 0 ? (substatTotalNorm / baselineNorm) * 100 : 0,
             substatTotalPctRig: baselineRig > 0 ? (substatTotalRig / baselineRig) * 100 : 0,
+            substatTotalNoCrit,
+            substatTotalPctNoCrit: baselineNoCrit > 0 ? (substatTotalNoCrit / baselineNoCrit) * 100 : 0,
             echoes: info,
             aggregated
         }

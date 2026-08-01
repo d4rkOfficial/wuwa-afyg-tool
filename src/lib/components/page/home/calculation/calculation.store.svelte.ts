@@ -305,7 +305,7 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         damageElement: NON_DIRECT_ELEMENT[nd.name] ?? '',
                         sourceTimelineBlockId: db.sourceId,
                         burstLayers: isDianci ? burstLayers : 0,
-                        hits: 1
+                        hits: nd.hits ?? 1
                     },
                     pos,
                     order: order++

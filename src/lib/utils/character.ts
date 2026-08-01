@@ -4,7 +4,9 @@ const SHORT_NAME_MAP: Record<string, string> = {
     '漂泊者·气动': '风主',
     '漂泊者·导电': '雷主',
     '漂泊者·热熔': '火主',
-    '漂泊者·冷凝': '冰主'
+    '漂泊者·冷凝': '冰主',
+    // Brant, nb!
+    布兰特: '船长'
 }
 
 export function shortName(name: string): string {

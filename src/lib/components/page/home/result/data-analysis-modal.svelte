@@ -9,6 +9,7 @@
     import Icon from '@iconify/svelte'
     import { ALGORITHM_HELP } from './consts'
     import { openHelp } from '$lib/data/help.svelte'
+    import { aggregateDirectDamageByType, DAMAGE_TYPE_CATEGORIES, TYPE_COLORS } from './utils'
 
     interface Props {
         entries: ResultEntry[]
@@ -42,6 +43,7 @@
 
     let charElements = $derived(getCharElementMap())
     let selectedSubstatChar = $state(0)
+    let selectedTypeChar = $state(0)
     let helpItems = $derived(
         algorithmsInfo.map((algo) => ({
             name: algo.name,
@@ -263,7 +265,9 @@
             const labels = sa.aggregated.map((a) => a.type).reverse()
             const normData = sa.aggregated.map((a) => +a.contribPctNorm.toFixed(1)).reverse()
             const rigData = sa.aggregated.map((a) => +a.contribPctRig.toFixed(1)).reverse()
+            const noCritData = sa.aggregated.map((a) => +a.contribPctNoCrit.toFixed(1)).reverse()
             const hasRig = sa.totalDamageRig !== sa.totalDamageNorm
+            const hasNoCrit = sa.totalDamageNoCrit !== sa.totalDamageNorm
 
             const chart = new Chart(canvas, {
                 type: 'bar',
@@ -287,6 +291,17 @@
                                       borderRadius: 3
                                   }
                               ]
+                            : []),
+                        ...(hasNoCrit
+                            ? [
+                                  {
+                                      label: '不暴',
+                                      data: noCritData,
+                                      backgroundColor: hexToRgba(cssVar('--theme-nocrit-bg', '#22c55e'), 0.85),
+                                      borderColor: 'transparent',
+                                      borderRadius: 3
+                                  }
+                              ]
                             : [])
                     ]
                 },
@@ -299,7 +314,7 @@
                         x: {
                             stacked: false,
                             beginAtZero: true,
-                            max: Math.max(...normData, ...rigData) * 1.3 || 10,
+                            max: Math.max(...normData, ...rigData, ...noCritData) * 1.3 || 10,
                             grid: { color: hexToRgba(dividerColor, 0.3) },
                             ticks: {
                                 color: textColor,
@@ -316,7 +331,7 @@
                     },
                     plugins: {
                         legend: {
-                            display: hasRig,
+                            display: hasRig || hasNoCrit,
                             labels: { color: textColor, font: { size: 9 }, boxWidth: 10, padding: 8 }
                         },
                         tooltip: {
@@ -338,7 +353,89 @@
 
     $effect(() => {
         substatAnalysis
+        selectedSubstatChar
         untrack(() => drawBarCharts())
+    })
+
+    // ── damage-type doughnut charts ──
+    let directDamageByType = $derived(aggregateDirectDamageByType(entries))
+    let activeTypeAgg = $derived(
+        directDamageByType.length > 0
+            ? directDamageByType[Math.min(selectedTypeChar, directDamageByType.length - 1)]
+            : undefined
+    )
+    let typeCharts: Chart<'doughnut'>[] = []
+    const typeChartCanvasMap = new Map<string, HTMLCanvasElement>()
+
+    function registerTypeChartCanvas(node: HTMLCanvasElement, charName: string) {
+        typeChartCanvasMap.set(charName, node)
+        return {
+            destroy() {
+                typeChartCanvasMap.delete(charName)
+            }
+        }
+    }
+
+    function drawTypeCharts() {
+        for (const c of typeCharts) c.destroy()
+        typeCharts = []
+
+        const textColor = cssVar('--theme-modal-text', '#e2e8f0')
+        const bgColor = cssVar('--theme-modal-bg', '#1e293b')
+        const dividerColor = cssVar('--theme-divider-border', '#334155')
+
+        for (const agg of directDamageByType) {
+            const canvas = typeChartCanvasMap.get(agg.character)
+            if (!canvas || agg.total <= 0) continue
+
+            const labels = DAMAGE_TYPE_CATEGORIES.filter((c) => agg.byType[c] > 0)
+            const data = labels.map((c) => agg.byType[c])
+            const colors = labels.map((c) => TYPE_COLORS[c])
+
+            const chart = new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            data,
+                            backgroundColor: colors,
+                            borderColor: bgColor,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            bodyColor: textColor,
+                            titleColor: textColor,
+                            backgroundColor: bgColor,
+                            borderColor: dividerColor,
+                            borderWidth: 1,
+                            callbacks: {
+                                label: (ctx) => {
+                                    const val = ctx.parsed as number
+                                    const pct = ((val / agg.total) * 100).toFixed(1)
+                                    return `${ctx.label}: ${Math.round(val).toLocaleString()} (${pct}%)`
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+            typeCharts.push(chart)
+        }
+    }
+
+    $effect(() => {
+        directDamageByType
+        selectedTypeChar
+        untrack(() => drawTypeCharts())
     })
 
     onMount(() => {
@@ -346,6 +443,7 @@
         return () => {
             pieChart?.destroy()
             for (const c of barCharts) c.destroy()
+            for (const c of typeCharts) c.destroy()
         }
     })
 </script>
@@ -707,9 +805,17 @@
                                                 {#if charSA.totalDamageRig !== charSA.totalDamageNorm}
                                                     <span
                                                         class="text-[10px] tabular-nums"
-                                                        style="color: var(--theme-accent-text); opacity: 0.6;"
+                                                        style="color: var(--theme-rigcrit-text);"
                                                     >
                                                         [凹暴 {Math.round(charSA.totalDamageRig).toLocaleString()}]
+                                                    </span>
+                                                {/if}
+                                                {#if charSA.totalDamageNoCrit !== charSA.totalDamageNorm}
+                                                    <span
+                                                        class="text-[10px] tabular-nums"
+                                                        style="color: var(--theme-nocrit-text);"
+                                                    >
+                                                        [不暴 {Math.round(charSA.totalDamageNoCrit).toLocaleString()}]
                                                     </span>
                                                 {/if}
                                             </div>
@@ -724,8 +830,15 @@
                                                     )}%)</span
                                                 >
                                                 {#if charSA.substatTotalRig !== charSA.substatTotalNorm}
-                                                    <span class="text-(--theme-accent-text)">
+                                                    <span class="text-(--theme-rigcrit-text)">
                                                         [凹暴 +{Math.round(charSA.substatTotalRig).toLocaleString()} ({charSA.substatTotalPctRig.toFixed(
+                                                            1
+                                                        )}%)]</span
+                                                    >
+                                                {/if}
+                                                {#if charSA.substatTotalNoCrit !== charSA.substatTotalNorm}
+                                                    <span class="text-(--theme-nocrit-text)">
+                                                        [不暴 +{Math.round(charSA.substatTotalNoCrit).toLocaleString()} ({charSA.substatTotalPctNoCrit.toFixed(
                                                             1
                                                         )}%)]</span
                                                     >
@@ -821,11 +934,23 @@
                                                                 {#if sub.contributionRig !== sub.contributionNorm}
                                                                     <span
                                                                         class="tabular-nums shrink-0"
-                                                                        style="color: var(--theme-accent-text); opacity: 0.6;"
+                                                                        style="color: var(--theme-rigcrit-text);"
                                                                     >
                                                                         [凹暴 +{Math.round(
                                                                             sub.contributionRig
                                                                         ).toLocaleString()} ({sub.contribPctRig.toFixed(
+                                                                            1
+                                                                        )}%)]
+                                                                    </span>
+                                                                {/if}
+                                                                {#if sub.contributionNoCrit !== sub.contributionNorm}
+                                                                    <span
+                                                                        class="tabular-nums shrink-0"
+                                                                        style="color: var(--theme-nocrit-text);"
+                                                                    >
+                                                                        [不暴 +{Math.round(
+                                                                            sub.contributionNoCrit
+                                                                        ).toLocaleString()} ({sub.contribPctNoCrit.toFixed(
                                                                             1
                                                                         )}%)]
                                                                     </span>
@@ -849,9 +974,21 @@
                                                             {#if echo.totalRig !== echo.totalNorm}
                                                                 <span
                                                                     class="tabular-nums"
-                                                                    style="color: var(--theme-accent-text); opacity: 0.7;"
+                                                                    style="color: var(--theme-rigcrit-text);"
                                                                 >
                                                                     [凹暴 +{Math.round(echo.totalRig).toLocaleString()} ({echo.totalPctRig.toFixed(
+                                                                        1
+                                                                    )}%)]
+                                                                </span>
+                                                            {/if}
+                                                            {#if echo.totalNoCrit !== echo.totalNorm}
+                                                                <span
+                                                                    class="tabular-nums"
+                                                                    style="color: var(--theme-nocrit-text);"
+                                                                >
+                                                                    [不暴 +{Math.round(
+                                                                        echo.totalNoCrit
+                                                                    ).toLocaleString()} ({echo.totalPctNoCrit.toFixed(
                                                                         1
                                                                     )}%)]
                                                                 </span>
@@ -879,6 +1016,87 @@
             {:else}
                 <div class="text-xs text-center py-8" style="color: var(--theme-modal-text); opacity: 0.4;">
                     {analysisComputing ? '计算中…' : '暂无数据'}
+                </div>
+            {/if}
+        </div>
+
+        <!-- 角色伤害类型占比 -->
+        <div class="px-6 py-4 border-t" style="border-color: var(--theme-divider-border);">
+            <div class="flex items-center gap-2 mb-3">
+                <Icon icon="mdi:chart-bar" class="size-4" style="color: var(--theme-accent-text);" />
+                <span class="text-sm font-medium" style="color: var(--theme-modal-text);">角色伤害类型占比</span>
+                <span class="text-[10px]" style="color: var(--theme-modal-text); opacity: 0.4;">（仅直伤）</span>
+                {#if directDamageByType.length > 1}
+                    <div
+                        class="ml-auto flex items-center gap-1 rounded-lg border px-1 py-1"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                    >
+                        {#each directDamageByType as agg, i}
+                            <button
+                                onclick={() => (selectedTypeChar = i)}
+                                class={[
+                                    'rounded-md px-2.5 py-1 text-[11px] font-medium transition-all',
+                                    selectedTypeChar === i
+                                        ? 'shadow-sm'
+                                        : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
+                                ].join(' ')}
+                                style="background: {selectedTypeChar === i
+                                    ? 'var(--theme-accent-bg)'
+                                    : 'transparent'}; color: {selectedTypeChar === i
+                                    ? 'var(--theme-accent-text-on-bg, #ffffff)'
+                                    : ''};"
+                            >
+                                {agg.character || `角色${i + 1}`}
+                            </button>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+            {#if directDamageByType.length === 0 || !activeTypeAgg}
+                <div class="text-xs text-center py-8" style="color: var(--theme-modal-text); opacity: 0.4;">
+                    暂无直伤数据
+                </div>
+            {:else}
+                <div
+                    class="rounded-xl border backdrop-blur-lg"
+                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
+                >
+                    <div class="px-4 py-2.5 flex items-center justify-between">
+                        <span class="text-xs font-semibold" style="color: var(--theme-modal-text);"
+                            >{activeTypeAgg.character || '—'}</span
+                        >
+                        <span class="text-[10px] tabular-nums" style="color: var(--theme-modal-text); opacity: 0.5;"
+                            >{Math.round(activeTypeAgg.total).toLocaleString()}</span
+                        >
+                    </div>
+                    <div class="flex items-center gap-4 px-4 pb-4">
+                        <div class="size-36 shrink-0">
+                            <canvas use:registerTypeChartCanvas={activeTypeAgg.character} class="size-full"></canvas>
+                        </div>
+                        <div class="space-y-1.5 min-w-0 flex-1">
+                            {#each DAMAGE_TYPE_CATEGORIES as cat}
+                                {#if activeTypeAgg.byType[cat] > 0}
+                                    <div
+                                        class="flex items-center gap-1.5 text-[10px]"
+                                        style="color: var(--theme-modal-text);"
+                                    >
+                                        <span
+                                            class="size-2 rounded-full shrink-0"
+                                            style="background: {TYPE_COLORS[cat]};"
+                                        ></span>
+                                        <span class="truncate">
+                                            {cat}
+                                            <span class="tabular-nums" style="opacity: 0.6;"
+                                                >{((activeTypeAgg.byType[cat] / activeTypeAgg.total) * 100).toFixed(
+                                                    1
+                                                )}%</span
+                                            >
+                                        </span>
+                                    </div>
+                                {/if}
+                            {/each}
+                        </div>
+                    </div>
                 </div>
             {/if}
         </div>

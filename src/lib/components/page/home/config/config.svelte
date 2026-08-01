@@ -38,15 +38,9 @@
     let showSubstatModal = $state<{ ci: number; si: number } | null>(null)
     let showEnhanceModal = $state<{ ci: number; si: number } | null>(null)
     let dragState = $state<{ ci: number; si: number; idx: number; dropIdx: number; outside: boolean } | null>(null)
-    let echoScrollEl = $state<HTMLDivElement | undefined>()
 
     $effect(() => {
         init(data, locked)
-    })
-
-    $effect(() => {
-        activeTab
-        if (echoScrollEl) echoScrollEl.scrollLeft = 0
     })
 
     let config = $derived(getConfig())
@@ -142,40 +136,6 @@
             if (Math.abs(option.tiers[i] - value) < Math.abs(option.tiers[closest] - value)) closest = i
         }
         return closest
-    }
-
-    function horizontalScroll(node: HTMLElement) {
-        const parent = node.parentElement
-        const leftShadow = parent?.querySelector('[data-shadow="left"]') as HTMLElement | null
-        const rightShadow = parent?.querySelector('[data-shadow="right"]') as HTMLElement | null
-
-        function updateShadows() {
-            if (!leftShadow || !rightShadow) return
-            leftShadow.style.opacity = String(Math.min(1, node.scrollLeft / 40))
-            rightShadow.style.opacity = String(
-                Math.min(1, (node.scrollWidth - node.clientWidth - node.scrollLeft) / 40)
-            )
-        }
-
-        function onWheel(e: WheelEvent) {
-            const prev = node.scrollLeft
-            node.scrollLeft += e.deltaY
-            if (prev !== node.scrollLeft) {
-                e.preventDefault()
-                updateShadows()
-            }
-        }
-
-        node.addEventListener('scroll', updateShadows)
-        node.addEventListener('wheel', onWheel, { passive: false })
-        updateShadows()
-
-        return {
-            destroy() {
-                node.removeEventListener('scroll', updateShadows)
-                node.removeEventListener('wheel', onWheel)
-            }
-        }
     }
 
     function startDrag(e: PointerEvent, ci: number, si: number, idx: number) {
@@ -281,18 +241,11 @@
         {@const ci = parseInt(activeTab.replace('char', ''))}
         <div class="flex flex-col flex-1 min-h-0">
             <div class="relative flex-1 min-h-0">
-                <div
-                    bind:this={echoScrollEl}
-                    class="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 items-start scale-y-[-1] hide-scrollbar absolute inset-0"
-                    use:horizontalScroll
-                >
+                <div class="flex flex-wrap content-start gap-4 overflow-y-auto pb-2 hide-scrollbar absolute inset-0">
                     {#each config.characters[ci].echoes as slot, si}
                         {@const second = SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT]}
                         <div
-                            class={[
-                                'relative rounded-xl shrink-0 w-72 scale-y-[-1]',
-                                si % 2 === 1 ? 'self-center' : 'self-end'
-                            ].join(' ')}
+                            class="relative rounded-xl shrink-0 w-72"
                             style="background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, var(--theme-modal-text) 6%, transparent) 100%);"
                         >
                             <!-- COST overlay -->

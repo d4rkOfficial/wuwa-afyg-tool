@@ -556,9 +556,10 @@ let _skillPickerGroups = $state<SkillPickerGroup[]>([])
 let _skillPickerSelected = $state<Set<string>>(new Set())
 let _skillPickerIsRef = $state(false)
 let _refSkillPickerCache = $state<Record<string, SkillPickerGroup[]>>({})
+let _opSkillPickerCache = $state<Record<string, SkillPickerGroup[]>>({})
 let _skillPickerHitHits = $state<Record<string, number>>({})
 let _nonDirectPickerBlockId = $state<string | null>(null)
-let _nonDirectPickerData = $state<{ name: string; category: string; layers: number }[]>([])
+let _nonDirectPickerData = $state<{ name: string; category: string; layers: number; hits: number }[]>([])
 let _nonDirectPickerSelected = $state<Set<string>>(new Set())
 let _nonDirectPickerResponders = $state<Record<string, string[]>>({})
 let _nonDirectPickerBurstLayers = $state<Record<string, number>>({})
@@ -664,7 +665,7 @@ export function setNonDirectPickerBlockId(v: string | null) {
 export function getNonDirectPickerData() {
     return _nonDirectPickerData
 }
-export function setNonDirectPickerData(v: { name: string; category: string; layers: number }[]) {
+export function setNonDirectPickerData(v: { name: string; category: string; layers: number; hits: number }[]) {
     _nonDirectPickerData = v
 }
 export function getNonDirectPickerSelected() {
@@ -758,7 +759,9 @@ function estimateDamageWidth(d: DamageBlock): number {
         texts.push(h.hitName.replace('伤害', '') + ((h.hits ?? 0) > 1 ? `×${h.hits}` : ''))
     }
     for (const nd of d.nonDirectEntries) {
-        texts.push(nd.category === '效应' ? `${nd.name}${nd.layers}层` : nd.name)
+        texts.push(
+            nd.category === '效应' ? `${nd.name}${nd.layers}层${(nd.hits ?? 1) > 1 ? `×${nd.hits}段` : ''}` : nd.name
+        )
     }
     const maxChars = Math.max(...texts.map((t) => t.length), 0)
     const singleTagW = maxChars * 5.5 + 22
@@ -1774,6 +1777,7 @@ export async function openSkillPicker(blockId: string) {
     _skillPickerCharacter = _team[op.trackIndex]?.character ?? ''
     _skillPickerLoading = true
     _skillPickerGroups = []
+    _opSkillPickerCache = {}
     _skillPickerHitHits = {}
     _skillPickerSelected = new Set()
     for (const h of dmg.skillHits) {
@@ -1790,14 +1794,8 @@ export async function openSkillPicker(blockId: string) {
     }
     try {
         const groups = await loadCharSkills(_skillPickerCharacter)
-        const echoName = _team[op.trackIndex]?.echoes?.[0]?.name ?? null
-        if (echoName) {
-            const cached = await loadEchoSkill(echoName)
-            if (cached?.values?.length) {
-                const echoHits = cached.values.map(([n, v, e]) => ({ name: n, ratio: v, element: e }))
-                groups.push({ type: '声骸技能', hits: echoHits })
-            }
-        }
+        await appendEchoSkillToCache(_opSkillPickerCache, _skillPickerCharacter)
+        _opSkillPickerCache[_skillPickerCharacter] = groups
         _skillPickerGroups = appendCustomGroups(groups, _skillPickerCharacter)
     } catch {
         _skillPickerGroups = []
@@ -1814,7 +1812,9 @@ export function applySkillHits() {
         const character = parts[0]
         const skillType = parts[1]
         const hitName = parts.slice(2).join('|')
-        const groups = _skillPickerIsRef ? _refSkillPickerCache[character] : _skillPickerGroups
+        const groups = _skillPickerIsRef
+            ? _refSkillPickerCache[character]
+            : (_opSkillPickerCache[character] ?? _skillPickerGroups)
         if (!groups) continue
         for (const g of groups) {
             if (g.type !== skillType) continue
@@ -1887,17 +1887,7 @@ export async function openRefSkillPicker(blockId: string) {
     }
     _refSkillPickerCache = {}
     _skillPickerCharacter = _team[0]?.character ?? ''
-    _skillPickerLoading = true
-    try {
-        const groups = await loadCharSkills(_skillPickerCharacter)
-        await appendEchoSkillToRefCache(_skillPickerCharacter)
-        _refSkillPickerCache[_skillPickerCharacter] = groups
-        _skillPickerGroups = appendCustomGroups(groups, _skillPickerCharacter)
-    } catch {
-        _skillPickerGroups = []
-    } finally {
-        _skillPickerLoading = false
-    }
+    await loadCharGroupsToCache(_refSkillPickerCache, _skillPickerCharacter)
 }
 
 function appendCustomGroups(groups: SkillPickerGroup[], charName: string): SkillPickerGroup[] {
@@ -1927,7 +1917,25 @@ function appendCustomGroups(groups: SkillPickerGroup[], charName: string): Skill
     ]
 }
 
-export async function appendEchoSkillToRefCache(charName: string) {
+async function loadCharGroupsToCache(cache: Record<string, SkillPickerGroup[]>, charName: string) {
+    if (cache[charName]) {
+        _skillPickerGroups = appendCustomGroups(cache[charName], charName)
+        return
+    }
+    _skillPickerLoading = true
+    try {
+        const groups = await loadCharSkills(charName)
+        await appendEchoSkillToCache(cache, charName)
+        cache[charName] = groups
+        _skillPickerGroups = appendCustomGroups(groups, charName)
+    } catch {
+        _skillPickerGroups = []
+    } finally {
+        _skillPickerLoading = false
+    }
+}
+
+async function appendEchoSkillToCache(cache: Record<string, SkillPickerGroup[]>, charName: string) {
     const idx = getTeamCharNames().indexOf(charName)
     if (idx < 0) return
     const echoName = _team[idx]?.echoes?.[0]?.name ?? null
@@ -1935,28 +1943,27 @@ export async function appendEchoSkillToRefCache(charName: string) {
     const cached = await loadEchoSkill(echoName)
     if (cached?.values?.length) {
         const echoHits = cached.values.map(([n, v, e]) => ({ name: n, ratio: v, element: e }))
-        const existing = _refSkillPickerCache[charName] ?? []
-        _refSkillPickerCache[charName] = [...existing, { type: '声骸技能', hits: echoHits }]
+        const existing = cache[charName] ?? []
+        cache[charName] = [...existing, { type: '声骸技能', hits: echoHits }]
     }
+}
+
+export async function appendEchoSkillToRefCache(charName: string) {
+    await appendEchoSkillToCache(_refSkillPickerCache, charName)
 }
 
 export async function switchRefSkillPickerTab(charName: string) {
     _skillPickerCharacter = charName
-    if (_refSkillPickerCache[charName]) {
-        _skillPickerGroups = appendCustomGroups(_refSkillPickerCache[charName], charName)
-        return
-    }
-    _skillPickerLoading = true
-    try {
-        const groups = await loadCharSkills(charName)
-        await appendEchoSkillToRefCache(charName)
-        _refSkillPickerCache[charName] = groups
-        _skillPickerGroups = appendCustomGroups(groups, charName)
-    } catch {
-        _skillPickerGroups = []
-    } finally {
-        _skillPickerLoading = false
-    }
+    await loadCharGroupsToCache(_refSkillPickerCache, charName)
+}
+
+export async function switchOpSkillPickerTab(charName: string) {
+    _skillPickerCharacter = charName
+    await loadCharGroupsToCache(_opSkillPickerCache, charName)
+}
+
+export function switchSkillPickerTab(charName: string) {
+    return _skillPickerIsRef ? switchRefSkillPickerTab(charName) : switchOpSkillPickerTab(charName)
 }
 
 // ── Non-Direct Picker Functions ──
@@ -1970,7 +1977,12 @@ export function openNonDirectPicker(sourceType: 'op' | 'ref', blockId: string) {
     _nonDirectPickerBlockId = block.id
     _nonDirectPickerData = NON_DIRECT_CONFIGS.map((cfg) => {
         const existing = block.nonDirectEntries.find((e) => e.name === cfg.name)
-        return { name: cfg.name, category: cfg.category, layers: cfg.category === '响应' ? 0 : (existing?.layers ?? 0) }
+        return {
+            name: cfg.name,
+            category: cfg.category,
+            layers: cfg.category === '响应' ? 0 : (existing?.layers ?? 0),
+            hits: cfg.category === '响应' ? 1 : (existing?.hits ?? 1)
+        }
     })
     _nonDirectPickerSelected = new Set<string>([
         ...block.nonDirectEntries.filter((e) => e.category === '响应').map((e) => e.name),
@@ -2006,7 +2018,12 @@ export function applyNonDirectEntries() {
                 entries.push(entry)
             }
         } else if (d.layers > 0) {
-            entries.push({ name: d.name, category: d.category as '处决' | '效应' | '响应', layers: d.layers })
+            entries.push({
+                name: d.name,
+                category: d.category as '处决' | '效应' | '响应',
+                layers: d.layers,
+                hits: d.hits
+            })
         }
     }
     const burstLayers = _nonDirectPickerBurstLayers['burst'] ?? 0
@@ -2055,8 +2072,7 @@ function buildDamageList() {
                     h.skillType === '声骸技能'
                         ? (_team.find((s) => s.character === h.character)?.echoes?.[0]?.name ?? '?')
                         : null
-                const character =
-                    d.sourceType === 'ref' ? h.character || '无' : h.skillType === '声骸技能' ? h.character : sourceChar
+                const character = d.sourceType === 'ref' ? h.character || '无' : h.character || sourceChar
                 const name =
                     h.skillType === '声骸技能' && echoName
                         ? echoName + '·' + h.hitName.replace('伤害', '') + '(' + h.skillType + ')'
@@ -2080,16 +2096,17 @@ function buildDamageList() {
             if (dianci || baofa) {
                 const layers = dianci?.layers ?? 0
                 const burstLayers = baofa?.layers ?? 0
+                const hits = dianci?.hits ?? 1
                 const mult = getEffectMultiplier('电磁效应', layers)
                 const burstMult = getEffectBurstMultiplier('电磁效应', burstLayers)
                 const total = mult + burstMult
                 entries.push({
                     character: '无',
-                    name: `电磁效应${layers}层+爆发${burstLayers}层`,
+                    name: `电磁效应${layers}层+爆发${burstLayers}层${hits > 1 ? `×${hits}段` : ''}`,
                     value:
-                        burstLayers > 0
+                        (burstLayers > 0
                             ? (mult * 100).toFixed(2) + '%+' + (burstMult * 100).toFixed(2) + '%'
-                            : (mult * 100).toFixed(2) + '%',
+                            : (mult * 100).toFixed(2) + '%') + (hits > 1 ? `*${hits}` : ''),
                     baseType: '效应系数',
                     time,
                     x,
@@ -2099,10 +2116,11 @@ function buildDamageList() {
             for (const nd of effectNDs) {
                 if (nd.name === '电磁效应' || nd.name === '电磁爆发') continue
                 const mult = getEffectMultiplier(nd.name, nd.layers)
+                const hits = nd.hits ?? 1
                 entries.push({
                     character: '无',
-                    name: nd.name + nd.layers + '层',
-                    value: (mult * 100).toFixed(2) + '%',
+                    name: nd.name + nd.layers + '层' + (hits > 1 ? `×${hits}段` : ''),
+                    value: (mult * 100).toFixed(2) + '%' + (hits > 1 ? `*${hits}` : ''),
                     baseType: '效应系数',
                     time,
                     x,

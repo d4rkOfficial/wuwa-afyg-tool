@@ -57,6 +57,9 @@ export interface ResultEntry {
     critPerHit: number
     canCrit: boolean
     multiplierZones: MultiplierZone[]
+
+    // resolved damage types (拉表配置优先，否则推断)；非直伤为空
+    damageTypes: string[]
 }
 
 export interface CharSummary {
@@ -73,6 +76,8 @@ export interface SubstatContribution {
     contributionRig: number
     contribPctNorm: number
     contribPctRig: number
+    contributionNoCrit: number
+    contribPctNoCrit: number
 }
 
 export interface EchoContribution {
@@ -83,16 +88,21 @@ export interface EchoContribution {
     totalRig: number
     totalPctNorm: number
     totalPctRig: number
+    totalNoCrit: number
+    totalPctNoCrit: number
 }
 
 export interface CharSubstatAnalysis {
     character: string
     totalDamageNorm: number
     totalDamageRig: number
+    totalDamageNoCrit: number
     substatTotalNorm: number
     substatTotalRig: number
     substatTotalPctNorm: number
     substatTotalPctRig: number
+    substatTotalNoCrit: number
+    substatTotalPctNoCrit: number
     echoes: EchoContribution[]
     aggregated: SubstatContribution[]
 }

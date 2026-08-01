@@ -73,10 +73,13 @@
     )
     let entryCharIdx = $derived(selectedEntry?.character ? (charToIdx[selectedEntry.character] ?? -1) : -1)
     let visibleBuffSets = $derived(
-        (entryCharIdx >= 0
-            ? buffSets.filter((b) => b.scope === 'all' || (b.scope as number[]).includes(entryCharIdx))
-            : buffSets.filter((b) => b.scope === 'all')
-        ).filter((b) => !globalBuffSetIds.includes(b.id))
+        buffSets.filter((b) => {
+            if (globalBuffSetIds.includes(b.id)) return false
+            if (selectedEntry?.isEffect) {
+                return b.scope === 'all' || (Array.isArray(b.scope) && b.scope.length === 0)
+            }
+            return entryCharIdx >= 0 && (b.scope === 'all' || (b.scope as number[]).includes(entryCharIdx))
+        })
     )
     let groupedVisibleSets = $derived(groupBuffSets(visibleBuffSets))
     let groupedFolderItems = $derived(groupedVisibleSets.filter((g) => g.type === 'folder'))
@@ -197,6 +200,20 @@
             for (const id of childIds) currentSet.delete(id)
         } else {
             for (const id of childIds) currentSet.add(id)
+        }
+        setBuffSetIdsForEntry(expandedEntryId, [...currentSet])
+        onupdate(getCalcState())
+    }
+
+    function handleToggleBuffPrefix(folder: GroupedBuffSetItem, index: number) {
+        if (!expandedEntryId || !folder.children) return
+        const prefixIds = folder.children.slice(0, index + 1).map((c) => c.id)
+        const allSelected = prefixIds.every((id) => selectedEntrySetIds.includes(id))
+        const currentSet = new Set(selectedEntrySetIds)
+        if (allSelected) {
+            for (const id of prefixIds) currentSet.delete(id)
+        } else {
+            for (const id of prefixIds) currentSet.add(id)
         }
         setBuffSetIdsForEntry(expandedEntryId, [...currentSet])
         onupdate(getCalcState())
@@ -637,7 +654,7 @@
                                                         selectedEntrySetIds.includes(c.id)
                                                     )}
                                                     <div
-                                                        class="flex items-center gap-1 rounded border px-2 py-1 text-xs transition-colors"
+                                                        class="flex flex-wrap items-center gap-1 rounded border px-2 py-1 text-xs transition-colors"
                                                         style={folderActive
                                                             ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
                                                             : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
@@ -664,15 +681,19 @@
                                                         <span class="text-(--theme-modal-text)/70 whitespace-nowrap"
                                                             >{item.prefixText}</span
                                                         >
-                                                        <div class="flex gap-0.5">
-                                                            {#each item.children! as child}
+                                                        <div class="flex flex-wrap gap-0.5">
+                                                            {#each item.children! as child, ci}
                                                                 {@const childChecked = selectedEntrySetIds.includes(
                                                                     child.id
                                                                 )}
                                                                 <button
                                                                     onclick={(e) => {
                                                                         e.stopPropagation()
-                                                                        handleToggleBuffSetForEntry(child.id)
+                                                                        if (e.ctrlKey || e.metaKey) {
+                                                                            handleToggleBuffPrefix(item, ci)
+                                                                        } else {
+                                                                            handleToggleBuffSetForEntry(child.id)
+                                                                        }
                                                                     }}
                                                                     class={[
                                                                         'rounded px-2 py-1 text-[10px] font-medium tabular-nums transition-colors min-w-[1.2em] text-center',

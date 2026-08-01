@@ -15,7 +15,14 @@
         reorderNonGlobalBuffSets,
         toggleBuffSetStarred
     } from './calculation.store.svelte'
-    import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP, groupBuffSets } from './calculation.consts'
+    import {
+        ZONE_DEFS,
+        ZONE_MAP,
+        ZONE_REF_DEFS,
+        ZONE_REF_MAP,
+        groupBuffSets,
+        LAYERED_BUFF_PATTERN
+    } from './calculation.consts'
     import type { ZoneId, GroupedBuffSetItem } from './calculation.consts'
     import type { CharSlot } from '$lib/data/types'
     import type { ZoneRef, BuffSet } from './calculation.types'
@@ -50,6 +57,8 @@
     let showDeleteFolderConfirm = $state(false)
     let deleteFolderPrefix = $state('')
     let deleteFolderCount = $state(0)
+    let showCopyOptions = $state(false)
+    let copyOptions = $state<string[]>([])
 
     function globalBuffColor(buffSet: { scope: number[] | 'all' }): string {
         if (!Array.isArray(buffSet.scope) || buffSet.scope.length === 0) return '#eab308'
@@ -170,16 +179,48 @@
     }
 
     function handleCopyBuffSet() {
-        if (!selectedBuffSetId) return
-        let copyName: string | undefined
-        for (const item of groupedBuffSets) {
-            if (item.type === 'folder' && item.children?.some((c) => c.id === selectedBuffSetId)) {
-                copyName = (item.prefixText ?? '') + '0' + (item.suffixText ?? '')
-                break
-            }
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        const folder = groupedBuffSets.find(
+            (item) => item.type === 'folder' && item.children?.some((c) => c.id === selectedBuffSetId)
+        )
+        if (folder) {
+            const nums = (folder.children ?? [])
+                .map((c) => {
+                    const m = c.name.match(LAYERED_BUFF_PATTERN)
+                    return m ? parseInt(m[2]) : 0
+                })
+                .filter((n) => !isNaN(n))
+            const max = nums.length > 0 ? Math.max(...nums) : 0
+            const copyName = (folder.prefixText ?? '') + (max + 1) + (folder.suffixText ?? '')
+            const newId = duplicateBuffSet(selectedBuffSetId, copyName)
+            if (newId) selectedBuffSetId = newId
+            return
         }
-        const newId = duplicateBuffSet(selectedBuffSetId, copyName)
+        const digits = [...selectedBuffSet.name.matchAll(/\d+/g)]
+        if (digits.length === 0) {
+            const newId = duplicateBuffSet(selectedBuffSetId)
+            if (newId) selectedBuffSetId = newId
+            return
+        }
+        copyOptions = [
+            selectedBuffSet.name + ' （复制）',
+            ...digits.map((m) => {
+                const inc = String(parseInt(m[0]) + 1).padStart(m[0].length, '0')
+                return (
+                    selectedBuffSet.name.slice(0, m.index) +
+                    inc +
+                    selectedBuffSet.name.slice((m.index ?? 0) + m[0].length)
+                )
+            })
+        ]
+        showCopyOptions = true
+    }
+
+    function confirmCopyBuff(name: string) {
+        if (!selectedBuffSetId) return
+        const newId = duplicateBuffSet(selectedBuffSetId, name)
         if (newId) selectedBuffSetId = newId
+        showCopyOptions = false
     }
 
     function handleRenameInline() {
@@ -671,8 +712,8 @@
                             />
                             <button
                                 onclick={handleCreateBuffSet}
-                                class="shrink-0 rounded px-2 py-1 text-xs text-white transition-colors"
-                                style="background: var(--theme-accent-bg);"
+                                class="shrink-0 rounded px-2 py-1 text-xs transition-colors"
+                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                             >
                                 <Icon icon="mdi:plus" class="size-3" />
                             </button>
@@ -1280,8 +1321,9 @@
                     >
                     <button
                         onclick={handleConfirmRef}
-                        class="rounded-md px-4 py-1.5 text-xs text-white transition-all hover:brightness-125 shadow-sm"
-                        style="background: var(--theme-accent-bg);">确认</button
+                        class="rounded-md px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
+                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                        >确认</button
                     >
                 </div>
             </div>
@@ -1314,8 +1356,46 @@
                 >
                 <button
                     onclick={confirmDeleteFolder}
-                    class="h-7 rounded-md px-3 text-xs text-white transition-all hover:brightness-125"
-                    style="background: var(--theme-accent-bg);">确认删除</button
+                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    >确认删除</button
+                >
+            </div>
+        </div>
+    </div>
+{/if}
+
+{#if showCopyOptions}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+        class="fixed inset-0 z-70 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        onkeydown={(e) => e.key === 'Escape' && (showCopyOptions = false)}
+    >
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div
+            class="rounded-xl border p-5 shadow-xl w-96"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <h3 class="text-sm font-semibold mb-2">复制 BUFF</h3>
+            <p class="text-xs text-(--theme-modal-text)/60 mb-4">检测到您的 buff 名带数字，请问要复制为？</p>
+            <div class="flex flex-col gap-1.5">
+                {#each copyOptions as name}
+                    <button
+                        onclick={() => confirmCopyBuff(name)}
+                        class="h-8 rounded-md px-3 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/10"
+                        style="background: var(--theme-input-bg);"
+                    >
+                        {name}
+                    </button>
+                {/each}
+            </div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button
+                    onclick={() => (showCopyOptions = false)}
+                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    style="background: var(--theme-input-bg);">取消</button
                 >
             </div>
         </div>

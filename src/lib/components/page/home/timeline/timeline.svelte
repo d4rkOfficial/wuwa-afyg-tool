@@ -570,13 +570,27 @@
                                                 {#each dmg.skillHits as hit}
                                                     {@const echoName = team.find((s) => s.character === hit.character)
                                                         ?.echoes?.[0]?.name}
+                                                    {@const srcOp =
+                                                        dmg.sourceType === 'op'
+                                                            ? getOpBlocks().find((b) => b.id === dmg.sourceId)
+                                                            : null}
+                                                    {@const srcChar =
+                                                        dmg.sourceType === 'ref'
+                                                            ? ''
+                                                            : srcOp && srcOp.trackIndex < getTRACKS().length - 1
+                                                              ? (team[srcOp.trackIndex]?.character ?? '')
+                                                              : ''}
                                                     <span
                                                         class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-px"
                                                         style="color: var(--theme-element-{hit.element}, #888); border-color: var(--theme-element-{hit.element}, #888);"
                                                     >
                                                         {(dmg.sourceType === 'ref' && hit.character
                                                             ? `[${hit.character}]`
-                                                            : '') +
+                                                            : dmg.sourceType === 'op' &&
+                                                                hit.character &&
+                                                                hit.character !== srcChar
+                                                              ? `[${hit.character}]`
+                                                              : '') +
                                                             (hit.skillType === '声骸技能' && echoName
                                                                 ? echoName + '·'
                                                                 : '') +
@@ -604,7 +618,10 @@
                                                             : 1};"
                                                     >
                                                         {nd.category === '效应'
-                                                            ? nd.name + nd.layers + '层'
+                                                            ? nd.name +
+                                                              nd.layers +
+                                                              '层' +
+                                                              ((nd.hits ?? 1) > 1 ? `×${nd.hits}段` : '')
                                                             : nd.name}{nd.responders?.length
                                                             ? '[' + nd.responders.join(',') + ']'
                                                             : ''}

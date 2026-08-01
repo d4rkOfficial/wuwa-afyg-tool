@@ -804,7 +804,8 @@
                     disabled={!newName.trim()}
                     onclick={() => handleCreate(newName)}
                     class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
-                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">确认</button
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    >确认</button
                 >
             </div>
         </div>
@@ -839,7 +840,8 @@
                     disabled={!renameValue.trim()}
                     onclick={handleRename}
                     class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
-                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">确认</button
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    >确认</button
                 >
             </div>
         </div>
@@ -890,7 +892,8 @@
                 <button
                     onclick={handleExport}
                     class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
-                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">导出</button
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    >导出</button
                 >
             </div>
         </div>
@@ -955,7 +958,8 @@
                     disabled={!cloneName.trim()}
                     onclick={handleClone}
                     class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
-                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);">复制</button
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    >复制</button
                 >
             </div>
         </div>

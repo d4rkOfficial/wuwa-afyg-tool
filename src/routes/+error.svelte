@@ -12,7 +12,7 @@
     <button
         onclick={() => goto('/')}
         class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-        style="background: var(--theme-btn-bg, linear-gradient(135deg, #e4e4e7, #a1a1aa)); color: var(--theme-btn-text, #18181b)"
+        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff)"
     >
         <Icon icon="mdi:arrow-left" class="size-4" />
         返回首页

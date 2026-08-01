@@ -43,6 +43,8 @@ function applyThemeCSS() {
     root.style.setProperty('--theme-layout-scheme', theme.id === 'light' ? 'light' : 'dark')
     root.style.setProperty('--theme-rigcrit-text', theme.id === 'light' ? '#dc2626' : '#ef4444')
     root.style.setProperty('--theme-rigcrit-bg', theme.id === 'light' ? '#dc2626' : '#ef4444')
+    root.style.setProperty('--theme-nocrit-text', theme.id === 'light' ? '#16a34a' : '#22c55e')
+    root.style.setProperty('--theme-nocrit-bg', theme.id === 'light' ? '#16a34a' : '#22c55e')
     root.style.setProperty('--theme-w-icon-filter', theme.id === 'light' ? 'invert(1)' : 'none')
     root.style.setProperty('--theme-num', theme.id === 'light' ? '#a16207' : '#ca8a04')
 

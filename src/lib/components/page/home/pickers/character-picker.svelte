@@ -252,7 +252,7 @@
                 <button
                     onclick={handleConfirm}
                     class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
-                    style="background: var(--theme-btn-bg); color: var(--theme-btn-text);"
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 >
                     <Icon icon="mdi:check" class="size-4" />
                     确认

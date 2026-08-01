@@ -32,6 +32,7 @@ export interface NonDirectEntry {
     name: string
     category: '处决' | '响应' | '效应'
     layers: number
+    hits?: number
     responders?: string[]
 }
 

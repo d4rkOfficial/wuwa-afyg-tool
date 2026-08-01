@@ -91,7 +91,7 @@
                     : 'bg-(--theme-input-bg) text-(--theme-modal-text)/30 cursor-not-allowed'
             ].join(' ')}
             style={selected.length > 0 && !running
-                ? 'background: var(--theme-accent-bg); color: var(--theme-btn-text, #fff);'
+                ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
                 : ''}
         >
             {#if running}

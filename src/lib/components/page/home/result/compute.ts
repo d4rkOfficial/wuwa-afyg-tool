@@ -22,6 +22,30 @@ function clamp(v: number, min: number, max: number): number {
 
 import type { EnemyConfig } from '../config/config.types'
 
+function inferDamageTypes(entry: DamageEntry): string[] {
+    switch (entry.skillType) {
+        case '常态攻击':
+            return entry.hitName.includes('重击') ? ['重击伤害'] : ['普攻伤害']
+        case '共鸣技能':
+            return ['共鸣技能伤害']
+        case '共鸣解放':
+            return ['共鸣解放伤害']
+        case '声骸技能':
+            return ['声骸技能伤害']
+        case '变奏技能':
+            return ['变奏技能伤害']
+        case '延奏技能':
+            return ['延奏技能伤害']
+        default:
+            return []
+    }
+}
+
+function resolveDamageTypes(entry: DamageEntry, damageEntryDamageTypes: Record<string, string[]>): string[] {
+    const explicit = damageEntryDamageTypes[entry.id] ?? []
+    return explicit.length > 0 ? explicit : inferDamageTypes(entry)
+}
+
 /**
  * 实战对比验证：鸣潮减防与穿防为独立乘算 (1-减防)×(1-穿防)，
  * 非加算 (1-减防-穿防)，原算法（加算）低估了减防/穿防收益
@@ -273,6 +297,7 @@ function getBoundBuffSets(
     return buffSets.filter((bs) => {
         if (!boundIds.includes(bs.id)) return false
         if (bs.scope === 'all') return true
+        if (Array.isArray(bs.scope) && bs.scope.length === 0) return charIndex < 0
         return (bs.scope as number[]).includes(charIndex)
     })
 }
@@ -458,6 +483,7 @@ function computeResultEntry(
         r.rawPerHit = Math.round(baseValue)
         r.totalDamage = Math.round(baseValue)
         r.totalMultiplier = 1
+        r.damageTypes = damageTypes
         return r
     }
 
@@ -608,7 +634,8 @@ function computeResultEntry(
         nonCritPerHit,
         critPerHit,
         canCrit: entry.damageBaseType !== '偏谐系数',
-        multiplierZones: multZones
+        multiplierZones: multZones,
+        damageTypes
     }
 }
 
@@ -659,7 +686,8 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         nonCritPerHit: 0,
         critPerHit: 0,
         canCrit: false,
-        multiplierZones: []
+        multiplierZones: [],
+        damageTypes: []
     }
 }
 
@@ -779,7 +807,8 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         nonCritPerHit: expectedPerHit,
         critPerHit: expectedPerHit,
         canCrit: false,
-        multiplierZones: multZones
+        multiplierZones: multZones,
+        damageTypes: []
     }
 }
 
@@ -826,7 +855,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
     const burstLayers = entry.burstLayers ?? 0
     const effectMult = getEffectMultiplier(entry.hitName, layers)
     const burstMult = getEffectBurstMultiplier(entry.hitName, burstLayers)
-    const multiplier = effectMult + burstMult
+    const multiplier = (effectMult + burstMult) * (entry.hits || 1)
     const ratioNum = multiplier
     const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
     const element = (NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? ''
@@ -924,7 +953,8 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         nonCritPerHit: expectedPerHit,
         critPerHit: expectedPerHit,
         canCrit: false,
-        multiplierZones: multZones
+        multiplierZones: multZones,
+        damageTypes: []
     }
 }
 
@@ -1165,7 +1195,7 @@ export function computeAll(
         }
 
         // direct damage
-        const damageTypes = damageEntryDamageTypes[entry.id] ?? []
+        const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
         return computeResultEntry(entry, stats, enemy, damageTypes)
     })
 }
@@ -1223,7 +1253,7 @@ export function computeOneEntry(
     const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
     const wInfo = weaponInfoMap[weaponName ?? ''] ?? null
     const charInfo = charName ? charInfoMap[charName] : undefined
-    const boundBuffSets = charIndex >= 0 ? getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds) : []
+    const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds)
 
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo
@@ -1248,7 +1278,7 @@ export function computeOneEntry(
     if (entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数') {
         return computeTuneEntry(entry, stats, enemy)
     }
-    const damageTypes = damageEntryDamageTypes[entry.id] ?? []
+    const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
     return computeResultEntry(entry, stats, enemy, damageTypes)
 }
 

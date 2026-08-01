@@ -47,7 +47,7 @@ export const ZONE_REF_DEFS = [
     { id: 'baseAtk', label: '攻击白值', unit: 'flat' },
     { id: 'totalAtk', label: '当前攻击', unit: 'flat' },
     { id: 'baseHp', label: '生命白值', unit: 'flat' },
-    { id: 'totalHp', label: '当前最大生命', unit: 'flat' },
+    { id: 'totalHp', label: '生命上限', unit: 'flat' },
     { id: 'baseDef', label: '防御白值', unit: 'flat' },
     { id: 'totalDef', label: '当前防御', unit: 'flat' },
     { id: 'recharge', label: '共鸣效率', unit: '%' },

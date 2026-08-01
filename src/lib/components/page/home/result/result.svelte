@@ -36,6 +36,7 @@
     let charElements = $derived(getCharElementMap())
     let resultAnalysis = $derived(getActiveProject()?.resultAnalysis)
     let rigCritEntryIds = $state<string[]>([])
+    let noCritEntryIds = $state<string[]>([])
 
     $effect(() => {
         calcState
@@ -75,6 +76,7 @@
             /* ignore */
         }
         rigCritEntryIds = getActiveProject()?.resultAnalysis?.rigCritEntryIds ?? []
+        noCritEntryIds = getActiveProject()?.resultAnalysis?.noCritEntryIds ?? []
         computeAll()
         loading = false
     }
@@ -98,24 +100,32 @@
             charInfoMap,
             weaponInfoMap
         )
-        applyRigCrit(cleanEntries)
+        applyModes(cleanEntries)
     }
 
-    function applyRigCrit(sourceEntries: ResultEntry[]) {
-        const ids = new Set(rigCritEntryIds)
+    function applyModes(sourceEntries: ResultEntry[]) {
+        const rigIds = new Set(rigCritEntryIds)
+        const noCritIds = new Set(noCritEntryIds)
         entries = sourceEntries.map((e) => {
-            if (ids.has(e.id)) {
+            if (rigIds.has(e.id)) {
                 return { ...e, expectedPerHit: e.critPerHit, totalDamage: e.critPerHit }
+            }
+            if (noCritIds.has(e.id)) {
+                return { ...e, expectedPerHit: e.nonCritPerHit, totalDamage: e.nonCritPerHit }
             }
             return e
         })
     }
 
-    function toggleRigCrit(id: string) {
-        const next = rigCritEntryIds.includes(id) ? rigCritEntryIds.filter((i) => i !== id) : [...rigCritEntryIds, id]
-        rigCritEntryIds = next
-        updateResultAnalysis({ timings: resultAnalysis?.timings ?? [], rigCritEntryIds: next })
-        applyRigCrit(cleanEntries)
+    function setEntryMode(id: string, mode: 'expect' | 'crit' | 'nocrit') {
+        let rig = rigCritEntryIds.includes(id) ? rigCritEntryIds.filter((i) => i !== id) : rigCritEntryIds
+        let noCrit = noCritEntryIds.includes(id) ? noCritEntryIds.filter((i) => i !== id) : noCritEntryIds
+        if (mode === 'crit' && !rig.includes(id)) rig = [...rig, id]
+        if (mode === 'nocrit' && !noCrit.includes(id)) noCrit = [...noCrit, id]
+        rigCritEntryIds = rig
+        noCritEntryIds = noCrit
+        updateResultAnalysis({ timings: resultAnalysis?.timings ?? [], rigCritEntryIds: rig, noCritEntryIds: noCrit })
+        applyModes(cleanEntries)
     }
 
     let charSummaries = $derived.by(() => {
@@ -157,7 +167,8 @@
                 team,
                 charInfoMap,
                 weaponInfoMap,
-                new Set(rigCritEntryIds)
+                new Set(rigCritEntryIds),
+                new Set(noCritEntryIds)
             )
             analysisComputing = false
         }, 0)
@@ -289,7 +300,9 @@
                                 class="py-1.5 px-3 text-right tabular-nums font-medium"
                                 style="color: {rigCritEntryIds.includes(entry.id)
                                     ? 'var(--theme-rigcrit-text)'
-                                    : 'var(--theme-accent-text)'}">{entry.expectedPerHit.toLocaleString()}</td
+                                    : noCritEntryIds.includes(entry.id)
+                                      ? 'var(--theme-nocrit-text)'
+                                      : 'var(--theme-accent-text)'}">{entry.expectedPerHit.toLocaleString()}</td
                             >
                             <td class="py-1.5 w-8"></td>
                         </tr>
@@ -517,6 +530,10 @@
                                                         <div class="font-bold" style="color: var(--theme-rigcrit-text)">
                                                             期望 = 暴击 = {entry.critPerHit.toLocaleString()}
                                                         </div>
+                                                    {:else if noCritEntryIds.includes(entry.id)}
+                                                        <div class="font-bold" style="color: var(--theme-nocrit-text)">
+                                                            期望 = 不暴击 = {entry.nonCritPerHit.toLocaleString()}
+                                                        </div>
                                                     {:else}
                                                         <div>不暴击 = {entry.nonCritPerHit.toLocaleString()}</div>
                                                         <div>
@@ -532,25 +549,56 @@
                                                         </div>
                                                     {/if}
                                                 </div>
-                                                <button
-                                                    onclick={(e) => {
-                                                        e.stopPropagation()
-                                                        toggleRigCrit(entry.id)
-                                                    }}
-                                                    class="shrink-0 self-start inline-flex items-center gap-1 rounded px-3 py-2 text-sm font-medium transition-colors"
-                                                    style="background: {rigCritEntryIds.includes(entry.id)
-                                                        ? 'var(--theme-accent-bg)'
-                                                        : 'transparent'}; color: {rigCritEntryIds.includes(entry.id)
-                                                        ? 'var(--theme-accent-text-on-bg, #ffffff)'
-                                                        : 'var(--theme-modal-text)/40'}; border: 1px solid {rigCritEntryIds.includes(
-                                                        entry.id
-                                                    )
-                                                        ? 'transparent'
-                                                        : 'var(--theme-divider-border)'}"
+                                                <div
+                                                    class="shrink-0 self-start inline-flex items-center rounded-lg border overflow-hidden"
+                                                    style="border-color: var(--theme-divider-border);"
                                                 >
-                                                    <Icon icon="mdi:target" class="size-4" />
-                                                    凹暴
-                                                </button>
+                                                    <button
+                                                        onclick={(e) => {
+                                                            e.stopPropagation()
+                                                            setEntryMode(entry.id, 'expect')
+                                                        }}
+                                                        class="px-3 py-2 text-sm font-medium transition-colors"
+                                                        style="background: {!rigCritEntryIds.includes(entry.id) &&
+                                                        !noCritEntryIds.includes(entry.id)
+                                                            ? 'var(--theme-accent-bg)'
+                                                            : 'transparent'}; color: {!rigCritEntryIds.includes(
+                                                            entry.id
+                                                        ) && !noCritEntryIds.includes(entry.id)
+                                                            ? 'var(--theme-accent-text-on-bg, #ffffff)'
+                                                            : 'var(--theme-modal-text)/40'};"
+                                                    >
+                                                        期望
+                                                    </button>
+                                                    <button
+                                                        onclick={(e) => {
+                                                            e.stopPropagation()
+                                                            setEntryMode(entry.id, 'crit')
+                                                        }}
+                                                        class="px-3 py-2 text-sm font-medium transition-colors border-l"
+                                                        style="background: {rigCritEntryIds.includes(entry.id)
+                                                            ? 'var(--theme-rigcrit-bg)'
+                                                            : 'transparent'}; color: {rigCritEntryIds.includes(entry.id)
+                                                            ? '#ffffff'
+                                                            : 'var(--theme-modal-text)/40'}; border-color: var(--theme-divider-border);"
+                                                    >
+                                                        凹暴
+                                                    </button>
+                                                    <button
+                                                        onclick={(e) => {
+                                                            e.stopPropagation()
+                                                            setEntryMode(entry.id, 'nocrit')
+                                                        }}
+                                                        class="px-3 py-2 text-sm font-medium transition-colors border-l"
+                                                        style="background: {noCritEntryIds.includes(entry.id)
+                                                            ? 'var(--theme-nocrit-bg)'
+                                                            : 'transparent'}; color: {noCritEntryIds.includes(entry.id)
+                                                            ? '#ffffff'
+                                                            : 'var(--theme-modal-text)/40'}; border-color: var(--theme-divider-border);"
+                                                    >
+                                                        不暴
+                                                    </button>
+                                                </div>
                                             </div>
                                         {/if}
                                     </div>

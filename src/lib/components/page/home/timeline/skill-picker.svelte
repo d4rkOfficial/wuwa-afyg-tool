@@ -7,7 +7,6 @@
         getSkillPickerGroups,
         getSkillPickerSelected,
         setSkillPickerSelected,
-        getSkillPickerIsRef,
         setSkillPickerIsRef,
         getRefSkillPickerCache,
         getSkillPickerHitHits,
@@ -20,7 +19,7 @@
         addCustomHit,
         removeCustomHit,
         applySkillHits,
-        switchRefSkillPickerTab
+        switchSkillPickerTab
     } from './timeline.store.svelte'
     import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
     import type { CustomHit } from './timeline.types'
@@ -118,40 +117,15 @@
             >
                 <h2 class="text-sm font-semibold">配置直伤倍率</h2>
                 <div class="flex items-center gap-2">
-                    {#if getSkillPickerIsRef()}
-                        <div class="flex items-center gap-1.5">
-                            {#each getTeamCharNames() as name}
-                                <button
-                                    class="size-7 rounded-full overflow-hidden {getSkillPickerCharacter() === name
-                                        ? 'ring-2 ring-[var(--theme-accent-bg)]'
-                                        : 'ring-1 ring-[var(--theme-divider-border)]'}"
-                                    onclick={() => switchRefSkillPickerTab(name)}
-                                >
-                                    {#if getCharIconMap()[name]}
-                                        <img
-                                            src={getCharIconMap()[name]}
-                                            alt={name}
-                                            draggable="false"
-                                            use:fallbackIcon={'/icons/placeholder-character.svg'}
-                                            class="size-full object-cover"
-                                        />
-                                    {:else}
-                                        <span
-                                            class="flex size-full items-center justify-center text-[10px] font-medium text-[var(--theme-modal-text)]/60 bg-[var(--theme-modal-bg)]/80"
-                                            >{name[0]}</span
-                                        >
-                                    {/if}
-                                </button>
-                            {/each}
-                        </div>
-                    {:else}
-                        {@const name = getSkillPickerCharacter()}
-                        <div class="flex items-center gap-1.5">
-                            {#if getCharIconMap()[name]}
-                                <div
-                                    class="size-7 rounded-full overflow-hidden ring-2 ring-[var(--theme-accent-bg)] flex items-center justify-center"
-                                    style="background: var(--theme-input-bg);"
-                                >
+                    <div class="flex items-center gap-1.5">
+                        {#each getTeamCharNames() as name}
+                            <button
+                                class="size-7 rounded-full overflow-hidden {getSkillPickerCharacter() === name
+                                    ? 'ring-2 ring-[var(--theme-accent-bg)]'
+                                    : 'ring-1 ring-[var(--theme-divider-border)]'}"
+                                onclick={() => switchSkillPickerTab(name)}
+                            >
+                                {#if getCharIconMap()[name]}
                                     <img
                                         src={getCharIconMap()[name]}
                                         alt={name}
@@ -159,16 +133,15 @@
                                         use:fallbackIcon={'/icons/placeholder-character.svg'}
                                         class="size-full object-cover"
                                     />
-                                </div>
-                            {:else}
-                                <div
-                                    class="size-7 rounded-full ring-2 ring-[var(--theme-accent-bg)] flex items-center justify-center text-[10px] font-medium text-[var(--theme-modal-text)]/60 bg-[var(--theme-modal-bg)]/80"
-                                >
-                                    {name[0]}
-                                </div>
-                            {/if}
-                        </div>
-                    {/if}
+                                {:else}
+                                    <span
+                                        class="flex size-full items-center justify-center text-[10px] font-medium text-[var(--theme-modal-text)]/60 bg-[var(--theme-modal-bg)]/80"
+                                        >{name[0]}</span
+                                    >
+                                {/if}
+                            </button>
+                        {/each}
+                    </div>
                 </div>
             </div>
 
@@ -245,7 +218,7 @@
                                             0 &&
                                         group.type !== '谐度破坏' &&
                                         !isResponseHit
-                                            ? 'bg-[var(--theme-accent-bg)] text-white'
+                                            ? 'bg-[var(--theme-accent-bg)] text-[var(--theme-accent-text-on-bg)]'
                                             : 'border'}"
                                         style="border-color: {order > 0 && group.type !== '谐度破坏' && !isResponseHit
                                             ? 'transparent'
@@ -337,8 +310,8 @@
                         }}>取消</button
                     >
                     <button
-                        class="h-7 rounded-md px-3 text-xs text-white transition-colors"
-                        style="background: var(--theme-accent-bg);"
+                        class="h-7 rounded-md px-3 text-xs transition-colors"
+                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         onclick={applySkillHits}>确认</button
                     >
                 </div>
@@ -510,8 +483,9 @@
                     >
                     <button
                         onclick={() => confirmAddCustom(getSkillPickerCharacter())}
-                        class="rounded-md px-4 py-1.5 text-xs text-white transition-all hover:brightness-125 shadow-sm"
-                        style="background: var(--theme-accent-bg);">确认</button
+                        class="rounded-md px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
+                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                        >确认</button
                     >
                 </div>
             </div>

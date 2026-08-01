@@ -51,4 +51,5 @@ export type { PhaseKey } from '$lib/consts/game-terms'
 export interface ResultAnalysisData {
     timings: { refLineId: string; seconds: number }[]
     rigCritEntryIds?: string[]
+    noCritEntryIds?: string[]
 }

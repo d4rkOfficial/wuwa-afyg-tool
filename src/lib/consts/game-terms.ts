@@ -134,7 +134,7 @@ export const NON_DIRECT_CONFIGS = [
     { name: '霜渐效应', category: '效应' as const, max: 19, element: '冷凝' },
     { name: '聚爆效应', category: '效应' as const, max: 19, element: '热熔' },
     { name: '电磁效应', category: '效应' as const, max: 19, element: '导电' },
-    { name: '虚湮效应', category: '效应' as const, max: 6, element: '湮灭' }
+    { name: '虚湮效应', category: '效应' as const, max: 9, element: '湮灭' }
 ] as const
 
 export const NON_DIRECT_ELEMENT = NON_DIRECT_CONFIGS.reduce<Record<string, string>>(
