@@ -56,6 +56,8 @@
     import favicon from '$lib/assets/favicon.svg'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
+    import BuffLibraryModal from '$lib/components/page/home/buff-library-modal.svelte'
+    import ThemeCustomizer from '$lib/components/layout/theme-customizer.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
@@ -70,6 +72,8 @@
     let showNewModal = $state(false)
     let newName = $state('')
     let showResult = $state(false)
+    let showBuffLibrary = $state(false)
+    let showThemeCustomizer = $state(false)
 
     let sidebarWidth = $state(240)
     let sidebarDragging = $state(false)
@@ -551,6 +555,26 @@
                             <span class="text-sm text-(--theme-muted-text)">前往社区站点浏览、分享与下载工程</span>
                         </div>
                     </a>
+                    <button
+                        onclick={() => (showBuffLibrary = true)}
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                    >
+                        <Icon icon="mdi:view-dashboard-outline" class="size-8 text-(--theme-accent-text)" />
+                        <div class="flex flex-col gap-1">
+                            <span class="text-base font-semibold text-(--theme-card-text)">Buff 集</span>
+                            <span class="text-sm text-(--theme-muted-text)">管理本地增益，拉表时一键导入</span>
+                        </div>
+                    </button>
+                    <button
+                        onclick={() => (showThemeCustomizer = true)}
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                    >
+                        <Icon icon="mdi:palette-outline" class="size-8 text-(--theme-accent-text)" />
+                        <div class="flex flex-col gap-1">
+                            <span class="text-base font-semibold text-(--theme-card-text)">主题设置</span>
+                            <span class="text-sm text-(--theme-muted-text)">定制主色调、背景与明暗主题</span>
+                        </div>
+                    </button>
                 </div>
             </div>
         {:else if activeProject}
@@ -764,6 +788,10 @@
 <svelte:head><title>椰果工具箱</title></svelte:head>
 
 <WorkshopModal open={showWorkshop} onclose={() => (showWorkshop = false)} />
+
+<BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
+
+<ThemeCustomizer open={showThemeCustomizer} onclose={() => (showThemeCustomizer = false)} />
 
 <svelte:window
     onkeydown={(e) => {

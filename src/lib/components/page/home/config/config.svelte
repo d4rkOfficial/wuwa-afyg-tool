@@ -38,6 +38,60 @@
     let showSubstatModal = $state<{ ci: number; si: number } | null>(null)
     let showEnhanceModal = $state<{ ci: number; si: number } | null>(null)
     let dragState = $state<{ ci: number; si: number; idx: number; dropIdx: number; outside: boolean } | null>(null)
+    let mainStatMenuPos = $state<{ left: number; top: number; width: number } | null>(null)
+    let mainStatMenuEl: HTMLElement | undefined = $state()
+    const mainStatTriggers = new Map<string, HTMLButtonElement>()
+
+    function registerMainStatTrigger(node: HTMLButtonElement, key: string) {
+        mainStatTriggers.set(key, node)
+        return {
+            destroy() {
+                mainStatTriggers.delete(key)
+            }
+        }
+    }
+
+    function closeMainStatMenu() {
+        showMainStatMenu = null
+        mainStatMenuPos = null
+    }
+
+    function toggleMainStatMenu(ci: number, si: number) {
+        if (showMainStatMenu?.ci === ci && showMainStatMenu?.si === si) {
+            closeMainStatMenu()
+            return
+        }
+        const el = mainStatTriggers.get(`${ci}:${si}`)
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        mainStatMenuPos = { left: r.left, top: r.bottom + 4, width: r.width }
+        showMainStatMenu = { ci, si }
+    }
+
+    let mainStatMenuData = $derived.by(() => {
+        if (!showMainStatMenu) return null
+        const { ci, si } = showMainStatMenu
+        return config.characters[ci]?.echoes[si] ?? null
+    })
+
+    $effect(() => {
+        if (!showMainStatMenu || !mainStatMenuEl || !mainStatMenuPos) return
+        requestAnimationFrame(() => {
+            const el = mainStatMenuEl
+            const pos = mainStatMenuPos
+            const menu = showMainStatMenu
+            if (!el || !pos || !menu) return
+            const r = el.getBoundingClientRect()
+            const cw = document.documentElement.clientWidth
+            const ch = document.documentElement.clientHeight
+            if (r.right > cw - 8) el.style.left = cw - r.width - 8 + 'px'
+            if (r.bottom > ch - 8) {
+                const btn = mainStatTriggers.get(`${menu.ci}:${menu.si}`)
+                const btnRect = btn?.getBoundingClientRect()
+                el.style.top = btnRect ? btnRect.top - r.height - 4 + 'px' : ch - r.height - 8 + 'px'
+            }
+        })
+    })
 
     $effect(() => {
         init(data, locked)
@@ -74,7 +128,7 @@
 
     function handleSetMainStat(ci: number, si: number, stat: { type: string; value: number; unit: string } | null) {
         setMainStat(ci, si, stat)
-        showMainStatMenu = null
+        closeMainStatMenu()
         onupdate(getCalcState())
     }
 
@@ -193,7 +247,7 @@
             <button
                 onclick={() => {
                     activeTab = i < 3 ? (`char${i}` as 'char0' | 'char1' | 'char2') : 'enemy'
-                    showMainStatMenu = null
+                    closeMainStatMenu()
                     showSubstatModal = null
                 }}
                 class={[
@@ -241,7 +295,10 @@
         {@const ci = parseInt(activeTab.replace('char', ''))}
         <div class="flex flex-col flex-1 min-h-0">
             <div class="relative flex-1 min-h-0">
-                <div class="flex flex-wrap content-start gap-4 overflow-y-auto pb-2 hide-scrollbar absolute inset-0">
+                <div
+                    class="flex flex-wrap content-start gap-4 overflow-y-auto pb-2 hide-scrollbar absolute inset-0"
+                    onscroll={closeMainStatMenu}
+                >
                     {#each config.characters[ci].echoes as slot, si}
                         {@const second = SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT]}
                         <div
@@ -293,11 +350,8 @@
                                 <!-- Main stat + second stat combined -->
                                 <div class="relative z-20 mb-2">
                                     <button
-                                        onclick={() =>
-                                            (showMainStatMenu =
-                                                showMainStatMenu?.ci === ci && showMainStatMenu?.si === si
-                                                    ? null
-                                                    : { ci, si })}
+                                        use:registerMainStatTrigger={`${ci}:${si}`}
+                                        onclick={() => toggleMainStatMenu(ci, si)}
                                         class="w-full rounded border px-3 py-2 transition-colors hover:bg-(--theme-modal-text)/10"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
@@ -323,42 +377,6 @@
                                             />
                                         </div>
                                     </button>
-                                    {#if showMainStatMenu?.ci === ci && showMainStatMenu?.si === si}
-                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                        <div
-                                            class="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
-                                            style="background: color-mix(in srgb, var(--theme-modal-bg) 85%, transparent); border-color: var(--theme-divider-border);"
-                                            onclick={(e) => e.stopPropagation()}
-                                            onwheel={(e) => e.stopPropagation()}
-                                        >
-                                            <button
-                                                onclick={() => handleSetMainStat(ci, si, null)}
-                                                class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-input-bg)"
-                                                >未选择</button
-                                            >
-                                            {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt}
-                                                <button
-                                                    onclick={() =>
-                                                        handleSetMainStat(ci, si, {
-                                                            type: opt.label,
-                                                            value: opt.maxValue,
-                                                            unit: opt.unit
-                                                        })}
-                                                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-input-bg)"
-                                                >
-                                                    <span class="flex-1">{opt.label}</span>
-                                                    <span class="text-(--theme-modal-text)/40"
-                                                        >{opt.maxValue}{opt.unit}</span
-                                                    >
-                                                    {#if slot.mainStat?.type === opt.label}<Icon
-                                                            icon="mdi:check"
-                                                            class="size-3 text-(--theme-accent-text)"
-                                                        />{/if}
-                                                </button>
-                                            {/each}
-                                        </div>
-                                    {/if}
                                 </div>
 
                                 <!-- Substats -->
@@ -481,6 +499,53 @@
                         </div>
                     {/each}
                 </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Main stat selector popup -->
+    {#if showMainStatMenu && mainStatMenuData}
+        {@const menu = showMainStatMenu}
+        {@const slot = mainStatMenuData}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+            class="fixed inset-0 z-50"
+            role="presentation"
+            onclick={closeMainStatMenu}
+            onkeydown={(e) => e.key === 'Escape' && closeMainStatMenu()}
+        >
+            <div
+                bind:this={mainStatMenuEl}
+                class="absolute max-h-48 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
+                style="left: {mainStatMenuPos?.left ?? 0}px; top: {mainStatMenuPos?.top ??
+                    0}px; width: {mainStatMenuPos?.width ??
+                    0}px; background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <button
+                    onclick={() => handleSetMainStat(menu.ci, menu.si, null)}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-input-bg)"
+                    >未选择</button
+                >
+                {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt}
+                    <button
+                        onclick={() =>
+                            handleSetMainStat(menu.ci, menu.si, {
+                                type: opt.label,
+                                value: opt.maxValue,
+                                unit: opt.unit
+                            })}
+                        class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-input-bg)"
+                    >
+                        <span class="flex-1">{opt.label}</span>
+                        <span class="text-(--theme-modal-text)/40">{opt.maxValue}{opt.unit}</span>
+                        {#if slot.mainStat?.type === opt.label}<Icon
+                                icon="mdi:check"
+                                class="size-3 text-(--theme-accent-text)"
+                            />{/if}
+                    </button>
+                {/each}
             </div>
         </div>
     {/if}

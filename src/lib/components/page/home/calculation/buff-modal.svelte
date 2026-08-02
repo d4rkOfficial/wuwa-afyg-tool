@@ -29,6 +29,7 @@
     import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
     import Icon from '@iconify/svelte'
     import QuickLookup from './quick-lookup.svelte'
+    import BuffImportModal from '../buff-import-modal.svelte'
     import { slide } from 'svelte/transition'
     import { fallbackIcon } from '$lib/utils/icons'
 
@@ -42,6 +43,7 @@
 
     let showLookup = $state(false)
     let showRefLookup = $state(false)
+    let showImport = $state(false)
 
     type DragState = {
         id: string
@@ -508,13 +510,22 @@
                 style="border-bottom: 1px solid var(--theme-divider-border);"
             >
                 <h2 class="text-sm font-semibold">BUFF 配置</h2>
-                <button
-                    onclick={() => (showLookup = true)}
-                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
-                >
-                    <Icon icon="mdi:magnify" class="size-3.5" />
-                    速查
-                </button>
+                <div class="flex items-center gap-1">
+                    <button
+                        onclick={() => (showImport = true)}
+                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                    >
+                        <Icon icon="mdi:import" class="size-3.5" />
+                        导入Buff集
+                    </button>
+                    <button
+                        onclick={() => (showLookup = true)}
+                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                    >
+                        <Icon icon="mdi:magnify" class="size-3.5" />
+                        速查
+                    </button>
+                </div>
             </div>
 
             <div class="flex flex-1 overflow-hidden">
@@ -922,7 +933,7 @@
                                                 >
                                             </div>
                                         {/if}
-                                        {#if zone.zoneId !== 'atkPct' && zone.zoneId !== 'hpPct' && zone.zoneId !== 'defPct'}
+                                        {#if zone.zoneId !== 'atkPct' && zone.zoneId !== 'hpPct' && zone.zoneId !== 'defPct' && zone.zoneId !== 'extraRatio'}
                                             <button
                                                 onclick={() =>
                                                     setBuffSetZoneOverride(
@@ -1417,3 +1428,5 @@
     showCustomHitOption={false}
     onclose={() => (showRefLookup = false)}
 />
+
+<BuffImportModal open={showImport} {team} onclose={() => (showImport = false)} />

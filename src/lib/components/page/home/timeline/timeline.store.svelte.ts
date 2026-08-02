@@ -1812,9 +1812,8 @@ export function applySkillHits() {
         const character = parts[0]
         const skillType = parts[1]
         const hitName = parts.slice(2).join('|')
-        const groups = _skillPickerIsRef
-            ? _refSkillPickerCache[character]
-            : (_opSkillPickerCache[character] ?? _skillPickerGroups)
+        const base = _skillPickerIsRef ? _refSkillPickerCache[character] : _opSkillPickerCache[character]
+        const groups = appendCustomGroups(base ?? _skillPickerGroups.filter((g) => g.type !== '自定义'), character)
         if (!groups) continue
         for (const g of groups) {
             if (g.type !== skillType) continue
@@ -1826,20 +1825,7 @@ export function applySkillHits() {
                     const ch = _customSkillHits[character]?.find((c) => c.id === hitName)
                     if (ch) {
                         displayName = ch.name
-                        const parts: string[] = []
-                        if (ch.flatValue > 0) parts.push(ch.flatValue.toString())
-                        if (ch.pctValue > 0) {
-                            const suf =
-                                ch.pctUnit === '攻击百分比'
-                                    ? ''
-                                    : ch.pctUnit === '生命百分比'
-                                      ? '生命'
-                                      : ch.pctUnit === '防御百分比'
-                                        ? '防御'
-                                        : ch.pctUnit
-                            parts.push(ch.pctValue + '%' + suf)
-                        }
-                        ratio = parts.join('+') || '0'
+                        ratio = customHitRatio(ch)
                     }
                 }
                 const entry: SkillHit = {
@@ -1890,6 +1876,17 @@ export async function openRefSkillPicker(blockId: string) {
     await loadCharGroupsToCache(_refSkillPickerCache, _skillPickerCharacter)
 }
 
+function customHitRatio(ch: CustomHit): string {
+    const parts: string[] = []
+    if (ch.flatValue > 0) parts.push(ch.flatValue.toString())
+    if (ch.pctValue > 0) {
+        const suf =
+            ch.pctUnit === '攻击%' ? '' : ch.pctUnit === '生命%' ? '生命' : ch.pctUnit === '防御%' ? '防御' : ch.pctUnit
+        parts.push(ch.pctValue + '%' + suf)
+    }
+    return parts.join('+') || '0'
+}
+
 function appendCustomGroups(groups: SkillPickerGroup[], charName: string): SkillPickerGroup[] {
     const customHits = _customSkillHits[charName] ?? []
     if (customHits.length === 0) return groups
@@ -1897,22 +1894,11 @@ function appendCustomGroups(groups: SkillPickerGroup[], charName: string): Skill
         ...groups,
         {
             type: '自定义',
-            hits: customHits.map((ch) => {
-                const parts: string[] = []
-                if (ch.flatValue > 0) parts.push(ch.flatValue.toString())
-                if (ch.pctValue > 0) {
-                    const suf =
-                        ch.pctUnit === '攻击百分比'
-                            ? ''
-                            : ch.pctUnit === '生命百分比'
-                              ? '生命'
-                              : ch.pctUnit === '防御百分比'
-                                ? '防御'
-                                : ch.pctUnit
-                    parts.push(ch.pctValue + '%' + suf)
-                }
-                return { name: ch.id, ratio: parts.join('+') || '0', element: ch.element }
-            })
+            hits: customHits.map((ch) => ({
+                name: ch.id,
+                ratio: customHitRatio(ch),
+                element: ch.element
+            }))
         }
     ]
 }

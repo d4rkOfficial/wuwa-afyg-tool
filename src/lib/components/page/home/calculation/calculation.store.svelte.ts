@@ -7,6 +7,7 @@ import { getSkillCache, getCharElementMap } from '../timeline/timeline.store.sve
 import { getCharacterInfo } from '$lib/data/api'
 import { addToast } from '$lib/data/toast.svelte'
 import { migrateZoneId } from '$lib/data/zone-id-migration'
+import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffSet[]>([])
@@ -347,6 +348,91 @@ export function createBuffSet(name: string) {
     _buffSets = [..._buffSets, buffSet]
 }
 
+export interface ImportBuffZone {
+    zoneId: string
+    value: number
+    override?: boolean
+    ref?: {
+        targetZoneId: string
+        pct: number
+        threshold?: number
+        lower?: number
+        upper?: number
+        discrete?: boolean
+        divisor?: number
+        multiplier?: number
+    }
+}
+
+export interface ImportBuffInput {
+    name: string
+    scope?: 'self' | 'self_except' | 'team' | 'effect_only'
+    zones: ImportBuffZone[]
+}
+
+// share 的 scope 语义 → 工具 BuffSet.scope（'all' | number[]）
+// 由导入方传入 ownerIdx（该实体归属的角色槽位，无则 -1），self_except 需要队伍总槽位数
+export function mapImportedScope(
+    scope: ImportBuffInput['scope'],
+    ownerIdx: number,
+    teamSize: number
+): 'all' | number[] {
+    switch (scope) {
+        case 'self':
+            return ownerIdx >= 0 ? [ownerIdx] : []
+        case 'self_except': {
+            if (ownerIdx < 0) return 'all'
+            const idxs: number[] = []
+            for (let i = 0; i < teamSize; i++) if (i !== ownerIdx) idxs.push(i)
+            return idxs.length ? idxs : []
+        }
+        case 'effect_only':
+        case 'team':
+        default:
+            return 'all'
+    }
+}
+
+export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize = 3) {
+    if (!assertUnlocked()) return 0
+    const fresh: BuffSet[] = []
+    for (const item of items) {
+        const name = item.name.trim()
+        if (!name) continue
+        const zones: BuffZoneValue[] = []
+        for (const z of item.zones ?? []) {
+            const zoneId = migrateZoneId(z.zoneId) as BuffZoneValue['zoneId']
+            if (!ZONE_MAP.has(zoneId)) continue
+            const zone: BuffZoneValue = { zoneId, value: z.value }
+            if (z.ref && ZONE_REF_MAP.has(z.ref.targetZoneId as never)) {
+                zone.ref = {
+                    characterIdx: 0,
+                    zoneId: z.ref.targetZoneId as never,
+                    threshold: z.ref.threshold ?? 0,
+                    pct: z.ref.pct,
+                    lower: z.ref.lower,
+                    upper: z.ref.upper,
+                    discrete: z.ref.discrete,
+                    divisor: z.ref.divisor,
+                    multiplier: z.ref.multiplier
+                }
+            }
+            if (z.override) zone.override = true
+            zones.push(zone)
+        }
+        const buffSet: BuffSet = {
+            id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name,
+            zones,
+            scope: mapImportedScope(item.scope, ownerIdx, teamSize)
+        }
+        fresh.push(buffSet)
+    }
+    if (!fresh.length) return 0
+    _buffSets = [..._buffSets, ...fresh]
+    return fresh.length
+}
+
 export function duplicateBuffSet(id: string, customName?: string): string | undefined {
     if (!assertUnlocked()) return
     const source = _buffSets.find((s) => s.id === id)
@@ -386,13 +472,14 @@ export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./
 
 export function setBuffSetZoneOverride(setId: string, zoneId: string, override: boolean) {
     if (!assertUnlocked()) return
+    const nextOverride = zoneId === 'extraRatio' ? false : override
     _buffSets = _buffSets.map((s) =>
         s.id === setId
             ? {
                   ...s,
                   zones: s.zones.map((z) =>
                       z.zoneId === (zoneId as any)
-                          ? { ...z, override: override || undefined, ref: override ? undefined : z.ref }
+                          ? { ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }
                           : z
                   )
               }

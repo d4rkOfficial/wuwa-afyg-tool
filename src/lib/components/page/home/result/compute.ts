@@ -995,6 +995,9 @@ function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number
         case 'dmgRedPen':
             stats.dmgRedPen += value
             break
+        case 'extraRatio':
+            stats.extraRatio += value
+            break
         case 'atkFlat':
             stats.atkFlatSum += value
             break
@@ -1068,9 +1071,6 @@ function applyOverrideToStats(stats: CharacterComputed, zoneId: string, value: n
             break
         case 'dmgRedPen':
             stats.dmgRedPen = value
-            break
-        case 'extraRatio':
-            stats.extraRatio = value
             break
         case 'atkFlat':
             stats.totalAtk = value
