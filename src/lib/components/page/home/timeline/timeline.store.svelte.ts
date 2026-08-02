@@ -1794,9 +1794,9 @@ export async function openSkillPicker(blockId: string) {
     }
     try {
         const groups = await loadCharSkills(_skillPickerCharacter)
-        await appendEchoSkillToCache(_opSkillPickerCache, _skillPickerCharacter)
         _opSkillPickerCache[_skillPickerCharacter] = groups
-        _skillPickerGroups = appendCustomGroups(groups, _skillPickerCharacter)
+        await appendEchoSkillToCache(_opSkillPickerCache, _skillPickerCharacter)
+        _skillPickerGroups = appendCustomGroups(_opSkillPickerCache[_skillPickerCharacter], _skillPickerCharacter)
     } catch {
         _skillPickerGroups = []
     } finally {
@@ -1925,9 +1925,9 @@ async function loadCharGroupsToCache(cache: Record<string, SkillPickerGroup[]>, 
     _skillPickerLoading = true
     try {
         const groups = await loadCharSkills(charName)
-        await appendEchoSkillToCache(cache, charName)
         cache[charName] = groups
-        _skillPickerGroups = appendCustomGroups(groups, charName)
+        await appendEchoSkillToCache(cache, charName)
+        _skillPickerGroups = appendCustomGroups(cache[charName], charName)
     } catch {
         _skillPickerGroups = []
     } finally {
