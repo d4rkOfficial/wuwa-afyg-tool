@@ -3,7 +3,9 @@ import { browser } from '$app/environment'
 export const NANOKA_BASE = 'https://static.nanoka.cc'
 export const SHARE_BASE = 'https://wuwa-afyg-share.200503.xyz'
 
-let _wwVersion = '3.5'
+const VERSION_KEY = 'wuwa-afyg:ww-version'
+
+let _wwVersion = browser ? (localStorage.getItem(VERSION_KEY) ?? '3.5') : '3.5'
 
 export function getWWVersion() {
     return _wwVersion
@@ -28,6 +30,7 @@ export async function ensureVersion() {
                 if (text) {
                     const parsed = JSON.parse(text)
                     _wwVersion = typeof parsed === 'string' ? parsed : (parsed.ww?.latest ?? _wwVersion)
+                    if (browser) localStorage.setItem(VERSION_KEY, _wwVersion)
                 }
             } catch {
                 // keep fallback

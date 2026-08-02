@@ -367,6 +367,7 @@ export interface ImportBuffZone {
 export interface ImportBuffInput {
     name: string
     scope?: 'self' | 'self_except' | 'team' | 'effect_only'
+    ownerIdx?: number
     zones: ImportBuffZone[]
 }
 
@@ -424,7 +425,7 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
             id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name,
             zones,
-            scope: mapImportedScope(item.scope, ownerIdx, teamSize)
+            scope: mapImportedScope(item.scope, item.ownerIdx ?? ownerIdx, teamSize)
         }
         fresh.push(buffSet)
     }

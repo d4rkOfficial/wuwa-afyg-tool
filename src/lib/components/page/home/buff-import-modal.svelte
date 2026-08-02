@@ -96,13 +96,15 @@
             addToast('请先勾选要导入的 Buff 集', 'info')
             return
         }
-        const items = picked.flatMap((e) =>
-            e.buffs.map((b) => ({
+        const items = picked.flatMap((e) => {
+            const ownerIdx = ownerIdxFor(e)
+            return e.buffs.map((b) => ({
                 name: b.buffName,
                 scope: b.scope,
+                ownerIdx,
                 zones: b.zones
             }))
-        )
+        })
         // 定位每个实体归属的角色槽位：character 直接用实体名匹配；武器/声骸/套装找配装中该角色
         function ownerIdxFor(e: BuffLibraryEntity): number {
             if (e.entityType === 'character') {
@@ -114,8 +116,7 @@
                 return s?.triggerSets?.some((ts) => ts.name === e.entityName && `${ts.pieces}set` === e.entityType)
             })
         }
-        const ownerIdx = picked.length === 1 ? ownerIdxFor(picked[0]) : -1
-        const count = importBuffSets(items, ownerIdx, team.length)
+        const count = importBuffSets(items, -1, team.length)
         if (count > 0) addToast(`已导入 ${count} 条 buff`, 'success')
         onclose?.()
     }

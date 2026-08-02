@@ -29,11 +29,11 @@ export default defineConfig({
                 maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
                 runtimeCaching: [
                     {
-                        urlPattern: /^\/api\/v1\//,
+                        urlPattern: /^\/api\/v[12]\//,
                         handler: 'NetworkFirst',
                         options: {
                             cacheName: 'api-cache',
-                            expiration: { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 }
+                            expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 }
                         }
                     },
                     {

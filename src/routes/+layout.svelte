@@ -24,6 +24,9 @@
 
     onMount(() => {
         loadThemes()
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+        }
     })
 </script>
 

@@ -6,6 +6,7 @@
     import type { BuffEntityType, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
     import { ENTITY_TYPE_LABELS, ENTITY_TYPES, updateEntityBuffs, SCOPE_LABELS } from '$lib/data/buff-library.svelte'
     import { addToast } from '$lib/data/toast.svelte'
+    import Select from '$lib/components/ui/select.svelte'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -201,16 +202,12 @@
                         </button>
                     </div>
                     <div class="mt-1 flex flex-wrap items-center gap-2">
-                        <select
-                            bind:value={buff.scope}
-                            onchange={(e) =>
-                                setBuffScope(i, (e.currentTarget as HTMLSelectElement).value as BuffLibraryScope)}
-                            class="rounded border border-(--theme-card-border) bg-(--theme-input-bg) px-1.5 py-1 text-[10px] outline-none focus:border-(--theme-accent-bg)"
-                        >
-                            {#each Object.entries(SCOPE_LABELS) as [k, v]}
-                                <option value={k}>{v}</option>
-                            {/each}
-                        </select>
+                        <Select
+                            options={Object.entries(SCOPE_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+                            value={buff.scope ?? 'team'}
+                            onchange={(v) => setBuffScope(i, v as BuffLibraryScope)}
+                            style="width: 6.5rem;"
+                        />
                         <button
                             onclick={() => setBuffExclusive(i, !buff.exclusive)}
                             class="rounded border px-1.5 py-1 text-[10px] transition-colors"

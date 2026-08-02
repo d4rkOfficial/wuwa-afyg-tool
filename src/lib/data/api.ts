@@ -11,8 +11,9 @@ import type {
 } from '$lib/api/types'
 
 const PREFIX = 'wuwa-afyg:'
-const LIST_TTL = 24 * 60 * 60 * 1000
-const INFO_TTL = 24 * 60 * 60 * 1000
+const LIST_TTL = 7 * 24 * 60 * 60 * 1000
+const INFO_TTL = 7 * 24 * 60 * 60 * 1000
+const ICON_TTL = 7 * 24 * 60 * 60 * 1000
 
 const memoryCache = new Map<string, unknown>()
 const inFlight = new Map<string, Promise<unknown>>()
@@ -75,6 +76,11 @@ async function fetchJSON<T>(url: string, cacheK: string, ttl: number): Promise<T
 async function fetchBatchIcons(entity: string): Promise<Record<string, string>> {
     const k = cacheKey('batch-icons', entity)
     if (memoryCache.has(k)) return memoryCache.get(k) as Record<string, string>
+    const cached = getLocal<Record<string, string>>(k, ICON_TTL)
+    if (cached) {
+        memoryCache.set(k, cached)
+        return cached
+    }
     if (inFlight.has(k)) return inFlight.get(k) as Promise<Record<string, string>>
 
     const promise = (async () => {
@@ -82,6 +88,7 @@ async function fetchBatchIcons(entity: string): Promise<Record<string, string>> 
         if (!res.ok) throw new Error(`API ${res.status}: /api/v1/batch-icons/${entity}`)
         const data: Record<string, string> = await res.json()
         memoryCache.set(k, data)
+        setLocal(k, data)
         warmImageCache(Object.values(data))
         return data
     })()
