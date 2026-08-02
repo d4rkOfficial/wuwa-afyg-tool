@@ -81,24 +81,23 @@
 </script>
 
 <div
-    class="flex items-center gap-1 border-b px-4"
+    class="flex items-center gap-1 border-b px-3"
     style="background: var(--theme-tabs-bg); color: var(--theme-tabs-text); border-color: var(--theme-divider-border)"
 >
     {#each tabs as tab}
+        {@const isActive = !showResult && active === tab.key}
         <button
             onclick={() => !tab.disabled && onchange(tab.key)}
             disabled={tab.disabled}
             title={tab.disabled ? tab.disabledReason : ''}
             class={[
-                'relative flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors',
-                !showResult && tab.locked && active === tab.key
-                    ? 'text-emerald-600'
-                    : !showResult && active === tab.key
-                      ? 'text-(--theme-accent-text)'
-                      : tab.disabled
-                        ? 'opacity-30 cursor-not-allowed'
-                        : 'opacity-60 hover:opacity-100',
-                !tab.disabled && 'hover:bg-(--theme-tabs-text)/5'
+                'relative flex items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-sm transition-all',
+                isActive
+                    ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text) font-medium'
+                    : tab.disabled
+                      ? 'opacity-30 cursor-not-allowed'
+                      : 'text-(--theme-tabs-text)/60 hover:bg-(--theme-tabs-text)/5 hover:text-(--theme-tabs-text)',
+                !tab.disabled && 'hover:opacity-100'
             ].join(' ')}
         >
             {#if tab.locked}
@@ -118,7 +117,7 @@
                     class="cursor-pointer"
                     title="点击解锁"
                 >
-                    <Icon icon="mdi:lock" class="size-3.5 text-emerald-600" />
+                    <Icon icon="mdi:lock" class="size-3.5 text-(--theme-accent-text)" />
                 </span>
             {:else if tab.disabled}
                 <Icon icon="mdi:lock-outline" class="size-3.5 opacity-30" />
@@ -145,30 +144,28 @@
                 </span>
             {/if}
             {tab.label}
-            {#if !showResult && active === tab.key}
-                <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-            {/if}
         </button>
     {/each}
     <button
         onclick={onresult}
         disabled={!resultEnabled}
         class={[
-            'relative flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors',
-            showResult || resultEnabled ? 'text-(--theme-accent-text)' : 'opacity-30 cursor-not-allowed'
+            'relative flex items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-sm transition-all',
+            showResult
+                ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text) font-medium'
+                : resultEnabled
+                  ? 'text-(--theme-tabs-text)/60 hover:bg-(--theme-tabs-text)/5 hover:text-(--theme-tabs-text) hover:opacity-100'
+                  : 'opacity-30 cursor-not-allowed'
         ].join(' ')}
         title={resultEnabled ? '' : '请先锁定队伍配置'}
     >
-        <Icon icon="mdi:chart-box-outline" class="size-3.5" />
+        <Icon icon="mdi:chart-box-outline" class="size-4" />
         结果
-        {#if showResult}
-            <div class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-        {/if}
     </button>
     <div class="flex-1"></div>
     <button
         onclick={() => openHelp('使用帮助', workflowHelpItems)}
-        class="flex items-center justify-center rounded-full w-6 h-6 text-sm transition-colors hover:bg-(--theme-tabs-text)/10"
+        class="flex items-center justify-center rounded-full size-7 text-sm transition-colors hover:bg-(--theme-tabs-text)/10"
         style="color: var(--theme-accent-text);"
         title="使用帮助"
     >

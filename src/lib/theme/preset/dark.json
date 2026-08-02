@@ -65,8 +65,8 @@
             "textColor": "#e4e4e7"
         },
         "card": {
-            "backgroundImage": "rgba(255,255,255,0.02)",
-            "backgroundImageFocused": "rgba(255,255,255,0.05)",
+            "backgroundImage": "rgba(24,24,32,0.4)",
+            "backgroundImageFocused": "rgba(42,42,56,0.52)",
             "textColor": "#e4e4e7",
             "borderColor": "rgba(255,255,255,0.1)"
         },
@@ -91,7 +91,7 @@
             "backgroundImage": "rgba(0,0,0,0.5)"
         },
         "muted": {
-            "textColor": "#71717a"
+            "textColor": "#8f8f9c"
         },
         "watermark": {
             "backgroundImage": "rgba(0,0,0,0.15)",

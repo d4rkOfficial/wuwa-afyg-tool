@@ -340,7 +340,7 @@
 
     <div
         class="shrink-0 border-t px-2 pt-2 pb-3 space-y-0.5"
-        style="box-shadow: 0 -4px 12px -2px var(--theme-sidebar-bg); border-color: var(--theme-divider-border)"
+        style="box-shadow: 0 -4px 12px -2px color-mix(in srgb, var(--theme-sidebar-bg) 45%, transparent); border-color: var(--theme-divider-border)"
     >
         {#if compact}
             <button

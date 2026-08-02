@@ -9,9 +9,90 @@
         <meta name="apple-mobile-web-app-title" content="椰果工具箱" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.webmanifest" />
+        <script>
+            try {
+                if (sessionStorage.getItem('wuwa-afyg:splash')) {
+                    document.documentElement.classList.add('splash-skip')
+                } else {
+                    sessionStorage.setItem('wuwa-afyg:splash', '1')
+                }
+            } catch (e) {}
+            window.__splashStart = performance.now()
+            window.addEventListener('load', () => {
+                const el = document.getElementById('splash')
+                if (el && performance.now() - window.__splashStart > 1500) {
+                    el.classList.add('splash-hidden')
+                    setTimeout(() => el.remove(), 500)
+                }
+            })
+        </script>
+        <style>
+            #splash {
+                position: fixed;
+                inset: 0;
+                z-index: 9999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #1e1b2e;
+                transition: opacity 0.4s ease;
+            }
+            #splash .splash-inner {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 18px;
+            }
+            #splash .splash-logo {
+                width: 80px;
+                height: 80px;
+                animation: splash-breathe 2s ease-in-out infinite;
+            }
+            #splash .splash-title {
+                font-size: 18px;
+                letter-spacing: 0.2em;
+                color: #e8e4f0;
+            }
+            #splash .splash-spinner {
+                width: 26px;
+                height: 26px;
+                border-radius: 50%;
+                border: 2px solid rgba(255, 255, 255, 0.15);
+                border-top-color: #6366f1;
+                animation: splash-spin 0.9s linear infinite;
+            }
+            #splash.splash-hidden {
+                opacity: 0;
+                pointer-events: none;
+            }
+            html.splash-skip #splash {
+                display: none;
+            }
+            @keyframes splash-breathe {
+                0%,
+                100% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.08);
+                }
+            }
+            @keyframes splash-spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+        </style>
         %sveltekit.head%
     </head>
     <body data-sveltekit-preload-data="hover">
+        <div id="splash">
+            <div class="splash-inner">
+                <img src="/pwa-icon.svg" alt="椰果工具箱" class="splash-logo" />
+                <div class="splash-title">椰果工具箱</div>
+                <div class="splash-spinner"></div>
+            </div>
+        </div>
         <div style="display: contents">%sveltekit.body%</div>
     </body>
 </html>

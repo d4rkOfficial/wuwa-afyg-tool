@@ -53,6 +53,7 @@
         init as initCalculation
     } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
+    import { hideSplash } from '$lib/utils/splash'
     import favicon from '$lib/assets/favicon.svg'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
@@ -143,6 +144,7 @@
         loadIcons()
         checkShare()
         await handleImportFromHash()
+        hideSplash()
     })
 
     let projects = $derived(getProjects())
@@ -499,8 +501,8 @@
     />
     <button
         aria-label="调整侧栏宽度"
-        class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-(--theme-accent-bg)/50"
-        style="background: transparent;"
+        class="shrink-0 w-1 cursor-col-resize"
+        style="background: color-mix(in srgb, var(--theme-sidebar-bg) 80%, transparent);"
         onmousedown={(e) => {
             e.preventDefault()
             if (sidebarWidth === 52) sidebarWidth = 200
@@ -513,9 +515,13 @@
         {#if !activeProject}
             <div class="flex flex-1 flex-col items-center justify-center gap-6 px-8">
                 <div class="text-center">
-                    <img src={favicon} alt="椰果工具箱" class="mx-auto mb-4 size-12" />
-                    <h2 class="mb-2 text-lg font-semibold">椰果工具箱</h2>
-                    <p class="text-sm text-(--theme-muted-text)">
+                    <img
+                        src={favicon}
+                        alt="椰果工具箱"
+                        class="mx-auto mb-5 size-14 drop-shadow-[0_0_4px_rgba(0,0,0,0.85)]"
+                    />
+                    <h2 class="mb-2 text-xl font-semibold [text-shadow:_0_0_3px_rgba(0,0,0,0.85)]">椰果工具箱</h2>
+                    <p class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.85)]">
                         鸣潮社区公益工具！ 游戏数据版本:{getWWVersion()}
                     </p>
                 </div>
@@ -525,54 +531,94 @@
                             newName = ''
                             showNewModal = true
                         }}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
-                        <Icon icon="mdi:plus" class="size-8 text-(--theme-accent-text)" />
+                        <Icon
+                            icon="mdi:plus"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                        />
                         <div class="flex flex-col gap-1">
-                            <span class="text-base font-semibold text-(--theme-card-text)">创建工程</span>
-                            <span class="text-sm text-(--theme-muted-text)">从空白开始，配置配队、排轴与伤害计算</span>
+                            <span
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                >创建工程</span
+                            >
+                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                                >从空白开始，配置配队、排轴与伤害计算</span
+                            >
                         </div>
                     </button>
                     <button
                         onclick={() => goto('/api-test')}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
-                        <Icon icon="mdi:api" class="size-8 text-(--theme-accent-text)" />
+                        <Icon
+                            icon="mdi:api"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                        />
                         <div class="flex flex-col gap-1">
-                            <span class="text-base font-semibold text-(--theme-card-text)">接口测试</span>
-                            <span class="text-sm text-(--theme-muted-text)">调试游戏数据接口与工具 API</span>
+                            <span
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                >接口测试</span
+                            >
+                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                                >调试游戏数据接口与工具 API</span
+                            >
                         </div>
                     </button>
                     <a
                         href={SHARE_BASE}
                         target="_blank"
                         rel="noreferrer"
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
-                        <Icon icon="mdi:storefront-outline" class="size-8 text-(--theme-accent-text)" />
+                        <Icon
+                            icon="mdi:storefront-outline"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                        />
                         <div class="flex flex-col gap-1">
-                            <span class="text-base font-semibold text-(--theme-card-text)">椰果工坊</span>
-                            <span class="text-sm text-(--theme-muted-text)">前往社区站点浏览、分享与下载工程</span>
+                            <span
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                >椰果工坊</span
+                            >
+                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                                >前往社区站点浏览、分享与下载工程</span
+                            >
                         </div>
                     </a>
                     <button
                         onclick={() => (showBuffLibrary = true)}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
-                        <Icon icon="mdi:view-dashboard-outline" class="size-8 text-(--theme-accent-text)" />
+                        <Icon
+                            icon="mdi:view-dashboard-outline"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                        />
                         <div class="flex flex-col gap-1">
-                            <span class="text-base font-semibold text-(--theme-card-text)">Buff 集</span>
-                            <span class="text-sm text-(--theme-muted-text)">管理本地增益，拉表时一键导入</span>
+                            <span
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                >Buff 集</span
+                            >
+                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                                >管理本地增益，拉表时一键导入</span
+                            >
                         </div>
                     </button>
                     <button
                         onclick={() => (showThemeCustomizer = true)}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
-                        <Icon icon="mdi:palette-outline" class="size-8 text-(--theme-accent-text)" />
+                        <Icon
+                            icon="mdi:palette-outline"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                        />
                         <div class="flex flex-col gap-1">
-                            <span class="text-base font-semibold text-(--theme-card-text)">主题设置</span>
-                            <span class="text-sm text-(--theme-muted-text)">定制主色调、背景与明暗主题</span>
+                            <span
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                >主题设置</span
+                            >
+                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                                >定制主色调、背景与明暗主题</span
+                            >
                         </div>
                     </button>
                 </div>

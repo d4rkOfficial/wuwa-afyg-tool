@@ -47,6 +47,12 @@ function applyThemeCSS() {
     root.style.setProperty('--theme-nocrit-bg', theme.id === 'light' ? '#16a34a' : '#22c55e')
     root.style.setProperty('--theme-w-icon-filter', theme.id === 'light' ? 'invert(1)' : 'none')
     root.style.setProperty('--theme-num', theme.id === 'light' ? '#a16207' : '#ca8a04')
+    root.style.setProperty(
+        '--theme-card-shadow',
+        theme.id === 'light'
+            ? '0 10px 30px -8px rgba(99,102,241,0.45), 0 4px 14px -6px rgba(99,102,241,0.25)'
+            : '0 12px 30px -8px rgba(0,0,0,0.65), 0 4px 12px -4px rgba(0,0,0,0.5)'
+    )
 
     applyOverridesCSS(root)
 }
