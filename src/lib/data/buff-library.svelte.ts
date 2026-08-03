@@ -63,6 +63,26 @@ export const ENTITY_TYPE_LABELS: Record<BuffEntityType, string> = {
 
 export const ENTITY_TYPES: BuffEntityType[] = ['character', 'weapon', 'echo', '1set', '2set', '3set', '4set', '5set']
 
+export type BuffCategory = 'character' | 'weapon' | 'echo' | 'set'
+
+export const BUFF_CATEGORY_ORDER: BuffCategory[] = ['character', 'weapon', 'echo', 'set']
+
+export const BUFF_CATEGORY_LABELS: Record<BuffCategory, string> = {
+    character: '角色',
+    weapon: '武器',
+    echo: '首位声骸',
+    set: '套装'
+}
+
+export function categoryOfType(type: BuffEntityType): BuffCategory {
+    return type === 'character' || type === 'weapon' || type === 'echo' ? type : 'set'
+}
+
+export function setPiecesOf(type: BuffEntityType): number {
+    const n = parseInt(type, 10)
+    return Number.isFinite(n) ? n : 0
+}
+
 export const SCOPE_LABELS: Record<BuffLibraryScope, string> = {
     self: '对自己',
     self_except: '自己除外',

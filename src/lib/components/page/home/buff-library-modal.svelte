@@ -12,8 +12,10 @@
         loadBuffLibrary,
         createCustomEntity,
         setEntitySource,
-        ENTITY_TYPES,
-        ENTITY_TYPE_LABELS,
+        BUFF_CATEGORY_ORDER,
+        BUFF_CATEGORY_LABELS,
+        categoryOfType,
+        setPiecesOf,
         SCOPE_LABELS,
         type BuffEntityType,
         type BuffLibraryEntity
@@ -66,6 +68,16 @@
 
     let editTarget = $state<BuffLibraryEntity | null>(null)
     let confirmDelete = $state<BuffLibraryEntity | null>(null)
+
+    let query = $state('')
+
+    let filteredEntities = $derived(
+        query.trim()
+            ? entities.filter(
+                  (e) => e.entityName.includes(query.trim()) || e.buffs.some((b) => b.buffName.includes(query.trim()))
+              )
+            : entities
+    )
 
     function zoneLabel(zoneId: string) {
         const def = ZONE_MAP.get(zoneId as never)
@@ -256,19 +268,45 @@
         </div>
     {/if}
 
+    <div
+        class="mb-3 flex items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
+    >
+        <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
+        <input
+            bind:value={query}
+            placeholder="搜索实体 / Buff 名…"
+            class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
+        />
+        {#if query}
+            <button
+                onclick={() => (query = '')}
+                class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
+            >
+                <Icon icon="mdi:close" class="size-4" />
+            </button>
+        {/if}
+    </div>
+
     {#if entities.length === 0}
         <div class="flex flex-col items-center gap-2 py-12 text-sm text-(--theme-muted-text)">
             <Icon icon="mdi:view-dashboard-outline" class="size-9" />
             本地还没有 Buff 预设，点击右上角新增或从工坊同步
         </div>
+    {:else if filteredEntities.length === 0}
+        <div class="flex flex-col items-center gap-2 py-12 text-sm text-(--theme-muted-text)">
+            <Icon icon="mdi:magnify-close" class="size-9" />
+            没有匹配的 Buff 预设
+        </div>
     {:else}
         <div class="space-y-4">
-            {#each ENTITY_TYPES as type}
-                {@const group = entities.filter((e) => e.entityType === type)}
+            {#each BUFF_CATEGORY_ORDER as cat}
+                {@const group = filteredEntities
+                    .filter((e) => categoryOfType(e.entityType) === cat)
+                    .sort((a, b) => setPiecesOf(a.entityType) - setPiecesOf(b.entityType))}
                 {#if group.length > 0}
                     <div>
                         <h3 class="mb-1.5 text-xs font-medium text-(--theme-muted-text)">
-                            {ENTITY_TYPE_LABELS[type]}（{group.length}）
+                            {BUFF_CATEGORY_LABELS[cat]}（{group.length}）
                         </h3>
                         <div class="space-y-1.5">
                             {#each group as entity (entity.entityType + '/' + entity.entityName)}
@@ -280,6 +318,13 @@
                                             <span class="truncate text-sm font-medium text-(--theme-layout-text)">
                                                 {entity.entityName}
                                             </span>
+                                            {#if categoryOfType(entity.entityType) === 'set'}
+                                                <span
+                                                    class="shrink-0 rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                                >
+                                                    {setPiecesOf(entity.entityType)}件
+                                                </span>
+                                            {/if}
                                             <button
                                                 onclick={() => toggleSource(entity)}
                                                 class="shrink-0 rounded px-1.5 py-0.5 text-[10px] transition-colors"

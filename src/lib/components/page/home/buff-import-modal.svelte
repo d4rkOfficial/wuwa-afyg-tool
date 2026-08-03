@@ -2,7 +2,15 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import { getBuffEntities, loadBuffLibrary, ENTITY_TYPE_LABELS } from '$lib/data/buff-library.svelte'
+    import {
+        getBuffEntities,
+        loadBuffLibrary,
+        ENTITY_TYPE_LABELS,
+        BUFF_CATEGORY_ORDER,
+        BUFF_CATEGORY_LABELS,
+        categoryOfType,
+        setPiecesOf
+    } from '$lib/data/buff-library.svelte'
     import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
     import { importBuffSets } from './calculation/calculation.store.svelte'
     import { ZONE_MAP } from './calculation/calculation.consts'
@@ -54,8 +62,16 @@
         return keys
     })
 
-    const recommendedEntities = $derived(allEntities.filter((e) => mergedKeys.has(entityKey(e))))
-    const otherEntities = $derived(allEntities.filter((e) => !mergedKeys.has(entityKey(e))))
+    const recommendedEntities = $derived(allEntities.filter((e) => mergedKeys.has(entityKey(e)) && matchQuery(e)))
+    const otherEntities = $derived(allEntities.filter((e) => !mergedKeys.has(entityKey(e)) && matchQuery(e)))
+
+    let query = $state('')
+
+    function matchQuery(e: BuffLibraryEntity): boolean {
+        const q = query.trim()
+        if (!q) return true
+        return e.entityName.includes(q) || e.buffs.some((b) => b.buffName.includes(q))
+    }
 
     let selected = $state<Record<string, boolean>>({})
 
@@ -131,7 +147,26 @@
         勾选对应角色/武器/首位声骸/套装即可全选其全部 Buff。上方为根据当前配装推荐的实体，下方为其它已下载的
     </p>
 
-    <div class="mb-4 space-y-4">
+    <div
+        class="mb-3 flex items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
+    >
+        <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
+        <input
+            bind:value={query}
+            placeholder="搜索实体 / Buff 名…"
+            class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
+        />
+        {#if query}
+            <button
+                onclick={() => (query = '')}
+                class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
+            >
+                <Icon icon="mdi:close" class="size-4" />
+            </button>
+        {/if}
+    </div>
+
+    <div class="space-y-4">
         <div>
             <h3 class="mb-1.5 flex items-center gap-1 text-xs font-medium text-(--theme-accent-text)">
                 <Icon icon="mdi:star" class="size-3.5" />
@@ -145,11 +180,7 @@
                     没有匹配到推荐 Buff 集，可先到主页「Buff 集」从工坊下载
                 </div>
             {:else}
-                <div class="space-y-1.5">
-                    {#each recommendedEntities as entity (entityKey(entity))}
-                        {@render EntityRow(entity, isChecked(entity))}
-                    {/each}
-                </div>
+                {@render CategoryGroup(recommendedEntities)}
             {/if}
         </div>
 
@@ -165,33 +196,51 @@
                     暂无其它 Buff 集
                 </div>
             {:else}
-                <div class="space-y-1.5">
-                    {#each otherEntities as entity (entityKey(entity))}
-                        {@render EntityRow(entity, isChecked(entity))}
-                    {/each}
-                </div>
+                {@render CategoryGroup(otherEntities)}
             {/if}
         </div>
     </div>
 
-    <div class="flex items-center justify-end gap-2 border-t border-(--theme-card-border) pt-3">
-        <button
-            onclick={onclose}
-            class="rounded-lg px-4 py-1.5 text-sm text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
-        >
-            取消
-        </button>
-        <button
-            onclick={handleImport}
-            disabled={countSelectedBuffs === 0}
-            class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125 disabled:opacity-40"
-            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
-        >
-            <Icon icon="mdi:import" class="size-4" />
-            导入{#if countSelectedBuffs > 0}（{countSelectedBuffs} 条）{/if}
-        </button>
-    </div>
+    {#snippet footer()}
+        <div class="flex items-center justify-end gap-2 border-t border-(--theme-card-border) pt-3">
+            <button
+                onclick={onclose}
+                class="rounded-lg px-4 py-1.5 text-sm text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+            >
+                取消
+            </button>
+            <button
+                onclick={handleImport}
+                disabled={countSelectedBuffs === 0}
+                class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125 disabled:opacity-40"
+                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
+            >
+                <Icon icon="mdi:import" class="size-4" />
+                导入{#if countSelectedBuffs > 0}（{countSelectedBuffs} 条）{/if}
+            </button>
+        </div>
+    {/snippet}
 </Modal>
+
+{#snippet CategoryGroup(list: BuffLibraryEntity[])}
+    {#each BUFF_CATEGORY_ORDER as cat}
+        {@const group = list
+            .filter((e) => categoryOfType(e.entityType) === cat)
+            .sort((a, b) => setPiecesOf(a.entityType) - setPiecesOf(b.entityType))}
+        {#if group.length > 0}
+            <div class="mb-2">
+                <h4 class="mb-1 px-0.5 text-[10px] font-medium text-(--theme-muted-text)">
+                    {BUFF_CATEGORY_LABELS[cat]}（{group.length}）
+                </h4>
+                <div class="space-y-1.5">
+                    {#each group as entity (entityKey(entity))}
+                        {@render EntityRow(entity, isChecked(entity))}
+                    {/each}
+                </div>
+            </div>
+        {/if}
+    {/each}
+{/snippet}
 
 {#snippet EntityRow(entity: BuffLibraryEntity, checked: boolean)}
     <div
@@ -213,7 +262,9 @@
                 <span
                     class="shrink-0 rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
                 >
-                    {ENTITY_TYPE_LABELS[entity.entityType]}
+                    {categoryOfType(entity.entityType) === 'set'
+                        ? `${setPiecesOf(entity.entityType)}件`
+                        : ENTITY_TYPE_LABELS[entity.entityType]}
                 </span>
                 <span class="shrink-0 text-[10px] text-(--theme-muted-text)">{entity.buffs.length} 条</span>
             </div>

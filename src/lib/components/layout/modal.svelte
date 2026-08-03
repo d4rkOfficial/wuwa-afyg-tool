@@ -9,6 +9,7 @@
         backdropClose?: boolean
         children?: Snippet
         title?: Snippet
+        footer?: Snippet
     }
 
     let {
@@ -20,7 +21,8 @@
         class: className,
         style: styleProp,
         children,
-        title
+        title,
+        footer
     }: Props = $props()
 
     let mergedStyle = $derived(
@@ -83,7 +85,8 @@
         <div
             bind:this={modalEl}
             class={[
-                'relative max-h-[85vh] min-w-80 overflow-y-auto rounded-xl p-6 shadow-2xl',
+                'relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
+                footer ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
                 'text-(--theme-modal-text)',
                 className || ''
             ]
@@ -107,13 +110,22 @@
                 onmousedown={handleResizeStart}
             ></div>
             {#if title}
-                <div class="mb-4 pr-6 text-base font-semibold">
+                <div class="mb-4 pr-6 text-base font-semibold {footer ? 'shrink-0' : ''}">
                     {@render title()}
                 </div>
             {/if}
-            <div>
-                {@render children?.()}
-            </div>
+            {#if footer}
+                <div class="min-h-0 flex-1 overflow-y-auto">
+                    {@render children?.()}
+                </div>
+                <div class="shrink-0">
+                    {@render footer()}
+                </div>
+            {:else}
+                <div>
+                    {@render children?.()}
+                </div>
+            {/if}
         </div>
     </div>
 {/if}
