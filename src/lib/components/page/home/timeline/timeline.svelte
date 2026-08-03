@@ -97,6 +97,7 @@
     import NonDirectPicker from './non-direct-picker.svelte'
     import DamageList from './damage-list.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { normalizeKeyEvent, getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 
     interface Props {
         team: [CharSlot, CharSlot, CharSlot]
@@ -232,6 +233,11 @@
         return { destroy: () => ro.disconnect() }
     }
 
+    function blockIconKey(block: OpBlock): string {
+        const entry = getKeyMapEntries().find((e) => getDefaultBlockKey(e.id) === block.key)
+        return entry ? entry.blockKey : block.key
+    }
+
     function onTrackContextMenu(e: MouseEvent, i: number) {
         if (getQuickMode() || i >= getTRACKS().length - 1 || !timelineEl || getLocked()) return
         const rect = timelineEl.getBoundingClientRect()
@@ -361,7 +367,7 @@
                 quickUndoLast()
                 return
             }
-            const res = quickInput(key)
+            const res = quickInput(normalizeKeyEvent(e))
             if (res !== null) {
                 e.preventDefault()
                 if (res !== QUICK_CHAR_MARKER) scrollQuickBlockIntoView(res)
@@ -445,6 +451,7 @@
                         {#if i < getTRACKS().length - 1}
                             <div class="absolute pointer-events-none" style="left: 5rem; top: 0; right: 0; bottom: 0;">
                                 {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
+                                    {@const effKey = blockIconKey(block)}
                                     {@const isGroupDrag = getIsGroupDrag()}
                                     {@const isHighlighted =
                                         getDragBlockId() === block.id ||
@@ -500,15 +507,15 @@
                                             {#if block.switchback}
                                                 <span class="text-xs text-cyan-400 font-semibold shrink-0">切回</span>
                                             {/if}
-                                            {#if uiBtnIconMap.get(block.key)}
+                                            {#if uiBtnIconMap.get(effKey)}
                                                 <img
-                                                    src={uiBtnIconMap.get(block.key)}
-                                                    alt={block.key}
+                                                    src={uiBtnIconMap.get(effKey)}
+                                                    alt={effKey}
                                                     draggable="false"
                                                     class="size-10 object-contain shrink-0"
                                                 />
                                             {:else}
-                                                <span class="font-bold text-(--theme-timeline-text)">{block.key}</span>
+                                                <span class="font-bold text-(--theme-timeline-text)">{effKey}</span>
                                             {/if}
                                             {#if getEditingBlockId() === block.id}
                                                 <input

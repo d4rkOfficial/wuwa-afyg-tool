@@ -49,10 +49,9 @@ function applyThemeCSS() {
     root.style.setProperty('--theme-num', theme.id === 'light' ? '#a16207' : '#ca8a04')
     root.style.setProperty(
         '--theme-card-shadow',
-        theme.id === 'light'
-            ? '0 10px 30px -8px rgba(99,102,241,0.45), 0 4px 14px -6px rgba(99,102,241,0.25)'
-            : '0 12px 30px -8px rgba(0,0,0,0.65), 0 4px 12px -4px rgba(0,0,0,0.5)'
+        theme.id === 'light' ? '0 0 24px -4px rgba(255,255,255,0.6)' : '0 2px 10px rgba(0,0,0,0.25)'
     )
+    root.style.setProperty('--theme-halo-color', theme.id === 'light' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)')
 
     applyOverridesCSS(root)
 }

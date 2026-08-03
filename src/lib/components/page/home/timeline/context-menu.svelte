@@ -44,8 +44,13 @@
         setBlockKeyPickerId
     } from './timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
+    import { ORIGINAL_BUTTON_KEYS } from './timeline.consts'
 
     let confirmMultiAction = $state<'delete' | 'reset' | null>(null)
+
+    let menuBtnIcons = $derived(
+        getUiBtnIcons().filter(([name]) => (ORIGINAL_BUTTON_KEYS as readonly string[]).includes(name))
+    )
 
     const specialOptions = [
         { value: 'none', label: '无' },
@@ -422,7 +427,7 @@
     >
         <div class="flex flex-col">
             <div class="flex items-center gap-1">
-                {#each getUiBtnIcons() as [name, url]}
+                {#each menuBtnIcons as [name, url]}
                     <button
                         class="size-7 flex items-center justify-center rounded hover:bg-(--theme-context-menu-bg-focused) transition-colors"
                         onclick={() => addOpBlock(tm.trackIndex, tm.pos, name)}
@@ -485,7 +490,7 @@
         {/snippet}
         {#snippet children()}
             <div class="flex flex-wrap gap-1.5">
-                {#each getUiBtnIcons() as [name, url]}
+                {#each menuBtnIcons as [name, url]}
                     <button
                         onclick={() => {
                             setBlockKey(pickerBlockId, name)

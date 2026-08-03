@@ -1,6 +1,6 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
-import { SHARE_BASE } from '$lib/api/consts'
+import { getShareBase } from './workshop.svelte'
 import type { BuffZoneValue } from '$lib/components/page/home/calculation/calculation.types'
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
@@ -289,7 +289,7 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
     _loading = true
     _error = null
     try {
-        const res = await fetch(`${SHARE_BASE}/api/buff-sets`)
+        const res = await fetch(`${getShareBase()}/api/buff-sets`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const json = (await res.json()) as {
             buffSets?: Array<{

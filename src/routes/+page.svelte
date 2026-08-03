@@ -25,7 +25,7 @@
         ProjectParseError
     } from '$lib/data/project.svelte'
     import { checkShare, shareProject, importFromShareUrl } from '$lib/data/share.svelte'
-    import { getWWVersion, ensureVersion, resetVersionPromise, SHARE_BASE } from '$lib/api/consts'
+    import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/consts'
     import { clearCache } from '$lib/data/api'
     import { browser } from '$app/environment'
     import type { PhaseKey, CharSlot } from '$lib/data/types'
@@ -41,8 +41,11 @@
         loadCustomHits,
         getQuickMode,
         toggleQuickMode,
+        formatTimeline,
         init as initTimeline
     } from '$lib/components/page/home/timeline/timeline.store.svelte'
+    import { loadKeyMap } from '$lib/data/keymap.svelte'
+    import { getShareBase, loadWorkshop } from '$lib/data/workshop.svelte'
     import {
         setShowBuffModal,
         getBuffDiffMode,
@@ -58,7 +61,7 @@
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
     import BuffLibraryModal from '$lib/components/page/home/buff-library-modal.svelte'
-    import ThemeCustomizer from '$lib/components/layout/theme-customizer.svelte'
+    import SettingsModal from '$lib/components/layout/settings-modal.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
@@ -74,7 +77,7 @@
     let newName = $state('')
     let showResult = $state(false)
     let showBuffLibrary = $state(false)
-    let showThemeCustomizer = $state(false)
+    let showSettings = $state(false)
 
     let sidebarWidth = $state(240)
     let sidebarDragging = $state(false)
@@ -142,6 +145,8 @@
         }
         loadProjects()
         loadIcons()
+        loadKeyMap()
+        loadWorkshop()
         checkShare()
         await handleImportFromHash()
         hideSplash()
@@ -328,7 +333,7 @@
             addToast(res.error ?? '分享失败', 'error')
             return
         }
-        const link = `${location.origin}#import_project=${encodeURIComponent(`${SHARE_BASE}/share/${res.code}/download`)}`
+        const link = `${location.origin}#import_project=${encodeURIComponent(`${getShareBase()}/share/${res.code}/download`)}`
         try {
             await navigator.clipboard.writeText(link)
             addToast(`已分享(10分钟)：${link}（链接已复制）`, 'success')
@@ -518,10 +523,12 @@
                     <img
                         src={favicon}
                         alt="椰果工具箱"
-                        class="mx-auto mb-5 size-14 drop-shadow-[0_0_4px_rgba(0,0,0,0.85)]"
+                        class="mx-auto mb-5 size-14 drop-shadow-[0_0_4px_var(--theme-halo-color)]"
                     />
-                    <h2 class="mb-2 text-xl font-semibold [text-shadow:_0_0_3px_rgba(0,0,0,0.85)]">椰果工具箱</h2>
-                    <p class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.85)]">
+                    <h2 class="mb-2 text-xl font-semibold [text-shadow:_0_0_3px_var(--theme-halo-color)]">
+                        椰果工具箱
+                    </h2>
+                    <p class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]">
                         鸣潮社区公益工具！ 游戏数据版本:{getWWVersion()}
                     </p>
                 </div>
@@ -535,14 +542,15 @@
                     >
                         <Icon
                             icon="mdi:plus"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
                                 >创建工程</span
                             >
-                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                            <span
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >从空白开始，配置配队、排轴与伤害计算</span
                             >
                         </div>
@@ -553,34 +561,36 @@
                     >
                         <Icon
                             icon="mdi:api"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
                                 >接口测试</span
                             >
-                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                            <span
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >调试游戏数据接口与工具 API</span
                             >
                         </div>
                     </button>
                     <a
-                        href={SHARE_BASE}
+                        href={getShareBase()}
                         target="_blank"
                         rel="noreferrer"
                         class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
                         <Icon
                             icon="mdi:storefront-outline"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
                                 >椰果工坊</span
                             >
-                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                            <span
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >前往社区站点浏览、分享与下载工程</span
                             >
                         </div>
@@ -591,33 +601,35 @@
                     >
                         <Icon
                             icon="mdi:view-dashboard-outline"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
                                 >Buff 集</span
                             >
-                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
+                            <span
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >管理本地增益，拉表时一键导入</span
                             >
                         </div>
                     </button>
                     <button
-                        onclick={() => (showThemeCustomizer = true)}
+                        onclick={() => (showSettings = true)}
                         class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
                         <Icon
-                            icon="mdi:palette-outline"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_rgba(0,0,0,0.8)]"
+                            icon="mdi:cog-outline"
+                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_rgba(0,0,0,0.7)]"
-                                >主题设置</span
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
+                                >设置</span
                             >
-                            <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_rgba(0,0,0,0.7)]"
-                                >定制主色调、背景与明暗主题</span
+                            <span
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                >主题、按键绑定与工坊设置</span
                             >
                         </div>
                     </button>
@@ -720,6 +732,14 @@
                         >
                             <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
                             查看所有伤害
+                        </button>
+                        <button
+                            onclick={formatTimeline}
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
+                            title="自动格式化：每个操作块右边界对齐下一个块（可跨角色）的左边界，参考线跟随其左右块"
+                        >
+                            <Icon icon="mdi:auto-fix" class="size-4 shrink-0" />
+                            格式化
                         </button>
                         <div class="relative group">
                             <button
@@ -837,7 +857,7 @@
 
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
 
-<ThemeCustomizer open={showThemeCustomizer} onclose={() => (showThemeCustomizer = false)} />
+<SettingsModal open={showSettings} onclose={() => (showSettings = false)} />
 
 <svelte:window
     onkeydown={(e) => {

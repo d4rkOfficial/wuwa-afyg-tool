@@ -29,8 +29,6 @@ import {
     NON_DIRECT_CONFIGS,
     NON_DIRECT_ELEMENT,
     BUTTON_KEY_ORDER,
-    QUICK_KEY_MAP,
-    QUICK_DESC_MAP,
     QUICK_CHAR_MARKER,
     BLOCK_H_PAD
 } from './timeline.consts'
@@ -38,6 +36,7 @@ import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$l
 import { parseValueString, sumRatioNum } from '$lib/consts/parse-value-string'
 import { addToast } from '$lib/data/toast.svelte'
 import { setCharElements } from '$lib/data/char-elements.svelte'
+import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 
 // ── Core Data ──
 let _refLines = $state<RefLine[]>([
@@ -119,7 +118,6 @@ export function init(
     _lastPointerX = null
     _showDamageList = false
     _dragVisualPositions = {}
-    _blockWidths = {}
     _isGroupDrag = false
     _dragRefInitialPositions = {}
     _dragBlockInitialPositions = {}
@@ -298,9 +296,26 @@ function quickBlockWidth(key: string, desc: string): number {
     for (const b of _opBlocks) {
         if (b.key === key && b.desc === desc && _blockWidths[b.id]) return _blockWidths[b.id]
     }
+    return estimateInnerWidth(key, desc)
+}
+
+function estimateInnerWidth(key: string, desc: string, chips = 0): number {
     const hasIcon = _uiBtnIcons.some(([n, url]) => n === key && url)
-    const inner = (hasIcon ? 40 : key.length * 8) + (desc ? 6 + desc.length * 18 : 0)
-    return Math.max(56, inner + 24)
+    let inner = hasIcon ? 40 : key.length * 8
+    if (desc) inner += 4 + Math.min(desc.length * 14, 96)
+    inner += chips * 28
+    return Math.max(56, inner + 22)
+}
+
+function estimateOpBlockWidth(block: OpBlock): number {
+    if (_blockWidths[block.id]) return _blockWidths[block.id]
+    for (const b of _opBlocks) {
+        if (b.id !== block.id && b.key === block.key && b.desc === block.desc && _blockWidths[b.id]) {
+            return _blockWidths[b.id]
+        }
+    }
+    const chips = (block.intro ? 1 : 0) + (block.switchback ? 1 : 0)
+    return estimateInnerWidth(block.key, block.desc, chips)
 }
 
 export function quickInput(rawKey: string): string | null {
@@ -311,17 +326,17 @@ export function quickInput(rawKey: string): string | null {
     }
     const names = getTeamCharNames()
     if (names.length === 0 || _quickCharIndex >= names.length) return null
-    const mapped = QUICK_KEY_MAP[rawKey]
-    if (!mapped) return null
-    const desc = QUICK_DESC_MAP[rawKey] ?? ''
-    const newWidth = quickBlockWidth(mapped, desc)
+    const entry = getKeyMapEntries().find((e) => e.physical === rawKey)
+    if (!entry) return null
+    const storedKey = getDefaultBlockKey(entry.id) || entry.blockKey
+    const newWidth = quickBlockWidth(storedKey, '')
     let maxRight = 0
     for (const b of _opBlocks) {
         const bw = _blockWidths[b.id] ?? 56
         maxRight = Math.max(maxRight, b.pos + bw / 2)
     }
     const pos = maxRight > 0 ? maxRight + newWidth / 2 : SIDE_PAD + newWidth / 2
-    const id = addOpBlock(_quickCharIndex, pos, mapped, desc)
+    const id = addOpBlock(_quickCharIndex, pos, storedKey, '')
     if (id) _quickStack.push(id)
     return id
 }
@@ -1116,7 +1131,7 @@ export function onBlockDrag(rawX: number) {
     const idx = _opBlocks.findIndex((b) => b.id === _dragBlockId)
     if (idx < 0) return
     const centerX = rawX - _dragBlockOffset
-    const pos = snapBlockX(centerX, _opBlocks[idx].trackIndex, _dragBlockId, _blockWidths[_dragBlockId] ?? 0)
+    const pos = snapBlockX(centerX, _dragBlockId, _blockWidths[_dragBlockId] ?? 0)
     const clampedPos = Math.max(0, Math.min(MAX_POS, pos))
     if (_isGroupDrag) {
         applyGroupDelta(clampedPos - _dragBlockStartPos)
@@ -1141,14 +1156,21 @@ export function stopBlockDrag() {
         } else if (Math.abs(dragged.pos - _dragBlockStartPos) > 1) {
             const dw = _blockWidths[_dragBlockId] ?? 0
             const dLeft = dragged.pos - dw / 2
+            const dRight = dragged.pos + dw / 2
             for (const b of _opBlocks) {
                 if (b.id === _dragBlockId || b.trackIndex !== dragged.trackIndex) continue
                 const bw = _blockWidths[b.id] ?? 0
                 const bLeft = b.pos - bw / 2
                 const bRight = b.pos + bw / 2
-                if (dragged.pos >= b.pos && dLeft > bLeft + SNAP_PX && dLeft < bRight - SNAP_PX) {
+                if (dLeft < bRight && dRight > bLeft) {
+                    const pushRight = dragged.pos >= b.pos
                     _opBlocks = _opBlocks.map((ob) =>
-                        ob.id === _dragBlockId ? { ...ob, pos: Math.max(0, Math.min(MAX_POS, bRight + dw / 2)) } : ob
+                        ob.id === _dragBlockId
+                            ? {
+                                  ...ob,
+                                  pos: Math.max(0, Math.min(MAX_POS, pushRight ? bRight + dw / 2 : bLeft - dw / 2))
+                              }
+                            : ob
                     )
                     break
                 }
@@ -1621,7 +1643,7 @@ export function confirmBlockDesc() {
 }
 
 // ── Snap / Reflow ──
-export function snapBlockX(centerX: number, trackIndex: number, excludeId: string, width: number): number {
+export function snapBlockX(centerX: number, excludeId: string, width: number): number {
     const left = centerX - width / 2
     const right = centerX + width / 2
     for (const b of _opBlocks) {
@@ -1632,12 +1654,9 @@ export function snapBlockX(centerX: number, trackIndex: number, excludeId: strin
 
         if (Math.abs(left - bRight) < SNAP_PX) return bRight + width / 2
         if (Math.abs(right - bLeft) < SNAP_PX) return bLeft - width / 2
-        if (centerX > b.pos) {
-            const inL = bLeft + BLOCK_H_PAD
-            const inR = bRight - BLOCK_H_PAD
-            if (Math.abs(left - inL) < SNAP_PX) return inL + width / 2
-            if (Math.abs(left - inR) < SNAP_PX) return inR + width / 2
-        }
+    }
+    for (const rl of _refLines) {
+        if (Math.abs(right - rl.pos) < SNAP_PX) return rl.pos - width / 2
     }
     return centerX
 }
@@ -1687,6 +1706,81 @@ export function reflowTrack(trackIndex: number) {
     _opBlocks = updated
     enforceIntro()
     enforceSwitchback()
+}
+
+export function formatTimeline() {
+    if (!assertUnlocked()) return
+    const lastTrackIdx = getTRACKS().length - 1
+    const items = _opBlocks
+        .filter((b) => b.trackIndex < lastTrackIdx)
+        .map((b) => {
+            const w = estimateOpBlockWidth(b)
+            return { block: b, w, left: b.pos - w / 2, right: b.pos + w / 2 }
+        })
+        .sort((a, b) => a.left - b.left)
+    if (items.length === 0) return
+
+    const refInfo = _refLines.map((rl) => {
+        let leftBlock: (typeof items)[number] | null = null
+        let rightBlock: (typeof items)[number] | null = null
+        let bestLeft = Infinity
+        let bestRight = Infinity
+        for (const it of items) {
+            const dl = rl.pos - it.right
+            if (it.right <= rl.pos && dl < bestLeft) {
+                bestLeft = dl
+                leftBlock = it
+            }
+            const dr = it.left - rl.pos
+            if (it.left >= rl.pos && dr < bestRight) {
+                bestRight = dr
+                rightBlock = it
+            }
+        }
+        return { rl, pos: rl.pos, leftBlock, rightBlock }
+    })
+
+    const widthById: Record<string, number> = {}
+    const newPosById: Record<string, number> = {}
+    let cursor = items[0].left
+    for (const it of items) {
+        const pos = Math.max(0, Math.min(MAX_POS, cursor + it.w / 2))
+        widthById[it.block.id] = it.w
+        newPosById[it.block.id] = pos
+        cursor = pos + it.w / 2
+    }
+    const leftOf = (id: string) => newPosById[id] - widthById[id] / 2
+    const rightOf = (id: string) => newPosById[id] + widthById[id] / 2
+
+    const placed = refInfo
+        .map(({ rl, pos, leftBlock, rightBlock }) => {
+            if (rl.id === 'left') return { rl, pos: 0 }
+            if (leftBlock && rightBlock) {
+                const origSpan = rightBlock.left - leftBlock.right
+                const ratio = origSpan > 0 ? (pos - leftBlock.right) / origSpan : 0
+                const newSpan = leftOf(rightBlock.block.id) - rightOf(leftBlock.block.id)
+                return { rl, pos: rightOf(leftBlock.block.id) + ratio * newSpan }
+            }
+            if (leftBlock) return { rl, pos: rightOf(leftBlock.block.id) + (pos - leftBlock.right) }
+            if (rightBlock) return { rl, pos: leftOf(rightBlock.block.id) - (rightBlock.left - pos) }
+            return { rl, pos }
+        })
+        .sort((a, b) => a.pos - b.pos)
+
+    const finalRefs: RefLine[] = []
+    let prev = -Infinity
+    for (const { rl, pos } of placed) {
+        const p = rl.id === 'left' ? 0 : Math.max(prev + MIN_GAP, Math.min(MAX_POS, pos))
+        finalRefs.push({ ...rl, pos: p })
+        prev = p
+    }
+
+    _opBlocks = _opBlocks.map((b) => (newPosById[b.id] !== undefined ? { ...b, pos: newPosById[b.id] } : b))
+    _refLines = finalRefs
+    enforceIntro()
+    enforceSwitchback()
+    save()
+    addToast('已自动对齐：块右边界对接下一块左边界，参考线跟随', 'success')
 }
 
 // ── Damage Block Functions ──

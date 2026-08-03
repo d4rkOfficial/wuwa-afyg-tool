@@ -18,6 +18,26 @@ async function download(url, dest) {
     console.log(`  ✓ ${dest}`)
 }
 
+async function downloadOrSkip(url, dest) {
+    try {
+        await download(url, dest)
+    } catch (e) {
+        console.warn(`  ✗ skipped: ${dest} (${e.message})`)
+    }
+}
+
+async function downloadAny(urls, dest) {
+    for (const url of urls) {
+        try {
+            await download(url, dest)
+            return
+        } catch {
+            /* try next alias */
+        }
+    }
+    console.warn(`  ✗ skipped: ${dest}`)
+}
+
 async function main() {
     console.log('Downloading static icons from nanoka CDN...\n')
 
@@ -65,6 +85,45 @@ async function main() {
     for (const [name, url] of buttons) {
         await download(url, join(staticDir, 'btn', `${name}.webp`))
     }
+
+    // ── Keyboard key icons (digits / letters / named keys) ──
+    console.log('[key]')
+    const keys = []
+    for (let i = 0; i <= 9; i++) keys.push([String(i), `T_IconPcBtn_Key${i}_UI.webp`])
+    for (let i = 0; i < 26; i++) {
+        const c = String.fromCharCode(65 + i)
+        keys.push([c, `T_IconPcBtn_Key${c}_UI.webp`])
+    }
+    const named = [
+        'Esc',
+        'Tab',
+        'CapsLock',
+        'LeftShift',
+        'RightShift',
+        'LeftCtrl',
+        'RightCtrl',
+        'LeftAlt',
+        'RightAlt',
+        'Enter',
+        'Delete',
+        'Up',
+        'Down',
+        'Left',
+        'Right'
+    ]
+    for (const name of named) keys.push([name, `T_IconPcBtn_Key${name}_UI.webp`])
+    for (const [name, file] of keys) {
+        await downloadOrSkip(`${UI_BTN_BASE}/${file}`, join(staticDir, 'btn', `${name}.webp`))
+    }
+    // Backspace uses an alias on the CDN
+    await downloadAny(
+        [
+            `${UI_BTN_BASE}/T_IconPcBtn_KeyBackSpace_UI.webp`,
+            `${UI_BTN_BASE}/T_IconPcBtn_KeyBackspace_UI.webp`,
+            `${UI_BTN_BASE}/T_IconPcBtn_KeyBack_UI.webp`
+        ],
+        join(staticDir, 'btn', 'Backspace.webp')
+    )
 
     console.log('\nDone!')
 }

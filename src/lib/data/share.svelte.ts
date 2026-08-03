@@ -1,5 +1,5 @@
 import { browser } from '$app/environment'
-import { SHARE_BASE } from '$lib/api/consts'
+import { getShareBase } from './workshop.svelte'
 import {
     buildExportFile,
     getPhaseOrder,
@@ -74,7 +74,7 @@ export async function checkShare(force = false) {
             excludeAnon: '1'
         })
         if (shareState.query.trim()) params.set('q', shareState.query.trim())
-        const res = await fetch(`${SHARE_BASE}/api/public/projects?${params}`)
+        const res = await fetch(`${getShareBase()}/api/public/projects?${params}`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const json = (await res.json()) as { projects: ShareProject[]; total?: number }
         if (seq !== _seq) return
@@ -122,7 +122,7 @@ export function setPage(page: number) {
 export async function shareProject(project: Project): Promise<ShareResult> {
     const file = buildExportFile(project, getPhaseOrder(), true)
     try {
-        const res = await fetch(`${SHARE_BASE}/api/public/projects`, {
+        const res = await fetch(`${getShareBase()}/api/public/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fileText: JSON.stringify(file) })
@@ -142,7 +142,7 @@ export interface DownloadResult {
 
 export async function downloadProject(code: string): Promise<DownloadResult> {
     try {
-        const res = await fetch(`${SHARE_BASE}/share/${code}/download`)
+        const res = await fetch(`${getShareBase()}/share/${code}/download`)
         if (!res.ok) return { ok: false, error: `下载失败（HTTP ${res.status}）` }
         const imported = parseProjectFile(await res.text())
         importProjects(imported)

@@ -40,15 +40,9 @@
     let dragState = $state<{ ci: number; si: number; idx: number; dropIdx: number; outside: boolean } | null>(null)
     let mainStatMenuPos = $state<{ left: number; top: number; width: number } | null>(null)
     let mainStatMenuEl: HTMLElement | undefined = $state()
-    const mainStatTriggers = new Map<string, HTMLButtonElement>()
 
-    function registerMainStatTrigger(node: HTMLButtonElement, key: string) {
-        mainStatTriggers.set(key, node)
-        return {
-            destroy() {
-                mainStatTriggers.delete(key)
-            }
-        }
+    function getMainStatTrigger(ci: number, si: number): HTMLButtonElement | null {
+        return document.querySelector(`[data-main-stat-trigger="${ci}:${si}"]`)
     }
 
     function closeMainStatMenu() {
@@ -61,7 +55,7 @@
             closeMainStatMenu()
             return
         }
-        const el = mainStatTriggers.get(`${ci}:${si}`)
+        const el = getMainStatTrigger(ci, si)
         if (!el) return
         const r = el.getBoundingClientRect()
         mainStatMenuPos = { left: r.left, top: r.bottom + 4, width: r.width }
@@ -86,7 +80,7 @@
             const ch = document.documentElement.clientHeight
             if (r.right > cw - 8) el.style.left = cw - r.width - 8 + 'px'
             if (r.bottom > ch - 8) {
-                const btn = mainStatTriggers.get(`${menu.ci}:${menu.si}`)
+                const btn = getMainStatTrigger(menu.ci, menu.si)
                 const btnRect = btn?.getBoundingClientRect()
                 el.style.top = btnRect ? btnRect.top - r.height - 4 + 'px' : ch - r.height - 8 + 'px'
             }
@@ -350,7 +344,7 @@
                                 <!-- Main stat + second stat combined -->
                                 <div class="relative z-20 mb-2">
                                     <button
-                                        use:registerMainStatTrigger={`${ci}:${si}`}
+                                        data-main-stat-trigger={`${ci}:${si}`}
                                         onclick={() => toggleMainStatMenu(ci, si)}
                                         class="w-full rounded border px-3 py-2 transition-colors hover:bg-(--theme-modal-text)/10"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
