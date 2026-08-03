@@ -38,6 +38,7 @@ export interface Project {
     resultAnalysis?: ResultAnalysisData
     lockedTeamKey?: string
     lockedTeamNames?: string[]
+    archived?: boolean
     phases: {
         team: PhaseState
         timeline: PhaseState

@@ -1,6 +1,5 @@
 <script lang="ts">
     import { onMount, tick } from 'svelte'
-    import { goto } from '$app/navigation'
     import {
         loadProjects,
         getProjects,
@@ -22,9 +21,10 @@
         createProjectData,
         buildExportFile,
         parseProjectFile,
+        archiveProject,
         ProjectParseError
     } from '$lib/data/project.svelte'
-    import { checkShare, shareProject, importFromShareUrl } from '$lib/data/share.svelte'
+    import { checkShare, importFromShareUrl, getShareLink } from '$lib/data/share.svelte'
     import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/consts'
     import { clearCache } from '$lib/data/api'
     import { browser } from '$app/environment'
@@ -78,6 +78,9 @@
     let showResult = $state(false)
     let showBuffLibrary = $state(false)
     let showSettings = $state(false)
+    let showWorkshopFrame = $state(false)
+    let workshopFrameKey = $state(0)
+    let showZoomTip = $state(browser ? !localStorage.getItem('wuwa-afyg:zoom-tip') : false)
 
     let sidebarWidth = $state(240)
     let sidebarDragging = $state(false)
@@ -135,6 +138,7 @@
     let activePhase = $state<PhaseKey>('team')
 
     onMount(async () => {
+        hideSplash()
         await ensureVersion()
         if (browser) {
             const prev = localStorage.getItem('wuwa-afyg:version')
@@ -149,8 +153,12 @@
         loadWorkshop()
         checkShare()
         await handleImportFromHash()
-        hideSplash()
     })
+
+    function dismissZoomTip() {
+        showZoomTip = false
+        localStorage.setItem('wuwa-afyg:zoom-tip', '1')
+    }
 
     let projects = $derived(getProjects())
     let activeId = $derived(getActiveId())
@@ -328,18 +336,29 @@
     async function handleShare(id: string) {
         const p = projects.find((pr) => pr.id === id)
         if (!p) return
-        const res = await shareProject(p)
-        if (!res.ok || !res.code) {
-            addToast(res.error ?? '分享失败', 'error')
+        addToast('正在生成分享链接...', 'info')
+        const link = await getShareLink(p)
+        if (!link) {
+            addToast('分享失败', 'error')
             return
         }
-        const link = `${location.origin}#import_project=${encodeURIComponent(`${getShareBase()}/share/${res.code}/download`)}`
         try {
             await navigator.clipboard.writeText(link)
-            addToast(`已分享(10分钟)：${link}（链接已复制）`, 'success')
+            addToast('已分享(10分钟)，链接已复制到剪贴板', 'success')
         } catch {
-            addToast(`已分享(10分钟)：${link}`, 'success')
+            addToast('已分享(10分钟)，请在地址栏查看导入链接', 'success')
         }
+    }
+
+    async function handleArchive(id: string) {
+        const p = projects.find((pr) => pr.id === id)
+        if (!p) return
+        await archiveProject(id)
+        if (id === activeId) {
+            activePhase = 'team'
+            initForActiveProject()
+        }
+        addToast(`工程「${p.name}」已归档`, 'success')
     }
 
     async function handleImportFromHash() {
@@ -501,6 +520,7 @@
         onrename={openRename}
         onclone={openClone}
         onexport={openExport}
+        onarchive={handleArchive}
         ondelete={openDelete}
         onselect={handleSelectProject}
     />
@@ -517,22 +537,61 @@
     <input type="file" accept=".json" class="hidden" bind:this={importInput} onchange={handleImport} />
 
     <div class="flex flex-1 flex-col overflow-hidden">
+        {#if showZoomTip}
+            <div
+                class="mx-6 mt-4 flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent); color: var(--theme-modal-text);"
+            >
+                <Icon icon="mdi:information-outline" class="size-4 shrink-0 text-(--theme-accent-text)" />
+                <span class="flex-1">
+                    建议将浏览器页面缩放调整为 <b>125%</b> 以获得最佳显示效果（Ctrl/⌘ 与 +/- 或浏览器菜单缩放）
+                </span>
+                <button
+                    onclick={dismissZoomTip}
+                    class="shrink-0 rounded p-1 text-(--theme-muted-text) transition-colors hover:text-(--theme-modal-text)"
+                    title="知道了"
+                >
+                    <Icon icon="mdi:close" class="size-4" />
+                </button>
+            </div>
+        {/if}
         {#if !activeProject}
-            <div class="flex flex-1 flex-col items-center justify-center gap-6 px-8">
-                <div class="text-center">
-                    <img
-                        src={favicon}
-                        alt="椰果工具箱"
-                        class="mx-auto mb-5 size-14 drop-shadow-[0_0_4px_var(--theme-halo-color)]"
-                    />
-                    <h2 class="mb-2 text-xl font-semibold [text-shadow:_0_0_3px_var(--theme-halo-color)]">
+            <div class="flex flex-1 flex-col items-center justify-end gap-8 px-8 pb-10">
+                <div class="flex flex-col items-center text-center">
+                    <div class="relative mb-4">
+                        <div
+                            class="absolute inset-0 rounded-full bg-(--theme-accent-bg)/25 blur-2xl"
+                            aria-hidden="true"
+                        ></div>
+                        <img
+                            src={favicon}
+                            alt="椰果工具箱"
+                            class="relative size-20 rounded-2xl object-contain drop-shadow-[0_0_10px_var(--theme-halo-color)]"
+                        />
+                    </div>
+                    <h2
+                        class="mb-2 text-3xl font-bold tracking-tight text-(--theme-card-text) [text-shadow:_0_0_8px_var(--theme-halo-color)]"
+                    >
                         椰果工具箱
                     </h2>
-                    <p class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]">
-                        鸣潮社区公益工具！ 游戏数据版本:{getWWVersion()}
+                    <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                        <span class="text-sm text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]">
+                            鸣潮社区公益工具
+                        </span>
+                        <span
+                            class="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-(--theme-accent-text)"
+                            style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);"
+                        >
+                            数据版本 {getWWVersion()}
+                        </span>
+                    </div>
+                    <p class="mt-2 text-xs text-(--theme-muted-text)/70 [text-shadow:_0_0_2px_var(--theme-halo-color)]">
+                        <!-- 先不写 -->
+                        <br />
+                        <br />
                     </p>
                 </div>
-                <div class="grid w-full max-w-2xl gap-4 sm:grid-cols-3">
+                <div class="grid w-full max-w-5xl grid-cols-4 gap-4">
                     <button
                         onclick={() => {
                             newName = ''
@@ -556,28 +615,7 @@
                         </div>
                     </button>
                     <button
-                        onclick={() => goto('/api-test')}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
-                    >
-                        <Icon
-                            icon="mdi:api"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
-                        />
-                        <div class="flex flex-col gap-1">
-                            <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
-                                >接口测试</span
-                            >
-                            <span
-                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
-                                >调试游戏数据接口与工具 API</span
-                            >
-                        </div>
-                    </button>
-                    <a
-                        href={getShareBase()}
-                        target="_blank"
-                        rel="noreferrer"
+                        onclick={() => (showWorkshopFrame = true)}
                         class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
                         <Icon
@@ -594,7 +632,7 @@
                                 >前往社区站点浏览、分享与下载工程</span
                             >
                         </div>
-                    </a>
+                    </button>
                     <button
                         onclick={() => (showBuffLibrary = true)}
                         class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
@@ -858,6 +896,63 @@
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
 
 <SettingsModal open={showSettings} onclose={() => (showSettings = false)} />
+
+{#if showWorkshopFrame}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5))"
+        onclick={(e) => {
+            if (e.target === e.currentTarget) showWorkshopFrame = false
+        }}
+        onkeydown={(e) => {
+            if (e.key === 'Escape') showWorkshopFrame = false
+        }}
+    >
+        <div
+            class="flex h-[90vh] w-[min(94vw,1100px)] flex-col overflow-hidden rounded-xl border shadow-2xl"
+            style="background: var(--theme-modal-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+            role="dialog"
+            aria-modal="true"
+        >
+            <div class="flex min-h-0 flex-1">
+                <!-- Left toolbar -->
+                <div
+                    class="flex w-12 shrink-0 flex-col items-center gap-1 border-r py-3"
+                    style="border-color: var(--theme-divider-border);"
+                >
+                    <button
+                        onclick={() => workshopFrameKey++}
+                        class="rounded p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                        title="刷新"
+                    >
+                        <Icon icon="mdi:refresh" class="size-4.5" />
+                    </button>
+                    <a
+                        href={getShareBase()}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="rounded p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                        title="在新标签页打开"
+                    >
+                        <Icon icon="mdi:open-in-new" class="size-4.5" />
+                    </a>
+                    <button
+                        onclick={() => (showWorkshopFrame = false)}
+                        class="rounded p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-red-500"
+                        title="关闭"
+                    >
+                        <Icon icon="mdi:close" class="size-4.5" />
+                    </button>
+                </div>
+                {#key workshopFrameKey}
+                    <iframe src={getShareBase()} title="椰果工坊" class="min-h-0 w-full flex-1 border-0"></iframe>
+                {/key}
+            </div>
+        </div>
+    </div>
+{/if}
 
 <svelte:window
     onkeydown={(e) => {

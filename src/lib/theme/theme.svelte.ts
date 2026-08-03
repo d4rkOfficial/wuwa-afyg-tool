@@ -41,10 +41,6 @@ function applyThemeCSS() {
     }
 
     root.style.setProperty('--theme-layout-scheme', theme.id === 'light' ? 'light' : 'dark')
-    root.style.setProperty('--theme-rigcrit-text', theme.id === 'light' ? '#dc2626' : '#ef4444')
-    root.style.setProperty('--theme-rigcrit-bg', theme.id === 'light' ? '#dc2626' : '#ef4444')
-    root.style.setProperty('--theme-nocrit-text', theme.id === 'light' ? '#16a34a' : '#22c55e')
-    root.style.setProperty('--theme-nocrit-bg', theme.id === 'light' ? '#16a34a' : '#22c55e')
     root.style.setProperty('--theme-w-icon-filter', theme.id === 'light' ? 'invert(1)' : 'none')
     root.style.setProperty('--theme-num', theme.id === 'light' ? '#a16207' : '#ca8a04')
     root.style.setProperty(
@@ -54,6 +50,28 @@ function applyThemeCSS() {
     root.style.setProperty('--theme-halo-color', theme.id === 'light' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)')
 
     applyOverridesCSS(root)
+}
+
+function applyCritGradients(root: HTMLElement, hue: number | null) {
+    if (hue === null) {
+        root.style.setProperty('--theme-rigcrit-from', '#ef4444')
+        root.style.setProperty('--theme-rigcrit-to', '#fb923c')
+        root.style.setProperty('--theme-nocrit-from', '#22c55e')
+        root.style.setProperty('--theme-nocrit-to', '#a3e635')
+    } else {
+        root.style.setProperty('--theme-rigcrit-from', `oklch(58% 0.15 ${hue + 120})`)
+        root.style.setProperty('--theme-rigcrit-to', `oklch(68% 0.16 ${hue + 135})`)
+        root.style.setProperty('--theme-nocrit-from', `oklch(58% 0.15 ${hue - 120})`)
+        root.style.setProperty('--theme-nocrit-to', `oklch(68% 0.16 ${hue - 105})`)
+    }
+    root.style.setProperty(
+        '--theme-rigcrit-grad',
+        'linear-gradient(135deg, var(--theme-rigcrit-from) 0%, var(--theme-rigcrit-to) 100%)'
+    )
+    root.style.setProperty(
+        '--theme-nocrit-grad',
+        'linear-gradient(135deg, var(--theme-nocrit-from) 0%, var(--theme-nocrit-to) 100%)'
+    )
 }
 
 function applyAccentOverride(root: HTMLElement) {
@@ -82,6 +100,7 @@ function applyAccentOverride(root: HTMLElement) {
         root.style.setProperty('--theme-track-2', isDark ? '#666' : '#999')
         root.style.setProperty('--theme-track-3', isDark ? '#777' : '#888')
         root.style.setProperty('--theme-track-4', isDark ? '#888' : '#777')
+        applyCritGradients(root, null)
     } else if (typeof overrides.accentHue === 'number') {
         restoreElementColors()
 
@@ -102,6 +121,7 @@ function applyAccentOverride(root: HTMLElement) {
         root.style.setProperty('--theme-track-2', `oklch(55% 0.15 ${h})`)
         root.style.setProperty('--theme-track-3', `oklch(55% 0.12 ${h + 20})`)
         root.style.setProperty('--theme-track-4', `oklch(55% 0.10 ${h + 40})`)
+        applyCritGradients(root, h)
     } else if (themeObj) {
         restoreElementColors()
 
@@ -119,6 +139,7 @@ function applyAccentOverride(root: HTMLElement) {
         root.style.setProperty('--theme-track-2', '#7c3aed')
         root.style.setProperty('--theme-track-3', '#db2777')
         root.style.setProperty('--theme-track-4', '#16a34a')
+        applyCritGradients(root, null)
     }
 }
 

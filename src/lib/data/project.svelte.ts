@@ -61,6 +61,7 @@ function normalizeProject(p: Partial<Project>): Project {
         resultAnalysis: p.resultAnalysis,
         lockedTeamKey: p.lockedTeamKey,
         lockedTeamNames: p.lockedTeamNames,
+        archived: p.archived ?? false,
         phases: {
             team: phases.team ?? emptyPhaseState(),
             timeline: phases.timeline ?? emptyPhaseState(),
@@ -178,6 +179,28 @@ export async function deleteProject(id: string) {
     await persist()
 }
 
+export function getArchivedProjects() {
+    return projects.filter((p) => p.archived === true)
+}
+
+export async function archiveProject(id: string) {
+    const project = projects.find((p) => p.id === id)
+    if (!project) return
+    project.archived = true
+    if (activeId === id) {
+        activeId = ''
+        await dbSet(ACTIVE_KEY, activeId)
+    }
+    await persist()
+}
+
+export async function unarchiveProject(id: string) {
+    const project = projects.find((p) => p.id === id)
+    if (!project) return
+    project.archived = false
+    await persist()
+}
+
 export async function updateTeam(team: [CharSlot, CharSlot, CharSlot]) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
@@ -248,6 +271,7 @@ export function importProjects(imported: Project[]) {
     for (const item of imported) {
         if (existingIds.has(item.id)) item.id = crypto.randomUUID()
         const normalized = normalizeProject(item)
+        normalized.archived = false
         if (normalized.phases.team.locked && !normalized.lockedTeamKey) {
             normalized.lockedTeamKey = getTeamKeyFromTeam(normalized.team)
             normalized.lockedTeamNames = normalized.team

@@ -25,7 +25,12 @@ export async function ensureVersion() {
     if (!_versionPromise) {
         _versionPromise = (async () => {
             try {
-                const res = await fetch(browser ? '/api/v1/version/latest' : `${NANOKA_BASE}/manifest.json`)
+                const ctrl = new AbortController()
+                const timer = setTimeout(() => ctrl.abort(), 5000)
+                const res = await fetch(browser ? '/api/v1/version/latest' : `${NANOKA_BASE}/manifest.json`, {
+                    signal: ctrl.signal
+                })
+                clearTimeout(timer)
                 const text = await res.text()
                 if (text) {
                     const parsed = JSON.parse(text)

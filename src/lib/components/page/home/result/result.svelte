@@ -26,6 +26,11 @@
 
     let { team, calcState, configState, refreshKey = 0 }: Props = $props()
 
+    const RIG_GRAD_TEXT =
+        'background: var(--theme-rigcrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
+    const NOCRIT_GRAD_TEXT =
+        'background: var(--theme-nocrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
+
     let charInfoMap = $state<Record<string, CharacterInfo>>({})
     let weaponInfoMap = $state<Record<string, WeaponInfo>>({})
     let charIcons = $state<Record<string, string>>({})
@@ -298,11 +303,11 @@
                             >
                             <td
                                 class="py-1.5 px-3 text-right tabular-nums font-medium"
-                                style="color: {rigCritEntryIds.includes(entry.id)
-                                    ? 'var(--theme-rigcrit-text)'
+                                style={rigCritEntryIds.includes(entry.id)
+                                    ? RIG_GRAD_TEXT
                                     : noCritEntryIds.includes(entry.id)
-                                      ? 'var(--theme-nocrit-text)'
-                                      : 'var(--theme-accent-text)'}">{entry.expectedPerHit.toLocaleString()}</td
+                                      ? NOCRIT_GRAD_TEXT
+                                      : 'color: var(--theme-accent-text)'}>{entry.expectedPerHit.toLocaleString()}</td
                             >
                             <td class="py-1.5 w-8"></td>
                         </tr>
@@ -527,11 +532,11 @@
                                             <div class="flex items-start gap-4">
                                                 <div class="font-sans space-y-0.5 flex-1">
                                                     {#if rigCritEntryIds.includes(entry.id)}
-                                                        <div class="font-bold" style="color: var(--theme-rigcrit-text)">
+                                                        <div class="font-bold" style={RIG_GRAD_TEXT}>
                                                             期望 = 暴击 = {entry.critPerHit.toLocaleString()}
                                                         </div>
                                                     {:else if noCritEntryIds.includes(entry.id)}
-                                                        <div class="font-bold" style="color: var(--theme-nocrit-text)">
+                                                        <div class="font-bold" style={NOCRIT_GRAD_TEXT}>
                                                             期望 = 不暴击 = {entry.nonCritPerHit.toLocaleString()}
                                                         </div>
                                                     {:else}
@@ -577,7 +582,7 @@
                                                         }}
                                                         class="px-3 py-2 text-sm font-medium transition-colors border-l"
                                                         style="background: {rigCritEntryIds.includes(entry.id)
-                                                            ? 'var(--theme-rigcrit-bg)'
+                                                            ? 'var(--theme-rigcrit-grad)'
                                                             : 'transparent'}; color: {rigCritEntryIds.includes(entry.id)
                                                             ? '#ffffff'
                                                             : 'var(--theme-modal-text)/40'}; border-color: var(--theme-divider-border);"
@@ -591,7 +596,7 @@
                                                         }}
                                                         class="px-3 py-2 text-sm font-medium transition-colors border-l"
                                                         style="background: {noCritEntryIds.includes(entry.id)
-                                                            ? 'var(--theme-nocrit-bg)'
+                                                            ? 'var(--theme-nocrit-grad)'
                                                             : 'transparent'}; color: {noCritEntryIds.includes(entry.id)
                                                             ? '#ffffff'
                                                             : 'var(--theme-modal-text)/40'}; border-color: var(--theme-divider-border);"
@@ -623,6 +628,8 @@
         {analysisComputing}
         algorithmsInfo={ALGORITHMS_INFO}
         {selectedAlgorithm}
+        {rigCritEntryIds}
+        {noCritEntryIds}
         onSelectAlgorithm={(id: AlgorithmId) => (selectedAlgorithm = id)}
         onUpdateResultAnalysis={(data) => updateResultAnalysis(data)}
         onclose={() => (showDataAnalysis = false)}

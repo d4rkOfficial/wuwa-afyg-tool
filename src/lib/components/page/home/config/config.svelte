@@ -467,7 +467,7 @@
                                             </button>
                                             <button
                                                 onclick={() => (showEnhanceModal = { ci, si })}
-                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-emerald-600 transition-colors hover:bg-(--theme-input-bg)"
+                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
                                             >
                                                 <Icon icon="mdi:dice-5" class="size-3" />
                                                 随机强化

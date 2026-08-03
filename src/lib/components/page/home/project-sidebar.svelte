@@ -24,6 +24,7 @@
         onrename: (id: string) => void
         onclone: (id: string) => void
         onexport: (id: string) => void
+        onarchive: (id: string) => void
         ondelete: (id: string) => void
         onselect: (id: string) => void
     }
@@ -41,6 +42,7 @@
         onrename,
         onclone,
         onexport,
+        onarchive,
         ondelete,
         onselect
     }: Props = $props()
@@ -97,6 +99,13 @@
               ]
             : []),
         {
+            label: '归档',
+            icon: 'mdi:archive-outline',
+            action: () => {
+                if (ctxTargetId) onarchive(ctxTargetId)
+            }
+        },
+        {
             label: '删除',
             icon: 'mdi:delete-outline',
             action: () => {
@@ -134,6 +143,7 @@
         const raw: Project[] = []
 
         for (const p of projects) {
+            if (p.archived) continue
             if (p.lockedTeamKey) {
                 if (!map.has(p.lockedTeamKey)) {
                     map.set(p.lockedTeamKey, {
@@ -357,15 +367,13 @@
             >
                 <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
             </button>
-            {#if getShareState().available}
-                <button
-                    onclick={onworkshop}
-                    class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                    title="从工坊导入"
-                >
-                    <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
-                </button>
-            {/if}
+            <button
+                onclick={onworkshop}
+                class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                title="从工坊导入"
+            >
+                <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+            </button>
         {:else}
             <button
                 onclick={() => (actionsCollapsed = !actionsCollapsed)}
@@ -392,16 +400,14 @@
                         <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
                         <span>从本地导入</span>
                     </button>
-                    {#if getShareState().available}
-                        <button
-                            onclick={onworkshop}
-                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                            title="从工坊导入"
-                        >
-                            <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
-                            <span>从工坊导入</span>
-                        </button>
-                    {/if}
+                    <button
+                        onclick={onworkshop}
+                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                        title="从工坊导入"
+                    >
+                        <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+                        <span>从工坊导入</span>
+                    </button>
                 </div>
             {/if}
         {/if}

@@ -84,6 +84,8 @@
                         <Icon icon="mdi:file-export" class="size-4 shrink-0" />
                     {:else if item.icon === 'mdi:share-variant'}
                         <Icon icon="mdi:share-variant" class="size-4 shrink-0" />
+                    {:else if item.icon === 'mdi:archive-outline'}
+                        <Icon icon="mdi:archive-outline" class="size-4 shrink-0" />
                     {:else if item.icon === 'mdi:delete-outline'}
                         <Icon icon="mdi:delete-outline" class="size-4 shrink-0" />
                     {/if}

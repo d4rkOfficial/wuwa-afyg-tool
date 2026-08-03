@@ -18,6 +18,14 @@
         removeWorkshop,
         resetWorkshop
     } from '$lib/data/workshop.svelte'
+    import {
+        getArchivedProjects,
+        unarchiveProject,
+        deleteProject,
+        buildExportFile,
+        getPhaseOrder
+    } from '$lib/data/project.svelte'
+    import { getShareLink } from '$lib/data/share.svelte'
 
     interface Props {
         open: boolean
@@ -26,17 +34,20 @@
 
     let { open, onclose }: Props = $props()
 
-    let tab = $state<'theme' | 'keymap' | 'workshop'>('theme')
+    let tab = $state<'theme' | 'keymap' | 'workshop' | 'archive'>('theme')
 
     const SETTING_TABS = [
         { key: 'theme', label: '主题', icon: 'mdi:palette-outline' },
         { key: 'keymap', label: '按键绑定', icon: 'mdi:keyboard-outline' },
-        { key: 'workshop', label: '工坊设置', icon: 'mdi:storefront-outline' }
+        { key: 'workshop', label: '工坊设置', icon: 'mdi:storefront-outline' },
+        { key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' }
     ] as const
 
     const COLOR_PRESETS = [
         { name: '默认', hue: null as number | 'mono' | null },
+        { name: '橘红', hue: 28 as number | 'mono' | null },
         { name: '品红', hue: 330 as number | 'mono' | null },
+        { name: '墨绿', hue: 150 as number | 'mono' | null },
         { name: '黑白', hue: 'mono' as const }
     ]
 
@@ -146,6 +157,58 @@
         await resetWorkshop()
         addToast('已恢复默认工坊实例', 'success')
     }
+
+    // ── Archive management ──
+    let archivedProjects = $derived(getArchivedProjects())
+
+    async function handleUnarchive(id: string) {
+        const p = archivedProjects.find((pr) => pr.id === id)
+        if (!p) return
+        await unarchiveProject(id)
+        addToast(`工程「${p.name}」已取消归档`, 'success')
+    }
+
+    function handleArchiveExport(id: string) {
+        const p = archivedProjects.find((pr) => pr.id === id)
+        if (!p) return
+        const file = buildExportFile(p, getPhaseOrder(), true)
+        const blob = new Blob([JSON.stringify(file)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${p.name}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+        addToast(`工程「${p.name}」已导出`, 'success')
+    }
+
+    async function handleArchiveShare(id: string) {
+        const p = archivedProjects.find((pr) => pr.id === id)
+        if (!p) return
+        addToast('正在生成分享链接...', 'info')
+        const link = await getShareLink(p)
+        if (!link) {
+            addToast('分享失败', 'error')
+            return
+        }
+        try {
+            await navigator.clipboard.writeText(link)
+            addToast('已分享(10分钟)，链接已复制到剪贴板', 'success')
+        } catch {
+            addToast('已分享(10分钟)，请在地址栏查看导入链接', 'success')
+        }
+    }
+
+    async function handleArchiveDelete(id: string) {
+        const p = archivedProjects.find((pr) => pr.id === id)
+        if (!p) return
+        await deleteProject(id)
+        addToast(`工程「${p.name}」已永久删除`, 'info')
+    }
+
+    function formatArchiveDate(ts: number): string {
+        return new Date(ts).toLocaleString()
+    }
 </script>
 
 {#if open}
@@ -207,17 +270,22 @@
                         <!-- Accent color -->
                         <div class="mb-5">
                             <span class="mb-3 block text-xs font-medium text-(--theme-modal-text)/60">主色调</span>
-                            <div class="grid grid-cols-3 gap-2">
+                            <div
+                                class="flex gap-1 rounded-lg border p-1"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
                                 {#each COLOR_PRESETS as c}
                                     {@const style = getPresetStyle(c.hue)}
                                     <button
                                         onclick={() => updateOverride('accentHue', c.hue)}
-                                        class={`flex flex-col items-center gap-1 rounded-lg p-2 transition-all ${overrides.accentHue === c.hue ? (isDark ? 'ring-2 ring-white/60' : 'ring-2 ring-black/40') : ''}`}
-                                        style="background: {style.bg};"
+                                        class="flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors"
+                                        style="background: {overrides.accentHue === c.hue
+                                            ? style.bg
+                                            : 'transparent'}; color: {overrides.accentHue === c.hue
+                                            ? style.text
+                                            : 'var(--theme-modal-text)/60'};"
                                     >
-                                        <span class="text-[10px] font-medium" style="color: {style.text};"
-                                            >{c.name}</span
-                                        >
+                                        {c.name}
                                     </button>
                                 {/each}
                             </div>
@@ -413,7 +481,7 @@
                                 </button>
                             </div>
                         </div>
-                    {:else}
+                    {:else if tab === 'workshop'}
                         <!-- Workshop settings -->
                         <div>
                             <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">工坊设置</span>
@@ -485,6 +553,77 @@
                                     恢复默认
                                 </button>
                             </div>
+                        </div>
+                    {:else}
+                        <!-- Archive management -->
+                        <div>
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">归档管理</span>
+                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                已归档的工程不会出现在侧边栏，可取消归档恢复、全量导出、分享或永久删除
+                            </p>
+                            {#if archivedProjects.length === 0}
+                                <div
+                                    class="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-10"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <Icon icon="mdi:archive-outline" class="size-8 text-(--theme-modal-text)/20" />
+                                    <span class="text-xs text-(--theme-modal-text)/40">暂无归档的工程</span>
+                                </div>
+                            {:else}
+                                <div class="flex flex-col gap-2">
+                                    {#each archivedProjects as p}
+                                        <div
+                                            class="rounded-lg border px-2.5 py-2"
+                                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                        >
+                                            <div class="flex items-center gap-2">
+                                                <span
+                                                    class="min-w-0 flex-1 truncate text-xs font-medium text-(--theme-modal-text)"
+                                                    >{p.name}</span
+                                                >
+                                                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40"
+                                                    >{formatArchiveDate(p.createdAt)}</span
+                                                >
+                                            </div>
+                                            <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                                <button
+                                                    onclick={() => handleUnarchive(p.id)}
+                                                    class="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] transition-colors text-(--theme-accent-text) hover:brightness-125"
+                                                    style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);"
+                                                >
+                                                    <Icon icon="mdi:archive-arrow-up-outline" class="size-3" />
+                                                    取消归档
+                                                </button>
+                                                <button
+                                                    onclick={() => handleArchiveExport(p.id)}
+                                                    class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                                    style="border-color: var(--theme-divider-border);"
+                                                >
+                                                    <Icon icon="mdi:file-export" class="size-3" />
+                                                    导出
+                                                </button>
+                                                <button
+                                                    onclick={() => handleArchiveShare(p.id)}
+                                                    class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                                    style="border-color: var(--theme-divider-border);"
+                                                >
+                                                    <Icon icon="mdi:share-variant" class="size-3" />
+                                                    分享(10分钟)
+                                                </button>
+                                                <button
+                                                    onclick={() => handleArchiveDelete(p.id)}
+                                                    class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
+                                                    style="border-color: var(--theme-divider-border);"
+                                                    title="永久删除，不可恢复"
+                                                >
+                                                    <Icon icon="mdi:delete-outline" class="size-3" />
+                                                    永久删除
+                                                </button>
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
                         </div>
                     {/if}
                 </div>

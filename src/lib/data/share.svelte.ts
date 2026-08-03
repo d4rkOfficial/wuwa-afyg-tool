@@ -135,6 +135,13 @@ export async function shareProject(project: Project): Promise<ShareResult> {
     }
 }
 
+/** 分享工程并生成 10 分钟有效的导入链接；失败返回 null */
+export async function getShareLink(project: Project): Promise<string | null> {
+    const res = await shareProject(project)
+    if (!res.ok || !res.code) return null
+    return `${location.origin}#import_project=${encodeURIComponent(`${getShareBase()}/share/${res.code}/download`)}`
+}
+
 export interface DownloadResult {
     ok: boolean
     error?: string
