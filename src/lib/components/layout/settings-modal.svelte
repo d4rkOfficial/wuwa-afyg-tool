@@ -422,26 +422,33 @@
                             </p>
                             <div class="flex flex-col gap-2">
                                 {#each workshopInstances as inst}
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
-                                        class="flex items-center gap-2 rounded-lg border px-2.5 py-2"
-                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                        class={[
+                                            'flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors',
+                                            inst.id === workshopActiveId
+                                                ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
+                                                : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
+                                        ].join(' ')}
+                                        onclick={() => handleSwitchWorkshop(inst.id)}
+                                        title="点击选中该实例"
                                     >
-                                        <button
-                                            onclick={() => handleSwitchWorkshop(inst.id)}
-                                            class="flex min-w-0 flex-1 items-center gap-2 text-left"
-                                            title="选中该实例"
+                                        <Icon
+                                            icon={inst.id === workshopActiveId
+                                                ? 'mdi:radiobox-marked'
+                                                : 'mdi:radiobox-blank'}
+                                            class="size-4 shrink-0 text-(--theme-accent-text)"
+                                        />
+                                        <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)"
+                                            >{inst.url}</span
                                         >
-                                            <Icon
-                                                icon={inst.id === workshopActiveId
-                                                    ? 'mdi:radiobox-marked'
-                                                    : 'mdi:radiobox-blank'}
-                                                class="size-4 shrink-0 text-(--theme-accent-text)"
-                                            />
-                                            <span class="truncate text-xs text-(--theme-modal-text)">{inst.url}</span>
-                                        </button>
                                         {#if workshopInstances.length > 1}
                                             <button
-                                                onclick={() => handleRemoveWorkshop(inst.id)}
+                                                onclick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleRemoveWorkshop(inst.id)
+                                                }}
                                                 class="shrink-0 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
                                                 title="删除"
                                             >

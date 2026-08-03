@@ -73,6 +73,13 @@
         return e.entityName.includes(q) || e.buffs.some((b) => b.buffName.includes(q))
     }
 
+    const TYPE_ICONS: Record<string, string> = {
+        character: 'mdi:account-outline',
+        weapon: 'mdi:sword-cross',
+        echo: 'mdi:ghost-outline',
+        set: 'mdi:layers-outline'
+    }
+
     let selected = $state<Record<string, boolean>>({})
 
     const countSelectedBuffs = $derived(
@@ -243,19 +250,25 @@
 {/snippet}
 
 {#snippet EntityRow(entity: BuffLibraryEntity, checked: boolean)}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="flex items-start gap-3 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2"
-        class:border-(--theme-accent-bg)={checked}
+        class={[
+            'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition-colors',
+            checked
+                ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
+                : 'border-(--theme-card-border) bg-(--theme-card-bg) hover:bg-(--theme-card-bg-focused)'
+        ].join(' ')}
+        onclick={() => toggle(entity)}
+        title="点击选中"
     >
-        <button
-            onclick={() => toggle(entity)}
-            class="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors"
-            style={checked
-                ? 'background: var(--theme-accent-bg); border-color: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
-                : 'border-color: var(--theme-card-border);'}
+        <span
+            class="mt-0.5 flex size-5 shrink-0 items-center justify-center {checked
+                ? 'text-(--theme-accent-text)'
+                : 'text-(--theme-muted-text)'}"
         >
-            {#if checked}<Icon icon="mdi:check" class="size-3" />{/if}
-        </button>
+            <Icon icon={TYPE_ICONS[categoryOfType(entity.entityType)]} class="size-5" />
+        </span>
         <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
                 <span class="truncate text-sm font-medium text-(--theme-layout-text)">{entity.entityName}</span>
@@ -272,5 +285,8 @@
                 {buffDetail(entity)}
             </div>
         </div>
+        {#if checked}
+            <Icon icon="mdi:check-circle" class="mt-0.5 size-4 shrink-0 text-(--theme-accent-text)" />
+        {/if}
     </div>
 {/snippet}

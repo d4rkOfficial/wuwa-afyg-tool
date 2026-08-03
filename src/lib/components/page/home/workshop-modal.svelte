@@ -214,28 +214,30 @@
         {/if}
     </div>
 
-    {#if share.total > 0}
-        <div
-            class="mt-3 flex items-center justify-between gap-2 border-t border-(--theme-card-border) pt-3 text-xs text-(--theme-muted-text)"
-        >
-            <span class="shrink-0">共 {share.total} 条</span>
-            <div class="flex items-center gap-2">
-                <button
-                    onclick={() => setPage(share.page - 1)}
-                    disabled={share.page <= 1}
-                    class="rounded-md px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
-                >
-                    上一页
-                </button>
-                <span class="shrink-0">第 {share.page} / {totalPages} 页</span>
-                <button
-                    onclick={() => setPage(share.page + 1)}
-                    disabled={share.page >= totalPages}
-                    class="rounded-md px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
-                >
-                    下一页
-                </button>
+    {#snippet footer()}
+        {#if share.total > 0}
+            <div
+                class="flex items-center justify-between gap-2 border-t border-(--theme-card-border) pt-3 text-xs text-(--theme-muted-text)"
+            >
+                <span class="shrink-0">共 {share.total} 条</span>
+                <div class="flex items-center gap-2">
+                    <button
+                        onclick={() => setPage(share.page - 1)}
+                        disabled={share.page <= 1}
+                        class="rounded-md px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                        上一页
+                    </button>
+                    <span class="shrink-0">第 {share.page} / {totalPages} 页</span>
+                    <button
+                        onclick={() => setPage(share.page + 1)}
+                        disabled={share.page >= totalPages}
+                        class="rounded-md px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                        下一页
+                    </button>
+                </div>
             </div>
-        </div>
-    {/if}
+        {/if}
+    {/snippet}
 </Modal>
