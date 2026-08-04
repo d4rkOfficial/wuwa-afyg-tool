@@ -1,4 +1,4 @@
-import type { BuffSet, BuffZoneValue, CalcState, DamageEntry } from './calculation.types'
+import type { BuffSet, BuffZoneValue, CalcState, DamageEntry, BuffCondition } from './calculation.types'
 import type { TimelineData } from '../timeline/timeline.types'
 import type { CharSlot } from '$lib/data/types'
 import { parseValueString } from '$lib/consts/parse-value-string'
@@ -362,6 +362,7 @@ export interface ImportBuffInput {
     name: string
     scope?: 'self' | 'self_except' | 'team' | 'effect_only'
     ownerIdx?: number
+    condition?: BuffCondition
     zones: ImportBuffZone[]
 }
 
@@ -419,7 +420,11 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
             id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name,
             zones,
-            scope: mapImportedScope(item.scope, item.ownerIdx ?? ownerIdx, teamSize)
+            scope: mapImportedScope(item.scope, item.ownerIdx ?? ownerIdx, teamSize),
+            ...(item.condition ? { condition: { ...item.condition } } : {}),
+            ...(item.condition && (item.ownerIdx ?? ownerIdx) >= 0
+                ? { conditionRefCharIdx: item.ownerIdx ?? ownerIdx }
+                : {})
         }
         fresh.push(buffSet)
     }
@@ -449,6 +454,22 @@ export function setBuffSetScope(setId: string, scope: 'all' | number[]) {
     if (!assertUnlocked()) return
     if (_globalBuffSetIds.includes(setId)) return
     _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, scope } : s))
+}
+
+export function setBuffSetCondition(setId: string, condition: BuffCondition | null) {
+    if (!assertUnlocked()) return
+    _buffSets = _buffSets.map((s) =>
+        s.id === setId ? { ...s, ...(condition ? { condition } : { condition: undefined }) } : s
+    )
+}
+
+export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
+    if (!assertUnlocked()) return
+    _buffSets = _buffSets.map((s) =>
+        s.id === setId
+            ? { ...s, ...(charIdx !== null ? { conditionRefCharIdx: charIdx } : { conditionRefCharIdx: undefined }) }
+            : s
+    )
 }
 
 export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./calculation.types').ZoneRef | null) {

@@ -11,6 +11,8 @@
         setBuffSetScope,
         setBuffSetZoneRef,
         setBuffSetZoneOverride,
+        setBuffSetCondition,
+        setBuffSetConditionRef,
         getGlobalBuffSetIds,
         reorderNonGlobalBuffSets,
         toggleBuffSetStarred
@@ -241,6 +243,26 @@
     function handleToggleNonChar() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         setBuffSetScope(selectedBuffSetId, isNonCharBuff ? 'all' : [])
+    }
+
+    function toggleBuffCondition() {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        setBuffSetCondition(selectedBuffSetId, selectedBuffSet.condition ? null : { type: 'chain', min: 1 })
+    }
+
+    function setBuffConditionType(type: 'chain' | 'refinement') {
+        if (!selectedBuffSetId || !selectedBuffSet?.condition) return
+        setBuffSetCondition(selectedBuffSetId, { type, min: selectedBuffSet.condition.min })
+    }
+
+    function setBuffConditionMin(value: number) {
+        if (!selectedBuffSetId || !selectedBuffSet?.condition) return
+        setBuffSetCondition(selectedBuffSetId, { ...selectedBuffSet.condition, min: value || 0 })
+    }
+
+    function setConditionRef(i: number) {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        setBuffSetConditionRef(selectedBuffSetId, selectedBuffSet.conditionRefCharIdx === i ? null : i)
     }
 
     function openRefModal(zoneId: string) {
@@ -862,6 +884,126 @@
                                     </svg>
                                     效应专属
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- 生效条件 -->
+                        <div
+                            class="shrink-0 px-3 pb-2.5 pt-1.5 border-b"
+                            style="border-bottom: 1px solid var(--theme-divider-border);"
+                        >
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <button
+                                    onclick={toggleBuffCondition}
+                                    class={[
+                                        'flex items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-all whitespace-nowrap',
+                                        selectedBuffSet.condition ? 'self-stretch' : 'h-6',
+                                        selectedBuffSet.condition
+                                            ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                            : 'border-transparent text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
+                                    ].join(' ')}
+                                    title="仅当该增益确有命座/精炼门槛时开启"
+                                >
+                                    <Icon
+                                        icon={selectedBuffSet.condition ? 'mdi:check-circle' : 'mdi:circle-outline'}
+                                        class="size-3.5 shrink-0"
+                                    />
+                                    {#if !selectedBuffSet.condition}共鸣链/精炼阶数条件{/if}
+                                </button>
+                                {#if selectedBuffSet.condition}
+                                    <div
+                                        class="flex flex-wrap items-center gap-2 rounded-md border px-2.5 py-1.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <div
+                                            class="flex overflow-hidden rounded border"
+                                            style="border-color: var(--theme-divider-border);"
+                                            title="chain=角色共鸣链；refinement=武器精炼（佩戴该武器的角色）"
+                                        >
+                                            <button
+                                                onclick={() => setBuffConditionType('chain')}
+                                                class={[
+                                                    'flex h-6 items-center px-2 text-[11px] transition-colors',
+                                                    selectedBuffSet.condition.type === 'chain'
+                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                ].join(' ')}
+                                            >
+                                                角色
+                                            </button>
+                                            <button
+                                                onclick={() => setBuffConditionType('refinement')}
+                                                class={[
+                                                    'flex h-6 items-center px-2 text-[11px] transition-colors',
+                                                    selectedBuffSet.condition.type === 'refinement'
+                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                ].join(' ')}
+                                            >
+                                                武器
+                                            </button>
+                                        </div>
+                                        <span class="flex h-6 items-center text-[11px] text-(--theme-modal-text)/50"
+                                            >≥</span
+                                        >
+                                        <div
+                                            class="flex overflow-hidden rounded border"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            {#each Array.from({ length: selectedBuffSet.condition.type === 'chain' ? 6 : 5 }, (_, k) => k + 1) as n}
+                                                <button
+                                                    onclick={() => setBuffConditionMin(n)}
+                                                    class={[
+                                                        'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                                        selectedBuffSet.condition.min === n
+                                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                    ].join(' ')}
+                                                >
+                                                    {n}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                        <span
+                                            class="flex h-6 w-4 items-center text-[11px] font-medium text-(--theme-accent-text)"
+                                        >
+                                            {selectedBuffSet.condition.type === 'chain' ? '链' : '阶'}
+                                        </span>
+                                        <!-- 参考角色（chain / refinement 共用同一人） -->
+                                        <div class="flex items-center gap-1">
+                                            <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/50"
+                                                >参考角色</span
+                                            >
+                                            {#each team as slot, i}
+                                                <button
+                                                    onclick={() => setConditionRef(i)}
+                                                    class={[
+                                                        'size-6 rounded-full overflow-hidden border-2 transition-all',
+                                                        selectedBuffSet.conditionRefCharIdx === i
+                                                            ? 'border-(--theme-accent-bg)'
+                                                            : 'border-(--theme-divider-border) grayscale opacity-40 hover:opacity-70'
+                                                    ].join(' ')}
+                                                    title={`看 ${slot.character ?? `角色 ${i + 1}`} 的链 / 精炼`}
+                                                >
+                                                    {#if slot.character && charIconMap[slot.character]}
+                                                        <img
+                                                            src={charIconMap[slot.character]}
+                                                            alt={slot.character}
+                                                            draggable="false"
+                                                            use:fallbackIcon={'/icons/placeholder-character.svg'}
+                                                            class="h-full w-full object-cover"
+                                                        />
+                                                    {:else}
+                                                        <span
+                                                            class="w-full h-full flex items-center justify-center text-[8px] font-bold text-(--theme-modal-text)/50"
+                                                            >{slot.character?.charAt(0) ?? '?'}</span
+                                                        >
+                                                    {/if}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
                             </div>
                         </div>
 

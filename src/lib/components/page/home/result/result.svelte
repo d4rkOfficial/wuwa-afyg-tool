@@ -8,7 +8,7 @@
     import { getAllDamageEntries, getCalcState } from '../calculation/calculation.store.svelte'
     import { getConfig } from '../config/config.store.svelte'
     import { getActiveProject, updateResultAnalysis } from '$lib/data/project.svelte'
-    import { computeAll as computeAllDamage } from './compute'
+    import { computeAll as computeAllDamage, DEFAULT_CONDITION_PROFILE, type ConditionProfile } from './compute'
     import type { ResultEntry, CharSubstatAnalysis } from './result.types'
     import { getAlgorithm, ALGORITHMS_INFO } from './substat-algorithms'
     import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
@@ -22,9 +22,10 @@
         calcState: CalcState | null
         configState: ConfigState | null
         refreshKey?: number
+        conditionProfile?: ConditionProfile
     }
 
-    let { team, calcState, configState, refreshKey = 0 }: Props = $props()
+    let { team, calcState, configState, refreshKey = 0, conditionProfile = DEFAULT_CONDITION_PROFILE }: Props = $props()
 
     const RIG_GRAD_TEXT =
         'background: var(--theme-rigcrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
@@ -50,6 +51,7 @@
     })
 
     $effect(() => {
+        conditionProfile
         if (refreshKey > 0) untrack(() => computeAll())
     })
 
@@ -103,7 +105,8 @@
             config,
             team,
             charInfoMap,
-            weaponInfoMap
+            weaponInfoMap,
+            conditionProfile
         )
         applyModes(cleanEntries)
     }

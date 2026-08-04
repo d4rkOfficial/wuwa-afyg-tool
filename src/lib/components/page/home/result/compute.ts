@@ -300,18 +300,38 @@ interface CharacterComputed {
     typeBonus: Record<string, number>
 }
 
+export interface ConditionProfile {
+    chains: number[]
+    refinements: number[]
+}
+
+export const DEFAULT_CONDITION_PROFILE: ConditionProfile = { chains: [0, 0, 0], refinements: [1, 1, 1] }
+
+// 生效条件判定：buff 有 condition 时，参考其归属角色（conditionRefCharIdx）的链/精炼，
+// 未指定参考角色则回退到当前角色自身判断；charIndex<0（效应/无角色）时条件型 buff 不生效
+function conditionMet(bs: BuffSet, profile: ConditionProfile, charIndex: number): boolean {
+    const cond = bs.condition
+    if (!cond) return true
+    const refIdx = bs.conditionRefCharIdx ?? charIndex
+    if (refIdx < 0) return false
+    if (cond.type === 'chain') return (profile.chains[refIdx] ?? 0) >= cond.min
+    return (profile.refinements[refIdx] ?? 1) >= cond.min
+}
+
 function getBoundBuffSets(
     entryId: string,
     charIndex: number,
     buffSets: BuffSet[],
-    damageEntryBuffSetIds: Record<string, string[]>
+    damageEntryBuffSetIds: Record<string, string[]>,
+    profile: ConditionProfile = DEFAULT_CONDITION_PROFILE
 ): BuffSet[] {
     const boundIds = damageEntryBuffSetIds[entryId] ?? []
     return buffSets.filter((bs) => {
         if (!boundIds.includes(bs.id)) return false
-        if (bs.scope === 'all') return true
-        if (Array.isArray(bs.scope) && bs.scope.length === 0) return charIndex < 0
-        return (bs.scope as number[]).includes(charIndex)
+        if (bs.scope === 'all') return conditionMet(bs, profile, charIndex)
+        if (Array.isArray(bs.scope) && bs.scope.length === 0)
+            return charIndex < 0 && conditionMet(bs, profile, charIndex)
+        return (bs.scope as number[]).includes(charIndex) && conditionMet(bs, profile, charIndex)
     })
 }
 
@@ -1112,7 +1132,8 @@ export function computeAll(
     configState: ConfigState,
     team: CharSlot[],
     charInfoMap: Record<string, CharacterInfo>,
-    weaponInfoMap: Record<string, WeaponInfo>
+    weaponInfoMap: Record<string, WeaponInfo>,
+    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
 ): ResultEntry[] {
     const enemy = configState.enemy
 
@@ -1130,8 +1151,8 @@ export function computeAll(
 
         const charBoundBuffSets = buffSets.filter((bs) => {
             if (!charBuffSetIds.has(bs.id)) return false
-            if (bs.scope === 'all') return true
-            return (bs.scope as number[]).includes(i)
+            if (bs.scope === 'all') return conditionMet(bs, conditionProfile, i)
+            return (bs.scope as number[]).includes(i) && conditionMet(bs, conditionProfile, i)
         })
 
         return computeCharacterStats(
@@ -1150,7 +1171,7 @@ export function computeAll(
         const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
         const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
         const echoes = charIndex >= 0 ? (configState.characters[charIndex]?.echoes ?? []) : []
-        const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds)
+        const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds, conditionProfile)
         const charInfo = charName ? charInfoMap[charName] : undefined
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
@@ -1211,7 +1232,8 @@ export function getCharFullStatsForChar(
     damageEntryBuffSetIds: Record<string, string[]>,
     charInfoMap: Record<string, CharacterInfo>,
     team: CharSlot[],
-    weaponInfoMap: Record<string, WeaponInfo>
+    weaponInfoMap: Record<string, WeaponInfo>,
+    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
 ): CharacterComputed {
     const slot = team[charIndex]
     if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats()
@@ -1225,8 +1247,8 @@ export function getCharFullStatsForChar(
 
     const charBoundBuffSets = buffSets.filter((bs) => {
         if (!charBuffSetIds.has(bs.id)) return false
-        if (bs.scope === 'all') return true
-        return (bs.scope as number[]).includes(charIndex)
+        if (bs.scope === 'all') return conditionMet(bs, conditionProfile, charIndex)
+        return (bs.scope as number[]).includes(charIndex) && conditionMet(bs, conditionProfile, charIndex)
     })
 
     return computeCharacterStats(
@@ -1249,14 +1271,15 @@ export function computeOneEntry(
     configState: ConfigState,
     team: CharSlot[],
     charInfoMap: Record<string, CharacterInfo>,
-    weaponInfoMap: Record<string, WeaponInfo>
+    weaponInfoMap: Record<string, WeaponInfo>,
+    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
 ): ResultEntry {
     const enemy = configState.enemy
     const charName = entry.character
     const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
     const wInfo = weaponInfoMap[weaponName ?? ''] ?? null
     const charInfo = charName ? charInfoMap[charName] : undefined
-    const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds)
+    const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds, conditionProfile)
 
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo

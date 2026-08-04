@@ -1,11 +1,25 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { getShareBase } from './workshop.svelte'
-import type { BuffZoneValue } from '$lib/components/page/home/calculation/calculation.types'
+import type { BuffCondition, BuffZoneValue } from '$lib/components/page/home/calculation/calculation.types'
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
 
 export type BuffLibraryScope = 'self' | 'self_except' | 'team' | 'effect_only'
+
+export const CHAIN_MAX = 6
+export const REFINE_MAX = 5
+
+function normalizeCondition(value: unknown): BuffCondition | undefined {
+    if (!value || typeof value !== 'object') return undefined
+    const c = value as Record<string, unknown>
+    if (c.type !== 'chain' && c.type !== 'refinement') return undefined
+    const type = c.type as BuffCondition['type']
+    const min = typeof c.min === 'number' && Number.isFinite(c.min) ? Math.floor(c.min) : 0
+    const max = type === 'chain' ? CHAIN_MAX : REFINE_MAX
+    if (min <= 0 || min > max) return undefined
+    return { type, min }
+}
 
 export interface BuffLibraryZoneRef {
     targetZoneId: string
@@ -32,6 +46,7 @@ export interface BuffLibraryItem {
     buffName: string
     scope?: BuffLibraryScope
     exclusive?: boolean
+    condition?: BuffCondition
     zones: BuffLibraryZone[]
 }
 
@@ -39,6 +54,7 @@ export interface BuffLibraryBuff {
     buffName: string
     scope?: BuffLibraryScope
     exclusive?: boolean
+    condition?: BuffCondition
     zones: BuffLibraryZone[]
 }
 
@@ -118,6 +134,7 @@ export function getBuffLibrary(): BuffLibraryItem[] {
                 buffName: buff.buffName,
                 scope: buff.scope,
                 exclusive: buff.exclusive,
+                ...(buff.condition ? { condition: buff.condition } : {}),
                 zones: buff.zones
             })
         }
@@ -164,6 +181,7 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
                     buffName: name,
                     scope: (bb.scope as BuffLibraryScope) ?? undefined,
                     exclusive: !!bb.exclusive,
+                    ...(normalizeCondition(bb.condition) ? { condition: normalizeCondition(bb.condition) } : {}),
                     zones
                 })
             }
@@ -255,7 +273,13 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
         const name = b.buffName.trim()
         if (!name || seen.has(name)) continue
         seen.add(name)
-        out.push({ buffName: name, scope: b.scope, exclusive: b.exclusive, zones: b.zones.map((z) => ({ ...z })) })
+        out.push({
+            buffName: name,
+            scope: b.scope,
+            exclusive: b.exclusive,
+            ...(b.condition ? { condition: { ...b.condition } } : {}),
+            zones: b.zones.map((z) => ({ ...z }))
+        })
     }
     return out
 }
@@ -312,6 +336,7 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
                 buff_name?: string
                 scope?: BuffLibraryScope
                 exclusive?: boolean
+                condition?: BuffCondition
                 buff_set?: BuffLibraryZone[]
             }>
         }
@@ -322,6 +347,7 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
                 buffName: (r.buff_name ?? '').trim(),
                 scope: r.scope,
                 exclusive: !!r.exclusive,
+                ...(normalizeCondition(r.condition) ? { condition: normalizeCondition(r.condition) } : {}),
                 zones: Array.isArray(r.buff_set) ? r.buff_set : []
             }))
             .filter((row) => ENTITY_TYPES.includes(row.entityType) && !!row.entityName && !!row.buffName)
@@ -352,6 +378,7 @@ function mergeShareRows(rows: BuffLibraryItem[]) {
             buffName: row.buffName.trim(),
             scope: row.scope,
             exclusive: row.exclusive,
+            ...(row.condition ? { condition: row.condition } : {}),
             zones
         })
     }

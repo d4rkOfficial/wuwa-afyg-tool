@@ -11,7 +11,8 @@
         categoryOfType,
         setPiecesOf
     } from '$lib/data/buff-library.svelte'
-    import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
+    import type { BuffLibraryEntity, BuffLibraryZone, BuffLibraryScope } from '$lib/data/buff-library.svelte'
+    import type { BuffCondition } from './calculation/calculation.types'
     import { importBuffSets } from './calculation/calculation.store.svelte'
     import { ZONE_MAP } from './calculation/calculation.consts'
     import { addToast } from '$lib/data/toast.svelte'
@@ -135,6 +136,23 @@
             })
             return idxs
         }
+        function toImportItem(
+            b: {
+                name: string
+                scope?: BuffLibraryScope
+                condition?: BuffCondition
+                zones: BuffLibraryZone[]
+            },
+            ownerIdx: number
+        ) {
+            return {
+                name: b.name,
+                scope: b.scope,
+                ownerIdx,
+                ...(b.condition ? { condition: b.condition } : {}),
+                zones: b.zones
+            }
+        }
         const items = picked.flatMap((e) => {
             const owners = ownerIdxFor(e)
             const firstOwner = owners[0] ?? -1
@@ -143,19 +161,26 @@
                 const selfItems = owners.flatMap((owner) =>
                     e.buffs
                         .filter((b) => b.scope === 'self')
-                        .map((b) => ({ name: b.buffName, scope: b.scope, ownerIdx: owner, zones: b.zones }))
+                        .map((b) =>
+                            toImportItem(
+                                { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
+                                owner
+                            )
+                        )
                 )
                 const otherItems = e.buffs
                     .filter((b) => b.scope !== 'self')
-                    .map((b) => ({ name: b.buffName, scope: b.scope, ownerIdx: firstOwner, zones: b.zones }))
+                    .map((b) =>
+                        toImportItem(
+                            { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
+                            firstOwner
+                        )
+                    )
                 return [...selfItems, ...otherItems]
             }
-            return e.buffs.map((b) => ({
-                name: b.buffName,
-                scope: b.scope,
-                ownerIdx: firstOwner,
-                zones: b.zones
-            }))
+            return e.buffs.map((b) =>
+                toImportItem({ name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones }, firstOwner)
+            )
         })
         const count = importBuffSets(items, -1, team.length)
         if (count > 0) addToast(`已导入 ${count} 条 buff`, 'success')

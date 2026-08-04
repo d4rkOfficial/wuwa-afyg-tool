@@ -14,7 +14,7 @@
         BuffLibraryScope,
         BuffLibraryZoneRef
     } from '$lib/data/buff-library.svelte'
-    import { ENTITY_TYPE_LABELS, updateEntityBuffs } from '$lib/data/buff-library.svelte'
+    import { ENTITY_TYPE_LABELS, updateEntityBuffs, CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
     import { addToast } from '$lib/data/toast.svelte'
 
     interface Props extends ComponentsProps {
@@ -59,6 +59,7 @@
                 buffName: b.buffName,
                 scope: b.scope,
                 exclusive: b.exclusive,
+                ...(b.condition ? { condition: { ...b.condition } } : {}),
                 zones: b.zones.map((z) => ({ ...z }))
             }))
             activeBuffIdx = 0
@@ -79,6 +80,24 @@
 
     function zoneLabel(id: string) {
         return ZONE_MAP.get(id as never)?.label ?? id
+    }
+
+    const conditionType: 'chain' | 'refinement' | null =
+        entityType === 'character' ? 'chain' : entityType === 'weapon' ? 'refinement' : null
+
+    function setBuffConditionEnabled(enabled: boolean) {
+        if (!conditionType) return
+        buffs = buffs.map((b, i) =>
+            i === activeBuffIdx
+                ? { ...b, ...(enabled ? { condition: { type: conditionType, min: 1 } } : { condition: undefined }) }
+                : b
+        )
+    }
+
+    function setBuffConditionMin(value: number) {
+        buffs = buffs.map((b, i) =>
+            i === activeBuffIdx && b.condition ? { ...b, condition: { ...b.condition, min: value || 0 } } : b
+        )
     }
 
     function selectBuff(idx: number) {
@@ -379,6 +398,64 @@
                             <Icon icon="mdi:delete-outline" class="size-3.5" />
                         </button>
                     </div>
+                    {#if conditionType}
+                        <div
+                            class="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5"
+                            style="border-color: var(--theme-divider-border);"
+                        >
+                            <button
+                                onclick={() => setBuffConditionEnabled(!activeBuff.condition)}
+                                class={[
+                                    'flex items-center gap-1 rounded border px-2 text-[10px] transition-colors',
+                                    activeBuff.condition ? 'self-stretch' : 'h-6',
+                                    activeBuff.condition
+                                        ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                                        : 'border-transparent text-(--theme-modal-text)/40 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/70'
+                                ].join(' ')}
+                                title="仅当该增益确有命座/精炼门槛时开启"
+                            >
+                                <Icon
+                                    icon={activeBuff.condition ? 'mdi:check-circle' : 'mdi:circle-outline'}
+                                    class="size-3"
+                                />
+                                {#if !activeBuff.condition}共鸣链/精炼阶数条件{/if}
+                            </button>
+                            {#if activeBuff.condition}
+                                <div
+                                    class="flex items-center gap-2 rounded border px-2.5 py-1.5"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70">
+                                        {conditionType === 'chain' ? '角色共鸣链' : '武器精炼'}
+                                    </span>
+                                    <div
+                                        class="flex overflow-hidden rounded border"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        {#each Array.from({ length: conditionType === 'chain' ? CHAIN_MAX : REFINE_MAX }, (_, k) => k + 1) as n}
+                                            <button
+                                                onclick={() => setBuffConditionMin(n)}
+                                                class={[
+                                                    'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                                    activeBuff.condition.min === n
+                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                ].join(' ')}
+                                            >
+                                                {n}
+                                            </button>
+                                        {/each}
+                                    </div>
+                                    <span
+                                        class="flex h-6 w-11 items-center text-center text-[11px] font-medium text-(--theme-modal-text) tabular-nums"
+                                    >
+                                        ≥ {activeBuff.condition.min}
+                                        {conditionType === 'chain' ? '链' : '阶'}
+                                    </span>
+                                </div>
+                            {/if}
+                        </div>
+                    {/if}
                     <div class="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
                         {#if activeBuff.zones.length === 0}
                             <div class="py-6 text-center text-xs text-(--theme-modal-text)/30">

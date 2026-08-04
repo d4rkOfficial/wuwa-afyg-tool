@@ -47,12 +47,20 @@ export interface BuffZoneValue {
     override?: boolean
 }
 
+// 生效条件：chain = 角色共鸣链 ≥ min（0-6）；refinement = 武器精炼 ≥ min（1-5）
+export interface BuffCondition {
+    type: 'chain' | 'refinement'
+    min: number
+}
+
 export interface BuffSet {
     id: string
     name: string
     zones: BuffZoneValue[]
     scope: 'all' | number[]
     starred?: boolean
+    condition?: BuffCondition
+    conditionRefCharIdx?: number
 }
 
 export interface CalcState {
