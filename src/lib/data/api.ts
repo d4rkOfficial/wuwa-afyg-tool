@@ -10,7 +10,7 @@ import type {
     EchoSetInfo
 } from '$lib/api/types'
 
-const PREFIX = 'wuwa-afyg:'
+const PREFIX = 'wuwa-afyg:v2:'
 const LIST_TTL = 7 * 24 * 60 * 60 * 1000
 const INFO_TTL = 7 * 24 * 60 * 60 * 1000
 const ICON_TTL = 7 * 24 * 60 * 60 * 1000

@@ -19,6 +19,14 @@
 
 副站：[https://wuwa-活泼椰果-tool.200503.xyz/](https://wuwa-hpyg-tool.200503.xyz/)
 
+### 另见：椰果工坊
+
+[d4rkOfficial/wuwa-afyg-share](https://github.com/d4rkOfficial/wuwa-afyg-share)
+
+配合 椰果工具箱 使用的《鸣潮》工程分享平台。
+
+用户可以上传椰果工具箱导出的工程 JSON，生成带有效期的分享链接；访客可浏览、克隆（下载）他人的拉表排轴工程。
+
 ## 功能
 
 - **队伍配置** — 选择角色、武器、首位声骸、套装

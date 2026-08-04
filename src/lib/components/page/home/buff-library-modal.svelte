@@ -10,17 +10,15 @@
         deleteBuffEntity,
         clearBuffLibrary,
         loadBuffLibrary,
-        createCustomEntity,
         setEntitySource,
         BUFF_CATEGORY_ORDER,
         BUFF_CATEGORY_LABELS,
         categoryOfType,
         setPiecesOf,
-        SCOPE_LABELS,
         type BuffEntityType,
-        type BuffLibraryEntity
+        type BuffLibraryEntity,
+        type BuffCategory
     } from '$lib/data/buff-library.svelte'
-    import { ZONE_MAP } from '$lib/components/page/home/calculation/calculation.consts'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         getCharacterList,
@@ -34,6 +32,7 @@
     } from '$lib/data/api'
     import type { Character, Weapon, Echo, EchoSetItem } from '$lib/api/types'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { fade } from 'svelte/transition'
     import BuffEntityEditModal from './buff-entity-edit-modal.svelte'
 
     interface Props extends ComponentsProps {
@@ -69,62 +68,15 @@
     let editTarget = $state<BuffLibraryEntity | null>(null)
     let confirmDelete = $state<BuffLibraryEntity | null>(null)
 
+    let tab = $state<BuffCategory>('character')
     let query = $state('')
+    let filter = $state<'with' | 'without'>('with')
+    const FILTERS = [
+        { key: 'with', label: '有条目' },
+        { key: 'without', label: '无条目' }
+    ] as const
 
-    let filteredEntities = $derived(
-        query.trim()
-            ? entities.filter(
-                  (e) => e.entityName.includes(query.trim()) || e.buffs.some((b) => b.buffName.includes(query.trim()))
-              )
-            : entities
-    )
-
-    function zoneLabel(zoneId: string) {
-        const def = ZONE_MAP.get(zoneId as never)
-        return def?.label ?? zoneId
-    }
-
-    async function handleDownload() {
-        const res = await fetchBuffSetsFromShare()
-        if (res.ok) {
-            addToast(res.added > 0 ? `已同步 ${res.added} 个实体` : '工坊 buff 集已是最新', 'success')
-        } else {
-            addToast(res.error ?? '下载失败', 'error')
-        }
-    }
-
-    function handleEdit(entity: BuffLibraryEntity) {
-        editTarget = entity
-    }
-
-    async function toggleSource(entity: BuffLibraryEntity) {
-        if (entity.source === 'custom') {
-            await setEntitySource(entity.entityType, entity.entityName, 'share')
-            addToast('已设为跟随工坊，下次下载时同步', 'success')
-        } else {
-            await setEntitySource(entity.entityType, entity.entityName, 'custom')
-            addToast('已设为自定义，不再跟随工坊', 'success')
-        }
-    }
-
-    async function handleDelete() {
-        if (!confirmDelete) return
-        await deleteBuffEntity(confirmDelete.entityType, confirmDelete.entityName)
-        addToast('已删除', 'success')
-        confirmDelete = null
-    }
-
-    function handleClear() {
-        clearBuffLibrary()
-        addToast('已清空本地 buff 预设', 'success')
-    }
-
-    // 新增预设弹窗状态
-    let showCreate = $state(false)
-    const CREATE_TABS = ['角色', '武器', '首位声骸', '套装'] as const
-    let createTab = $state<0 | 1 | 2 | 3>(0)
-    let createQuery = $state('')
-
+    // ── game data ──
     let characters: Character[] = $state([])
     let weapons: Weapon[] = $state([])
     let echoes: Echo[] = $state([])
@@ -133,12 +85,6 @@
     let weaponIcons: Record<string, string> = $state({})
     let echoIcons: Record<string, string> = $state({})
     let echoSetIcons: Record<string, string> = $state({})
-
-    let createCharacter = $state<Character | null>(null)
-    let createWeapon = $state<Weapon | null>(null)
-    let createEcho = $state<Echo | null>(null)
-    let createSet = $state<EchoSetItem | null>(null)
-    let createSetPieces = $state(0)
 
     let dataLoaded = false
     $effect(() => {
@@ -166,240 +112,347 @@
         })
     })
 
-    let filteredCharacters = $derived(createQuery ? characters.filter((c) => c.name.includes(createQuery)) : characters)
-    let filteredWeapons = $derived(createQuery ? weapons.filter((w) => w.name.includes(createQuery)) : weapons)
-    let filteredEchoes = $derived(createQuery ? echoes.filter((e) => e.name.includes(createQuery)) : echoes)
-
-    let createEntityType = $derived.by(() => {
-        if (createTab === 3) return createSetPieces > 0 ? (`${createSetPieces}set` as BuffEntityType) : null
-        return (['character', 'weapon', 'echo'] as BuffEntityType[])[createTab]
-    })
-    let createEntityName = $derived.by(() => {
-        if (createTab === 3) return createSet?.name ?? ''
-        return [createCharacter, createWeapon, createEcho][createTab]?.name ?? ''
-    })
-    let createCanSubmit = $derived(!!createEntityType && !!createEntityName)
-
-    function switchCreateTab(i: number) {
-        createTab = i as 0 | 1 | 2 | 3
-        createQuery = ''
+    interface EntityRow {
+        entityType: BuffEntityType
+        entityName: string
+        icon?: string
+        pieces?: number
+        count: number
+        source: 'share' | 'custom' | null
     }
 
-    function pickItemCls(selected: boolean): string {
-        return [
-            'flex w-[100px] shrink-0 flex-col items-center gap-1.5 rounded-lg p-3 transition-colors cursor-pointer',
-            selected ? 'ring-2 ring-(--theme-accent-bg) bg-(--theme-accent-bg)/10' : 'hover:bg-(--theme-modal-text)/5'
-        ].join(' ')
+    let entityKeyMap = $derived(new Map(entities.map((e) => [`${e.entityType}/${e.entityName}`, e])))
+
+    function rowOf(
+        entityType: BuffEntityType,
+        entityName: string,
+        icon: string | undefined,
+        pieces: number | undefined
+    ): EntityRow {
+        const e = entityKeyMap.get(`${entityType}/${entityName}`)
+        return { entityType, entityName, icon, pieces, count: e?.buffs.length ?? 0, source: e?.source ?? null }
     }
 
-    function closeCreate() {
-        showCreate = false
-        createQuery = ''
-        createCharacter = null
-        createWeapon = null
-        createEcho = null
-        createSet = null
-        createSetPieces = 0
-    }
-
-    async function handleCreate() {
-        if (!createEntityType || !createEntityName) {
-            addToast('请先选择实体', 'error')
-            return
+    let rows = $derived.by(() => {
+        let list: EntityRow[] = []
+        if (tab === 'character') {
+            list = characters.map((c) => rowOf('character', c.name, characterIcons[c.name], undefined))
+        } else if (tab === 'weapon') {
+            list = weapons.map((w) => rowOf('weapon', w.name, weaponIcons[w.name], undefined))
+        } else if (tab === 'echo') {
+            list = echoes.map((e) => rowOf('echo', e.name, echoIcons[e.name], undefined))
+        } else {
+            for (const set of echoSets) {
+                for (const piece of set.pieces) {
+                    list.push(rowOf(`${piece}set` as BuffEntityType, set.name, echoSetIcons[set.name], piece))
+                }
+            }
         }
-        const ok = await createCustomEntity(createEntityType, createEntityName)
-        if (!ok) {
-            addToast('该实体已存在', 'error')
-            return
+
+        const covered = new Set(list.map((r) => `${r.entityType}/${r.entityName}`))
+        for (const e of entities) {
+            if (categoryOfType(e.entityType) !== tab) continue
+            const key = `${e.entityType}/${e.entityName}`
+            if (covered.has(key)) continue
+            list.push(rowOf(e.entityType, e.entityName, undefined, setPiecesOf(e.entityType) || undefined))
         }
-        addToast('已创建自定义预设', 'success')
-        const created = entities.find((e) => e.entityType === createEntityType && e.entityName === createEntityName)
-        if (created) editTarget = created
-        closeCreate()
+
+        const seenRows = new Set<string>()
+        list = list.filter((r) => {
+            const k = `${r.entityType}/${r.entityName}`
+            if (seenRows.has(k)) return false
+            seenRows.add(k)
+            return true
+        })
+
+        if (tab === 'weapon') {
+            list = list.filter((r) => !r.entityName.startsWith('投影·'))
+        }
+
+        const q = query.trim()
+        if (q) list = list.filter((r) => r.entityName.includes(q))
+
+        if (filter === 'with') {
+            list = list.filter((r) => r.count > 0)
+        } else if (filter === 'without') {
+            list = list.filter((r) => r.count === 0)
+        }
+
+        list.sort((a, b) => a.entityName.localeCompare(b.entityName, 'zh') || (a.pieces ?? 0) - (b.pieces ?? 0))
+        return list
+    })
+
+    async function handleDownload() {
+        const res = await fetchBuffSetsFromShare()
+        if (res.ok) {
+            addToast(res.added > 0 ? `已同步 ${res.added} 个实体` : '工坊 buff 集已是最新', 'success')
+        } else {
+            addToast(res.error ?? '下载失败', 'error')
+        }
+    }
+
+    function openEdit(row: EntityRow) {
+        const existing = entityKeyMap.get(`${row.entityType}/${row.entityName}`)
+        editTarget = {
+            entityType: row.entityType,
+            entityName: row.entityName,
+            source: existing?.source ?? 'custom',
+            buffs: existing?.buffs ?? []
+        }
+    }
+
+    async function handleExcludeSync(entity: BuffLibraryEntity) {
+        if (entity.source === 'custom') {
+            await setEntitySource(entity.entityType, entity.entityName, 'share')
+            addToast('已恢复跟随工坊，下次同步时更新该实体', 'success')
+        } else {
+            await setEntitySource(entity.entityType, entity.entityName, 'custom')
+            addToast('已设为不同步工坊，工坊同步时保留该实体', 'success')
+        }
+    }
+
+    async function handleDelete() {
+        if (!confirmDelete) return
+        await deleteBuffEntity(confirmDelete.entityType, confirmDelete.entityName)
+        addToast('已删除', 'success')
+        confirmDelete = null
+    }
+
+    function handleClear() {
+        clearBuffLibrary()
+        addToast('已清空本地 buff 预设', 'success')
+    }
+
+    function iconFallback(entityType: BuffEntityType): string {
+        if (entityType === 'character') return '/icons/placeholder-character.svg'
+        if (entityType === 'weapon') return '/icons/placeholder-weapon.svg'
+        if (entityType === 'echo') return '/icons/placeholder-echo.svg'
+        return '/icons/placeholder-echo-set.svg'
     }
 </script>
 
-<Modal {open} {onclose} class={className} style="width: min(92vw, 820px); {mergedStyle}">
+<Modal {open} {onclose} class={className} style="width: min(92vw, 820px); height: min(85vh, 760px); {mergedStyle}">
     {#snippet title()}
         Buff 集
     {/snippet}
+    {#snippet footer()}{/snippet}
 
-    <div class="mb-3 flex items-center justify-between gap-2">
-        <p class="text-xs text-(--theme-muted-text)">管理角色/武器/首位声骸/套装的 Buff 预设，可跟工坊同步或自定义</p>
-        <div class="flex items-center gap-2">
-            <button
-                onclick={() => (showCreate = true)}
-                class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:brightness-125"
-                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
-            >
-                <Icon icon="mdi:plus" class="size-3.5" />
-                新增预设
-            </button>
-            <button
-                onclick={handleDownload}
-                disabled={loading}
-                class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
-                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
-            >
-                <Icon
-                    icon={loading ? 'mdi:loading' : 'mdi:download'}
-                    class={loading ? 'size-3.5 animate-spin' : 'size-3.5'}
-                />
-                从工坊同步
-            </button>
-            {#if entities.length > 0}
+    <div class="flex h-full flex-col">
+        <div class="mb-3 flex shrink-0 items-center justify-between gap-2">
+            <p class="text-xs text-(--theme-muted-text)">按角色/武器/声骸/套装管理 Buff 预设，点击条目即可编辑</p>
+            <div class="flex items-center gap-2">
                 <button
-                    onclick={handleClear}
-                    class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
+                    onclick={handleDownload}
+                    disabled={loading}
+                    class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                 >
-                    <Icon icon="mdi:delete-sweep-outline" class="size-3.5" />
-                    清空
+                    <Icon
+                        icon={loading ? 'mdi:loading' : 'mdi:download'}
+                        class={loading ? 'size-3.5 animate-spin' : 'size-3.5'}
+                    />
+                    从工坊同步
                 </button>
+                {#if entities.length > 0}
+                    <button
+                        onclick={handleClear}
+                        class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
+                    >
+                        <Icon icon="mdi:delete-sweep-outline" class="size-3.5" />
+                        清空
+                    </button>
+                {/if}
+            </div>
+        </div>
+
+        {#if error}
+            <div
+                class="mb-3 flex items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-xs text-red-500"
+            >
+                <Icon icon="mdi:alert-circle-outline" class="size-4 shrink-0" />
+                <span class="flex-1">从工坊下载失败：{error}</span>
+            </div>
+        {/if}
+
+        <!-- Tab bar -->
+        <div class="mb-3 flex shrink-0 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5">
+            {#each BUFF_CATEGORY_ORDER as cat}
+                <button
+                    onclick={() => (tab = cat)}
+                    class={[
+                        'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                        tab === cat
+                            ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
+                            : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
+                    ].join(' ')}
+                >
+                    <Icon
+                        icon={cat === 'character'
+                            ? 'mdi:account-outline'
+                            : cat === 'weapon'
+                              ? 'mdi:sword'
+                              : cat === 'echo'
+                                ? 'mdi:ghost-outline'
+                                : 'mdi:layers-outline'}
+                        class="size-3.5"
+                    />
+                    {BUFF_CATEGORY_LABELS[cat]}
+                </button>
+            {/each}
+        </div>
+
+        <!-- Search -->
+        <div
+            class="mb-3 flex shrink-0 items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
+        >
+            <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
+            <input
+                bind:value={query}
+                placeholder="搜索{BUFF_CATEGORY_LABELS[tab]}…"
+                class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
+            />
+            {#if query}
+                <button
+                    onclick={() => (query = '')}
+                    class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
+                >
+                    <Icon icon="mdi:close" class="size-4" />
+                </button>
+            {/if}
+            <div
+                class="ml-1 flex shrink-0 items-center gap-0.5 rounded-md border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5"
+            >
+                {#each FILTERS as f (f.key)}
+                    <button
+                        onclick={() => (filter = f.key)}
+                        class={[
+                            'whitespace-nowrap rounded px-2 py-1 text-[11px] font-medium transition-colors',
+                            filter === f.key
+                                ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
+                                : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
+                        ].join(' ')}
+                    >
+                        {f.label}
+                    </button>
+                {/each}
+            </div>
+        </div>
+
+        <!-- Entity list -->
+        <div class="min-h-0 flex-1 overflow-y-auto pr-0.5">
+            {#if rows.length === 0}
+                <div class="flex h-full flex-col items-center justify-center gap-2 text-sm text-(--theme-muted-text)">
+                    <Icon icon="mdi:magnify-close" class="size-9" />
+                    没有匹配的条目
+                </div>
+            {:else}
+                <div class="space-y-1">
+                    {#each rows as row (row.entityType + '/' + row.entityName)}
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div
+                            in:fade={{ duration: 120 }}
+                            onclick={() => openEdit(row)}
+                            role="button"
+                            tabindex="0"
+                            class="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-left transition-colors hover:bg-(--theme-card-bg-focused)"
+                        >
+                            <div
+                                class={[
+                                    'flex size-10 shrink-0 items-center justify-center overflow-hidden',
+                                    row.entityType === 'character'
+                                        ? 'rounded-full'
+                                        : 'rounded-lg bg-(--theme-card-bg-focused)'
+                                ].join(' ')}
+                            >
+                                {#if row.icon}
+                                    <img
+                                        src={row.icon}
+                                        alt={row.entityName}
+                                        use:fallbackIcon={iconFallback(row.entityType)}
+                                        class={row.entityType === 'character'
+                                            ? 'size-full object-cover'
+                                            : 'size-full object-contain p-1'}
+                                    />
+                                {:else}
+                                    <span class="text-xs text-(--theme-muted-text)">{row.entityName.charAt(0)}</span>
+                                {/if}
+                            </div>
+
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="truncate text-sm font-medium text-(--theme-layout-text)">
+                                        {row.entityName}
+                                    </span>
+                                    {#if row.pieces}
+                                        <span
+                                            class="shrink-0 rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                        >
+                                            {row.pieces}件
+                                        </span>
+                                    {/if}
+                                    {#if row.source}
+                                        <button
+                                            onclick={(e) => {
+                                                e.stopPropagation()
+                                                const existing = entityKeyMap.get(`${row.entityType}/${row.entityName}`)
+                                                if (existing) handleExcludeSync(existing)
+                                            }}
+                                            class={[
+                                                'inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors',
+                                                row.source === 'custom'
+                                                    ? 'text-(--theme-accent-text)'
+                                                    : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
+                                            ].join(' ')}
+                                            style={row.source === 'custom'
+                                                ? 'background: color-mix(in srgb, var(--theme-accent-bg) 10%, transparent);'
+                                                : ''}
+                                            title={row.source === 'custom'
+                                                ? '不同步工坊：点击恢复跟随工坊'
+                                                : '跟随工坊：点击设为不同步工坊'}
+                                        >
+                                            <Icon
+                                                icon={row.source === 'custom'
+                                                    ? 'mdi:check-circle'
+                                                    : 'mdi:circle-outline'}
+                                                class="size-3"
+                                            />
+                                            不同步工坊
+                                        </button>
+                                    {/if}
+                                </div>
+                            </div>
+
+                            <span
+                                class={[
+                                    'shrink-0 rounded px-1.5 py-0.5',
+                                    row.count > 0
+                                        ? 'bg-(--theme-accent-bg)/10 text-sm font-semibold text-(--theme-accent-text)'
+                                        : 'text-[10px] text-(--theme-muted-text)/60'
+                                ].join(' ')}
+                            >
+                                {row.count} 条
+                            </span>
+
+                            {#if row.count > 0}
+                                <button
+                                    onclick={(e) => {
+                                        e.stopPropagation()
+                                        const existing = entityKeyMap.get(`${row.entityType}/${row.entityName}`)
+                                        if (existing) confirmDelete = existing
+                                    }}
+                                    class="shrink-0 rounded p-1 text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
+                                    title="删除"
+                                >
+                                    <Icon icon="mdi:trash-can-outline" class="size-4" />
+                                </button>
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
             {/if}
         </div>
     </div>
-
-    {#if error}
-        <div
-            class="mb-3 flex items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-xs text-red-500"
-        >
-            <Icon icon="mdi:alert-circle-outline" class="size-4 shrink-0" />
-            <span class="flex-1">从工坊下载失败：{error}</span>
-        </div>
-    {/if}
-
-    <div
-        class="mb-3 flex items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
-    >
-        <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
-        <input
-            bind:value={query}
-            placeholder="搜索实体 / Buff 名…"
-            class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
-        />
-        {#if query}
-            <button
-                onclick={() => (query = '')}
-                class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
-            >
-                <Icon icon="mdi:close" class="size-4" />
-            </button>
-        {/if}
-    </div>
-
-    {#if entities.length === 0}
-        <div class="flex flex-col items-center gap-2 py-12 text-sm text-(--theme-muted-text)">
-            <Icon icon="mdi:view-dashboard-outline" class="size-9" />
-            本地还没有 Buff 预设，点击右上角新增或从工坊同步
-        </div>
-    {:else if filteredEntities.length === 0}
-        <div class="flex flex-col items-center gap-2 py-12 text-sm text-(--theme-muted-text)">
-            <Icon icon="mdi:magnify-close" class="size-9" />
-            没有匹配的 Buff 预设
-        </div>
-    {:else}
-        <div class="space-y-4">
-            {#each BUFF_CATEGORY_ORDER as cat}
-                {@const group = filteredEntities
-                    .filter((e) => categoryOfType(e.entityType) === cat)
-                    .sort((a, b) => setPiecesOf(a.entityType) - setPiecesOf(b.entityType))}
-                {#if group.length > 0}
-                    <div>
-                        <h3 class="mb-1.5 text-xs font-medium text-(--theme-muted-text)">
-                            {BUFF_CATEGORY_LABELS[cat]}（{group.length}）
-                        </h3>
-                        <div class="space-y-1.5">
-                            {#each group as entity (entity.entityType + '/' + entity.entityName)}
-                                <div
-                                    class="flex items-center gap-3 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2"
-                                >
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span class="truncate text-sm font-medium text-(--theme-layout-text)">
-                                                {entity.entityName}
-                                            </span>
-                                            {#if categoryOfType(entity.entityType) === 'set'}
-                                                <span
-                                                    class="shrink-0 rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
-                                                >
-                                                    {setPiecesOf(entity.entityType)}件
-                                                </span>
-                                            {/if}
-                                            <button
-                                                onclick={() => toggleSource(entity)}
-                                                class="shrink-0 rounded px-1.5 py-0.5 text-[10px] transition-colors"
-                                                class:text-(--theme-accent-text)={entity.source === 'share'}
-                                                class:text-(--theme-muted-text)={entity.source === 'custom'}
-                                                style={`background: ${
-                                                    entity.source === 'share'
-                                                        ? 'color-mix(in srgb, var(--theme-accent-bg) 10%, transparent)'
-                                                        : 'var(--theme-card-bg-focused)'
-                                                };`}
-                                                title="点击切换来源"
-                                            >
-                                                {entity.source === 'share' ? '跟工坊' : '自定义'}
-                                            </button>
-                                            <span class="shrink-0 text-[10px] text-(--theme-muted-text)">
-                                                {entity.buffs.length} 条
-                                            </span>
-                                        </div>
-                                        <div
-                                            class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-(--theme-muted-text)"
-                                        >
-                                            {#each entity.buffs as b, i}
-                                                <span>
-                                                    {b.buffName}
-                                                    {#if b.scope}
-                                                        <span
-                                                            class="rounded bg-(--theme-accent-bg)/10 px-1 py-0.5 text-[9px] text-(--theme-accent-text)"
-                                                        >
-                                                            {SCOPE_LABELS[b.scope]}
-                                                        </span>
-                                                    {/if}
-                                                    {#if b.exclusive}
-                                                        <span
-                                                            class="rounded bg-amber-500/10 px-1 py-0.5 text-[9px] text-amber-500"
-                                                        >
-                                                            专属
-                                                        </span>
-                                                    {/if}
-                                                    {#if b.zones.length}
-                                                        <span class="opacity-70">
-                                                            （{b.zones
-                                                                .map(
-                                                                    (z) =>
-                                                                        `${zoneLabel(z.zoneId)}${z.override ? '覆盖+' : '+'}${z.ref ? `引用${z.ref.targetZoneId}×${z.ref.pct}%` : z.value}`
-                                                                )
-                                                                .join(' · ')}）
-                                                        </span>
-                                                    {/if}
-                                                </span>
-                                                {#if i < entity.buffs.length - 1}<span>·</span>{/if}
-                                            {/each}
-                                        </div>
-                                    </div>
-                                    <button
-                                        onclick={() => handleEdit(entity)}
-                                        class="shrink-0 rounded p-1 text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-accent-text)"
-                                        title="编辑"
-                                    >
-                                        <Icon icon="mdi:pencil-outline" class="size-4" />
-                                    </button>
-                                    <button
-                                        onclick={() => (confirmDelete = entity)}
-                                        class="shrink-0 rounded p-1 text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
-                                        title="删除"
-                                    >
-                                        <Icon icon="mdi:trash-can-outline" class="size-4" />
-                                    </button>
-                                </div>
-                            {/each}
-                        </div>
-                    </div>
-                {/if}
-            {/each}
-        </div>
-    {/if}
 
     {#if editTarget}
         <BuffEntityEditModal
@@ -409,224 +462,6 @@
             initialBuffs={editTarget.buffs}
             onclose={() => (editTarget = null)}
         />
-    {/if}
-
-    {#if showCreate}
-        <Modal open onclose={closeCreate} backdropClose={false} style="width: min(92vw, 560px); {mergedStyle}">
-            {#snippet title()}
-                新增 Buff 预设
-            {/snippet}
-            <div class="space-y-3">
-                <!-- 类型 -->
-                <div class="flex rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5">
-                    {#each CREATE_TABS as tab, i}
-                        <button
-                            onclick={() => switchCreateTab(i)}
-                            class={[
-                                'flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-                                createTab === i
-                                    ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
-                                    : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
-                            ].join(' ')}
-                        >
-                            {tab}
-                        </button>
-                    {/each}
-                </div>
-
-                <!-- 搜索 -->
-                {#if createTab !== 3}
-                    <div
-                        class="flex items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
-                    >
-                        <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
-                        <input
-                            bind:value={createQuery}
-                            placeholder="搜索…"
-                            class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
-                        />
-                        {#if createQuery}
-                            <button
-                                onclick={() => (createQuery = '')}
-                                class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
-                            >
-                                <Icon icon="mdi:close" class="size-4" />
-                            </button>
-                        {/if}
-                    </div>
-                {/if}
-
-                <!-- 实体选择 -->
-                <div class="max-h-64 overflow-y-auto p-1">
-                    {#if createTab === 0}
-                        <div class="flex flex-wrap gap-2">
-                            {#each filteredCharacters as c}
-                                <button
-                                    onclick={() => (createCharacter = c)}
-                                    class={pickItemCls(createCharacter?.name === c.name)}
-                                >
-                                    <div class="size-14 overflow-hidden rounded-full bg-(--theme-modal-text)/10">
-                                        {#if characterIcons[c.name]}
-                                            <img
-                                                src={characterIcons[c.name]}
-                                                alt={c.name}
-                                                use:fallbackIcon={'/icons/placeholder-character.svg'}
-                                                class="size-full object-cover"
-                                            />
-                                        {:else}
-                                            <div
-                                                class="flex size-full items-center justify-center text-xs text-(--theme-muted-text)"
-                                            >
-                                                {c.name.charAt(0)}
-                                            </div>
-                                        {/if}
-                                    </div>
-                                    <span class="truncate text-[11px] leading-tight text-(--theme-modal-text)"
-                                        >{c.name}</span
-                                    >
-                                </button>
-                            {/each}
-                            {#if filteredCharacters.length === 0}
-                                <div class="w-full py-8 text-center text-xs text-(--theme-muted-text)">无匹配角色</div>
-                            {/if}
-                        </div>
-                    {:else if createTab === 1}
-                        <div class="flex flex-wrap gap-2">
-                            {#each filteredWeapons as w}
-                                <button
-                                    onclick={() => (createWeapon = w)}
-                                    class={pickItemCls(createWeapon?.name === w.name)}
-                                >
-                                    <div class="size-14 overflow-hidden rounded-full bg-(--theme-modal-text)/10">
-                                        {#if weaponIcons[w.name]}
-                                            <img
-                                                src={weaponIcons[w.name]}
-                                                alt={w.name}
-                                                use:fallbackIcon={'/icons/placeholder-weapon.svg'}
-                                                class="size-full object-cover"
-                                            />
-                                        {:else}
-                                            <div
-                                                class="flex size-full items-center justify-center text-xs text-(--theme-muted-text)"
-                                            >
-                                                {w.name.charAt(0)}
-                                            </div>
-                                        {/if}
-                                    </div>
-                                    <span class="truncate text-[11px] leading-tight text-(--theme-modal-text)"
-                                        >{w.name}</span
-                                    >
-                                </button>
-                            {/each}
-                            {#if filteredWeapons.length === 0}
-                                <div class="w-full py-8 text-center text-xs text-(--theme-muted-text)">无匹配武器</div>
-                            {/if}
-                        </div>
-                    {:else if createTab === 2}
-                        <div class="flex flex-wrap gap-2">
-                            {#each filteredEchoes as e}
-                                <button
-                                    onclick={() => (createEcho = e)}
-                                    class={pickItemCls(createEcho?.name === e.name)}
-                                >
-                                    <div class="size-14 overflow-hidden rounded-full bg-(--theme-modal-text)/10">
-                                        {#if echoIcons[e.name]}
-                                            <img
-                                                src={echoIcons[e.name]}
-                                                alt={e.name}
-                                                use:fallbackIcon={'/icons/placeholder-echo.svg'}
-                                                class="size-full object-cover"
-                                            />
-                                        {:else}
-                                            <div
-                                                class="flex size-full items-center justify-center text-xs text-(--theme-muted-text)"
-                                            >
-                                                {e.name.charAt(0)}
-                                            </div>
-                                        {/if}
-                                    </div>
-                                    <span class="truncate text-[11px] leading-tight text-(--theme-modal-text)"
-                                        >{e.name}</span
-                                    >
-                                </button>
-                            {/each}
-                            {#if filteredEchoes.length === 0}
-                                <div class="w-full py-8 text-center text-xs text-(--theme-muted-text)">无匹配声骸</div>
-                            {/if}
-                        </div>
-                    {:else}
-                        <div class="grid grid-cols-2 gap-2">
-                            {#each echoSets as set}
-                                <div
-                                    class={[
-                                        'flex flex-col gap-2 rounded-lg border p-2.5 transition-colors',
-                                        createSet?.name === set.name
-                                            ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
-                                            : 'border-(--theme-card-border) bg-(--theme-card-bg)'
-                                    ].join(' ')}
-                                >
-                                    <button
-                                        onclick={() => {
-                                            createSet = set
-                                            createSetPieces = 0
-                                        }}
-                                        class="flex items-center gap-2 min-w-0"
-                                    >
-                                        {#if echoSetIcons[set.name]}
-                                            <img
-                                                src={echoSetIcons[set.name]}
-                                                alt={set.name}
-                                                use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
-                                                class="size-8 shrink-0 rounded object-contain"
-                                            />
-                                        {/if}
-                                        <span class="min-w-0 truncate text-sm font-medium text-(--theme-layout-text)">
-                                            {set.name}
-                                        </span>
-                                    </button>
-                                    <div class="flex gap-1">
-                                        {#each set.pieces as piece}
-                                            <button
-                                                onclick={() => (createSetPieces = piece)}
-                                                disabled={createSet?.name !== set.name}
-                                                class={[
-                                                    'rounded px-2 py-0.5 text-[10px] font-medium transition-colors',
-                                                    createSet?.name === set.name && createSetPieces === piece
-                                                        ? 'bg-(--theme-accent-bg)/30 text-(--theme-accent-text)'
-                                                        : 'bg-(--theme-input-bg) text-(--theme-muted-text) hover:bg-(--theme-modal-text)/10',
-                                                    createSet?.name !== set.name ? 'opacity-40 pointer-events-none' : ''
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(' ')}
-                                            >
-                                                {piece}件
-                                            </button>
-                                        {/each}
-                                    </div>
-                                </div>
-                            {/each}
-                        </div>
-                    {/if}
-                </div>
-            </div>
-            <div class="mt-4 flex items-center justify-end gap-2 border-t border-(--theme-card-border) pt-3">
-                <button
-                    onclick={closeCreate}
-                    class="rounded-lg px-4 py-1.5 text-sm text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
-                >
-                    取消
-                </button>
-                <button
-                    onclick={handleCreate}
-                    disabled={!createCanSubmit}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125 disabled:opacity-40"
-                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
-                >
-                    <Icon icon="mdi:check" class="size-4" />
-                    创建并编辑
-                </button>
-            </div>
-        </Modal>
     {/if}
 
     {#if confirmDelete}

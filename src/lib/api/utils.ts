@@ -125,14 +125,16 @@ export const transformWeaponList = (data: Record<string, NanokaWeapon>): Weapon[
             weaponType: WEAPON_TYPE_MAP[w.type] ?? ''
         }))
 
-export const transformEchoList = (data: Record<string, NanokaEcho>, sonata: NanokaSonata): Echo[] =>
-    Object.values(data)
-        .filter((e) => e.zh)
+export const transformEchoList = (data: Record<string, NanokaEcho>, sonata: NanokaSonata): Echo[] => {
+    const seen = new Set<string>()
+    return Object.values(data)
+        .filter((e) => e.zh && !seen.has(e.zh) && seen.add(e.zh))
         .map((e) => ({
             name: e.zh,
             sets: e.group.map((gid) => sonata[String(gid)]?.name?.zh ?? '').filter(Boolean),
             cost: COST_MAP[e.intensity] ?? 1
         }))
+}
 
 export const transformEchoSetList = (sonata: NanokaSonata): EchoSetItem[] =>
     Object.values(sonata)
