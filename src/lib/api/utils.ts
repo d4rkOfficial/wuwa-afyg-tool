@@ -64,14 +64,14 @@ function interpolate(text: string, params: string[]): string {
 
 function makeSkillValues(
     skill: ZhCharacterDetail['skill_trees'][string]['skill']
-): [name: string, value: string, element: string][] {
+): [name: string, value: string, element: string, energy?: string, tune?: string][] {
     if (!skill.level) return []
     const keys = Object.keys(skill.level)
         .map(Number)
         .filter((k) => !isNaN(k))
     if (keys.length === 0) return []
     const sorted = keys.sort((a, b) => a - b)
-    const result: [string, string, string][] = []
+    const result: [string, string, string, string?, string?][] = []
 
     for (const lvKey of sorted) {
         const lvData = skill.level[String(lvKey)]
@@ -84,20 +84,42 @@ function makeSkillValues(
         const value = fmt ? fmt.replace('{0}', raw) : raw
 
         let element = ''
+        let energy: string | undefined
+        let tune: string | undefined
         if (skill.damage) {
-            const pct = parseFloat(raw.replace('%', '').split('*')[0])
+            const mRaw = raw.match(/^([\d.]+)%(?:\*(\d+))?/)
+            const pct = mRaw ? parseFloat(mRaw[1]) : NaN
+            const mult = mRaw && mRaw[2] ? parseInt(mRaw[2], 10) : 1
             if (!isNaN(pct)) {
                 const target = Math.round(pct * 100)
-                for (const dv of Object.values(skill.damage)) {
+                // 命中一段：同段 = damage key 去掉末 2 位后前缀相同的全部条目（段内多 hit）
+                let matchedKey: string | null = null
+                for (const dk of Object.keys(skill.damage)) {
+                    const dv = skill.damage[dk]
                     if (dv.rate_lv && dv.rate_lv[idx] === target) {
-                        element = ELEMENT_MAP[dv.element] ?? ''
+                        matchedKey = dk
                         break
+                    }
+                }
+                if (matchedKey) {
+                    const prefix = matchedKey.slice(0, -2)
+                    const group = Object.entries(skill.damage).filter(([k]) => k.slice(0, -2) === prefix)
+                    const first = group[0][1]
+                    element = ELEMENT_MAP[first.element] ?? ''
+                    // 倍率多段（如 48.17%*4）时能量/偏谐同样按 *N 乘，与倍率语义一致
+                    if (typeof first.energy === 'number') {
+                        const e = first.energy / 100
+                        energy = mult > 1 ? `${e}*${mult}` : String(e)
+                    }
+                    if (typeof first.weakness_lvl === 'number') {
+                        const t = first.weakness_lvl / 100
+                        tune = mult > 1 ? `${t}*${mult}` : String(t)
                     }
                 }
             }
         }
 
-        result.push([lvData.name, value, element])
+        result.push([lvData.name, value, element, energy, tune])
     }
     return result
 }
@@ -179,7 +201,7 @@ function preprocessSkills(skills: SkillEntry[], elementName: string) {
                         const finalValue = ratioPart + (unit === '攻击' ? '' : unit)
                         const foundElement = between.match(/物理|冷凝|热熔|导电|气动|衍射|湮灭/)
                         const el = foundElement ? foundElement[0] : elementName
-                        skill.values.push(['延奏技能伤害', finalValue, el])
+                        skill.values.push(['延奏技能伤害', finalValue, el, undefined, undefined])
                     }
                 }
             }

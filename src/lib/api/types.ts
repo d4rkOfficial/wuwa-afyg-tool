@@ -63,7 +63,9 @@ export interface SkillEntry {
     name: string
     type: '常态攻击' | '共鸣技能' | '共鸣解放' | '共鸣回路' | '变奏技能' | '延奏技能' | '谐度破坏'
     desc: string
-    values: [name: string, value: string, element: string][]
+    // [name, value, element, energy, tune]：energy=共鸣能量；tune=偏谐值。
+    // 段内多 hit 时以 'a+b' 连接（每个分量已 /100）
+    values: [name: string, value: string, element: string, energy?: string, tune?: string][]
 }
 
 export interface StatNode {

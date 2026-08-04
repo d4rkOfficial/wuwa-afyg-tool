@@ -39,7 +39,7 @@
     let charData = $state<CharacterInfo | null>(null)
     let weaponData = $state<WeaponInfo | null>(null)
     let echoSkillData = $state<{ desc: string; values: [string, string, string][] } | null>(null)
-    let setBonuses = $state<{ name: string; pieces: number; bonuses: Record<string, string> }[] | null>(null)
+    let setBonuses = $state<{ name: string; pieces: number[]; bonuses: Record<string, string> }[] | null>(null)
     let loading = $state(false)
     let charIcons = $state<Record<string, string>>({})
     let weaponIcons = $state<Record<string, string>>({})
@@ -113,13 +113,19 @@
                     .catch(() => {})
             if (slot.triggerSets.length > 0) {
                 const setResults = await Promise.allSettled(slot.triggerSets.map((s) => getEchoSetInfo(s.name)))
-                setBonuses = slot.triggerSets
-                    .map((s, i) => ({
-                        name: s.name,
-                        pieces: s.pieces,
-                        bonuses: setResults[i].status === 'fulfilled' ? setResults[i].value.bonuses : {}
-                    }))
-                    .filter((s) => Object.keys(s.bonuses).length > 0)
+                const merged = new Map<string, { name: string; pieces: number[]; bonuses: Record<string, string> }>()
+                for (let i = 0; i < slot.triggerSets.length; i++) {
+                    const s = slot.triggerSets[i]
+                    const r = setResults[i]
+                    const bonuses = r.status === 'fulfilled' ? r.value.bonuses : {}
+                    const ex = merged.get(s.name)
+                    if (ex) {
+                        ex.pieces.push(s.pieces)
+                    } else {
+                        merged.set(s.name, { name: s.name, pieces: [s.pieces], bonuses })
+                    }
+                }
+                setBonuses = [...merged.values()].filter((s) => Object.keys(s.bonuses).length > 0)
             }
         } catch {
             /* ignore */
@@ -412,11 +418,11 @@
                                                         />{/if}
                                                     <span class="text-sm font-medium">{set.name}</span>
                                                     <span class="text-sm text-(--theme-modal-text)/50"
-                                                        >({set.pieces}件)</span
+                                                        >({set.pieces.join('件 + ')}件)</span
                                                     >
                                                 </div>
                                                 <div class="space-y-0.5">
-                                                    {#each Object.entries(set.bonuses) as [pieces, desc]}
+                                                    {#each Object.entries(set.bonuses).filter( ([pieces]) => set.pieces.includes(Number(pieces)) ) as [pieces, desc]}
                                                         <div class="text-sm">
                                                             <span class="text-(--theme-accent-text) font-medium"
                                                                 >{pieces}件套</span
@@ -462,20 +468,45 @@
                                                     class="border-t px-3 py-2 space-y-0.5"
                                                     style="border-color: var(--theme-divider-border);"
                                                 >
-                                                    {#each skill.values as [vname, vvalue, velement]}
+                                                    {#each skill.values as [vname, vvalue, velement, venergy, vtune]}
                                                         <div
-                                                            class="grid grid-cols-[1fr_auto_auto] gap-2 text-sm even:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,transparent)] px-1 py-0.5 text-(--theme-modal-text)/70"
+                                                            class="flex flex-col px-1 py-0.5 text-sm text-(--theme-modal-text)/70 even:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,transparent)]"
                                                         >
-                                                            <span class="text-(--theme-modal-text)/50 truncate"
-                                                                >{vname}</span
-                                                            >
-                                                            <span class="tabular-nums whitespace-nowrap">{vvalue}</span>
-                                                            {#if velement}
-                                                                <span
-                                                                    class="tabular-nums whitespace-nowrap"
-                                                                    style="color: {ELEMENT_COLORS[velement] ??
-                                                                        'var(--theme-modal-text)'}">{velement}</span
+                                                            <div class="flex items-center justify-between gap-2">
+                                                                <span class="text-(--theme-modal-text)/50 truncate"
+                                                                    >{vname}</span
                                                                 >
+                                                                <span
+                                                                    class="flex items-center gap-2 text-[12px] leading-snug"
+                                                                >
+                                                                    <span class="tabular-nums whitespace-nowrap"
+                                                                        >{vvalue}</span
+                                                                    >
+                                                                    {#if velement}
+                                                                        <span
+                                                                            class="tabular-nums whitespace-nowrap"
+                                                                            style="color: {ELEMENT_COLORS[velement] ??
+                                                                                'var(--theme-modal-text)'}"
+                                                                            >{velement}</span
+                                                                        >
+                                                                    {/if}
+                                                                </span>
+                                                            </div>
+                                                            {#if vtune != null || venergy != null}
+                                                                <div class="mt-1 flex items-center justify-end gap-1.5">
+                                                                    {#if vtune != null}
+                                                                        <span
+                                                                            class="rounded border border-(--theme-accent-bg) px-1.5 py-0.5 text-[11px] tabular-nums whitespace-nowrap text-(--theme-accent-text) opacity-75"
+                                                                            >{vtune} 偏谐值</span
+                                                                        >
+                                                                    {/if}
+                                                                    {#if venergy != null}
+                                                                        <span
+                                                                            class="rounded border border-(--theme-accent-bg) px-1.5 py-0.5 text-[11px] tabular-nums whitespace-nowrap text-(--theme-accent-text) opacity-75"
+                                                                            >{venergy} 共鸣能量</span
+                                                                        >
+                                                                    {/if}
+                                                                </div>
                                                             {/if}
                                                         </div>
                                                     {/each}

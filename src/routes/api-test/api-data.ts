@@ -67,7 +67,7 @@ export const endpointGroups: EndpointGroup[] = [
 ]
 
 const CHAR_INFO_TYPE_CODE =
-    "interface CharacterInfo {\n    rarity: 4 | 5\n    element: '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'\n    weaponType: '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪'\n    lv90BaseStats: {\n        hp: number\n        atk: number\n        def: number\n        tuneBreakBoost: number\n    }\n    skills: SkillEntry[]\n    statNodes: StatNode[]\n    chains: ResonanceChain[]\n}"
+    "interface CharacterInfo {\n    rarity: 4 | 5\n    element: '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'\n    weaponType: '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪'\n    lv90BaseStats: {\n        hp: number\n        atk: number\n        def: number\n        tuneBreakBoost: number\n    }\n    skills: SkillEntry[]\n    statNodes: StatNode[]\n    chains: ResonanceChain[]\n}\n\ninterface SkillEntry {\n    name: string\n    type: '常态攻击' | '共鸣技能' | '共鸣解放' | '共鸣回路' | '变奏技能' | '延奏技能' | '谐度破坏'\n    desc: string\n    // values: [name, value, element, energy?, tune?]\n    // energy = 共鸣能量、tune = 偏谐值；各分量已 /100，倍率多段（如 48.17%*4）时以 '值*N' 表示\n    values: [string, string, string, string?, string?][]\n}"
 
 export const typeMap: Record<string, { name: string; code: string }> = {
     [VERSION_LATEST]: {
