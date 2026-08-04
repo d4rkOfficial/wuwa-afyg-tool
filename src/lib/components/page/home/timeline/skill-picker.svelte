@@ -249,13 +249,12 @@
                                             <input
                                                 type="number"
                                                 min="0"
-                                                max="20"
                                                 value={getSkillPickerHitHits()[key] ?? 1}
                                                 oninput={(e) => {
                                                     const v = parseInt((e.target as HTMLInputElement).value)
                                                     setSkillPickerHitHits({
                                                         ...getSkillPickerHitHits(),
-                                                        [key]: Math.min(20, Math.max(0, isNaN(v) ? 1 : v))
+                                                        [key]: Math.max(0, isNaN(v) ? 1 : v)
                                                     })
                                                 }}
                                                 class="w-10 h-6 bg-[var(--theme-modal-bg)]/60 text-xs text-[var(--theme-modal-text)] text-center rounded outline-none border tabular-nums"

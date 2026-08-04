@@ -164,7 +164,6 @@
                                                 <input
                                                     type="number"
                                                     min="1"
-                                                    max="20"
                                                     value={hits}
                                                     disabled={layers < 1}
                                                     oninput={(e) => {
@@ -174,10 +173,7 @@
                                                                 i === idx
                                                                     ? {
                                                                           ...d,
-                                                                          hits: Math.min(
-                                                                              20,
-                                                                              Math.max(1, isNaN(v) ? 1 : v)
-                                                                          )
+                                                                          hits: Math.max(1, isNaN(v) ? 1 : v)
                                                                       }
                                                                     : d
                                                             )

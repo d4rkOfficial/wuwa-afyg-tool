@@ -8,7 +8,7 @@
         physicalLabel,
         type KeyMapEntry
     } from '$lib/data/keymap.svelte'
-    import { getUiBtnIcons } from '$lib/data/api'
+    import { getUiBtnIcons, clearCacheCategory, countCacheCategory, type CacheCategory } from '$lib/data/api'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         getWorkshopInstances,
@@ -34,13 +34,14 @@
 
     let { open, onclose }: Props = $props()
 
-    let tab = $state<'theme' | 'keymap' | 'workshop' | 'archive'>('theme')
+    let tab = $state<'theme' | 'keymap' | 'workshop' | 'archive' | 'cache'>('theme')
 
     const SETTING_TABS = [
-        { key: 'theme', label: '主题', icon: 'mdi:palette-outline' },
+        { key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
         { key: 'keymap', label: '按键绑定', icon: 'mdi:keyboard-outline' },
         { key: 'workshop', label: '工坊设置', icon: 'mdi:storefront-outline' },
-        { key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' }
+        { key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
+        { key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' }
     ] as const
 
     const COLOR_PRESETS = [
@@ -60,6 +61,7 @@
     $effect(() => {
         if (open) {
             bgUrl = overrides.backgroundImage.startsWith('http') ? overrides.backgroundImage : ''
+            refreshCacheCounts()
         }
     })
 
@@ -208,6 +210,29 @@
 
     function formatArchiveDate(ts: number): string {
         return new Date(ts).toLocaleString()
+    }
+
+    // ── Cache management ──
+    let cacheCounts = $state({ list: 0, info: 0, image: 0 })
+
+    function refreshCacheCounts() {
+        cacheCounts = {
+            list: countCacheCategory('list'),
+            info: countCacheCategory('info'),
+            image: countCacheCategory('image')
+        }
+    }
+
+    const CACHE_LABELS: { key: CacheCategory; label: string; icon: string }[] = [
+        { key: 'list', label: '列表缓存', icon: 'mdi:file-document-outline' },
+        { key: 'info', label: '详情缓存', icon: 'mdi:information-outline' },
+        { key: 'image', label: '图像缓存', icon: 'mdi:image-outline' }
+    ]
+
+    async function handleClearCache(kind: CacheCategory) {
+        await clearCacheCategory(kind)
+        refreshCacheCounts()
+        addToast(`已清理${CACHE_LABELS.find((c) => c.key === kind)?.label ?? ''}`, 'success')
     }
 </script>
 
@@ -554,7 +579,7 @@
                                 </button>
                             </div>
                         </div>
-                    {:else}
+                    {:else if tab === 'archive'}
                         <!-- Archive management -->
                         <div>
                             <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">归档管理</span>
@@ -624,6 +649,38 @@
                                     {/each}
                                 </div>
                             {/if}
+                        </div>
+                    {:else}
+                        <!-- Cache management -->
+                        <div>
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">缓存清理</span>
+                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                仅清理接口数据缓存（列表 / 详情 / 图像），不影响你的工程与本地数据
+                            </p>
+                            <div class="flex flex-col gap-2">
+                                {#each CACHE_LABELS as item}
+                                    <div
+                                        class="flex items-center gap-2.5 rounded-lg border px-3 py-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <Icon icon={item.icon} class="size-4 shrink-0 text-(--theme-accent-text)" />
+                                        <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)"
+                                            >{item.label}</span
+                                        >
+                                        <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40"
+                                            >{cacheCounts[item.key]} 条</span
+                                        >
+                                        <button
+                                            onclick={() => handleClearCache(item.key)}
+                                            class="shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-all hover:brightness-125"
+                                            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
+                                        >
+                                            <Icon icon="mdi:delete-sweep-outline" class="size-3" />
+                                            清理
+                                        </button>
+                                    </div>
+                                {/each}
+                            </div>
                         </div>
                     {/if}
                 </div>

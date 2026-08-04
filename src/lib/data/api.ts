@@ -296,3 +296,31 @@ export function clearCache(category?: string, entity?: string): void {
         if (k.startsWith(prefix)) memoryCache.delete(k)
     }
 }
+
+export type CacheCategory = 'list' | 'info' | 'image'
+
+/** 分类清理接口数据缓存（仅清理 wuwa-afyg:v2: 命名空间，不影响用户工程/预设） */
+export async function clearCacheCategory(kind: CacheCategory): Promise<void> {
+    if (kind === 'list') {
+        clearCache('list')
+    } else if (kind === 'info') {
+        clearCache('info')
+    } else {
+        clearCache('batch-icons')
+        if (typeof caches !== 'undefined') {
+            await caches.delete('nanoka-cdn').catch(() => {})
+        }
+    }
+}
+
+/** 统计某类缓存的 localStorage 条目数 */
+export function countCacheCategory(kind: CacheCategory): number {
+    if (!browser) return 0
+    const prefix =
+        kind === 'list' ? cacheKey('list', '') : kind === 'info' ? cacheKey('info', '') : cacheKey('batch-icons', '')
+    let count = 0
+    for (let i = 0; i < localStorage.length; i++) {
+        if (localStorage.key(i)?.startsWith(prefix)) count++
+    }
+    return count
+}

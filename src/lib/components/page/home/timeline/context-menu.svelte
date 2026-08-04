@@ -45,12 +45,17 @@
     } from './timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
     import { ORIGINAL_BUTTON_KEYS } from './timeline.consts'
+    import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 
     let confirmMultiAction = $state<'delete' | 'reset' | null>(null)
 
-    let menuBtnIcons = $derived(
-        getUiBtnIcons().filter(([name]) => (ORIGINAL_BUTTON_KEYS as readonly string[]).includes(name))
-    )
+    let menuBtnIcons = $derived.by(() => {
+        const iconMap = new Map(getUiBtnIcons())
+        const customByDefault = new Map(getKeyMapEntries().map((e) => [getDefaultBlockKey(e.id), e.blockKey]))
+        return getUiBtnIcons()
+            .filter(([name]) => (ORIGINAL_BUTTON_KEYS as readonly string[]).includes(name))
+            .map(([name]) => [name, iconMap.get(customByDefault.get(name) ?? name) ?? ''] as [string, string])
+    })
 
     const specialOptions = [
         { value: 'none', label: '无' },

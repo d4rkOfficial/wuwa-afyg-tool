@@ -339,14 +339,15 @@ export function quickInput(rawKey: string): string | null {
     const entry = getKeyMapEntries().find((e) => e.physical === rawKey)
     if (!entry) return null
     const storedKey = getDefaultBlockKey(entry.id) || entry.blockKey
-    const newWidth = quickBlockWidth(storedKey, '')
+    const desc = entry.id === 'heavypress' ? entry.label : ''
+    const newWidth = quickBlockWidth(storedKey, desc)
     let maxRight = 0
     for (const b of _opBlocks) {
         const bw = _blockWidths[b.id] ?? 56
         maxRight = Math.max(maxRight, b.pos + bw / 2)
     }
     const pos = maxRight > 0 ? maxRight + newWidth / 2 : SIDE_PAD + newWidth / 2
-    const id = addOpBlock(_quickCharIndex, pos, storedKey, '')
+    const id = addOpBlock(_quickCharIndex, pos, storedKey, desc)
     if (id) _quickStack.push(id)
     return id
 }
