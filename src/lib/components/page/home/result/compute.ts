@@ -57,6 +57,19 @@ function computeDefMulti(enemy: EnemyConfig, defPen: number, defDown: number): n
     return Math.max(charTerm / (defEff + charTerm), 0.01)
 }
 
+/**
+ * 抗性乘区（分段公式，effResist 为有效抗性，单位小数，可负）
+ * - 抗性 < 0（抗性被穿/降穿透成负）：抗性乘区 = 1 + |抗性| / 2（减半收益）
+ * - 0 <= 抗性 < 80%：抗性乘区 = 1 - 抗性（线性减免）
+ * - 抗性 >= 80%：抗性乘区 = 1 / ((抗性 + 0.2) * 5)（封顶，防接近 100% 时伤害归零）
+ */
+function computeResMulti(baseResist: number, resPen: number, resDown: number): number {
+    const effResist = baseResist - resPen / 100 - resDown / 100
+    if (effResist < 0) return 1 + Math.abs(effResist) / 2
+    if (effResist < 0.8) return 1 - effResist
+    return 1 / ((effResist + 0.2) * 5)
+}
+
 const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
     baseAtk: 'baseAtk',
     totalAtk: 'totalAtk',
@@ -515,11 +528,7 @@ function computeResultEntry(
 
     // resistance zone
     const baseResist = (enemy.resistances[entry.damageElement] ?? 0) / 100
-    let combinedResist = 1 - baseResist * (1 - stats.resPen / 100) + stats.resDown / 100
-    if (combinedResist > 1) {
-        combinedResist = 1 + (combinedResist - 1) / 2
-    }
-    const resMulti = combinedResist
+    const resMulti = computeResMulti(baseResist, stats.resPen, stats.resDown)
 
     // damage reduction zone
     const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
@@ -716,11 +725,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
 
     // resistance zone (element from entry)
     const baseResist = (enemy.resistances[entry.damageElement] ?? 0) / 100
-    let combinedResist = 1 - baseResist * (1 - stats.resPen / 100) + stats.resDown / 100
-    if (combinedResist > 1) {
-        combinedResist = 1 + (combinedResist - 1) / 2
-    }
-    const resMulti = combinedResist
+    const resMulti = computeResMulti(baseResist, stats.resPen, stats.resDown)
 
     // damage reduction zone
     const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
@@ -868,9 +873,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
 
     // resistance zone
     const baseResist = (enemy.resistances[element] ?? 0) / 100
-    let combinedResist = 1 - baseResist * (1 - stats.resPen / 100) + stats.resDown / 100
-    if (combinedResist > 1) combinedResist = 1 + (combinedResist - 1) / 2
-    const resMulti = combinedResist
+    const resMulti = computeResMulti(baseResist, stats.resPen, stats.resDown)
 
     // damage reduction zone
     const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
