@@ -10,7 +10,9 @@
         setSearch,
         setSort,
         setPage,
-        SHARE_SORT_LABELS
+        buildImportLink,
+        SHARE_SORT_LABELS,
+        type ShareProject
     } from '$lib/data/share.svelte'
     import { getCharIconMap } from './timeline/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
@@ -68,6 +70,16 @@
             addToast(`已下载并导入「${title}」`, 'success')
         } else {
             addToast(res.error ?? '下载失败', 'error')
+        }
+    }
+
+    async function handleShare(item: ShareProject) {
+        const link = buildImportLink(item.code)
+        try {
+            await navigator.clipboard.writeText(link)
+            addToast(`已复制「${item.title}」的分享链接`, 'success')
+        } catch {
+            addToast(`分享链接：${link}`, 'success')
         }
     }
 
@@ -197,6 +209,14 @@
                             <span class="shrink-0">{formatTime(item.createdAt)}</span>
                         </div>
                     </div>
+                    <button
+                        onclick={() => handleShare(item)}
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-(--theme-card-border) px-3 py-1.5 text-sm text-(--theme-layout-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                        title="复制分享链接"
+                    >
+                        <Icon icon="mdi:share-variant" class="size-4" />
+                        分享
+                    </button>
                     <button
                         onclick={() => handleDownload(item.code, item.title)}
                         disabled={downloading !== null}

@@ -135,11 +135,16 @@ export async function shareProject(project: Project): Promise<ShareResult> {
     }
 }
 
+/** 根据分享 code 构建导入链接（与 10 分钟临时分享同一格式） */
+export function buildImportLink(code: string): string {
+    return `${location.origin}#import_project=${encodeURIComponent(`${getShareBase()}/share/${code}/download`)}`
+}
+
 /** 分享工程并生成 10 分钟有效的导入链接；失败返回 null */
 export async function getShareLink(project: Project): Promise<string | null> {
     const res = await shareProject(project)
     if (!res.ok || !res.code) return null
-    return `${location.origin}#import_project=${encodeURIComponent(`${getShareBase()}/share/${res.code}/download`)}`
+    return buildImportLink(res.code)
 }
 
 export interface DownloadResult {
