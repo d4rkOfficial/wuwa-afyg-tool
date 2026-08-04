@@ -119,26 +119,44 @@
             addToast('请先勾选要导入的 Buff 集', 'info')
             return
         }
+        // 定位每个实体归属的角色槽位：character 直接用实体名匹配；武器/声骸/套装找配装中该角色（可能多人共用）
+        function ownerIdxFor(e: BuffLibraryEntity): number[] {
+            if (e.entityType === 'character') {
+                const idx = team.findIndex((s) => s?.character === e.entityName)
+                return idx >= 0 ? [idx] : []
+            }
+            const idxs: number[] = []
+            team.forEach((s, i) => {
+                if (!s) return
+                if (s.weapon === e.entityName) return idxs.push(i)
+                if (s.echoes?.some((ec) => ec.name === e.entityName)) return idxs.push(i)
+                if (s.triggerSets?.some((ts) => ts.name === e.entityName && `${ts.pieces}set` === e.entityType))
+                    idxs.push(i)
+            })
+            return idxs
+        }
         const items = picked.flatMap((e) => {
-            const ownerIdx = ownerIdxFor(e)
+            const owners = ownerIdxFor(e)
+            const firstOwner = owners[0] ?? -1
+            // 多主人：self（主人专属）buff 按每个主人生成独立条目；其它 scope 单条（引用第一主人）
+            if (owners.length > 1) {
+                const selfItems = owners.flatMap((owner) =>
+                    e.buffs
+                        .filter((b) => b.scope === 'self')
+                        .map((b) => ({ name: b.buffName, scope: b.scope, ownerIdx: owner, zones: b.zones }))
+                )
+                const otherItems = e.buffs
+                    .filter((b) => b.scope !== 'self')
+                    .map((b) => ({ name: b.buffName, scope: b.scope, ownerIdx: firstOwner, zones: b.zones }))
+                return [...selfItems, ...otherItems]
+            }
             return e.buffs.map((b) => ({
                 name: b.buffName,
                 scope: b.scope,
-                ownerIdx,
+                ownerIdx: firstOwner,
                 zones: b.zones
             }))
         })
-        // 定位每个实体归属的角色槽位：character 直接用实体名匹配；武器/声骸/套装找配装中该角色
-        function ownerIdxFor(e: BuffLibraryEntity): number {
-            if (e.entityType === 'character') {
-                return team.findIndex((s) => s?.character === e.entityName)
-            }
-            return team.findIndex((s) => {
-                if (s?.weapon === e.entityName) return true
-                if (s?.echoes?.some((ec) => ec.name === e.entityName)) return true
-                return s?.triggerSets?.some((ts) => ts.name === e.entityName && `${ts.pieces}set` === e.entityType)
-            })
-        }
         const count = importBuffSets(items, -1, team.length)
         if (count > 0) addToast(`已导入 ${count} 条 buff`, 'success')
         onclose?.()

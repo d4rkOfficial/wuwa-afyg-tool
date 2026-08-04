@@ -16,6 +16,7 @@ export interface BuffLibraryZoneRef {
     discrete?: boolean
     divisor?: number
     multiplier?: number
+    refOwner?: 'self' | 'owner'
 }
 
 export interface BuffLibraryZone {
@@ -87,7 +88,7 @@ export const SCOPE_LABELS: Record<BuffLibraryScope, string> = {
     self: '对自己',
     self_except: '自己除外',
     team: '对全队',
-    effect_only: '效应专属'
+    effect_only: '效应'
 }
 
 let _entities = $state<BuffLibraryEntity[]>([])
@@ -259,25 +260,18 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
     return out
 }
 
-export async function createCustomEntity(
-    entityType: BuffEntityType,
-    entityName: string,
-    buffs: BuffLibraryBuff[] = []
-): Promise<boolean> {
-    const name = entityName.trim()
-    if (!name) return false
-    const key = entityKey(entityType, name)
-    if (_entities.some((e) => entityKey(e.entityType, e.entityName) === key)) return false
-    _entities = [..._entities, { entityType, entityName: name, source: 'custom', buffs: cloneBuffsValid(buffs) }]
-    await persist()
-    return true
-}
-
 export async function updateEntityBuffs(entityType: BuffEntityType, entityName: string, buffs: BuffLibraryBuff[]) {
     const key = entityKey(entityType, entityName)
-    _entities = _entities.map((e) =>
-        entityKey(e.entityType, e.entityName) === key ? { ...e, buffs: cloneBuffsValid(buffs) } : e
-    )
+    const exists = _entities.some((e) => entityKey(e.entityType, e.entityName) === key)
+    if (exists) {
+        _entities = _entities.map((e) =>
+            entityKey(e.entityType, e.entityName) === key
+                ? { ...e, source: 'custom', buffs: cloneBuffsValid(buffs) }
+                : e
+        )
+    } else {
+        _entities = [..._entities, { entityType, entityName, source: 'custom', buffs: cloneBuffsValid(buffs) }]
+    }
     await persist()
 }
 

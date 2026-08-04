@@ -6,7 +6,6 @@ import { NON_DIRECT_ELEMENT } from '../timeline/timeline.consts'
 import { getSkillCache, getCharElementMap } from '../timeline/timeline.store.svelte'
 import { getCharacterInfo } from '$lib/data/api'
 import { addToast } from '$lib/data/toast.svelte'
-import { migrateZoneId } from '$lib/data/zone-id-migration'
 import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
 
 let _entries = $state<DamageEntry[]>([])
@@ -60,12 +59,6 @@ export function init(
             JSON.stringify((savedState.buffSets ?? []).filter((bs) => !bs.name.startsWith('[配置]')))
         )
         _damageEntryBuffSetIds = JSON.parse(JSON.stringify(savedState.damageEntryBuffSetIds ?? {}))
-        for (const bs of _buffSets) {
-            for (const z of bs.zones) {
-                z.zoneId = migrateZoneId(z.zoneId) as typeof z.zoneId
-                if (z.ref) z.ref.zoneId = migrateZoneId(z.ref.zoneId) as typeof z.zoneId
-            }
-        }
         for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
             _damageEntryBuffSetIds[entryId] = setIds.filter((sid) => !autoIds.includes(sid))
         }
@@ -361,6 +354,7 @@ export interface ImportBuffZone {
         discrete?: boolean
         divisor?: number
         multiplier?: number
+        refOwner?: 'self' | 'owner'
     }
 }
 
@@ -402,12 +396,12 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
         if (!name) continue
         const zones: BuffZoneValue[] = []
         for (const z of item.zones ?? []) {
-            const zoneId = migrateZoneId(z.zoneId) as BuffZoneValue['zoneId']
+            const zoneId = z.zoneId as BuffZoneValue['zoneId']
             if (!ZONE_MAP.has(zoneId)) continue
             const zone: BuffZoneValue = { zoneId, value: z.value }
             if (z.ref && ZONE_REF_MAP.has(z.ref.targetZoneId as never)) {
                 zone.ref = {
-                    characterIdx: 0,
+                    characterIdx: item.ownerIdx ?? ownerIdx,
                     zoneId: z.ref.targetZoneId as never,
                     threshold: z.ref.threshold ?? 0,
                     pct: z.ref.pct,
