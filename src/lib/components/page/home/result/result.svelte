@@ -8,13 +8,15 @@
     import { getAllDamageEntries, getCalcState } from '../calculation/calculation.store.svelte'
     import { getConfig } from '../config/config.store.svelte'
     import { getActiveProject, updateResultAnalysis } from '$lib/data/project.svelte'
-    import { computeAll as computeAllDamage, DEFAULT_CONDITION_PROFILE, type ConditionProfile } from './compute'
+    import { computeAll as computeAllDamage, type ConditionProfile } from './compute'
     import type { ResultEntry, CharSubstatAnalysis } from './result.types'
     import { getAlgorithm, ALGORITHMS_INFO } from './substat-algorithms'
     import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
     import { tick, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
+    import Modal from '$lib/components/layout/modal.svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
     import DataAnalysisModal from './data-analysis-modal.svelte'
 
     interface Props {
@@ -22,15 +24,17 @@
         calcState: CalcState | null
         configState: ConfigState | null
         refreshKey?: number
-        conditionProfile?: ConditionProfile
     }
 
-    let { team, calcState, configState, refreshKey = 0, conditionProfile = DEFAULT_CONDITION_PROFILE }: Props = $props()
+    let { team, calcState, configState, refreshKey = 0 }: Props = $props()
 
     const RIG_GRAD_TEXT =
         'background: var(--theme-rigcrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
     const NOCRIT_GRAD_TEXT =
         'background: var(--theme-nocrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
+
+    let conditionProfile = $state<ConditionProfile>({ chains: [0, 0, 0], refinements: [1, 1, 1] })
+    let showConditionModal = $state(false)
 
     let charInfoMap = $state<Record<string, CharacterInfo>>({})
     let weaponInfoMap = $state<Record<string, WeaponInfo>>({})
@@ -239,14 +243,25 @@
                         </div>
                     </div>
                 {/each}
-                <button
-                    onclick={handleOpenAnalysis}
-                    class="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
-                    style="background: var(--theme-input-bg); color: var(--theme-accent-text);"
-                >
-                    <Icon icon="mdi:chart-box-outline" class="size-3.5" />
-                    数据分析
-                </button>
+                <div class="ml-auto flex items-center gap-2">
+                    <button
+                        onclick={() => (showConditionModal = true)}
+                        class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
+                        style="background: var(--theme-input-bg); color: var(--theme-accent-text);"
+                        title="设置各角色共鸣链 / 武器精炼档位，低于门槛的 buff 不生效"
+                    >
+                        <Icon icon="mdi:card-account-details-star-outline" class="size-3.5" />
+                        共鸣链 / 精炼
+                    </button>
+                    <button
+                        onclick={handleOpenAnalysis}
+                        class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
+                        style="background: var(--theme-input-bg); color: var(--theme-accent-text);"
+                    >
+                        <Icon icon="mdi:chart-box-outline" class="size-3.5" />
+                        数据分析
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -637,4 +652,114 @@
         onUpdateResultAnalysis={(data) => updateResultAnalysis(data)}
         onclose={() => (showDataAnalysis = false)}
     />
+{/if}
+
+{#if showConditionModal}
+    <Modal open={showConditionModal} onclose={() => (showConditionModal = false)} style="max-width: min(92vw, 440px);">
+        {#snippet title()}
+            共鸣链 / 精炼阶数
+        {/snippet}
+        <div class="space-y-2">
+            {#each team as slot, i}
+                <div
+                    class="relative rounded-lg border px-3 py-2 pr-11"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                >
+                    <div class="mb-1.5 flex items-center gap-2">
+                        {#if slot.character}
+                            {#if charIcons[slot.character]}
+                                <img
+                                    src={charIcons[slot.character]}
+                                    alt={slot.character}
+                                    draggable="false"
+                                    class="size-6 rounded-full object-cover"
+                                />
+                            {:else}
+                                <span
+                                    class="size-6 rounded-full flex items-center justify-center text-[11px] font-bold"
+                                    style="background: var(--theme-card-bg); color: var(--theme-modal-text)/50;"
+                                >
+                                    {slot.character.charAt(0)}
+                                </span>
+                            {/if}
+                        {/if}
+                        <span class="truncate text-xs font-medium text-(--theme-modal-text)">
+                            {slot.character ?? `角色 ${i + 1}`}
+                        </span>
+                    </div>
+                    {#if slot.weapon}
+                        <img
+                            src={weaponIcons[slot.weapon]}
+                            alt={slot.weapon}
+                            draggable="false"
+                            use:fallbackIcon={'/icons/placeholder-weapon.svg'}
+                            title={slot.weapon}
+                            class="absolute right-2 top-1/2 size-9 -translate-y-1/2 object-contain"
+                        />
+                    {/if}
+                    <div class="flex items-center gap-2">
+                        <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">角色</span>
+                        <div
+                            class="flex overflow-hidden rounded border"
+                            style="border-color: var(--theme-divider-border);"
+                        >
+                            {#each [0, 1, 2, 3, 4, 5, 6] as n}
+                                <button
+                                    onclick={() => {
+                                        conditionProfile = {
+                                            ...conditionProfile,
+                                            chains: conditionProfile.chains.map((c, j) => (j === i ? n : c))
+                                        }
+                                    }}
+                                    class={[
+                                        'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                        (conditionProfile.chains[i] ?? 0) === n
+                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                    ].join(' ')}
+                                >
+                                    {n}
+                                </button>
+                            {/each}
+                        </div>
+                        <span class="flex h-6 w-4 items-center text-[11px] font-medium text-(--theme-accent-text)">
+                            链
+                        </span>
+                    </div>
+                    <div class="mt-1.5 flex items-center gap-2">
+                        <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">武器</span>
+                        <div
+                            class="flex overflow-hidden rounded border"
+                            style="border-color: var(--theme-divider-border);"
+                        >
+                            {#each [1, 2, 3, 4, 5] as n}
+                                <button
+                                    onclick={() => {
+                                        conditionProfile = {
+                                            ...conditionProfile,
+                                            refinements: conditionProfile.refinements.map((r, j) => (j === i ? n : r))
+                                        }
+                                    }}
+                                    class={[
+                                        'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                        (conditionProfile.refinements[i] ?? 1) === n
+                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                    ].join(' ')}
+                                >
+                                    {n}
+                                </button>
+                            {/each}
+                        </div>
+                        <span class="flex h-6 w-4 items-center text-[11px] font-medium text-(--theme-accent-text)">
+                            阶
+                        </span>
+                    </div>
+                </div>
+            {/each}
+            <p class="text-[10px] text-(--theme-modal-text)/40">
+                低于生效条件（角色 buff 看共鸣链、武器 buff 看佩戴者武器精炼）的 buff 不生效，实时反映在结果中。
+            </p>
+        </div>
+    </Modal>
 {/if}

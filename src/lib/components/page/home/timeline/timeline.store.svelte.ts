@@ -122,17 +122,27 @@ export function init(
     _dragRefInitialPositions = {}
     _dragBlockInitialPositions = {}
     const snap = cloneData()
-    const incoming = data ? JSON.parse(JSON.stringify(data)) : null
-    if (!incoming || JSON.stringify(incoming) !== JSON.stringify(snap)) {
+    if (!data || timelineFingerprint(data) !== timelineFingerprint(snap)) {
         _undoStack = []
         _redoStack = []
     }
     _lastCommitted = snap
+    _estWidthCache.clear()
     loadCharElements()
 }
 
 function cloneData(): TimelineData {
     return JSON.parse(JSON.stringify({ refLines: _refLines, opBlocks: _opBlocks, damageBlocks: _damageBlocks }))
+}
+
+// 轻量指纹：只取数组长度与首末元素 id，避免全量序列化（用于判断 init 传入数据与当前状态是否一致）
+function timelineFingerprint(d: TimelineData): string {
+    const rl = d.refLines
+    const op = d.opBlocks
+    const dm = d.damageBlocks
+    return `${rl.length}:${rl[0]?.id ?? ''}:${rl[rl.length - 1]?.id ?? ''}|${op.length}:${op[0]?.id ?? ''}:${
+        op[op.length - 1]?.id ?? ''
+    }|${dm.length}`
 }
 
 function applyData(d: TimelineData) {
@@ -440,6 +450,19 @@ export function setBlockWidths(v: Record<string, number>) {
         corrected = true
     }
     if (corrected) save()
+}
+
+// 单键写入块宽度（避免每次测量都展开整个 map）
+export function setBlockWidth(id: string, width: number) {
+    _blockWidths[id] = width
+    const right = _quickPendingRight[id]
+    if (right !== undefined) {
+        delete _quickPendingRight[id]
+        _opBlocks = _opBlocks.map((b) =>
+            b.id === id ? { ...b, pos: Math.max(0, Math.min(MAX_POS, right + width / 2)) } : b
+        )
+        save()
+    }
 }
 export function getBlockMenu() {
     return _blockMenu
@@ -768,7 +791,12 @@ export function setDamageWidth(id: string, width: number) {
     _damageWidths[id] = width
 }
 
+// 估算宽度缓存：排布内层会对同一块反复调用，按 id 缓存避免重复计算
+const _estWidthCache = new Map<string, number>()
+
 function estimateDamageWidth(d: DamageBlock): number {
+    const cached = _estWidthCache.get(d.id)
+    if (cached !== undefined) return cached
     const texts: string[] = []
     for (const h of d.skillHits) {
         texts.push(h.hitName.replace('伤害', '') + ((h.hits ?? 0) > 1 ? `×${h.hits}` : ''))
@@ -780,7 +808,9 @@ function estimateDamageWidth(d: DamageBlock): number {
     }
     const maxChars = Math.max(...texts.map((t) => t.length), 0)
     const singleTagW = maxChars * 5.5 + 22
-    return singleTagW + 8
+    const result = singleTagW + 8
+    _estWidthCache.set(d.id, result)
+    return result
 }
 
 export function estimateDamageHeight(d: DamageBlock): number {

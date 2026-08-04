@@ -43,7 +43,7 @@
         confirmEdit,
         confirmBlockDesc,
         handleBlockDblclick,
-        setBlockWidths,
+        setBlockWidth,
         setContextMenu,
         setTrackMenu,
         setBlockMenu,
@@ -219,7 +219,7 @@
 
     function measureWidth(node: HTMLElement, blockId: string) {
         const set = () => {
-            setBlockWidths({ ...getBlockWidths(), [blockId]: node.offsetWidth })
+            setBlockWidth(blockId, node.offsetWidth)
         }
         set()
         const ro = new ResizeObserver(set)
