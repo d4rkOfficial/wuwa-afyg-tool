@@ -10,10 +10,12 @@
         ELEMENT_BONUS_MAP,
         TYPE_BONUS_MAP,
         ELEMENT_MAP,
+        DAMAGE_TYPE_SHORT,
         WEAPON_SUBSTAT_NAME_MAP,
         SUBSTAT_DECIMAL_TO_PCT
     } from '$lib/consts/game-terms'
     import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
+    import { getConditionProfile } from '../calculation/calculation.store.svelte'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
 
@@ -179,8 +181,33 @@
         }
 
         const charGlobalId = `global-${slot.character}`
-        const globalBuffs = (calcState?.buffSets ?? []).filter((bs) => bs.id === charGlobalId)
-        for (const bs of globalBuffs) {
+        // 全局文件夹全部纳入：global-all / 每角色 global-角色名 / 标记 global 的 buff，
+        // 按作用域（all 或包含该角色槽位）过滤，与该角色在计算中的生效范围一致
+        const globalBuffs = (calcState?.buffSets ?? []).filter((bs) => {
+            if (!bs.global && !bs.id.startsWith('global-')) return false
+            if (bs.scope === 'all') return true
+            return Array.isArray(bs.scope) && bs.scope.includes(idx)
+        })
+        // 兼容旧工程：无任何全局 buff 时回退到原 global-角色名 匹配
+        const fallbackGlobalBuffs = (calcState?.buffSets ?? []).filter((bs) => bs.id === charGlobalId)
+        const effectiveGlobalBuffs = globalBuffs.length > 0 ? globalBuffs : fallbackGlobalBuffs
+        for (const bs of effectiveGlobalBuffs) {
+            // 链/阶门槛：角色共鸣链 / 武器精炼配置不满足则不计入该加成
+            const cond = bs.condition
+            if (cond && (cond.chain !== undefined || cond.refinement !== undefined)) {
+                const refIdx = bs.conditionRefCharIdx ?? idx
+                if (cond.chain !== undefined) {
+                    if (refIdx < 0) continue
+                    if ((getConditionProfile().chains[refIdx] ?? 0) < cond.chain) continue
+                }
+                if (cond.refinement !== undefined) {
+                    if (refIdx < 0) continue
+                    if ((getConditionProfile().refinements[refIdx] ?? 1) < cond.refinement) continue
+                }
+            }
+            // 条件属性/类型加成：bonusDmg 按 condition 分流到对应元素/类型，否则计入全伤害
+            const isElementCond = Array.isArray(cond?.elements) && cond.elements.length > 0
+            const isTypeCond = Array.isArray(cond?.damageTypes) && cond.damageTypes.length > 0
             for (const z of bs.zones) {
                 switch (z.zoneId) {
                     case 'atkFlat':
@@ -214,7 +241,18 @@
                         tune += z.value
                         break
                     case 'bonusDmg':
-                        bonusDmg += z.value
+                        if (isElementCond) {
+                            for (const el of cond.elements ?? []) {
+                                elementDmg[el] = (elementDmg[el] ?? 0) + z.value
+                            }
+                        } else if (isTypeCond) {
+                            for (const dt of cond.damageTypes ?? []) {
+                                const key = DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt
+                                typeDmg[key] = (typeDmg[key] ?? 0) + z.value
+                            }
+                        } else {
+                            bonusDmg += z.value
+                        }
                         break
                 }
             }
@@ -277,7 +315,7 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
-            class="mx-4 max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-xl border shadow-2xl"
+            class="mx-4 max-h-[85vh] w-full max-w-7xl overflow-y-auto rounded-xl border shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -296,7 +334,7 @@
             </div>
             <div class="px-6 pb-6 pt-5">
                 <!-- Character panels -->
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {#each stats as s, i}
                         <div
                             class="rounded-xl border p-4"

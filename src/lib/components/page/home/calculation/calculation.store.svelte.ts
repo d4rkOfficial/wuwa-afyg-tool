@@ -683,6 +683,13 @@ export function getConditionProfile(): ConditionProfile {
     return _conditionProfile
 }
 
+// 从工程文件恢复链/阶配置（导入/加载工程时调用）
+export function setConditionProfile(profile: ConditionProfile | undefined) {
+    if (profile && Array.isArray(profile.chains) && Array.isArray(profile.refinements)) {
+        _conditionProfile = { chains: profile.chains, refinements: profile.refinements }
+    }
+}
+
 export function setConditionProfileChains(idx: number, value: number) {
     _conditionProfile = {
         ..._conditionProfile,

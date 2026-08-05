@@ -1,5 +1,6 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
+import { getConditionProfile } from '$lib/components/page/home/calculation/calculation.store.svelte'
 import type { Project, CharSlot, EchoSlot, PhaseKey, SelectedSet, ResultAnalysisData } from './types'
 import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
 import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
@@ -62,6 +63,7 @@ function normalizeProject(p: Partial<Project>): Project {
         lockedTeamKey: p.lockedTeamKey,
         lockedTeamNames: p.lockedTeamNames,
         archived: p.archived ?? false,
+        conditionProfile: p.conditionProfile,
         phases: {
             team: phases.team ?? emptyPhaseState(),
             timeline: phases.timeline ?? emptyPhaseState(),
@@ -147,6 +149,8 @@ export async function cloneProject(id: string, newName: string, selectedPhases: 
             newProject.lockedTeamKey = source.lockedTeamKey
             newProject.lockedTeamNames = source.lockedTeamNames
         }
+        // 克隆时一并复制链/阶配置
+        newProject.conditionProfile = JSON.parse(JSON.stringify(getConditionProfile()))
     }
 
     for (const phase of PHASE_ORDER) {
@@ -295,6 +299,8 @@ export function buildExportFile(
         data.team = project.team
         if (project.lockedTeamKey) data.lockedTeamKey = project.lockedTeamKey
         if (project.lockedTeamNames) data.lockedTeamNames = project.lockedTeamNames
+        // 导出角色的链/阶配置（与队伍配置一起）
+        data.conditionProfile = getConditionProfile()
     }
     data.customSkillHits = project.customSkillHits ?? {}
     const phases: Record<string, { locked: boolean; data: unknown }> = {}
@@ -370,7 +376,8 @@ export function parseProjectFile(text: string): Project[] {
             calculation: (item.phases as Record<string, unknown>)?.calculation ?? { locked: false, data: null },
             config: (item.phases as Record<string, unknown>)?.config ?? { locked: false, data: null }
         },
-        customSkillHits: (item.customSkillHits as Record<string, unknown[]>) ?? {}
+        customSkillHits: (item.customSkillHits as Record<string, unknown[]>) ?? {},
+        conditionProfile: (item.conditionProfile as Project['conditionProfile']) ?? undefined
     })) as unknown as Project[]
 }
 

@@ -52,6 +52,7 @@
         toggleBuffDiffMode,
         getHideConditionMismatch,
         toggleHideConditionMismatch,
+        setConditionProfile,
         syncGlobalBuffs,
         getCalcState,
         createBuffSet,
@@ -136,7 +137,6 @@
         calculation: false,
         config: false
     })
-    let exportResult = $state(false)
 
     let importInput = $state<HTMLInputElement | undefined>()
 
@@ -278,7 +278,6 @@
         }
         for (let i = 0; i < order.length; i++) selections[order[i]] = i <= order.indexOf(activePhase)
         exportSelections = selections
-        exportResult = false
         exportModal = true
     }
 
@@ -302,7 +301,7 @@
         const selected = (Object.entries(exportSelections) as [PhaseKey, boolean][])
             .filter(([, v]) => v)
             .map(([k]) => k)
-        const file = buildExportFile(p, selected, exportResult)
+        const file = buildExportFile(p, selected, true)
         const blob = new Blob([JSON.stringify(file)], { type: 'application/json' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -403,6 +402,8 @@
             (state) => updateCalculation(state)
         )
         initConfig(p.phases.config.data as ConfigState | null, p.phases.config?.locked ?? false)
+        // 恢复工程携带的链/阶配置（导入/分享下载的工程）
+        setConditionProfile(p.conditionProfile ?? undefined)
         const order = getPhaseOrder()
         let lastLocked = -1
         for (let i = order.length - 1; i >= 0; i--) {
@@ -421,6 +422,8 @@
     }
 
     let teamPhaseLocked = $derived(activeProject?.phases.team?.locked ?? false)
+    // 队伍中所有已配置角色都必须有武器，且队伍阶段已锁定，才能配置链/阶
+    let teamHasAllWeapons = $derived(activeProject ? activeProject.team.every((s) => !s.character || s.weapon) : false)
     let allPhasesLocked = $derived(
         activeProject ? getPhaseOrder().every((p) => activeProject!.phases[p]?.locked === true) : false
     )
@@ -877,15 +880,16 @@
                     </button>
                 {/if}
                 <div class="flex-1"></div>
+                <button
+                    onclick={() => (showConditionModal = true)}
+                    disabled={!teamPhaseLocked || !teamHasAllWeapons}
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none"
+                    title="队伍中所有角色配置武器并锁定队伍配置后可用；低于门槛的 buff 不生效"
+                >
+                    <Icon icon="mdi:card-account-details-star-outline" class="size-4 shrink-0" />
+                    链/阶配置
+                </button>
                 {#if !showResult}
-                    <button
-                        onclick={() => (showConditionModal = true)}
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
-                        title="设置各角色共鸣链 / 武器精炼档位，低于门槛的 buff 不生效"
-                    >
-                        <Icon icon="mdi:card-account-details-star-outline" class="size-4 shrink-0" />
-                        链/阶配置
-                    </button>
                     <button
                         onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
                         disabled={!phaseLocked && !canLock}
@@ -1098,17 +1102,6 @@
                     </label>
                 {/each}
             </div>
-            <label
-                class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
-            >
-                <input
-                    type="checkbox"
-                    bind:checked={exportResult}
-                    class="size-4"
-                    style="accent-color: var(--theme-accent-bg, #6366f1)"
-                />
-                <span>结果页配置（不必需）</span>
-            </label>
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (exportModal = false)}

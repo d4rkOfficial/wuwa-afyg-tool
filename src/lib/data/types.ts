@@ -39,6 +39,7 @@ export interface Project {
     lockedTeamKey?: string
     lockedTeamNames?: string[]
     archived?: boolean
+    conditionProfile?: { chains: number[]; refinements: number[] }
     phases: {
         team: PhaseState
         timeline: PhaseState

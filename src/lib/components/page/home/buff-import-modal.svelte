@@ -83,6 +83,11 @@
 
     let selected = $state<Record<string, boolean>>({})
 
+    // 「已下载 · 其它」默认折叠，点击展开（搜索时自动展开）
+    let showOthers = $state(false)
+
+    const otherSelectedCount = $derived(otherEntities.filter((e) => selected[entityKey(e)]).length)
+
     const countSelectedBuffs = $derived(
         [...recommendedEntities, ...otherEntities].reduce(
             (sum, e) => sum + (selected[entityKey(e)] ? e.buffs.length : 0),
@@ -235,18 +240,32 @@
         </div>
 
         <div>
-            <h3 class="mb-1.5 flex items-center gap-1 text-xs font-medium text-(--theme-muted-text)">
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <button
+                onclick={() => (showOthers = !showOthers)}
+                class="mb-1.5 flex w-full items-center gap-1 text-xs font-medium text-(--theme-muted-text) transition-colors hover:text-(--theme-modal-text)"
+                title="展开 / 收起非推荐实体"
+            >
+                <Icon icon={showOthers || query ? 'mdi:chevron-down' : 'mdi:chevron-right'} class="size-3.5 shrink-0" />
                 <Icon icon="mdi:download" class="size-3.5" />
-                已下载 · 其它
-            </h3>
-            {#if otherEntities.length === 0}
-                <div
-                    class="rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-3 text-xs text-(--theme-muted-text)"
-                >
-                    暂无其它 Buff 集
-                </div>
-            {:else}
-                {@render CategoryGroup(otherEntities)}
+                已下载 · 其它（{otherEntities.length}）
+                {#if otherSelectedCount > 0}
+                    <span class="rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                        >已选 {otherSelectedCount}</span
+                    >
+                {/if}
+            </button>
+            {#if showOthers || query}
+                {#if otherEntities.length === 0}
+                    <div
+                        class="rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-3 text-xs text-(--theme-muted-text)"
+                    >
+                        暂无其它 Buff 集
+                    </div>
+                {:else}
+                    {@render CategoryGroup(otherEntities)}
+                {/if}
             {/if}
         </div>
     </div>
