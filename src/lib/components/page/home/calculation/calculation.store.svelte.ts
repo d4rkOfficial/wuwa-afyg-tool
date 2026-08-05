@@ -68,7 +68,7 @@ export function init(
         _damageEntryBuffSetIds = {}
         _damageEntryDamageTypes = {}
     }
-    _globalBuffSetIds = _buffSets.filter((bs) => bs.id.startsWith('global-')).map((bs) => bs.id)
+    _globalBuffSetIds = _buffSets.filter((bs) => bs.global || bs.id.startsWith('global-')).map((bs) => bs.id)
     syncGlobalBuffs(team.map((s) => s.character))
     if (pruneOrphanedBindings()) {
         if (_onupdate) _onupdate(getCalcState())
@@ -441,7 +441,8 @@ export function duplicateBuffSet(id: string, customName?: string): string | unde
     const buffSet: BuffSet = {
         ...source,
         id: newId,
-        name: customName ?? source.name + ' 复制'
+        name: customName ?? source.name + ' 复制',
+        global: false
     }
     const idx = _buffSets.findIndex((s) => s.id === id)
     const next = [..._buffSets]
@@ -458,6 +459,8 @@ export function setBuffSetScope(setId: string, scope: 'all' | number[]) {
 
 export function setBuffSetCondition(setId: string, condition: BuffCondition | null) {
     if (!assertUnlocked()) return
+    // 默认全局 buff 不允许设置共鸣链/精炼条件
+    if (setId.startsWith('global-')) return
     _buffSets = _buffSets.map((s) =>
         s.id === setId ? { ...s, ...(condition ? { condition } : { condition: undefined }) } : s
     )
@@ -465,6 +468,8 @@ export function setBuffSetCondition(setId: string, condition: BuffCondition | nu
 
 export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
     if (!assertUnlocked()) return
+    // 默认全局 buff 不允许设置共鸣链/精炼条件
+    if (setId.startsWith('global-')) return
     _buffSets = _buffSets.map((s) =>
         s.id === setId
             ? { ...s, ...(charIdx !== null ? { conditionRefCharIdx: charIdx } : { conditionRefCharIdx: undefined }) }
@@ -506,6 +511,31 @@ export function setBuffSetZoneOverride(setId: string, zoneId: string, override: 
 export function toggleBuffSetStarred(id: string) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, starred: !s.starred } : s))
+}
+
+export function setBuffSetGlobal(id: string, global: boolean): boolean {
+    if (!assertUnlocked()) return false
+    // 默认全队/个人全局 buff 不可移出全局
+    if (id.startsWith('global-')) return false
+    const bs = _buffSets.find((s) => s.id === id)
+    if (!bs) return false
+    _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, global } : s))
+    _globalBuffSetIds = global
+        ? [..._globalBuffSetIds.filter((sid) => sid !== id), id]
+        : _globalBuffSetIds.filter((sid) => sid !== id)
+
+    if (global) {
+        const next: Record<string, string[]> = {}
+        for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
+            const filtered = setIds.filter((sid) => sid !== id)
+            if (filtered.length > 0) next[entryId] = filtered
+        }
+        _damageEntryBuffSetIds = next
+    }
+
+    syncGlobalBuffs((_initTeam ?? []).map((s) => s.character))
+    if (_onupdate) _onupdate(getCalcState())
+    return true
 }
 
 export function deleteBuffSet(id: string) {
@@ -662,7 +692,9 @@ export function syncGlobalBuffs(charNames: (string | null)[]) {
     const validCharNames = new Set(charNames.filter(Boolean) as string[])
 
     const orphanIds = _globalBuffSetIds.filter((id) => {
-        const charName = id.replace('global-', '')
+        if (id === 'global-all') return false
+        if (!id.startsWith('global-')) return false
+        const charName = id.slice('global-'.length)
         return !validCharNames.has(charName)
     })
     let newBuffSets = _buffSets.slice()
@@ -698,7 +730,8 @@ export function syncGlobalBuffs(charNames: (string | null)[]) {
                 id,
                 name: `${charName}·全局`,
                 zones: [],
-                scope: [i]
+                scope: [i],
+                global: true
             }
         ]
         if (!newGlobalIds.includes(id)) {
@@ -706,14 +739,50 @@ export function syncGlobalBuffs(charNames: (string | null)[]) {
         }
     }
 
-    for (const entry of _entries) {
-        if (!entry.character) continue
-        const gbsId = `global-${entry.character}`
-        if (!newGlobalIds.includes(gbsId)) continue
+    const TEAM_GLOBAL_ID = 'global-all'
+    if (validCharNames.size > 0) {
+        if (!newBuffSets.some((bs) => bs.id === TEAM_GLOBAL_ID)) {
+            newBuffSets = [
+                ...newBuffSets,
+                { id: TEAM_GLOBAL_ID, name: '全队·全局', zones: [], scope: 'all', global: true }
+            ]
+        }
+        if (!newGlobalIds.includes(TEAM_GLOBAL_ID)) {
+            newGlobalIds = [...newGlobalIds, TEAM_GLOBAL_ID]
+        }
+    }
 
-        const current = newBindings[entry.id] ?? []
-        if (!current.includes(gbsId)) {
-            newBindings[entry.id] = [...current, gbsId]
+    // 先清空所有全局 buff 的旧绑定，再按适用规则重建
+    const globalIdSet = new Set(newGlobalIds)
+    for (const entryId of Object.keys(newBindings)) {
+        newBindings[entryId] = newBindings[entryId].filter((sid) => !globalIdSet.has(sid))
+    }
+    const charIdxByName = new Map<string, number>()
+    for (const [i, s] of (_initTeam ?? []).entries()) {
+        if (s.character) charIdxByName.set(s.character, i)
+    }
+    const mergedGlobalBuffs = _buffSets.filter((bs) => newGlobalIds.includes(bs.id) && !bs.id.startsWith('global-'))
+    for (const entry of _entries) {
+        const entryCharIdx = entry.character ? charIdxByName.get(entry.character) : undefined
+        const applicable: string[] = []
+        if (entry.character) {
+            if (newGlobalIds.includes(`global-${entry.character}`)) applicable.push(`global-${entry.character}`)
+            if (newGlobalIds.includes(TEAM_GLOBAL_ID)) applicable.push(TEAM_GLOBAL_ID)
+        }
+        for (const mg of mergedGlobalBuffs) {
+            if (mg.scope === 'all') {
+                applicable.push(mg.id)
+            } else if (Array.isArray(mg.scope)) {
+                if (mg.scope.length === 0) {
+                    if (entry.isEffect) applicable.push(mg.id)
+                } else if (entryCharIdx !== undefined && mg.scope.includes(entryCharIdx)) {
+                    applicable.push(mg.id)
+                }
+            }
+        }
+        for (const gid of applicable) {
+            const current = newBindings[entry.id] ?? []
+            if (!current.includes(gid)) newBindings[entry.id] = [...current, gid]
         }
     }
 

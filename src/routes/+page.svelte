@@ -71,6 +71,7 @@
     import PhaseTabs from '$lib/components/page/home/phase-tabs.svelte'
     import QuickLookup from '$lib/components/page/home/calculation/quick-lookup.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
+    import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
     import Icon from '@iconify/svelte'
 
     let showNewModal = $state(false)
@@ -1157,26 +1158,12 @@
 
 <!-- Delete Modal -->
 {#if deleteModal}
-    <Modal open={true} onclose={() => (deleteModal = false)}>
-        {#snippet title()}
-            删除项目
-        {/snippet}
-        <div class="space-y-4">
-            <p class="text-sm text-zinc-400">
-                确认删除「<span class="font-semibold text-(--theme-layout-text)">{deleteName}</span>」？此操作不可撤销。
-            </p>
-            <div class="flex justify-end gap-2">
-                <button
-                    onclick={() => (deleteModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
-                    >取消</button
-                >
-                <button
-                    onclick={handleDelete}
-                    class="h-7 rounded-md bg-red-600 px-3 text-xs text-white transition-all hover:brightness-110 disabled:opacity-40 disabled:pointer-events-none"
-                    >删除</button
-                >
-            </div>
-        </div>
-    </Modal>
+    <ConfirmDeleteModal
+        open
+        title="删除项目"
+        confirmText={`删除${deleteName}`}
+        confirmLabel="删除"
+        onclose={() => (deleteModal = false)}
+        onconfirm={handleDelete}
+    />
 {/if}

@@ -470,22 +470,55 @@
                                     <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
                                         >{zoneLabel(z.zoneId)}</span
                                     >
-                                    <div class="flex flex-1 items-center justify-end gap-1">
-                                        <input
-                                            type="number"
-                                            value={z.value}
-                                            oninput={(e) =>
-                                                setZoneValue(
-                                                    z.zoneId,
-                                                    Number((e.currentTarget as HTMLInputElement).value)
-                                                )}
-                                            class="w-14 h-6 rounded border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
-                                            style="border-color: var(--theme-divider-border);"
-                                        />
-                                        <span class="w-3 text-[10px] text-(--theme-modal-text)/40">
-                                            {ZONE_MAP.get(z.zoneId as never)?.unit === '%' ? '%' : ''}
+                                    {#if z.ref}
+                                        {@const refDef =
+                                            ZONE_REF_MAP.get(z.ref.targetZoneId) ??
+                                            ZONE_MAP.get(z.ref.targetZoneId as never)}
+                                        {@const refOp = (z.ref.threshold ?? 0) < 0 ? '+' : '-'}
+                                        {@const refTh = Math.abs(z.ref.threshold ?? 0)}
+                                        {@const refS = simplifyPct(z.ref.pct)}
+                                        {@const hasThreshold = (z.ref.threshold ?? 0) !== 0}
+                                        {@const hasLower = z.ref.lower !== undefined}
+                                        {@const hasUpper = z.ref.upper !== undefined}
+                                        <span
+                                            class="flex-1 text-[10px] text-(--theme-modal-text)/40 truncate min-w-0 text-right"
+                                            title="引用: ({refDef?.label ?? '?'}{hasThreshold
+                                                ? ' ' + refOp + ' ' + refTh + (refDef?.unit === '%' ? '%' : '')
+                                                : ''}) ÷{refS.divisor}×{refS.multiplier}{hasLower || hasUpper
+                                                ? ' clamp(' +
+                                                  (hasLower ? String(z.ref.lower) : '') +
+                                                  ' ~ ' +
+                                                  (hasUpper ? String(z.ref.upper) : '') +
+                                                  ')'
+                                                : ''}"
+                                        >
+                                            引用: ({refDef?.label ?? '?'}{hasThreshold
+                                                ? refOp + refTh + (refDef?.unit === '%' ? '%' : '')
+                                                : ''}) ÷{refS.divisor}×{refS.multiplier}
+                                            {#if hasLower || hasUpper}
+                                                <span class="text-(--theme-modal-text)/30">
+                                                    ({hasLower ? z.ref.lower : ''}~{hasUpper ? z.ref.upper : ''})
+                                                </span>
+                                            {/if}
                                         </span>
-                                    </div>
+                                    {:else}
+                                        <div class="flex flex-1 items-center justify-end gap-1">
+                                            <input
+                                                type="number"
+                                                value={z.value}
+                                                oninput={(e) =>
+                                                    setZoneValue(
+                                                        z.zoneId,
+                                                        Number((e.currentTarget as HTMLInputElement).value)
+                                                    )}
+                                                class="w-14 h-6 rounded border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                                                style="border-color: var(--theme-divider-border);"
+                                            />
+                                            <span class="w-3 text-[10px] text-(--theme-modal-text)/40">
+                                                {ZONE_MAP.get(z.zoneId as never)?.unit === '%' ? '%' : ''}
+                                            </span>
+                                        </div>
+                                    {/if}
                                     {#if z.zoneId !== 'extraRatio'}
                                         <button
                                             onclick={() => setZoneOverride(z.zoneId, !z.override)}

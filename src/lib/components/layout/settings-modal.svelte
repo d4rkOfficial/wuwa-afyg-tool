@@ -26,6 +26,8 @@
         getPhaseOrder
     } from '$lib/data/project.svelte'
     import { getShareLink } from '$lib/data/share.svelte'
+    import Modal from '$lib/components/layout/modal.svelte'
+    import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
 
     interface Props {
         open: boolean
@@ -162,12 +164,30 @@
 
     // ── Archive management ──
     let archivedProjects = $derived(getArchivedProjects())
+    let confirmDelete = $state<{ id: string; name: string } | null>(null)
 
     async function handleUnarchive(id: string) {
         const p = archivedProjects.find((pr) => pr.id === id)
         if (!p) return
         await unarchiveProject(id)
         addToast(`工程「${p.name}」已取消归档`, 'success')
+    }
+
+    function openArchiveDelete(id: string) {
+        const p = archivedProjects.find((pr) => pr.id === id)
+        if (!p) return
+        confirmDelete = { id, name: p.name }
+    }
+
+    function closeArchiveDelete() {
+        confirmDelete = null
+    }
+
+    async function doArchiveDelete() {
+        if (!confirmDelete) return
+        await deleteProject(confirmDelete.id)
+        addToast(`工程「${confirmDelete.name}」已永久删除`, 'info')
+        closeArchiveDelete()
     }
 
     function handleArchiveExport(id: string) {
@@ -636,7 +656,7 @@
                                                     分享(10分钟)
                                                 </button>
                                                 <button
-                                                    onclick={() => handleArchiveDelete(p.id)}
+                                                    onclick={() => openArchiveDelete(p.id)}
                                                     class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
                                                     style="border-color: var(--theme-divider-border);"
                                                     title="永久删除，不可恢复"
@@ -687,6 +707,18 @@
             </div>
         </div>
     </div>
+
+    <!-- Archive delete confirm -->
+    {#if confirmDelete}
+        {@const target = confirmDelete}
+        <ConfirmDeleteModal
+            open
+            title="永久删除归档工程"
+            confirmText={`删除${target.name}`}
+            onclose={closeArchiveDelete}
+            onconfirm={doArchiveDelete}
+        />
+    {/if}
 
     <!-- Key picker -->
     {#if keyPickerFor}

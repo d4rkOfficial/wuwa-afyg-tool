@@ -90,7 +90,7 @@
         ...(getShareState().available
             ? [
                   {
-                      label: '分享(10分钟)',
+                      label: '分享',
                       icon: 'mdi:share-variant',
                       action: () => {
                           if (ctxTargetId) onshare(ctxTargetId)

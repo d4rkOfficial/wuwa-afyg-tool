@@ -15,7 +15,8 @@
         setBuffSetConditionRef,
         getGlobalBuffSetIds,
         reorderNonGlobalBuffSets,
-        toggleBuffSetStarred
+        toggleBuffSetStarred,
+        setBuffSetGlobal
     } from './calculation.store.svelte'
     import {
         ZONE_DEFS,
@@ -29,6 +30,7 @@
     import type { CharSlot } from '$lib/data/types'
     import type { ZoneRef, BuffSet } from './calculation.types'
     import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
+    import { addToast } from '$lib/data/toast.svelte'
     import Icon from '@iconify/svelte'
     import QuickLookup from './quick-lookup.svelte'
     import BuffImportModal from '../buff-import-modal.svelte'
@@ -63,6 +65,33 @@
     let deleteFolderCount = $state(0)
     let showCopyOptions = $state(false)
     let copyOptions = $state<string[]>([])
+
+    // ── Left sidebar resize ──
+    let leftWidth = $state(256)
+    let resizingSidebar = $state(false)
+    let resizeStartX = 0
+    let resizeStartWidth = 256
+    $effect(() => {
+        if (!resizingSidebar) return
+        const onMove = (e: MouseEvent) => {
+            leftWidth = Math.max(180, Math.min(480, resizeStartWidth + (e.clientX - resizeStartX)))
+        }
+        const onUp = () => {
+            resizingSidebar = false
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+        return () => {
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+        }
+    })
+    function startSidebarResize(e: MouseEvent) {
+        e.preventDefault()
+        resizeStartX = e.clientX
+        resizeStartWidth = leftWidth
+        resizingSidebar = true
+    }
 
     function globalBuffColor(buffSet: { scope: number[] | 'all' }): string {
         if (!Array.isArray(buffSet.scope) || buffSet.scope.length === 0) return '#eab308'
@@ -130,18 +159,29 @@
     )
 
     let groupedBuffSets = $derived.by(() => {
-        const globalItems = sortedBuffSets
-            .filter((bs) => globalBuffSetIds.includes(bs.id))
-            .map((bs) => ({ key: bs.id, type: 'item' as const, buffSet: bs }))
+        const globalBuffs = sortedBuffSets.filter((bs) => globalBuffSetIds.includes(bs.id))
+        const globalFolder: GroupedBuffSetItem[] =
+            globalBuffs.length > 0
+                ? [
+                      {
+                          key: 'folder:global',
+                          type: 'folder',
+                          name: '全局生效Buff',
+                          prefix: 'global',
+                          children: globalBuffs
+                      }
+                  ]
+                : []
         const nonGlobalItems = groupBuffSets(sortedBuffSets.filter((bs) => !globalBuffSetIds.includes(bs.id)))
-        return [...globalItems, ...nonGlobalItems] as GroupedBuffSetItem[]
+        return [...globalFolder, ...nonGlobalItems]
     })
     let topLevelFlatItems = $derived.by(() => {
         const result: Array<{ key: string; type: 'item' | 'folder' }> = []
         for (const item of groupedBuffSets) {
             if (item.type === 'folder') {
+                if (item.prefix === 'global') continue
                 result.push({ key: item.prefix!, type: 'folder' })
-            } else if (!globalBuffSetIds.includes(item.buffSet!.id)) {
+            } else {
                 result.push({ key: item.buffSet!.id, type: 'item' })
             }
         }
@@ -180,6 +220,18 @@
         if (!selectedBuffSetId) return
         deleteBuffSet(selectedBuffSetId)
         selectedBuffSetId = null
+    }
+
+    function handleToggleGlobal() {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        const isGlobal = globalBuffSetIds.includes(selectedBuffSetId)
+        const ok = setBuffSetGlobal(selectedBuffSetId, !isGlobal)
+        if (!ok) return
+        if (!isGlobal) {
+            addToast(selectedBuffSet.scope === 'all' ? '已并入全局，全队生效' : '已并入全局', 'success')
+        } else {
+            addToast('已移出全局', 'info')
+        }
     }
 
     function handleCopyBuffSet() {
@@ -245,23 +297,43 @@
         setBuffSetScope(selectedBuffSetId, isNonCharBuff ? 'all' : [])
     }
 
+    function isDefaultGlobalBuff(): boolean {
+        return !!selectedBuffSet && selectedBuffSet.id.startsWith('global-')
+    }
+
     function toggleBuffCondition() {
         if (!selectedBuffSetId || !selectedBuffSet) return
+        if (isDefaultGlobalBuff()) {
+            addToast('默认全局buff无法设置共鸣链/精炼条件', 'info')
+            return
+        }
         setBuffSetCondition(selectedBuffSetId, selectedBuffSet.condition ? null : { type: 'chain', min: 1 })
     }
 
     function setBuffConditionType(type: 'chain' | 'refinement') {
         if (!selectedBuffSetId || !selectedBuffSet?.condition) return
+        if (isDefaultGlobalBuff()) {
+            addToast('默认全局buff无法设置共鸣链/精炼条件', 'info')
+            return
+        }
         setBuffSetCondition(selectedBuffSetId, { type, min: selectedBuffSet.condition.min })
     }
 
     function setBuffConditionMin(value: number) {
         if (!selectedBuffSetId || !selectedBuffSet?.condition) return
+        if (isDefaultGlobalBuff()) {
+            addToast('默认全局buff无法设置共鸣链/精炼条件', 'info')
+            return
+        }
         setBuffSetCondition(selectedBuffSetId, { ...selectedBuffSet.condition, min: value || 0 })
     }
 
     function setConditionRef(i: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
+        if (isDefaultGlobalBuff()) {
+            addToast('默认全局buff无法设置共鸣链/精炼条件', 'info')
+            return
+        }
         setBuffSetConditionRef(selectedBuffSetId, selectedBuffSet.conditionRefCharIdx === i ? null : i)
     }
 
@@ -553,40 +625,54 @@
             <div class="flex flex-1 overflow-hidden">
                 <!-- Left column: block list -->
                 <div
-                    class="w-64 shrink-0 border-r flex flex-col"
-                    style="border-right: 1px solid var(--theme-divider-border);"
+                    class="shrink-0 border-r flex flex-col"
+                    style="width: {leftWidth}px; border-right: 1px solid var(--theme-divider-border);"
                 >
                     <div class="flex-1 overflow-y-auto p-2 space-y-1 buff-list-container">
                         {#each groupedBuffSets as item (item.key)}
                             {#if item.type === 'folder'}
+                                {@const isGlobalFolder = item.prefix === 'global'}
                                 {@const topIdx = topLevelIdxMap.get(item.prefix!)}
                                 {@const folderHasStar = item.children!.some((c) => c.starred)}
-                                {#if dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
+                                {#if !isGlobalFolder && dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
                                     <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
                                 {/if}
                                 <button
                                     data-folder-prefix={item.prefix}
                                     onclick={() => toggleFolder(item.prefix!)}
-                                    onpointerdown={(e) => startDrag(e, item.prefix!, 'folder')}
-                                    onpointermove={onDragMove}
-                                    onpointerup={onDragEnd}
+                                    onpointerdown={isGlobalFolder
+                                        ? undefined
+                                        : (e) => startDrag(e, item.prefix!, 'folder')}
+                                    onpointermove={isGlobalFolder ? undefined : onDragMove}
+                                    onpointerup={isGlobalFolder ? undefined : onDragEnd}
                                     class={[
                                         'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
                                         'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
-                                        dragState?.id === item.prefix &&
+                                        !isGlobalFolder &&
+                                            dragState?.id === item.prefix &&
                                             !dragState!.outside &&
                                             'ring-2 ring-(--theme-accent-bg)',
-                                        dragState?.id === item.prefix &&
+                                        !isGlobalFolder &&
+                                            dragState?.id === item.prefix &&
                                             dragState!.outside &&
                                             'ring-2 ring-red-500 opacity-50'
                                     ].join(' ')}
                                     transition:slide={{ duration: 200 }}
                                 >
                                     <Icon
-                                        icon={collapsedFolders.has(item.prefix!) ? 'mdi:folder' : 'mdi:folder-open'}
-                                        class="drag-handle touch-none select-none cursor-grab active:cursor-grabbing size-4 shrink-0 {folderHasStar
-                                            ? 'text-amber-400'
-                                            : 'opacity-60'}"
+                                        icon={isGlobalFolder
+                                            ? 'mdi:crown'
+                                            : collapsedFolders.has(item.prefix!)
+                                              ? 'mdi:folder'
+                                              : 'mdi:folder-open'}
+                                        class={[
+                                            'size-4 shrink-0',
+                                            isGlobalFolder
+                                                ? 'text-amber-400'
+                                                : `drag-handle touch-none select-none cursor-grab active:cursor-grabbing ${
+                                                      folderHasStar ? 'text-amber-400' : 'opacity-60'
+                                                  }`
+                                        ].join(' ')}
                                     />
                                     <span class="truncate flex-1">{item.name}</span>
                                     <span class="text-[10px] text-(--theme-modal-text)/30"
@@ -599,7 +685,7 @@
                                         style="border-color: var(--theme-divider-border);"
                                     >
                                         {#each item.children! as child, ci (child.id)}
-                                            {#if dragState && dragState.mode === 'child' && dragState.folderPrefix === item.prefix && !dragState.outside && dragState.dropIdx === ci}
+                                            {#if !isGlobalFolder && dragState && dragState.mode === 'child' && dragState.folderPrefix === item.prefix && !dragState.outside && dragState.dropIdx === ci}
                                                 <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
                                             {/if}
                                             <button
@@ -608,28 +694,41 @@
                                                 onclick={() => {
                                                     selectedBuffSetId = child.id
                                                 }}
-                                                onpointerdown={(e) => startDrag(e, child.id, 'child', item.prefix)}
-                                                onpointermove={onDragMove}
-                                                onpointerup={onDragEnd}
+                                                onpointerdown={isGlobalFolder
+                                                    ? undefined
+                                                    : (e) => startDrag(e, child.id, 'child', item.prefix)}
+                                                onpointermove={isGlobalFolder ? undefined : onDragMove}
+                                                onpointerup={isGlobalFolder ? undefined : onDragEnd}
                                                 class={[
                                                     'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
                                                     selectedBuffSetId === child.id
                                                         ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                         : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5',
-                                                    dragState?.id === child.id &&
+                                                    !isGlobalFolder &&
+                                                        dragState?.id === child.id &&
                                                         !dragState.outside &&
                                                         'ring-2 ring-(--theme-accent-bg)',
-                                                    dragState?.id === child.id &&
+                                                    !isGlobalFolder &&
+                                                        dragState?.id === child.id &&
                                                         dragState.outside &&
                                                         'ring-2 ring-red-500 opacity-50'
                                                 ].join(' ')}
                                                 transition:slide={{ duration: 200 }}
                                             >
                                                 <Icon
-                                                    icon={child.starred ? 'mdi:star' : 'mdi:widgets'}
-                                                    class="drag-handle touch-none select-none cursor-grab active:cursor-grabbing size-4 shrink-0 {child.starred
-                                                        ? 'text-amber-400'
-                                                        : 'opacity-60'}"
+                                                    icon={isGlobalFolder
+                                                        ? 'mdi:crown'
+                                                        : child.starred
+                                                          ? 'mdi:star'
+                                                          : 'mdi:widgets'}
+                                                    class={[
+                                                        'size-4 shrink-0',
+                                                        isGlobalFolder
+                                                            ? 'text-amber-400'
+                                                            : `drag-handle touch-none select-none cursor-grab active:cursor-grabbing ${
+                                                                  child.starred ? 'text-amber-400' : 'opacity-60'
+                                                              }`
+                                                    ].join(' ')}
                                                 />
                                                 <span class="truncate flex-1">{child.name}</span>
                                                 {#if child.scope === 'all'}
@@ -652,7 +751,7 @@
                                                 {/if}
                                             </button>
                                         {/each}
-                                        {#if dragState && dragState.mode === 'child' && dragState.folderPrefix === item.prefix && !dragState.outside && dragState.dropIdx === item.children!.length}
+                                        {#if !isGlobalFolder && dragState && dragState.mode === 'child' && dragState.folderPrefix === item.prefix && !dragState.outside && dragState.dropIdx === item.children!.length}
                                             <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
                                         {/if}
                                     </div>
@@ -753,16 +852,24 @@
                         </div>
                     </div>
                 </div>
+                <div
+                    class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-(--theme-accent-bg)/50"
+                    style="background: var(--theme-divider-border);"
+                    title="拖拽调整宽度"
+                    onmousedown={startSidebarResize}
+                ></div>
 
                 <!-- Right column: block editor -->
                 <div class="flex-1 flex flex-col">
                     {#if selectedBuffSet}
+                        {@const isGlobal = globalBuffSetIds.includes(selectedBuffSet.id)}
+                        {@const isDefaultGlobal = selectedBuffSet.id.startsWith('global-')}
                         <!-- Buff name header -->
                         <div
                             class="shrink-0 px-3 py-2.5 border-b flex items-center gap-2"
                             style="border-bottom: 1px solid var(--theme-divider-border);"
                         >
-                            {#if globalBuffSetIds.includes(selectedBuffSet.id)}
+                            {#if isGlobal}
                                 <button disabled class="shrink-0 rounded p-1 text-amber-400/40 cursor-not-allowed">
                                     <Icon
                                         icon={selectedBuffSet.starred ? 'mdi:star' : 'mdi:star-outline'}
@@ -776,6 +883,16 @@
                                     class="flex-1 min-w-0 rounded border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text) cursor-default"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 />
+                                {#if !isDefaultGlobal}
+                                    <button
+                                        onclick={handleToggleGlobal}
+                                        class="shrink-0 flex items-center gap-1 rounded border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <Icon icon="mdi:crown" class="size-3.5" />
+                                        移出全局
+                                    </button>
+                                {/if}
                             {:else}
                                 <button
                                     onclick={() => toggleBuffSetStarred(selectedBuffSet.id)}
@@ -813,6 +930,15 @@
                                     复制
                                 </button>
                                 <button
+                                    onclick={handleToggleGlobal}
+                                    class="shrink-0 flex items-center gap-1 rounded border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
+                                    style="border-color: var(--theme-divider-border);"
+                                    title="并入全局（全局 buff 的受益者将被锁定）"
+                                >
+                                    <Icon icon="mdi:crown" class="size-3.5" />
+                                    并入全局
+                                </button>
+                                <button
                                     onclick={handleDeleteBuffSet}
                                     class="shrink-0 flex items-center gap-1 rounded border border-red-500 px-2 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/20"
                                 >
@@ -834,13 +960,23 @@
                                         selectedBuffSet && globalBuffSetIds.includes(selectedBuffSet.id)}
                                     {@const disabled = globalDisabled || isNonCharBuff}
                                     <button
-                                        onclick={() => !disabled && handleToggleChar(i)}
+                                        onclick={() => {
+                                            if (isGlobal) {
+                                                addToast('全局buff无法更改作用域，请先移出全局', 'info')
+                                                return
+                                            }
+                                            if (!disabled) handleToggleChar(i)
+                                        }}
                                         class={[
                                             'size-8 rounded-full overflow-hidden border-2 transition-all',
                                             scopeChars[i]
                                                 ? 'border-(--theme-accent-bg)'
                                                 : 'border-(--theme-divider-border) grayscale opacity-30',
-                                            disabled ? 'pointer-events-none' : 'hover:opacity-60'
+                                            isGlobal
+                                                ? 'cursor-not-allowed'
+                                                : disabled
+                                                  ? 'pointer-events-none'
+                                                  : 'hover:opacity-60'
                                         ].join(' ')}
                                     >
                                         {#if slot.character && charIconMap[slot.character]}
@@ -861,9 +997,16 @@
                                 {/each}
                                 <div class="w-px h-5 mx-1" style="background: var(--theme-divider-border);"></div>
                                 <button
-                                    onclick={handleToggleNonChar}
+                                    onclick={() => {
+                                        if (isGlobal) {
+                                            addToast('全局buff无法更改作用域，请先移出全局', 'info')
+                                            return
+                                        }
+                                        handleToggleNonChar()
+                                    }}
                                     class={[
                                         'flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-all whitespace-nowrap',
+                                        isGlobal ? 'cursor-not-allowed opacity-50' : '',
                                         isNonCharBuff
                                             ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                             : 'border-transparent text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
@@ -897,12 +1040,15 @@
                                     onclick={toggleBuffCondition}
                                     class={[
                                         'flex items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-all whitespace-nowrap',
+                                        isDefaultGlobal ? 'cursor-not-allowed opacity-50' : '',
                                         selectedBuffSet.condition ? 'self-stretch' : 'h-6',
                                         selectedBuffSet.condition
                                             ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                             : 'border-transparent text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
                                     ].join(' ')}
-                                    title="仅当该增益确有命座/精炼门槛时开启"
+                                    title={isDefaultGlobal
+                                        ? '默认全局buff无法设置共鸣链/精炼条件'
+                                        : '仅当该增益确有命座/精炼门槛时开启'}
                                 >
                                     <Icon
                                         icon={selectedBuffSet.condition ? 'mdi:check-circle' : 'mdi:circle-outline'}
@@ -1158,9 +1304,12 @@
             >
                 <button
                     onclick={onclose}
-                    class="h-7 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
-                    style="background: var(--theme-input-bg);">保存并关闭</button
+                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
+                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 >
+                    <Icon icon="mdi:check" class="size-4" />
+                    保存并关闭
+                </button>
             </div>
         </div>
     </div>

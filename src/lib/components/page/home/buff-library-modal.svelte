@@ -2,6 +2,7 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
+    import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
     import {
         getBuffEntities,
         getBuffLibraryLoading,
@@ -223,6 +224,8 @@
         addToast('已清空本地 buff 预设', 'success')
     }
 
+    let showClearConfirm = $state(false)
+
     function iconFallback(entityType: BuffEntityType): string {
         if (entityType === 'character') return '/icons/placeholder-character.svg'
         if (entityType === 'weapon') return '/icons/placeholder-weapon.svg'
@@ -255,7 +258,7 @@
                 </button>
                 {#if entities.length > 0}
                     <button
-                        onclick={handleClear}
+                        onclick={() => (showClearConfirm = true)}
                         class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
                     >
                         <Icon icon="mdi:delete-sweep-outline" class="size-3.5" />
@@ -495,4 +498,17 @@
             </div>
         </Modal>
     {/if}
+
+    <ConfirmDeleteModal
+        open={showClearConfirm}
+        title="清空 Buff 集"
+        confirmText="我知道这会删除所有Buff集"
+        confirmLabel="确认清空"
+        hintSuffix="以确认清空："
+        onclose={() => (showClearConfirm = false)}
+        onconfirm={() => {
+            showClearConfirm = false
+            handleClear()
+        }}
+    />
 </Modal>

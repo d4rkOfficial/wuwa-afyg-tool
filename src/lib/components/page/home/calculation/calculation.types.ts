@@ -59,6 +59,7 @@ export interface BuffSet {
     zones: BuffZoneValue[]
     scope: 'all' | number[]
     starred?: boolean
+    global?: boolean
     condition?: BuffCondition
     conditionRefCharIdx?: number
 }
