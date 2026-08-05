@@ -305,6 +305,7 @@ function normalizeRef(value: unknown): BuffLibraryZoneRef | undefined {
     if (ro.discrete) out.discrete = true
     if (Number.isFinite(ro.divisor)) out.divisor = Number(ro.divisor)
     if (Number.isFinite(ro.multiplier)) out.multiplier = Number(ro.multiplier)
+    if (ro.refOwner === 'self' || ro.refOwner === 'owner') out.refOwner = ro.refOwner
     return out
 }
 
