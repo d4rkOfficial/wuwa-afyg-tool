@@ -50,6 +50,8 @@
         setShowBuffModal,
         getBuffDiffMode,
         toggleBuffDiffMode,
+        getHideConditionMismatch,
+        toggleHideConditionMismatch,
         syncGlobalBuffs,
         getCalcState,
         createBuffSet,
@@ -62,6 +64,7 @@
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
     import BuffLibraryModal from '$lib/components/page/home/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
+    import ConditionConfigModal from '$lib/components/page/home/condition-config-modal.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
@@ -80,6 +83,7 @@
     let showBuffLibrary = $state(false)
     let showSettings = $state(false)
     let showWorkshopFrame = $state(false)
+    let showConditionModal = $state(false)
     let workshopFrameKey = $state(0)
     let showZoomTip = $state(browser ? !localStorage.getItem('wuwa-afyg:zoom-tip') : false)
 
@@ -823,7 +827,23 @@
                                 icon={getBuffDiffMode() ? 'mdi:swap-vertical-bold' : 'mdi:swap-vertical'}
                                 class="size-4 shrink-0"
                             />
-                            {getBuffDiffMode() ? 'Buff: DIFF' : 'Buff: ALL'}
+                            {getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}
+                        </button>
+                        <button
+                            onclick={toggleHideConditionMismatch}
+                            class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getHideConditionMismatch()
+                                ? 'border-(--theme-accent-bg)'
+                                : 'border-(--theme-sidebar-text)/20'}"
+                            style="color: {getHideConditionMismatch()
+                                ? 'var(--theme-accent-text)'
+                                : 'var(--theme-sidebar-text)'}"
+                            title="隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff"
+                        >
+                            <Icon
+                                icon={getHideConditionMismatch() ? 'mdi:filter-off' : 'mdi:filter-outline'}
+                                class="size-4 shrink-0"
+                            />
+                            {getHideConditionMismatch() ? '可用Buff' : '全部Buff'}
                         </button>
                     {/if}
                     {#if activePhase === 'config'}
@@ -858,6 +878,14 @@
                 {/if}
                 <div class="flex-1"></div>
                 {#if !showResult}
+                    <button
+                        onclick={() => (showConditionModal = true)}
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
+                        title="设置各角色共鸣链 / 武器精炼档位，低于门槛的 buff 不生效"
+                    >
+                        <Icon icon="mdi:card-account-details-star-outline" class="size-4 shrink-0" />
+                        链/阶配置
+                    </button>
                     <button
                         onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
                         disabled={!phaseLocked && !canLock}
@@ -895,6 +923,14 @@
 <WorkshopModal open={showWorkshop} onclose={() => (showWorkshop = false)} />
 
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
+
+{#if activeProject}
+    <ConditionConfigModal
+        open={showConditionModal}
+        team={activeProject.team}
+        onclose={() => (showConditionModal = false)}
+    />
+{/if}
 
 <SettingsModal open={showSettings} onclose={() => (showSettings = false)} />
 

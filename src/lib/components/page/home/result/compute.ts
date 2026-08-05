@@ -293,7 +293,8 @@ export const DEFAULT_CONDITION_PROFILE: ConditionProfile = { chains: [0, 0, 0], 
 // 生效条件判定：chain/refinement 参考其归属角色（conditionRefCharIdx）的链/精炼，
 // 未指定参考角色则回退到当前角色自身判断；charIndex<0（效应/无角色）时条件型 buff 不生效。
 // elements/damageTypes 为条目级条件，需结合 entry 判定；无 entry（角色级聚合）时不生效。
-function conditionMet(
+// 供计算与「隐藏条件不匹配」过滤共用。
+export function conditionMet(
     bs: BuffSet,
     profile: ConditionProfile,
     charIndex: number,

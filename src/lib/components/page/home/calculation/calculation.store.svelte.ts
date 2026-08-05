@@ -7,6 +7,7 @@ import { getSkillCache, getCharElementMap } from '../timeline/timeline.store.sve
 import { getCharacterInfo } from '$lib/data/api'
 import { addToast } from '$lib/data/toast.svelte'
 import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
+import type { ConditionProfile } from '../result/compute'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffSet[]>([])
@@ -15,7 +16,10 @@ let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
 let _showBuffModal = $state(false)
 let _buffDiffMode = $state(false)
 let _locked = $state(false)
-
+// 全局生效配置：各角色共鸣链 / 武器精炼阶数（结果计算与条件过滤共用）
+let _conditionProfile: ConditionProfile = $state({ chains: [0, 0, 0], refinements: [1, 1, 1] })
+// 默认隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff
+let _hideConditionMismatch = $state(true)
 function assertUnlocked(): boolean {
     if (_locked) {
         addToast('本环节已锁定，请先解锁', 'info')
@@ -438,8 +442,36 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
         fresh.push(buffSet)
     }
     if (!fresh.length) return 0
+    // 导入前按条目名自然排序：数字段按数值（1层 < 2层 < 10层 < 11层），其余按 unicode 码点
+    fresh.sort((a, b) => compareNatural(a.name, b.name))
     _buffSets = [..._buffSets, ...fresh]
     return fresh.length
+}
+
+// 自然排序：数字段按数值比较，非数字段按码点比较（字符数字从小到大，小在先大在后）
+function compareNatural(a: string, b: string): number {
+    let i = 0
+    let j = 0
+    while (i < a.length && j < b.length) {
+        const ad = /\d/.test(a[i])
+        const bd = /\d/.test(b[j])
+        if (ad && bd) {
+            let x = i
+            let y = j
+            while (x < a.length && /\d/.test(a[x])) x++
+            while (y < b.length && /\d/.test(b[y])) y++
+            const na = BigInt(a.slice(i, x))
+            const nb = BigInt(b.slice(j, y))
+            if (na !== nb) return na < nb ? -1 : 1
+            i = x
+            j = y
+        } else {
+            if (a[i] !== b[j]) return a[i] < b[j] ? -1 : 1
+            i++
+            j++
+        }
+    }
+    return a.length - b.length
 }
 
 export function duplicateBuffSet(id: string, customName?: string): string | undefined {
@@ -643,6 +675,34 @@ export function getBuffDiffMode(): boolean {
 }
 export function toggleBuffDiffMode() {
     _buffDiffMode = !_buffDiffMode
+}
+
+// ── 生效配置（链/阶）与条件不符隐藏 ──
+
+export function getConditionProfile(): ConditionProfile {
+    return _conditionProfile
+}
+
+export function setConditionProfileChains(idx: number, value: number) {
+    _conditionProfile = {
+        ..._conditionProfile,
+        chains: _conditionProfile.chains.map((c, j) => (j === idx ? value : c))
+    }
+}
+
+export function setConditionProfileRefinements(idx: number, value: number) {
+    _conditionProfile = {
+        ..._conditionProfile,
+        refinements: _conditionProfile.refinements.map((r, j) => (j === idx ? value : r))
+    }
+}
+
+export function getHideConditionMismatch(): boolean {
+    return _hideConditionMismatch
+}
+
+export function toggleHideConditionMismatch() {
+    _hideConditionMismatch = !_hideConditionMismatch
 }
 
 export function reorderNonGlobalBuffSets(orderedIds: string[]) {

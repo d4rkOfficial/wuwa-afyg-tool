@@ -16,9 +16,12 @@
         setDamageTypesForEntry,
         init,
         getGlobalBuffSetIds,
-        getBuffDiffMode
+        getBuffDiffMode,
+        getConditionProfile,
+        getHideConditionMismatch
     } from './calculation.store.svelte'
     import { inferDamageTypes } from '../result/utils'
+    import { conditionMet } from '../result/compute'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         ZONE_MAP,
@@ -28,6 +31,7 @@
         LAYERED_BUFF_PATTERN
     } from './calculation.consts'
     import type { GroupedBuffSetItem } from './calculation.consts'
+    import type { BuffSet, DamageEntry } from './calculation.types'
     import type { CharSlot } from '$lib/data/types'
     import type { TimelineData } from '../timeline/timeline.types'
     import type { CalcState } from './calculation.types'
@@ -76,13 +80,24 @@
         Object.fromEntries(team.map((s, i) => [s.character ?? '', i]).filter(([name]) => name !== ''))
     )
     let entryCharIdx = $derived(selectedEntry?.character ? (charToIdx[selectedEntry.character] ?? -1) : -1)
+
+    // 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff）
+    const buffMatches = (bs: BuffSet | undefined, entry: DamageEntry): boolean => {
+        if (!bs) return false
+        if (!getHideConditionMismatch()) return true
+        const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
+        return conditionMet(bs, getConditionProfile(), charIdx, entry, entryDamageTypeMap)
+    }
+
     let visibleBuffSets = $derived(
         buffSets.filter((b) => {
             if (globalBuffSetIds.includes(b.id)) return false
-            if (selectedEntry?.isEffect) {
-                return b.scope === 'all' || (Array.isArray(b.scope) && b.scope.length === 0)
-            }
-            return entryCharIdx >= 0 && (b.scope === 'all' || (b.scope as number[]).includes(entryCharIdx))
+            const scopeOk = selectedEntry?.isEffect
+                ? b.scope === 'all' || (Array.isArray(b.scope) && b.scope.length === 0)
+                : entryCharIdx >= 0 && (b.scope === 'all' || (b.scope as number[]).includes(entryCharIdx))
+            if (!scopeOk) return false
+            if (selectedEntry && !buffMatches(b, selectedEntry)) return false
+            return true
         })
     )
     let groupedVisibleSets = $derived(groupBuffSets(visibleBuffSets))
@@ -104,8 +119,14 @@
         for (let i = 0; i < damageEntries.length; i++) {
             const e = damageEntries[i]
 
+            const match = (sid: string) =>
+                buffMatches(
+                    buffSets.find((b) => b.id === sid),
+                    e
+                )
+
             const globalItems = (entryBuffSetIdMap[e.id] ?? [])
-                .filter((sid) => globalBuffSetIds.includes(sid))
+                .filter((sid) => globalBuffSetIds.includes(sid) && match(sid))
                 .map((sid) => ({
                     setId: sid,
                     name: buffSets.find((b) => b.id === sid)?.name ?? '',
@@ -120,7 +141,7 @@
                 result[e.id] = [
                     ...(isFirstCharEntry ? globalItems : []),
                     ...(entryBuffSetIdMap[e.id] ?? [])
-                        .filter((sid) => !globalBuffSetIds.includes(sid))
+                        .filter((sid) => !globalBuffSetIds.includes(sid) && match(sid))
                         .map((sid) => ({
                             setId: sid,
                             name: buffSets.find((b) => b.id === sid)?.name ?? '',
@@ -153,7 +174,7 @@
                 result[e.id] = [
                     ...(isFirstCharEntry ? globalItems : []),
                     ...(entryBuffSetIdMap[e.id] ?? [])
-                        .filter((sid) => !globalBuffSetIds.includes(sid))
+                        .filter((sid) => !globalBuffSetIds.includes(sid) && match(sid))
                         .map((sid) => ({
                             setId: sid,
                             name: buffSets.find((b) => b.id === sid)?.name ?? '',
@@ -167,10 +188,10 @@
             const prev = new Set(entryBuffSetIdMap[prevId] ?? [])
             const items: BuffDiffItem[] = []
             for (const id of curr)
-                if (!prev.has(id))
+                if (!prev.has(id) && match(id))
                     items.push({ setId: id, name: buffSets.find((b) => b.id === id)?.name ?? '', type: 'added' })
             for (const id of prev)
-                if (!curr.has(id))
+                if (!curr.has(id) && match(id))
                     items.push({ setId: id, name: buffSets.find((b) => b.id === id)?.name ?? '', type: 'removed' })
             result[e.id] = items
         }
@@ -513,7 +534,7 @@
                                     {/if}
                                 {/each}
                             {:else}
-                                {#each entryBuffSetIdMap[damageEntry.id] ?? [] as setId}
+                                {#each (entryBuffSetIdMap[damageEntry.id] ?? []).filter( (sid) => buffMatches( buffSets.find((s) => s.id === sid), damageEntry ) ) as setId}
                                     {@const buffSet = buffSets.find((s) => s.id === setId)}
                                     {#if buffSet && !globalBuffSetIds.includes(setId)}
                                         <span
