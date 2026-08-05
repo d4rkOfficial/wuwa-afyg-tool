@@ -62,7 +62,16 @@ export function init(
         for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
             _damageEntryBuffSetIds[entryId] = setIds.filter((sid) => !autoIds.includes(sid))
         }
-        _damageEntryDamageTypes = JSON.parse(JSON.stringify(savedState.damageEntryDamageTypes ?? {}))
+        _damageEntryDamageTypes = JSON.parse(
+            JSON.stringify(
+                Object.fromEntries(
+                    Object.entries(savedState.damageEntryDamageTypes ?? {}).map(([id, types]) => [
+                        id,
+                        types.map((t) => (t === '视为效应伤害' ? '其它类型伤害' : t))
+                    ])
+                )
+            )
+        )
     } else {
         _buffSets = []
         _damageEntryBuffSetIds = {}

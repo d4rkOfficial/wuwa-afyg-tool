@@ -47,10 +47,16 @@ export interface BuffZoneValue {
     override?: boolean
 }
 
-// 生效条件：chain = 角色共鸣链 ≥ min（0-6）；refinement = 武器精炼 ≥ min（1-5）
+// 生效条件（可同时设置多项，全部满足才生效）：
+//   chain      = 角色共鸣链 ≥ chain（1-6）
+//   refinement = 武器精炼 ≥ refinement（1-5）
+//   elements   = 伤害属性（多选，含物理）
+//   damageTypes= 伤害类型（多选，普攻/重击/…伤害）
 export interface BuffCondition {
-    type: 'chain' | 'refinement'
-    min: number
+    chain?: number
+    refinement?: number
+    elements?: string[]
+    damageTypes?: string[]
 }
 
 export interface BuffSet {

@@ -18,6 +18,7 @@
         getGlobalBuffSetIds,
         getBuffDiffMode
     } from './calculation.store.svelte'
+    import { inferDamageTypes } from '../result/utils'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         ZONE_MAP,
@@ -61,6 +62,9 @@
     let globalBuffSetIds = $derived(getGlobalBuffSetIds())
     let entryDamageTypeMap = $derived<Record<string, string[]>>(
         Object.fromEntries(damageEntries.map((e) => [e.id, getDamageTypesForEntry(e.id)]))
+    )
+    let inferredDamageTypeMap = $derived<Record<string, string[]>>(
+        Object.fromEntries(damageEntries.map((e) => [e.id, inferDamageTypes(e)]))
     )
     let entryBuffSetIdMap = $derived<Record<string, string[]>>(
         Object.fromEntries(damageEntries.map((e) => [e.id, getBuffSetIdsForEntry(e.id)]))
@@ -465,6 +469,15 @@
                                     style="background: var(--theme-input-bg);"
                                     >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}</span
                                 >
+                            {:else}
+                                {@const inferred = inferredDamageTypeMap[damageEntry.id] ?? []}
+                                {#if inferred.length > 0}
+                                    <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
+                                        >自动推导：{inferred
+                                            .map((t) => DAMAGE_TYPE_SHORT[t as keyof typeof DAMAGE_TYPE_SHORT] ?? t)
+                                            .join('/')}</span
+                                    >
+                                {/if}
                             {/each}
                         </div>
                     </td>
@@ -553,6 +566,7 @@
                                                         e.stopPropagation()
                                                         handleToggleDamageType(damageEntry.id, dt)
                                                     }}
+                                                    title={dt}
                                                     class={[
                                                         'px-2 py-1 text-xs rounded transition-colors border',
                                                         selected
@@ -563,7 +577,7 @@
                                                         ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
                                                         : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
                                                 >
-                                                    {dt}
+                                                    {DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}
                                                 </button>
                                             {/each}
                                         </div>

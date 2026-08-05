@@ -1,4 +1,26 @@
 import type { ResultEntry } from './result.types'
+import type { DamageEntry } from '../calculation/calculation.types'
+
+// 自动推导伤害类型：按技能类型推断，常态攻击再按招式名分普攻/重击
+export function inferDamageTypes(entry: DamageEntry): string[] {
+    switch (entry.skillType) {
+        case '常态攻击':
+            return entry.hitName.includes('重击') ? ['重击伤害'] : ['普攻伤害']
+        case '共鸣技能':
+            return ['共鸣技能伤害']
+        case '共鸣解放':
+            return ['共鸣解放伤害']
+        case '声骸技能':
+            return ['声骸技能伤害']
+        case '变奏技能':
+            return ['变奏技能伤害']
+        case '延奏技能':
+            return ['延奏技能伤害']
+        default:
+            // 无法推导的类型统一归为「其它类型伤害」
+            return ['其它类型伤害']
+    }
+}
 
 export const DAMAGE_TYPE_CATEGORIES = [
     '普攻',

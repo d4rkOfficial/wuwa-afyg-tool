@@ -15,7 +15,9 @@
         BuffLibraryZoneRef
     } from '$lib/data/buff-library.svelte'
     import { ENTITY_TYPE_LABELS, updateEntityBuffs, CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
+    import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { addToast } from '$lib/data/toast.svelte'
+    import { slide } from 'svelte/transition'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -59,7 +61,15 @@
                 buffName: b.buffName,
                 scope: b.scope,
                 exclusive: b.exclusive,
-                ...(b.condition ? { condition: { ...b.condition } } : {}),
+                ...(b.condition
+                    ? {
+                          condition: {
+                              ...b.condition,
+                              ...(b.condition.elements ? { elements: [...b.condition.elements] } : {}),
+                              ...(b.condition.damageTypes ? { damageTypes: [...b.condition.damageTypes] } : {})
+                          }
+                      }
+                    : {}),
                 zones: b.zones.map((z) => ({ ...z }))
             }))
             activeBuffIdx = 0
@@ -82,22 +92,59 @@
         return ZONE_MAP.get(id as never)?.label ?? id
     }
 
-    const conditionType: 'chain' | 'refinement' | null =
-        entityType === 'character' ? 'chain' : entityType === 'weapon' ? 'refinement' : null
+    let condPanelOpen = $state(false)
 
-    function setBuffConditionEnabled(enabled: boolean) {
-        if (!conditionType) return
-        buffs = buffs.map((b, i) =>
-            i === activeBuffIdx
-                ? { ...b, ...(enabled ? { condition: { type: conditionType, min: 1 } } : { condition: undefined }) }
-                : b
-        )
+    function toggleCondPanel() {
+        condPanelOpen = !condPanelOpen
     }
 
-    function setBuffConditionMin(value: number) {
-        buffs = buffs.map((b, i) =>
-            i === activeBuffIdx && b.condition ? { ...b, condition: { ...b.condition, min: value || 0 } } : b
-        )
+    function clearCondition() {
+        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: undefined } : b))
+        condPanelOpen = false
+    }
+
+    // 各实体类型可配置的条件：角色可设共鸣链、武器可设精炼、声骸/套装均不可
+    const canChain = $derived(entityType === 'character')
+    const canRefinement = $derived(entityType === 'weapon')
+
+    const conditionSummary = $derived.by(() => {
+        const cond = activeBuff?.condition
+        if (!cond) return ''
+        const parts: string[] = []
+        if (cond.chain !== undefined && canChain) parts.push(`${entityName} ≥${cond.chain}链`)
+        if (cond.refinement !== undefined && canRefinement) parts.push(`${entityName} ≥${cond.refinement}阶`)
+        if (cond.elements?.length) parts.push(`伤害属性 ${cond.elements.join('/')}`)
+        if (cond.damageTypes?.length)
+            parts.push(`伤害类型 ${cond.damageTypes.map((d) => DAMAGE_TYPE_SHORT[d] ?? d).join('/')}`)
+        return parts.join('，')
+    })
+
+    function setBuffChain(min: number) {
+        const cond = activeBuff?.condition ?? {}
+        const next = cond.chain === min ? { ...cond, chain: undefined } : { ...cond, chain: min }
+        if (next.chain === undefined) delete next.chain
+        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: next } : b))
+    }
+
+    function setBuffRefinement(min: number) {
+        const cond = activeBuff?.condition ?? {}
+        const next = cond.refinement === min ? { ...cond, refinement: undefined } : { ...cond, refinement: min }
+        if (next.refinement === undefined) delete next.refinement
+        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: next } : b))
+    }
+
+    function toggleConditionElement(el: string) {
+        const cond = activeBuff?.condition ?? {}
+        const list = cond.elements ?? []
+        const next = list.includes(el) ? list.filter((e) => e !== el) : [...list, el]
+        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: { ...cond, elements: next } } : b))
+    }
+
+    function toggleConditionDamageType(dt: string) {
+        const cond = activeBuff?.condition ?? {}
+        const list = cond.damageTypes ?? []
+        const next = list.includes(dt) ? list.filter((d) => d !== dt) : [...list, dt]
+        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: { ...cond, damageTypes: next } } : b))
     }
 
     function selectBuff(idx: number) {
@@ -398,64 +445,151 @@
                             <Icon icon="mdi:delete-outline" class="size-3.5" />
                         </button>
                     </div>
-                    {#if conditionType}
-                        <div
-                            class="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5"
-                            style="border-color: var(--theme-divider-border);"
+                    <div class="shrink-0 border-b" style="border-color: var(--theme-divider-border);">
+                        <button
+                            onclick={toggleCondPanel}
+                            class={[
+                                'flex w-full items-center gap-1.5 px-3 py-2 text-left text-[10px] transition-colors hover:bg-(--theme-modal-text)/5',
+                                conditionSummary ? 'text-(--theme-accent-text)' : 'text-(--theme-modal-text)/60'
+                            ].join(' ')}
                         >
-                            <button
-                                onclick={() => setBuffConditionEnabled(!activeBuff.condition)}
-                                class={[
-                                    'flex items-center gap-1 rounded border px-2 text-[10px] transition-colors',
-                                    activeBuff.condition ? 'self-stretch' : 'h-6',
-                                    activeBuff.condition
-                                        ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
-                                        : 'border-transparent text-(--theme-modal-text)/40 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/70'
-                                ].join(' ')}
-                                title="仅当该增益确有命座/精炼门槛时开启"
+                            <Icon
+                                icon={condPanelOpen ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                class="size-3.5 shrink-0 text-(--theme-modal-text)/40"
+                            />
+                            <span class="shrink-0">生效条件</span>
+                            {#if conditionSummary}
+                                <span class="min-w-0 truncate">：{conditionSummary}</span>
+                            {/if}
+                        </button>
+                        {#if condPanelOpen}
+                            {@const cond = activeBuff?.condition ?? {}}
+                            <div
+                                transition:slide|local={{ duration: 200 }}
+                                class="flex flex-wrap items-center gap-2 px-3 pb-2.5"
                             >
-                                <Icon
-                                    icon={activeBuff.condition ? 'mdi:check-circle' : 'mdi:circle-outline'}
-                                    class="size-3"
-                                />
-                                {#if !activeBuff.condition}共鸣链/精炼阶数条件{/if}
-                            </button>
-                            {#if activeBuff.condition}
+                                {#if canChain}
+                                    <div
+                                        class="flex items-center gap-2 rounded border px-2 py-1"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
+                                            >共鸣链</span
+                                        >
+                                        <div
+                                            class="flex overflow-hidden rounded border"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            {#each Array.from({ length: CHAIN_MAX + 1 }, (_, k) => k) as n}
+                                                <button
+                                                    onclick={() => setBuffChain(n)}
+                                                    class={[
+                                                        'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                                        cond.chain === n
+                                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                    ].join(' ')}
+                                                >
+                                                    {n}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                        {#if cond.chain !== undefined}
+                                            <span
+                                                class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
+                                                >≥{cond.chain}链</span
+                                            >
+                                        {/if}
+                                    </div>
+                                {/if}
+                                {#if canRefinement}
+                                    <div
+                                        class="flex items-center gap-2 rounded border px-2 py-1"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
+                                            >精炼</span
+                                        >
+                                        <div
+                                            class="flex overflow-hidden rounded border"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            {#each Array.from({ length: REFINE_MAX }, (_, k) => k + 1) as n}
+                                                <button
+                                                    onclick={() => setBuffRefinement(n)}
+                                                    class={[
+                                                        'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                                        cond.refinement === n
+                                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                    ].join(' ')}
+                                                >
+                                                    {n}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                        {#if cond.refinement}
+                                            <span
+                                                class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
+                                                >≥{cond.refinement}阶</span
+                                            >
+                                        {/if}
+                                    </div>
+                                {/if}
                                 <div
-                                    class="flex items-center gap-2 rounded border px-2.5 py-1.5"
+                                    class="flex flex-wrap items-center gap-1 rounded border px-2 py-1"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
-                                    <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70">
-                                        {conditionType === 'chain' ? '角色共鸣链' : '武器精炼'}
-                                    </span>
-                                    <div
-                                        class="flex overflow-hidden rounded border"
-                                        style="border-color: var(--theme-divider-border);"
+                                    <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
+                                        >伤害属性</span
                                     >
-                                        {#each Array.from({ length: conditionType === 'chain' ? CHAIN_MAX : REFINE_MAX }, (_, k) => k + 1) as n}
-                                            <button
-                                                onclick={() => setBuffConditionMin(n)}
-                                                class={[
-                                                    'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                                    activeBuff.condition.min === n
-                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                                ].join(' ')}
-                                            >
-                                                {n}
-                                            </button>
-                                        {/each}
-                                    </div>
-                                    <span
-                                        class="flex h-6 w-11 items-center text-center text-[11px] font-medium text-(--theme-modal-text) tabular-nums"
-                                    >
-                                        ≥ {activeBuff.condition.min}
-                                        {conditionType === 'chain' ? '链' : '阶'}
-                                    </span>
+                                    {#each ELEMENTS as el}
+                                        <button
+                                            onclick={() => toggleConditionElement(el)}
+                                            class={[
+                                                'rounded px-1.5 py-0.5 text-[10px] transition-colors',
+                                                (cond.elements ?? []).includes(el)
+                                                    ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
+                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                            ].join(' ')}
+                                        >
+                                            {el}
+                                        </button>
+                                    {/each}
                                 </div>
-                            {/if}
-                        </div>
-                    {/if}
+                                <div
+                                    class="flex flex-wrap items-center gap-1 rounded border px-2 py-1"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
+                                        >伤害类型</span
+                                    >
+                                    {#each DAMAGE_TYPES as dt}
+                                        <button
+                                            onclick={() => toggleConditionDamageType(dt)}
+                                            title={dt}
+                                            class={[
+                                                'rounded px-1.5 py-0.5 text-[10px] transition-colors',
+                                                (cond.damageTypes ?? []).includes(dt)
+                                                    ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
+                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                            ].join(' ')}
+                                        >
+                                            {DAMAGE_TYPE_SHORT[dt] ?? dt}
+                                        </button>
+                                    {/each}
+                                </div>
+                                <button
+                                    onclick={clearCondition}
+                                    class="flex h-6 items-center gap-1 rounded border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <Icon icon="mdi:close-circle-outline" class="size-3" />
+                                    清除
+                                </button>
+                            </div>
+                        {/if}
+                    </div>
                     <div class="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
                         {#if activeBuff.zones.length === 0}
                             <div class="py-6 text-center text-xs text-(--theme-modal-text)/30">

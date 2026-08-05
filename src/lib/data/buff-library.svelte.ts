@@ -1,5 +1,6 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
+import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { getShareBase } from './workshop.svelte'
 import type { BuffCondition, BuffZoneValue } from '$lib/components/page/home/calculation/calculation.types'
 
@@ -10,15 +11,61 @@ export type BuffLibraryScope = 'self' | 'self_except' | 'team' | 'effect_only'
 export const CHAIN_MAX = 6
 export const REFINE_MAX = 5
 
+const ELEMENT_SET = new Set<string>(ELEMENTS)
+const DAMAGE_TYPE_SET = new Set<string>(DAMAGE_TYPES)
+
 function normalizeCondition(value: unknown): BuffCondition | undefined {
     if (!value || typeof value !== 'object') return undefined
     const c = value as Record<string, unknown>
-    if (c.type !== 'chain' && c.type !== 'refinement') return undefined
-    const type = c.type as BuffCondition['type']
-    const min = typeof c.min === 'number' && Number.isFinite(c.min) ? Math.floor(c.min) : 0
-    const max = type === 'chain' ? CHAIN_MAX : REFINE_MAX
-    if (min <= 0 || min > max) return undefined
-    return { type, min }
+    const out: BuffCondition = {}
+    // 旧格式兼容：{ type, min } / { type, elements } / { type, damageTypes }
+    if (c.type === 'chain' || c.type === 'refinement') {
+        const min = typeof c.min === 'number' && Number.isFinite(c.min) ? Math.floor(c.min) : 0
+        const max = c.type === 'chain' ? CHAIN_MAX : REFINE_MAX
+        const minOk = c.type === 'chain' ? min >= 0 : min >= 1
+        if (minOk && min <= max) out[c.type as 'chain' | 'refinement'] = min
+    } else if (c.type === 'element' && Array.isArray(c.elements)) {
+        const elements = c.elements.filter((e): e is string => typeof e === 'string' && ELEMENT_SET.has(e))
+        if (elements.length > 0) out.elements = [...new Set(elements)]
+    } else if (c.type === 'damageType' && Array.isArray(c.damageTypes)) {
+        const damageTypes = c.damageTypes.filter((d): d is string => typeof d === 'string' && DAMAGE_TYPE_SET.has(d))
+        if (damageTypes.length > 0) out.damageTypes = [...new Set(damageTypes)]
+    }
+    // 新格式：独立字段
+    if (typeof c.chain === 'number' && Number.isFinite(c.chain)) {
+        const min = Math.floor(c.chain)
+        if (min >= 0 && min <= CHAIN_MAX) out.chain = min
+    }
+    if (typeof c.refinement === 'number' && Number.isFinite(c.refinement)) {
+        const min = Math.floor(c.refinement)
+        if (min >= 1 && min <= REFINE_MAX) out.refinement = min
+    }
+    if (Array.isArray(c.elements)) {
+        const elements = c.elements.filter((e): e is string => typeof e === 'string' && ELEMENT_SET.has(e))
+        if (elements.length > 0) out.elements = [...new Set(elements)]
+    }
+    if (Array.isArray(c.damageTypes)) {
+        const damageTypes = c.damageTypes.filter((d): d is string => typeof d === 'string' && DAMAGE_TYPE_SET.has(d))
+        if (damageTypes.length > 0) out.damageTypes = [...new Set(damageTypes)]
+    }
+    return Object.keys(out).length > 0 ? out : undefined
+}
+
+function cloneCondition(cond: BuffCondition): BuffCondition {
+    return {
+        ...(cond.chain !== undefined ? { chain: cond.chain } : {}),
+        ...(cond.refinement !== undefined ? { refinement: cond.refinement } : {}),
+        ...(cond.elements ? { elements: [...cond.elements] } : {}),
+        ...(cond.damageTypes ? { damageTypes: [...cond.damageTypes] } : {})
+    }
+}
+
+// 按实体类型限制条件：角色可设共鸣链、武器可设精炼、声骸/套装均不可
+function sanitizeConditionForEntity(entityType: BuffEntityType, cond: BuffCondition): BuffCondition | undefined {
+    const out = cloneCondition(cond)
+    if (entityType !== 'character') delete out.chain
+    if (entityType !== 'weapon') delete out.refinement
+    return Object.keys(out).length > 0 ? out : undefined
 }
 
 export interface BuffLibraryZoneRef {
@@ -277,7 +324,7 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
             buffName: name,
             scope: b.scope,
             exclusive: b.exclusive,
-            ...(b.condition ? { condition: { ...b.condition } } : {}),
+            ...(b.condition ? { condition: cloneCondition(b.condition) } : {}),
             zones: b.zones.map((z) => ({ ...z }))
         })
     }
@@ -286,15 +333,17 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
 
 export async function updateEntityBuffs(entityType: BuffEntityType, entityName: string, buffs: BuffLibraryBuff[]) {
     const key = entityKey(entityType, entityName)
+    const valid = cloneBuffsValid(buffs).map((b) => ({
+        ...b,
+        ...(b.condition ? { condition: sanitizeConditionForEntity(entityType, b.condition) } : {})
+    }))
     const exists = _entities.some((e) => entityKey(e.entityType, e.entityName) === key)
     if (exists) {
         _entities = _entities.map((e) =>
-            entityKey(e.entityType, e.entityName) === key
-                ? { ...e, source: 'custom', buffs: cloneBuffsValid(buffs) }
-                : e
+            entityKey(e.entityType, e.entityName) === key ? { ...e, source: 'custom', buffs: valid } : e
         )
     } else {
-        _entities = [..._entities, { entityType, entityName, source: 'custom', buffs: cloneBuffsValid(buffs) }]
+        _entities = [..._entities, { entityType, entityName, source: 'custom', buffs: valid }]
     }
     await persist()
 }

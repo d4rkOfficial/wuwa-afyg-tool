@@ -22,24 +22,7 @@ function clamp(v: number, min: number, max: number): number {
 
 import type { EnemyConfig } from '../config/config.types'
 
-function inferDamageTypes(entry: DamageEntry): string[] {
-    switch (entry.skillType) {
-        case '常态攻击':
-            return entry.hitName.includes('重击') ? ['重击伤害'] : ['普攻伤害']
-        case '共鸣技能':
-            return ['共鸣技能伤害']
-        case '共鸣解放':
-            return ['共鸣解放伤害']
-        case '声骸技能':
-            return ['声骸技能伤害']
-        case '变奏技能':
-            return ['变奏技能伤害']
-        case '延奏技能':
-            return ['延奏技能伤害']
-        default:
-            return []
-    }
-}
+import { inferDamageTypes } from './utils'
 
 function resolveDamageTypes(entry: DamageEntry, damageEntryDamageTypes: Record<string, string[]>): string[] {
     const explicit = damageEntryDamageTypes[entry.id] ?? []
@@ -307,31 +290,57 @@ export interface ConditionProfile {
 
 export const DEFAULT_CONDITION_PROFILE: ConditionProfile = { chains: [0, 0, 0], refinements: [1, 1, 1] }
 
-// 生效条件判定：buff 有 condition 时，参考其归属角色（conditionRefCharIdx）的链/精炼，
-// 未指定参考角色则回退到当前角色自身判断；charIndex<0（效应/无角色）时条件型 buff 不生效
-function conditionMet(bs: BuffSet, profile: ConditionProfile, charIndex: number): boolean {
+// 生效条件判定：chain/refinement 参考其归属角色（conditionRefCharIdx）的链/精炼，
+// 未指定参考角色则回退到当前角色自身判断；charIndex<0（效应/无角色）时条件型 buff 不生效。
+// elements/damageTypes 为条目级条件，需结合 entry 判定；无 entry（角色级聚合）时不生效。
+function conditionMet(
+    bs: BuffSet,
+    profile: ConditionProfile,
+    charIndex: number,
+    entry?: DamageEntry,
+    damageEntryDamageTypes?: Record<string, string[]>
+): boolean {
     const cond = bs.condition
     if (!cond) return true
     const refIdx = bs.conditionRefCharIdx ?? charIndex
-    if (refIdx < 0) return false
-    if (cond.type === 'chain') return (profile.chains[refIdx] ?? 0) >= cond.min
-    return (profile.refinements[refIdx] ?? 1) >= cond.min
+    if (cond.chain !== undefined) {
+        if (refIdx < 0) return false
+        if ((profile.chains[refIdx] ?? 0) < cond.chain) return false
+    }
+    if (cond.refinement !== undefined) {
+        if (refIdx < 0) return false
+        if ((profile.refinements[refIdx] ?? 1) < cond.refinement) return false
+    }
+    if (cond.elements?.length) {
+        if (!entry) return false
+        if (!cond.elements.includes(entry.damageElement)) return false
+    }
+    if (cond.damageTypes?.length) {
+        if (!entry) return false
+        const types = resolveDamageTypes(entry, damageEntryDamageTypes ?? {})
+        if (!cond.damageTypes.some((dt) => types.includes(dt))) return false
+    }
+    return true
 }
 
 function getBoundBuffSets(
-    entryId: string,
+    entry: DamageEntry,
     charIndex: number,
     buffSets: BuffSet[],
     damageEntryBuffSetIds: Record<string, string[]>,
+    damageEntryDamageTypes: Record<string, string[]>,
     profile: ConditionProfile = DEFAULT_CONDITION_PROFILE
 ): BuffSet[] {
-    const boundIds = damageEntryBuffSetIds[entryId] ?? []
+    const boundIds = damageEntryBuffSetIds[entry.id] ?? []
     return buffSets.filter((bs) => {
         if (!boundIds.includes(bs.id)) return false
-        if (bs.scope === 'all') return conditionMet(bs, profile, charIndex)
+        if (bs.scope === 'all') return conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes)
         if (Array.isArray(bs.scope) && bs.scope.length === 0)
-            return charIndex < 0 && conditionMet(bs, profile, charIndex)
-        return (bs.scope as number[]).includes(charIndex) && conditionMet(bs, profile, charIndex)
+            return charIndex < 0 && conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes)
+        return (
+            (bs.scope as number[]).includes(charIndex) &&
+            conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes)
+        )
     })
 }
 
@@ -1171,7 +1180,14 @@ export function computeAll(
         const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
         const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
         const echoes = charIndex >= 0 ? (configState.characters[charIndex]?.echoes ?? []) : []
-        const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds, conditionProfile)
+        const boundBuffSets = getBoundBuffSets(
+            entry,
+            charIndex,
+            buffSets,
+            damageEntryBuffSetIds,
+            damageEntryDamageTypes,
+            conditionProfile
+        )
         const charInfo = charName ? charInfoMap[charName] : undefined
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
@@ -1279,7 +1295,14 @@ export function computeOneEntry(
     const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
     const wInfo = weaponInfoMap[weaponName ?? ''] ?? null
     const charInfo = charName ? charInfoMap[charName] : undefined
-    const boundBuffSets = getBoundBuffSets(entry.id, charIndex, buffSets, damageEntryBuffSetIds, conditionProfile)
+    const boundBuffSets = getBoundBuffSets(
+        entry,
+        charIndex,
+        buffSets,
+        damageEntryBuffSetIds,
+        damageEntryDamageTypes,
+        conditionProfile
+    )
 
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo

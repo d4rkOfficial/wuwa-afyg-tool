@@ -53,7 +53,9 @@ export const DAMAGE_TYPES = [
     '共鸣解放伤害',
     '声骸技能伤害',
     '变奏技能伤害',
-    '延奏技能伤害'
+    '延奏技能伤害',
+    '协同攻击伤害',
+    '其它类型伤害'
 ] as const
 
 export const DAMAGE_TYPE_SHORT: Record<string, string> = {
@@ -63,7 +65,9 @@ export const DAMAGE_TYPE_SHORT: Record<string, string> = {
     共鸣解放伤害: '共解',
     声骸技能伤害: '声骸',
     变奏技能伤害: '变奏',
-    延奏技能伤害: '延奏'
+    延奏技能伤害: '延奏',
+    协同攻击伤害: '协同',
+    其它类型伤害: '其它'
 } as const
 
 export const DAMAGE_BONUS_LABELS = ['普攻伤害加成', '重击伤害加成', '共鸣技能伤害加成', '共鸣解放伤害加成'] as const

@@ -28,7 +28,8 @@
     } from './calculation.consts'
     import type { ZoneId, GroupedBuffSetItem } from './calculation.consts'
     import type { CharSlot } from '$lib/data/types'
-    import type { ZoneRef, BuffSet } from './calculation.types'
+    import type { ZoneRef, BuffSet, BuffCondition } from './calculation.types'
+    import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import Icon from '@iconify/svelte'
@@ -301,40 +302,94 @@
         return !!selectedBuffSet && selectedBuffSet.id.startsWith('global-')
     }
 
-    function toggleBuffCondition() {
+    let condPanelOpen = $state(false)
+
+    function toggleCondPanel() {
         if (!selectedBuffSetId || !selectedBuffSet) return
-        if (isDefaultGlobalBuff()) {
-            addToast('默认全局buff无法设置共鸣链/精炼条件', 'info')
-            return
-        }
-        setBuffSetCondition(selectedBuffSetId, selectedBuffSet.condition ? null : { type: 'chain', min: 1 })
+        condPanelOpen = !condPanelOpen
     }
 
-    function setBuffConditionType(type: 'chain' | 'refinement') {
-        if (!selectedBuffSetId || !selectedBuffSet?.condition) return
-        if (isDefaultGlobalBuff()) {
-            addToast('默认全局buff无法设置共鸣链/精炼条件', 'info')
-            return
-        }
-        setBuffSetCondition(selectedBuffSetId, { type, min: selectedBuffSet.condition.min })
+    function clearCondition() {
+        if (!selectedBuffSetId) return
+        setBuffSetCondition(selectedBuffSetId, null)
+        setBuffSetConditionRef(selectedBuffSetId, null)
+        condPanelOpen = false
     }
 
-    function setBuffConditionMin(value: number) {
-        if (!selectedBuffSetId || !selectedBuffSet?.condition) return
-        if (isDefaultGlobalBuff()) {
-            addToast('默认全局buff无法设置共鸣链/精炼条件', 'info')
-            return
+    const conditionSummary = $derived.by(() => {
+        const cond = selectedBuffSet?.condition
+        if (!cond) return ''
+        const parts: string[] = []
+        if (cond.chain !== undefined) {
+            const refIdx = selectedBuffSet.conditionRefCharIdx ?? 0
+            const name = team[refIdx]?.character ?? `角色 ${refIdx + 1}`
+            parts.push(`${name} ≥${cond.chain}链`)
         }
-        setBuffSetCondition(selectedBuffSetId, { ...selectedBuffSet.condition, min: value || 0 })
+        if (cond.refinement !== undefined) {
+            const name =
+                team[selectedBuffSet.conditionRefCharIdx ?? 0]?.character ??
+                `角色 ${(selectedBuffSet.conditionRefCharIdx ?? 0) + 1}`
+            parts.push(`${name}的武器 ≥${cond.refinement}阶`)
+        }
+        if (cond.elements?.length) parts.push(`伤害属性 ${cond.elements.join('/')}`)
+        if (cond.damageTypes?.length)
+            parts.push(`伤害类型 ${cond.damageTypes.map((d) => DAMAGE_TYPE_SHORT[d] ?? d).join('/')}`)
+        return parts.join('，')
+    })
+
+    // 参考角色必须恰好一个：设置了链/精炼但未选参考角色时，默认参考第一位
+    function ensureConditionRef() {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        if (selectedBuffSet.conditionRefCharIdx === undefined) setBuffSetConditionRef(selectedBuffSetId, 0)
+    }
+
+    function setBuffChain(min: number) {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        if (isDefaultGlobalBuff()) return
+        const cond = selectedBuffSet.condition ?? {}
+        const next: BuffCondition = { ...cond }
+        if (next.chain === min) delete next.chain
+        else next.chain = min
+        setBuffSetCondition(selectedBuffSetId, next)
+        if (next.chain !== undefined || next.refinement !== undefined) ensureConditionRef()
+    }
+
+    function setBuffRefinement(min: number) {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        if (isDefaultGlobalBuff()) return
+        const cond = selectedBuffSet.condition ?? {}
+        const next: BuffCondition = { ...cond }
+        if (next.refinement === min) delete next.refinement
+        else next.refinement = min
+        setBuffSetCondition(selectedBuffSetId, next)
+        if (next.chain !== undefined || next.refinement !== undefined) ensureConditionRef()
+    }
+
+    function toggleConditionElement(el: string) {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        if (isDefaultGlobalBuff()) return
+        const cond = selectedBuffSet.condition ?? {}
+        const list = cond.elements ?? []
+        const next = list.includes(el) ? list.filter((e) => e !== el) : [...list, el]
+        setBuffSetCondition(selectedBuffSetId, { ...cond, elements: next })
+    }
+
+    function toggleConditionDamageType(dt: string) {
+        if (!selectedBuffSetId || !selectedBuffSet) return
+        if (isDefaultGlobalBuff()) return
+        const cond = selectedBuffSet.condition ?? {}
+        const list = cond.damageTypes ?? []
+        const next = list.includes(dt) ? list.filter((d) => d !== dt) : [...list, dt]
+        setBuffSetCondition(selectedBuffSetId, { ...cond, damageTypes: next })
     }
 
     function setConditionRef(i: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) {
-            addToast('默认全局buff无法设置共鸣链/精炼条件', 'info')
+            addToast('默认全局buff无法设置生效条件', 'info')
             return
         }
-        setBuffSetConditionRef(selectedBuffSetId, selectedBuffSet.conditionRefCharIdx === i ? null : i)
+        setBuffSetConditionRef(selectedBuffSetId, i)
     }
 
     function openRefModal(zoneId: string) {
@@ -1031,77 +1086,50 @@
                         </div>
 
                         <!-- 生效条件 -->
-                        <div
-                            class="shrink-0 px-3 pb-2.5 pt-1.5 border-b"
-                            style="border-bottom: 1px solid var(--theme-divider-border);"
-                        >
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <button
-                                    onclick={toggleBuffCondition}
-                                    class={[
-                                        'flex items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-all whitespace-nowrap',
-                                        isDefaultGlobal ? 'cursor-not-allowed opacity-50' : '',
-                                        selectedBuffSet.condition ? 'self-stretch' : 'h-6',
-                                        selectedBuffSet.condition
-                                            ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                            : 'border-transparent text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                    ].join(' ')}
-                                    title={isDefaultGlobal
-                                        ? '默认全局buff无法设置共鸣链/精炼条件'
-                                        : '仅当该增益确有命座/精炼门槛时开启'}
+                        <div class="shrink-0 border-b" style="border-bottom: 1px solid var(--theme-divider-border);">
+                            <button
+                                onclick={toggleCondPanel}
+                                class={[
+                                    'flex w-full items-center gap-1.5 px-3 py-2 text-left text-[11px] transition-colors hover:bg-(--theme-modal-text)/5',
+                                    conditionSummary ? 'text-(--theme-accent-text)' : 'text-(--theme-modal-text)/60'
+                                ].join(' ')}
+                                title={isDefaultGlobal ? '生效条件（默认全局buff不可配置）' : '生效条件'}
+                            >
+                                <Icon
+                                    icon={condPanelOpen ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                    class="size-3.5 shrink-0 text-(--theme-modal-text)/40"
+                                />
+                                <span class="shrink-0">生效条件</span>
+                                {#if conditionSummary}
+                                    <span class="min-w-0 truncate text-[11px]">：{conditionSummary}</span>
+                                {/if}
+                            </button>
+                            {#if condPanelOpen}
+                                {@const cond = selectedBuffSet.condition ?? {}}
+                                <div
+                                    transition:slide|local={{ duration: 200 }}
+                                    class="flex flex-wrap items-center gap-2 px-3 pb-2.5"
                                 >
-                                    <Icon
-                                        icon={selectedBuffSet.condition ? 'mdi:check-circle' : 'mdi:circle-outline'}
-                                        class="size-3.5 shrink-0"
-                                    />
-                                    {#if !selectedBuffSet.condition}共鸣链/精炼阶数条件{/if}
-                                </button>
-                                {#if selectedBuffSet.condition}
-                                    <div
-                                        class="flex flex-wrap items-center gap-2 rounded-md border px-2.5 py-1.5"
-                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                    >
-                                        <div
-                                            class="flex overflow-hidden rounded border"
-                                            style="border-color: var(--theme-divider-border);"
-                                            title="chain=角色共鸣链；refinement=武器精炼（佩戴该武器的角色）"
+                                    {#if isDefaultGlobal}
+                                        <span class="text-[10px] text-(--theme-modal-text)/35"
+                                            >默认全局buff无法设置生效条件</span
                                         >
-                                            <button
-                                                onclick={() => setBuffConditionType('chain')}
-                                                class={[
-                                                    'flex h-6 items-center px-2 text-[11px] transition-colors',
-                                                    selectedBuffSet.condition.type === 'chain'
-                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                                ].join(' ')}
-                                            >
-                                                角色
-                                            </button>
-                                            <button
-                                                onclick={() => setBuffConditionType('refinement')}
-                                                class={[
-                                                    'flex h-6 items-center px-2 text-[11px] transition-colors',
-                                                    selectedBuffSet.condition.type === 'refinement'
-                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                                ].join(' ')}
-                                            >
-                                                武器
-                                            </button>
-                                        </div>
-                                        <span class="flex h-6 items-center text-[11px] text-(--theme-modal-text)/50"
-                                            >≥</span
+                                    {/if}
+                                    <!-- 共鸣链 -->
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
+                                            >共鸣链</span
                                         >
                                         <div
                                             class="flex overflow-hidden rounded border"
                                             style="border-color: var(--theme-divider-border);"
                                         >
-                                            {#each Array.from({ length: selectedBuffSet.condition.type === 'chain' ? 6 : 5 }, (_, k) => k + 1) as n}
+                                            {#each Array.from({ length: 7 }, (_, k) => k) as n}
                                                 <button
-                                                    onclick={() => setBuffConditionMin(n)}
+                                                    onclick={() => setBuffChain(n)}
                                                     class={[
                                                         'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                                        selectedBuffSet.condition.min === n
+                                                        cond.chain === n
                                                             ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                                             : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                                                     ].join(' ')}
@@ -1110,12 +1138,45 @@
                                                 </button>
                                             {/each}
                                         </div>
-                                        <span
-                                            class="flex h-6 w-4 items-center text-[11px] font-medium text-(--theme-accent-text)"
+                                        {#if cond.chain !== undefined}
+                                            <span
+                                                class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
+                                                >≥{cond.chain}链</span
+                                            >
+                                        {/if}
+                                    </div>
+                                    <!-- 武器精炼 -->
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
+                                            >精炼</span
                                         >
-                                            {selectedBuffSet.condition.type === 'chain' ? '链' : '阶'}
-                                        </span>
-                                        <!-- 参考角色（chain / refinement 共用同一人） -->
+                                        <div
+                                            class="flex overflow-hidden rounded border"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            {#each Array.from({ length: 5 }, (_, k) => k + 1) as n}
+                                                <button
+                                                    onclick={() => setBuffRefinement(n)}
+                                                    class={[
+                                                        'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                                        cond.refinement === n
+                                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                    ].join(' ')}
+                                                >
+                                                    {n}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                        {#if cond.refinement}
+                                            <span
+                                                class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
+                                                >≥{cond.refinement}阶</span
+                                            >
+                                        {/if}
+                                    </div>
+                                    <!-- 参考角色（仅共鸣链 / 精炼需要） -->
+                                    {#if cond.chain !== undefined || cond.refinement !== undefined}
                                         <div class="flex items-center gap-1">
                                             <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/50"
                                                 >参考角色</span
@@ -1125,7 +1186,7 @@
                                                     onclick={() => setConditionRef(i)}
                                                     class={[
                                                         'size-6 rounded-full overflow-hidden border-2 transition-all',
-                                                        selectedBuffSet.conditionRefCharIdx === i
+                                                        (selectedBuffSet.conditionRefCharIdx ?? 0) === i
                                                             ? 'border-(--theme-accent-bg)'
                                                             : 'border-(--theme-divider-border) grayscale opacity-40 hover:opacity-70'
                                                     ].join(' ')}
@@ -1148,9 +1209,56 @@
                                                 </button>
                                             {/each}
                                         </div>
+                                    {/if}
+                                    <!-- 伤害属性 -->
+                                    <div class="flex flex-wrap items-center gap-1">
+                                        <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
+                                            >伤害属性</span
+                                        >
+                                        {#each ELEMENTS as el}
+                                            <button
+                                                onclick={() => toggleConditionElement(el)}
+                                                class={[
+                                                    'rounded px-1.5 py-0.5 text-[10px] transition-colors',
+                                                    (cond.elements ?? []).includes(el)
+                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                ].join(' ')}
+                                            >
+                                                {el}
+                                            </button>
+                                        {/each}
                                     </div>
-                                {/if}
-                            </div>
+                                    <!-- 伤害类型 -->
+                                    <div class="flex flex-wrap items-center gap-1">
+                                        <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
+                                            >伤害类型</span
+                                        >
+                                        {#each DAMAGE_TYPES as dt}
+                                            <button
+                                                onclick={() => toggleConditionDamageType(dt)}
+                                                title={dt}
+                                                class={[
+                                                    'rounded px-1.5 py-0.5 text-[10px] transition-colors',
+                                                    (cond.damageTypes ?? []).includes(dt)
+                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                ].join(' ')}
+                                            >
+                                                {DAMAGE_TYPE_SHORT[dt] ?? dt}
+                                            </button>
+                                        {/each}
+                                    </div>
+                                    <button
+                                        onclick={clearCondition}
+                                        class="flex h-6 items-center gap-1 rounded border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <Icon icon="mdi:close-circle-outline" class="size-3" />
+                                        清除
+                                    </button>
+                                </div>
+                            {/if}
                         </div>
 
                         <!-- Zone list -->
