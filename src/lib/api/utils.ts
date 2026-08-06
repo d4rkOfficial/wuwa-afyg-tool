@@ -86,7 +86,8 @@ function makeSkillValues(
         let element = ''
         let energy: string | undefined
         let tune: string | undefined
-        if (skill.damage) {
+        const damage = skill.damage
+        if (damage) {
             const mRaw = raw.match(/^([\d.]+)%(?:\*(\d+))?/)
             const pct = mRaw ? parseFloat(mRaw[1]) : NaN
             const mult = mRaw && mRaw[2] ? parseInt(mRaw[2], 10) : 1
@@ -94,27 +95,87 @@ function makeSkillValues(
                 const target = Math.round(pct * 100)
                 // 命中一段：同段 = damage key 去掉末 2 位后前缀相同的全部条目（段内多 hit）
                 let matchedKey: string | null = null
-                for (const dk of Object.keys(skill.damage)) {
-                    const dv = skill.damage[dk]
+                let extraHits = 1
+                for (const dk of Object.keys(damage)) {
+                    const dv = damage[dk]
                     if (dv.rate_lv && dv.rate_lv[idx] === target) {
                         matchedKey = dk
                         break
                     }
                 }
+                // 兼容聚合倍率（如共鸣回路 100.00% = 4×25.00%）：行参数是聚合值而 rate_lv 是单段值，
+                // 精确匹配不到时按倍数回退（k = target / rate_lv[idx] ∈ [2,10]，取倍数最小的单段值），
+                // 允许 ±0.10% 容差以吸收上游聚合值的四舍五入（如 198.81% ≈ 49.71%×4）
+                if (!matchedKey) {
+                    for (const dk of Object.keys(damage)) {
+                        const dv = damage[dk]
+                        const rate = dv.rate_lv?.[idx] ?? 0
+                        if (rate <= 0) continue
+                        const kf = target / rate
+                        const k = Math.round(kf)
+                        if (k < 2 || k > 10) continue
+                        const diff = Math.abs(target - rate * k)
+                        if (diff <= 10 && (!matchedKey || k < extraHits)) {
+                            matchedKey = dk
+                            extraHits = k
+                        }
+                    }
+                }
+                // 不可靠估算：聚合值还含无法拆分的成分（如「每点焰光」加成）时，
+                // 取倍率最接近的单段值，按实际倍率比（可为小数）比例估算能量/偏谐
+                let isEstimate = false
+                if (!matchedKey) {
+                    let bestKey: string | null = null
+                    let bestDiff = Infinity
+                    for (const dk of Object.keys(damage)) {
+                        const dv = damage[dk]
+                        const rate = dv.rate_lv?.[idx] ?? 0
+                        if (rate <= 0) continue
+                        const kf = target / rate
+                        const k = Math.round(kf)
+                        if (k < 1 || k > 10) continue
+                        const diff = Math.abs(target - rate * k)
+                        if (diff < bestDiff) {
+                            bestDiff = diff
+                            bestKey = dk
+                        }
+                    }
+                    if (bestKey && bestDiff <= target * 0.15) {
+                        matchedKey = bestKey
+                        extraHits = target / (damage[bestKey].rate_lv?.[idx] ?? 1)
+                        isEstimate = true
+                    }
+                }
                 if (matchedKey) {
                     const prefix = matchedKey.slice(0, -2)
-                    const group = Object.entries(skill.damage).filter(([k]) => k.slice(0, -2) === prefix)
-                    const first = group[0][1]
+                    const group = Object.values(damage).filter((_, i) => Object.keys(damage)[i].slice(0, -2) === prefix)
+                    // 精确命中取组内首个（同段多 hit）；聚合/估算路径直接取命中 key 自身的数据
+                    const first = isEstimate || extraHits > 1 ? damage[matchedKey] : (group[0] ?? damage[matchedKey])
                     element = ELEMENT_MAP[first.element] ?? ''
-                    // 倍率多段（如 48.17%*4）时能量/偏谐同样按 *N 乘，与倍率语义一致
-                    if (typeof first.energy === 'number') {
-                        const e = first.energy / 100
-                        energy = mult > 1 ? `${e}*${mult}` : String(e)
+                    const hitFactor = mult * extraHits
+                    if (isEstimate) {
+                        // 估算值：单段能量/偏谐 × 实际倍率比，四舍五入到两位
+                        if (typeof first.energy === 'number') {
+                            energy = ((first.energy / 100) * hitFactor).toFixed(2)
+                        }
+                        if (typeof first.weakness_lvl === 'number') {
+                            tune = ((first.weakness_lvl / 100) * hitFactor).toFixed(2)
+                        }
+                    } else {
+                        // 倍率多段（如 48.17%*4）或聚合倍率（如 100.00% = 4hit）时能量/偏谐同样按 hit 数乘，与倍率语义一致
+                        if (typeof first.energy === 'number') {
+                            const e = first.energy / 100
+                            energy = hitFactor > 1 ? `${e}*${hitFactor}` : String(e)
+                        }
+                        if (typeof first.weakness_lvl === 'number') {
+                            const t = first.weakness_lvl / 100
+                            tune = hitFactor > 1 ? `${t}*${hitFactor}` : String(t)
+                        }
                     }
-                    if (typeof first.weakness_lvl === 'number') {
-                        const t = first.weakness_lvl / 100
-                        tune = mult > 1 ? `${t}*${mult}` : String(t)
-                    }
+                } else {
+                    // 兜底：仍匹配不到时取技能内首个伤害条目的元素（同技能内伤害属性一致），能量/偏谐留空
+                    const first = Object.values(damage)[0]
+                    if (first) element = ELEMENT_MAP[first.element] ?? ''
                 }
             }
         }
@@ -192,7 +253,7 @@ function preprocessSkills(skills: SkillEntry[], elementName: string) {
                 const dmgIdx = skill.desc.indexOf('伤害', causeIdx + 1)
                 if (causeIdx >= 0 && dmgIdx > causeIdx) {
                     const between = skill.desc.slice(causeIdx + 2, dmgIdx)
-                    const ratioMatch = between.match(/[\d+%]+/)
+                    const ratioMatch = between.match(/[\d+%.]+/)
                     if (ratioMatch) {
                         const ratioPart = ratioMatch[0]
                         const after = between.slice(ratioMatch.index! + ratioPart.length)

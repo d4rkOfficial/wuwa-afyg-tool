@@ -349,7 +349,7 @@
                     />
                 </div>
 
-                <div>
+                <div ondblclick={() => (hasFlat = true)}>
                     <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">固定值</label>
                     <div class="flex items-center rounded-md border" style="border-color: var(--theme-divider-border);">
                         <button
@@ -370,9 +370,11 @@
                             <input
                                 type="number"
                                 bind:value={customFlat}
-                                disabled={!hasFlat}
+                                readonly={!hasFlat}
+                                ondblclick={() => (hasFlat = true)}
                                 placeholder="0"
-                                class="w-full min-w-0 text-xs outline-none tabular-nums text-center bg-transparent disabled:text-(--theme-modal-text)/20"
+                                title={hasFlat ? '' : '双击启用'}
+                                class="w-full min-w-0 text-xs outline-none tabular-nums text-center bg-transparent readonly:text-(--theme-modal-text)/20"
                                 class:text-(--theme-modal-text)={hasFlat}
                             />
                         </div>
@@ -380,7 +382,7 @@
                     </div>
                 </div>
 
-                <div>
+                <div ondblclick={() => (hasPct = true)}>
                     <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">百分比值</label>
                     <div class="flex items-center rounded-md border" style="border-color: var(--theme-divider-border);">
                         <button
@@ -401,9 +403,11 @@
                             <input
                                 type="number"
                                 bind:value={customPct}
-                                disabled={!hasPct}
+                                readonly={!hasPct}
+                                ondblclick={() => (hasPct = true)}
                                 placeholder="0"
-                                class="w-full min-w-0 text-xs outline-none tabular-nums text-center bg-transparent disabled:text-(--theme-modal-text)/20"
+                                title={hasPct ? '' : '双击启用'}
+                                class="w-full min-w-0 text-xs outline-none tabular-nums text-center bg-transparent readonly:text-(--theme-modal-text)/20"
                                 class:text-(--theme-modal-text)={hasPct}
                             />
                         </div>
