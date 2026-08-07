@@ -12,7 +12,8 @@
     import type { ResultEntry, CharSubstatAnalysis } from './result.types'
     import { getAlgorithm, ALGORITHMS_INFO } from './substat-algorithms'
     import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
-    import { tick, untrack } from 'svelte'
+    import { tick, untrack, onMount } from 'svelte'
+    import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import DataAnalysisModal from './data-analysis-modal.svelte'
@@ -192,6 +193,16 @@
 
     let expandedEntry = $state<string | null>(null)
     let showDataAnalysis = $state(false)
+
+    onMount(() => {
+        registerPanel(
+            'data-analysis',
+            '数据分析',
+            () => showDataAnalysis,
+            (v) => (showDataAnalysis = v)
+        )
+        return () => unregisterPanel('data-analysis')
+    })
     let tableContainer = $state<HTMLDivElement | undefined>()
 
     function toggleExpand(id: string, _index: number) {

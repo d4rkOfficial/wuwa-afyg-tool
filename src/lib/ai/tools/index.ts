@@ -1,0 +1,12 @@
+// 工具框架出口：注册表 + 各领域工具（副作用 import 完成注册）
+export * from './registry'
+import './project'
+import './team'
+import './view'
+import './calculation'
+import './buff-library'
+import './timeline'
+import './config'
+import './result'
+import './panels'
+import './buff-generate'

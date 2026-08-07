@@ -26,6 +26,18 @@
         getPhaseOrder
     } from '$lib/data/project.svelte'
     import { getShareLink } from '$lib/data/share.svelte'
+    import { getNamingRule, getSystemPrompt, loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
+    import {
+        getAiConfig,
+        getAiProfiles,
+        loadAiConfig,
+        setActiveProfile,
+        addProfile,
+        deleteProfile,
+        updateProfile,
+        resetAiConfig,
+        type AiProfile
+    } from '$lib/ai/config.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
     import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
 
@@ -36,14 +48,15 @@
 
     let { open, onclose }: Props = $props()
 
-    let tab = $state<'theme' | 'keymap' | 'workshop' | 'archive' | 'cache'>('theme')
+    let tab = $state<'theme' | 'keymap' | 'workshop' | 'archive' | 'cache' | 'ai'>('theme')
 
     const SETTING_TABS = [
         { key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
         { key: 'keymap', label: '按键绑定', icon: 'mdi:keyboard-outline' },
         { key: 'workshop', label: '工坊设置', icon: 'mdi:storefront-outline' },
         { key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
-        { key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' }
+        { key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
+        { key: 'ai', label: 'AI 配置', icon: 'mdi:robot-outline' }
     ] as const
 
     const COLOR_PRESETS = [
@@ -59,11 +72,85 @@
 
     let overrides = $derived(getOverrides())
     let isDark = $derived(getActiveId() !== 'light')
+    let aiProfiles = $derived(getAiProfiles())
+    // AI 配置草稿：输入先改草稿，点“保存”才写入当前配置文件
+    let aiDraft = $state<AiProfile>({ ...getAiConfig() })
+    let aiNameDraft = $state('')
+    let aiDeleteConfirm = $state<AiProfile | null>(null)
+    let namingRuleDraft = $state('')
+    let systemPromptDraft = $state('')
+
+    async function saveAiConfig() {
+        await updateProfile(aiDraft.id, { ...aiDraft })
+        addToast('AI 配置已保存', 'success')
+    }
+
+    async function saveGenPrefs() {
+        await updateGenPrefs({ namingRule: namingRuleDraft, systemPrompt: systemPromptDraft })
+        addToast('提示词设置已保存', 'success')
+    }
+
+    async function handleSelectAiProfile(id: string) {
+        await setActiveProfile(id)
+        aiDraft = { ...getAiConfig() }
+    }
+
+    async function handleAddAiProfile() {
+        const profile = await addProfile(aiNameDraft)
+        aiNameDraft = ''
+        aiDraft = { ...profile }
+        addToast('已新建配置文件，填写 API Key 后保存', 'success')
+    }
+
+    function handleDeleteAiProfile(profile: AiProfile) {
+        aiDeleteConfirm = profile
+    }
+
+    async function doResetAiConfig() {
+        await resetAiConfig()
+        aiDraft = { ...getAiConfig() }
+        addToast('AI 配置文件已恢复为默认 3 个', 'success')
+    }
+
+    async function doDeleteAiProfile() {
+        if (!aiDeleteConfirm) return
+        const ok = await deleteProfile(aiDeleteConfirm.id)
+        aiDeleteConfirm = null
+        if (!ok) {
+            addToast('至少保留一个配置文件', 'error')
+            return
+        }
+        aiDraft = { ...getAiConfig() }
+        addToast('配置文件已删除', 'info')
+    }
+
+    function isDeepSeekBaseUrl(url: string): boolean {
+        try {
+            return new URL(url).host === 'api.deepseek.com'
+        } catch {
+            return false
+        }
+    }
+
+    function isOpencodeBaseUrl(url: string): boolean {
+        try {
+            return new URL(url).host === 'opencode.ai'
+        } catch {
+            return false
+        }
+    }
 
     $effect(() => {
         if (open) {
             bgUrl = overrides.backgroundImage.startsWith('http') ? overrides.backgroundImage : ''
             refreshCacheCounts()
+            loadAiConfig().then(() => {
+                aiDraft = { ...getAiConfig() }
+            })
+            loadGenPrefs().then(() => {
+                namingRuleDraft = getNamingRule()
+                systemPromptDraft = getSystemPrompt()
+            })
         }
     })
 
@@ -670,7 +757,7 @@
                                 </div>
                             {/if}
                         </div>
-                    {:else}
+                    {:else if tab === 'cache'}
                         <!-- Cache management -->
                         <div>
                             <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">缓存清理</span>
@@ -702,6 +789,276 @@
                                 {/each}
                             </div>
                         </div>
+                    {:else if tab === 'ai'}
+                        <!-- AI 助手配置 -->
+                        <div>
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">AI 助手配置</span>
+                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                可配置多组「提供商 / 模型 / API Key」并一键切换，每组独立保存；API Key
+                                仅存本机。修改后点「保存」生效
+                            </p>
+                            <div class="flex flex-col gap-2">
+                                <!-- 配置文件设置（下拉展开） -->
+                                <details
+                                    open
+                                    class="rounded-lg border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <summary class="cursor-pointer text-xs font-medium text-(--theme-modal-text)/70">
+                                        配置文件设置
+                                    </summary>
+                                    <div class="mt-2 flex flex-col gap-3">
+                                        <!-- 配置文件列表 -->
+                                        <div>
+                                            <div class="mb-1 flex items-center justify-between">
+                                                <span class="block text-xs text-(--theme-modal-text)/60">配置文件</span>
+                                                <button
+                                                    onclick={doResetAiConfig}
+                                                    class="inline-flex items-center gap-0.5 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-accent-text)"
+                                                >
+                                                    <Icon icon="mdi:restore" class="size-3" />
+                                                    恢复默认
+                                                </button>
+                                            </div>
+                                            <div class="mb-1.5 flex flex-col gap-1">
+                                                {#each aiProfiles as p}
+                                                    <div
+                                                        class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors"
+                                                        style="border-color: {p.id === aiDraft.id
+                                                            ? 'color-mix(in srgb, var(--theme-accent-bg) 45%, transparent)'
+                                                            : 'var(--theme-divider-border)'}; background: color-mix(in srgb, var(--theme-accent-bg) {p.id ===
+                                                        aiDraft.id
+                                                            ? '10%'
+                                                            : '0%'}, transparent);"
+                                                    >
+                                                        <button
+                                                            onclick={() => handleSelectAiProfile(p.id)}
+                                                            class="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
+                                                            title="切换到该配置"
+                                                        >
+                                                            <span
+                                                                class="flex w-full items-center gap-1.5 text-xs font-medium text-(--theme-modal-text)"
+                                                            >
+                                                                <span class="truncate">{p.label}</span>
+                                                                {#if p.id === aiDraft.id}
+                                                                    <span
+                                                                        class="shrink-0 rounded bg-(--theme-accent-bg)/20 px-1 py-px text-[9px] text-(--theme-accent-text)"
+                                                                        >编辑中</span
+                                                                    >
+                                                                {/if}
+                                                            </span>
+                                                            <span
+                                                                class="w-full truncate text-[10px] text-(--theme-modal-text)/40"
+                                                            >
+                                                                {p.model} · {p.baseUrl}
+                                                            </span>
+                                                        </button>
+                                                        {#if p.id === aiDraft.id}
+                                                            <button
+                                                                onclick={() => handleDeleteAiProfile(p)}
+                                                                class="shrink-0 rounded p-1 text-(--theme-modal-text)/35 transition-colors hover:text-red-400"
+                                                                title="删除此配置"
+                                                            >
+                                                                <Icon icon="mdi:trash-can-outline" class="size-3.5" />
+                                                            </button>
+                                                        {/if}
+                                                    </div>
+                                                {/each}
+                                            </div>
+                                            <div class="flex items-center gap-1.5">
+                                                <input
+                                                    type="text"
+                                                    bind:value={aiNameDraft}
+                                                    placeholder="新配置名称，如 本地 Ollama"
+                                                    class="min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                                                    style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                                                />
+                                                <button
+                                                    onclick={handleAddAiProfile}
+                                                    class="inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:brightness-110"
+                                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                                >
+                                                    <Icon icon="mdi:plus" class="size-3.5" />
+                                                    新建
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="my-0.5 border-t"
+                                            style="border-color: var(--theme-divider-border);"
+                                        ></div>
+                                        <label class="block">
+                                            <span class="mb-1 block text-xs text-(--theme-modal-text)/60"
+                                                >AI 服务地址</span
+                                            >
+                                            <input
+                                                type="url"
+                                                value={aiDraft.baseUrl}
+                                                oninput={(e) =>
+                                                    (aiDraft = {
+                                                        ...aiDraft,
+                                                        baseUrl: (e.currentTarget as HTMLInputElement).value
+                                                    })}
+                                                placeholder="https://api.deepseek.com"
+                                                class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                                                style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                                            />
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-1 block text-xs text-(--theme-modal-text)/60">模型名</span>
+                                            <input
+                                                type="text"
+                                                value={aiDraft.model}
+                                                oninput={(e) =>
+                                                    (aiDraft = {
+                                                        ...aiDraft,
+                                                        model: (e.currentTarget as HTMLInputElement).value
+                                                    })}
+                                                placeholder="deepseek-v4-flash"
+                                                class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                                                style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                                            />
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-1 block text-xs text-(--theme-modal-text)/60"
+                                                >AI API Key</span
+                                            >
+                                            <input
+                                                type="password"
+                                                value={aiDraft.apiKey}
+                                                oninput={(e) =>
+                                                    (aiDraft = {
+                                                        ...aiDraft,
+                                                        apiKey: (e.currentTarget as HTMLInputElement).value
+                                                    })}
+                                                placeholder="sk-..."
+                                                class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                                                style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                                            />
+                                            {#if isDeepSeekBaseUrl(aiDraft.baseUrl)}
+                                                <p class="mt-1 text-[10px] text-(--theme-modal-text)/40">
+                                                    API Key 在
+                                                    <a
+                                                        href="https://platform.deepseek.com"
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        class="text-(--theme-accent-text) hover:underline"
+                                                        >DeepSeek 开放平台</a
+                                                    >
+                                                    获取
+                                                </p>
+                                            {:else if isOpencodeBaseUrl(aiDraft.baseUrl)}
+                                                <p class="mt-1 text-[10px] text-(--theme-modal-text)/40">
+                                                    API Key 在
+                                                    <a
+                                                        href="https://opencode.ai/auth"
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        class="text-(--theme-accent-text) hover:underline"
+                                                        >opencode Workspace</a
+                                                    >
+                                                    获取
+                                                </p>
+                                            {/if}
+                                        </label>
+                                        <div>
+                                            <span class="mb-1 block text-xs text-(--theme-modal-text)/60">思考强度</span
+                                            >
+                                            <div class="flex flex-wrap gap-1">
+                                                {#each ['low', 'medium', 'high'] as level}
+                                                    <button
+                                                        onclick={() =>
+                                                            (aiDraft = {
+                                                                ...aiDraft,
+                                                                reasoningEffort: level as 'low' | 'medium' | 'high'
+                                                            })}
+                                                        class="rounded-md px-2 py-1 text-[10px] transition-colors {aiDraft.reasoningEffort ===
+                                                        level
+                                                            ? 'text-(--theme-accent-text)'
+                                                            : 'text-(--theme-modal-text)/60'}"
+                                                        style="background: color-mix(in srgb, var(--theme-accent-bg) {aiDraft.reasoningEffort ===
+                                                        level
+                                                            ? '14%'
+                                                            : '0%'}, transparent);"
+                                                    >
+                                                        {level === 'low' ? '低' : level === 'medium' ? '中' : '高'}
+                                                    </button>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-end">
+                                            <button
+                                                onclick={saveAiConfig}
+                                                class="inline-flex items-center gap-1 rounded-lg px-4 py-1.5 text-xs font-medium transition-all hover:brightness-110"
+                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                            >
+                                                <Icon icon="mdi:content-save-outline" class="size-3.5" />
+                                                保存配置文件
+                                            </button>
+                                        </div>
+                                    </div>
+                                </details>
+
+                                <!-- 提示词设置（下拉展开，独立保存） -->
+                                <details
+                                    class="rounded-lg border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <summary class="cursor-pointer text-xs font-medium text-(--theme-modal-text)/70">
+                                        提示词设置
+                                    </summary>
+                                    <p class="mt-2 mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                        命名规则与人设提示词，与模型配置分开保存
+                                    </p>
+                                    <div class="flex flex-col gap-3">
+                                        <div>
+                                            <span class="mb-1 block text-xs text-(--theme-modal-text)/60"
+                                                >Buff 命名规则</span
+                                            >
+                                            <textarea
+                                                value={namingRuleDraft}
+                                                oninput={(e) =>
+                                                    (namingRuleDraft = (e.currentTarget as HTMLTextAreaElement).value)}
+                                                rows="6"
+                                                placeholder="生成 Buff 时按此规则命名；清空则每次生成前由 AI 询问你"
+                                                class="w-full resize-y rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                                                style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                                            ></textarea>
+                                            <p class="mt-1 text-[10px] text-(--theme-modal-text)/40">
+                                                默认采用工坊（share）端的命名风格；可自由改成你自己的规则
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span class="mb-1 block text-xs text-(--theme-modal-text)/60"
+                                                >人设提示词</span
+                                            >
+                                            <textarea
+                                                value={systemPromptDraft}
+                                                oninput={(e) =>
+                                                    (systemPromptDraft = (e.currentTarget as HTMLTextAreaElement)
+                                                        .value)}
+                                                rows="10"
+                                                class="w-full resize-y rounded-lg border px-2.5 py-1.5 text-xs leading-relaxed outline-none transition-colors"
+                                                style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                                            ></textarea>
+                                            <p class="mt-1 text-[10px] text-(--theme-modal-text)/40">
+                                                AI 助手的角色与行为规则（system prompt）；清空则使用默认人设
+                                            </p>
+                                        </div>
+                                        <div class="flex justify-end">
+                                            <button
+                                                onclick={saveGenPrefs}
+                                                class="inline-flex items-center gap-1 rounded-lg px-4 py-1.5 text-xs font-medium transition-all hover:brightness-110"
+                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                            >
+                                                <Icon icon="mdi:content-save-outline" class="size-3.5" />
+                                                保存提示词设置
+                                            </button>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
                     {/if}
                 </div>
             </div>
@@ -717,6 +1074,17 @@
             confirmText={`删除${target.name}`}
             onclose={closeArchiveDelete}
             onconfirm={doArchiveDelete}
+        />
+    {/if}
+
+    <!-- AI profile delete confirm -->
+    {#if aiDeleteConfirm}
+        <ConfirmDeleteModal
+            open
+            title="删除 AI 配置文件"
+            confirmText={`删除「${aiDeleteConfirm.label}」`}
+            onclose={() => (aiDeleteConfirm = null)}
+            onconfirm={doDeleteAiProfile}
         />
     {/if}
 

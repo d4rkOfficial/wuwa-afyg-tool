@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount, tick } from 'svelte'
+    import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import {
         loadProjects,
         getProjects,
@@ -66,6 +67,7 @@
     import BuffLibraryModal from '$lib/components/page/home/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
     import ConditionConfigModal from '$lib/components/page/home/condition-config-modal.svelte'
+    import AiAssistant from '$lib/ai/components/ai-assistant.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
@@ -141,6 +143,28 @@
     let importInput = $state<HTMLInputElement | undefined>()
 
     let activePhase = $state<PhaseKey>('team')
+
+    // 注册本地弹窗状态供 AI 查看/开关（同步 onMount，卸载时注销）
+    onMount(() => {
+        const panels: Array<[string, string, () => boolean, (v: boolean) => void]> = [
+            ['quick-lookup', '速查', () => showLookup, (v) => (showLookup = v)],
+            ['buff-library', 'Buff 库', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
+            ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
+            ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
+            ['workshop-frame', '工坊页', () => showWorkshopFrame, (v) => (showWorkshopFrame = v)],
+            ['condition-config', '链/阶配置', () => showConditionModal, (v) => (showConditionModal = v)],
+            ['stat-overview', '角色面板总览', () => showStatOverview, (v) => (showStatOverview = v)],
+            ['new-project', '新建工程', () => showNewModal, (v) => (showNewModal = v)],
+            ['rename-project', '重命名工程', () => renameModal, (v) => (renameModal = v)],
+            ['clone-project', '克隆工程', () => cloneModal, (v) => (cloneModal = v)],
+            ['delete-project', '删除工程', () => deleteModal, (v) => (deleteModal = v)],
+            ['export-project', '导出工程', () => exportModal, (v) => (exportModal = v)]
+        ]
+        for (const [name, label, get, set] of panels) registerPanel(name, label, get, set)
+        return () => {
+            for (const [name] of panels) unregisterPanel(name)
+        }
+    })
 
     onMount(async () => {
         hideSplash()
@@ -937,6 +961,19 @@
 {/if}
 
 <SettingsModal open={showSettings} onclose={() => (showSettings = false)} />
+
+<AiAssistant
+    viewPhase={activePhase}
+    viewShowResult={showResult}
+    onRequestView={(phase) => {
+        if (phase === 'result') {
+            showResult = true
+        } else {
+            activePhase = phase as PhaseKey
+            showResult = false
+        }
+    }}
+/>
 
 {#if showWorkshopFrame}
     <!-- svelte-ignore a11y_click_events_have_key_events -->

@@ -741,6 +741,11 @@ export function getCalcState(): CalcState {
     )
 }
 
+// 通知宿主持久化当前计算态（AI 工具修改后调用）
+export function notifyCalcUpdate() {
+    if (_onupdate) _onupdate(getCalcState())
+}
+
 export function remapDuplicatedDamageBuffs(damageMap: Record<string, string>) {
     const pairs = Object.entries(damageMap).filter(([, newId]) => Boolean(newId))
     if (pairs.length === 0) return

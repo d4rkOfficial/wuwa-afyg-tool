@@ -135,6 +135,11 @@ function cloneData(): TimelineData {
     return JSON.parse(JSON.stringify({ refLines: _refLines, opBlocks: _opBlocks, damageBlocks: _damageBlocks }))
 }
 
+// 当前排轴状态快照（AI 工具修改后持久化用）
+export function getTimelineState(): TimelineData {
+    return cloneData()
+}
+
 // 轻量指纹：只取数组长度与首末元素 id，避免全量序列化（用于判断 init 传入数据与当前状态是否一致）
 function timelineFingerprint(d: TimelineData): string {
     const rl = d.refLines
@@ -920,8 +925,8 @@ export function addAfter(id: string) {
     startEdit(nid, '')
 }
 
-export function addRefLineAt(x: number) {
-    if (!assertUnlocked()) return
+export function addRefLineAt(x: number): boolean {
+    if (!assertUnlocked()) return false
     const cx = Math.max(SIDE_PAD, Math.min(MAX_POS, x))
     const i = _refLines.findIndex((r) => r.pos > cx)
     const insertIdx = i === -1 ? _refLines.length : i
@@ -929,7 +934,7 @@ export function addRefLineAt(x: number) {
     const nextX = i >= 0 ? _refLines[i].pos : Infinity
     if (cx - prevX < MIN_GAP || nextX - cx < MIN_GAP) {
         addToast('空间不足，无法创建参考线', 'error')
-        return
+        return false
     }
     const nid = `c${Date.now()}`
     _dragVisualPositions = { ..._dragVisualPositions, [nid]: cx }
@@ -937,6 +942,7 @@ export function addRefLineAt(x: number) {
     _trackMenu = null
     save()
     startEdit(nid, '')
+    return true
 }
 
 export function removeLine(id: string) {
@@ -1829,6 +1835,22 @@ export function addDamageBlock(sourceType: 'op' | 'ref', sourceId: string) {
 export function removeDamageBlock(id: string) {
     if (!assertUnlocked()) return
     _damageBlocks = _damageBlocks.filter((d) => d.id !== id)
+    save()
+}
+
+// 直接写入指定操作块绑定的技能命中列表（AI 排轴用；自动创建对应的伤害块）
+export function setDamageBlockSkillHits(blockId: string, hits: SkillHit[]) {
+    if (!assertUnlocked()) return
+    const lastTrackIdx = getTRACKS().length - 1
+    let dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
+    if (!dmg) {
+        addDamageBlock('op', blockId)
+        dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
+    }
+    if (!dmg) return
+    _damageBlocks = _damageBlocks
+        .map((d) => (d.id === dmg.id ? { ...d, skillHits: hits } : d))
+        .filter((d) => !(d.id === dmg.id && d.skillHits.length === 0 && d.nonDirectEntries.length === 0))
     save()
 }
 

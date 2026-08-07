@@ -11,10 +11,10 @@
         categoryOfType,
         setPiecesOf
     } from '$lib/data/buff-library.svelte'
-    import type { BuffLibraryEntity, BuffLibraryZone, BuffLibraryScope } from '$lib/data/buff-library.svelte'
-    import type { BuffCondition } from './calculation/calculation.types'
+    import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
     import { importBuffSets } from './calculation/calculation.store.svelte'
     import { ZONE_MAP } from './calculation/calculation.consts'
+    import { buildEntityImportItems } from './buff-import-utils'
     import { addToast } from '$lib/data/toast.svelte'
     import type { CharSlot } from '$lib/data/types'
 
@@ -125,68 +125,7 @@
             addToast('请先勾选要导入的 Buff 集', 'info')
             return
         }
-        // 定位每个实体归属的角色槽位：character 直接用实体名匹配；武器/声骸/套装找配装中该角色（可能多人共用）
-        function ownerIdxFor(e: BuffLibraryEntity): number[] {
-            if (e.entityType === 'character') {
-                const idx = team.findIndex((s) => s?.character === e.entityName)
-                return idx >= 0 ? [idx] : []
-            }
-            const idxs: number[] = []
-            team.forEach((s, i) => {
-                if (!s) return
-                if (s.weapon === e.entityName) return idxs.push(i)
-                if (s.echoes?.some((ec) => ec.name === e.entityName)) return idxs.push(i)
-                if (s.triggerSets?.some((ts) => ts.name === e.entityName && `${ts.pieces}set` === e.entityType))
-                    idxs.push(i)
-            })
-            return idxs
-        }
-        function toImportItem(
-            b: {
-                name: string
-                scope?: BuffLibraryScope
-                condition?: BuffCondition
-                zones: BuffLibraryZone[]
-            },
-            ownerIdx: number
-        ) {
-            return {
-                name: b.name,
-                scope: b.scope,
-                ownerIdx,
-                ...(b.condition ? { condition: b.condition } : {}),
-                zones: b.zones
-            }
-        }
-        const items = picked.flatMap((e) => {
-            const owners = ownerIdxFor(e)
-            const firstOwner = owners[0] ?? -1
-            // 多主人：self（主人专属）buff 按每个主人生成独立条目；其它 scope 单条（引用第一主人）
-            if (owners.length > 1) {
-                const selfItems = owners.flatMap((owner) =>
-                    e.buffs
-                        .filter((b) => b.scope === 'self')
-                        .map((b) =>
-                            toImportItem(
-                                { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
-                                owner
-                            )
-                        )
-                )
-                const otherItems = e.buffs
-                    .filter((b) => b.scope !== 'self')
-                    .map((b) =>
-                        toImportItem(
-                            { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
-                            firstOwner
-                        )
-                    )
-                return [...selfItems, ...otherItems]
-            }
-            return e.buffs.map((b) =>
-                toImportItem({ name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones }, firstOwner)
-            )
-        })
+        const items = picked.flatMap((e) => buildEntityImportItems(e, team))
         const count = importBuffSets(items, -1, team.length)
         if (count > 0) addToast(`已导入 ${count} 条 buff`, 'success')
         onclose?.()

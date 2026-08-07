@@ -36,6 +36,8 @@
     import QuickLookup from './quick-lookup.svelte'
     import BuffImportModal from '../buff-import-modal.svelte'
     import { slide } from 'svelte/transition'
+    import { onMount } from 'svelte'
+    import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
 
     interface Props {
@@ -49,6 +51,16 @@
     let showLookup = $state(false)
     let showRefLookup = $state(false)
     let showImport = $state(false)
+
+    onMount(() => {
+        registerPanel(
+            'buff-import',
+            '导入 Buff 集',
+            () => showImport,
+            (v) => (showImport = v)
+        )
+        return () => unregisterPanel('buff-import')
+    })
 
     type DragState = {
         id: string
