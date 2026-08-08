@@ -91,4 +91,37 @@ export const ORIGINAL_BUTTON_KEYS = [
 
 export const QUICK_CHAR_MARKER = '__char__'
 
+// 手柄键位（图标来自游戏原生 UI 素材，与键盘图标同源：static/icons/gamepad，nanoka UiIconPcBtn/XboxGamepad_* 系列）
+export interface GamepadButton {
+    id: string
+    label: string
+    icon: string | null
+}
+
+export const GAMEPAD_BUTTONS: GamepadButton[] = [
+    { id: 'x', label: 'X', icon: '/icons/gamepad/x.webp' },
+    { id: 'y', label: 'Y', icon: '/icons/gamepad/y.webp' },
+    { id: 'b', label: 'B', icon: '/icons/gamepad/b.webp' },
+    { id: 'a', label: 'A', icon: '/icons/gamepad/a.webp' },
+    { id: 'lb', label: 'LB', icon: '/icons/gamepad/lb.webp' },
+    { id: 'rb', label: 'RB', icon: '/icons/gamepad/rb.webp' },
+    { id: 'lt', label: 'LT', icon: '/icons/gamepad/lt.webp' },
+    { id: 'rt', label: 'RT', icon: '/icons/gamepad/rt.webp' },
+    { id: 'leftstick', label: '左摇杆', icon: '/icons/gamepad/leftstick.webp' },
+    { id: 'rightstick', label: '右摇杆', icon: '/icons/gamepad/rightstick.webp' },
+    // 编号手柄图标（游戏原生资源，未一一对应键名，均可选用）
+    { id: 'xbox10', label: 'Xbox10', icon: '/icons/gamepad/xbox/Xbox10.webp' },
+    { id: 'xbox13', label: 'Xbox13', icon: '/icons/gamepad/xbox/Xbox13.webp' },
+    { id: 'xbox14', label: 'Xbox14', icon: '/icons/gamepad/xbox/Xbox14.webp' },
+    { id: 'xbox15', label: 'Xbox15', icon: '/icons/gamepad/xbox/Xbox15.webp' },
+    { id: 'xbox16', label: 'Xbox16', icon: '/icons/gamepad/xbox/Xbox16.webp' },
+    { id: 'xbox17', label: 'Xbox17', icon: '/icons/gamepad/xbox/Xbox17.webp' },
+    { id: 'xbox18', label: 'Xbox18', icon: '/icons/gamepad/xbox/Xbox18.webp' },
+    { id: 'xbox19', label: 'Xbox19', icon: '/icons/gamepad/xbox/Xbox19.webp' },
+    { id: 'xbox20', label: 'Xbox20', icon: '/icons/gamepad/xbox/Xbox20.webp' },
+    { id: 'xbox29', label: 'Xbox29', icon: '/icons/gamepad/xbox/Xbox29.webp' },
+    { id: 'xboxl', label: 'XboxL', icon: '/icons/gamepad/xbox/XboxL.webp' },
+    { id: 'xboxr', label: 'XboxR', icon: '/icons/gamepad/xbox/XboxR.webp' }
+]
+
 export { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from '$lib/consts/game-terms'

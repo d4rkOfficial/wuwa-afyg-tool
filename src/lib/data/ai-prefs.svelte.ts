@@ -1,9 +1,11 @@
-// AI 生成偏好（持久化到 IndexedDB）：Buff 命名规则 + AI 助手人设提示词，独立于模型配置保存
+// AI 生成偏好（持久化到 IndexedDB）：是否启用 AI 助手 + Buff 命名规则 + AI 助手人设提示词，独立于模型配置保存
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { DEFAULT_SYSTEM_PROMPT } from '$lib/ai/persona'
 
 export interface AiGenPrefs {
+    // 是否启用 AI 助手（悬浮窗显隐）
+    enabled: boolean
     // 用户自定义的 Buff 命名规则（默认使用工坊 share 端风格；清空 = 生成前由 AI 询问用户）
     namingRule: string
     // AI 助手人设提示词（system prompt，可自定义覆盖；清空 = 用默认人设）
@@ -48,6 +50,7 @@ const PREFS_KEY = 'ai-gen-prefs'
 const LEGACY_PREFS_KEY = 'ai-naming-prefs'
 
 const DEFAULT_PREFS: AiGenPrefs = {
+    enabled: true,
     namingRule: SHARE_NAMING_RULES,
     systemPrompt: DEFAULT_SYSTEM_PROMPT
 }
@@ -84,6 +87,7 @@ export async function loadGenPrefs(): Promise<void> {
         // 兼容旧结构（仅 namingRule / initialTaskPrompt）：字段缺失 → 填充默认值
         const hasLegacyShape = typeof d.initialTaskPrompt === 'string' && typeof d.systemPrompt !== 'string'
         _prefs = {
+            enabled: typeof d.enabled === 'boolean' ? d.enabled : DEFAULT_PREFS.enabled,
             namingRule:
                 typeof d.namingRule === 'string' && d.namingRule.trim()
                     ? d.namingRule

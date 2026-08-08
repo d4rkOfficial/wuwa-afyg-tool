@@ -183,7 +183,7 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
     }
 
     if (!cfg.apiKey.trim()) {
-        emit({ type: 'error', message: '请先在 设置 → AI 配置 中填写 API Key' })
+        emit({ type: 'error', message: '请先在 设置 → 助手设置 中填写 API Key' })
         return { ok: false, text: '', error: '未配置 API Key' }
     }
 

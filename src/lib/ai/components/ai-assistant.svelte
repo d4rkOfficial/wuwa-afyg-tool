@@ -4,7 +4,7 @@
     import { fade } from 'svelte/transition'
     import { runAiTurn, type SessionEvent } from '../session'
     import { getAiConfig, loadAiConfig } from '../config.svelte'
-    import { loadGenPrefs } from '$lib/data/ai-prefs.svelte'
+    import { loadGenPrefs, getGenPrefs } from '$lib/data/ai-prefs.svelte'
     import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
     import { notifyCalcUpdate, getCalcState } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
@@ -127,21 +127,26 @@
         toggle()
     }
 
-    // 恢复记忆位置
-    if (typeof localStorage !== 'undefined') {
-        try {
-            const saved = localStorage.getItem('ai-assistant-pos')
-            if (saved) {
-                const parsed = JSON.parse(saved) as { x: number; y: number }
-                if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) dragPos = parsed
-            }
-        } catch {
-            /* ignore */
-        }
+    // 将坐标钳制到当前视口内（按元素尺寸 w/h 留 8px 边距；视口不可用/过小则回退默认位置）
+    function clampToViewport(
+        pos: { x: number; y: number } | null,
+        w: number,
+        h: number
+    ): { x: number; y: number } | null {
+        if (!pos) return null
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 0
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 0
+        if (vw <= 0 || vh <= 0) return null
+        const maxX = vw - w - 8
+        const maxY = vh - h - 8
+        if (maxX < 8 || maxY < 8) return null
+        return { x: Math.max(8, Math.min(pos.x, maxX)), y: Math.max(8, Math.min(pos.y, maxY)) }
     }
 
     const aiConfig = $derived(getAiConfig())
     const modelLabel = $derived(`${aiConfig.label} · ${aiConfig.model}`)
+    // AI 助手是否启用（悬浮窗显隐）
+    const aiEnabled = $derived(getGenPrefs().enabled)
     // 最新一条用户消息的展示索引（仅它可重试）
     const lastUserDisplayIdx = $derived.by(() => {
         for (let i = display.length - 1; i >= 0; i--) {
@@ -163,6 +168,12 @@
 
     function toggle() {
         expanded = !expanded
+        // 展开瞬间按卡片尺寸重新钳制，保证面板不伸出屏幕
+        if (expanded && dragPos) {
+            const clamped = clampToViewport(dragPos, cardW, cardH)
+            if (clamped && (clamped.x !== dragPos.x || clamped.y !== dragPos.y)) dragPos = clamped
+            else if (!clamped) dragPos = null
+        }
         if (typeof localStorage !== 'undefined') localStorage.setItem('ai-assistant-open', expanded ? '1' : '0')
     }
 
@@ -324,11 +335,46 @@
             winW = window.innerWidth
             winH = window.innerHeight
             expandedH = cardH
+            // 窗口尺寸变化（或展开/收起切换）时按当前形态尺寸修正悬浮窗位置
+            const cw = expanded ? cardW : 48
+            const ch = expanded ? cardH : 48
+            if (dragPos) {
+                const clamped = clampToViewport(dragPos, cw, ch)
+                if (clamped && (clamped.x !== dragPos.x || clamped.y !== dragPos.y)) dragPos = clamped
+                else if (!clamped) dragPos = null
+            }
         }
         update()
         window.addEventListener('resize', update)
         return () => window.removeEventListener('resize', update)
     })
+
+    // 展开卡片尺寸（非响应式场景，与 cardW/cardH 同逻辑）
+    function expandedCardSize(): { w: number; h: number } {
+        const w = typeof window !== 'undefined' ? window.innerWidth : 1280
+        const h = typeof window !== 'undefined' ? window.innerHeight : 800
+        const landscape = w > h
+        return {
+            w: landscape ? 480 : Math.max(280, w - 24),
+            h: landscape ? h - 24 : Math.min(h * 0.6, 560)
+        }
+    }
+
+    // 恢复记忆位置（按展开卡片尺寸钳制，保证收起/展开都不出屏；越界/脏数据回退默认右下角）
+    if (typeof localStorage !== 'undefined') {
+        try {
+            const saved = localStorage.getItem('ai-assistant-pos')
+            if (saved) {
+                const parsed = JSON.parse(saved) as { x: number; y: number }
+                if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) {
+                    const size = expandedCardSize()
+                    dragPos = clampToViewport({ x: parsed.x, y: parsed.y }, size.w, size.h)
+                }
+            }
+        } catch {
+            /* ignore */
+        }
+    }
 
     // 挂载时从本地库恢复持久化的 AI 配置（悬浮窗直接使用场景也生效）
     onMount(() => {
@@ -338,249 +384,258 @@
 </script>
 
 <!-- 单容器：收起=48px 圆钮（图标居中），展开=卡片；尺寸/圆角/背景过渡动画 -->
-<div
-    class="fixed z-[75] flex flex-col overflow-hidden border shadow-2xl {dragPos ? '' : 'bottom-4 right-4'}"
-    style="{dragPos ? `left:${dragPos.x}px;top:${dragPos.y}px;` : ''}width:{expanded ? cardW : 48}px;height:{expanded
-        ? cardH
-        : 48}px;border-radius:{expanded
-        ? '0.75rem'
-        : '9999px'};transition:width .28s cubic-bezier(.4,0,.2,1),height .28s cubic-bezier(.4,0,.2,1),border-radius .28s cubic-bezier(.4,0,.2,1),background-color .28s;background:{expanded
-        ? 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'
-        : 'var(--theme-accent-bg)'};backdrop-filter:{expanded ? 'blur(14px)' : 'none'};-webkit-backdrop-filter:{expanded
-        ? 'blur(14px)'
-        : 'none'};color:{expanded
-        ? 'var(--theme-modal-text)'
-        : 'var(--theme-accent-text-on-bg, #fff)'};border-color:var(--theme-divider-border);"
->
-    {#if !expanded}
-        <!-- 收起态：图标居中（可点击/拖动，拖动不触发展开） -->
-        <div
-            class="flex h-full w-full cursor-grab touch-none select-none items-center justify-center"
-            onpointerdown={btnDown}
-            onpointermove={btnMove}
-            onpointerup={btnUp}
-            onpointercancel={btnUp}
-            onclick={btnClick}
-            title="AI 助手（拖动可移动）"
-        >
-            <div transition:fade class="flex h-full w-full items-center justify-center">
-                <Icon icon="mdi:robot-outline" class="size-6" />
-            </div>
-        </div>
-    {:else}
-        <!-- 头部（可拖动） -->
-        <div
-            class="flex shrink-0 cursor-move touch-none select-none items-center gap-2 border-b px-3 py-2.5"
-            style="border-color: var(--theme-divider-border);"
-            onpointerdown={startDrag}
-            onpointermove={moveDrag}
-            onpointerup={stopDrag}
-            onpointercancel={stopDrag}
-        >
-            <Icon icon="mdi:robot-outline" class="size-5 text-(--theme-accent-text)" />
-            <span class="min-w-0 flex-1 truncate text-sm font-semibold">AI 助手</span>
-            <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40" title={aiConfig.baseUrl}>{modelLabel}</span>
-            <button
-                onclick={clearConversation}
-                class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
-                title="清空对话"
+{#if aiEnabled}
+    <div
+        class="fixed z-[75] flex flex-col overflow-hidden border shadow-2xl {dragPos ? '' : 'bottom-4 right-4'}"
+        style="{dragPos ? `left:${dragPos.x}px;top:${dragPos.y}px;` : ''}width:{expanded
+            ? cardW
+            : 48}px;height:{expanded ? cardH : 48}px;border-radius:{expanded
+            ? '0.75rem'
+            : '9999px'};transition:width .28s cubic-bezier(.4,0,.2,1),height .28s cubic-bezier(.4,0,.2,1),border-radius .28s cubic-bezier(.4,0,.2,1),background-color .28s;background:{expanded
+            ? 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'
+            : 'var(--theme-accent-bg)'};backdrop-filter:{expanded
+            ? 'blur(14px)'
+            : 'none'};-webkit-backdrop-filter:{expanded ? 'blur(14px)' : 'none'};color:{expanded
+            ? 'var(--theme-modal-text)'
+            : 'var(--theme-accent-text-on-bg, #fff)'};border-color:var(--theme-divider-border);"
+    >
+        {#if !expanded}
+            <!-- 收起态：图标居中（可点击/拖动，拖动不触发展开） -->
+            <div
+                class="flex h-full w-full cursor-grab touch-none select-none items-center justify-center"
+                onpointerdown={btnDown}
+                onpointermove={btnMove}
+                onpointerup={btnUp}
+                onpointercancel={btnUp}
+                onclick={btnClick}
+                title="AI 助手（拖动可移动）"
             >
-                <Icon icon="mdi:broom" class="size-4" />
-            </button>
-            <button
-                onclick={toggle}
-                class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
-                title="收起"
-            >
-                <Icon icon="mdi:chevron-down" class="size-4" />
-            </button>
-        </div>
-
-        <!-- 消息区 -->
-        <div bind:this={bodyEl} class="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-            {#if display.length === 0}
-                <div class="py-10 text-center text-xs text-(--theme-modal-text)/30">
-                    用文字指挥我：创建工程、锁定环节、查队伍、
-                    <br />后续还可排轴、拉表、配置 Buff 集
+                <div transition:fade class="flex h-full w-full items-center justify-center">
+                    <Icon icon="mdi:robot-outline" class="size-6" />
                 </div>
-            {/if}
-            {#each display as m, i (m)}
-                {#if m.role === 'user'}
-                    {@const isLastUser = i === lastUserDisplayIdx}
-                    <div class="flex justify-end">
-                        <div
-                            class="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm px-3 py-2 text-xs leading-relaxed"
-                            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                        >
-                            {m.text}
-                            {#if isLastUser}
-                                <button
-                                    onclick={() => send(m.text)}
-                                    disabled={busy}
-                                    class="ml-1 inline-flex items-center rounded px-0.5 py-0.5 align-middle opacity-50 transition-opacity hover:opacity-100 disabled:opacity-30"
-                                    style="color: var(--theme-accent-text-on-bg, #fff);"
-                                    title="重试这条指令"
-                                >
-                                    <Icon icon="mdi:refresh" class="size-3" />
-                                </button>
-                            {/if}
-                        </div>
+            </div>
+        {:else}
+            <!-- 头部（可拖动） -->
+            <div
+                class="flex shrink-0 cursor-move touch-none select-none items-center gap-2 border-b px-3 py-2.5"
+                style="border-color: var(--theme-divider-border);"
+                onpointerdown={startDrag}
+                onpointermove={moveDrag}
+                onpointerup={stopDrag}
+                onpointercancel={stopDrag}
+            >
+                <Icon icon="mdi:robot-outline" class="size-5 text-(--theme-accent-text)" />
+                <span class="min-w-0 flex-1 truncate text-sm font-semibold">AI 助手</span>
+                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40" title={aiConfig.baseUrl}
+                    >{modelLabel}</span
+                >
+                <button
+                    onclick={clearConversation}
+                    class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
+                    title="清空对话"
+                >
+                    <Icon icon="mdi:broom" class="size-4" />
+                </button>
+                <button
+                    onclick={toggle}
+                    class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
+                    title="收起"
+                >
+                    <Icon icon="mdi:chevron-down" class="size-4" />
+                </button>
+            </div>
+
+            <!-- 消息区 -->
+            <div bind:this={bodyEl} class="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+                {#if display.length === 0}
+                    <div class="py-10 text-center text-xs text-(--theme-modal-text)/30">
+                        用文字指挥我：创建工程、锁定环节、查队伍、
+                        <br />后续还可排轴、拉表、配置 Buff 集
                     </div>
-                {:else}
-                    {@const hasReasoning = !!m.reasoning}
-                    {@const hasTools = !!(m.tools && m.tools.length > 0)}
-                    {@const activeTab = m.tab ?? 'chat'}
-                    <div class="flex justify-start">
-                        <div
-                            class="ai-md max-w-[92%] break-words rounded-2xl rounded-bl-sm px-3 py-2 text-xs leading-relaxed"
-                            style="background: var(--theme-input-bg);"
-                        >
-                            {#if hasReasoning || hasTools}
-                                <div
-                                    class="mb-1.5 flex items-center gap-0.5 border-b pb-1"
-                                    style="border-color: var(--theme-divider-border);"
-                                >
+                {/if}
+                {#each display as m, i (m)}
+                    {#if m.role === 'user'}
+                        {@const isLastUser = i === lastUserDisplayIdx}
+                        <div class="flex justify-end">
+                            <div
+                                class="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm px-3 py-2 text-xs leading-relaxed"
+                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                            >
+                                {m.text}
+                                {#if isLastUser}
                                     <button
-                                        onclick={() => setTab(m, 'chat')}
-                                        class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab === 'chat'
-                                            ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
+                                        onclick={() => send(m.text)}
+                                        disabled={busy}
+                                        class="ml-1 inline-flex items-center rounded px-0.5 py-0.5 align-middle opacity-50 transition-opacity hover:opacity-100 disabled:opacity-30"
+                                        style="color: var(--theme-accent-text-on-bg, #fff);"
+                                        title="重试这条指令"
                                     >
-                                        聊天
+                                        <Icon icon="mdi:refresh" class="size-3" />
                                     </button>
-                                    {#if hasReasoning}
-                                        <button
-                                            onclick={() => setTab(m, 'reasoning')}
-                                            class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
-                                            'reasoning'
-                                                ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
-                                        >
-                                            思考{busy && !m.text ? '（生成中…）' : ''}
-                                        </button>
-                                    {/if}
-                                    {#if hasTools}
-                                        <button
-                                            onclick={() => setTab(m, 'tools')}
-                                            class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
-                                            'tools'
-                                                ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
-                                        >
-                                            工具（{m.tools!.length}）
-                                        </button>
-                                    {/if}
-                                </div>
-                            {/if}
-                            {#if activeTab === 'chat'}
-                                {#if m.text}
-                                    {@html renderMd(m.text)}
-                                {:else if busy}
-                                    <span class="text-(--theme-modal-text)/40">思考中…</span>
                                 {/if}
-                            {:else if activeTab === 'reasoning'}
-                                {#if m.reasoning}
+                            </div>
+                        </div>
+                    {:else}
+                        {@const hasReasoning = !!m.reasoning}
+                        {@const hasTools = !!(m.tools && m.tools.length > 0)}
+                        {@const activeTab = m.tab ?? 'chat'}
+                        <div class="flex justify-start">
+                            <div
+                                class="ai-md max-w-[92%] break-words rounded-2xl rounded-bl-sm px-3 py-2 text-xs leading-relaxed"
+                                style="background: var(--theme-input-bg);"
+                            >
+                                {#if hasReasoning || hasTools}
                                     <div
-                                        class="whitespace-pre-wrap text-[10px] leading-relaxed text-(--theme-modal-text)/50"
+                                        class="mb-1.5 flex items-center gap-0.5 border-b pb-1"
+                                        style="border-color: var(--theme-divider-border);"
                                     >
-                                        {m.reasoning}
+                                        <button
+                                            onclick={() => setTab(m, 'chat')}
+                                            class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                            'chat'
+                                                ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
+                                        >
+                                            聊天
+                                        </button>
+                                        {#if hasReasoning}
+                                            <button
+                                                onclick={() => setTab(m, 'reasoning')}
+                                                class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                                'reasoning'
+                                                    ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
+                                            >
+                                                思考{busy && !m.text ? '（生成中…）' : ''}
+                                            </button>
+                                        {/if}
+                                        {#if hasTools}
+                                            <button
+                                                onclick={() => setTab(m, 'tools')}
+                                                class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                                'tools'
+                                                    ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
+                                            >
+                                                工具（{m.tools!.length}）
+                                            </button>
+                                        {/if}
                                     </div>
-                                {:else}
-                                    <span class="text-(--theme-modal-text)/40">思考中…</span>
                                 {/if}
-                            {:else}
-                                <div class="flex flex-col gap-1">
-                                    {#each m.tools ?? [] as t}
-                                        <div class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/50">
-                                            <Icon icon="mdi:wrench-outline" class="size-3 shrink-0" />
-                                            <span class="font-medium">{t.name}</span>
-                                            {#if t.resultLen !== undefined}
-                                                <span class="text-(--theme-modal-text)/30">→ {t.resultLen} 字符</span>
-                                            {:else if typeof t.args.status === 'string' && t.args.status}
-                                                <span class="truncate text-(--theme-modal-text)/40"
-                                                    >{t.args.status}</span
-                                                >
-                                            {:else}
-                                                <span class="text-(--theme-accent-text)">执行中…</span>
-                                            {/if}
+                                {#if activeTab === 'chat'}
+                                    {#if m.text}
+                                        {@html renderMd(m.text)}
+                                    {:else if busy}
+                                        <span class="text-(--theme-modal-text)/40">思考中…</span>
+                                    {/if}
+                                {:else if activeTab === 'reasoning'}
+                                    {#if m.reasoning}
+                                        <div
+                                            class="whitespace-pre-wrap text-[10px] leading-relaxed text-(--theme-modal-text)/50"
+                                        >
+                                            {m.reasoning}
                                         </div>
-                                    {/each}
-                                </div>
-                            {/if}
+                                    {:else}
+                                        <span class="text-(--theme-modal-text)/40">思考中…</span>
+                                    {/if}
+                                {:else}
+                                    <div class="flex flex-col gap-1">
+                                        {#each m.tools ?? [] as t}
+                                            <div
+                                                class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/50"
+                                            >
+                                                <Icon icon="mdi:wrench-outline" class="size-3 shrink-0" />
+                                                <span class="font-medium">{t.name}</span>
+                                                {#if t.resultLen !== undefined}
+                                                    <span class="text-(--theme-modal-text)/30"
+                                                        >→ {t.resultLen} 字符</span
+                                                    >
+                                                {:else if typeof t.args.status === 'string' && t.args.status}
+                                                    <span class="truncate text-(--theme-modal-text)/40"
+                                                        >{t.args.status}</span
+                                                    >
+                                                {:else}
+                                                    <span class="text-(--theme-accent-text)">执行中…</span>
+                                                {/if}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    {/if}
+                {/each}
+
+                {#if confirmCard}
+                    <div
+                        class="rounded-2xl border border-red-500/40 px-3 py-2.5"
+                        style="background: color-mix(in srgb, var(--theme-input-bg) 80%, transparent);"
+                    >
+                        <div class="flex items-center gap-2 text-xs font-semibold">
+                            <Icon icon="mdi:alert-outline" class="size-4 text-red-500" />
+                            确认执行操作
+                        </div>
+                        <div class="mt-1.5 rounded-lg px-2.5 py-2 text-xs" style="background: var(--theme-input-bg);">
+                            <div class="font-medium text-(--theme-accent-text)">{confirmCard.toolName}</div>
+                            <div class="mt-0.5 break-words text-(--theme-modal-text)/60">{confirmCard.summary}</div>
+                        </div>
+                        <div class="mt-2.5 flex justify-end gap-2">
+                            <button
+                                onclick={() => {
+                                    confirmCard?.resolve(false)
+                                    confirmCard = null
+                                }}
+                                class="rounded-lg px-3 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                            >
+                                拒绝
+                            </button>
+                            <button
+                                onclick={() => {
+                                    confirmCard?.resolve(true)
+                                    confirmCard = null
+                                }}
+                                class="rounded-lg px-3.5 py-1.5 text-xs font-medium text-white transition-all hover:brightness-110"
+                                style="background: #ef4444;"
+                            >
+                                允许执行
+                            </button>
                         </div>
                     </div>
                 {/if}
-            {/each}
+            </div>
 
-            {#if confirmCard}
-                <div
-                    class="rounded-2xl border border-red-500/40 px-3 py-2.5"
-                    style="background: color-mix(in srgb, var(--theme-input-bg) 80%, transparent);"
-                >
-                    <div class="flex items-center gap-2 text-xs font-semibold">
-                        <Icon icon="mdi:alert-outline" class="size-4 text-red-500" />
-                        确认执行操作
-                    </div>
-                    <div class="mt-1.5 rounded-lg px-2.5 py-2 text-xs" style="background: var(--theme-input-bg);">
-                        <div class="font-medium text-(--theme-accent-text)">{confirmCard.toolName}</div>
-                        <div class="mt-0.5 break-words text-(--theme-modal-text)/60">{confirmCard.summary}</div>
-                    </div>
-                    <div class="mt-2.5 flex justify-end gap-2">
+            <!-- 输入区 -->
+            <div class="shrink-0 border-t p-2.5" style="border-color: var(--theme-divider-border);">
+                <div class="flex items-end gap-2">
+                    <textarea
+                        bind:value={input}
+                        placeholder="输入指令…（Enter 发送，Shift+Enter 换行）"
+                        rows="2"
+                        onkeydown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                send()
+                            }
+                        }}
+                        class="min-h-0 flex-1 resize-none rounded-lg border px-2.5 py-2 text-xs leading-relaxed outline-none transition-colors"
+                        style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                    ></textarea>
+                    <div class="flex shrink-0 flex-col items-center gap-1">
                         <button
-                            onclick={() => {
-                                confirmCard?.resolve(false)
-                                confirmCard = null
-                            }}
-                            class="rounded-lg px-3 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                            onclick={() => (busy ? stopGenerating() : send())}
+                            disabled={!busy && !input.trim()}
+                            class="flex size-9 items-center justify-center rounded-lg transition-all hover:brightness-115 disabled:opacity-40"
+                            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                            title={busy ? '停止生成' : '发送'}
                         >
-                            拒绝
-                        </button>
-                        <button
-                            onclick={() => {
-                                confirmCard?.resolve(true)
-                                confirmCard = null
-                            }}
-                            class="rounded-lg px-3.5 py-1.5 text-xs font-medium text-white transition-all hover:brightness-110"
-                            style="background: #ef4444;"
-                        >
-                            允许执行
+                            <Icon icon={busy ? 'mdi:stop' : 'mdi:send'} class="size-4" />
                         </button>
                     </div>
-                </div>
-            {/if}
-        </div>
-
-        <!-- 输入区 -->
-        <div class="shrink-0 border-t p-2.5" style="border-color: var(--theme-divider-border);">
-            <div class="flex items-end gap-2">
-                <textarea
-                    bind:value={input}
-                    placeholder="输入指令…（Enter 发送，Shift+Enter 换行）"
-                    rows="2"
-                    onkeydown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            send()
-                        }
-                    }}
-                    class="min-h-0 flex-1 resize-none rounded-lg border px-2.5 py-2 text-xs leading-relaxed outline-none transition-colors"
-                    style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
-                ></textarea>
-                <div class="flex shrink-0 flex-col items-center gap-1">
-                    <button
-                        onclick={() => (busy ? stopGenerating() : send())}
-                        disabled={!busy && !input.trim()}
-                        class="flex size-9 items-center justify-center rounded-lg transition-all hover:brightness-115 disabled:opacity-40"
-                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                        title={busy ? '停止生成' : '发送'}
-                    >
-                        <Icon icon={busy ? 'mdi:stop' : 'mdi:send'} class="size-4" />
-                    </button>
                 </div>
             </div>
-        </div>
-    {/if}
-</div>
+        {/if}
+    </div>
+{/if}
 
 <style>
     .ai-md > :first-child {

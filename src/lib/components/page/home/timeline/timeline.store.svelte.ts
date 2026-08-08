@@ -30,7 +30,8 @@ import {
     NON_DIRECT_ELEMENT,
     BUTTON_KEY_ORDER,
     QUICK_CHAR_MARKER,
-    BLOCK_H_PAD
+    BLOCK_H_PAD,
+    GAMEPAD_BUTTONS
 } from './timeline.consts'
 import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$lib/consts/tune-data'
 import { parseValueString, sumRatioNum } from '$lib/consts/parse-value-string'
@@ -296,6 +297,32 @@ export function toggleQuickMode() {
     addToast(_quickMode ? '快速排轴模式已开启' : '快速排轴模式已关闭', _quickMode ? 'success' : 'info')
 }
 
+// 特殊切人状态：读取最新输入的操作块（dir=1 向前循环 none→intro→switchback，dir=-1 向后）
+export function getQuickSpecial(): 'none' | 'intro' | 'switchback' {
+    const id = getLastQuickOpBlockId()
+    const block = id ? _opBlocks.find((b) => b.id === id) : null
+    if (!block) return 'none'
+    return block.intro ? 'intro' : block.switchback ? 'switchback' : 'none'
+}
+
+export function cycleQuickSpecial(dir: 1 | -1 = 1) {
+    const id = getLastQuickOpBlockId()
+    const block = id ? _opBlocks.find((b) => b.id === id) : null
+    if (!block) {
+        addToast('没有操作块可设置切人模式', 'info')
+        return
+    }
+    const order = ['none', 'intro', 'switchback'] as const
+    const cur: (typeof order)[number] = block.intro ? 'intro' : block.switchback ? 'switchback' : 'none'
+    const idx = order.indexOf(cur)
+    const next = order[(idx + dir + order.length) % order.length]
+    _opBlocks = _opBlocks.map((b) =>
+        b.id === block.id ? { ...b, intro: next === 'intro', switchback: next === 'switchback' } : b
+    )
+    save()
+    addToast(next === 'none' ? '已取消特殊切人' : next === 'intro' ? '已设置变奏入场' : '已设置为切回', 'success')
+}
+
 export function quickCycleChar() {
     const count = getTeamCharNames().length
     if (count === 0) return
@@ -303,8 +330,10 @@ export function quickCycleChar() {
 }
 
 export function quickUndoLast() {
-    const id = _quickStack.pop()
-    if (id) removeBlock(id)
+    const item = _quickStack.pop()
+    if (!item) return
+    if (item.type === 'op') removeBlock(item.id)
+    else removeLine(item.id)
 }
 
 function quickBlockWidth(key: string, desc: string): number {
@@ -315,7 +344,8 @@ function quickBlockWidth(key: string, desc: string): number {
 }
 
 function estimateInnerWidth(key: string, desc: string, chips = 0): number {
-    const hasIcon = _uiBtnIcons.some(([n, url]) => n === key && url)
+    const hasIcon =
+        _uiBtnIcons.some(([n, url]) => n === key && url) || GAMEPAD_BUTTONS.some((b) => b.id === key && b.icon)
     let inner = hasIcon ? 40 : key.length * 8
     if (desc) inner += 4 + Math.min(desc.length * 14, 96)
     inner += chips * 28
@@ -352,9 +382,65 @@ export function quickInput(rawKey: string): string | null {
         maxRight = Math.max(maxRight, b.pos + bw / 2)
     }
     const pos = maxRight > 0 ? maxRight + newWidth / 2 : SIDE_PAD + newWidth / 2
-    const id = addOpBlock(_quickCharIndex, pos, storedKey, desc)
-    if (id) _quickStack.push(id)
+    const id = addOpBlock(_quickCharIndex, pos, storedKey, desc, 'none', true)
+    if (id) _quickStack.push({ type: 'op', id })
     return id
+}
+
+// 快速添加参考线：插在当前排轴末尾（openEdit 时立即进入标签编辑）
+export function quickAddRefLine(openEdit: boolean): boolean {
+    if (!assertUnlocked()) return false
+    let maxRight = 0
+    for (const b of _opBlocks) {
+        const bw = _blockWidths[b.id] ?? 56
+        maxRight = Math.max(maxRight, b.pos + bw / 2)
+    }
+    const cx = Math.max(SIDE_PAD, Math.min(MAX_POS, maxRight > 0 ? maxRight : SIDE_PAD))
+    const i = _refLines.findIndex((r) => r.pos > cx)
+    const insertIdx = i === -1 ? _refLines.length : i
+    const prevX = i > 0 ? _refLines[i - 1].pos : -Infinity
+    const nextX = i >= 0 ? _refLines[i].pos : Infinity
+    if (cx - prevX < MIN_GAP || nextX - cx < MIN_GAP) {
+        addToast('空间不足，无法创建参考线', 'error')
+        return false
+    }
+    const nid = `c${Date.now()}`
+    _dragVisualPositions = { ..._dragVisualPositions, [nid]: cx }
+    _refLines = [..._refLines.slice(0, insertIdx), { id: nid, time: '', pos: cx }, ..._refLines.slice(insertIdx)]
+    _quickStack.push({ type: 'ref', id: nid })
+    save()
+    if (openEdit) startEdit(nid, '')
+    return true
+}
+
+// 最近一个快速输入的 op 块（无则回退时间轴最后一块）
+export function getLastQuickOpBlockId(): string | null {
+    for (let i = _quickStack.length - 1; i >= 0; i--) {
+        if (_quickStack[i].type === 'op') return _quickStack[i].id
+    }
+    const last = _opBlocks[_opBlocks.length - 1]
+    return last ? last.id : null
+}
+
+// 快速编辑最近块的备注（复用双击编辑 desc 的输入框，Enter 确认 / Esc 取消）
+export function quickEditLastDesc() {
+    if (_locked) return
+    const id = getLastQuickOpBlockId()
+    if (!id) return
+    const block = _opBlocks.find((b) => b.id === id)
+    if (!block) return
+    _editingBlockId = id
+    _editingBlockDesc = block.desc
+}
+
+// 打开最近块的倍率绑定选择器（Enter）
+export async function quickOpenLastBind() {
+    const id = getLastQuickOpBlockId()
+    if (!id) {
+        addToast('没有可绑定的操作块', 'info')
+        return
+    }
+    await openSkillPicker(id)
 }
 
 // ── Ref Line State ──
@@ -412,7 +498,7 @@ let _selectedRefLineIds = $state<Record<string, boolean>>({})
 let _selectionRect = $state<{ startX: number; currentX: number } | null>(null)
 let _quickMode = $state(false)
 let _quickCharIndex = $state(0)
-let _quickStack: string[] = []
+let _quickStack: { type: 'op' | 'ref'; id: string }[] = []
 let _quickPendingRight: Record<string, number> = {}
 
 export function getTrackMenu() {
@@ -1018,6 +1104,22 @@ export function clampDragPos(cx: number, id: string): number {
     return cx
 }
 
+// 直接设置参考线位置（AI 工具用；与相邻参考线保持 MIN_GAP，不满足返回 null）
+export function setRefLinePos(id: string, pos: number): number | null {
+    if (!assertUnlocked()) return null
+    if (isBoundary(id)) return null
+    const idx = _refLines.findIndex((r) => r.id === id)
+    if (idx < 0) return null
+    const cx = Math.max(SIDE_PAD, Math.min(MAX_POS, pos))
+    const minX = idx > 0 ? vx(_refLines[idx - 1].id, _refLines[idx - 1].pos) + MIN_GAP : -Infinity
+    const maxX = idx < _refLines.length - 1 ? vx(_refLines[idx + 1].id, _refLines[idx + 1].pos) - MIN_GAP : Infinity
+    if (cx < minX || cx > maxX) return null
+    _refLines = _refLines.map((r) => (r.id === id ? { ...r, pos: cx } : r))
+    _dragVisualPositions = { ..._dragVisualPositions, [id]: cx }
+    save()
+    return cx
+}
+
 export function startDrag(e: MouseEvent, id: string) {
     if (!assertUnlocked()) return
     if (e.button !== 0 || id === 'left') return
@@ -1126,13 +1228,30 @@ function resetGroupDrag() {
 }
 
 // ── Op Block Functions ──
-export function addOpBlock(trackIndex: number, pos: number, key: string, desc = '') {
+export function addOpBlock(
+    trackIndex: number,
+    pos: number,
+    key: string,
+    desc = '',
+    special: 'none' | 'intro' | 'switchback' = 'none',
+    skipEnforce = false
+) {
     if (!assertUnlocked()) return null
-    const block = { id: `b${Date.now()}`, trackIndex, pos, key, desc, intro: false, switchback: false }
+    const block = {
+        id: `b${Date.now()}`,
+        trackIndex,
+        pos,
+        key,
+        desc,
+        intro: special === 'intro',
+        switchback: special === 'switchback'
+    }
     _opBlocks = [..._opBlocks, block]
     _trackMenu = null
-    enforceIntro()
-    enforceSwitchback()
+    if (!skipEnforce) {
+        enforceIntro()
+        enforceSwitchback()
+    }
     save()
     return block.id
 }
@@ -1619,6 +1738,17 @@ export function setBlockKey(blockId: string, key: string) {
     addToast(`已更换按键为「${key}」`, 'success')
 }
 
+// 直接设置操作块位置（AI 工具用；clamp 到有效范围并保存，返回实际位置）
+export function setOpBlockPos(blockId: string, pos: number): number | null {
+    if (!assertUnlocked()) return null
+    const idx = _opBlocks.findIndex((b) => b.id === blockId)
+    if (idx < 0) return null
+    const clamped = Math.max(0, Math.min(MAX_POS, pos))
+    _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, pos: clamped } : b))
+    save()
+    return clamped
+}
+
 function enforceSwitchback() {
     const lastTrackIdx = getTRACKS().length - 1
     const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
@@ -1877,6 +2007,22 @@ export function removeDamageBySource(sourceId: string, type: 'skillHits' | 'nonD
     save()
 }
 
+// 直接写入指定操作块绑定的非直伤条目（AI 排轴用；自动创建对应的伤害块）
+export function setDamageBlockNonDirectEntries(blockId: string, entries: NonDirectEntry[]) {
+    if (!assertUnlocked()) return
+    const lastTrackIdx = getTRACKS().length - 1
+    let dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
+    if (!dmg) {
+        addDamageBlock('op', blockId)
+        dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
+    }
+    if (!dmg) return
+    _damageBlocks = _damageBlocks
+        .map((d) => (d.id === dmg.id ? { ...d, nonDirectEntries: entries } : d))
+        .filter((d) => !(d.id === dmg.id && d.skillHits.length === 0 && d.nonDirectEntries.length === 0))
+    save()
+}
+
 // ── Skill Picker Functions ──
 export async function loadCharSkills(charName: string): Promise<SkillPickerGroup[]> {
     if (_skillCache[charName]) return _skillCache[charName]
@@ -1884,6 +2030,24 @@ export async function loadCharSkills(charName: string): Promise<SkillPickerGroup
     const groups = buildSkillGroups(info.skills)
     _skillCache[charName] = groups
     return groups
+}
+
+// 完整技能命中（AI 绑定用）：角色技能 + 装备声骸技能 + 用户自定义直伤，与 UI 选择器一致
+export async function getFullSkillGroups(charName: string): Promise<SkillPickerGroup[]> {
+    const groups = await loadCharSkills(charName)
+    const withEcho = [...groups]
+    const idx = getTeamCharNames().indexOf(charName)
+    const echoName = idx >= 0 ? (_team[idx]?.echoes?.[0]?.name ?? null) : null
+    if (echoName) {
+        const cached = await loadEchoSkill(echoName)
+        if (cached?.values?.length) {
+            withEcho.push({
+                type: '声骸技能',
+                hits: cached.values.map(([n, v, e]) => ({ name: n, ratio: v, element: e }))
+            })
+        }
+    }
+    return appendCustomGroups(withEcho, charName)
 }
 
 function buildSkillGroups(skills: SkillEntry[]): SkillPickerGroup[] {
@@ -1993,6 +2157,7 @@ export function applySkillHits() {
     _skillPickerBlockId = null
     _skillPickerIsRef = false
     save()
+    addToast('已应用直伤配置', 'success')
 }
 
 export async function openRefSkillPicker(blockId: string) {
@@ -2170,6 +2335,7 @@ export function applyNonDirectEntries() {
         )
     _nonDirectPickerBlockId = null
     save()
+    addToast('已应用非直伤配置', 'success')
 }
 
 // ── Damage List ──

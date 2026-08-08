@@ -26,7 +26,15 @@
         getPhaseOrder
     } from '$lib/data/project.svelte'
     import { getShareLink } from '$lib/data/share.svelte'
-    import { getNamingRule, getSystemPrompt, loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
+    import {
+        getNamingRule,
+        getSystemPrompt,
+        getGenPrefs,
+        loadGenPrefs,
+        updateGenPrefs
+    } from '$lib/data/ai-prefs.svelte'
+    import { GAMEPAD_BUTTONS } from '$lib/components/page/home/timeline/timeline.consts'
+    import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
     import {
         getAiConfig,
         getAiProfiles,
@@ -48,15 +56,16 @@
 
     let { open, onclose }: Props = $props()
 
-    let tab = $state<'theme' | 'keymap' | 'workshop' | 'archive' | 'cache' | 'ai'>('theme')
+    let tab = $state<'theme' | 'keymap' | 'interaction' | 'workshop' | 'archive' | 'cache' | 'ai'>('theme')
 
     const SETTING_TABS = [
         { key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
-        { key: 'keymap', label: '按键绑定', icon: 'mdi:keyboard-outline' },
+        { key: 'keymap', label: '按键图标', icon: 'mdi:keyboard-outline' },
+        { key: 'interaction', label: '交互相关', icon: 'mdi:tune-variant' },
         { key: 'workshop', label: '工坊设置', icon: 'mdi:storefront-outline' },
         { key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
         { key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
-        { key: 'ai', label: 'AI 配置', icon: 'mdi:robot-outline' }
+        { key: 'ai', label: '助手设置', icon: 'mdi:robot-outline' }
     ] as const
 
     const COLOR_PRESETS = [
@@ -82,12 +91,22 @@
 
     async function saveAiConfig() {
         await updateProfile(aiDraft.id, { ...aiDraft })
-        addToast('AI 配置已保存', 'success')
+        addToast('助手设置已保存', 'success')
     }
 
     async function saveGenPrefs() {
         await updateGenPrefs({ namingRule: namingRuleDraft, systemPrompt: systemPromptDraft })
         addToast('提示词设置已保存', 'success')
+    }
+
+    async function toggleAiEnabled() {
+        await updateGenPrefs({ enabled: !getGenPrefs().enabled })
+        addToast(getGenPrefs().enabled ? 'AI 助手已启用' : 'AI 助手已禁用', 'success')
+    }
+
+    function switchCalcViewMode(mode: 'dropdown' | 'spread') {
+        setCalcViewMode(mode)
+        addToast(mode === 'spread' ? '已切换为 buff 铺开模式' : '已切换为 buff 下拉模式', 'success')
     }
 
     async function handleSelectAiProfile(id: string) {
@@ -109,7 +128,7 @@
     async function doResetAiConfig() {
         await resetAiConfig()
         aiDraft = { ...getAiConfig() }
-        addToast('AI 配置文件已恢复为默认 3 个', 'success')
+        addToast('助手设置已恢复为默认 3 个', 'success')
     }
 
     async function doDeleteAiProfile() {
@@ -208,6 +227,10 @@
 
     function iconOf(blockKey: string): string | undefined {
         return uiBtnIconList.find(([n]) => n === blockKey)?.[1]
+    }
+
+    function gamepadIconOf(blockKey: string): string | undefined {
+        return GAMEPAD_BUTTONS.find((b) => b.id === blockKey)?.icon ?? undefined
     }
 
     function entryById(id: string): KeyMapEntry | undefined {
@@ -555,9 +578,10 @@
                     {:else if tab === 'keymap'}
                         <!-- Key mapping -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">按键绑定</span>
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">按键图标</span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
-                                每行决定排轴时操作块显示的按键图标；快捷键固定（快速排轴 1/2/3 仍用于切换角色）
+                                每行决定排轴时操作块显示的按键图标（键盘或手柄）；快捷键固定（快速排轴 1/2/3
+                                仍用于切换角色）
                             </p>
                             <div class="flex flex-col gap-2">
                                 {#each keymapEntries as entry}
@@ -574,9 +598,19 @@
                                                     class="size-8 object-contain"
                                                 />
                                             {:else}
-                                                <span class="text-[10px] font-bold text-(--theme-modal-text)/60"
-                                                    >{entry.blockKey}</span
-                                                >
+                                                {@const gIcon = gamepadIconOf(entry.blockKey)}
+                                                {#if gIcon}
+                                                    <img
+                                                        src={gIcon}
+                                                        alt={entry.blockKey}
+                                                        draggable="false"
+                                                        class="size-7 object-contain"
+                                                    />
+                                                {:else}
+                                                    <span class="text-[10px] font-bold text-(--theme-modal-text)/60"
+                                                        >{entry.blockKey}</span
+                                                    >
+                                                {/if}
                                             {/if}
                                         </span>
                                         <input
@@ -610,6 +644,41 @@
                                 >
                                     <Icon icon="mdi:restore" class="size-3.5" />
                                     恢复默认
+                                </button>
+                            </div>
+                        </div>
+                    {:else if tab === 'interaction'}
+                        <div>
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">拉表视图</span>
+                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                选择拉表页面的 Buff 编辑方式；后续拉表/排轴等快捷键设置也将集中在此区域
+                            </p>
+                            <div
+                                class="flex gap-1 rounded-lg border p-1"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                role="tablist"
+                            >
+                                <button
+                                    role="tab"
+                                    aria-selected={getCalcViewMode() === 'dropdown'}
+                                    onclick={() => switchCalcViewMode('dropdown')}
+                                    class="flex-1 rounded-md px-1 py-1.5 text-xs font-medium transition-colors"
+                                    style={getCalcViewMode() === 'dropdown'
+                                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
+                                        : 'color: var(--theme-modal-text)/60;'}
+                                >
+                                    buff 下拉模式
+                                </button>
+                                <button
+                                    role="tab"
+                                    aria-selected={getCalcViewMode() === 'spread'}
+                                    onclick={() => switchCalcViewMode('spread')}
+                                    class="flex-1 rounded-md px-1 py-1.5 text-xs font-medium transition-colors"
+                                    style={getCalcViewMode() === 'spread'
+                                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
+                                        : 'color: var(--theme-modal-text)/60;'}
+                                >
+                                    buff 铺开模式
                                 </button>
                             </div>
                         </div>
@@ -790,14 +859,44 @@
                             </div>
                         </div>
                     {:else if tab === 'ai'}
-                        <!-- AI 助手配置 -->
+                        <!-- 助手设置 -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">AI 助手配置</span>
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">助手设置</span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 可配置多组「提供商 / 模型 / API Key」并一键切换，每组独立保存；API Key
                                 仅存本机。修改后点「保存」生效
                             </p>
                             <div class="flex flex-col gap-2">
+                                <!-- 启用 AI 助手（独立开关，立即保存） -->
+                                <div
+                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >启用 AI 助手</span
+                                        >
+                                        <span class="mt-0.5 block text-[10px] text-(--theme-modal-text)/40">
+                                            开启后页面右下角显示 AI 助手悬浮窗；关闭后悬浮窗隐藏，所有 AI 功能不可用
+                                        </span>
+                                    </div>
+                                    <button
+                                        onclick={() => toggleAiEnabled()}
+                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                        style="background: {getGenPrefs().enabled
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 size-4 rounded-full transition-all"
+                                            style="left: {getGenPrefs().enabled
+                                                ? '18px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+
                                 <!-- 配置文件设置（下拉展开） -->
                                 <details
                                     open
@@ -1088,7 +1187,7 @@
         />
     {/if}
 
-    <!-- Key picker -->
+    <!-- Key picker（键盘图标 + 手柄键位） -->
     {#if keyPickerFor}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1105,13 +1204,17 @@
                 onclick={(e) => e.stopPropagation()}
             >
                 <div class="mb-3 flex items-center justify-between">
-                    <span class="text-sm font-semibold">选择按键</span>
+                    <span class="text-sm font-semibold">选择按键与手柄键位</span>
                     <button
                         onclick={() => (keyPickerFor = null)}
                         class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                     >
                         <Icon icon="mdi:close" class="size-4.5" />
                     </button>
+                </div>
+                <div class="mb-2 flex items-center gap-2 text-[10px] font-medium text-(--theme-modal-text)/60">
+                    <Icon icon="mdi:keyboard-outline" class="size-3.5" />
+                    键盘
                 </div>
                 <div class="flex flex-wrap gap-1.5">
                     {#each uiBtnIconList as [name, url]}
@@ -1135,6 +1238,40 @@
                                 draggable="false"
                                 class="size-6 object-contain pointer-events-none"
                             />
+                        </button>
+                    {/each}
+                </div>
+                <div class="my-3 border-t" style="border-color: var(--theme-divider-border);"></div>
+                <div class="mb-2 flex items-center gap-2 text-[10px] font-medium text-(--theme-modal-text)/60">
+                    <Icon icon="mdi:gamepad-variant-outline" class="size-3.5" />
+                    手柄图标
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    {#each GAMEPAD_BUTTONS as btn}
+                        <button
+                            onclick={() => {
+                                updateEntry(keyPickerFor!, { blockKey: btn.id })
+                                keyPickerFor = null
+                            }}
+                            class="flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-md border px-2 transition-colors {keyPickerFor &&
+                            entryById(keyPickerFor)?.blockKey === btn.id
+                                ? 'border-(--theme-accent-bg)'
+                                : 'hover:bg-(--theme-modal-text)/10'}"
+                            style="border-color: {keyPickerFor && entryById(keyPickerFor)?.blockKey === btn.id
+                                ? 'var(--theme-accent-bg)'
+                                : 'var(--theme-divider-border)'};"
+                            title={btn.label}
+                        >
+                            {#if btn.icon}
+                                <img
+                                    src={btn.icon}
+                                    alt={btn.label}
+                                    draggable="false"
+                                    class="size-5 object-contain pointer-events-none"
+                                />
+                            {:else}
+                                <span class="text-[10px] font-bold text-(--theme-modal-text)/80">{btn.label}</span>
+                            {/if}
                         </button>
                     {/each}
                 </div>

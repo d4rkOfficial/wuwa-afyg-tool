@@ -69,14 +69,22 @@
         setPointerX,
         hasClipboard,
         getQuickMode,
+        getQuickSpecial,
         getQuickCharIndex,
         toggleQuickMode,
         quickInput,
-        quickCycleChar,
         quickUndoLast,
+        quickAddRefLine,
+        quickEditLastDesc,
+        quickOpenLastBind,
+        cycleQuickSpecial,
+        getLastQuickOpBlockId,
+        openNonDirectPicker,
         getSkillPickerBlockId,
         getNonDirectPickerBlockId,
-        getBlockKeyPickerId
+        getBlockKeyPickerId,
+        applySkillHits,
+        applyNonDirectEntries
     } from './timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
     import {
@@ -89,7 +97,8 @@
         MAX_POS,
         NON_DIRECT_ELEMENT,
         TRACK_COLORS,
-        QUICK_CHAR_MARKER
+        QUICK_CHAR_MARKER,
+        GAMEPAD_BUTTONS
     } from './timeline.consts'
     import type { OpBlock, DamageBlock } from './timeline.types'
     import ContextMenu from './context-menu.svelte'
@@ -98,6 +107,7 @@
     import DamageList from './damage-list.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { normalizeKeyEvent, getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
+    import { addToast } from '$lib/data/toast.svelte'
 
     interface Props {
         team: [CharSlot, CharSlot, CharSlot]
@@ -111,8 +121,15 @@
     let timelineEl: HTMLDivElement | undefined = $state()
     let editInput: HTMLInputElement | undefined = $state()
     let blockEditInput: HTMLInputElement | undefined = $state()
+    // 长按 Enter：非直伤配置触发（定时器 + 标记，短按松开执行倍率绑定）
+    let enterHoldTimer: ReturnType<typeof setTimeout> | null = null
+    let enterLongPressed = false
+    // 最近一次 Enter 按下是否来自输入框（备注编辑 Enter 保存后不应触发倍率绑定/长按定时器）
+    let enterFromInput = false
 
     let uiBtnIconMap = $derived(new Map(getUiBtnIcons()))
+    // 手柄图标（游戏原生，blockKey 为手柄 id 时使用）
+    const gamepadIconMap = new Map(GAMEPAD_BUTTONS.filter((b) => b.icon).map((b) => [b.id, b.icon as string]))
     let damageStack = $derived(getDamageBlocksStacked())
     let damageStackHeight = $derived.by(() => {
         let maxBottom = 0
@@ -326,8 +343,45 @@
         if (Object.keys(damageMap).length > 0) remapDuplicatedDamageBuffs(damageMap)
     }}
     onkeydown={(e) => {
+        // Enter 按下的瞬间记录来源（输入框/弹窗内按下后元素可能销毁，keyup 的 target 会变成 body）
+        if (e.key === 'Enter') {
+            const fromInput =
+                e.target instanceof HTMLElement && !!e.target.closest('input, textarea, [contenteditable]')
+            const fromModal = getSkillPickerBlockId() !== null || getNonDirectPickerBlockId() !== null
+            // 一旦来自输入框/弹窗，保持抑制直到 keyup 重置（元素销毁后 repeat 的 target 不再是原元素）
+            enterFromInput = enterFromInput || fromInput || fromModal
+        }
+        // 直伤/非直伤弹窗：ESC=保存并退出（全局兜底，弹窗内部事件也冒泡至此）；Enter 留给弹窗内点击
+        if (e.key === 'Escape') {
+            if (getSkillPickerBlockId() !== null) {
+                e.preventDefault()
+                applySkillHits()
+                return
+            }
+            if (getNonDirectPickerBlockId() !== null) {
+                e.preventDefault()
+                applyNonDirectEntries()
+                return
+            }
+        }
         const target = e.target as HTMLElement
         if (target.closest('input, textarea, [contenteditable]')) return
+        // PageUp/PageDown：快速左右滚动（弹窗/菜单打开时不拦截）
+        if (
+            (e.key === 'PageUp' || e.key === 'PageDown') &&
+            !getSkillPickerBlockId() &&
+            !getNonDirectPickerBlockId() &&
+            !getBlockKeyPickerId() &&
+            !getContextMenu() &&
+            !getTrackMenu() &&
+            !getBlockMenu() &&
+            !getMultiBlockMenu()
+        ) {
+            e.preventDefault()
+            const amount = timelineEl?.clientWidth ?? 800
+            timelineEl?.scrollBy({ left: e.key === 'PageUp' ? -amount : amount, behavior: 'smooth' })
+            return
+        }
         const key = e.key.toLowerCase()
         if ((e.ctrlKey || e.metaKey) && key === 'a') {
             e.preventDefault()
@@ -357,14 +411,60 @@
             !getBlockMenu() &&
             !getMultiBlockMenu()
         ) {
+            // 全角符号归一化（中文输入法下 ；。，／、＼【】 与半角同键）
+            const norm =
+                key === '；'
+                    ? ';'
+                    : key === '。'
+                      ? '.'
+                      : key === '，'
+                        ? ','
+                        : key === '／'
+                          ? '/'
+                          : key === '、' || key === '＼'
+                            ? '\\'
+                            : key === '【'
+                              ? '['
+                              : key === '】'
+                                ? ']'
+                                : key
             if (key === 'enter') {
+                // 长按 Enter（≥500ms）：为最近输入的操作块打开非直伤配置；短按松开 = 打开倍率绑定
                 e.preventDefault()
-                quickCycleChar()
+                if (enterHoldTimer === null && !enterLongPressed && !enterFromInput) {
+                    enterHoldTimer = setTimeout(() => {
+                        enterHoldTimer = null
+                        enterLongPressed = true
+                        const blockId = getLastQuickOpBlockId()
+                        if (blockId) openNonDirectPicker('op', blockId)
+                        else addToast('没有可配置的操作块', 'info')
+                    }, 500)
+                }
                 return
             }
             if (key === 'backspace') {
                 e.preventDefault()
                 quickUndoLast()
+                return
+            }
+            if (norm === '\\') {
+                e.preventDefault()
+                quickAddRefLine(true)
+                return
+            }
+            if (norm === '[') {
+                e.preventDefault()
+                cycleQuickSpecial(1)
+                return
+            }
+            if (norm === ']') {
+                e.preventDefault()
+                cycleQuickSpecial(-1)
+                return
+            }
+            if (norm === '/') {
+                e.preventDefault()
+                quickEditLastDesc()
                 return
             }
             const res = quickInput(normalizeKeyEvent(e))
@@ -379,6 +479,32 @@
             removeSelection()
         }
     }}
+    onkeyup={(e) => {
+        if (e.key !== 'Enter') return
+        // 输入框内（备注编辑等）的 Enter 已由输入框自身处理，不触发倍率绑定
+        if (enterFromInput) {
+            enterFromInput = false
+            return
+        }
+        if (enterHoldTimer !== null) {
+            clearTimeout(enterHoldTimer)
+            enterHoldTimer = null
+        }
+        // 短按 Enter：打开最近操作块的倍率绑定（长按已进入非直伤配置则跳过）
+        const quickActive =
+            getQuickMode() &&
+            !getSkillPickerBlockId() &&
+            !getNonDirectPickerBlockId() &&
+            !getBlockKeyPickerId() &&
+            !getContextMenu() &&
+            !getTrackMenu() &&
+            !getBlockMenu() &&
+            !getMultiBlockMenu()
+        if (!enterLongPressed && quickActive) {
+            void quickOpenLastBind()
+        }
+        enterLongPressed = false
+    }}
 />
 
 <div class="flex h-full flex-col bg-(--theme-timeline-bg) text-(--theme-timeline-text)">
@@ -388,9 +514,19 @@
                 <!-- Header row -->
                 <div class="relative shrink-0 h-8 border-b" style="border-bottom-color: var(--theme-divider-border);">
                     <div
-                        class="sticky left-0 z-35 w-20 h-full bg-(--theme-timeline-bg)/80 border-r backdrop-blur-sm"
+                        class="sticky left-0 z-35 w-20 h-full bg-(--theme-timeline-bg)/80 border-r backdrop-blur-sm flex items-center justify-center"
                         style="border-right-color: var(--theme-divider-border);"
-                    ></div>
+                    >
+                        {#if getQuickMode() && getQuickSpecial() !== 'none'}
+                            <span
+                                class="text-[10px] font-bold {getQuickSpecial() === 'intro'
+                                    ? 'text-yellow-400'
+                                    : 'text-cyan-400'}"
+                            >
+                                {getQuickSpecial() === 'intro' ? '变奏' : '切回'}
+                            </span>
+                        {/if}
+                    </div>
                 </div>
 
                 <!-- Track rows -->
@@ -452,6 +588,7 @@
                             <div class="absolute pointer-events-none" style="left: 5rem; top: 0; right: 0; bottom: 0;">
                                 {#each getOpBlocks().filter((b: OpBlock) => b.trackIndex === i) as block (block.id)}
                                     {@const effKey = blockIconKey(block)}
+                                    {@const blockIcon = uiBtnIconMap.get(effKey) ?? gamepadIconMap.get(effKey)}
                                     {@const isGroupDrag = getIsGroupDrag()}
                                     {@const isHighlighted =
                                         getDragBlockId() === block.id ||
@@ -507,9 +644,9 @@
                                             {#if block.switchback}
                                                 <span class="text-xs text-cyan-400 font-semibold shrink-0">切回</span>
                                             {/if}
-                                            {#if uiBtnIconMap.get(effKey)}
+                                            {#if blockIcon}
                                                 <img
-                                                    src={uiBtnIconMap.get(effKey)}
+                                                    src={blockIcon}
                                                     alt={effKey}
                                                     draggable="false"
                                                     class="size-10 object-contain shrink-0"

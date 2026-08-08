@@ -49,6 +49,13 @@ function applyThemeCSS() {
     )
     root.style.setProperty('--theme-halo-color', theme.id === 'light' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)')
 
+    // 拉表页 buff 块背景/文字色（黄色=全局/差异新增、绿色=差异新增）：白天加深便于识别，夜间保持原色
+    const isLight = theme.id === 'light'
+    root.style.setProperty('--theme-buff-yellow-bg', isLight ? 'rgba(202,138,4,0.28)' : 'rgba(234,179,8,0.15)')
+    root.style.setProperty('--theme-buff-yellow-text', isLight ? '#854d0e' : '#eab308')
+    root.style.setProperty('--theme-buff-green-bg', isLight ? 'rgba(22,101,52,0.3)' : 'rgba(34,197,94,0.15)')
+    root.style.setProperty('--theme-buff-green-text', isLight ? '#14532d' : '#22c55e')
+
     applyOverridesCSS(root)
 }
 

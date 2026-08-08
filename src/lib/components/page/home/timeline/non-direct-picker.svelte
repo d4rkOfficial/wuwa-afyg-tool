@@ -20,24 +20,31 @@
     import { getCharIconMap } from './timeline.store.svelte'
     import { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from './timeline.consts'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { focusTrap } from '$lib/utils/focus-trap'
 </script>
 
 {#if getNonDirectPickerBlockId() !== null}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
         class="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if ((e.target as HTMLElement) === e.currentTarget) setNonDirectPickerBlockId(null)
         }}
-        onkeydown={(e) => e.key === 'Escape' && setNonDirectPickerBlockId(null)}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
+            use:focusTrap
+            tabindex="-1"
             class="w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.stopPropagation()}
+            onkeydown={(e) => {
+                // 放行 ESC/Enter 到 window 层统一处理（保存/关闭），其余按键阻止冒泡
+                if (e.key === 'Escape' || e.key === 'Enter') return
+                e.stopPropagation()
+            }}
         >
             <div
                 class="flex items-center justify-between px-4 py-3 border-b"

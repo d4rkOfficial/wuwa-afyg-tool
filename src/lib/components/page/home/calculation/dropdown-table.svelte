@@ -1,0 +1,770 @@
+<script lang="ts">
+    import { tick } from 'svelte'
+    import { slide } from 'svelte/transition'
+    import {
+        getBuffSetIdsForEntry,
+        toggleBuffSetForEntry,
+        setBuffSetIdsForEntry,
+        getCalcState,
+        getCalcElementMap,
+        getDamageTypesForEntry,
+        toggleDamageTypeForEntry,
+        setDamageTypesForEntry
+    } from './calculation.store.svelte'
+    import { inferDamageTypes } from '../result/utils'
+    import { conditionMet } from '../result/compute'
+    import { addToast } from '$lib/data/toast.svelte'
+    import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, groupBuffSets, LAYERED_BUFF_PATTERN } from './calculation.consts'
+    import type { GroupedBuffSetItem } from './calculation.consts'
+    import type { BuffSet, DamageEntry } from './calculation.types'
+    import type { ConditionProfile } from '../result/compute'
+    import type { CharSlot } from '$lib/data/types'
+    import type { CalcState } from './calculation.types'
+    import Icon from '@iconify/svelte'
+
+    interface Props {
+        team: [CharSlot, CharSlot, CharSlot]
+        damageEntries: DamageEntry[]
+        buffSets: BuffSet[]
+        entryBuffSetIdMap: Record<string, string[]>
+        entryDamageTypeMap: Record<string, string[]>
+        globalBuffSetIds: string[]
+        conditionProfile: ConditionProfile
+        hideConditionMismatch: boolean
+        buffDiffMode: boolean
+        onupdate: (state: CalcState) => void
+    }
+
+    let {
+        team,
+        damageEntries,
+        buffSets,
+        entryBuffSetIdMap,
+        entryDamageTypeMap,
+        globalBuffSetIds,
+        conditionProfile,
+        hideConditionMismatch,
+        buffDiffMode,
+        onupdate
+    }: Props = $props()
+
+    let expandedEntryId = $state<string | null>(null)
+    let calcContainer = $state<HTMLDivElement | undefined>()
+
+    let calcElementMap = $derived(getCalcElementMap())
+    let inferredDamageTypeMap = $derived<Record<string, string[]>>(
+        Object.fromEntries(damageEntries.map((e) => [e.id, inferDamageTypes(e)]))
+    )
+
+    let selectedEntry = $derived(damageEntries.find((e) => e.id === expandedEntryId) ?? null)
+    let selectedEntrySetIds = $derived(expandedEntryId ? getBuffSetIdsForEntry(expandedEntryId) : [])
+    let charToIdx = $derived<Record<string, number>>(
+        Object.fromEntries(team.map((s, i) => [s.character ?? '', i]).filter(([name]) => name !== ''))
+    )
+    let entryCharIdx = $derived(selectedEntry?.character ? (charToIdx[selectedEntry.character] ?? -1) : -1)
+
+    // 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff）
+    const buffMatches = (bs: BuffSet | undefined, entry: DamageEntry): boolean => {
+        if (!bs) return false
+        if (!hideConditionMismatch) return true
+        const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
+        return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap)
+    }
+
+    let visibleBuffSets = $derived(
+        buffSets.filter((b) => {
+            if (globalBuffSetIds.includes(b.id)) return false
+            const scopeOk = selectedEntry?.isEffect
+                ? b.scope === 'all' || (Array.isArray(b.scope) && b.scope.length === 0)
+                : entryCharIdx >= 0 && (b.scope === 'all' || (b.scope as number[]).includes(entryCharIdx))
+            if (!scopeOk) return false
+            if (selectedEntry && !buffMatches(b, selectedEntry)) return false
+            return true
+        })
+    )
+    let groupedVisibleSets = $derived(groupBuffSets(visibleBuffSets))
+    let groupedFolderItems = $derived(groupedVisibleSets.filter((g) => g.type === 'folder'))
+    let groupedStandaloneItems = $derived(groupedVisibleSets.filter((g) => g.type !== 'folder'))
+
+    interface BuffDiffItem {
+        setId: string
+        name: string
+        type: 'added' | 'removed' | 'same' | 'global'
+    }
+
+    let entryBuffDiff = $derived.by(() => {
+        if (!buffDiffMode) return {} as Record<string, BuffDiffItem[]>
+
+        const result: Record<string, BuffDiffItem[]> = {}
+        for (let i = 0; i < damageEntries.length; i++) {
+            const e = damageEntries[i]
+
+            const match = (sid: string) =>
+                buffMatches(
+                    buffSets.find((b) => b.id === sid),
+                    e
+                )
+
+            const globalItems = (entryBuffSetIdMap[e.id] ?? [])
+                .filter((sid) => globalBuffSetIds.includes(sid) && match(sid))
+                .map((sid) => ({
+                    setId: sid,
+                    name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                    type: 'global' as const
+                }))
+
+            const isFirstCharEntry = e.character
+                ? !damageEntries.slice(0, i).some((p) => p.character === e.character)
+                : true
+
+            if (e.isTuneBreak || e.isTuneResponse) {
+                result[e.id] = [
+                    ...(isFirstCharEntry ? globalItems : []),
+                    ...(entryBuffSetIdMap[e.id] ?? [])
+                        .filter((sid) => !globalBuffSetIds.includes(sid) && match(sid))
+                        .map((sid) => ({
+                            setId: sid,
+                            name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                            type: 'same' as const
+                        }))
+                ]
+                continue
+            }
+
+            let prevId: string | null = null
+            if (e.isEffect) {
+                for (let j = i - 1; j >= 0; j--) {
+                    const p = damageEntries[j]
+                    if (p.isEffect && p.hitName === e.hitName) {
+                        prevId = p.id
+                        break
+                    }
+                }
+            } else {
+                for (let j = i - 1; j >= 0; j--) {
+                    const p = damageEntries[j]
+                    if (!p.isEffect && !p.isTuneBreak && !p.isTuneResponse && p.character === e.character) {
+                        prevId = p.id
+                        break
+                    }
+                }
+            }
+
+            if (!prevId) {
+                result[e.id] = [
+                    ...(isFirstCharEntry ? globalItems : []),
+                    ...(entryBuffSetIdMap[e.id] ?? [])
+                        .filter((sid) => !globalBuffSetIds.includes(sid) && match(sid))
+                        .map((sid) => ({
+                            setId: sid,
+                            name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                            type: 'added' as const
+                        }))
+                ]
+                continue
+            }
+
+            const curr = new Set(entryBuffSetIdMap[e.id] ?? [])
+            const prev = new Set(entryBuffSetIdMap[prevId] ?? [])
+            const items: BuffDiffItem[] = []
+            for (const id of curr)
+                if (!prev.has(id) && match(id))
+                    items.push({ setId: id, name: buffSets.find((b) => b.id === id)?.name ?? '', type: 'added' })
+            for (const id of prev)
+                if (!curr.has(id) && match(id))
+                    items.push({ setId: id, name: buffSets.find((b) => b.id === id)?.name ?? '', type: 'removed' })
+            result[e.id] = items
+        }
+        return result
+    })
+
+    function handleToggleExpand(id: string, _index: number) {
+        const expanding = expandedEntryId !== id
+        expandedEntryId = expanding ? id : null
+        if (expanding) {
+            tick().then(() => {
+                calcContainer
+                    ?.querySelector<HTMLElement>(`[data-entry-id="${id}"]`)
+                    ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+            })
+        }
+    }
+
+    function handleToggleBuffSetForEntry(setId: string) {
+        if (!expandedEntryId) return
+        toggleBuffSetForEntry(expandedEntryId, setId)
+        onupdate(getCalcState())
+    }
+
+    function handleToggleFolder(folder: GroupedBuffSetItem) {
+        if (!expandedEntryId || !folder.children) return
+        const childIds = folder.children.map((c) => c.id)
+        const allSelected = childIds.every((id) => selectedEntrySetIds.includes(id))
+        const currentSet = new Set(selectedEntrySetIds)
+        if (allSelected) {
+            for (const id of childIds) currentSet.delete(id)
+        } else {
+            for (const id of childIds) currentSet.add(id)
+        }
+        setBuffSetIdsForEntry(expandedEntryId, [...currentSet])
+        onupdate(getCalcState())
+    }
+
+    function handleToggleBuffPrefix(folder: GroupedBuffSetItem, index: number) {
+        if (!expandedEntryId || !folder.children) return
+        const prefixIds = folder.children.slice(0, index + 1).map((c) => c.id)
+        const allSelected = prefixIds.every((id) => selectedEntrySetIds.includes(id))
+        const currentSet = new Set(selectedEntrySetIds)
+        if (allSelected) {
+            for (const id of prefixIds) currentSet.delete(id)
+        } else {
+            for (const id of prefixIds) currentSet.add(id)
+        }
+        setBuffSetIdsForEntry(expandedEntryId, [...currentSet])
+        onupdate(getCalcState())
+    }
+
+    function handleToggleDamageType(entryId: string, damageType: string) {
+        toggleDamageTypeForEntry(entryId, damageType)
+        onupdate(getCalcState())
+    }
+
+    function handleCopyDamageTypeToNext(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.character) return
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        if (entryIndex < 0) return
+        const char = entry.character
+        const currentTypes = getDamageTypesForEntry(entryId)
+        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
+            const next = damageEntries[i]
+            if (next.character === char && isDirectDamage(next)) {
+                setDamageTypesForEntry(next.id, [...currentTypes])
+                onupdate(getCalcState())
+                expandedEntryId = next.id
+                addToast('已复制伤害类型到下一段直伤', 'success')
+                return
+            }
+        }
+        addToast('已经是本角色最后一段直伤', 'info')
+    }
+
+    function isDirectDamage(e: { isEffect: boolean; isTuneBreak: boolean; isTuneResponse: boolean }): boolean {
+        return !e.isEffect && !e.isTuneBreak && !e.isTuneResponse
+    }
+
+    function handleCopyFromPrevDirect(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.character) return
+
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        if (entryIndex <= 0) {
+            addToast('未找到本角色的上一个直伤', 'info')
+            return
+        }
+
+        for (let i = entryIndex - 1; i >= 0; i--) {
+            const prev = damageEntries[i]
+            if (prev.character === entry.character && isDirectDamage(prev)) {
+                const prevSetIds = getBuffSetIdsForEntry(prev.id)
+                if (!setBuffSetIdsForEntry(entryId, prevSetIds)) return
+                onupdate(getCalcState())
+                addToast('已复制前段直伤的增益', 'success')
+                return
+            }
+        }
+
+        addToast('未找到本角色的上一个直伤', 'info')
+    }
+
+    function handleCopyToNextDirect(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.character) return
+
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        const char = entry.character
+        const currentSetIds = getBuffSetIdsForEntry(entryId)
+
+        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
+            const next = damageEntries[i]
+            if (next.character === char && isDirectDamage(next)) {
+                if (!setBuffSetIdsForEntry(next.id, [...currentSetIds])) return
+                onupdate(getCalcState())
+                expandedEntryId = next.id
+                addToast('已复制增益到下一段直伤', 'success')
+                return
+            }
+        }
+
+        expandedEntryId = null
+        addToast('已经是本角色最后一段直伤', 'info')
+    }
+
+    function handleCopyFromPrevEffect(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.isEffect) return
+
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        if (entryIndex <= 0) {
+            addToast('未找到上一个同名效应', 'info')
+            return
+        }
+
+        for (let i = entryIndex - 1; i >= 0; i--) {
+            const prev = damageEntries[i]
+            if (prev.isEffect && prev.hitName === entry.hitName) {
+                const prevSetIds = getBuffSetIdsForEntry(prev.id)
+                if (!setBuffSetIdsForEntry(entryId, prevSetIds)) return
+                onupdate(getCalcState())
+                addToast('已复制前段效应的增益', 'success')
+                return
+            }
+        }
+
+        addToast('未找到上一个同名效应', 'info')
+    }
+
+    function handleCopyToNextEffect(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        if (!entry || !entry.isEffect) return
+
+        const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
+        const currentSetIds = getBuffSetIdsForEntry(entryId)
+
+        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
+            const next = damageEntries[i]
+            if (next.isEffect && next.hitName === entry.hitName) {
+                if (!setBuffSetIdsForEntry(next.id, [...currentSetIds])) return
+                onupdate(getCalcState())
+                expandedEntryId = next.id
+                addToast('已复制增益到下一段效应', 'success')
+                return
+            }
+        }
+
+        expandedEntryId = null
+        addToast('已经是本效应最后一次伤害结算', 'info')
+    }
+
+    function handleClearAllBuffs(entryId: string) {
+        if (!setBuffSetIdsForEntry(entryId, [])) return
+        onupdate(getCalcState())
+    }
+</script>
+
+<svelte:window
+    onkeydown={(e) => {
+        const el = e.target as HTMLElement
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'BUTTON') return
+        if (e.key === ' ' && expandedEntryId !== null) {
+            e.preventDefault()
+            const idx = damageEntries.findIndex((de) => de.id === expandedEntryId)
+            if (idx >= 0) {
+                const nextIdx = idx + 1 < damageEntries.length ? idx + 1 : 0
+                handleToggleExpand(damageEntries[nextIdx].id, nextIdx)
+            }
+        }
+        if (e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.metaKey && expandedEntryId !== null) {
+            e.preventDefault()
+            handleCopyDamageTypeToNext(expandedEntryId)
+        }
+        if (e.key === 'Z' && e.shiftKey && !e.ctrlKey && !e.metaKey && expandedEntryId !== null) {
+            e.preventDefault()
+            handleCopyFromPrevDirect(expandedEntryId)
+        }
+        if (e.key === 'X' && e.shiftKey && !e.ctrlKey && !e.metaKey && expandedEntryId !== null) {
+            e.preventDefault()
+            handleCopyToNextDirect(expandedEntryId)
+        }
+        if (e.key === 'C' && e.shiftKey && !e.ctrlKey && !e.metaKey && expandedEntryId !== null) {
+            e.preventDefault()
+            handleClearAllBuffs(expandedEntryId)
+        }
+    }}
+/>
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+    class="h-full overflow-auto pb-48"
+    style="background: var(--theme-modal-bg);"
+    bind:this={calcContainer}
+    onwheel={(e) => {
+        if (e.ctrlKey) {
+            e.preventDefault()
+            ;(e.currentTarget as HTMLElement).scrollLeft += e.deltaY
+        }
+    }}
+>
+    <table class="w-full text-xs table-fixed">
+        <thead>
+            <tr
+                class="text-(--theme-modal-text)/50 sticky top-0 bg-(--theme-modal-bg)/80 backdrop-blur-md opacity-100!"
+                style="border-bottom: 1px solid var(--theme-divider-border);"
+            >
+                <th
+                    class="text-left font-medium py-2 px-3 w-20 shrink-0 border-r border-dashed"
+                    style="border-color: var(--theme-divider-border);">来源</th
+                >
+                <th
+                    class="text-left font-medium py-2 px-3 w-56 shrink-0 border-r border-dashed"
+                    style="border-color: var(--theme-divider-border);">条目</th
+                >
+                <th
+                    class="text-left font-medium py-2 px-3 w-32 shrink-0 border-r border-dashed"
+                    style="border-color: var(--theme-divider-border);">视为</th
+                >
+                <th class="text-left font-medium py-2 px-3">Buff</th>
+            </tr>
+        </thead>
+        <tbody>
+            {#each damageEntries as damageEntry, i}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <tr
+                    onclick={() => handleToggleExpand(damageEntry.id, i)}
+                    data-entry-id={damageEntry.id}
+                    class={[
+                        'cursor-pointer border-b transition-colors',
+                        expandedEntryId === damageEntry.id ? '' : 'hover:bg-(--theme-modal-text)/5',
+                        expandedEntryId !== null && expandedEntryId !== damageEntry.id ? 'opacity-40' : ''
+                    ].join(' ')}
+                    style={'border-color: var(--theme-divider-border);' +
+                        (expandedEntryId === damageEntry.id
+                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 10%, transparent);'
+                            : '')}
+                >
+                    <td
+                        class="py-1.5 px-3 w-20 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        style="border-color: var(--theme-divider-border);"
+                    >
+                        <span style="color: var(--theme-element-{calcElementMap[damageEntry.character ?? '']}, #888)">
+                            {damageEntry.character ?? '—'}
+                        </span>
+                    </td>
+                    <td
+                        class="py-1.5 px-3 w-56 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        style="border-color: var(--theme-divider-border);"
+                    >
+                        <span
+                            style="color: var(--theme-element-{damageEntry.damageElement}, #888)"
+                            title={damageEntry.displayName}
+                        >
+                            {damageEntry.displayName}
+                        </span>
+                    </td>
+                    <td
+                        class="py-1.5 px-3 w-32 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        style="border-color: var(--theme-divider-border);"
+                    >
+                        <div class="flex flex-wrap gap-0.5">
+                            {#each entryDamageTypeMap[damageEntry.id] ?? [] as dt}
+                                <span
+                                    class="text-[10px] px-1 rounded text-(--theme-modal-text)/70 leading-tight"
+                                    style="background: var(--theme-input-bg);"
+                                    >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}</span
+                                >
+                            {:else}
+                                {@const inferred = inferredDamageTypeMap[damageEntry.id] ?? []}
+                                {#if inferred.length > 0}
+                                    <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
+                                        >自动推导：{inferred
+                                            .map((t) => DAMAGE_TYPE_SHORT[t as keyof typeof DAMAGE_TYPE_SHORT] ?? t)
+                                            .join('/')}</span
+                                    >
+                                {/if}
+                            {/each}
+                        </div>
+                    </td>
+                    <td class="py-1.5 px-3">
+                        <div class="flex flex-wrap gap-1">
+                            {#if buffDiffMode}
+                                {#each entryBuffDiff[damageEntry.id] ?? [] as diff}
+                                    {#if diff.type === 'global'}
+                                        <span
+                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
+                                        >
+                                            <Icon icon="mdi:crown" class="size-3" />{diff.name}
+                                        </span>
+                                    {:else if diff.type === 'added'}
+                                        <span
+                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            style="background: var(--theme-buff-green-bg); color: var(--theme-buff-green-text);"
+                                        >
+                                            <Icon icon="mdi:plus" class="size-3" />{diff.name}
+                                        </span>
+                                    {:else if diff.type === 'removed'}
+                                        <span
+                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-500/15 text-red-500"
+                                        >
+                                            <Icon icon="mdi:minus" class="size-3" />{diff.name}
+                                        </span>
+                                    {:else}
+                                        <span
+                                            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
+                                        >
+                                            {diff.name}
+                                        </span>
+                                    {/if}
+                                {/each}
+                            {:else}
+                                {#each (entryBuffSetIdMap[damageEntry.id] ?? []).filter( (sid) => buffMatches( buffSets.find((s) => s.id === sid), damageEntry ) ) as setId}
+                                    {@const buffSet = buffSets.find((s) => s.id === setId)}
+                                    {#if buffSet && !globalBuffSetIds.includes(setId)}
+                                        <span
+                                            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
+                                        >
+                                            {buffSet.name}
+                                        </span>
+                                    {/if}
+                                {/each}
+                            {/if}
+                        </div>
+                    </td>
+                </tr>
+                {#if expandedEntryId === damageEntry.id}
+                    <tr style="background: var(--theme-input-bg);">
+                        <td colspan="4" class="p-0">
+                            <div
+                                transition:slide|local={{ duration: 200 }}
+                                class="border-b px-6 py-3 space-y-3"
+                                style="border-color: var(--theme-divider-border);"
+                            >
+                                {#if !damageEntry.isEffect && !damageEntry.isTuneBreak && !damageEntry.isTuneResponse}
+                                    <div>
+                                        <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">伤害类型</div>
+                                        {#if isDirectDamage(damageEntry) && damageEntry.character}
+                                            <div class="mb-1.5">
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyDamageTypeToNext(damageEntry.id)
+                                                    }}
+                                                    title="Shift+Enter"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                >
+                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
+                                                    复制到下段直伤
+                                                </button>
+                                            </div>
+                                        {/if}
+                                        <div class="flex flex-wrap gap-1">
+                                            {#each DAMAGE_TYPES as dt}
+                                                {@const selected = (entryDamageTypeMap[damageEntry.id] ?? []).includes(
+                                                    dt
+                                                )}
+                                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleToggleDamageType(damageEntry.id, dt)
+                                                    }}
+                                                    title={dt}
+                                                    class={[
+                                                        'px-2 py-1 text-xs rounded transition-colors border',
+                                                        selected
+                                                            ? ''
+                                                            : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
+                                                    ].join(' ')}
+                                                    style={selected
+                                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
+                                                        : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                >
+                                                    {DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
+                                <div>
+                                    <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">增益选择</div>
+                                    {#if visibleBuffSets.length > 0}
+                                        <div
+                                            class="flex flex-wrap items-center gap-1 pb-2 border-b mb-2"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            {#if isDirectDamage(damageEntry)}
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyFromPrevDirect(damageEntry.id)
+                                                    }}
+                                                    title="Shift+Z"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                >
+                                                    <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
+                                                    复制前段直伤
+                                                </button>
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyToNextDirect(damageEntry.id)
+                                                    }}
+                                                    title="Shift+X"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                >
+                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
+                                                    复制到下段直伤
+                                                </button>
+                                            {:else if damageEntry.isEffect}
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyFromPrevEffect(damageEntry.id)
+                                                    }}
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                >
+                                                    <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
+                                                    复制前段效应
+                                                </button>
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleCopyToNextEffect(damageEntry.id)
+                                                    }}
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                >
+                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
+                                                    复制到下段效应
+                                                </button>
+                                            {/if}
+                                            <button
+                                                disabled={selectedEntrySetIds.length === 0}
+                                                onclick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleClearAllBuffs(damageEntry.id)
+                                                }}
+                                                title="Shift+C"
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40 disabled:pointer-events-none"
+                                            >
+                                                <Icon icon="mdi:close-circle-outline" class="size-3 shrink-0" />
+                                                清除所有增益
+                                            </button>
+                                            <div class="flex-1"></div>
+                                            <button
+                                                onclick={(e) => {
+                                                    e.stopPropagation()
+                                                    const nextIdx = i + 1 < damageEntries.length ? i + 1 : 0
+                                                    handleToggleExpand(damageEntries[nextIdx].id, nextIdx)
+                                                }}
+                                                title="Space"
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-accent-bg)/20 text-(--theme-accent-text) border border-(--theme-accent-bg)/30 hover:bg-(--theme-accent-bg)/30"
+                                            >
+                                                <Icon icon="mdi:arrow-down" class="size-3 shrink-0" />
+                                                下一条
+                                            </button>
+                                        </div>
+                                        {#if groupedFolderItems.length > 0}
+                                            <div class="flex flex-wrap gap-1 mb-2">
+                                                {#each groupedFolderItems as item (item.key)}
+                                                    {@const folderActive = item.children!.some((c) =>
+                                                        selectedEntrySetIds.includes(c.id)
+                                                    )}
+                                                    <div
+                                                        class="flex flex-wrap items-center gap-1 rounded border px-2 py-1 text-xs transition-colors"
+                                                        style={folderActive
+                                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
+                                                            : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                    >
+                                                        <button
+                                                            onclick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleToggleFolder(item)
+                                                            }}
+                                                            class="shrink-0 transition-colors"
+                                                            class:text-(--theme-accent-text)={item.children!.some((c) =>
+                                                                selectedEntrySetIds.includes(c.id)
+                                                            )}
+                                                        >
+                                                            <Icon
+                                                                icon={item.children!.some((c) =>
+                                                                    selectedEntrySetIds.includes(c.id)
+                                                                )
+                                                                    ? 'mdi:check'
+                                                                    : 'mdi:close'}
+                                                                class="size-3"
+                                                            />
+                                                        </button>
+                                                        <span class="text-(--theme-modal-text)/70 whitespace-nowrap"
+                                                            >{item.prefixText}</span
+                                                        >
+                                                        <div class="flex flex-wrap gap-0.5">
+                                                            {#each item.children! as child, ci}
+                                                                {@const childChecked = selectedEntrySetIds.includes(
+                                                                    child.id
+                                                                )}
+                                                                <button
+                                                                    onclick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        if (e.ctrlKey || e.metaKey) {
+                                                                            handleToggleBuffPrefix(item, ci)
+                                                                        } else {
+                                                                            handleToggleBuffSetForEntry(child.id)
+                                                                        }
+                                                                    }}
+                                                                    class={[
+                                                                        'rounded px-2 py-1 text-[10px] font-medium tabular-nums transition-colors min-w-[1.2em] text-center',
+                                                                        childChecked
+                                                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/30'
+                                                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-accent-bg)/10'
+                                                                    ].join(' ')}
+                                                                >
+                                                                    {child.name
+                                                                        .match(LAYERED_BUFF_PATTERN)
+                                                                        ?.slice(2)
+                                                                        .join('') ?? child.name}
+                                                                </button>
+                                                            {/each}
+                                                        </div>
+                                                    </div>
+                                                {/each}
+                                            </div>
+                                        {/if}
+                                        {#if groupedStandaloneItems.length > 0}
+                                            <div class="flex flex-wrap gap-1">
+                                                {#each groupedStandaloneItems as item (item.key)}
+                                                    {@const checked = selectedEntrySetIds.includes(item.buffSet!.id)}
+                                                    <button
+                                                        onclick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleToggleBuffSetForEntry(item.buffSet!.id)
+                                                        }}
+                                                        class={[
+                                                            'px-2 py-1 text-xs rounded transition-colors inline-flex items-center gap-1 border',
+                                                            checked
+                                                                ? ''
+                                                                : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
+                                                        ].join(' ')}
+                                                        style={checked
+                                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
+                                                            : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                    >
+                                                        <Icon
+                                                            icon={checked ? 'mdi:check' : 'mdi:close'}
+                                                            class="size-3 shrink-0"
+                                                        />
+                                                        {item.buffSet!.name}
+                                                    </button>
+                                                {/each}
+                                            </div>
+                                        {/if}
+                                    {:else}
+                                        <div class="text-xs text-(--theme-modal-text)/30">
+                                            无可用 BUFF 块，点击底栏【BUFF配置】按钮进行配置
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                {/if}
+            {/each}
+        </tbody>
+    </table>
+    {#if damageEntries.length === 0}
+        <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
+    {/if}
+</div>

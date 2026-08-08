@@ -41,6 +41,7 @@
         setShowDamageList,
         loadCustomHits,
         getQuickMode,
+        getQuickSpecial,
         toggleQuickMode,
         formatTimeline,
         init as initTimeline
@@ -59,6 +60,13 @@
         createBuffSet,
         init as initCalculation
     } from '$lib/components/page/home/calculation/calculation.store.svelte'
+    import {
+        getCalcViewMode,
+        getDamageTypeEditMode,
+        setDamageTypeEditMode,
+        getScrollAxisDefault,
+        setScrollAxisDefault
+    } from '$lib/data/calc-view.svelte'
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
     import { hideSplash } from '$lib/utils/splash'
     import favicon from '$lib/assets/favicon.svg'
@@ -88,7 +96,6 @@
     let showWorkshopFrame = $state(false)
     let showConditionModal = $state(false)
     let workshopFrameKey = $state(0)
-    let showZoomTip = $state(browser ? !localStorage.getItem('wuwa-afyg:zoom-tip') : false)
 
     let sidebarWidth = $state(240)
     let sidebarDragging = $state(false)
@@ -183,11 +190,6 @@
         checkShare()
         await handleImportFromHash()
     })
-
-    function dismissZoomTip() {
-        showZoomTip = false
-        localStorage.setItem('wuwa-afyg:zoom-tip', '1')
-    }
 
     let projects = $derived(getProjects())
     let activeId = $derived(getActiveId())
@@ -569,24 +571,6 @@
     <input type="file" accept=".json" class="hidden" bind:this={importInput} onchange={handleImport} />
 
     <div class="flex flex-1 flex-col overflow-hidden">
-        {#if showZoomTip}
-            <div
-                class="mx-6 mt-4 flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs"
-                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent); color: var(--theme-modal-text);"
-            >
-                <Icon icon="mdi:information-outline" class="size-4 shrink-0 text-(--theme-accent-text)" />
-                <span class="flex-1">
-                    建议将浏览器页面缩放调整为 <b>125%</b> 以获得最佳显示效果（Ctrl/⌘ 与 +/- 或浏览器菜单缩放）
-                </span>
-                <button
-                    onclick={dismissZoomTip}
-                    class="shrink-0 rounded p-1 text-(--theme-muted-text) transition-colors hover:text-(--theme-modal-text)"
-                    title="知道了"
-                >
-                    <Icon icon="mdi:close" class="size-4" />
-                </button>
-            </div>
-        {/if}
         {#if !activeProject}
             <div class="flex flex-1 flex-col items-center justify-end gap-8 px-8 pb-10">
                 <div class="flex flex-col items-center text-center">
@@ -699,7 +683,7 @@
                             >
                             <span
                                 class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
-                                >主题、按键绑定与工坊设置</span
+                                >主题、按键图标与工坊设置</span
                             >
                         </div>
                     </button>
@@ -822,15 +806,14 @@
                                     : 'var(--theme-sidebar-text)'}"
                             >
                                 <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" />
-                                {getQuickMode() ? '快速排轴(关闭)' : '快速排轴(开启)'}
+                                {getQuickMode()
+                                    ? '快速排轴(关闭' +
+                                      (getQuickSpecial() !== 'none'
+                                          ? `·${getQuickSpecial() === 'intro' ? '变奏' : '切回'}`
+                                          : '') +
+                                      ')'
+                                    : '快速排轴(开启)'}
                             </button>
-                            <div
-                                class="pointer-events-none absolute bottom-full left-0 mb-2 hidden whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-lg group-hover:block"
-                                style="background: var(--theme-context-menu-bg); color: var(--theme-context-menu-text); border-color: var(--theme-divider-border); z-index: 40;"
-                            >
-                                Shift 切换 · 1/2/3 选角色 · Enter 下一角色 · Backspace 撤销 · Q/E/R/T/F/空格 技能 · A
-                                左键 / S 右键 / Z 重击(左键)
-                            </div>
                         </div>
                     {/if}
                     {#if activePhase === 'calculation'}
@@ -841,37 +824,91 @@
                             <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
                             BUFF配置
                         </button>
-                        <button
-                            onclick={toggleBuffDiffMode}
-                            class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getBuffDiffMode()
-                                ? 'border-(--theme-accent-bg)'
-                                : 'border-(--theme-sidebar-text)/20'}"
-                            style="color: {getBuffDiffMode()
-                                ? 'var(--theme-accent-text)'
-                                : 'var(--theme-sidebar-text)'}"
-                        >
-                            <Icon
-                                icon={getBuffDiffMode() ? 'mdi:swap-vertical-bold' : 'mdi:swap-vertical'}
-                                class="size-4 shrink-0"
-                            />
-                            {getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}
-                        </button>
-                        <button
-                            onclick={toggleHideConditionMismatch}
-                            class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getHideConditionMismatch()
-                                ? 'border-(--theme-accent-bg)'
-                                : 'border-(--theme-sidebar-text)/20'}"
-                            style="color: {getHideConditionMismatch()
-                                ? 'var(--theme-accent-text)'
-                                : 'var(--theme-sidebar-text)'}"
-                            title="隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff"
-                        >
-                            <Icon
-                                icon={getHideConditionMismatch() ? 'mdi:filter-off' : 'mdi:filter-outline'}
-                                class="size-4 shrink-0"
-                            />
-                            {getHideConditionMismatch() ? '可用Buff' : '全部Buff'}
-                        </button>
+                        {#if getCalcViewMode() !== 'spread'}
+                            <button
+                                onclick={toggleBuffDiffMode}
+                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getBuffDiffMode()
+                                    ? 'border-(--theme-accent-bg)'
+                                    : 'border-(--theme-sidebar-text)/20'}"
+                                style="color: {getBuffDiffMode()
+                                    ? 'var(--theme-accent-text)'
+                                    : 'var(--theme-sidebar-text)'}"
+                            >
+                                <Icon
+                                    icon={getBuffDiffMode() ? 'mdi:swap-vertical-bold' : 'mdi:swap-vertical'}
+                                    class="size-4 shrink-0"
+                                />
+                                {getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}
+                            </button>
+                        {/if}
+                        {#if getCalcViewMode() === 'spread'}
+                            <button
+                                onclick={() => {
+                                    const next = !getDamageTypeEditMode()
+                                    setDamageTypeEditMode(next)
+                                    addToast(next ? '已切换为编辑伤害类型' : '已切换为仅查看伤害类型', 'success')
+                                }}
+                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getDamageTypeEditMode()
+                                    ? 'border-(--theme-accent-bg)'
+                                    : 'border-(--theme-sidebar-text)/20'}"
+                                style="color: {getDamageTypeEditMode()
+                                    ? 'var(--theme-accent-text)'
+                                    : 'var(--theme-sidebar-text)'}"
+                                title="切换「视为」列伤害类型的编辑 / 只读查看"
+                            >
+                                <Icon
+                                    icon={getDamageTypeEditMode() ? 'mdi:pencil' : 'mdi:eye-off'}
+                                    class="size-4 shrink-0"
+                                />
+                                {getDamageTypeEditMode() ? '伤害类型(编辑中)' : '伤害类型(仅查看)'}
+                            </button>
+                            <button
+                                onclick={() => {
+                                    const next = getScrollAxisDefault() === 'vertical' ? 'horizontal' : 'vertical'
+                                    setScrollAxisDefault(next)
+                                    addToast(
+                                        next === 'horizontal'
+                                            ? '已切换为默认横向滚动（Shift+方向键改变默认方向，Ctrl+滚轮临时换向）'
+                                            : '已切换为默认纵向滚动（Shift+方向键改变默认方向，Ctrl+滚轮临时换向）',
+                                        'success'
+                                    )
+                                }}
+                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getScrollAxisDefault() ===
+                                'horizontal'
+                                    ? 'border-(--theme-accent-bg)'
+                                    : 'border-(--theme-sidebar-text)/20'}"
+                                style="color: {getScrollAxisDefault() === 'horizontal'
+                                    ? 'var(--theme-accent-text)'
+                                    : 'var(--theme-sidebar-text)'}"
+                                title="修改默认滚动方向：Shift+方向键 改变默认方向（持久）；Ctrl+滚轮 临时换向"
+                            >
+                                <Icon
+                                    icon={getScrollAxisDefault() === 'horizontal'
+                                        ? 'mdi:arrow-right-bold'
+                                        : 'mdi:arrow-down'}
+                                    class="size-4 shrink-0"
+                                />
+                                {getScrollAxisDefault() === 'horizontal' ? '默认横向滚动' : '默认纵向滚动'}
+                            </button>
+                        {/if}
+                        {#if getCalcViewMode() !== 'spread'}
+                            <button
+                                onclick={toggleHideConditionMismatch}
+                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getHideConditionMismatch()
+                                    ? 'border-(--theme-accent-bg)'
+                                    : 'border-(--theme-sidebar-text)/20'}"
+                                style="color: {getHideConditionMismatch()
+                                    ? 'var(--theme-accent-text)'
+                                    : 'var(--theme-sidebar-text)'}"
+                                title="隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff"
+                            >
+                                <Icon
+                                    icon={getHideConditionMismatch() ? 'mdi:filter-off' : 'mdi:filter-outline'}
+                                    class="size-4 shrink-0"
+                                />
+                                {getHideConditionMismatch() ? '可用Buff' : '全部Buff'}
+                            </button>
+                        {/if}
                     {/if}
                     {#if activePhase === 'config'}
                         <button

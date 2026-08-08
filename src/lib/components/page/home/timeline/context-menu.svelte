@@ -44,17 +44,28 @@
         setBlockKeyPickerId
     } from './timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
-    import { ORIGINAL_BUTTON_KEYS } from './timeline.consts'
+    import { ORIGINAL_BUTTON_KEYS, GAMEPAD_BUTTONS } from './timeline.consts'
     import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 
     let confirmMultiAction = $state<'delete' | 'reset' | null>(null)
+
+    // 手柄图标（blockKey 为手柄 id 时使用）
+    const gamepadIconMap = new Map(GAMEPAD_BUTTONS.filter((b) => b.icon).map((b) => [b.id, b.icon as string]))
 
     let menuBtnIcons = $derived.by(() => {
         const iconMap = new Map(getUiBtnIcons())
         const customByDefault = new Map(getKeyMapEntries().map((e) => [getDefaultBlockKey(e.id), e.blockKey]))
         return getUiBtnIcons()
             .filter(([name]) => (ORIGINAL_BUTTON_KEYS as readonly string[]).includes(name))
-            .map(([name]) => [name, iconMap.get(customByDefault.get(name) ?? name) ?? ''] as [string, string])
+            .map(
+                ([name]) =>
+                    [
+                        name,
+                        iconMap.get(customByDefault.get(name) ?? name) ??
+                            gamepadIconMap.get(customByDefault.get(name) ?? name) ??
+                            ''
+                    ] as [string, string]
+            )
     })
 
     const specialOptions = [
@@ -524,6 +535,28 @@
                                           ? 'M'
                                           : name}</span
                             >
+                        {/if}
+                    </button>
+                {/each}
+                {#each GAMEPAD_BUTTONS as btn}
+                    <button
+                        onclick={() => {
+                            setBlockKey(pickerBlockId, btn.id)
+                            setBlockKeyPickerId(null)
+                        }}
+                        class="size-10 flex items-center justify-center rounded-md border transition-colors hover:bg-(--theme-modal-text)/10"
+                        style="border-color: var(--theme-divider-border);"
+                        title={btn.label}
+                    >
+                        {#if btn.icon}
+                            <img
+                                src={btn.icon}
+                                alt={btn.label}
+                                draggable="false"
+                                class="size-6 object-contain pointer-events-none"
+                            />
+                        {:else}
+                            <span class="text-xs font-bold text-(--theme-modal-text)">{btn.label}</span>
                         {/if}
                     </button>
                 {/each}

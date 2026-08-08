@@ -14,6 +14,7 @@
     import type { CharSlot } from '$lib/data/types'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { focusTrap } from '$lib/utils/focus-trap'
 
     interface Props {
         open: boolean
@@ -188,11 +189,19 @@
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
         class="fixed inset-0 z-70 flex items-center justify-center select-text backdrop-blur-sm"
-        onkeydown={(e) => e.key === 'Escape' && onclose()}
+        onkeydown={(e) => {
+            if (e.key === 'Escape') {
+                onclose()
+                // 只关闭当前层，不继续冒泡关闭上层弹窗
+                e.stopPropagation()
+            }
+        }}
         oncontextmenu={handleCtxMenu}
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            use:focusTrap
+            tabindex="-1"
             class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}

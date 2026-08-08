@@ -27,6 +27,7 @@
     import QuickLookup from '../calculation/quick-lookup.svelte'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { focusTrap } from '$lib/utils/focus-trap'
 
     let showLookup = $state(false)
     let showCustomModal = $state(false)
@@ -83,10 +84,18 @@
         hasPct = false
         showCustomModal = true
     }
+
+    function toggleSkillSelection(key: string) {
+        const next = new Set(getSkillPickerSelected())
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        setSkillPickerSelected(next)
+    }
 </script>
 
 {#if getSkillPickerBlockId() !== null}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
         class="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
@@ -96,19 +105,19 @@
                 setSkillPickerIsRef(false)
             }
         }}
-        onkeydown={(e) => {
-            if (e.key === 'Escape') {
-                setSkillPickerBlockId(null)
-                setSkillPickerIsRef(false)
-            }
-        }}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
+            use:focusTrap
+            tabindex="-1"
             class="w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.stopPropagation()}
+            onkeydown={(e) => {
+                // 放行 ESC/Enter 到 window 层统一处理（保存/关闭），其余按键阻止冒泡
+                if (e.key === 'Escape' || e.key === 'Enter') return
+                e.stopPropagation()
+            }}
         >
             <!-- Header -->
             <div
@@ -196,21 +205,31 @@
                                           : hit.name}
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
                                 <div
+                                    tabindex={group.type === '谐度破坏' || isResponseHit ? -1 : 0}
                                     class={[
                                         'flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors',
                                         group.type === '谐度破坏' || isResponseHit
                                             ? 'opacity-40 cursor-not-allowed select-none text-[var(--theme-modal-text)]/60'
                                             : getSkillPickerSelected().has(key)
                                               ? 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]'
-                                              : 'text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/[0.05]'
+                                              : 'text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/[0.05]',
+                                        group.type !== '谐度破坏' && !isResponseHit
+                                            ? 'focus-visible:outline-none focus-visible:bg-[var(--theme-modal-text)]/[0.05] focus-visible:ring-1 focus-visible:ring-[var(--theme-accent-bg)]'
+                                            : ''
                                     ].join(' ')}
                                     onclick={() => {
                                         if (group.type === '谐度破坏' || isResponseHit) return
-                                        const next = new Set(getSkillPickerSelected())
-                                        if (next.has(key)) next.delete(key)
-                                        else next.add(key)
-                                        setSkillPickerSelected(next)
+                                        toggleSkillSelection(key)
+                                    }}
+                                    onkeydown={(e) => {
+                                        if (group.type === '谐度破坏' || isResponseHit) return
+                                        // 段数输入框的 Enter 由输入框自身处理，不触发选中切换
+                                        if (e.target !== e.currentTarget) return
+                                        if (e.key !== 'Enter' && e.key !== ' ') return
+                                        e.preventDefault()
+                                        toggleSkillSelection(key)
                                     }}
                                 >
                                     <div
@@ -325,10 +344,17 @@
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
         class="fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm"
-        onkeydown={(e) => e.key === 'Escape' && (showCustomModal = false)}
+        onkeydown={(e) => {
+            if (e.key === 'Escape') {
+                showCustomModal = false
+                e.stopPropagation()
+            }
+        }}
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            use:focusTrap={{ initial: 'input' }}
+            tabindex="-1"
             class="rounded-xl border p-5 shadow-xl w-[28rem]"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}

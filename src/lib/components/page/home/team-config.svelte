@@ -283,12 +283,12 @@
 </script>
 
 <div class="flex h-full flex-col p-6" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
-    <div class="flex flex-1 gap-4">
+    <div class="flex min-h-0 flex-1 gap-4 portrait:flex-col">
         {#each localTeam as slot, i}
             {@const charData = characterMap.get(slot.character ?? '')}
             {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
-                class="group relative flex flex-1 flex-col overflow-hidden rounded-xl border p-6"
+                class="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border p-6"
                 style={slot.character && eColor
                     ? `background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, ${eColor} 18%, transparent) 100%); border-color: color-mix(in srgb, ${eColor} 50%, transparent)`
                     : 'background: var(--theme-context-menu-bg); border-color: var(--theme-card-border)'}
@@ -311,198 +311,206 @@
                     </button>
                 {/if}
 
-                <div class="relative z-1 flex flex-1 flex-col gap-3">
-                    <!-- Character -->
-                    <div class="flex flex-1 flex-col">
-                        <span class="mb-1 block text-sm text-(--theme-muted-text)">角色</span>
-                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div
-                            class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
-                                slot.character
-                                    ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
-                                    : 'border-2 border-dashed border-(--theme-card-border)',
-                                !slot.character && !locked ? 'border-2 border-dashed border-(--theme-card-border)' : ''
-                            ].join(' ')}
-                            onclick={() => openPicker(i, 'character')}
-                        >
-                            {#if slot.character && characterIcons[slot.character]}
-                                <img
-                                    src={characterIcons[slot.character]}
-                                    alt={slot.character}
-                                    use:fallbackIcon={'/icons/placeholder-character.svg'}
-                                    class="size-14 shrink-0 rounded-full object-cover"
-                                />
-                            {/if}
-                            <div class="flex flex-col min-w-0 flex-1">
-                                <span
-                                    class:opacity-40={!slot.character}
-                                    class:text-[var(--theme-muted-text)]={!slot.character}
-                                >
-                                    {slot.character || (locked ? '未设置' : '点击选择')}
-                                </span>
-                                {#if slot.character}
-                                    {@const charData = characterMap.get(slot.character)}
-                                    {#if charData}
-                                        <span class="flex items-center gap-1.5 text-sm text-(--theme-muted-text)">
-                                            {#if elementIcons[charData.element]}
-                                                <img
-                                                    src={elementIcons[charData.element]}
-                                                    alt={charData.element}
-                                                    class="size-4 shrink-0"
-                                                />
-                                            {/if}
-                                            {charData.element}
-                                            {#if weaponTypeIcons[charData.weaponType]}
-                                                <img
-                                                    src={weaponTypeIcons[charData.weaponType]}
-                                                    alt={charData.weaponType}
-                                                    class="size-4 shrink-0 w-icon"
-                                                />
-                                            {/if}
-                                            {charData.weaponType}
-                                        </span>
-                                    {/if}
+                <div class="relative z-1 flex min-h-0 flex-1 flex-col overflow-y-auto hide-scrollbar">
+                    <!-- 包装层：非滚动 flex 容器，内容按自然高度撑开以触发滚动，min-h-full 保证内容不足时仍均分填满 -->
+                    <div class="flex min-h-full flex-col gap-3">
+                        <!-- Character -->
+                        <div class="flex shrink-0 flex-1 flex-col">
+                            <span class="mb-1 block text-sm text-(--theme-muted-text)">角色</span>
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div
+                                class={[
+                                    'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
+                                    slot.character
+                                        ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
+                                        : 'border-2 border-dashed border-(--theme-card-border)',
+                                    !slot.character && !locked
+                                        ? 'border-2 border-dashed border-(--theme-card-border)'
+                                        : ''
+                                ].join(' ')}
+                                onclick={() => openPicker(i, 'character')}
+                            >
+                                {#if slot.character && characterIcons[slot.character]}
+                                    <img
+                                        src={characterIcons[slot.character]}
+                                        alt={slot.character}
+                                        use:fallbackIcon={'/icons/placeholder-character.svg'}
+                                        class="size-14 shrink-0 rounded-full object-cover"
+                                    />
                                 {/if}
+                                <div class="flex flex-col min-w-0 flex-1">
+                                    <span
+                                        class:opacity-40={!slot.character}
+                                        class:text-[var(--theme-muted-text)]={!slot.character}
+                                        class=""
+                                    >
+                                        {slot.character || (locked ? '未设置' : '点击选择')}
+                                    </span>
+                                    {#if slot.character}
+                                        {@const charData = characterMap.get(slot.character)}
+                                        {#if charData}
+                                            <span class="flex items-center gap-1.5 text-sm text-(--theme-muted-text)">
+                                                {#if elementIcons[charData.element]}
+                                                    <img
+                                                        src={elementIcons[charData.element]}
+                                                        alt={charData.element}
+                                                        class="size-4 shrink-0"
+                                                    />
+                                                {/if}
+                                                <span>{charData.element}</span>
+                                                {#if weaponTypeIcons[charData.weaponType]}
+                                                    <img
+                                                        src={weaponTypeIcons[charData.weaponType]}
+                                                        alt={charData.weaponType}
+                                                        class="size-4 shrink-0 w-icon"
+                                                    />
+                                                {/if}
+                                                <span>{charData.weaponType}</span>
+                                            </span>
+                                        {/if}
+                                    {/if}
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Weapon -->
-                    <div class="flex flex-1 flex-col">
-                        <span class="mb-1 block text-sm text-(--theme-muted-text)">武器</span>
-                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div
-                            class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
-                                slot.weapon
-                                    ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
-                                    : 'border-2 border-dashed border-(--theme-card-border)',
-                                !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
-                            ]
-                                .filter(Boolean)
-                                .join(' ')}
-                            onclick={() => openPicker(i, 'weapon')}
-                        >
-                            {#if slot.weapon && weaponIcons[slot.weapon]}
-                                <img
-                                    src={weaponIcons[slot.weapon]}
-                                    alt={slot.weapon}
-                                    use:fallbackIcon={'/icons/placeholder-weapon.svg'}
-                                    class="size-14 shrink-0 rounded-lg object-contain bg-(--theme-card-bg)"
-                                />
-                            {/if}
-                            <div class="flex flex-col min-w-0 flex-1">
-                                {#if autoRecommending[i]}
-                                    <span class="text-(--theme-muted-text)">自动推荐中...</span>
+                        <!-- Weapon -->
+                        <div class="flex shrink-0 flex-1 flex-col">
+                            <span class="mb-1 block text-sm text-(--theme-muted-text)">武器</span>
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div
+                                class={[
+                                    'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
+                                    slot.weapon
+                                        ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
+                                        : 'border-2 border-dashed border-(--theme-card-border)',
+                                    !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
+                                ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                onclick={() => openPicker(i, 'weapon')}
+                            >
+                                {#if slot.weapon && weaponIcons[slot.weapon]}
+                                    <img
+                                        src={weaponIcons[slot.weapon]}
+                                        alt={slot.weapon}
+                                        use:fallbackIcon={'/icons/placeholder-weapon.svg'}
+                                        class="size-14 shrink-0 rounded-lg object-contain bg-(--theme-card-bg)"
+                                    />
+                                {/if}
+                                <div class="flex flex-col min-w-0 flex-1">
+                                    {#if autoRecommending[i]}
+                                        <span class="text-(--theme-muted-text)">自动推荐中...</span>
+                                    {:else}
+                                        <span
+                                            class:opacity-40={!slot.weapon}
+                                            class:text-[var(--theme-muted-text)]={!slot.weapon}
+                                            class=""
+                                        >
+                                            {slot.weapon ||
+                                                (slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色')}
+                                        </span>
+                                    {/if}
+                                    {#if slot.weapon}
+                                        {@const wpData = weaponMap.get(slot.weapon)}
+                                        {#if wpData}
+                                            <span class="text-amber-600 text-sm tracking-wider">
+                                                {'★'.repeat(wpData.star)}
+                                            </span>
+                                        {/if}
+                                    {/if}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- First Echo -->
+                        <div class="flex shrink-0 flex-1 flex-col">
+                            <span class="mb-1 block text-sm text-(--theme-muted-text)">首位声骸</span>
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div
+                                class={[
+                                    'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
+                                    slot.echoes[0].name
+                                        ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
+                                        : 'border-2 border-dashed border-(--theme-card-border)',
+                                    !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
+                                ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                onclick={() => openPicker(i, 'echo')}
+                            >
+                                {#if slot.echoes[0].name && echoIcons[slot.echoes[0].name]}
+                                    <img
+                                        src={echoIcons[slot.echoes[0].name]}
+                                        alt={slot.echoes[0].name}
+                                        use:fallbackIcon={'/icons/placeholder-echo.svg'}
+                                        class="size-14 shrink-0 rounded-lg object-contain bg-(--theme-card-bg)"
+                                    />
+                                {/if}
+                                <span
+                                    class="flex-1 text-base"
+                                    class:opacity-40={!slot.echoes[0].name}
+                                    class:text-[var(--theme-muted-text)]={!slot.echoes[0].name}
+                                >
+                                    {slot.echoes[0].name
+                                        ? `${slot.echoes[0].name} (C${slot.echoes[0].cost})`
+                                        : slot.character
+                                          ? '点击选择'
+                                          : locked
+                                            ? '未设置'
+                                            : '请先选择角色'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Trigger Sets -->
+                        <div class="flex shrink-0 flex-1 flex-col">
+                            <span class="mb-1 block text-sm text-(--theme-muted-text)">触发套装</span>
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div
+                                class={[
+                                    'flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
+                                    slot.triggerSets.length > 0
+                                        ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
+                                        : 'border-2 border-dashed border-(--theme-card-border)',
+                                    !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
+                                ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                onclick={() => openPicker(i, 'sets')}
+                            >
+                                {#if slot.triggerSets.length > 0}
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        {#each slot.triggerSets as set}
+                                            <span
+                                                class="inline-flex items-center gap-1 rounded bg-(--theme-input-bg) px-2 py-1 text-sm"
+                                            >
+                                                {#if echoSetIcons[set.name]}
+                                                    <img
+                                                        src={echoSetIcons[set.name]}
+                                                        alt={set.name}
+                                                        use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
+                                                        class="size-5 shrink-0 rounded"
+                                                    />
+                                                {/if}
+                                                <span>{set.name}</span>
+                                                ({set.pieces})
+                                            </span>
+                                        {/each}
+                                    </div>
                                 {:else}
                                     <span
-                                        class:opacity-40={!slot.weapon}
-                                        class:text-[var(--theme-muted-text)]={!slot.weapon}
+                                        class="flex-1 truncate text-sm"
+                                        class:opacity-40={slot.triggerSets.length === 0}
+                                        class:text-[var(--theme-muted-text)]={slot.triggerSets.length === 0}
                                     >
-                                        {slot.weapon ||
-                                            (slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色')}
+                                        {slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色'}
                                     </span>
                                 {/if}
-                                {#if slot.weapon}
-                                    {@const wpData = weaponMap.get(slot.weapon)}
-                                    {#if wpData}
-                                        <span class="text-amber-600 text-sm tracking-wider">
-                                            {'★'.repeat(wpData.star)}
-                                        </span>
-                                    {/if}
-                                {/if}
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- First Echo -->
-                    <div class="flex flex-1 flex-col">
-                        <span class="mb-1 block text-sm text-(--theme-muted-text)">首位声骸</span>
-                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div
-                            class={[
-                                'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
-                                slot.echoes[0].name
-                                    ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
-                                    : 'border-2 border-dashed border-(--theme-card-border)',
-                                !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
-                            ]
-                                .filter(Boolean)
-                                .join(' ')}
-                            onclick={() => openPicker(i, 'echo')}
-                        >
-                            {#if slot.echoes[0].name && echoIcons[slot.echoes[0].name]}
-                                <img
-                                    src={echoIcons[slot.echoes[0].name]}
-                                    alt={slot.echoes[0].name}
-                                    use:fallbackIcon={'/icons/placeholder-echo.svg'}
-                                    class="size-14 shrink-0 rounded-lg object-contain bg-(--theme-card-bg)"
-                                />
-                            {/if}
-                            <span
-                                class="flex-1 text-base"
-                                class:opacity-40={!slot.echoes[0].name}
-                                class:text-[var(--theme-muted-text)]={!slot.echoes[0].name}
-                            >
-                                {slot.echoes[0].name
-                                    ? `${slot.echoes[0].name} (C${slot.echoes[0].cost})`
-                                    : slot.character
-                                      ? '点击选择'
-                                      : locked
-                                        ? '未设置'
-                                        : '请先选择角色'}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Trigger Sets -->
-                    <div class="flex flex-1 flex-col">
-                        <span class="mb-1 block text-sm text-(--theme-muted-text)">触发套装</span>
-                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div
-                            class={[
-                                'flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
-                                slot.triggerSets.length > 0
-                                    ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
-                                    : 'border-2 border-dashed border-(--theme-card-border)',
-                                !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
-                            ]
-                                .filter(Boolean)
-                                .join(' ')}
-                            onclick={() => openPicker(i, 'sets')}
-                        >
-                            {#if slot.triggerSets.length > 0}
-                                <div class="flex flex-wrap items-center gap-2">
-                                    {#each slot.triggerSets as set}
-                                        <span
-                                            class="inline-flex items-center gap-1 rounded bg-(--theme-input-bg) px-2 py-1 text-sm"
-                                        >
-                                            {#if echoSetIcons[set.name]}
-                                                <img
-                                                    src={echoSetIcons[set.name]}
-                                                    alt={set.name}
-                                                    use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
-                                                    class="size-5 shrink-0 rounded"
-                                                />
-                                            {/if}
-                                            {set.name}({set.pieces})
-                                        </span>
-                                    {/each}
-                                </div>
-                            {:else}
-                                <span
-                                    class="flex-1 truncate text-sm"
-                                    class:opacity-40={slot.triggerSets.length === 0}
-                                    class:text-[var(--theme-muted-text)]={slot.triggerSets.length === 0}
-                                >
-                                    {slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色'}
-                                </span>
-                            {/if}
                         </div>
                     </div>
                 </div>
@@ -550,3 +558,13 @@
         icons={echoSetIcons}
     />
 {/if}
+
+<style>
+    .hide-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+</style>
