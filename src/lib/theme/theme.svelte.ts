@@ -175,12 +175,14 @@ function applyAccentOverride(root: HTMLElement) {
 
 function applyBgBlend(root: HTMLElement) {
     root.style.setProperty('--theme-glass-blur', `${overrides.bgBlur}px`)
+    // 暗度只压暗玻璃表面背后的区域（backdrop brightness），背景图本身保持原亮度形成对比；
+    // 无背景图时复位为 1，避免先调暗度再删背景后玻璃表面被残留压暗（暗度滑块仅在有背景图时可见，用户无法自行复位）
+    const glassBrightness = overrides.backgroundImage
+        ? 1 - (Math.max(0, Math.min(100, overrides.bgDim)) / 100) * 0.6
+        : 1
+    root.style.setProperty('--theme-glass-brightness', String(glassBrightness))
     if (overrides.backgroundImage) {
-        const dim = Math.max(0, Math.min(100, overrides.bgDim)) / 100
-        root.style.setProperty(
-            '--theme-bg-image',
-            `linear-gradient(rgba(0, 0, 0, ${dim}), rgba(0, 0, 0, ${dim})), url("${overrides.backgroundImage}")`
-        )
+        root.style.setProperty('--theme-bg-image', `url("${overrides.backgroundImage}")`)
         const theme = themes.find((t) => t.id === activeId)
         if (theme) {
             for (const key of Object.keys(theme.components)) {
@@ -244,7 +246,15 @@ export async function loadThemes() {
     }
 
     const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
-    if (ov) overrides = { ...DEFAULT_OVERRIDES, ...ov.data }
+    if (ov) {
+        overrides = { ...DEFAULT_OVERRIDES, ...ov.data }
+        // 旧版未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃
+        const bg = overrides.backgroundImage
+        if (bg && bg.startsWith('data:') && bg.length > 3_000_000) {
+            overrides.backgroundImage = ''
+            await dbSet(OVERRIDES_KEY, toPlain(overrides))
+        }
+    }
 
     applyThemeCSS()
 }

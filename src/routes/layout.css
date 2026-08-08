@@ -1,5 +1,50 @@
 @import 'tailwindcss';
 
+/* 全局可复用动效（Tailwind v4 @theme 注册，任何地方 class="animate-pop-in" 即可用）
+   风格：Mac 式干脆——短时长 + Fast-Out-Slow-In + 小位移缩放，无拖沓回弹 */
+@theme {
+    --animate-pop-in: pop-in 0.2s cubic-bezier(0.2, 0, 0, 1) backwards;
+    --animate-fade-in: fade-in 0.15s ease both;
+    --animate-rise-in: rise-in 0.32s cubic-bezier(0.2, 0, 0, 1) backwards;
+
+    @keyframes pop-in {
+        0% {
+            opacity: 0;
+            transform: scale(0.96) translateY(8px);
+        }
+        100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+    @keyframes rise-in {
+        0% {
+            opacity: 0;
+            transform: translateY(14px) scale(0.98);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-pop-in,
+    .animate-fade-in,
+    .animate-rise-in {
+        animation: none;
+    }
+}
+
 @font-face {
     font-family: 'FangXinShu';
     src: url('/fonts/fang-xin-shu.ttf') format('truetype');
@@ -57,8 +102,9 @@
         z-index: -1;
     }
     .theme-glass-surface {
-        -webkit-backdrop-filter: blur(var(--theme-glass-blur, 4px)) saturate(1.1);
-        backdrop-filter: blur(var(--theme-glass-blur, 4px)) saturate(1.1);
+        -webkit-backdrop-filter: blur(var(--theme-glass-blur, 4px)) saturate(1.1)
+            brightness(var(--theme-glass-brightness, 1));
+        backdrop-filter: blur(var(--theme-glass-blur, 4px)) saturate(1.1) brightness(var(--theme-glass-brightness, 1));
         box-shadow: inset 0 1px 0 color-mix(in srgb, var(--theme-layout-text) 6%, transparent);
     }
     .font-mono {

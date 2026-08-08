@@ -47,7 +47,8 @@
         result: '结果'
     }
 
-    let expanded = $state(false)
+    // 悬浮窗形态：collapsed=48px 圆钮 / small=默认小卡片 / large=全尺寸卡片
+    let size = $state<'collapsed' | 'small' | 'large'>('collapsed')
     let busy = $state(false)
     let input = $state('')
     let messages = $state<ChatMessage[]>([])
@@ -66,8 +67,8 @@
         if (target.closest('button')) return
         dragging = true
         const base = dragPos ?? {
-            x: window.innerWidth - cardW - 16,
-            y: window.innerHeight - cardH - 16
+            x: window.innerWidth - curW - 16,
+            y: window.innerHeight - curH - 16
         }
         dragStart = { mx: e.clientX, my: e.clientY, x: base.x, y: base.y }
         ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
@@ -78,8 +79,8 @@
         const nx = dragStart.x + (e.clientX - dragStart.mx)
         const ny = dragStart.y + (e.clientY - dragStart.my)
         dragPos = {
-            x: Math.max(0, Math.min(nx, window.innerWidth - cardW)),
-            y: Math.max(0, Math.min(ny, window.innerHeight - cardH))
+            x: Math.max(0, Math.min(nx, window.innerWidth - curW)),
+            y: Math.max(0, Math.min(ny, window.innerHeight - curH))
         }
     }
 
@@ -167,14 +168,29 @@
     })
 
     function toggle() {
-        expanded = !expanded
+        size = size === 'collapsed' ? 'small' : 'collapsed'
         // 展开瞬间按卡片尺寸重新钳制，保证面板不伸出屏幕
-        if (expanded && dragPos) {
-            const clamped = clampToViewport(dragPos, cardW, cardH)
+        if (size !== 'collapsed' && dragPos) {
+            const w = size === 'small' ? smallW : cardW
+            const h = size === 'small' ? smallH : cardH
+            const clamped = clampToViewport(dragPos, w, h)
             if (clamped && (clamped.x !== dragPos.x || clamped.y !== dragPos.y)) dragPos = clamped
             else if (!clamped) dragPos = null
         }
-        if (typeof localStorage !== 'undefined') localStorage.setItem('ai-assistant-open', expanded ? '1' : '0')
+        if (typeof localStorage !== 'undefined') localStorage.setItem('ai-assistant-open', size)
+    }
+
+    // 小卡片 ↔ 全尺寸卡片切换
+    function toggleScale() {
+        size = size === 'small' ? 'large' : 'small'
+        if (dragPos) {
+            const w = size === 'small' ? smallW : cardW
+            const h = size === 'small' ? smallH : cardH
+            const clamped = clampToViewport(dragPos, w, h)
+            if (clamped && (clamped.x !== dragPos.x || clamped.y !== dragPos.y)) dragPos = clamped
+            else if (!clamped) dragPos = null
+        }
+        if (typeof localStorage !== 'undefined') localStorage.setItem('ai-assistant-open', size)
     }
 
     function clearConversation() {
@@ -329,6 +345,11 @@
     const isLandscape = $derived(winW > winH)
     const cardW = $derived(isLandscape ? 480 : Math.max(280, winW - 24))
     const cardH = $derived(isLandscape ? winH - 24 : Math.min(winH * 0.6, 560))
+    // 默认展开的小卡片尺寸
+    const smallW = $derived(isLandscape ? 380 : Math.max(280, winW - 24))
+    const smallH = $derived(isLandscape ? 460 : Math.min(winH * 0.45, 420))
+    const curW = $derived(size === 'collapsed' ? 48 : size === 'small' ? smallW : cardW)
+    const curH = $derived(size === 'collapsed' ? 48 : size === 'small' ? smallH : cardH)
     let expandedH = $state(600)
     $effect(() => {
         const update = () => {
@@ -336,8 +357,8 @@
             winH = window.innerHeight
             expandedH = cardH
             // 窗口尺寸变化（或展开/收起切换）时按当前形态尺寸修正悬浮窗位置
-            const cw = expanded ? cardW : 48
-            const ch = expanded ? cardH : 48
+            const cw = size === 'collapsed' ? 48 : size === 'small' ? smallW : cardW
+            const ch = size === 'collapsed' ? 48 : size === 'small' ? smallH : cardH
             if (dragPos) {
                 const clamped = clampToViewport(dragPos, cw, ch)
                 if (clamped && (clamped.x !== dragPos.x || clamped.y !== dragPos.y)) dragPos = clamped
@@ -367,8 +388,8 @@
             if (saved) {
                 const parsed = JSON.parse(saved) as { x: number; y: number }
                 if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) {
-                    const size = expandedCardSize()
-                    dragPos = clampToViewport({ x: parsed.x, y: parsed.y }, size.w, size.h)
+                    const cardSize = expandedCardSize()
+                    dragPos = clampToViewport({ x: parsed.x, y: parsed.y }, cardSize.w, cardSize.h)
                 }
             }
         } catch {
@@ -386,18 +407,18 @@
 <!-- 单容器：收起=48px 圆钮（图标居中），展开=卡片；尺寸/圆角/背景过渡动画 -->
 {#if aiEnabled}
     <div
-        class="theme-glass-surface fixed z-[75] flex flex-col overflow-hidden border shadow-2xl {dragPos ? '' : 'bottom-4 right-4'}"
-        style="{dragPos ? `left:${dragPos.x}px;top:${dragPos.y}px;` : ''}width:{expanded
-            ? cardW
-            : 48}px;height:{expanded ? cardH : 48}px;border-radius:{expanded
-            ? '0.75rem'
-            : '9999px'};transition:width .28s cubic-bezier(.4,0,.2,1),height .28s cubic-bezier(.4,0,.2,1),border-radius .28s cubic-bezier(.4,0,.2,1),background-color .28s;background:{expanded
-            ? 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'
-            : 'var(--theme-accent-bg)'};color:{expanded
-            ? 'var(--theme-modal-text)'
-            : 'var(--theme-accent-text-on-bg, #fff)'};border-color:var(--theme-divider-border);"
+        class="theme-glass-surface fixed z-40 flex flex-col overflow-hidden border shadow-2xl {dragPos ? '' : 'bottom-4 right-4'}"
+        style="{dragPos ? `left:${dragPos.x}px;top:${dragPos.y}px;` : ''}width:{curW}px;height:{curH}px;border-radius:{size ===
+            'collapsed'
+            ? '9999px'
+            : '0.75rem'};transition:width .38s cubic-bezier(.32,.72,.24,1),height .38s cubic-bezier(.32,.72,.24,1),border-radius .38s cubic-bezier(.32,.72,.24,1),background-color .38s cubic-bezier(.32,.72,.24,1);background:{size ===
+            'collapsed'
+            ? 'var(--theme-accent-bg)'
+            : 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'};color:{size === 'collapsed'
+            ? 'var(--theme-accent-text-on-bg, #fff)'
+            : 'var(--theme-modal-text)'};border-color:var(--theme-divider-border);"
     >
-        {#if !expanded}
+        {#if size === 'collapsed'}
             <!-- 收起态：图标居中（可点击/拖动，拖动不触发展开） -->
             <div
                 class="flex h-full w-full cursor-grab touch-none select-none items-center justify-center"
@@ -433,6 +454,13 @@
                     title="清空对话"
                 >
                     <Icon icon="mdi:broom" class="size-4" />
+                </button>
+                <button
+                    onclick={toggleScale}
+                    class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
+                    title={size === 'small' ? '放大到全尺寸' : '缩小'}
+                >
+                    <Icon icon={size === 'small' ? 'mdi:arrow-expand' : 'mdi:arrow-collapse'} class="size-4" />
                 </button>
                 <button
                     onclick={toggle}

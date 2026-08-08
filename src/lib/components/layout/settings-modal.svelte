@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { fade } from 'svelte/transition'
+    import { popOut } from '$lib/utils/motion'
     import { getActiveId, getOverrides, updateOverride } from '$lib/theme'
     import Icon from '@iconify/svelte'
     import {
@@ -184,15 +186,59 @@
         return { bg: '#6366f1', text: '#ffffff' }
     }
 
+    function compressImage(file: File): Promise<string> {
+        // 大图转 data URL 塞进 CSS 变量会静默失败（~9MB 就不生效），统一压缩后再存储
+        const MAX_EDGE = 2560
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+                const dataUrl = reader.result as string
+                const img = new Image()
+                img.onload = () => {
+                    const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight))
+                    if (scale >= 1 && dataUrl.length < 1_500_000) {
+                        resolve(dataUrl)
+                        return
+                    }
+                    const canvas = document.createElement('canvas')
+                    canvas.width = Math.round(img.naturalWidth * scale)
+                    canvas.height = Math.round(img.naturalHeight * scale)
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) {
+                        resolve(dataUrl)
+                        return
+                    }
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+                    let out = canvas.toDataURL('image/webp', 0.85)
+                    if (!out.startsWith('data:image/webp')) out = canvas.toDataURL('image/jpeg', 0.85)
+                    if (out.length >= dataUrl.length) out = dataUrl
+                    resolve(out)
+                }
+                img.onerror = () => reject(new Error('图片解码失败'))
+                img.src = dataUrl
+            }
+            reader.onerror = () => reject(reader.error)
+            reader.readAsDataURL(file)
+        })
+    }
+
     function handleFileSelect(e: Event) {
         const file = (e.target as HTMLInputElement).files?.[0]
         if (!file) return
-        const reader = new FileReader()
-        reader.onload = () => {
-            updateOverride('backgroundImage', reader.result as string)
-            bgUrl = ''
-        }
-        reader.readAsDataURL(file)
+        compressImage(file)
+            .then((dataUrl) => {
+                updateOverride('backgroundImage', dataUrl)
+                bgUrl = ''
+            })
+            .catch((err) => {
+                console.error('[bg] 压缩失败，改用原图', err)
+                const reader = new FileReader()
+                reader.onload = () => {
+                    updateOverride('backgroundImage', reader.result as string)
+                    bgUrl = ''
+                }
+                reader.readAsDataURL(file)
+            })
     }
 
     function handleUrlApply() {
@@ -370,7 +416,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5))"
         onclick={(e) => {
             if (e.target === e.currentTarget) onclose()
@@ -378,12 +424,14 @@
         onkeydown={(e) => {
             if (e.key === 'Escape') onclose()
         }}
+        out:fade={{ duration: 130 }}
     >
         <div
-            class="theme-glass-surface relative flex h-[min(720px,92dvh)] w-[640px] max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl sm:h-[560px] sm:max-h-[90vh]"
+            class="animate-pop-in theme-glass-surface relative flex h-[min(720px,92dvh)] w-[640px] max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl sm:h-[560px] sm:max-h-[90vh]"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
+            out:popOut
         >
             <div
                 class="flex shrink-0 items-center justify-between border-b px-6 py-4"
@@ -544,14 +592,12 @@
                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-input-bg) 70%, transparent);"
                                 >
                                     <div
-                                        class="relative h-28 overflow-hidden border-b"
-                                        style="border-color: var(--theme-divider-border); background-image: linear-gradient(rgba(0,0,0,{overrides.bgDim /
-                                            100}), rgba(0,0,0,{overrides.bgDim /
-                                            100})), url('{overrides.backgroundImage}'); background-position: center; background-size: cover;"
+                                        class="relative h-40 overflow-hidden border-b"
+                                        style="border-color: var(--theme-divider-border); background-image: url('{overrides.backgroundImage}'); background-position: center; background-size: cover;"
                                     >
                                         <div
                                             class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-xl border p-3 shadow-xl"
-                                            style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent); background: color-mix(in srgb, var(--theme-modal-bg) {overrides.bgOpacity}%, transparent); backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12); -webkit-backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12);"
+                                            style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent); background: color-mix(in srgb, var(--theme-modal-bg) {overrides.bgOpacity}%, transparent); backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 - (overrides.bgDim / 100) * 0.6}); -webkit-backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 - (overrides.bgDim / 100) * 0.6});"
                                         >
                                             <div
                                                 class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent"
