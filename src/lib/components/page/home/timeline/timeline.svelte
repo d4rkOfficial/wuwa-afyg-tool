@@ -508,7 +508,7 @@
 />
 
 <div class="theme-glass-surface flex h-full flex-col bg-(--theme-timeline-bg) text-(--theme-timeline-text)">
-    <div class="flex-1 overflow-x-auto overflow-y-hidden" bind:this={timelineEl} onwheel={onWheel}>
+    <div class="theme-scrollbar flex-1 overflow-x-auto overflow-y-hidden" bind:this={timelineEl} onwheel={onWheel}>
         <div class="relative" style="width: {getTableWidth()}px; min-width: 100%; height: 100%;">
             <div class="flex flex-col h-full">
                 <!-- Header row -->
@@ -681,7 +681,7 @@
                         {:else}
                             <!-- Damage blocks overlay for track 3 -->
                             <div
-                                class="absolute pointer-events-auto overflow-y-auto"
+                                class="absolute pointer-events-auto theme-scrollbar overflow-y-auto"
                                 style="left: 5rem; top: 0; right: 0; bottom: 0; z-index: 6;"
                                 use:nonpassiveWheel={onDamageWheel}
                             >

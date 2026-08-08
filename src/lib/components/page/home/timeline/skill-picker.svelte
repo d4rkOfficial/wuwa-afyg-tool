@@ -98,7 +98,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if ((e.target as HTMLElement) === e.currentTarget) {
                 setSkillPickerBlockId(null)
@@ -110,7 +110,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -155,7 +155,7 @@
             </div>
 
             <!-- Body -->
-            <div class="flex-1 overflow-y-auto p-2">
+            <div class="theme-scrollbar flex-1 overflow-y-auto p-2">
                 {#if getSkillPickerLoading()}
                     <div class="flex items-center justify-center py-8">
                         <span class="text-xs text-[var(--theme-modal-text)]/50">加载中…</span>
@@ -343,7 +343,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm"
         onkeydown={(e) => {
             if (e.key === 'Escape') {
                 showCustomModal = false
@@ -355,7 +355,7 @@
         <div
             use:focusTrap={{ initial: 'input' }}
             tabindex="-1"
-            class="rounded-xl border p-5 shadow-xl w-[28rem]"
+            class="animate-pop-in rounded-xl border p-5 shadow-xl w-[28rem]"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -447,7 +447,7 @@
                             </button>
                             {#if showUnitMenu}
                                 <div
-                                    class="absolute right-0 top-full z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                    class="theme-scrollbar absolute right-0 top-full z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
                                     style="border-color: var(--theme-divider-border);"
                                     onclick={(e) => e.stopPropagation()}
                                 >

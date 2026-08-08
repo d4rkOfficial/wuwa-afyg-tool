@@ -342,7 +342,7 @@
         </div>
 
         <!-- Entity list -->
-        <div class="min-h-0 flex-1 overflow-y-auto pr-0.5">
+        <div class="theme-scrollbar min-h-0 flex-1 overflow-y-auto pr-0.5">
             {#if rows.length === 0}
                 <div class="flex h-full flex-col items-center justify-center gap-2 text-sm text-(--theme-muted-text)">
                     <Icon icon="mdi:magnify-close" class="size-9" />

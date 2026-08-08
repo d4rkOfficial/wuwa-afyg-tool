@@ -122,7 +122,7 @@
     >
         <div
             bind:this={menuEl}
-            class="absolute max-h-64 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
+            class="animate-pop-in theme-scrollbar absolute max-h-64 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
             style="left: {pos.left}px; top: {pos.top}px; width: {pos.width}px; background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >

@@ -88,7 +88,7 @@
         <div
             bind:this={modalEl}
             class={[
-                'animate-pop-in theme-glass-surface relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
+                'animate-pop-in theme-glass-surface theme-scrollbar relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
                 footer ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
                 'text-(--theme-modal-text)',
                 className || ''
@@ -119,7 +119,7 @@
                 </div>
             {/if}
             {#if footer}
-                <div class="min-h-0 flex-1 overflow-y-auto">
+                <div class="theme-scrollbar min-h-0 flex-1 overflow-y-auto">
                     {@render children?.()}
                 </div>
                 <div class="shrink-0">

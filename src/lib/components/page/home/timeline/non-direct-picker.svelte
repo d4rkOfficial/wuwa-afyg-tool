@@ -28,7 +28,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if ((e.target as HTMLElement) === e.currentTarget) setNonDirectPickerBlockId(null)
         }}
@@ -37,7 +37,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -52,7 +52,7 @@
             >
                 <h2 class="text-sm font-semibold">配置非直伤</h2>
             </div>
-            <div class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div class="theme-scrollbar flex-1 overflow-y-auto p-4 space-y-3">
                 <div class="text-[11px] font-semibold text-[var(--theme-modal-text)]/60 tracking-wider">处决/响应</div>
                 {#each NON_DIRECT_CONFIGS.filter((c) => c.name === '谐度破坏' || c.category === '响应') as cfg}
                     {@const isTuneBreak = cfg.name === '谐度破坏'}

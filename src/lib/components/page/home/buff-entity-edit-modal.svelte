@@ -378,7 +378,7 @@
                         新增
                     </button>
                 </div>
-                <div class="min-h-0 flex-1 space-y-1 overflow-y-auto p-1.5">
+                <div class="theme-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto p-1.5">
                     {#if buffs.length === 0}
                         <div class="py-6 text-center text-xs text-(--theme-modal-text)/30">暂无 Buff，点击上方新增</div>
                     {:else}
@@ -590,7 +590,7 @@
                             </div>
                         {/if}
                     </div>
-                    <div class="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+                    <div class="theme-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
                         {#if activeBuff.zones.length === 0}
                             <div class="py-6 text-center text-xs text-(--theme-modal-text)/30">
                                 暂无乘区，请点击右侧乘区添加
@@ -707,7 +707,7 @@
                 >
                     乘区
                 </div>
-                <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
+                <div class="theme-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
                     {#each ZONE_DEFS as def}
                         {@const exists = activeZoneIds.has(def.id)}
                         <button
@@ -733,12 +733,12 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && (showRefModal = false)}
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border p-5 shadow-xl w-[30rem] max-h-[88vh] overflow-y-auto"
+            class="animate-pop-in theme-scrollbar rounded-xl border p-5 shadow-xl w-[30rem] max-h-[88vh] overflow-y-auto"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -768,7 +768,7 @@
                         </button>
                         {#if showRefZoneMenu}
                             <div
-                                class="absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
                                 style="border-color: var(--theme-divider-border);"
                                 onclick={(e) => e.stopPropagation()}
                             >

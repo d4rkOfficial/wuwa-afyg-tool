@@ -90,13 +90,13 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         onkeydown={(e) => {
             if (e.key === 'Escape') onclose()
         }}
     >
         <div
-            class="relative flex max-h-[75vh] min-h-[50vh] w-170 max-w-[90vw] flex-col rounded-xl text-(--theme-modal-text) shadow-2xl"
+            class="animate-pop-in relative flex max-h-[75vh] min-h-[50vh] w-170 max-w-[90vw] flex-col rounded-xl text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent);"
             role="dialog"
             aria-modal="true"
@@ -121,7 +121,7 @@
 
             <div class="flex flex-1 overflow-hidden">
                 <!-- Content area (left) -->
-                <div class="flex-1 overflow-y-auto p-4">
+                <div class="theme-scrollbar flex-1 overflow-y-auto p-4">
                     {#if showSearchResults}
                         {#if searchResults.length === 0}
                             <div class="py-12 text-center text-sm text-(--theme-muted-text)">无匹配角色</div>

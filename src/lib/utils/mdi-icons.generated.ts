@@ -10,6 +10,8 @@ export const MDI_ICONS = {
         'alert-circle': { body: '<path fill="currentColor" d="M13 13h-2V7h2m0 10h-2v-2h2M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2"/>' },
         'alert-circle-outline': { body: '<path fill="currentColor" d="M11 15h2v2h-2zm0-8h2v6h-2zm1-5C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8"/>' },
         'alert-outline': { body: '<path fill="currentColor" d="M12 2L1 21h22M12 6l7.53 13H4.47M11 10v4h2v-4m-2 6v2h2v-2"/>' },
+        'apple-keyboard-control': { body: '<path fill="currentColor" d="m19.78 11.78l-1.42 1.41L12 6.83l-6.36 6.36l-1.42-1.41L12 4z"/>' },
+        'apple-keyboard-shift': { body: '<path fill="currentColor" d="M15 18v-6h2.17L12 6.83L6.83 12H9v6zM12 4l10 10h-5v6H7v-6H2z"/>' },
         'archive-arrow-up-outline': { body: '<path fill="currentColor" d="M20 21H4V10h2v9h12v-9h2zM3 3h18v6H3zm2 2v2h14V5m-8.5 12v-3H8l4-4l4 4h-2.5v3"/>' },
         'archive-outline': { body: '<path fill="currentColor" d="M20 21H4V10h2v9h12v-9h2zM3 3h18v6H3zm6.5 8h5c.28 0 .5.22.5.5V13H9v-1.5c0-.28.22-.5.5-.5M5 5v2h14V5z"/>' },
         'arrow-collapse': { body: '<path fill="currentColor" d="M19.5 3.09L15 7.59V4h-2v7h7V9h-3.59l4.5-4.5zM4 13v2h3.59l-4.5 4.5l1.41 1.41l4.5-4.5V20h2v-7z"/>' },

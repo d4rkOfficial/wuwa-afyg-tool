@@ -294,12 +294,12 @@
     <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center overflow-hidden backdrop-blur-sm"
         onclick={onclose}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border p-8 shadow-2xl"
+            class="animate-pop-in rounded-xl border p-8 shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -310,12 +310,12 @@
     <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center overflow-hidden backdrop-blur-sm"
         onclick={onclose}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
         <div
-            class="mx-4 max-h-[85vh] w-full max-w-7xl overflow-y-auto rounded-xl border shadow-2xl"
+            class="animate-pop-in theme-scrollbar mx-4 max-h-[85vh] w-full max-w-7xl overflow-y-auto rounded-xl border shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >

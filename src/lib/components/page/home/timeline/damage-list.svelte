@@ -6,7 +6,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if ((e.target as HTMLElement) === e.currentTarget) setShowDamageList(false)
         }}
@@ -14,7 +14,7 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[70vh] max-w-2xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-2xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
@@ -26,7 +26,7 @@
                 <h2 class="text-sm font-semibold">伤害列表</h2>
                 <span class="text-xs text-[var(--theme-modal-text)]/50">{getDamageList().length} 条</span>
             </div>
-            <div class="flex-1 overflow-y-auto p-3">
+            <div class="theme-scrollbar flex-1 overflow-y-auto p-3">
                 {#if getDamageList().length === 0}
                     <div class="flex items-center justify-center py-8 text-xs text-[var(--theme-modal-text)]/50">
                         暂无伤害数据

@@ -20,6 +20,9 @@ export interface ThemeOverrides {
     bgOpacity: number
     bgBlur: number
     bgDim: number
+    // 背景图自身的独立控制（与玻璃表面分开）：背景图模糊、背景图遮罩强度
+    bgImageBlur: number
+    bgImageMask: number
 }
 
 export type ThemeComponentKey =

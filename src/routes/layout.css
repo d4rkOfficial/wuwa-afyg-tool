@@ -6,6 +6,7 @@
     --animate-pop-in: pop-in 0.2s cubic-bezier(0.2, 0, 0, 1) backwards;
     --animate-fade-in: fade-in 0.15s ease both;
     --animate-rise-in: rise-in 0.32s cubic-bezier(0.2, 0, 0, 1) backwards;
+    --animate-shrink-in: shrink-in 0.32s cubic-bezier(0.2, 0, 0, 1) backwards;
 
     @keyframes pop-in {
         0% {
@@ -35,12 +36,23 @@
             transform: translateY(0) scale(1);
         }
     }
+    @keyframes shrink-in {
+        0% {
+            opacity: 0;
+            transform: scale(1.02) translateY(8px);
+        }
+        100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .animate-pop-in,
     .animate-fade-in,
-    .animate-rise-in {
+    .animate-rise-in,
+    .animate-shrink-in {
         animation: none;
     }
 }
@@ -98,6 +110,18 @@
         position: fixed;
         inset: 0;
         background: var(--theme-bg-image, none) center/cover;
+        /* 背景图自身的模糊（独立于玻璃表面毛玻璃强度），由「背景图模糊」控制 */
+        filter: blur(var(--theme-bg-image-blur, 0px));
+        -webkit-filter: blur(var(--theme-bg-image-blur, 0px));
+        pointer-events: none;
+        z-index: -1;
+    }
+    /* 背景图遮罩层（压暗背景图本身，独立于玻璃表面背景暗度），由「背景图遮罩」控制；无背景图时透明度为 0 */
+    html::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, var(--theme-bg-mask-opacity, 0));
         pointer-events: none;
         z-index: -1;
     }
@@ -112,14 +136,14 @@
     }
     * {
         scrollbar-width: thin;
-        scrollbar-color: oklch(0.3 0 0) transparent;
+        scrollbar-color: oklch(0.3 0 0) oklch(0.5 0 0);
     }
     *::-webkit-scrollbar {
         width: 6px;
         height: 6px;
     }
     *::-webkit-scrollbar-track {
-        background: transparent;
+        background: oklch(0.5 0 0);
     }
     *::-webkit-scrollbar-thumb {
         background: oklch(0.3 0 0);
@@ -130,7 +154,22 @@
         background: oklch(0.45 0.1 260);
     }
     *::-webkit-scrollbar-corner {
-        background: transparent;
+        background: oklch(0.5 0 0);
+    }
+    /* 排轴/拉表（平铺+下拉）/结果表格 滚动条：背景跟随主题（白天白/夜间黑），透明度跟随「背景透明度」设置 */
+    .theme-scrollbar {
+        scrollbar-color: var(--theme-scrollbar-thumb, oklch(0.3 0 0)) var(--theme-scrollbar-track, oklch(0.5 0 0));
+    }
+    .theme-scrollbar::-webkit-scrollbar-track,
+    .theme-scrollbar::-webkit-scrollbar-corner {
+        background: var(--theme-scrollbar-track, oklch(0.5 0 0));
+    }
+    .theme-scrollbar::-webkit-scrollbar-thumb {
+        background: var(--theme-scrollbar-thumb, oklch(0.3 0 0));
+        border-color: transparent;
+    }
+    .theme-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: color-mix(in srgb, var(--theme-scrollbar-thumb, oklch(0.3 0 0)) 55%, var(--theme-accent-bg));
     }
     .w-icon {
         filter: var(--theme-w-icon-filter, none);

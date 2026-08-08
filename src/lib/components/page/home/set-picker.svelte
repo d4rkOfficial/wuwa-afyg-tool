@@ -96,7 +96,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if (e.target === e.currentTarget) onclose()
         }}
@@ -105,7 +105,7 @@
         }}
     >
         <div
-            class="relative flex max-h-[85vh] w-150 max-w-[90vw] flex-col rounded-xl p-4 shadow-2xl text-(--theme-modal-text)"
+            class="animate-pop-in relative flex max-h-[85vh] w-150 max-w-[90vw] flex-col rounded-xl p-4 shadow-2xl text-(--theme-modal-text)"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent);"
             role="dialog"
             aria-modal="true"
@@ -114,7 +114,7 @@
                 <h3 class="text-sm font-semibold">触发套装</h3>
             </div>
 
-            <div class="flex-1 overflow-y-auto">
+            <div class="theme-scrollbar flex-1 overflow-y-auto">
                 {#if pinnedList.length > 0}
                     <div class="mb-2 text-xs font-semibold tracking-wider text-(--theme-muted-text)">首位声骸所属</div>
                     <div class="grid grid-cols-2 gap-3">

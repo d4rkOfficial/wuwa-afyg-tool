@@ -514,7 +514,7 @@
         >
             <div
                 bind:this={mainStatMenuEl}
-                class="absolute max-h-48 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
+                class="animate-pop-in theme-scrollbar absolute max-h-48 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
                 style="left: {mainStatMenuPos?.left ?? 0}px; top: {mainStatMenuPos?.top ??
                     0}px; width: {mainStatMenuPos?.width ??
                     0}px; background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
@@ -555,13 +555,13 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-            class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+            class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
             onclick={() => (showSubstatModal = null)}
         >
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-                class="w-72 max-h-80 rounded-xl border p-4 shadow-2xl backdrop-blur-lg"
+                class="animate-pop-in w-72 max-h-80 rounded-xl border p-4 shadow-2xl backdrop-blur-lg"
                 style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
                 onclick={(e) => e.stopPropagation()}
             >
@@ -574,7 +574,7 @@
                         <Icon icon="mdi:close" class="size-4" />
                     </button>
                 </div>
-                <div class="space-y-0.5 max-h-56 overflow-y-auto">
+                <div class="theme-scrollbar space-y-0.5 max-h-56 overflow-y-auto">
                     {#each SUBSTAT_OPTIONS as opt}
                         {@const exists = mSlot.substats.some((s) => s.type === opt.label)}
                         <button

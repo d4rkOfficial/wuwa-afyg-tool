@@ -574,7 +574,7 @@
 
     <div class="flex flex-1 flex-col overflow-hidden">
         {#if !activeProject}
-            <div class="flex flex-1 flex-col items-center justify-end gap-8 px-8 pb-10">
+            <div class="flex flex-1 flex-col items-center justify-center gap-8 px-8">
                 <div class="flex flex-col items-center text-center">
                     <div class="relative mb-4">
                         <div
@@ -593,7 +593,7 @@
                         椰果工具箱
                     </h2>
                     <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                        <span class="text-sm text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]">
+                        <span class="text-sm text-(--theme-card-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]">
                             鸣潮社区公益工具
                         </span>
                         <span
@@ -603,10 +603,31 @@
                             数据版本 {getWWVersion()}
                         </span>
                     </div>
-                    <p class="mt-2 text-xs text-(--theme-muted-text)/70 [text-shadow:_0_0_2px_var(--theme-halo-color)]">
-                        <!-- 先不写 -->
-                        <br />
-                        <br />
+                    <p
+                        class="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-xs text-(--theme-card-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                    >
+                        <kbd
+                            class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium text-(--theme-card-text)"
+                            style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--theme-modal-text) 12%, transparent);"
+                        >
+                            <Icon icon="mdi:apple-keyboard-control" class="size-3" />
+                            Ctrl/Cmd
+                        </kbd>
+                        <span>+</span>
+                        <kbd
+                            class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium text-(--theme-card-text)"
+                            style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--theme-modal-text) 12%, transparent);"
+                        >
+                            <Icon icon="mdi:apple-keyboard-shift" class="size-3" />
+                            Shift
+                        </kbd>
+                        <span>+</span>
+                        <kbd
+                            class="rounded-md border px-1.5 py-0.5 text-[10px] font-medium text-(--theme-card-text)"
+                            style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--theme-modal-text) 12%, transparent);"
+                            >R</kbd
+                        >
+                        <span>尝试更新版本</span>
                     </p>
                 </div>
                 <div class="grid w-full max-w-5xl grid-cols-4 gap-4">
@@ -615,11 +636,13 @@
                             newName = ''
                             showNewModal = true
                         }}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)" style="animation-delay: 0ms"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        style="animation-delay: 0ms"
                     >
                         <Icon
                             icon="mdi:plus"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]" style="animation-delay: 90ms"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            style="animation-delay: 90ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
@@ -634,11 +657,13 @@
                     </button>
                     <button
                         onclick={() => (showWorkshopFrame = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)" style="animation-delay: 55ms"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        style="animation-delay: 55ms"
                     >
                         <Icon
                             icon="mdi:storefront-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]" style="animation-delay: 145ms"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            style="animation-delay: 145ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
@@ -653,11 +678,13 @@
                     </button>
                     <button
                         onclick={() => (showBuffLibrary = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)" style="animation-delay: 110ms"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        style="animation-delay: 110ms"
                     >
                         <Icon
                             icon="mdi:view-dashboard-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]" style="animation-delay: 200ms"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            style="animation-delay: 200ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
@@ -672,11 +699,13 @@
                     </button>
                     <button
                         onclick={() => (showSettings = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)" style="animation-delay: 165ms"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        style="animation-delay: 165ms"
                     >
                         <Icon
                             icon="mdi:cog-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]" style="animation-delay: 255ms"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            style="animation-delay: 255ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
@@ -707,43 +736,55 @@
             />
 
             <div class="flex-1 overflow-hidden relative">
-                {#if showResult}
-                    <Result
-                        team={activeProject.team}
-                        calcState={activeProject.phases.calculation.data as CalcState | null}
-                        configState={activeProject.phases.config.data as ConfigState | null}
-                        refreshKey={resultRefreshKey}
-                    />
-                {:else if activePhase === 'team'}
-                    <TeamConfig
-                        team={activeProject.team}
-                        onupdate={handleUpdateTeam}
-                        onreset={handleResetTeam}
-                        locked={teamPhaseLocked}
-                    />
-                {:else if activePhase === 'timeline'}
-                    <Timeline
-                        team={activeProject.team}
-                        locked={phaseLocked}
-                        data={activeProject.phases.timeline.data as TimelineData | null}
-                        onupdate={updateTimeline}
-                    />
-                {:else if activePhase === 'calculation'}
-                    <Calculation
-                        team={activeProject.team}
-                        timelineData={activeProject.phases.timeline.data as TimelineData | null}
-                        calcState={activeProject.phases.calculation.data as CalcState | null}
-                        locked={phaseLocked}
-                        onupdate={(state) => updateCalculation(state)}
-                    />
-                {:else}
-                    <Config
-                        team={activeProject.team}
-                        data={activeProject.phases.config.data as ConfigState | null}
-                        locked={phaseLocked}
-                        onupdate={(state) => updateConfig(state)}
-                    />
-                {/if}
+                {#key activeProject?.id}
+                    {#if showResult}
+                        <div class="h-full animate-shrink-in">
+                            <Result
+                                team={activeProject.team}
+                                calcState={activeProject.phases.calculation.data as CalcState | null}
+                                configState={activeProject.phases.config.data as ConfigState | null}
+                                refreshKey={resultRefreshKey}
+                            />
+                        </div>
+                    {:else if activePhase === 'team'}
+                        <div class="h-full animate-shrink-in">
+                            <TeamConfig
+                                team={activeProject.team}
+                                onupdate={handleUpdateTeam}
+                                onreset={handleResetTeam}
+                                locked={teamPhaseLocked}
+                            />
+                        </div>
+                    {:else if activePhase === 'timeline'}
+                        <div class="h-full animate-shrink-in">
+                            <Timeline
+                                team={activeProject.team}
+                                locked={phaseLocked}
+                                data={activeProject.phases.timeline.data as TimelineData | null}
+                                onupdate={updateTimeline}
+                            />
+                        </div>
+                    {:else if activePhase === 'calculation'}
+                        <div class="h-full animate-shrink-in">
+                            <Calculation
+                                team={activeProject.team}
+                                timelineData={activeProject.phases.timeline.data as TimelineData | null}
+                                calcState={activeProject.phases.calculation.data as CalcState | null}
+                                locked={phaseLocked}
+                                onupdate={(state) => updateCalculation(state)}
+                            />
+                        </div>
+                    {:else}
+                        <div class="h-full animate-shrink-in">
+                            <Config
+                                team={activeProject.team}
+                                data={activeProject.phases.config.data as ConfigState | null}
+                                locked={phaseLocked}
+                                onupdate={(state) => updateConfig(state)}
+                            />
+                        </div>
+                    {/if}
+                {/key}
                 {#if showStatOverview}
                     <StatOverview
                         team={activeProject.team}

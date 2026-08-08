@@ -696,21 +696,21 @@
 
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <div
-    class="fixed inset-0 z-50 flex items-start justify-center pt-12 pb-8 overflow-hidden backdrop-blur-sm"
+    class="animate-fade-in fixed inset-0 z-50 flex items-start justify-center pt-12 pb-8 overflow-hidden backdrop-blur-sm"
     style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
     role="presentation"
 >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="w-185 max-h-[85vh] overflow-y-auto rounded-xl border shadow-2xl"
+        class="animate-pop-in theme-scrollbar w-185 max-h-[85vh] overflow-y-auto rounded-xl border shadow-2xl"
         style="scrollbar-width: none; background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
         <!-- Header -->
         <div
             class="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); backdrop-filter: blur(8px); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-color: var(--theme-divider-border);"
         >
             <div class="flex items-center gap-2">
                 <Icon icon="mdi:chart-box-outline" class="size-4" style="color: var(--theme-accent-text);" />

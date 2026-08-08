@@ -40,12 +40,12 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
     style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-    class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+    class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
     onclick={() => !running && onclose()}
 >
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="w-72 rounded-xl border p-4 shadow-2xl backdrop-blur-lg"
+        class="animate-pop-in w-72 rounded-xl border p-4 shadow-2xl backdrop-blur-lg"
         style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
@@ -60,7 +60,7 @@
             </button>
         </div>
         <div class="text-xs text-(--theme-modal-text)/50 mb-2">选择希望出现的副词条（最多 5 个）</div>
-        <div class="space-y-0.5 max-h-56 overflow-y-auto mb-3">
+        <div class="theme-scrollbar space-y-0.5 max-h-56 overflow-y-auto mb-3">
             {#each available as type}
                 {@const isSelected = selected.includes(type)}
                 <button

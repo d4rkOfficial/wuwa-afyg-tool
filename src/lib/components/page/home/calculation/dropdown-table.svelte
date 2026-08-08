@@ -385,7 +385,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="theme-glass-surface h-full overflow-auto pb-48"
+    class="theme-scrollbar h-full overflow-auto pb-48"
     style="background: var(--theme-modal-bg);"
     bind:this={calcContainer}
     onwheel={(e) => {
@@ -398,8 +398,8 @@
     <table class="w-full text-xs table-fixed">
         <thead>
             <tr
-                class="text-(--theme-modal-text)/50 sticky top-0 bg-(--theme-modal-bg)/80 backdrop-blur-md opacity-100!"
-                style="border-bottom: 1px solid var(--theme-divider-border);"
+                class="text-(--theme-modal-text)/50 sticky top-0 opacity-100!"
+                style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-bottom: 1px solid var(--theme-divider-border);"
             >
                 <th
                     class="text-left font-medium py-2 px-3 w-20 shrink-0 border-r border-dashed"

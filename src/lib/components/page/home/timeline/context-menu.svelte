@@ -162,7 +162,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {cm.x}px; top: {cm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: cm.x, y: cm.y }}
@@ -238,7 +238,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {bm.x}px; top: {bm.y}px; border-color: var(--theme-divider-border);"
         data-block-menu="true"
         use:clampMenu={{ x: bm.x, y: bm.y }}
@@ -310,7 +310,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {mm.x}px; top: {mm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: mm.x, y: mm.y }}
@@ -435,7 +435,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed z-50 max-w-[80vw] overflow-x-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in fixed z-50 max-w-[80vw] overflow-x-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 shadow-xl backdrop-blur-lg"
         style="left: {tm.x}px; top: {tm.y}px; border-color: var(--theme-divider-border);"
         data-track-menu="true"
         use:clampMenu={{ x: tm.x, y: tm.y }}

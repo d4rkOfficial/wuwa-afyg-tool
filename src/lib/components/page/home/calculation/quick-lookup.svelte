@@ -188,7 +188,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-70 flex items-center justify-center select-text backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-70 flex items-center justify-center select-text backdrop-blur-sm"
         onkeydown={(e) => {
             if (e.key === 'Escape') {
                 onclose()
@@ -202,14 +202,14 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="theme-glass-surface mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-(--theme-modal-text) shadow-2xl"
+            class="animate-pop-in mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <div bind:this={scrollContainer} class="flex-1 overflow-y-auto rounded-xl hide-scrollbar">
                 <div
-                    class="theme-glass-surface sticky top-0 z-10 flex items-center justify-between border-b px-5 py-3"
-                    style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
+                    class="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-3"
+                    style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-color: var(--theme-divider-border);"
                 >
                     <h2 class="text-base font-semibold">速查</h2>
                     <button
@@ -219,8 +219,8 @@
                     >
                 </div>
                 <div
-                    class="theme-glass-surface sticky top-13 z-10 flex gap-1 border-b px-5 py-2"
-                    style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
+                    class="sticky top-13 z-10 flex gap-1 border-b px-5 py-2"
+                    style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-color: var(--theme-divider-border);"
                 >
                     {#each charNames as name, i}
                         <button
@@ -615,7 +615,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="fixed inset-0 z-80" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
         <div
-            class="absolute min-w-36 rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+            class="animate-pop-in absolute min-w-36 rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
             style="border-color: var(--theme-divider-border); left: {ctxX}px; top: {ctxY}px;"
         >
             <button

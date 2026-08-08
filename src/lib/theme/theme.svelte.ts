@@ -14,7 +14,9 @@ const DEFAULT_OVERRIDES: ThemeOverrides = {
     backgroundImage: '',
     bgOpacity: 85,
     bgBlur: 4,
-    bgDim: 0
+    bgDim: 0,
+    bgImageBlur: 4,
+    bgImageMask: 0
 }
 
 const TRANSLUCENT_SURFACES = new Set([
@@ -175,6 +177,11 @@ function applyAccentOverride(root: HTMLElement) {
 
 function applyBgBlend(root: HTMLElement) {
     root.style.setProperty('--theme-glass-blur', `${overrides.bgBlur}px`)
+    // 背景图自身的独立控制（遮罩层）：模糊与遮罩强度，与玻璃表面（毛玻璃强度/背景暗度）分开
+    root.style.setProperty('--theme-bg-image-blur', `${overrides.bgImageBlur}px`)
+    // 仅在有背景图时压暗背景图本身（黑色半透明），无背景图时复位为 0
+    const maskOpacity = overrides.backgroundImage ? (Math.max(0, Math.min(100, overrides.bgImageMask)) / 100) * 0.6 : 0
+    root.style.setProperty('--theme-bg-mask-opacity', String(maskOpacity))
     // 暗度只压暗玻璃表面背后的区域（backdrop brightness），背景图本身保持原亮度形成对比；
     // 无背景图时复位为 1，避免先调暗度再删背景后玻璃表面被残留压暗（暗度滑块仅在有背景图时可见，用户无法自行复位）
     const glassBrightness = overrides.backgroundImage
@@ -217,6 +224,13 @@ function applyBgBlend(root: HTMLElement) {
     } else {
         root.style.removeProperty('--theme-bg-image')
     }
+    // 排轴/拉表/结果表格滚动条：白天白底、夜间黑底，透明度跟随「背景透明度」设置
+    const isLight = activeId === 'light'
+    root.style.setProperty(
+        '--theme-scrollbar-track',
+        `color-mix(in srgb, ${isLight ? '#ffffff' : '#000000'} ${overrides.bgOpacity}%, transparent)`
+    )
+    root.style.setProperty('--theme-scrollbar-thumb', isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)')
 }
 
 function applyOverridesCSS(root: HTMLElement) {
@@ -272,9 +286,15 @@ export function getActiveId(): string {
 }
 
 export async function setActiveTheme(id: string) {
-    if (themes.find((t) => t.id === id)) {
+    if (themes.find((t) => t.id === id) && id !== activeId) {
+        const prevId = activeId
         activeId = id
         await dbSet(ACTIVE_KEY, id)
+        // 白天↔黑夜互切：卡片透明度与背景图遮罩镜像对调（透明度 0↔70 即 bgOpacity 130-bgOpacity；遮罩 0↔100 即 bgImageMask 100-bgImageMask）
+        if ((prevId === 'light' && id === 'dark') || (prevId === 'dark' && id === 'light')) {
+            overrides = { ...overrides, bgOpacity: 130 - overrides.bgOpacity, bgImageMask: 100 - overrides.bgImageMask }
+            await dbSet(OVERRIDES_KEY, toPlain(overrides))
+        }
         applyThemeCSS()
     }
 }
@@ -288,7 +308,15 @@ export async function updateOverride<K extends keyof ThemeOverrides>(key: K, val
     await dbSet(OVERRIDES_KEY, toPlain(overrides))
     const root = document.documentElement
     applyAccentOverride(root)
-    if (key === 'backgroundImage' || key === 'bgOpacity' || key === 'bgBlur' || key === 'bgDim') applyBgBlend(root)
+    if (
+        key === 'backgroundImage' ||
+        key === 'bgOpacity' ||
+        key === 'bgBlur' ||
+        key === 'bgDim' ||
+        key === 'bgImageBlur' ||
+        key === 'bgImageMask'
+    )
+        applyBgBlend(root)
 }
 
 export function getComponentTheme(key: ThemeComponentKey): ComponentTheme {

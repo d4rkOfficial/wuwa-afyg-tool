@@ -22,7 +22,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-60 flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-60 flex items-center justify-center backdrop-blur-sm"
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
         onclick={handleBackdropClick}
         onkeydown={handleKeydown}
@@ -30,7 +30,7 @@
     >
         <div
             class={[
-                'relative max-h-[85vh] w-[90vw] max-w-4xl overflow-y-auto rounded-xl p-6 shadow-2xl',
+                'animate-pop-in theme-scrollbar relative max-h-[85vh] w-[90vw] max-w-4xl overflow-y-auto rounded-xl p-6 shadow-2xl',
                 'text-(--theme-modal-text)',
                 className || ''
             ]

@@ -81,6 +81,49 @@
         Object.fromEntries(team.map((s, i) => [s.character ?? '', i]).filter(([name]) => name !== ''))
     )
 
+    // 非直伤条目对 buff 的可用性（与单元格勾选同款判定）：scope 匹配 +（隐藏条件不匹配时）条件满足
+    const buffEnabledForEntry = (bs: BuffSet, entry: DamageEntry, charIdx: number): boolean => {
+        const scopeOk = entry.isEffect
+            ? bs.scope === 'all' || (Array.isArray(bs.scope) && bs.scope.length === 0)
+            : charIdx >= 0 && (bs.scope === 'all' || (bs.scope as number[]).includes(charIdx))
+        if (!scopeOk) return false
+        if (!hideConditionMismatch) return true
+        return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap)
+    }
+
+    // 非直伤伤害结算实际读取的乘区（computeEffectEntry / computeTuneEntry）：
+    // 效应吃加深、不吃谐度增幅；处决/响应吃谐度增幅、不吃加深；两者都不吃攻击/暴击/增伤/面板类
+    const EFFECT_RELEVANT_ZONES = new Set([
+        'extraRatio',
+        'deepenDmg',
+        'resPen',
+        'resDown',
+        'defPen',
+        'defDown',
+        'dmgRedPen',
+        'dmgTakenInc',
+        'finalDmg',
+        'customFinalDmg'
+    ])
+    const TUNE_RELEVANT_ZONES = new Set([
+        'extraRatio',
+        'tuneBreakBoost',
+        'resPen',
+        'resDown',
+        'defPen',
+        'defDown',
+        'dmgRedPen',
+        'dmgTakenInc',
+        'finalDmg',
+        'customFinalDmg'
+    ])
+
+    // 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff）
+    const buffRelevantForNonDirect = (bs: BuffSet, entry: DamageEntry): boolean => {
+        const zones = entry.isTuneBreak || entry.isTuneResponse ? TUNE_RELEVANT_ZONES : EFFECT_RELEVANT_ZONES
+        return bs.zones.some((z) => zones.has(z.zoneId))
+    }
+
     interface CellData {
         buffId: string
         enabled: boolean
@@ -106,6 +149,8 @@
         colStats: ColStat[]
         // 该组角色吃不到的 buff 列索引（组内无任何启用行）——表头直接筛掉
         visibleColIdx: number[]
+        // 该组实际能用的全局 buff（scope/条件/乘区判定）——吃不到的全局 buff 不显示
+        visibleGlobalBuffs: BuffSet[]
     }
 
     // 预计算整表数据：单元格可用性/选中态、行/列统计、不连续分割标记一次算好，模板零逻辑
@@ -141,13 +186,7 @@
                 const cells: CellData[] = []
                 for (let ci = 0; ci < cols.length; ci++) {
                     const bs = cols[ci]
-                    const scopeOk = entry.isEffect
-                        ? bs.scope === 'all' || (Array.isArray(bs.scope) && bs.scope.length === 0)
-                        : charIdx >= 0 && (bs.scope === 'all' || (bs.scope as number[]).includes(charIdx))
-                    const enabled =
-                        scopeOk &&
-                        (!hideConditionMismatch ||
-                            conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap))
+                    const enabled = buffEnabledForEntry(bs, entry, charIdx)
                     // selected 反映真实绑定状态（含条件不匹配但已勾选的 buff，用于降透明度展示）
                     const selected = (entryBuffSetIdMap[entry.id] ?? []).includes(bs.id)
                     cells.push({ buffId: bs.id, enabled, selected })
@@ -169,12 +208,22 @@
                 })
                 prevIdx = idx
             }
+            const visibleGlobalBuffs = globalBuffs.filter((gb) =>
+                g.items.some(({ entry }) => {
+                    const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
+                    const isNonDirect = entry.isEffect || entry.isTuneBreak || entry.isTuneResponse
+                    return (
+                        buffEnabledForEntry(gb, entry, charIdx) && (!isNonDirect || buffRelevantForNonDirect(gb, entry))
+                    )
+                })
+            )
             result.push({
                 charName: g.charName,
                 kind: g.kind,
                 rows,
                 colStats,
-                visibleColIdx: cols.map((_, ci) => ci).filter((ci) => colStats[ci].enabled > 0)
+                visibleColIdx: cols.map((_, ci) => ci).filter((ci) => colStats[ci].enabled > 0),
+                visibleGlobalBuffs
             })
         }
         return result
@@ -380,6 +429,40 @@
             onSetEntryBuffSetIds(row.entry.id, [...cur])
         }
     }
+
+    // ── 所有子表等宽：测量各组表头列宽和取最大值，统一表格宽度；窄表格最后一列吸收剩余空间 ──
+    let groupTableWidths = $state<Record<number, number>>({})
+    let maxTableWidth = $state(0)
+
+    $effect(() => {
+        tableData
+        const measure = () => {
+            const tables = Array.from(document.querySelectorAll<HTMLElement>('[data-group-table]'))
+            if (tables.length === 0) return
+            const widths: Record<number, number> = {}
+            let max = 0
+            for (const tbl of tables) {
+                const g = Number(tbl.dataset.groupTable)
+                let w = 0
+                // 排除填充列（data-fill-th）——否则其吸收剩余空间后的宽度计入测量，造成「加填充列→测出等宽→移除填充列」震荡
+                tbl.querySelectorAll<HTMLElement>('thead th:not([data-fill-th])').forEach((th) => {
+                    w += th.getBoundingClientRect().width
+                })
+                w += tbl.offsetWidth - tbl.clientWidth
+                widths[g] = Math.round(w)
+                max = Math.max(max, widths[g])
+            }
+            groupTableWidths = widths
+            maxTableWidth = max
+        }
+        const raf = requestAnimationFrame(measure)
+        const obs = new ResizeObserver(measure)
+        for (const tbl of document.querySelectorAll<HTMLElement>('[data-group-table]')) obs.observe(tbl)
+        return () => {
+            cancelAnimationFrame(raf)
+            obs.disconnect()
+        }
+    })
 </script>
 
 <svelte:window
@@ -401,7 +484,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="theme-glass-surface h-full overflow-auto pb-48"
+    class="theme-scrollbar h-full overflow-auto pb-48"
     bind:this={rootEl}
     onmousedown={handleMouseDown}
     onclickcapture={handleClickCapture}
@@ -439,10 +522,13 @@
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
         <div class="mb-6">
             <div>
-                <!-- 表格主体底色不透明（单元格区域保持透明）；上/右/下 = 主题色双实线，右上/右下圆角；左 = 常规分隔线 -->
+                <!-- 表格主体底色不透明（单元格区域保持透明）；上/右/下 = 昼夜色双实线（随明暗主题），右上/右下圆角；左 = 常规分隔线 -->
                 <table
                     class="min-w-full text-xs"
-                    style="background: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-top: 3px double var(--theme-accent-bg); border-right: 3px double var(--theme-accent-bg); border-bottom: 3px double var(--theme-accent-bg); border-left: 1px solid var(--theme-divider-border); border-top-right-radius: 0.5rem; border-bottom-right-radius: 0.5rem;"
+                    data-group-table={gi}
+                    style="background: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-top: 3px double var(--theme-divider-border); border-right: 3px double var(--theme-divider-border); border-bottom: 3px double var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); border-bottom-right-radius: 0.5rem; {maxTableWidth
+                        ? `width: ${maxTableWidth}px;`
+                        : ''}"
                 >
                     <!-- 标题块与全局 buff 行放入 caption：宽度自动跟随表头（表格宽度） -->
                     <caption class="text-left">
@@ -458,12 +544,12 @@
                             >
                             <span class="text-[10px] text-(--theme-modal-text)/35">{group.rows.length} 条</span>
                         </div>
-                        {#if globalBuffs.length > 0}
+                        {#if group.visibleGlobalBuffs.length > 0}
                             <div
                                 class="flex items-center gap-1 overflow-hidden whitespace-nowrap border-b px-2 py-1"
                                 style="background: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
                             >
-                                {#each globalBuffs as gb}
+                                {#each group.visibleGlobalBuffs as gb}
                                     <span
                                         class="inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
                                         style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
@@ -478,7 +564,7 @@
                         <tr>
                             <th
                                 class="sticky left-0 top-0 z-40 w-52 min-w-52 px-2 py-1.5 text-left font-medium text-(--theme-modal-text)/50 border-r"
-                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 80%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);"
+                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
                             >
                                 条目
                             </th>
@@ -489,7 +575,7 @@
                                 {@const partial = stat.selected > 0 && !allSelected}
                                 <th
                                     class="sticky top-0 z-30 p-0 align-top border-b"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 80%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); {colBorderStyle(
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
                                         col.id,
                                         colPos + 1 < group.visibleColIdx.length
                                             ? columns[group.visibleColIdx[colPos + 1]]?.id
@@ -519,6 +605,14 @@
                                     </button>
                                 </th>
                             {/each}
+                            {#if groupTableWidths[gi] < maxTableWidth}
+                                <!-- 填充列：表格不足最宽时在末列后补一列，吸收剩余空间（width: 100%） -->
+                                <th
+                                    data-fill-th
+                                    class="sticky top-0 z-30 p-0 border-b"
+                                    style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
+                                ></th>
+                            {/if}
                         </tr>
                     </thead>
                     <tbody>
@@ -530,7 +624,7 @@
                             >
                                 <td
                                     class="sticky left-0 z-20 px-2 py-1 border-r"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 80%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
                                 >
                                     <button
                                         onclick={() => toggleRow(row)}
@@ -645,6 +739,13 @@
                                         {/if}
                                     </td>
                                 {/each}
+                                {#if groupTableWidths[gi] < maxTableWidth}
+                                    <!-- 填充列：吸收剩余空间；无内容无交互，不参与框选（无 data-col） -->
+                                    <td
+                                        class="p-0"
+                                        style="border-left: 1px dashed var(--theme-divider-border); width: 100%;"
+                                    ></td>
+                                {/if}
                             </tr>
                         {/each}
                     </tbody>

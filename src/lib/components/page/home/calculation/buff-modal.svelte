@@ -656,12 +656,12 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && onclose()}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="w-full max-h-[95vh] h-full max-w-6xl rounded-xl border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
+            class="animate-pop-in w-full max-h-[95vh] h-full max-w-6xl rounded-xl border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
@@ -695,7 +695,7 @@
                     class="shrink-0 border-r flex flex-col"
                     style="width: {leftWidth}px; border-right: 1px solid var(--theme-divider-border);"
                 >
-                    <div class="flex-1 overflow-y-auto p-2 space-y-1 buff-list-container">
+                    <div class="theme-scrollbar flex-1 overflow-y-auto p-2 space-y-1 buff-list-container">
                         {#each groupedBuffSets as item (item.key)}
                             {#if item.type === 'folder'}
                                 {@const isGlobalFolder = item.prefix === 'global'}
@@ -1274,7 +1274,7 @@
                         </div>
 
                         <!-- Zone list -->
-                        <div class="flex-1 overflow-y-auto p-3 space-y-1">
+                        <div class="theme-scrollbar flex-1 overflow-y-auto p-3 space-y-1">
                             {#each selectedBuffSet.zones as zone}
                                 {@const def = ZONE_MAP.get(zone.zoneId)}
                                 {#if def}
@@ -1386,7 +1386,7 @@
                         class="w-52 shrink-0 border-l flex flex-col"
                         style="border-left: 1px solid var(--theme-divider-border);"
                     >
-                        <div class="flex-1 overflow-y-auto p-3">
+                        <div class="theme-scrollbar flex-1 overflow-y-auto p-3">
                             <div class="flex flex-col gap-0.5">
                                 {#each ZONE_DEFS as def}
                                     {@const exists = selectedBuffSet.zones.some((z) => z.zoneId === def.id)}
@@ -1439,12 +1439,12 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && (showRefModal = false)}
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border p-5 shadow-xl w-[28rem]"
+            class="animate-pop-in rounded-xl border p-5 shadow-xl w-[28rem]"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -1507,7 +1507,7 @@
                         </button>
                         {#if showRefZoneMenu}
                             <div
-                                class="absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
                                 style="border-color: var(--theme-divider-border);"
                                 onclick={(e) => e.stopPropagation()}
                             >
@@ -1757,12 +1757,12 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-70 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-70 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && (showDeleteFolderConfirm = false)}
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border p-5 shadow-xl w-80"
+            class="animate-pop-in rounded-xl border p-5 shadow-xl w-80"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -1791,12 +1791,12 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="fixed inset-0 z-70 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-70 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         onkeydown={(e) => e.key === 'Escape' && (showCopyOptions = false)}
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="rounded-xl border p-5 shadow-xl w-96"
+            class="animate-pop-in rounded-xl border p-5 shadow-xl w-96"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >

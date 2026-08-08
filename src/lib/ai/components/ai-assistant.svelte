@@ -407,12 +407,15 @@
 <!-- 单容器：收起=48px 圆钮（图标居中），展开=卡片；尺寸/圆角/背景过渡动画 -->
 {#if aiEnabled}
     <div
-        class="theme-glass-surface fixed z-40 flex flex-col overflow-hidden border shadow-2xl {dragPos ? '' : 'bottom-4 right-4'}"
-        style="{dragPos ? `left:${dragPos.x}px;top:${dragPos.y}px;` : ''}width:{curW}px;height:{curH}px;border-radius:{size ===
-            'collapsed'
+        class="theme-glass-surface fixed z-40 flex flex-col overflow-hidden border shadow-2xl {dragPos
+            ? ''
+            : 'bottom-4 right-4'}"
+        style="{dragPos
+            ? `left:${dragPos.x}px;top:${dragPos.y}px;`
+            : ''}width:{curW}px;height:{curH}px;border-radius:{size === 'collapsed'
             ? '9999px'
             : '0.75rem'};transition:width .38s cubic-bezier(.32,.72,.24,1),height .38s cubic-bezier(.32,.72,.24,1),border-radius .38s cubic-bezier(.32,.72,.24,1),background-color .38s cubic-bezier(.32,.72,.24,1);background:{size ===
-            'collapsed'
+        'collapsed'
             ? 'var(--theme-accent-bg)'
             : 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'};color:{size === 'collapsed'
             ? 'var(--theme-accent-text-on-bg, #fff)'

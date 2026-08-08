@@ -314,7 +314,7 @@
                     </button>
                 {/if}
 
-                <div class="relative z-1 flex min-h-0 flex-1 flex-col overflow-y-auto hide-scrollbar">
+                <div class="relative z-1 flex min-h-0 flex-1 flex-col overflow-y-auto hide-scrollbar px-3 py-2">
                     <!-- 包装层：非滚动 flex 容器，内容按自然高度撑开以触发滚动，min-h-full 保证内容不足时仍均分填满 -->
                     <div class="flex min-h-full flex-col gap-3">
                         <!-- Character -->
@@ -324,7 +324,7 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
                                     slot.character
                                         ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
                                         : 'border-2 border-dashed border-(--theme-card-border)',
@@ -384,7 +384,7 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
                                     slot.weapon
                                         ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
                                         : 'border-2 border-dashed border-(--theme-card-border)',
@@ -434,7 +434,7 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
                                     slot.echoes[0].name
                                         ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
                                         : 'border-2 border-dashed border-(--theme-card-border)',
@@ -475,7 +475,7 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-all hover:scale-[1.15] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
                                     slot.triggerSets.length > 0
                                         ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
                                         : 'border-2 border-dashed border-(--theme-card-border)',
