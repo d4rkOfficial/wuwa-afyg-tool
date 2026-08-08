@@ -36,9 +36,10 @@
     import QuickLookup from './quick-lookup.svelte'
     import BuffImportModal from '../buff-import-modal.svelte'
     import { slide } from 'svelte/transition'
-    import { onMount } from 'svelte'
+    import { onMount, onDestroy } from 'svelte'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { registerDragCancel } from '$lib/utils/drag-guard'
 
     interface Props {
         open: boolean
@@ -59,7 +60,11 @@
             () => showImport,
             (v) => (showImport = v)
         )
-        return () => unregisterPanel('buff-import')
+        unregisterDragCancel = registerDragCancel(cancelBuffDrag)
+        return () => {
+            unregisterPanel('buff-import')
+            unregisterDragCancel?.()
+        }
     })
 
     type DragState = {
@@ -73,6 +78,7 @@
     let dragState = $state<DragState | null>(null)
     let collapsedFolders = $state(new Set<string>())
     let savedCollapsedState: Set<string> | null = null
+    let unregisterDragCancel: (() => void) | null = null
     let showDeleteFolderConfirm = $state(false)
     let deleteFolderPrefix = $state('')
     let deleteFolderCount = $state(0)
@@ -473,6 +479,16 @@
             next.add(prefix)
         }
         collapsedFolders = next
+    }
+
+    // 拖动进入 AI 悬浮窗等"禁区"时取消拖拽（不触发 drop 的删除/重排/确认弹窗）
+    function cancelBuffDrag() {
+        if (!dragState) return
+        dragState = null
+        if (savedCollapsedState !== null) {
+            collapsedFolders = savedCollapsedState
+            savedCollapsedState = null
+        }
     }
 
     function startDrag(e: PointerEvent, id: string, mode: 'item' | 'folder' | 'child', folderPrefix?: string) {

@@ -29,7 +29,6 @@ import {
     NON_DIRECT_CONFIGS,
     NON_DIRECT_ELEMENT,
     BUTTON_KEY_ORDER,
-    QUICK_CHAR_MARKER,
     BLOCK_H_PAD,
     GAMEPAD_BUTTONS
 } from './timeline.consts'
@@ -38,6 +37,8 @@ import { parseValueString, sumRatioNum } from '$lib/consts/parse-value-string'
 import { addToast } from '$lib/data/toast.svelte'
 import { setCharElements } from '$lib/data/char-elements.svelte'
 import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
+import { getInputShortcutId } from '$lib/data/shortcuts.svelte'
+import { registerDragCancel } from '$lib/utils/drag-guard'
 
 // ── Core Data ──
 let _refLines = $state<RefLine[]>([
@@ -365,14 +366,12 @@ function estimateOpBlockWidth(block: OpBlock): number {
 
 export function quickInput(rawKey: string): string | null {
     if (!_quickMode) return null
-    if (rawKey === '1' || rawKey === '2' || rawKey === '3') {
-        setQuickCharIndex(Number(rawKey) - 1)
-        return QUICK_CHAR_MARKER
-    }
+    // 输入键由快捷键配置决定（与 keymap 存储的 physical 无关）；命中后按 keymap entry 取操作块键/标签
+    const entryId = getInputShortcutId(rawKey)
+    const entry = entryId ? getKeyMapEntries().find((e) => e.id === entryId) : undefined
+    if (!entry) return null
     const names = getTeamCharNames()
     if (names.length === 0 || _quickCharIndex >= names.length) return null
-    const entry = getKeyMapEntries().find((e) => e.physical === rawKey)
-    if (!entry) return null
     const storedKey = getDefaultBlockKey(entry.id) || entry.blockKey
     const desc = entry.id === 'heavypress' ? entry.label : ''
     const newWidth = quickBlockWidth(storedKey, desc)
@@ -2489,3 +2488,43 @@ let _damageList = $derived(buildDamageList())
 export function getDamageList() {
     return _damageList
 }
+
+// 拖动进入 AI 悬浮窗等"禁区"时：取消进行中的框选/拖拽并还原（不保存、不触发松开副作用）
+registerDragCancel(() => {
+    // 框选：丢弃选区，不执行选中逻辑
+    _selectionRect = null
+    // 参考线拖拽：非组拖时 _refLines 未变，丢弃视觉位置即还原；组拖恢复初始快照
+    if (_draggingId) {
+        if (_isGroupDrag) {
+            _opBlocks = _opBlocks.map((b) =>
+                _dragBlockInitialPositions[b.id] !== undefined ? { ...b, pos: _dragBlockInitialPositions[b.id] } : b
+            )
+            _refLines = _refLines.map((r) =>
+                _dragRefInitialPositions[r.id] !== undefined ? { ...r, pos: _dragRefInitialPositions[r.id] } : r
+            )
+        }
+        _dragVisualPositions = {}
+        _draggingId = null
+        resetGroupDrag()
+    }
+    // 块拖拽：恢复拖前位置
+    if (_dragBlockId) {
+        const block = _opBlocks.find((b) => b.id === _dragBlockId)
+        if (block) {
+            if (_isGroupDrag) {
+                _opBlocks = _opBlocks.map((b) =>
+                    _dragBlockInitialPositions[b.id] !== undefined ? { ...b, pos: _dragBlockInitialPositions[b.id] } : b
+                )
+                _refLines = _refLines.map((r) =>
+                    _dragRefInitialPositions[r.id] !== undefined ? { ...r, pos: _dragRefInitialPositions[r.id] } : r
+                )
+            } else if (Math.abs(block.pos - _dragBlockStartPos) > 0.5) {
+                _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: _dragBlockStartPos } : b))
+            }
+        }
+        _dragBlockInitialPositions = {}
+        _dragRefInitialPositions = {}
+        _isGroupDrag = false
+        _dragBlockId = null
+    }
+})

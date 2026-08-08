@@ -49,6 +49,7 @@
         init as initTimeline
     } from '$lib/components/page/home/timeline/timeline.store.svelte'
     import { loadKeyMap } from '$lib/data/keymap.svelte'
+    import { loadShortcuts } from '$lib/data/shortcuts.svelte'
     import { getShareBase, loadWorkshop } from '$lib/data/workshop.svelte'
     import {
         setShowBuffModal,
@@ -188,6 +189,7 @@
         loadProjects()
         loadIcons()
         loadKeyMap()
+        loadShortcuts()
         loadWorkshop()
         checkShare()
         await handleImportFromHash()
@@ -566,8 +568,18 @@
         style="background: color-mix(in srgb, var(--theme-sidebar-bg) 80%, transparent);"
         onmousedown={(e) => {
             e.preventDefault()
-            if (sidebarWidth === 52) sidebarWidth = 200
+            if (sidebarWidth === 52) {
+                // 先以展开态渲染一帧（宽度过渡动画生效），下一帧再进入拖拽态
+                sidebarWidth = 200
+                requestAnimationFrame(() => {
+                    sidebarDragging = true
+                })
+                return
+            }
             sidebarDragging = true
+        }}
+        ondblclick={() => {
+            if (sidebarWidth !== 52) sidebarWidth = 52
         }}
     ></button>
     <input type="file" accept=".json" class="hidden" bind:this={importInput} onchange={handleImport} />

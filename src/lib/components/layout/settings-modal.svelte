@@ -38,6 +38,17 @@
     import { GAMEPAD_BUTTONS } from '$lib/components/page/home/timeline/timeline.consts'
     import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
     import {
+        SHORTCUT_GROUPS,
+        applyLockedMods,
+        getShortcutDef,
+        getShortcutKey,
+        getShortcuts,
+        normalizeShortcutEvent,
+        resetShortcuts,
+        shortcutLabel,
+        updateShortcut
+    } from '$lib/data/shortcuts.svelte'
+    import {
         getAiConfig,
         getAiProfiles,
         loadAiConfig,
@@ -108,7 +119,7 @@
 
     function switchCalcViewMode(mode: 'dropdown' | 'spread') {
         setCalcViewMode(mode)
-        addToast(mode === 'spread' ? '已切换为 buff 铺开模式' : '已切换为 buff 下拉模式', 'success')
+        addToast(mode === 'spread' ? '已切换为 buff 平铺模式' : '已切换为 buff 下拉模式', 'success')
     }
 
     async function handleSelectAiProfile(id: string) {
@@ -262,6 +273,40 @@
     let keymapEntries = $derived(getKeyMapEntries())
     let uiBtnIconList = $state<[string, string][]>([])
     let keyPickerFor = $state<string | null>(null)
+
+    // ── 界面快捷键 ──
+    let shortcutCapture = $state<string | null>(null)
+
+    $effect(() => {
+        if (shortcutCapture === null) return
+        const onKey = (e: KeyboardEvent) => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (e.key === 'Escape') {
+                shortcutCapture = null
+                return
+            }
+            const key = normalizeShortcutEvent(e)
+            if (!key) return
+            const id = shortcutCapture
+            if (id === null) return
+            const def = getShortcutDef(id)
+            if (!def) return
+            // 锁定修饰键（如 Shift 固定）：按到被锁定的纯修饰键时继续等待主键
+            if (def.lockedMods?.length && key.split('+').length === 1 && def.lockedMods.includes(key)) return
+            const final = applyLockedMods(def, key)
+            void updateShortcut(id, final).then((conflict) => {
+                if (conflict) {
+                    addToast(`「${def?.label}」与「${conflict.label}」冲突，未保存`, 'error')
+                } else {
+                    addToast(`「${def?.label}」已设为 ${shortcutLabel(final)}`, 'success')
+                }
+                shortcutCapture = null
+            })
+        }
+        window.addEventListener('keydown', onKey, true)
+        return () => window.removeEventListener('keydown', onKey, true)
+    })
 
     $effect(() => {
         if (open && uiBtnIconList.length === 0) {
@@ -852,8 +897,7 @@
                         <div>
                             <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">按键图标</span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
-                                每行决定排轴时操作块显示的按键图标（键盘或手柄）；快捷键固定（快速排轴 1/2/3
-                                仍用于切换角色）
+                                每行决定排轴时操作块显示的按键图标（键盘或手柄）；快速排轴输入键与界面快捷键可在「交互相关」中配置
                             </p>
                             <div class="flex flex-col gap-2">
                                 {#each keymapEntries as entry}
@@ -950,8 +994,73 @@
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
                                         : 'color: var(--theme-modal-text)/60;'}
                                 >
-                                    buff 铺开模式
+                                    buff 平铺模式
                                 </button>
+                            </div>
+
+                            <div class="mt-5">
+                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60"
+                                    >界面快捷键</span
+                                >
+                                <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                    点击「记录」后按下新键即时绑定（ESC 取消）；同组冲突会被拒绝。弹窗关闭与 Ctrl+A/Z/Y
+                                    等固定不可改
+                                </p>
+                                {#each SHORTCUT_GROUPS as g}
+                                    <div class="mt-3">
+                                        <span class="text-[11px] font-medium text-(--theme-modal-text)/45"
+                                            >{g.label}</span
+                                        >
+                                        <div class="mt-1 flex flex-col gap-1.5">
+                                            {#each getShortcuts().filter((s) => s.group === g.key) as s}
+                                                <div
+                                                    class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+                                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                                >
+                                                    <div class="min-w-0 flex-1">
+                                                        <span class="block text-xs text-(--theme-modal-text)"
+                                                            >{s.label}</span
+                                                        >
+                                                        <span
+                                                            class="block truncate text-[10px] leading-4 text-(--theme-modal-text)/35"
+                                                            title={s.desc}>{s.desc}</span
+                                                        >
+                                                    </div>
+                                                    <span
+                                                        class="shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[10px] text-(--theme-modal-text)/70"
+                                                        style="border-color: var(--theme-divider-border);"
+                                                        >{shortcutLabel(getShortcutKey(s.id))}</span
+                                                    >
+                                                    <button
+                                                        onclick={() =>
+                                                            (shortcutCapture = shortcutCapture === s.id ? null : s.id)}
+                                                        class="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium transition-all"
+                                                        style={shortcutCapture === s.id
+                                                            ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
+                                                            : 'background: var(--theme-modal-text)/8; color: var(--theme-modal-text)/70;'}
+                                                        >{shortcutCapture === s.id
+                                                            ? s.lockedMods?.length
+                                                                ? `按下新键…（${s.lockedMods
+                                                                      .map(shortcutLabel)
+                                                                      .join('+')} 固定）`
+                                                                : '按下新键…'
+                                                            : '记录'}</button
+                                                    >
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/each}
+                                <div class="mt-3 flex items-center gap-2">
+                                    <button
+                                        onclick={() => resetShortcuts()}
+                                        class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <Icon icon="mdi:restore" class="size-3.5" />
+                                        恢复默认
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     {:else if tab === 'workshop'}

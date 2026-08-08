@@ -84,7 +84,8 @@
         getNonDirectPickerBlockId,
         getBlockKeyPickerId,
         applySkillHits,
-        applyNonDirectEntries
+        applyNonDirectEntries,
+        setQuickCharIndex
     } from './timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
     import {
@@ -97,7 +98,6 @@
         MAX_POS,
         NON_DIRECT_ELEMENT,
         TRACK_COLORS,
-        QUICK_CHAR_MARKER,
         GAMEPAD_BUTTONS
     } from './timeline.consts'
     import type { OpBlock, DamageBlock } from './timeline.types'
@@ -106,7 +106,8 @@
     import NonDirectPicker from './non-direct-picker.svelte'
     import DamageList from './damage-list.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
-    import { normalizeKeyEvent, getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
+    import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
+    import { getInputShortcutId, getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { addToast } from '$lib/data/toast.svelte'
 
     interface Props {
@@ -343,8 +344,9 @@
         if (Object.keys(damageMap).length > 0) remapDuplicatedDamageBuffs(damageMap)
     }}
     onkeydown={(e) => {
+        const quickConfigKey = getShortcutKey('timeline-quick.config')
         // Enter 按下的瞬间记录来源（输入框/弹窗内按下后元素可能销毁，keyup 的 target 会变成 body）
-        if (e.key === 'Enter') {
+        if (normalizeShortcutEvent(e) === quickConfigKey) {
             const fromInput =
                 e.target instanceof HTMLElement && !!e.target.closest('input, textarea, [contenteditable]')
             const fromModal = getSkillPickerBlockId() !== null || getNonDirectPickerBlockId() !== null
@@ -366,9 +368,10 @@
         }
         const target = e.target as HTMLElement
         if (target.closest('input, textarea, [contenteditable]')) return
+        const norm = normalizeShortcutEvent(e)
         // PageUp/PageDown：快速左右滚动（弹窗/菜单打开时不拦截）
         if (
-            (e.key === 'PageUp' || e.key === 'PageDown') &&
+            (norm === getShortcutKey('timeline.scroll-left') || norm === getShortcutKey('timeline.scroll-right')) &&
             !getSkillPickerBlockId() &&
             !getNonDirectPickerBlockId() &&
             !getBlockKeyPickerId() &&
@@ -379,7 +382,10 @@
         ) {
             e.preventDefault()
             const amount = timelineEl?.clientWidth ?? 800
-            timelineEl?.scrollBy({ left: e.key === 'PageUp' ? -amount : amount, behavior: 'smooth' })
+            timelineEl?.scrollBy({
+                left: norm === getShortcutKey('timeline.scroll-left') ? -amount : amount,
+                behavior: 'smooth'
+            })
             return
         }
         const key = e.key.toLowerCase()
@@ -394,15 +400,12 @@
             else undo()
             return
         }
-        if (e.key === 'Shift' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (norm === getShortcutKey('timeline.quick-mode') && !e.repeat) {
             toggleQuickMode()
             return
         }
         if (
             getQuickMode() &&
-            !e.ctrlKey &&
-            !e.metaKey &&
-            !e.altKey &&
             !getSkillPickerBlockId() &&
             !getNonDirectPickerBlockId() &&
             !getBlockKeyPickerId() &&
@@ -411,25 +414,8 @@
             !getBlockMenu() &&
             !getMultiBlockMenu()
         ) {
-            // 全角符号归一化（中文输入法下 ；。，／、＼【】 与半角同键）
-            const norm =
-                key === '；'
-                    ? ';'
-                    : key === '。'
-                      ? '.'
-                      : key === '，'
-                        ? ','
-                        : key === '／'
-                          ? '/'
-                          : key === '、' || key === '＼'
-                            ? '\\'
-                            : key === '【'
-                              ? '['
-                              : key === '】'
-                                ? ']'
-                                : key
-            if (key === 'enter') {
-                // 长按 Enter（≥500ms）：为最近输入的操作块打开非直伤配置；短按松开 = 打开倍率绑定
+            if (norm === quickConfigKey) {
+                // 长按（≥500ms）：为最近输入的操作块打开非直伤配置；短按松开 = 打开倍率绑定
                 e.preventDefault()
                 if (enterHoldTimer === null && !enterLongPressed && !enterFromInput) {
                     enterHoldTimer = setTimeout(() => {
@@ -442,37 +428,56 @@
                 }
                 return
             }
-            if (key === 'backspace') {
+            if (norm === getShortcutKey('timeline-quick.quick-undo')) {
                 e.preventDefault()
                 quickUndoLast()
                 return
             }
-            if (norm === '\\') {
+            if (norm === getShortcutKey('timeline-quick.ref-line')) {
                 e.preventDefault()
                 quickAddRefLine(true)
                 return
             }
-            if (norm === '[') {
+            if (norm === getShortcutKey('timeline-quick.cycle-next')) {
                 e.preventDefault()
                 cycleQuickSpecial(1)
                 return
             }
-            if (norm === ']') {
+            if (norm === getShortcutKey('timeline-quick.cycle-prev')) {
                 e.preventDefault()
                 cycleQuickSpecial(-1)
                 return
             }
-            if (norm === '/') {
+            if (norm === getShortcutKey('timeline-quick.edit-desc')) {
                 e.preventDefault()
                 quickEditLastDesc()
                 return
             }
-            const res = quickInput(normalizeKeyEvent(e))
-            if (res !== null) {
+            if (norm === getShortcutKey('timeline-quick.char-1')) {
                 e.preventDefault()
-                if (res !== QUICK_CHAR_MARKER) scrollQuickBlockIntoView(res)
+                setQuickCharIndex(0)
                 return
             }
+            if (norm === getShortcutKey('timeline-quick.char-2')) {
+                e.preventDefault()
+                setQuickCharIndex(1)
+                return
+            }
+            if (norm === getShortcutKey('timeline-quick.char-3')) {
+                e.preventDefault()
+                setQuickCharIndex(2)
+                return
+            }
+            // 输入键（普攻/重击/闪避/Q/E/R/F/T/跳跃）按配置匹配，支持修饰组合；置于修饰键拦截之前
+            const inputId = getInputShortcutId(norm)
+            if (inputId !== null) {
+                e.preventDefault()
+                const res = quickInput(norm)
+                if (res !== null) scrollQuickBlockIntoView(res)
+                return
+            }
+            // 未匹配到任何配置键的修饰键组合（复制/粘贴等）不触发快速输入
+            if (e.ctrlKey || e.metaKey || e.altKey) return
         }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace')) {
             e.preventDefault()
@@ -480,7 +485,7 @@
         }
     }}
     onkeyup={(e) => {
-        if (e.key !== 'Enter') return
+        if (normalizeShortcutEvent(e) !== getShortcutKey('timeline-quick.config')) return
         // 输入框内（备注编辑等）的 Enter 已由输入框自身处理，不触发倍率绑定
         if (enterFromInput) {
             enterFromInput = false

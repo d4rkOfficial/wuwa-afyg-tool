@@ -14,6 +14,7 @@
     import { inferDamageTypes } from '../result/utils'
     import { conditionMet } from '../result/compute'
     import { addToast } from '$lib/data/toast.svelte'
+    import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, groupBuffSets, LAYERED_BUFF_PATTERN } from './calculation.consts'
     import type { GroupedBuffSetItem } from './calculation.consts'
     import type { BuffSet, DamageEntry } from './calculation.types'
@@ -356,7 +357,8 @@
     onkeydown={(e) => {
         const el = e.target as HTMLElement
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'BUTTON') return
-        if (e.key === ' ' && expandedEntryId !== null) {
+        const norm = normalizeShortcutEvent(e)
+        if (norm === getShortcutKey('calc-dropdown.expand-next') && expandedEntryId !== null) {
             e.preventDefault()
             const idx = damageEntries.findIndex((de) => de.id === expandedEntryId)
             if (idx >= 0) {
@@ -364,19 +366,19 @@
                 handleToggleExpand(damageEntries[nextIdx].id, nextIdx)
             }
         }
-        if (e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.metaKey && expandedEntryId !== null) {
+        if (norm === getShortcutKey('calc-dropdown.copy-dt-next') && expandedEntryId !== null) {
             e.preventDefault()
             handleCopyDamageTypeToNext(expandedEntryId)
         }
-        if (e.key === 'Z' && e.shiftKey && !e.ctrlKey && !e.metaKey && expandedEntryId !== null) {
+        if (norm === getShortcutKey('calc-dropdown.copy-from-prev') && expandedEntryId !== null) {
             e.preventDefault()
             handleCopyFromPrevDirect(expandedEntryId)
         }
-        if (e.key === 'X' && e.shiftKey && !e.ctrlKey && !e.metaKey && expandedEntryId !== null) {
+        if (norm === getShortcutKey('calc-dropdown.copy-to-next') && expandedEntryId !== null) {
             e.preventDefault()
             handleCopyToNextDirect(expandedEntryId)
         }
-        if (e.key === 'C' && e.shiftKey && !e.ctrlKey && !e.metaKey && expandedEntryId !== null) {
+        if (norm === getShortcutKey('calc-dropdown.clear-all') && expandedEntryId !== null) {
             e.preventDefault()
             handleClearAllBuffs(expandedEntryId)
         }

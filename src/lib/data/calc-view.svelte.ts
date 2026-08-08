@@ -1,4 +1,4 @@
-// 拉表页面交互偏好（持久化到 localStorage）：buff 下拉模式 / buff 铺开模式；铺开模式伤害类型编辑/仅查看、默认滚动方向
+// 拉表页面交互偏好（持久化到 localStorage）：buff 下拉模式 / buff 平铺模式；平铺模式伤害类型编辑/仅查看、默认滚动方向
 import { browser } from '$app/environment'
 
 export type CalcViewMode = 'dropdown' | 'spread'
@@ -40,7 +40,7 @@ export function setDamageTypeEditMode(v: boolean): void {
     if (browser) localStorage.setItem(DT_EDIT_KEY, v ? '1' : '0')
 }
 
-// 铺开表默认滚动方向：↑↓/普通滚轮 的滚动轴；Shift（方向键）/Ctrl（滚轮）临时换到另一轴
+// 平铺表默认滚动方向：↑↓/普通滚轮 的滚动轴；Shift（方向键）/Ctrl（滚轮）临时换到另一轴
 export function getScrollAxisDefault(): CalcScrollAxis {
     return _scrollAxisDefault
 }

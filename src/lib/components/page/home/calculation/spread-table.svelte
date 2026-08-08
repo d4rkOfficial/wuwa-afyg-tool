@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount, onDestroy } from 'svelte'
     import type { BuffSet, DamageEntry } from './calculation.types'
     import type { CharSlot } from '$lib/data/types'
     import type { ConditionProfile } from '../result/compute'
@@ -7,6 +8,8 @@
     import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, LAYERED_BUFF_PATTERN } from './calculation.consts'
     import { getCalcElementMap } from './calculation.store.svelte'
     import { getDamageTypeEditMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
+    import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
+    import { registerDragCancel } from '$lib/utils/drag-guard'
     import Icon from '@iconify/svelte'
 
     interface Props {
@@ -281,6 +284,15 @@
         selRect = null
     }
 
+    // 拖动进入 AI 悬浮窗等"禁区"时取消框选（不应用选中）
+    let unregisterDragCancel: (() => void) | null = null
+    onMount(() => {
+        unregisterDragCancel = registerDragCancel(cancelSelection)
+    })
+    onDestroy(() => {
+        unregisterDragCancel?.()
+    })
+
     function handleMouseDown(e: MouseEvent) {
         if (e.button !== 0) return
         const td = (e.target as HTMLElement).closest<HTMLElement>('td[data-row][data-col]')
@@ -472,8 +484,8 @@
         // 方向键滚动界面（输入框内不拦截）
         const el = e.target as HTMLElement
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return
-        // Shift 键直接切换默认滚动方向（不需要配合方向键）
-        if (e.key === 'Shift' && !e.repeat) {
+        // 配置键直接切换默认滚动方向（不需要配合方向键）
+        if (normalizeShortcutEvent(e) === getShortcutKey('calc-spread.axis-switch') && !e.repeat) {
             const next = getScrollAxisDefault() === 'vertical' ? 'horizontal' : 'vertical'
             setScrollAxisDefault(next)
             return

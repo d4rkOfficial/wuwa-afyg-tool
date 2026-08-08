@@ -8,6 +8,7 @@
     import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
     import { notifyCalcUpdate, getCalcState } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
+    import { cancelActiveDrags } from '$lib/utils/drag-guard'
     import { marked } from 'marked'
     import { getOpenPanelsSummary } from '../panels.svelte'
     import { DeepSeekError, type ChatMessage } from '../client'
@@ -65,6 +66,8 @@
     function startDrag(e: PointerEvent) {
         const target = e.target as HTMLElement
         if (target.closest('button')) return
+        // 阻止兼容 mouse 事件穿透到下层页面（避免拖动卡片时触发排轴/拉表框选）
+        e.preventDefault()
         dragging = true
         const base = dragPos ?? {
             x: window.innerWidth - curW - 16,
@@ -98,6 +101,8 @@
     let btnStart = $state({ mx: 0, my: 0, x: 0, y: 0 })
 
     function btnDown(e: PointerEvent) {
+        // 阻止兼容 mouse 事件穿透到下层页面（避免拖动圆钮时触发排轴/拉表框选）
+        e.preventDefault()
         btnDrag = true
         btnMoved = false
         const base = dragPos ?? { x: window.innerWidth - 48 - 16, y: window.innerHeight - 48 - 16 }
@@ -406,6 +411,7 @@
 
 <!-- 单容器：收起=48px 圆钮（图标居中），展开=卡片；尺寸/圆角/背景过渡动画 -->
 {#if aiEnabled}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         class="theme-glass-surface fixed z-40 flex flex-col overflow-hidden border shadow-2xl {dragPos
             ? ''
@@ -420,6 +426,15 @@
             : 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'};color:{size === 'collapsed'
             ? 'var(--theme-accent-text-on-bg, #fff)'
             : 'var(--theme-modal-text)'};border-color:var(--theme-divider-border);"
+        onmousedown={(e) => e.stopPropagation()}
+        onmousemove={(e) => e.stopPropagation()}
+        onmouseup={(e) => e.stopPropagation()}
+        onpointerenter={(e) => {
+            if (e.buttons !== 0) cancelActiveDrags()
+        }}
+        onmouseenter={(e) => {
+            if (e.buttons !== 0) cancelActiveDrags()
+        }}
     >
         {#if size === 'collapsed'}
             <!-- 收起态：图标居中（可点击/拖动，拖动不触发展开） -->
@@ -475,7 +490,7 @@
             </div>
 
             <!-- 消息区 -->
-            <div bind:this={bodyEl} class="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+            <div bind:this={bodyEl} class="theme-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
                 {#if display.length === 0}
                     <div class="py-10 text-center text-xs text-(--theme-modal-text)/30">
                         用文字指挥我：创建工程、锁定环节、查队伍、
