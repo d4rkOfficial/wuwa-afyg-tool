@@ -19,6 +19,7 @@ export interface ThemeOverrides {
     backgroundImage: string
     bgOpacity: number
     bgBlur: number
+    bgDim: number
 }
 
 export type ThemeComponentKey =

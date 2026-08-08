@@ -9,9 +9,32 @@ const OVERRIDES_KEY = 'theme-overrides'
 
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
+const DEFAULT_OVERRIDES: ThemeOverrides = {
+    accentHue: null,
+    backgroundImage: '',
+    bgOpacity: 85,
+    bgBlur: 4,
+    bgDim: 0
+}
+
+const TRANSLUCENT_SURFACES = new Set([
+    'avatar',
+    'tabs',
+    'sidebar',
+    'search-box',
+    'modal',
+    'context-menu',
+    'toast',
+    'toast-top',
+    'timeline',
+    'card',
+    'input',
+    'watermark'
+])
+
 let themes = $state<Theme[]>([])
 let activeId = $state<string>('')
-let overrides = $state<ThemeOverrides>({ accentHue: null, backgroundImage: '', bgOpacity: 85, bgBlur: 4 })
+let overrides = $state<ThemeOverrides>({ ...DEFAULT_OVERRIDES })
 
 let bgOriginals = new Map<string, string>()
 
@@ -151,18 +174,27 @@ function applyAccentOverride(root: HTMLElement) {
 }
 
 function applyBgBlend(root: HTMLElement) {
-    root.style.setProperty('--theme-bg-blur', `${overrides.bgBlur}px`)
+    root.style.setProperty('--theme-glass-blur', `${overrides.bgBlur}px`)
     if (overrides.backgroundImage) {
-        root.style.setProperty('--theme-bg-image', `url("${overrides.backgroundImage}")`)
+        const dim = Math.max(0, Math.min(100, overrides.bgDim)) / 100
+        root.style.setProperty(
+            '--theme-bg-image',
+            `linear-gradient(rgba(0, 0, 0, ${dim}), rgba(0, 0, 0, ${dim})), url("${overrides.backgroundImage}")`
+        )
         const theme = themes.find((t) => t.id === activeId)
         if (theme) {
             for (const key of Object.keys(theme.components)) {
                 const varName = `--theme-${key}-bg`
+                if (key !== 'layout' && !TRANSLUCENT_SURFACES.has(key)) continue
                 if (!bgOriginals.has(varName)) {
                     const val = root.style.getPropertyValue(varName)
                     if (val) bgOriginals.set(varName, val)
                 }
                 const orig = bgOriginals.get(varName)
+                if (key === 'layout') {
+                    root.style.setProperty(varName, 'transparent')
+                    continue
+                }
                 if (
                     orig &&
                     !orig.startsWith('linear-gradient') &&
@@ -211,8 +243,8 @@ export async function loadThemes() {
         activeId = themes[0]?.id ?? ''
     }
 
-    const ov = await dbGet<ThemeOverrides>(OVERRIDES_KEY)
-    if (ov) overrides = ov.data
+    const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
+    if (ov) overrides = { ...DEFAULT_OVERRIDES, ...ov.data }
 
     applyThemeCSS()
 }
@@ -246,7 +278,7 @@ export async function updateOverride<K extends keyof ThemeOverrides>(key: K, val
     await dbSet(OVERRIDES_KEY, toPlain(overrides))
     const root = document.documentElement
     applyAccentOverride(root)
-    if (key === 'backgroundImage' || key === 'bgOpacity' || key === 'bgBlur') applyBgBlend(root)
+    if (key === 'backgroundImage' || key === 'bgOpacity' || key === 'bgBlur' || key === 'bgDim') applyBgBlend(root)
 }
 
 export function getComponentTheme(key: ThemeComponentKey): ComponentTheme {

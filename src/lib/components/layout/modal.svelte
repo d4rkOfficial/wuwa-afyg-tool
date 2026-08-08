@@ -85,7 +85,7 @@
         <div
             bind:this={modalEl}
             class={[
-                'relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
+                'theme-glass-surface relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
                 footer ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
                 'text-(--theme-modal-text)',
                 className || ''

@@ -218,7 +218,10 @@
     }
 </script>
 
-<div class="flex h-full flex-col" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
+<div
+    class="theme-glass-surface flex h-full flex-col"
+    style="background: var(--theme-modal-bg); color: var(--theme-modal-text)"
+>
     {#if loading}
         <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">计算中…</div>
     {:else if entries.length === 0}

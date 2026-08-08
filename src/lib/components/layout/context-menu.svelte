@@ -53,7 +53,7 @@
     <div class="fixed inset-0 z-50" onclick={onclose} oncontextmenu={(e) => e.preventDefault()}>
         <div
             class={[
-                'absolute min-w-36 rounded-lg border border-white/10 py-1 shadow-xl backdrop-blur-lg',
+                'theme-glass-surface absolute min-w-36 rounded-lg border border-white/10 py-1 shadow-xl',
                 'bg-(--theme-context-menu-bg) text-(--theme-context-menu-text)',
                 className || ''
             ]

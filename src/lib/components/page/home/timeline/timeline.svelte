@@ -507,7 +507,7 @@
     }}
 />
 
-<div class="flex h-full flex-col bg-(--theme-timeline-bg) text-(--theme-timeline-text)">
+<div class="theme-glass-surface flex h-full flex-col bg-(--theme-timeline-bg) text-(--theme-timeline-text)">
     <div class="flex-1 overflow-x-auto overflow-y-hidden" bind:this={timelineEl} onwheel={onWheel}>
         <div class="relative" style="width: {getTableWidth()}px; min-width: 100%; height: 100%;">
             <div class="flex flex-col h-full">

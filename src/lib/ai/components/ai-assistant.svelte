@@ -386,16 +386,14 @@
 <!-- 单容器：收起=48px 圆钮（图标居中），展开=卡片；尺寸/圆角/背景过渡动画 -->
 {#if aiEnabled}
     <div
-        class="fixed z-[75] flex flex-col overflow-hidden border shadow-2xl {dragPos ? '' : 'bottom-4 right-4'}"
+        class="theme-glass-surface fixed z-[75] flex flex-col overflow-hidden border shadow-2xl {dragPos ? '' : 'bottom-4 right-4'}"
         style="{dragPos ? `left:${dragPos.x}px;top:${dragPos.y}px;` : ''}width:{expanded
             ? cardW
             : 48}px;height:{expanded ? cardH : 48}px;border-radius:{expanded
             ? '0.75rem'
             : '9999px'};transition:width .28s cubic-bezier(.4,0,.2,1),height .28s cubic-bezier(.4,0,.2,1),border-radius .28s cubic-bezier(.4,0,.2,1),background-color .28s;background:{expanded
             ? 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'
-            : 'var(--theme-accent-bg)'};backdrop-filter:{expanded
-            ? 'blur(14px)'
-            : 'none'};-webkit-backdrop-filter:{expanded ? 'blur(14px)' : 'none'};color:{expanded
+            : 'var(--theme-accent-bg)'};color:{expanded
             ? 'var(--theme-modal-text)'
             : 'var(--theme-accent-text-on-bg, #fff)'};border-color:var(--theme-divider-border);"
     >

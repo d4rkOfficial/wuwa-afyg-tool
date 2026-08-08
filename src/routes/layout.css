@@ -53,10 +53,13 @@
         position: fixed;
         inset: 0;
         background: var(--theme-bg-image, none) center/cover;
-        filter: blur(var(--theme-bg-blur, 0px));
-        -webkit-filter: blur(var(--theme-bg-blur, 0px));
         pointer-events: none;
         z-index: -1;
+    }
+    .theme-glass-surface {
+        -webkit-backdrop-filter: blur(var(--theme-glass-blur, 4px)) saturate(1.1);
+        backdrop-filter: blur(var(--theme-glass-blur, 4px)) saturate(1.1);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--theme-layout-text) 6%, transparent);
     }
     .font-mono {
         font-family: 'JetBrains Mono', ui-monospace, monospace;

@@ -81,7 +81,7 @@
 </script>
 
 <div
-    class="flex items-center gap-1 border-b px-3"
+    class="theme-glass-surface flex items-center gap-1 border-b px-3"
     style="background: var(--theme-tabs-bg); color: var(--theme-tabs-text); border-color: var(--theme-divider-border)"
 >
     {#each tabs as tab}

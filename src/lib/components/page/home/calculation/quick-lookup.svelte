@@ -202,14 +202,14 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-(--theme-modal-text) shadow-2xl"
+            class="theme-glass-surface mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <div bind:this={scrollContainer} class="flex-1 overflow-y-auto rounded-xl hide-scrollbar">
                 <div
-                    class="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-3"
-                    style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); backdrop-filter: blur(8px); border-color: var(--theme-divider-border);"
+                    class="theme-glass-surface sticky top-0 z-10 flex items-center justify-between border-b px-5 py-3"
+                    style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
                 >
                     <h2 class="text-base font-semibold">速查</h2>
                     <button
@@ -219,8 +219,8 @@
                     >
                 </div>
                 <div
-                    class="sticky top-13 z-10 flex gap-1 border-b px-5 py-2"
-                    style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); backdrop-filter: blur(8px); border-color: var(--theme-divider-border);"
+                    class="theme-glass-surface sticky top-13 z-10 flex gap-1 border-b px-5 py-2"
+                    style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
                 >
                     {#each charNames as name, i}
                         <button

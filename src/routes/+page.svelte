@@ -613,7 +613,7 @@
                             newName = ''
                             showNewModal = true
                         }}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
                         <Icon
                             icon="mdi:plus"
@@ -632,7 +632,7 @@
                     </button>
                     <button
                         onclick={() => (showWorkshopFrame = true)}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
                         <Icon
                             icon="mdi:storefront-outline"
@@ -651,7 +651,7 @@
                     </button>
                     <button
                         onclick={() => (showBuffLibrary = true)}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
                         <Icon
                             icon="mdi:view-dashboard-outline"
@@ -670,7 +670,7 @@
                     </button>
                     <button
                         onclick={() => (showSettings = true)}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                     >
                         <Icon
                             icon="mdi:cog-outline"
@@ -1093,7 +1093,7 @@
                     id="project-name"
                     bind:value={newName}
                     placeholder="输入项目名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleCreate(newName)}
                 />
@@ -1101,7 +1101,7 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (showNewModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
@@ -1129,7 +1129,7 @@
                     id="rename-name"
                     bind:value={renameValue}
                     placeholder="输入新名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleRename()}
                 />
@@ -1137,7 +1137,7 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (renameModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
@@ -1179,7 +1179,7 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (exportModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
@@ -1206,7 +1206,7 @@
                     id="clone-name"
                     bind:value={cloneName}
                     placeholder="输入新项目名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleClone()}
                 />
@@ -1244,7 +1244,7 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (cloneModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button

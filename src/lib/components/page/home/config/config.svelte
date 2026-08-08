@@ -233,7 +233,10 @@
     }
 </script>
 
-<div class="flex h-full flex-col p-5" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
+<div
+    class="theme-glass-surface flex h-full flex-col p-5"
+    style="background: var(--theme-modal-bg); color: var(--theme-modal-text)"
+>
     <!-- Tabs -->
     <div class="flex gap-2 mb-4">
         {#each TAB_LABELS as label, i}

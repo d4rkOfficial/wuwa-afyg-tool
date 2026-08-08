@@ -401,7 +401,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="h-full overflow-auto pb-48"
+    class="theme-glass-surface h-full overflow-auto pb-48"
     bind:this={rootEl}
     onmousedown={handleMouseDown}
     onclickcapture={handleClickCapture}
