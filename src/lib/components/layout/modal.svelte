@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
+    import { fade } from 'svelte/transition'
+    import { popOut } from '$lib/utils/motion'
     import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
 
@@ -77,15 +79,16 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5))"
         onclick={handleBackdropClick}
         onkeydown={handleKeydown}
+        out:fade={{ duration: 130 }}
     >
         <div
             bind:this={modalEl}
             class={[
-                'relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
+                'animate-pop-in theme-glass-surface relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
                 footer ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
                 'text-(--theme-modal-text)',
                 className || ''
@@ -97,6 +100,7 @@
                 : ''}; {mergedStyle}"
             role="dialog"
             aria-modal="true"
+            out:popOut
         >
             <button
                 onclick={onclose}

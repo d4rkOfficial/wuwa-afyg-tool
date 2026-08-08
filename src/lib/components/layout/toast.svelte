@@ -41,7 +41,7 @@
             <div
                 class={[
                     'pointer-events-auto flex items-center gap-3 rounded-xl px-5 py-3 text-sm shadow-xl',
-                    'bg-(--theme-toast-bg) text-(--theme-toast-text) backdrop-blur-lg',
+                    'theme-glass-surface bg-(--theme-toast-bg) text-(--theme-toast-text)',
                     typeStyles[toast.type] || typeStyles.info,
                     typeBgStyles[toast.type] || '',
                     'min-w-72 max-w-md',

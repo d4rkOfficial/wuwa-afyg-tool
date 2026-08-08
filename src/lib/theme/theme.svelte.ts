@@ -9,9 +9,32 @@ const OVERRIDES_KEY = 'theme-overrides'
 
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
+const DEFAULT_OVERRIDES: ThemeOverrides = {
+    accentHue: null,
+    backgroundImage: '',
+    bgOpacity: 85,
+    bgBlur: 4,
+    bgDim: 0
+}
+
+const TRANSLUCENT_SURFACES = new Set([
+    'avatar',
+    'tabs',
+    'sidebar',
+    'search-box',
+    'modal',
+    'context-menu',
+    'toast',
+    'toast-top',
+    'timeline',
+    'card',
+    'input',
+    'watermark'
+])
+
 let themes = $state<Theme[]>([])
 let activeId = $state<string>('')
-let overrides = $state<ThemeOverrides>({ accentHue: null, backgroundImage: '', bgOpacity: 85, bgBlur: 4 })
+let overrides = $state<ThemeOverrides>({ ...DEFAULT_OVERRIDES })
 
 let bgOriginals = new Map<string, string>()
 
@@ -151,18 +174,29 @@ function applyAccentOverride(root: HTMLElement) {
 }
 
 function applyBgBlend(root: HTMLElement) {
-    root.style.setProperty('--theme-bg-blur', `${overrides.bgBlur}px`)
+    root.style.setProperty('--theme-glass-blur', `${overrides.bgBlur}px`)
+    // 暗度只压暗玻璃表面背后的区域（backdrop brightness），背景图本身保持原亮度形成对比；
+    // 无背景图时复位为 1，避免先调暗度再删背景后玻璃表面被残留压暗（暗度滑块仅在有背景图时可见，用户无法自行复位）
+    const glassBrightness = overrides.backgroundImage
+        ? 1 - (Math.max(0, Math.min(100, overrides.bgDim)) / 100) * 0.6
+        : 1
+    root.style.setProperty('--theme-glass-brightness', String(glassBrightness))
     if (overrides.backgroundImage) {
         root.style.setProperty('--theme-bg-image', `url("${overrides.backgroundImage}")`)
         const theme = themes.find((t) => t.id === activeId)
         if (theme) {
             for (const key of Object.keys(theme.components)) {
                 const varName = `--theme-${key}-bg`
+                if (key !== 'layout' && !TRANSLUCENT_SURFACES.has(key)) continue
                 if (!bgOriginals.has(varName)) {
                     const val = root.style.getPropertyValue(varName)
                     if (val) bgOriginals.set(varName, val)
                 }
                 const orig = bgOriginals.get(varName)
+                if (key === 'layout') {
+                    root.style.setProperty(varName, 'transparent')
+                    continue
+                }
                 if (
                     orig &&
                     !orig.startsWith('linear-gradient') &&
@@ -211,8 +245,16 @@ export async function loadThemes() {
         activeId = themes[0]?.id ?? ''
     }
 
-    const ov = await dbGet<ThemeOverrides>(OVERRIDES_KEY)
-    if (ov) overrides = ov.data
+    const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
+    if (ov) {
+        overrides = { ...DEFAULT_OVERRIDES, ...ov.data }
+        // 旧版未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃
+        const bg = overrides.backgroundImage
+        if (bg && bg.startsWith('data:') && bg.length > 3_000_000) {
+            overrides.backgroundImage = ''
+            await dbSet(OVERRIDES_KEY, toPlain(overrides))
+        }
+    }
 
     applyThemeCSS()
 }
@@ -246,7 +288,7 @@ export async function updateOverride<K extends keyof ThemeOverrides>(key: K, val
     await dbSet(OVERRIDES_KEY, toPlain(overrides))
     const root = document.documentElement
     applyAccentOverride(root)
-    if (key === 'backgroundImage' || key === 'bgOpacity' || key === 'bgBlur') applyBgBlend(root)
+    if (key === 'backgroundImage' || key === 'bgOpacity' || key === 'bgBlur' || key === 'bgDim') applyBgBlend(root)
 }
 
 export function getComponentTheme(key: ThemeComponentKey): ComponentTheme {

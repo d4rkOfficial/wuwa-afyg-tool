@@ -282,7 +282,10 @@
     )
 </script>
 
-<div class="flex h-full flex-col p-6" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
+<div
+    class="theme-glass-surface flex h-full flex-col p-6"
+    style="background: var(--theme-modal-bg); color: var(--theme-modal-text)"
+>
     <div class="flex min-h-0 flex-1 gap-4 portrait:flex-col">
         {#each localTeam as slot, i}
             {@const charData = characterMap.get(slot.character ?? '')}

@@ -1,5 +1,7 @@
 <script lang="ts">
     import { onMount, tick } from 'svelte'
+    import { fade } from 'svelte/transition'
+    import { popOut } from '$lib/utils/motion'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import {
         loadProjects,
@@ -613,11 +615,11 @@
                             newName = ''
                             showNewModal = true
                         }}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)" style="animation-delay: 0ms"
                     >
                         <Icon
                             icon="mdi:plus"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]" style="animation-delay: 90ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
@@ -632,11 +634,11 @@
                     </button>
                     <button
                         onclick={() => (showWorkshopFrame = true)}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)" style="animation-delay: 55ms"
                     >
                         <Icon
                             icon="mdi:storefront-outline"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]" style="animation-delay: 145ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
@@ -651,11 +653,11 @@
                     </button>
                     <button
                         onclick={() => (showBuffLibrary = true)}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)" style="animation-delay: 110ms"
                     >
                         <Icon
                             icon="mdi:view-dashboard-outline"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]" style="animation-delay: 200ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
@@ -670,11 +672,11 @@
                     </button>
                     <button
                         onclick={() => (showSettings = true)}
-                        class="group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left backdrop-blur-lg shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)" style="animation-delay: 165ms"
                     >
                         <Icon
                             icon="mdi:cog-outline"
-                            class="size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]" style="animation-delay: 255ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
@@ -1016,7 +1018,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5))"
         onclick={(e) => {
             if (e.target === e.currentTarget) showWorkshopFrame = false
@@ -1024,12 +1026,14 @@
         onkeydown={(e) => {
             if (e.key === 'Escape') showWorkshopFrame = false
         }}
+        out:fade={{ duration: 130 }}
     >
         <div
-            class="flex h-[90vh] w-[min(94vw,1100px)] flex-col overflow-hidden rounded-xl border shadow-2xl"
+            class="animate-pop-in flex h-[90vh] w-[min(94vw,1100px)] flex-col overflow-hidden rounded-xl border shadow-2xl"
             style="background: var(--theme-modal-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
+            out:popOut
         >
             <div class="flex min-h-0 flex-1">
                 <!-- Left toolbar -->
@@ -1093,7 +1097,7 @@
                     id="project-name"
                     bind:value={newName}
                     placeholder="输入项目名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleCreate(newName)}
                 />
@@ -1101,7 +1105,7 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (showNewModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
@@ -1129,7 +1133,7 @@
                     id="rename-name"
                     bind:value={renameValue}
                     placeholder="输入新名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleRename()}
                 />
@@ -1137,7 +1141,7 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (renameModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
@@ -1179,7 +1183,7 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (exportModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
@@ -1206,7 +1210,7 @@
                     id="clone-name"
                     bind:value={cloneName}
                     placeholder="输入新项目名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50"
+                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleClone()}
                 />
@@ -1244,7 +1248,7 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (cloneModal = false)}
-                    class="h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                     >取消</button
                 >
                 <button
@@ -1270,3 +1274,41 @@
         onconfirm={handleDelete}
     />
 {/if}
+
+<style>
+    /* 首页功能卡片入场：错峰上浮淡入 + 轻微缩放 */
+    .card-pop-in {
+        animation: card-pop-in 0.38s cubic-bezier(0.2, 0, 0, 1) backwards;
+    }
+    @keyframes card-pop-in {
+        0% {
+            opacity: 0;
+            transform: translateY(16px) scale(0.98);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    /* 卡片图标：快速弹跳（:global，作用于 Icon 组件根元素） */
+    :global(.icon-pop) {
+        animation: icon-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+    }
+    @keyframes icon-pop {
+        0% {
+            transform: scale(0);
+        }
+        70% {
+            transform: scale(1.12);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .card-pop-in,
+        :global(.icon-pop) {
+            animation: none;
+        }
+    }
+</style>

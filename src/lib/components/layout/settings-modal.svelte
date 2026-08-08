@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { fade } from 'svelte/transition'
+    import { popOut } from '$lib/utils/motion'
     import { getActiveId, getOverrides, updateOverride } from '$lib/theme'
     import Icon from '@iconify/svelte'
     import {
@@ -184,15 +186,59 @@
         return { bg: '#6366f1', text: '#ffffff' }
     }
 
+    function compressImage(file: File): Promise<string> {
+        // 大图转 data URL 塞进 CSS 变量会静默失败（~9MB 就不生效），统一压缩后再存储
+        const MAX_EDGE = 2560
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+                const dataUrl = reader.result as string
+                const img = new Image()
+                img.onload = () => {
+                    const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight))
+                    if (scale >= 1 && dataUrl.length < 1_500_000) {
+                        resolve(dataUrl)
+                        return
+                    }
+                    const canvas = document.createElement('canvas')
+                    canvas.width = Math.round(img.naturalWidth * scale)
+                    canvas.height = Math.round(img.naturalHeight * scale)
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) {
+                        resolve(dataUrl)
+                        return
+                    }
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+                    let out = canvas.toDataURL('image/webp', 0.85)
+                    if (!out.startsWith('data:image/webp')) out = canvas.toDataURL('image/jpeg', 0.85)
+                    if (out.length >= dataUrl.length) out = dataUrl
+                    resolve(out)
+                }
+                img.onerror = () => reject(new Error('图片解码失败'))
+                img.src = dataUrl
+            }
+            reader.onerror = () => reject(reader.error)
+            reader.readAsDataURL(file)
+        })
+    }
+
     function handleFileSelect(e: Event) {
         const file = (e.target as HTMLInputElement).files?.[0]
         if (!file) return
-        const reader = new FileReader()
-        reader.onload = () => {
-            updateOverride('backgroundImage', reader.result as string)
-            bgUrl = ''
-        }
-        reader.readAsDataURL(file)
+        compressImage(file)
+            .then((dataUrl) => {
+                updateOverride('backgroundImage', dataUrl)
+                bgUrl = ''
+            })
+            .catch((err) => {
+                console.error('[bg] 压缩失败，改用原图', err)
+                const reader = new FileReader()
+                reader.onload = () => {
+                    updateOverride('backgroundImage', reader.result as string)
+                    bgUrl = ''
+                }
+                reader.readAsDataURL(file)
+            })
     }
 
     function handleUrlApply() {
@@ -370,7 +416,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5))"
         onclick={(e) => {
             if (e.target === e.currentTarget) onclose()
@@ -378,12 +424,14 @@
         onkeydown={(e) => {
             if (e.key === 'Escape') onclose()
         }}
+        out:fade={{ duration: 130 }}
     >
         <div
-            class="relative flex h-[560px] w-[640px] max-h-[90vh] max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl"
+            class="animate-pop-in theme-glass-surface relative flex h-[min(720px,92dvh)] w-[640px] max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl sm:h-[560px] sm:max-h-[90vh]"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
+            out:popOut
         >
             <div
                 class="flex shrink-0 items-center justify-between border-b px-6 py-4"
@@ -393,21 +441,22 @@
                 <button
                     onclick={onclose}
                     class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                    aria-label="关闭设置"
                 >
                     <Icon icon="mdi:close" class="size-4.5" />
                 </button>
             </div>
 
-            <div class="flex min-h-0 flex-1">
+            <div class="flex min-h-0 flex-1 flex-col sm:flex-row">
                 <!-- Sidebar -->
                 <div
-                    class="flex w-40 shrink-0 flex-col gap-1 border-r p-3"
+                    class="flex w-full shrink-0 gap-1 overflow-x-auto border-b p-2 [scrollbar-width:none] sm:w-40 sm:flex-col sm:overflow-x-visible sm:border-r sm:border-b-0 sm:p-3 [&::-webkit-scrollbar]:hidden"
                     style="border-color: var(--theme-divider-border);"
                 >
                     {#each SETTING_TABS as t}
                         <button
                             onclick={() => (tab = t.key)}
-                            class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors {tab ===
+                            class="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors {tab ===
                             t.key
                                 ? 'text-[var(--theme-accent-text-on-bg)]'
                                 : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
@@ -420,7 +469,9 @@
                 </div>
 
                 <!-- Content -->
-                <div class="min-w-0 flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div
+                    class="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 [scrollbar-width:none] sm:p-6 [&::-webkit-scrollbar]:hidden"
+                >
                     {#if tab === 'theme'}
                         <!-- Accent color -->
                         <div class="mb-5">
@@ -448,61 +499,21 @@
 
                         <hr class="mb-5" style="border-color: var(--theme-divider-border);" />
 
-                        <!-- Background opacity slider -->
-                        <div class="mb-5">
-                            <span
-                                class="mb-3 flex items-center justify-between text-xs font-medium text-(--theme-modal-text)/60"
-                            >
-                                <span>背景透明度</span>
-                                <span class="font-mono text-(--theme-accent-text)">{overrides.bgOpacity}%</span>
-                            </span>
-                            <input
-                                type="range"
-                                min="50"
-                                max="100"
-                                value={overrides.bgOpacity}
-                                oninput={(e) =>
-                                    updateOverride('bgOpacity', Number((e.target as HTMLInputElement).value))}
-                                class="w-full h-2 rounded-full appearance-none cursor-pointer touch-none bg-(--theme-modal-text)/10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-(--theme-accent-bg) [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white/80 [&::-moz-range-thumb]:bg-(--theme-accent-bg) [&::-moz-range-thumb]:shadow-md"
-                            />
-                            <div class="mt-1 flex justify-between text-[10px] text-(--theme-modal-text)/30">
-                                <span>半透明</span>
-                                <span>不透明</span>
-                            </div>
-                        </div>
-
-                        <!-- Background blur slider -->
-                        <div class="mb-5">
-                            <span
-                                class="mb-3 flex items-center justify-between text-xs font-medium text-(--theme-modal-text)/60"
-                            >
-                                <span>背景模糊</span>
-                                <span class="font-mono text-(--theme-accent-text)">{overrides.bgBlur}px</span>
-                            </span>
-                            <input
-                                type="range"
-                                min="0"
-                                max="20"
-                                step="1"
-                                value={overrides.bgBlur}
-                                disabled={!overrides.backgroundImage}
-                                oninput={(e) => updateOverride('bgBlur', Number((e.target as HTMLInputElement).value))}
-                                class="w-full h-2 rounded-full appearance-none cursor-pointer touch-none bg-(--theme-modal-text)/10 disabled:cursor-not-allowed disabled:opacity-40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-(--theme-accent-bg) [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white/80 [&::-moz-range-thumb]:bg-(--theme-accent-bg) [&::-moz-range-thumb]:shadow-md"
-                            />
-                            <div class="mt-1 flex justify-between text-[10px] text-(--theme-modal-text)/30">
-                                <span>无</span>
-                                <span>强</span>
-                            </div>
-                            {#if !overrides.backgroundImage}
-                                <div class="mt-1 text-[10px] text-(--theme-modal-text)/40">需先设置背景图才能生效</div>
-                            {/if}
-                        </div>
-
-                        <hr class="mb-5" style="border-color: var(--theme-divider-border);" />
-
                         <!-- Background image -->
                         <div>
-                            <span class="mb-3 block text-xs font-medium text-(--theme-modal-text)/60">背景图</span>
+                            <div class="mb-3 flex items-center gap-2">
+                                <span
+                                    class="flex size-7 items-center justify-center rounded-lg bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                >
+                                    <Icon icon="mdi:image-outline" class="size-4" />
+                                </span>
+                                <div>
+                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70">背景图</span>
+                                    <span class="block text-[10px] text-(--theme-modal-text)/35"
+                                        >为工作区添加专属氛围</span
+                                    >
+                                </div>
+                            </div>
 
                             {#if overrides.backgroundImage}
                                 <div
@@ -512,7 +523,7 @@
                                     <img
                                         src={overrides.backgroundImage}
                                         alt="背景预览"
-                                        class="h-32 w-full object-cover"
+                                        class="h-28 w-full object-cover"
                                     />
                                     <div
                                         class="flex items-center justify-end gap-2 px-3 py-2 bg-(--theme-modal-text)/5"
@@ -574,6 +585,161 @@
                                     加载
                                 </button>
                             </div>
+
+                            {#if overrides.backgroundImage}
+                                <div
+                                    class="mt-4 overflow-hidden rounded-xl border"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-input-bg) 70%, transparent);"
+                                >
+                                    <div
+                                        class="relative h-40 overflow-hidden border-b"
+                                        style="border-color: var(--theme-divider-border); background-image: url('{overrides.backgroundImage}'); background-position: center; background-size: cover;"
+                                    >
+                                        <div
+                                            class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-xl border p-3 shadow-xl"
+                                            style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent); background: color-mix(in srgb, var(--theme-modal-bg) {overrides.bgOpacity}%, transparent); backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 - (overrides.bgDim / 100) * 0.6}); -webkit-backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 - (overrides.bgDim / 100) * 0.6});"
+                                        >
+                                            <div
+                                                class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent"
+                                            ></div>
+                                            <div class="flex items-center gap-2">
+                                                <span
+                                                    class="flex size-6 items-center justify-center rounded-md bg-(--theme-accent-bg)/20 text-(--theme-accent-text)"
+                                                >
+                                                    <Icon icon="mdi:blur" class="size-3.5" />
+                                                </span>
+                                                <span class="text-[11px] font-medium">玻璃质感预览</span>
+                                            </div>
+                                            <div class="space-y-1.5">
+                                                <div class="h-1.5 w-full rounded-full bg-(--theme-modal-text)/15"></div>
+                                                <div class="h-1.5 w-2/3 rounded-full bg-(--theme-modal-text)/10"></div>
+                                            </div>
+                                        </div>
+                                        <span
+                                            class="absolute bottom-3 right-3 rounded-md bg-black/30 px-2 py-1 font-mono text-[9px] tracking-wide text-white/70 backdrop-blur-sm"
+                                            >LIVE</span
+                                        >
+                                    </div>
+
+                                    <div class="p-4">
+                                        <div class="mb-4 flex items-start gap-2.5">
+                                            <span
+                                                class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
+                                            >
+                                                <Icon icon="mdi:layers-triple-outline" class="size-4" />
+                                            </span>
+                                            <div>
+                                                <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                    >背景质感</span
+                                                >
+                                                <span class="block text-[10px] leading-4 text-(--theme-modal-text)/35"
+                                                    >预览与工作区同步更新</span
+                                                >
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-4">
+                                            <div>
+                                                <span
+                                                    class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                >
+                                                    <span class="flex items-center gap-1.5"
+                                                        ><Icon
+                                                            icon="mdi:cards-outline"
+                                                            class="size-3.5"
+                                                        />卡片透明度</span
+                                                    >
+                                                    <span class="font-mono text-(--theme-accent-text)"
+                                                        >{100 - overrides.bgOpacity}%</span
+                                                    >
+                                                </span>
+                                                <input
+                                                    aria-label="卡片透明度"
+                                                    type="range"
+                                                    min="0"
+                                                    max="70"
+                                                    value={100 - overrides.bgOpacity}
+                                                    oninput={(e) =>
+                                                        updateOverride(
+                                                            'bgOpacity',
+                                                            100 - Number((e.target as HTMLInputElement).value)
+                                                        )}
+                                                    class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                />
+                                                <div
+                                                    class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                >
+                                                    <span>清晰</span><span>通透</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span
+                                                    class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                >
+                                                    <span class="flex items-center gap-1.5"
+                                                        ><Icon icon="mdi:blur" class="size-3.5" />毛玻璃强度</span
+                                                    >
+                                                    <span class="font-mono text-(--theme-accent-text)"
+                                                        >{overrides.bgBlur}px</span
+                                                    >
+                                                </span>
+                                                <input
+                                                    aria-label="毛玻璃强度"
+                                                    type="range"
+                                                    min="0"
+                                                    max="32"
+                                                    step="1"
+                                                    value={overrides.bgBlur}
+                                                    oninput={(e) =>
+                                                        updateOverride(
+                                                            'bgBlur',
+                                                            Number((e.target as HTMLInputElement).value)
+                                                        )}
+                                                    class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                />
+                                                <div
+                                                    class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                >
+                                                    <span>柔和</span><span>朦胧</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span
+                                                    class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                >
+                                                    <span class="flex items-center gap-1.5"
+                                                        ><Icon icon="mdi:brightness-4" class="size-3.5" />背景暗度</span
+                                                    >
+                                                    <span class="font-mono text-(--theme-accent-text)"
+                                                        >{overrides.bgDim}%</span
+                                                    >
+                                                </span>
+                                                <input
+                                                    aria-label="背景暗度"
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    step="1"
+                                                    value={overrides.bgDim}
+                                                    oninput={(e) =>
+                                                        updateOverride(
+                                                            'bgDim',
+                                                            Number((e.target as HTMLInputElement).value)
+                                                        )}
+                                                    class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                />
+                                                <div
+                                                    class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                >
+                                                    <span>原图</span><span>沉浸</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
                         </div>
                     {:else if tab === 'keymap'}
                         <!-- Key mapping -->
