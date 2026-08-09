@@ -55,6 +55,7 @@ export const DAMAGE_TYPES = [
     '变奏技能伤害',
     '延奏技能伤害',
     '协同攻击伤害',
+    '效应伤害',
     '其它类型伤害'
 ] as const
 
@@ -67,6 +68,7 @@ export const DAMAGE_TYPE_SHORT: Record<string, string> = {
     变奏技能伤害: '变奏',
     延奏技能伤害: '延奏',
     协同攻击伤害: '协同',
+    效应伤害: '效应',
     其它类型伤害: '其它'
 } as const
 

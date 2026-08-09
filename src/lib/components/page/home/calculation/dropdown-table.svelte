@@ -1,4 +1,5 @@
 <script lang="ts">
+    /** @desc 下拉表（拉表默认视图）：每条伤害可点击展开，配置伤害类型/增益勾选/叠层文件夹/复制前后段，支持 Buff 差异模式展示 */
     import { tick } from 'svelte'
     import { slide } from 'svelte/transition'
     import {
@@ -52,11 +53,13 @@
     let expandedEntryId = $state<string | null>(null)
     let calcContainer = $state<HTMLDivElement | undefined>()
 
+    /** @desc 角色元素映射与自动推导伤害类型（未手填时按条目特征推断） */
     let calcElementMap = $derived(getCalcElementMap())
     let inferredDamageTypeMap = $derived<Record<string, string[]>>(
         Object.fromEntries(damageEntries.map((e) => [e.id, inferDamageTypes(e)]))
     )
 
+    /** @desc 当前展开条目及它的 Buff/伤害类型绑定、角色槽位索引 */
     let selectedEntry = $derived(damageEntries.find((e) => e.id === expandedEntryId) ?? null)
     let selectedEntrySetIds = $derived(expandedEntryId ? getBuffSetIdsForEntry(expandedEntryId) : [])
     let charToIdx = $derived<Record<string, number>>(
@@ -64,7 +67,7 @@
     )
     let entryCharIdx = $derived(selectedEntry?.character ? (charToIdx[selectedEntry.character] ?? -1) : -1)
 
-    // 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff）
+    /** @desc 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff） */
     const buffMatches = (bs: BuffSet | undefined, entry: DamageEntry): boolean => {
         if (!bs) return false
         if (!hideConditionMismatch) return true
@@ -72,6 +75,7 @@
         return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap)
     }
 
+    /** @desc 对当前展开条目可见（非全局、作用域匹配、条件满足）的 Buff，并按叠层规则分组 */
     let visibleBuffSets = $derived(
         buffSets.filter((b) => {
             if (globalBuffSetIds.includes(b.id)) return false
@@ -93,6 +97,7 @@
         type: 'added' | 'removed' | 'same' | 'global'
     }
 
+    /** @desc Buff 差异模式的数据：逐条目对比上一段（同角色直伤 / 同名效应），标出 新增/移除/不变/全局 */
     let entryBuffDiff = $derived.by(() => {
         if (!buffDiffMode) return {} as Record<string, BuffDiffItem[]>
 
@@ -179,6 +184,7 @@
         return result
     })
 
+    /** @desc 展开/收起条目（展开后滚动到该行，block: nearest 平滑滚动） */
     function handleToggleExpand(id: string, _index: number) {
         const expanding = expandedEntryId !== id
         expandedEntryId = expanding ? id : null
@@ -191,12 +197,14 @@
         }
     }
 
+    /** @desc 切换当前展开条目与某 Buff 的绑定并持久化 */
     function handleToggleBuffSetForEntry(setId: string) {
         if (!expandedEntryId) return
         toggleBuffSetForEntry(expandedEntryId, setId)
         onupdate(getCalcState())
     }
 
+    /** @desc 叠层文件夹整体勾选/取消（子项全选则全部取消，否则全选） */
     function handleToggleFolder(folder: GroupedBuffSetItem) {
         if (!expandedEntryId || !folder.children) return
         const childIds = folder.children.map((c) => c.id)
@@ -211,6 +219,7 @@
         onupdate(getCalcState())
     }
 
+    /** @desc 叠层文件夹按前缀段批量勾选：前 index+1 个（1层、2层…）全选或全取消 */
     function handleToggleBuffPrefix(folder: GroupedBuffSetItem, index: number) {
         if (!expandedEntryId || !folder.children) return
         const prefixIds = folder.children.slice(0, index + 1).map((c) => c.id)
@@ -225,11 +234,13 @@
         onupdate(getCalcState())
     }
 
+    /** @desc 切换条目伤害类型并持久化 */
     function handleToggleDamageType(entryId: string, damageType: string) {
         toggleDamageTypeForEntry(entryId, damageType)
         onupdate(getCalcState())
     }
 
+    /** @desc 复制当前直伤的伤害类型到同角色下一段直伤（并展开那段） */
     function handleCopyDamageTypeToNext(entryId: string) {
         const entry = damageEntries.find((e) => e.id === entryId)
         if (!entry || !entry.character) return
@@ -250,10 +261,12 @@
         addToast('已经是本角色最后一段直伤', 'info')
     }
 
+    /** @desc 是否为直伤条目（非效应/非处决/非响应） */
     function isDirectDamage(e: { isEffect: boolean; isTuneBreak: boolean; isTuneResponse: boolean }): boolean {
         return !e.isEffect && !e.isTuneBreak && !e.isTuneResponse
     }
 
+    /** @desc 从同角色上一段直伤复制增益 */
     function handleCopyFromPrevDirect(entryId: string) {
         const entry = damageEntries.find((e) => e.id === entryId)
         if (!entry || !entry.character) return
@@ -278,6 +291,7 @@
         addToast('未找到本角色的上一个直伤', 'info')
     }
 
+    /** @desc 复制当前直伤的增益到同角色下一段直伤（并展开那段） */
     function handleCopyToNextDirect(entryId: string) {
         const entry = damageEntries.find((e) => e.id === entryId)
         if (!entry || !entry.character) return
@@ -301,6 +315,7 @@
         addToast('已经是本角色最后一段直伤', 'info')
     }
 
+    /** @desc 从上一个同名效应复制增益 */
     function handleCopyFromPrevEffect(entryId: string) {
         const entry = damageEntries.find((e) => e.id === entryId)
         if (!entry || !entry.isEffect) return
@@ -325,6 +340,7 @@
         addToast('未找到上一个同名效应', 'info')
     }
 
+    /** @desc 复制当前效应的增益到下一个同名效应（并展开那段） */
     function handleCopyToNextEffect(entryId: string) {
         const entry = damageEntries.find((e) => e.id === entryId)
         if (!entry || !entry.isEffect) return
@@ -347,12 +363,14 @@
         addToast('已经是本效应最后一次伤害结算', 'info')
     }
 
+    /** @desc 清空当前条目的全部 Buff 绑定 */
     function handleClearAllBuffs(entryId: string) {
         if (!setBuffSetIdsForEntry(entryId, [])) return
         onupdate(getCalcState())
     }
 </script>
 
+<!-- @desc 全局快捷键：展开下一条 / 复制伤害类型到下段直伤 / 复制前段/后段直伤 / 清除所有增益（输入框/按钮内不拦截） -->
 <svelte:window
     onkeydown={(e) => {
         const el = e.target as HTMLElement
@@ -385,6 +403,7 @@
     }}
 />
 
+<!-- @desc 表格容器：Ctrl+滚轮横向滚动，背景为弹窗底色 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="theme-scrollbar h-full overflow-auto pb-48"
@@ -398,6 +417,7 @@
     }}
 >
     <table class="w-full text-xs table-fixed">
+        <!-- 表头：来源 / 条目 / 视为（伤害类型） / Buff 四列，吸顶毛玻璃 -->
         <thead>
             <tr
                 class="text-(--theme-modal-text)/50 sticky top-0 opacity-100!"
@@ -418,6 +438,7 @@
                 <th class="text-left font-medium py-2 px-3">Buff</th>
             </tr>
         </thead>
+        <!-- 表体：每行一个伤害条目（点击展开编辑）；展开行内嵌增益配置面板 -->
         <tbody>
             {#each damageEntries as damageEntry, i}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -435,6 +456,7 @@
                             ? 'background: color-mix(in srgb, var(--theme-accent-bg) 10%, transparent);'
                             : '')}
                 >
+                    <!-- 来源列：角色名（按元素着色） -->
                     <td
                         class="py-1.5 px-3 w-20 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
                         style="border-color: var(--theme-divider-border);"
@@ -443,6 +465,7 @@
                             {damageEntry.character ?? '—'}
                         </span>
                     </td>
+                    <!-- 条目列：伤害名（按伤害元素着色），超宽省略 + title 完整名 -->
                     <td
                         class="py-1.5 px-3 w-56 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
                         style="border-color: var(--theme-divider-border);"
@@ -454,6 +477,7 @@
                             {damageEntry.displayName}
                         </span>
                     </td>
+                    <!-- 视为列：已选伤害类型标签；未选时显示自动推导结果 -->
                     <td
                         class="py-1.5 px-3 w-32 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
                         style="border-color: var(--theme-divider-border);"
@@ -477,6 +501,7 @@
                             {/each}
                         </div>
                     </td>
+                    <!-- Buff 列：差异模式显示 新增(绿+)/移除(红-)/不变/全局(黄皇冠)；普通模式显示已绑定且条件匹配的 buff 标签 -->
                     <td class="py-1.5 px-3">
                         <div class="flex flex-wrap gap-1">
                             {#if buffDiffMode}
@@ -526,6 +551,7 @@
                         </div>
                     </td>
                 </tr>
+                <!-- 展开面板：伤害类型编辑（直伤）+ 增益选择（复制前段/下段、清除、下一条、叠层文件夹、独立 buff 按钮） -->
                 {#if expandedEntryId === damageEntry.id}
                     <tr style="background: var(--theme-input-bg);">
                         <td colspan="4" class="p-0">
@@ -766,6 +792,7 @@
             {/each}
         </tbody>
     </table>
+    <!-- @desc 无条目时的占位提示 -->
     {#if damageEntries.length === 0}
         <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {/if}

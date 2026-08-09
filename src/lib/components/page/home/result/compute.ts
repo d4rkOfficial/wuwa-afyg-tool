@@ -885,7 +885,12 @@ function emptyCharacterStats(): CharacterComputed {
 
 // ── effect damage ──
 
-function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy: ConfigState['enemy']): ResultEntry {
+function computeEffectEntry(
+    entry: DamageEntry,
+    stats: CharacterComputed,
+    enemy: ConfigState['enemy'],
+    damageTypes: string[]
+): ResultEntry {
     /** @desc
      * ── 倍率：查表取效应倍率（EFFECT_TABLE[效应名][层数]，见 $lib/consts/effect-data.ts）──
      * entry.ratioValue 即效应层数；burstLayers 仅电磁效应 > 0（其余效应为 0）
@@ -937,7 +942,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
     ]
 
     /** @desc
-     * ── 输出 ResultEntry：效应伤害不能暴击（canCrit: false）、无伤害类型（damageTypes: []）、
+     * ── 输出 ResultEntry：效应伤害不能暴击（canCrit: false）、伤害类型为推导/显式结果（damageTypes: ['效应伤害'] 等）、
      * 面板类字段（攻击/双暴等）恒为 0，基础值来自独立常量 EFFECT_BASE_VALUE ──
      */
     return {
@@ -988,7 +993,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         critPerHit: expectedPerHit,
         canCrit: false,
         multiplierZones: multZones,
-        damageTypes: []
+        damageTypes
     }
 }
 
@@ -1225,9 +1230,12 @@ export function computeAll(
             }
         }
 
+        // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
+        const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
+
         // effect damage
         if (entry.isEffect) {
-            return computeEffectEntry(entry, stats, enemy)
+            return computeEffectEntry(entry, stats, enemy, damageTypes)
         }
         if (!charName || !charInfo || charIndex < 0) return makeStubEntry(entry)
 
@@ -1237,7 +1245,6 @@ export function computeAll(
         }
 
         // direct damage
-        const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
         return computeResultEntry(entry, stats, enemy, damageTypes)
     })
 }
@@ -1322,14 +1329,16 @@ export function computeOneEntry(
         }
     }
 
+    // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
+    const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
+
     if (entry.isEffect) {
-        return computeEffectEntry(entry, stats, enemy)
+        return computeEffectEntry(entry, stats, enemy, damageTypes)
     }
     if (!charName || !charInfo || charIndex < 0) return makeStubEntry(entry)
     if (entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数') {
         return computeTuneEntry(entry, stats, enemy)
     }
-    const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
     return computeResultEntry(entry, stats, enemy, damageTypes)
 }
 

@@ -192,7 +192,7 @@ defineTool('unbind_buff_from_entry', {
 
 defineTool('set_entry_damage_types', {
     description:
-        '设置指定伤害条目的伤害类型列表（覆盖）。取值：普攻伤害/重击伤害/共鸣技能伤害/共鸣解放伤害/声骸技能伤害/变奏技能伤害/延奏技能伤害/协同攻击伤害/其它类型伤害。',
+        '设置指定伤害条目的伤害类型列表（覆盖）。取值：普攻伤害/重击伤害/共鸣技能伤害/共鸣解放伤害/声骸技能伤害/变奏技能伤害/延奏技能伤害/协同攻击伤害/效应伤害/其它类型伤害。',
     parameters: {
         type: 'object',
         properties: {

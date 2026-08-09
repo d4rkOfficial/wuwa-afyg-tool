@@ -1,3 +1,4 @@
+/** @desc 拉表页状态 store：持有伤害条目/Buff 块/条目绑定/生效配置等全局响应式状态，提供 CRUD 与持久化快照接口 */
 import type { BuffSet, BuffZoneValue, CalcState, DamageEntry, BuffCondition } from './calculation.types'
 import type { TimelineData } from '../timeline/timeline.types'
 import type { CharSlot } from '$lib/data/types'
@@ -16,10 +17,11 @@ let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
 let _showBuffModal = $state(false)
 let _buffDiffMode = $state(false)
 let _locked = $state(false)
-// 全局生效配置：各角色共鸣链 / 武器精炼阶数（结果计算与条件过滤共用）
+/** @desc 全局生效配置：各角色共鸣链 / 武器精炼阶数（结果计算与条件过滤共用） */
 let _conditionProfile: ConditionProfile = $state({ chains: [0, 0, 0], refinements: [1, 1, 1] })
-// 默认隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff
+/** @desc 默认隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff */
 let _hideConditionMismatch = $state(true)
+/** @desc 锁定态下拦截所有写操作（加锁环节，如对比分锁） */
 function assertUnlocked(): boolean {
     if (_locked) {
         addToast('本环节已锁定，请先解锁', 'info')
@@ -34,6 +36,7 @@ let _globalBuffSetIds = $state<string[]>([])
 let _fetchPromise: Promise<void> | null = null
 let _onupdate: ((state: CalcState) => void) | undefined = $state()
 
+/** @desc 初始化/重建整个 store：写入队伍与时间线、加载保存态（过滤[配置]自动块）、重建伤害条目、同步全局 buff；返回前清理孤儿绑定 */
 export function init(
     team: [CharSlot, CharSlot, CharSlot],
     timelineData: TimelineData | null,
@@ -71,7 +74,7 @@ export function init(
                 Object.fromEntries(
                     Object.entries(savedState.damageEntryDamageTypes ?? {}).map(([id, types]) => [
                         id,
-                        types.map((t) => (t === '视为效应伤害' ? '其它类型伤害' : t))
+                        types.map((t) => (t === '视为效应伤害' ? '效应伤害' : t))
                     ])
                 )
             )
@@ -88,6 +91,7 @@ export function init(
     }
 }
 
+/** @desc 清理绑定表中已不存在条目的孤儿映射（条目被删后残留的 buff 绑定） */
 function pruneOrphanedBindings(): boolean {
     const validIds = new Set(_entries.map((e) => e.id))
     let changed = false
@@ -107,6 +111,7 @@ function pruneOrphanedBindings(): boolean {
     return changed
 }
 
+/** @desc 批量拉取角色元素信息（用于伤害条目补全元素），完成后重建伤害条目（元素决定伤害属性/图标颜色） */
 async function queueElementFetch(names: string[]) {
     if (_fetchPromise) return _fetchPromise
     _fetchPromise = (async () => {
@@ -125,6 +130,7 @@ async function queueElementFetch(names: string[]) {
     _fetchPromise = null
 }
 
+/** @desc 从时间线数据构建全部伤害条目：遍历 damageBlocks 中的 skillHits（解析倍率成分→按基础类型分组，含固定值条目）与非直伤条目（响应/处决/效应：查技能缓存取倍率、按元素归类、效应层数映射） */
 function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, CharSlot, CharSlot]): DamageEntry[] {
     const temp: Array<{ item: DamageEntry; pos: number; order: number }> = []
     let order = 0
@@ -325,6 +331,7 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
     return temp.map((t) => t.item)
 }
 
+/** @desc 伤害条目入口：无时间线时返回空数组 */
 function buildDamageEntries(_team: [CharSlot, CharSlot, CharSlot], _timelineData: TimelineData | null): DamageEntry[] {
     if (!_timelineData) return []
 
@@ -337,12 +344,13 @@ export function getAllDamageEntries(): DamageEntry[] {
     return _entries
 }
 
-// ── BuffSet CRUD ──
+/** @desc ── BuffSet CRUD ── */
 
 export function getAllBuffSets(): BuffSet[] {
     return _buffSets
 }
 
+/** @desc 新建空 Buff 块（随机 id，默认全队作用域） */
 export function createBuffSet(name: string) {
     if (!assertUnlocked()) return
     const buffSet: BuffSet = {
@@ -354,6 +362,7 @@ export function createBuffSet(name: string) {
     _buffSets = [..._buffSets, buffSet]
 }
 
+/** @desc 导入接口类型：外部（工坊 share / AI）传入的 Buff 结构，scope 用 share 语义（self/self_except/team/effect_only） */
 export interface ImportBuffZone {
     zoneId: string
     value: number
@@ -379,8 +388,7 @@ export interface ImportBuffInput {
     zones: ImportBuffZone[]
 }
 
-// share 的 scope 语义 → 工具 BuffSet.scope（'all' | number[]）
-// 由导入方传入 ownerIdx（该实体归属的角色槽位，无则 -1），self_except 需要队伍总槽位数
+/** @desc share 的 scope 语义 → 工具 BuffSet.scope（'all' | number[]）：由导入方传入 ownerIdx（该实体归属的角色槽位，无则 -1），self_except 需要队伍总槽位数 */
 export function mapImportedScope(
     scope: ImportBuffInput['scope'],
     ownerIdx: number,
@@ -402,6 +410,7 @@ export function mapImportedScope(
     }
 }
 
+/** @desc 批量导入 Buff 块：校验乘区合法性、转换引用（ZONE_REF_MAP 校验）、按导入自然序排序后并入列表，返回成功条数 */
 export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize = 3) {
     if (!assertUnlocked()) return 0
     const fresh: BuffSet[] = []
@@ -448,7 +457,7 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
     return fresh.length
 }
 
-// 自然排序：数字段按数值比较，非数字段按码点比较（字符数字从小到大，小在先大在后）
+/** @desc 自然排序：数字段按数值比较（1层 < 2层 < 10层 < 11层），其余按 unicode 码点比较 */
 function compareNatural(a: string, b: string): number {
     let i = 0
     let j = 0
@@ -474,6 +483,7 @@ function compareNatural(a: string, b: string): number {
     return a.length - b.length
 }
 
+/** @desc 复制 Buff 块（插入到原块之后，返回新 id；复制品自动解除全局） */
 export function duplicateBuffSet(id: string, customName?: string): string | undefined {
     if (!assertUnlocked()) return
     const source = _buffSets.find((s) => s.id === id)
@@ -492,12 +502,14 @@ export function duplicateBuffSet(id: string, customName?: string): string | unde
     return newId
 }
 
+/** @desc 设置 Buff 作用域（全局 buff 不允许改） */
 export function setBuffSetScope(setId: string, scope: 'all' | number[]) {
     if (!assertUnlocked()) return
     if (_globalBuffSetIds.includes(setId)) return
     _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, scope } : s))
 }
 
+/** @desc 设置生效条件（默认全局 buff 不允许设链/阶条件） */
 export function setBuffSetCondition(setId: string, condition: BuffCondition | null) {
     if (!assertUnlocked()) return
     // 默认全局 buff 不允许设置共鸣链/精炼条件
@@ -507,6 +519,7 @@ export function setBuffSetCondition(setId: string, condition: BuffCondition | nu
     )
 }
 
+/** @desc 设置条件参考角色槽位（默认全局 buff 不允许设） */
 export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
     if (!assertUnlocked()) return
     // 默认全局 buff 不允许设置共鸣链/精炼条件
@@ -518,6 +531,7 @@ export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
     )
 }
 
+/** @desc 设置某乘区的引用（存在引用时清除 override 标记） */
 export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./calculation.types').ZoneRef | null) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) =>
@@ -532,6 +546,7 @@ export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./
     )
 }
 
+/** @desc 切换乘区「追加/覆盖」标记（extraRatio 恒为追加；覆盖时清除引用） */
 export function setBuffSetZoneOverride(setId: string, zoneId: string, override: boolean) {
     if (!assertUnlocked()) return
     const nextOverride = zoneId === 'extraRatio' ? false : override
@@ -549,11 +564,13 @@ export function setBuffSetZoneOverride(setId: string, zoneId: string, override: 
     )
 }
 
+/** @desc 切换收藏标记 */
 export function toggleBuffSetStarred(id: string) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, starred: !s.starred } : s))
 }
 
+/** @desc 并入/移出全局：并入时清理该 buff 在全部条目上的绑定并加入全局列表，随后重建全局自动绑定 */
 export function setBuffSetGlobal(id: string, global: boolean): boolean {
     if (!assertUnlocked()) return false
     // 默认全队/个人全局 buff 不可移出全局
@@ -579,6 +596,7 @@ export function setBuffSetGlobal(id: string, global: boolean): boolean {
     return true
 }
 
+/** @desc 删除 Buff 块（全局 buff 不可删），同时清理所有条目上的绑定 */
 export function deleteBuffSet(id: string) {
     if (!assertUnlocked()) return
     if (_globalBuffSetIds.includes(id)) return
@@ -591,11 +609,13 @@ export function deleteBuffSet(id: string) {
     _damageEntryBuffSetIds = next
 }
 
+/** @desc 重命名 Buff 块 */
 export function renameBuffSet(id: string, name: string) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, name } : s))
 }
 
+/** @desc 给 Buff 块新增一个乘区（默认值 0） */
 export function addZoneToBuffSet(setId: string, zoneId: string) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) =>
@@ -603,6 +623,7 @@ export function addZoneToBuffSet(setId: string, zoneId: string) {
     )
 }
 
+/** @desc 从 Buff 块移除一个乘区 */
 export function removeZoneFromBuffSet(setId: string, zoneId: string) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) =>
@@ -610,6 +631,7 @@ export function removeZoneFromBuffSet(setId: string, zoneId: string) {
     )
 }
 
+/** @desc 设置某乘区的数值 */
 export function setBuffSetZoneValue(setId: string, zoneId: string, value: number) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) =>
@@ -617,18 +639,20 @@ export function setBuffSetZoneValue(setId: string, zoneId: string, value: number
     )
 }
 
-// ── Entry-BuffSet Assignment ──
+/** @desc ── Entry-BuffSet 绑定 ── */
 
 export function getBuffSetIdsForEntry(entryId: string): string[] {
     return _damageEntryBuffSetIds[entryId] ?? []
 }
 
+/** @desc 覆写条目绑定的 Buff 集合（框选/行列头批量用） */
 export function setBuffSetIdsForEntry(entryId: string, setIds: string[]): boolean {
     if (!assertUnlocked()) return false
     _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: [...setIds] }
     return true
 }
 
+/** @desc 切换条目↔Buff 的单条绑定 */
 export function toggleBuffSetForEntry(entryId: string, setId: string) {
     if (!assertUnlocked()) return
     const current = _damageEntryBuffSetIds[entryId] ?? []
@@ -639,12 +663,13 @@ export function toggleBuffSetForEntry(entryId: string, setId: string) {
     }
 }
 
-// ── Entry Damage Types ──
+/** @desc ── 条目伤害类型（视为某类伤害）── */
 
 export function getDamageTypesForEntry(entryId: string): string[] {
     return _damageEntryDamageTypes[entryId] ?? []
 }
 
+/** @desc 切换条目↔伤害类型的绑定 */
 export function toggleDamageTypeForEntry(entryId: string, damageType: string) {
     if (!assertUnlocked()) return
     const current = _damageEntryDamageTypes[entryId] ?? []
@@ -655,11 +680,12 @@ export function toggleDamageTypeForEntry(entryId: string, damageType: string) {
     }
 }
 
+/** @desc 覆写条目的伤害类型集合（复制到下段直伤等用） */
 export function setDamageTypesForEntry(entryId: string, types: string[]) {
     _damageEntryDamageTypes = { ..._damageEntryDamageTypes, [entryId]: types }
 }
 
-// ── Buff Modal State ──
+/** @desc ── Buff 弹窗开关 ── */
 
 export function getShowBuffModal(): boolean {
     return _showBuffModal
@@ -668,7 +694,7 @@ export function setShowBuffModal(v: boolean) {
     _showBuffModal = v
 }
 
-// ── Buff Diff Mode ──
+/** @desc ── Buff 差异模式（拉表页按段展示 新增/移除/不变/全局 的 buff 变化）── */
 
 export function getBuffDiffMode(): boolean {
     return _buffDiffMode
@@ -677,19 +703,20 @@ export function toggleBuffDiffMode() {
     _buffDiffMode = !_buffDiffMode
 }
 
-// ── 生效配置（链/阶）与条件不符隐藏 ──
+/** @desc ── 生效配置（链/阶）与条件不符隐藏 ── */
 
 export function getConditionProfile(): ConditionProfile {
     return _conditionProfile
 }
 
-// 从工程文件恢复链/阶配置（导入/加载工程时调用）
+/** @desc 从工程文件恢复链/阶配置（导入/加载工程时调用） */
 export function setConditionProfile(profile: ConditionProfile | undefined) {
     if (profile && Array.isArray(profile.chains) && Array.isArray(profile.refinements)) {
         _conditionProfile = { chains: profile.chains, refinements: profile.refinements }
     }
 }
 
+/** @desc 设置某角色槽位的共鸣链档位 */
 export function setConditionProfileChains(idx: number, value: number) {
     _conditionProfile = {
         ..._conditionProfile,
@@ -697,6 +724,7 @@ export function setConditionProfileChains(idx: number, value: number) {
     }
 }
 
+/** @desc 设置某角色槽位的武器精炼档位 */
 export function setConditionProfileRefinements(idx: number, value: number) {
     _conditionProfile = {
         ..._conditionProfile,
@@ -704,6 +732,7 @@ export function setConditionProfileRefinements(idx: number, value: number) {
     }
 }
 
+/** @desc 隐藏不匹配开关的读取/切换 */
 export function getHideConditionMismatch(): boolean {
     return _hideConditionMismatch
 }
@@ -712,6 +741,7 @@ export function toggleHideConditionMismatch() {
     _hideConditionMismatch = !_hideConditionMismatch
 }
 
+/** @desc 按拖拽结果重排非全局 Buff 块（全局固定在最前） */
 export function reorderNonGlobalBuffSets(orderedIds: string[]) {
     if (!assertUnlocked()) return
     const global = _buffSets.filter((bs) => _globalBuffSetIds.includes(bs.id))
@@ -721,7 +751,7 @@ export function reorderNonGlobalBuffSets(orderedIds: string[]) {
     _buffSets = [...global, ...reordered, ...remaining]
 }
 
-// ── Persistence ──
+/** @desc ── 持久化 ── */
 
 export function getCalcElementMap() {
     return _calcElementMap
@@ -731,6 +761,7 @@ export function getGlobalBuffSetIds(): string[] {
     return _globalBuffSetIds
 }
 
+/** @desc 导出当前计算态深拷贝快照（供工程保存/导出） */
 export function getCalcState(): CalcState {
     return JSON.parse(
         JSON.stringify({
@@ -741,11 +772,12 @@ export function getCalcState(): CalcState {
     )
 }
 
-// 通知宿主持久化当前计算态（AI 工具修改后调用）
+/** @desc 通知宿主持久化当前计算态（AI 工具修改后调用） */
 export function notifyCalcUpdate() {
     if (_onupdate) _onupdate(getCalcState())
 }
 
+/** @desc 伤害条目被复制/拆分后，按旧 id→新 id 映射重绑 buff 与伤害类型（key 前缀匹配） */
 export function remapDuplicatedDamageBuffs(damageMap: Record<string, string>) {
     const pairs = Object.entries(damageMap).filter(([, newId]) => Boolean(newId))
     if (pairs.length === 0) return
@@ -769,6 +801,7 @@ export function remapDuplicatedDamageBuffs(damageMap: Record<string, string>) {
     if (_onupdate) _onupdate(getCalcState())
 }
 
+/** @desc 同步全局 buff：清除无主角色的 global-{角色名} 孤儿块、按当前队伍补齐每个角色与全队的全局块，并按「角色/全队/效应专属/手动并入」规则重建所有条目上的全局绑定 */
 export function syncGlobalBuffs(charNames: (string | null)[]) {
     const validCharNames = new Set(charNames.filter(Boolean) as string[])
 

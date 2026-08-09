@@ -1,4 +1,5 @@
 <script lang="ts">
+    /** @desc 铺开表（拉表铺开模式）：按角色×直伤/非直伤分组，Buff 作列、条目作行，支持单元格/行列头三态勾选、框选批量、叠层文件夹列线区分 */
     import { onMount, onDestroy } from 'svelte'
     import type { BuffSet, DamageEntry } from './calculation.types'
     import type { CharSlot } from '$lib/data/types'
@@ -40,10 +41,11 @@
         onSetEntryBuffSetIds
     }: Props = $props()
 
+    /** @desc 普通 buff 列（非全局）与全局 buff 列（仅展示，不可勾选） */
     const columns = $derived(buffSets.filter((b) => !globalBuffSetIds.includes(b.id)))
     const globalBuffs = $derived(buffSets.filter((b) => globalBuffSetIds.includes(b.id)))
 
-    // 叠层 folder 归属：名字匹配「前缀+数字+后缀」且同前缀 ≥2 条 → 视为紧密相连的倍率条目组
+    /** @desc 叠层 folder 归属：名字匹配「前缀+数字+后缀」且同前缀 ≥2 条 → 视为紧密相连的倍率条目组 */
     const folderPrefixOf = $derived.by(() => {
         const groups = new Map<string, number>()
         for (const c of columns) {
@@ -64,8 +66,7 @@
         return map
     })
 
-    // 列间分割线：同一 folder 内部 → 虚线；folder 与 folder/普通 buff 接壤 → 主题色半透明实线加粗；普通 buff 之间 → 虚线。
-    // 以 border-right 绘制（相邻列只画一侧，避免 separate 模式下边框重叠）；最后一列不画（表格右边缘由 table 边框提供）
+    /** @desc 列间分割线：同一 folder 内部→虚线；folder 与 folder/普通 buff 接壤→主题色半透明实线加粗；普通 buff 之间→虚线（border-right 单侧绘制避免重叠，最后一列不画） */
     const colBorderStyle = (curId: string, nextId: string | undefined): string => {
         if (nextId === undefined) return ''
         const curFolder = folderPrefixOf.get(curId)
@@ -76,15 +77,17 @@
             : 'border-right: 1px dashed var(--theme-divider-border);'
     }
 
+    /** @desc 自动推导伤害类型映射（未手填伤害类型时展示推导结果） */
     const inferredDamageTypeMap = $derived<Record<string, string[]>>(
         Object.fromEntries(damageEntries.map((e) => [e.id, inferDamageTypes(e)]))
     )
 
+    /** @desc 角色名→槽位索引（用于 scope 判定） */
     const charToIdx = $derived<Record<string, number>>(
         Object.fromEntries(team.map((s, i) => [s.character ?? '', i]).filter(([name]) => name !== ''))
     )
 
-    // 非直伤条目对 buff 的可用性（与单元格勾选同款判定）：scope 匹配 +（隐藏条件不匹配时）条件满足
+    /** @desc 非直伤条目对 buff 的可用性判定：scope 匹配 +（隐藏条件不匹配时）条件满足 */
     const buffEnabledForEntry = (bs: BuffSet, entry: DamageEntry, charIdx: number): boolean => {
         const scopeOk = entry.isEffect
             ? bs.scope === 'all' || (Array.isArray(bs.scope) && bs.scope.length === 0)
@@ -94,8 +97,7 @@
         return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap)
     }
 
-    // 非直伤伤害结算实际读取的乘区（computeEffectEntry / computeTuneEntry）：
-    // 效应吃加深、不吃谐度增幅；处决/响应吃谐度增幅、不吃加深；两者都不吃攻击/暴击/增伤/面板类
+    /** @desc 效应/处决/响应伤害实际读取的乘区（computeEffectEntry / computeTuneEntry）：效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；都不吃攻击/暴击/增伤/面板类 */
     const EFFECT_RELEVANT_ZONES = new Set([
         'extraRatio',
         'deepenDmg',
@@ -121,7 +123,7 @@
         'customFinalDmg'
     ])
 
-    // 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff）
+    /** @desc 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff） */
     const buffRelevantForNonDirect = (bs: BuffSet, entry: DamageEntry): boolean => {
         const zones = entry.isTuneBreak || entry.isTuneResponse ? TUNE_RELEVANT_ZONES : EFFECT_RELEVANT_ZONES
         return bs.zones.some((z) => zones.has(z.zoneId))
@@ -156,7 +158,7 @@
         visibleGlobalBuffs: BuffSet[]
     }
 
-    // 预计算整表数据：单元格可用性/选中态、行/列统计、不连续分割标记一次算好，模板零逻辑
+    /** @desc 预计算整表数据：单元格可用性/选中态、行/列统计、不连续分割标记一次算好，模板零逻辑 */
     const tableData = $derived.by(() => {
         const cols = columns
         const groupMap = new Map<
@@ -232,10 +234,12 @@
         return result
     })
 
+    /** @desc 单击单元格：切换绑定 */
     function toggleCell(row: RowData, cell: CellData) {
         onToggle(row.entry.id, cell.buffId)
     }
 
+    /** @desc 单击列头：该列所有可应用行 全选/全取消（三态） */
     function toggleColumn(group: GroupData, ci: number) {
         const col = columns[ci]
         const stat = group.colStats[ci]
@@ -251,6 +255,7 @@
         }
     }
 
+    /** @desc 单击行头：该行所有可应用 buff 全选/全取消（三态） */
     function toggleRow(row: RowData) {
         if (row.enabledBuffIds.length === 0) return
         const cur = new Set(entryBuffSetIdMap[row.entry.id] ?? [])
@@ -262,7 +267,7 @@
         onSetEntryBuffSetIds(row.entry.id, [...next])
     }
 
-    // ── 框选批量生效/失效（拖拽矩形范围：范围内有已勾选 → 全部取消，否则全部勾选） ──
+    /** @desc ── 框选批量生效/失效（拖拽矩形范围：范围内有已勾选 → 全部取消，否则全部勾选）── */
     let rootEl = $state<HTMLDivElement | undefined>()
     let selStart: { g: number; r: number; c: number; x: number; y: number } | null = null
     let selStartTd: HTMLElement | null = null
@@ -274,6 +279,7 @@
     let lastMouseX = 0
     let lastMouseY = 0
 
+    /** @desc 重置框选状态（拖入禁区/鼠标松开时调用，不应用选中） */
     function cancelSelection() {
         selStart = null
         selStartTd = null
@@ -284,7 +290,7 @@
         selRect = null
     }
 
-    // 拖动进入 AI 悬浮窗等"禁区"时取消框选（不应用选中）
+    /** @desc 拖动进入 AI 悬浮窗等"禁区"时取消框选（不应用选中） */
     let unregisterDragCancel: (() => void) | null = null
     onMount(() => {
         unregisterDragCancel = registerDragCancel(cancelSelection)
@@ -293,6 +299,7 @@
         unregisterDragCancel?.()
     })
 
+    /** @desc mousedown：记录框选起点单元格（仅左键） */
     function handleMouseDown(e: MouseEvent) {
         if (e.button !== 0) return
         const td = (e.target as HTMLElement).closest<HTMLElement>('td[data-row][data-col]')
@@ -310,7 +317,7 @@
         dragging = false
     }
 
-    // 滚动后同步框选：按鼠标最后位置更新当前单元格，并重算选区矩形（滚动不破坏框选）
+    /** @desc 滚动后同步框选：按鼠标最后位置更新当前单元格，并重算选区矩形（滚动不破坏框选） */
     function syncSelectionRect() {
         if (!selStart || !selStartTd) return
         if (dragging) {
@@ -332,6 +339,7 @@
         }
     }
 
+    /** @desc mousemove：拖动超过 4px 阈值后进入框选，随鼠标更新当前单元格与选区矩形 */
     function handleMouseMove(e: MouseEvent) {
         if (!selStart || !selStartTd) return
         lastMouseX = e.clientX
@@ -354,6 +362,7 @@
         }
     }
 
+    /** @desc mouseup：拖动结束应用框选结果（下一次 click 会被拦截） */
     function handleMouseUp() {
         if (selStart && dragging) {
             justDragged = true
@@ -365,6 +374,7 @@
         cancelSelection()
     }
 
+    /** @desc 框选结束后拦截单元格 click，避免误触发单选 */
     function handleClickCapture(e: MouseEvent) {
         // 框选结束后拦截单元格 click，避免误触发单选
         if (justDragged) {
@@ -374,7 +384,7 @@
         }
     }
 
-    // 方向键滚动：↑↓ 沿「主轴」（默认滚动方向），←→ 沿次轴；Shift 键本身直接切换默认方向
+    /** @desc 方向键滚动：↑↓ 沿「主轴」（默认滚动方向），←→ 沿次轴；Shift 键本身直接切换默认方向 */
     const ARROW_STEP = 60
     function handleArrowKey(e: KeyboardEvent) {
         if (!rootEl) return
@@ -405,6 +415,7 @@
         rootEl.scrollBy({ left: dx, top: dy })
     }
 
+    /** @desc 应用框选：范围内单元格有已勾选 → 全部取消，否则全部勾选（仅可启用单元格） */
     function applySelection() {
         if (!selStart || !selCurrent) return
         const group = tableData[selStart.g]
@@ -442,7 +453,7 @@
         }
     }
 
-    // ── 所有子表等宽：测量各组表头列宽和取最大值，统一表格宽度；窄表格最后一列吸收剩余空间 ──
+    /** @desc ── 所有子表等宽：测量各组表头列宽和取最大值，统一表格宽度；窄表格最后一列吸收剩余空间 ── */
     let groupTableWidths = $state<Record<number, number>>({})
     let maxTableWidth = $state(0)
 
@@ -477,6 +488,7 @@
     })
 </script>
 
+<!-- @desc 窗口级事件：鼠标移动/松开（框选）、方向键滚动、快捷键切换默认滚动轴（输入框/文本域内不拦截） -->
 <svelte:window
     onmousemove={handleMouseMove}
     onmouseup={handleMouseUp}
@@ -494,6 +506,7 @@
     }}
 />
 
+<!-- @desc 表格根容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="theme-scrollbar h-full overflow-auto pb-48"
@@ -530,6 +543,7 @@
     {#if damageEntries.length === 0}
         <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {/if}
+    <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（组内等宽） -->
     {#each tableData as group, gi}
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
         <div class="mb-6">
@@ -572,6 +586,7 @@
                             </div>
                         {/if}
                     </caption>
+                    <!-- 表头：左列=条目（吸顶），后续=可见 buff 列（列头带三态勾选），最窄表补填充列 -->
                     <thead>
                         <tr>
                             <th
@@ -627,6 +642,7 @@
                             {/if}
                         </tr>
                     </thead>
+                    <!-- 表体：每行一个伤害条目（行头三态 + 伤害类型编辑），单元格可勾选 -->
                     <tbody>
                         {#each group.rows as row, ri}
                             <tr
@@ -766,6 +782,8 @@
         </div>
     {/each}
 </div>
+
+<!-- @desc 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） -->
 
 <style>
     /* 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） */

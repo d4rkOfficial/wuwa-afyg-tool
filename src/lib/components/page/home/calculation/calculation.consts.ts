@@ -1,5 +1,6 @@
 import type { ZoneDef, BuffSet } from './calculation.types'
 
+/** @desc 全部乘区定义（拉表页可配置的 Buff 乘区清单）：攻击/生命/防御/双暴/充能/谐度/增伤/加深/穿透/减抗/终伤/易伤/额外倍率等，unit 区分百分比与固定值 */
 export const ZONE_DEFS = [
     { id: 'atkFlat', label: '攻击固定值', unit: 'flat' },
     { id: 'atkPct', label: '攻击百分比', unit: '%' },
@@ -39,10 +40,12 @@ export const ZONE_DEFS = [
     { id: 'extraRatio', label: '额外倍率', unit: '%' }
 ] as const satisfies readonly ZoneDef[]
 
+/** @desc ZoneId 联合类型与查询 Map（由 ZONE_DEFS 派生，供界面与计算引擎快速查乘区定义） */
 export type ZoneId = (typeof ZONE_DEFS)[number]['id']
 
 export const ZONE_MAP = new Map(ZONE_DEFS.map((z) => [z.id, z]))
 
+/** @desc 可被「引用」的属性清单（ZoneRef 的目标）：角色白值/当前面板/充能/谐度/双暴等 */
 export const ZONE_REF_DEFS = [
     { id: 'baseAtk', label: '攻击白值', unit: 'flat' },
     { id: 'totalAtk', label: '当前攻击', unit: 'flat' },
@@ -57,16 +60,21 @@ export const ZONE_REF_DEFS = [
     { id: 'critDmg', label: '暴击伤害', unit: '%' }
 ] as const satisfies readonly ZoneDef[]
 
+/** @desc 引用属性的查询 Map（同上，供 ZoneRef 目标查表） */
 export const ZONE_REF_MAP: Map<string, ZoneDef> = new Map(ZONE_REF_DEFS.map((z) => [z.id, z]))
 
+/** @desc 把 "15%" 之类的字符串解析为小数（15% → 0.15） */
 export function parseRatio(r: string): number {
     return parseFloat(r.replace('%', '')) / 100
 }
 
+/** @desc 伤害类型常量（普攻/重击/…伤害 及其短名），转出到 game-terms 常量 */
 export { DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
 
+/** @desc 叠层 Buff 命名模式：匹配「前缀+数字+后缀」（如 3+30%/6+75% 这类按层数展开的同源倍率条目） */
 export const LAYERED_BUFF_PATTERN = /^(.+?)(\d+)([^\d]*)$/
 
+/** @desc 分组条目：folder=叠层文件夹（同前缀 ≥2 条自动归组），item=普通 Buff 条目 */
 export interface GroupedBuffSetItem {
     key: string
     type: 'item' | 'folder'
@@ -78,6 +86,7 @@ export interface GroupedBuffSetItem {
     children?: BuffSet[]
 }
 
+/** @desc 按叠层命名规则把 Buff 列表分组：同「前缀+后缀」且 ≥2 条归入一个 folder（folder 内部保持原顺序），其余保持 item */
 export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
     const result: GroupedBuffSetItem[] = []
     const pattern = LAYERED_BUFF_PATTERN
