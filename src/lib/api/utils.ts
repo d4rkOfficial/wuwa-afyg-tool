@@ -154,23 +154,28 @@ function makeSkillValues(
                     const first = isEstimate || extraHits > 1 ? damage[matchedKey] : (group[0] ?? damage[matchedKey])
                     element = ELEMENT_MAP[first.element] ?? ''
                     const hitFactor = mult * extraHits
+                    // 能量/偏谐为 0 视为上游无数据（延奏等技能普遍缺失），输出 undefined 而非 0 值
+                    const fmtTune = (raw: number) => {
+                        const v = raw / 100
+                        return v > 0 ? (hitFactor > 1 ? `${v}*${hitFactor}` : String(v)) : undefined
+                    }
                     if (isEstimate) {
                         // 估算值：单段能量/偏谐 × 实际倍率比，四舍五入到两位
                         if (typeof first.energy === 'number') {
-                            energy = ((first.energy / 100) * hitFactor).toFixed(2)
+                            const est = ((first.energy / 100) * hitFactor).toFixed(2)
+                            energy = Number(est) > 0 ? est : undefined
                         }
                         if (typeof first.weakness_lvl === 'number') {
-                            tune = ((first.weakness_lvl / 100) * hitFactor).toFixed(2)
+                            const est = ((first.weakness_lvl / 100) * hitFactor).toFixed(2)
+                            tune = Number(est) > 0 ? est : undefined
                         }
                     } else {
                         // 倍率多段（如 48.17%*4）或聚合倍率（如 100.00% = 4hit）时能量/偏谐同样按 hit 数乘，与倍率语义一致
                         if (typeof first.energy === 'number') {
-                            const e = first.energy / 100
-                            energy = hitFactor > 1 ? `${e}*${hitFactor}` : String(e)
+                            energy = fmtTune(first.energy)
                         }
                         if (typeof first.weakness_lvl === 'number') {
-                            const t = first.weakness_lvl / 100
-                            tune = hitFactor > 1 ? `${t}*${hitFactor}` : String(t)
+                            tune = fmtTune(first.weakness_lvl)
                         }
                     }
                 } else {
@@ -248,10 +253,8 @@ function preprocessSkills(skills: SkillEntry[], elementName: string) {
             // 补元素仅限含 % 的倍率条目，避免把纯增益参数误标成伤害
             if (skill.type === '延奏技能' && !v[2] && elementName && /%/.test(v[1])) v[2] = elementName
         }
-        // 上游无伤害数据（damage 为空）的纯增益延奏：不推断倍率，直接跳过
-        if (skill.type === '延奏技能' && elementName && Object.keys(skill.damage ?? {}).length === 0) {
-            continue
-        }
+        // desc 提取对 damage 是否为空一视同仁：% 锚定正则（"造成…%…伤害"）才是防误判核心，
+        // damage 空不代表无伤害（炽霞/安可/丽贝卡/漂泊者等延奏伤害仅在 desc 文本中）
         if (skill.type === '延奏技能' && elementName) {
             const hasElement = skill.values.some(([, , el]) => el)
             if (!hasElement) {

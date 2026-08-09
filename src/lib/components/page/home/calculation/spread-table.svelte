@@ -12,6 +12,7 @@
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
     import Icon from '@iconify/svelte'
+    import ContextMenu from '$lib/components/layout/context-menu.svelte'
 
     interface Props {
         team: [CharSlot, CharSlot, CharSlot]
@@ -45,35 +46,43 @@
     const columns = $derived(buffSets.filter((b) => !globalBuffSetIds.includes(b.id)))
     const globalBuffs = $derived(buffSets.filter((b) => globalBuffSetIds.includes(b.id)))
 
-    /** @desc 叠层 folder 归属：名字匹配「前缀+数字+后缀」且同前缀 ≥2 条 → 视为紧密相连的倍率条目组 */
-    const folderPrefixOf = $derived.by(() => {
-        const groups = new Map<string, number>()
+    /** @desc 叠层分组信息：buffId → 组（同「前缀+后缀」≥2 条成组；仅用于表头分组展示与分隔线，列本身仍每层一列） */
+    interface FolderGroup {
+        key: string
+        prefix: string
+        suffix: string
+        buffs: BuffSet[]
+    }
+
+    const folderGroupOf = $derived.by(() => {
+        const map = new Map<string, FolderGroup>()
+        const groups = new Map<string, FolderGroup>()
         for (const c of columns) {
             const m = c.name.match(LAYERED_BUFF_PATTERN)
             if (m) {
                 const key = m[1] + m[3]
-                groups.set(key, (groups.get(key) ?? 0) + 1)
+                let g = groups.get(key)
+                if (!g) groups.set(key, (g = { key, prefix: m[1], suffix: m[3], buffs: [] }))
+                g.buffs.push(c)
             }
         }
-        const map = new Map<string, string>()
-        for (const c of columns) {
-            const m = c.name.match(LAYERED_BUFF_PATTERN)
-            if (m) {
-                const key = m[1] + m[3]
-                if ((groups.get(key) ?? 0) >= 2) map.set(c.id, key)
+        for (const g of groups.values()) {
+            if (g.buffs.length >= 2) {
+                for (const b of g.buffs) map.set(b.id, g)
             }
         }
         return map
     })
 
-    /** @desc 列间分割线：同一 folder 内部→虚线；folder 与 folder/普通 buff 接壤→主题色半透明实线加粗；普通 buff 之间→虚线（border-right 单侧绘制避免重叠，最后一列不画） */
-    const colBorderStyle = (curId: string, nextId: string | undefined): string => {
+    /** @desc 列间分割线：folder 组与 folder/普通 buff 接壤→主题色半透明实线加粗；其余→虚线（border-right 单侧绘制避免重叠，最后一列不画） */
+    const colBorderStyle = (curId: string | undefined, nextId: string | undefined): string => {
         if (nextId === undefined) return ''
-        const curFolder = folderPrefixOf.get(curId)
-        const nextFolder = folderPrefixOf.get(nextId)
-        const solid = (curFolder !== undefined || nextFolder !== undefined) && curFolder !== nextFolder
+        if (curId === undefined) return ''
+        const curGroup = folderGroupOf.get(curId)
+        const nextGroup = folderGroupOf.get(nextId)
+        const solid = (curGroup !== undefined || nextGroup !== undefined) && curGroup !== nextGroup
         return solid
-            ? 'border-right: 2px solid color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);'
+            ? 'border-right: 2px solid color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);'
             : 'border-right: 1px dashed var(--theme-divider-border);'
     }
 
@@ -183,14 +192,14 @@
 
         const result: GroupData[] = []
         for (const g of groupMap.values()) {
-            const colStats: ColStat[] = cols.map(() => ({ enabled: 0, selected: 0 }))
+            const colStats: ColStat[] = columns.map(() => ({ enabled: 0, selected: 0 }))
             const rows: RowData[] = []
             let prevIdx = -Infinity
             for (const { entry, idx } of g.items) {
                 const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
                 const cells: CellData[] = []
-                for (let ci = 0; ci < cols.length; ci++) {
-                    const bs = cols[ci]
+                for (let ci = 0; ci < columns.length; ci++) {
+                    const bs = columns[ci]
                     const enabled = buffEnabledForEntry(bs, entry, charIdx)
                     // selected 反映真实绑定状态（含条件不匹配但已勾选的 buff，用于降透明度展示）
                     const selected = (entryBuffSetIdMap[entry.id] ?? []).includes(bs.id)
@@ -227,7 +236,7 @@
                 kind: g.kind,
                 rows,
                 colStats,
-                visibleColIdx: cols.map((_, ci) => ci).filter((ci) => colStats[ci].enabled > 0),
+                visibleColIdx: columns.map((_, ci) => ci).filter((ci) => colStats[ci].enabled > 0),
                 visibleGlobalBuffs
             })
         }
@@ -239,32 +248,77 @@
         onToggle(row.entry.id, cell.buffId)
     }
 
-    /** @desc 单击列头：该列所有可应用行 全选/全取消（三态） */
-    function toggleColumn(group: GroupData, ci: number) {
+    /** @desc 行/列全选或全不选（右键菜单触发，取代原行/列头点击三态） */
+    function selectRow(row: RowData, all: boolean) {
+        if (row.enabledBuffIds.length === 0) return
+        const cur = new Set(entryBuffSetIdMap[row.entry.id] ?? [])
+        for (const id of row.enabledBuffIds) {
+            if (all) cur.add(id)
+            else cur.delete(id)
+        }
+        onSetEntryBuffSetIds(row.entry.id, [...cur])
+    }
+
+    function selectColumn(group: GroupData, ci: number, all: boolean) {
         const col = columns[ci]
-        const stat = group.colStats[ci]
-        const enabledRows = group.rows.filter((r) => r.cells[ci].enabled)
-        if (enabledRows.length === 0) return
-        const allSelected = stat.selected > 0 && stat.selected === stat.enabled
-        for (const r of enabledRows) {
-            const cur = entryBuffSetIdMap[r.entry.id] ?? []
-            onSetEntryBuffSetIds(
-                r.entry.id,
-                allSelected ? cur.filter((id) => id !== col.id) : cur.includes(col.id) ? cur : [...cur, col.id]
-            )
+        for (const r of group.rows) {
+            if (!r.cells[ci].enabled) continue
+            const cur = new Set(entryBuffSetIdMap[r.entry.id] ?? [])
+            if (all) cur.add(col.id)
+            else cur.delete(col.id)
+            onSetEntryBuffSetIds(r.entry.id, [...cur])
         }
     }
 
-    /** @desc 单击行头：该行所有可应用 buff 全选/全取消（三态） */
-    function toggleRow(row: RowData) {
-        if (row.enabledBuffIds.length === 0) return
-        const cur = new Set(entryBuffSetIdMap[row.entry.id] ?? [])
-        const next = new Set(cur)
-        for (const id of row.enabledBuffIds) {
-            if (row.allSelected) next.delete(id)
-            else next.add(id)
+    /** @desc ── 行/列高亮（左键单击首列/表头触发，行列互斥；再点同目标取消，表格外点击清除）── */
+    let highlight = $state<{ gi: number; kind: 'row' | 'col'; index: number } | null>(null)
+
+    function clickRowHeader(gi: number, ri: number) {
+        highlight =
+            highlight && highlight.gi === gi && highlight.kind === 'row' && highlight.index === ri
+                ? null
+                : { gi, kind: 'row', index: ri }
+    }
+
+    function clickColHeader(gi: number, ci: number) {
+        highlight =
+            highlight && highlight.gi === gi && highlight.kind === 'col' && highlight.index === ci
+                ? null
+                : { gi, kind: 'col', index: ci }
+    }
+
+    /** @desc 首列/表头右键菜单（仿 layout/context-menu；items 在触发处构造闭包） */
+    let ctxMenu = $state<{ x: number; y: number; items: Array<{ label: string; action: () => void }> } | null>(null)
+
+    /** @desc 高亮行/列的背景色（由原单元格选中背景转移而来） */
+    const HIGHLIGHT_BG = 'color-mix(in srgb, var(--theme-accent-bg) 20%, transparent)'
+
+    function onRowHeaderContextMenu(e: MouseEvent, gi: number, ri: number) {
+        e.preventDefault()
+        const row = tableData[gi]?.rows[ri]
+        if (!row) return
+        ctxMenu = {
+            x: e.clientX,
+            y: e.clientY,
+            items: [
+                { label: '全选本行', action: () => selectRow(row, true) },
+                { label: '全不选本行', action: () => selectRow(row, false) }
+            ]
         }
-        onSetEntryBuffSetIds(row.entry.id, [...next])
+    }
+
+    function onColHeaderContextMenu(e: MouseEvent, gi: number, ci: number) {
+        e.preventDefault()
+        const group = tableData[gi]
+        if (!group) return
+        ctxMenu = {
+            x: e.clientX,
+            y: e.clientY,
+            items: [
+                { label: '全选本列', action: () => selectColumn(group, ci, true) },
+                { label: '全不选本列', action: () => selectColumn(group, ci, false) }
+            ]
+        }
     }
 
     /** @desc ── 框选批量生效/失效（拖拽矩形范围：范围内有已勾选 → 全部取消，否则全部勾选）── */
@@ -299,7 +353,7 @@
         unregisterDragCancel?.()
     })
 
-    /** @desc mousedown：记录框选起点单元格（仅左键） */
+    /** @desc mousedown：记录框选起点单元格（仅左键）；起点为 folder 列时进入层级框选模式 */
     function handleMouseDown(e: MouseEvent) {
         if (e.button !== 0) return
         const td = (e.target as HTMLElement).closest<HTMLElement>('td[data-row][data-col]')
@@ -467,8 +521,9 @@
             for (const tbl of tables) {
                 const g = Number(tbl.dataset.groupTable)
                 let w = 0
-                // 排除填充列（data-fill-th）——否则其吸收剩余空间后的宽度计入测量，造成「加填充列→测出等宽→移除填充列」震荡
-                tbl.querySelectorAll<HTMLElement>('thead th:not([data-fill-th])').forEach((th) => {
+                // 排除填充列（data-fill-th）——否则其吸收剩余空间后的宽度计入测量，造成「加填充列→测出等宽→移除填充列」震荡；
+                // 两级表头只测列名行（最后一行），避免组名行 colspan 重复计数
+                tbl.querySelectorAll<HTMLElement>('thead tr:last-child th:not([data-fill-th])').forEach((th) => {
                     w += th.getBoundingClientRect().width
                 })
                 w += tbl.offsetWidth - tbl.clientWidth
@@ -488,10 +543,14 @@
     })
 </script>
 
-<!-- @desc 窗口级事件：鼠标移动/松开（框选）、方向键滚动、快捷键切换默认滚动轴（输入框/文本域内不拦截） -->
+<!-- @desc 窗口级事件：鼠标移动/松开（框选）、方向键滚动、快捷键切换默认滚动轴（输入框/文本域内不拦截）、表格外点击清除高亮 -->
 <svelte:window
     onmousemove={handleMouseMove}
     onmouseup={handleMouseUp}
+    onclick={(e) => {
+        const t = e.target as HTMLElement
+        if (rootEl && !rootEl.contains(t)) highlight = null
+    }}
     onkeydown={(e) => {
         // 方向键滚动界面（输入框内不拦截）
         const el = e.target as HTMLElement
@@ -546,6 +605,7 @@
     <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（组内等宽） -->
     {#each tableData as group, gi}
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
+        {@const hasFolder = group.visibleColIdx.some((ci) => folderGroupOf.has(columns[ci].id))}
         <div class="mb-6">
             <div>
                 <!-- 表格主体底色不透明（单元格区域保持透明）；上/右/下 = 昼夜色双实线（随明暗主题），右上/右下圆角；左 = 常规分隔线 -->
@@ -586,100 +646,169 @@
                             </div>
                         {/if}
                     </caption>
-                    <!-- 表头：左列=条目（吸顶），后续=可见 buff 列（列头带三态勾选），最窄表补填充列 -->
+                    <!-- 表头（两级，仅含叠层组时）：第一行=叠层组名行（跨列合并，普通列占位）；第二行=列名行（folder 子列显示层数数字，普通列显示略名换行），吸顶 -->
+                    <!-- 分割线规则：每个 th 的右边界按「本列（或本组尾列）vs 右邻可见列」判断，两行同间隙一致 -->
                     <thead>
-                        <tr>
-                            <th
-                                class="sticky left-0 top-0 z-40 w-52 min-w-52 px-2 py-1.5 text-left font-medium text-(--theme-modal-text)/50 border-r"
-                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
-                            >
-                                条目
-                            </th>
-                            {#each group.visibleColIdx as ci, colPos}
-                                {@const col = columns[ci]}
-                                {@const stat = group.colStats[ci]}
-                                {@const allSelected = stat.selected > 0 && stat.selected === stat.enabled}
-                                {@const partial = stat.selected > 0 && !allSelected}
+                        {#if hasFolder}
+                            <tr>
                                 <th
-                                    class="sticky top-0 z-30 p-0 align-top border-b"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
-                                        col.id,
+                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-medium text-(--theme-modal-text)/50"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
+                                    rowspan="2"
+                                >
+                                    条目
+                                </th>
+                                {#each group.visibleColIdx as ci, colPos}
+                                    {@const bs = columns[ci]}
+                                    {@const grp = folderGroupOf.get(bs.id)}
+                                    {#if grp}
+                                        {@const groupCis = group.visibleColIdx.filter(
+                                            (x) => folderGroupOf.get(columns[x].id)?.key === grp.key
+                                        )}
+                                        {#if groupCis[0] === ci}
+                                            {@const tailCi = groupCis[groupCis.length - 1]}
+                                            {@const tailPos = group.visibleColIdx.indexOf(tailCi)}
+                                            {@const nextId =
+                                                tailPos + 1 < group.visibleColIdx.length
+                                                    ? columns[group.visibleColIdx[tailPos + 1]]?.id
+                                                    : undefined}
+                                            <th
+                                                colspan={groupCis.length}
+                                                class="sticky top-0 z-30 h-6 p-0 text-center"
+                                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                                    columns[tailCi].id,
+                                                    nextId
+                                                )}"
+                                            >
+                                                <span
+                                                    class="block truncate px-1 text-[10px] font-semibold text-(--theme-modal-text)/70"
+                                                    title={grp.prefix}>{grp.prefix}</span
+                                                >
+                                            </th>
+                                        {/if}
+                                    {:else}
+                                        {@const nextId =
+                                            colPos + 1 < group.visibleColIdx.length
+                                                ? columns[group.visibleColIdx[colPos + 1]]?.id
+                                                : undefined}
+                                        <th
+                                            class="sticky top-0 z-30 h-6 p-0"
+                                            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                                bs.id,
+                                                nextId
+                                            )}"
+                                        ></th>
+                                    {/if}
+                                {/each}
+                                {#if groupTableWidths[gi] < maxTableWidth}
+                                    <th
+                                        data-fill-th
+                                        class="sticky top-0 z-30 h-6 p-0"
+                                        style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
+                                    ></th>
+                                {/if}
+                            </tr>
+                        {/if}
+                        <tr>
+                            {#each group.visibleColIdx as ci, colPos}
+                                {@const bs = columns[ci]}
+                                {@const stat = group.colStats[ci]}
+                                {@const grp = folderGroupOf.get(bs.id)}
+                                {@const layerNum = grp ? (bs.name.match(LAYERED_BUFF_PATTERN)?.[2] ?? '') : ''}
+                                {@const colHighlighted =
+                                    highlight?.gi === gi && highlight.kind === 'col' && highlight.index === ci}
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <th
+                                    class="sticky {hasFolder
+                                        ? 'top-6'
+                                        : 'top-0'} z-30 cursor-pointer select-none p-0 align-top border-b {grp
+                                        ? 'w-8 min-w-8'
+                                        : ''}"
+                                    style="border-color: var(--theme-divider-border); background: {colHighlighted
+                                        ? HIGHLIGHT_BG
+                                        : 'color-mix(in srgb, var(--theme-modal-bg) 92%, transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                        bs.id,
                                         colPos + 1 < group.visibleColIdx.length
                                             ? columns[group.visibleColIdx[colPos + 1]]?.id
                                             : undefined
-                                    )}"
+                                    )}{colHighlighted ? ' box-shadow: inset 0 -2px 0 var(--theme-accent-bg);' : ''}"
+                                    title={`${bs.name}${stat.enabled > 0 ? `（${stat.selected}/${stat.enabled}）` : '（无可应用条目）'}：单击高亮列，右键全选/全不选`}
+                                    onclick={() => clickColHeader(gi, ci)}
+                                    oncontextmenu={(e) => onColHeaderContextMenu(e, gi, ci)}
                                 >
-                                    <button
-                                        onclick={() => toggleColumn(group, ci)}
-                                        title={`${col.name}${stat.enabled > 0 ? `（${stat.selected}/${stat.enabled}）` : '（无可应用条目）'}`}
-                                        class="flex h-full w-full flex-col items-center justify-center gap-1 px-1 pt-1 pb-1.5 transition-colors hover:bg-(--theme-modal-text)/5 disabled:opacity-30"
-                                        disabled={stat.enabled === 0}
+                                    <span
+                                        class="flex h-full w-full flex-col items-center justify-center gap-1 px-1 pt-1 pb-1.5 transition-colors hover:bg-(--theme-modal-text)/5 {stat.enabled ===
+                                        0
+                                            ? 'opacity-30'
+                                            : ''}"
                                     >
-                                        <span
-                                            class="line-clamp-3 w-max max-w-40 text-center text-[10px] leading-4 text-(--theme-modal-text)/60"
-                                            title={col.name}>{col.name}</span
-                                        >
-                                        <span
-                                            class="flex size-3.5 shrink-0 items-center justify-center rounded-sm border text-[10px] leading-none"
-                                            style={allSelected
-                                                ? 'background: var(--theme-accent-bg); border-color: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
-                                                : partial
-                                                  ? 'background: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 60%, transparent); color: var(--theme-accent-text);'
-                                                  : 'border-color: var(--theme-divider-border);'}
-                                        >
-                                            {allSelected ? '✓' : partial ? '—' : ''}
-                                        </span>
-                                    </button>
+                                        {#if grp}
+                                            <span
+                                                class="text-[11px] font-bold leading-none tabular-nums"
+                                                style="color: var(--theme-modal-text)/70;"
+                                                title={bs.name}>{layerNum}</span
+                                            >
+                                        {:else}
+                                            <span
+                                                class="line-clamp-2 w-max max-w-24 break-words text-center text-[10px] leading-3 text-(--theme-modal-text)/60"
+                                                title={bs.name}>{bs.name}</span
+                                            >
+                                        {/if}
+                                    </span>
                                 </th>
                             {/each}
                             {#if groupTableWidths[gi] < maxTableWidth}
-                                <!-- 填充列：表格不足最宽时在末列后补一列，吸收剩余空间（width: 100%） -->
                                 <th
                                     data-fill-th
-                                    class="sticky top-0 z-30 p-0 border-b"
+                                    class="sticky {hasFolder ? 'top-6' : 'top-0'} z-30 p-0 border-b"
                                     style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
                                 ></th>
                             {/if}
                         </tr>
                     </thead>
-                    <!-- 表体：每行一个伤害条目（行头三态 + 伤害类型编辑），单元格可勾选 -->
+                    <!-- 表体：每行一个伤害条目（行头单击高亮行/右键全选全不选 + 伤害类型编辑），单元格可勾选 -->
                     <tbody>
                         {#each group.rows as row, ri}
+                            {@const rowHighlighted =
+                                highlight?.gi === gi && highlight.kind === 'row' && highlight.index === ri}
+                            {@const rowHighlightActive = highlight?.gi === gi && highlight.kind === 'row'}
+                            {@const colHighlightActive = highlight?.gi === gi && highlight.kind === 'col'}
                             <tr
                                 class:split-row={row.splitBefore}
-                                class="border-b"
-                                style="border-bottom: 1px dashed var(--theme-divider-border);"
+                                class="border-b {rowHighlightActive && !rowHighlighted
+                                    ? 'opacity-40 transition-opacity'
+                                    : ''}"
+                                style="border-bottom: 1px dashed var(--theme-divider-border);{rowHighlightActive &&
+                                rowHighlighted
+                                    ? ` background: ${HIGHLIGHT_BG};`
+                                    : ''}"
                             >
                                 <td
-                                    class="sticky left-0 z-20 px-2 py-1 border-r"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
+                                    class="sticky left-0 z-20 cursor-pointer select-none px-2 py-1 border-r transition-colors"
+                                    style="border-color: var(--theme-divider-border); background: {rowHighlighted
+                                        ? HIGHLIGHT_BG
+                                        : 'color-mix(in srgb, var(--theme-modal-bg) 92%, transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;{rowHighlighted
+                                        ? ' box-shadow: inset 3px 0 0 var(--theme-accent-bg);'
+                                        : ''}"
+                                    title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${row.selectedCount}/${row.enabledBuffIds.length}）`}
+                                    onclick={() => clickRowHeader(gi, ri)}
+                                    oncontextmenu={(e) => onRowHeaderContextMenu(e, gi, ri)}
                                 >
-                                    <button
-                                        onclick={() => toggleRow(row)}
-                                        title={row.enabledBuffIds.length > 0
-                                            ? `${row.selectedCount}/${row.enabledBuffIds.length}`
-                                            : '无可应用增益'}
-                                        class="flex w-full items-center gap-1.5 py-0.5 text-left transition-colors hover:bg-(--theme-modal-text)/5 disabled:opacity-30"
-                                        disabled={row.enabledBuffIds.length === 0}
+                                    <div
+                                        class="flex w-full items-center gap-1.5 py-0.5 text-left transition-colors hover:bg-(--theme-modal-text)/5"
                                     >
-                                        <span
-                                            class="flex size-3.5 shrink-0 items-center justify-center rounded-sm border text-[10px] leading-none"
-                                            style={row.allSelected
-                                                ? 'background: var(--theme-accent-bg); border-color: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
-                                                : row.partial
-                                                  ? 'background: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 60%, transparent); color: var(--theme-accent-text);'
-                                                  : 'border-color: var(--theme-divider-border);'}
-                                        >
-                                            {row.allSelected ? '✓' : row.partial ? '—' : ''}
-                                        </span>
                                         <span
                                             class="truncate text-(--theme-modal-text)"
                                             style="color: var(--theme-element-{row.entry.damageElement}, #888);"
-                                            title={row.entry.displayName}>{row.entry.displayName}</span
+                                            >{row.entry.displayName}</span
                                         >
-                                    </button>
-                                    <!-- 视为：伤害类型（可切换 编辑 / 仅查看） -->
-                                    <div class="flex flex-wrap gap-0.5 px-0.5 pb-0.5">
+                                    </div>
+                                    <!-- 视为：伤害类型（可切换 编辑 / 仅查看）；stopPropagation 避免触发行高亮 -->
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <div
+                                        class="flex flex-wrap gap-0.5 px-0.5 pb-0.5"
+                                        onclick={(e) => e.stopPropagation()}
+                                    >
                                         {#if getDamageTypeEditMode()}
                                             {#each DAMAGE_TYPES as dt}
                                                 {@const selected = (entryDamageTypeMap[row.entry.id] ?? []).includes(
@@ -729,14 +858,22 @@
                                 </td>
                                 {#each group.visibleColIdx as ci, colPos}
                                     {@const cell = row.cells[ci]}
+                                    {@const bs = columns[ci]}
+                                    {@const colHighlighted =
+                                        highlight?.gi === gi && highlight.kind === 'col' && highlight.index === ci}
+                                    {@const cellInHighlight =
+                                        (rowHighlightActive && highlight?.index === ri) ||
+                                        (colHighlightActive && highlight?.index === ci)}
                                     <td
-                                        class="min-w-9 p-0 text-center"
-                                        style={colBorderStyle(
-                                            cell.buffId,
+                                        class="min-w-9 p-0 text-center {colHighlightActive && !colHighlighted
+                                            ? 'opacity-40 transition-opacity'
+                                            : ''}"
+                                        style="{colBorderStyle(
+                                            bs.id,
                                             colPos + 1 < group.visibleColIdx.length
                                                 ? columns[group.visibleColIdx[colPos + 1]]?.id
                                                 : undefined
-                                        )}
+                                        )}{colHighlightActive && colHighlighted ? ` background: ${HIGHLIGHT_BG};` : ''}"
                                         data-group={gi}
                                         data-row={ri}
                                         data-col={ci}
@@ -745,20 +882,22 @@
                                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                                             <button
                                                 onclick={() => toggleCell(row, cell)}
-                                                title={cell.selected
-                                                    ? `取消勾选：${columns[ci]?.name}`
-                                                    : `勾选：${columns[ci]?.name}`}
+                                                title={cell.selected ? `取消勾选：${bs.name}` : `勾选：${bs.name}`}
                                                 class="flex min-h-6 w-full items-center justify-center px-1 py-1 transition-colors hover:bg-(--theme-modal-text)/10"
-                                                style={cell.selected
-                                                    ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent);'
-                                                    : ''}
                                             >
                                                 {#if cell.selected}
-                                                    <span
-                                                        class="line-clamp-2 text-[10px] leading-tight"
-                                                        style="color: var(--theme-accent-text);"
-                                                        >{columns[ci]?.name}</span
-                                                    >
+                                                    {#if cellInHighlight}
+                                                        <span
+                                                            class="line-clamp-2 text-[10px] leading-tight"
+                                                            style="color: var(--theme-accent-text);">{bs.name}</span
+                                                        >
+                                                    {:else}
+                                                        <Icon
+                                                            icon="mdi:check"
+                                                            class="size-3.5 shrink-0"
+                                                            style="color: var(--theme-accent-text);"
+                                                        />
+                                                    {/if}
                                                 {/if}
                                             </button>
                                         {:else}
@@ -783,11 +922,16 @@
     {/each}
 </div>
 
+<!-- @desc 首列/表头右键菜单：全选/全不选（行或列） -->
+{#if ctxMenu}
+    <ContextMenu open x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onclose={() => (ctxMenu = null)} />
+{/if}
+
 <!-- @desc 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） -->
 
 <style>
     /* 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） */
     .split-row td {
-        border-top: 2px dashed color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);
+        border-top: 2px dashed color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
     }
 </style>
