@@ -886,52 +886,60 @@ function emptyCharacterStats(): CharacterComputed {
 // ── effect damage ──
 
 function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy: ConfigState['enemy']): ResultEntry {
+    /** @desc
+     * ── 倍率：查表取效应倍率（EFFECT_TABLE[效应名][层数]，见 $lib/consts/effect-data.ts）──
+     * entry.ratioValue 即效应层数；burstLayers 仅电磁效应 > 0（其余效应为 0）
+     */
     const layers = Math.round(entry.ratioValue)
     const burstLayers = entry.burstLayers ?? 0
     const effectMult = getEffectMultiplier(entry.hitName, layers)
     const burstMult = getEffectBurstMultiplier(entry.hitName, burstLayers)
     const multiplier = (effectMult + burstMult) * (entry.hits || 1)
     const ratioNum = multiplier
+
+    /** @desc ── 加「额外倍率」乘区（buff 提供，效应伤害专属增益）── */
     const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
     const element = (NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? ''
 
+    /** @desc ── 基础值：效应伤害有独立基础值 3674，与角色攻击力无关（不吃攻击/暴击/增伤/面板类）── */
     const baseUnit = '效应系数'
     const baseValue = Math.round(EFFECT_BASE_VALUE * effectiveRatio)
 
-    // defense zone
+    /** @desc 防御区：独立乘算 (1-减防)×(1-穿防)（非加算），800+8×等级 减伤公式 */
     const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
 
-    // resistance zone
+    /** @desc 抗性区：分段公式（负抗减半收益 / 线性减免 / ≥80% 封顶，防止伤害归零） */
     const baseResist = (enemy.resistances[element] ?? 0) / 100
     const resMulti = computeResMulti(baseResist, stats.resPen, stats.resDown)
 
-    // damage reduction zone
+    /** @desc 免伤区：1 - 敌人免伤 - 穿免 */
     const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
 
-    // deepen zone
+    /** @desc 加深区：1 + 加深%（效应吃加深、不吃谐度增幅） */
     const deepen = 1 + stats.deepenDmg / 100
 
-    // vulnerability / dmg taken inc
-    const vulnerability = 1 + stats.dmgTakenInc / 100
-
-    // final dmg & custom mult
+    /** @desc 终伤区 & 特殊乘区：1 + 终伤%；自定义倍率（≠0 才生效） */
     const finalDmgDec = stats.finalDmg / 100
     const customMultVal = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
 
-    const totalPerHit =
-        baseValue * defMulti * resMulti * dmgRedMulti * deepen * vulnerability * (1 + finalDmgDec) * customMultVal
+    /** @desc ── 汇总：基础值 × 各乘区乘积 = 单段期望伤害（无易伤区，效应伤害不吃易伤）── */
+    const totalPerHit = baseValue * defMulti * resMulti * dmgRedMulti * deepen * (1 + finalDmgDec) * customMultVal
     const expectedPerHit = Math.round(totalPerHit)
 
+    /** @desc 乘区明细（供结果页展示乘区分解） */
     const multZones: MultiplierZone[] = [
         { label: '加深区', value: deepen, detail: `(1 + ${stats.deepenDmg.toFixed(1)}%)` },
         { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
         { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
         { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
-        { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
         { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
         { label: '特殊乘区', value: customMultVal, detail: customMultVal.toFixed(4) }
     ]
 
+    /** @desc
+     * ── 输出 ResultEntry：效应伤害不能暴击（canCrit: false）、无伤害类型（damageTypes: []）、
+     * 面板类字段（攻击/双暴等）恒为 0，基础值来自独立常量 EFFECT_BASE_VALUE ──
+     */
     return {
         id: entry.id,
         character: entry.character ?? '',
@@ -945,14 +953,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         baseValue,
         baseUnit,
         totalMultiplier:
-            effectiveRatio *
-            defMulti *
-            resMulti *
-            dmgRedMulti *
-            deepen *
-            vulnerability *
-            (1 + finalDmgDec) *
-            customMultVal,
+            effectiveRatio * defMulti * resMulti * dmgRedMulti * deepen * (1 + finalDmgDec) * customMultVal,
         baseAtk: EFFECT_BASE_VALUE,
         totalAtk: 0,
         atkPctSum: 0,
@@ -978,7 +979,7 @@ function computeEffectEntry(entry: DamageEntry, stats: CharacterComputed, enemy:
         finalTuneBreakZone: 0,
         customMult: customMultVal,
         extraRatio: stats.extraRatio,
-        vulnerability: stats.dmgTakenInc,
+        vulnerability: 0,
         totalDamageRaw: totalPerHit,
         rawPerHit: expectedPerHit,
         expectedPerHit,

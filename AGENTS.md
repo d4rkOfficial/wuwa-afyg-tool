@@ -6,6 +6,7 @@
 - 优先使用箭头函数（`const fn = () => { ... }`），非 `function` 声明
     - 例外：事件处理函数（`onWindowMouseDown` 等）、SvelteKit 要求的 `load`/`actions` 函数可以保留 `function` 声明
 - 优先flex布局
+- 注释使用/** @desc [markdown] */形式
 
 ## 2. 页面逻辑分离
 
