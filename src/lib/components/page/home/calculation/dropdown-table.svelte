@@ -370,7 +370,7 @@
     }
 </script>
 
-/** @desc 全局快捷键：展开下一条 / 复制伤害类型到下段直伤 / 复制前段/后段直伤 / 清除所有增益（输入框/按钮内不拦截） */
+<!-- @desc 全局快捷键：展开下一条 / 复制伤害类型到下段直伤 / 复制前段/后段直伤 / 清除所有增益（输入框/按钮内不拦截） -->
 <svelte:window
     onkeydown={(e) => {
         const el = e.target as HTMLElement
@@ -403,7 +403,7 @@
     }}
 />
 
-/** @desc 表格容器：Ctrl+滚轮横向滚动，背景为弹窗底色 */
+<!-- @desc 表格容器：Ctrl+滚轮横向滚动，背景为弹窗底色 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="theme-scrollbar h-full overflow-auto pb-48"
@@ -792,7 +792,7 @@
             {/each}
         </tbody>
     </table>
-    /** @desc 无条目时的占位提示 */
+    <!-- @desc 无条目时的占位提示 -->
     {#if damageEntries.length === 0}
         <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {/if}

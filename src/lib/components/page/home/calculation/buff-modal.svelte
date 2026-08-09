@@ -706,7 +706,7 @@
     let teamNames = $derived(team.map((s) => s.character ?? '?'))
 </script>
 
-/** @desc BUFF 配置弹窗根容器：遮罩 + 主卡片（标题栏/左侧列表/右侧编辑器/底部保存） */
+<!-- @desc BUFF 配置弹窗根容器：遮罩 + 主卡片（标题栏/左侧列表/右侧编辑器/底部保存） -->
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -721,7 +721,7 @@
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
-            /** @desc 标题栏：BUFF 配置 + 导入Buff集/速查入口 */
+            <!-- @desc 标题栏：BUFF 配置 + 导入Buff集/速查入口 -->
             <div
                 class="flex items-center justify-between px-5 py-3 border-b"
                 style="border-bottom: 1px solid var(--theme-divider-border);"
@@ -751,8 +751,8 @@
                     class="shrink-0 border-r flex flex-col"
                     style="width: {leftWidth}px; border-right: 1px solid var(--theme-divider-border);"
                 >
-                    /** @desc 左侧列表：叠层文件夹（可折叠/整体拖拽）+ 独立 buff
-                    块（可拖拽/拖出删除），插入位置显示指示条 */
+                    <!-- @desc 左侧列表：叠层文件夹（可折叠/整体拖拽）+ 独立 buff
+                    块（可拖拽/拖出删除），插入位置显示指示条 -->
                     <div class="theme-scrollbar flex-1 overflow-y-auto p-2 space-y-1 buff-list-container">
                         {#each groupedBuffSets as item (item.key)}
                             {#if item.type === 'folder'}
@@ -957,7 +957,7 @@
                             <div class="text-xs text-(--theme-modal-text)/30 text-center py-4">暂无 BUFF 块</div>
                         {/if}
                     </div>
-                    /** @desc 底部新建栏：输入名称 + 新建按钮 */
+                    <!-- @desc 底部新建栏：输入名称 + 新建按钮 -->
                     <div class="shrink-0 border-t p-2" style="border-top: 1px solid var(--theme-divider-border);">
                         <div class="flex gap-1">
                             <input
@@ -978,7 +978,7 @@
                         </div>
                     </div>
                 </div>
-                /** @desc 左栏宽度调节把手 */
+                <!-- @desc 左栏宽度调节把手 -->
                 <div
                     class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-(--theme-accent-bg)/50"
                     style="background: var(--theme-divider-border);"
@@ -991,7 +991,7 @@
                     {#if selectedBuffSet}
                         {@const isGlobal = globalBuffSetIds.includes(selectedBuffSet.id)}
                         {@const isDefaultGlobal = selectedBuffSet.id.startsWith('global-')}
-                        /** @desc 选中块头部：收藏/重命名（双击编辑）/复制/并入全局/移出全局/删除（全局块锁定只读） */
+                        <!-- @desc 选中块头部：收藏/重命名（双击编辑）/复制/并入全局/移出全局/删除（全局块锁定只读） -->
                         <!-- Buff name header -->
                         <div
                             class="shrink-0 px-3 py-2.5 border-b flex items-center gap-2"
@@ -1076,7 +1076,7 @@
                             {/if}
                         </div>
 
-                        /** @desc 作用域区：角色头像勾选（可吃到的角色）+ 效应专属切换（全局块锁定） */
+                        <!-- @desc 作用域区：角色头像勾选（可吃到的角色）+ 效应专属切换（全局块锁定） -->
                         <!-- Character scope -->
                         <div
                             class="shrink-0 px-3 pt-3 pb-2.5 border-b"
@@ -1159,7 +1159,7 @@
                             </div>
                         </div>
 
-                        /** @desc 生效条件区：折叠面板内配置 共鸣链/精炼/参考角色/伤害属性/伤害类型 */
+                        <!-- @desc 生效条件区：折叠面板内配置 共鸣链/精炼/参考角色/伤害属性/伤害类型 -->
                         <!-- 生效条件 -->
                         <div class="shrink-0 border-b" style="border-bottom: 1px solid var(--theme-divider-border);">
                             <button
@@ -1336,7 +1336,7 @@
                             {/if}
                         </div>
 
-                        /** @desc 乘区列表：已配置乘区的数值输入/引用展示/追加覆盖切换/引用配置入口 */
+                        <!-- @desc 乘区列表：已配置乘区的数值输入/引用展示/追加覆盖切换/引用配置入口 -->
                         <!-- Zone list -->
                         <div class="theme-scrollbar flex-1 overflow-y-auto p-3 space-y-1">
                             {#each selectedBuffSet.zones as zone}
@@ -1445,7 +1445,7 @@
                         </div>
                     {/if}
                 </div>
-                /** @desc 右栏乘区清单：全部可配置乘区，点击加入/移出当前 Buff */
+                <!-- @desc 右栏乘区清单：全部可配置乘区，点击加入/移出当前 Buff -->
                 {#if selectedBuffSet}
                     <div
                         class="w-52 shrink-0 border-l flex flex-col"
@@ -1483,7 +1483,7 @@
                 {/if}
             </div>
 
-            /** @desc 底部：保存并关闭按钮 */
+            <!-- @desc 底部：保存并关闭按钮 -->
             <div
                 class="flex items-center justify-end gap-2 border-t px-5 py-3"
                 style="border-top: 1px solid var(--theme-divider-border);"
@@ -1501,7 +1501,7 @@
     </div>
 {/if}
 
-/** @desc 引用配置弹窗：选择引用角色/属性、阈值与换算规则（线性/离散、除乘）、上下限 clamp */
+<!-- @desc 引用配置弹窗：选择引用角色/属性、阈值与换算规则（线性/离散、除乘）、上下限 clamp -->
 {#if showRefModal}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -1820,7 +1820,7 @@
     </div>
 {/if}
 
-/** @desc 删除文件夹确认弹窗 */
+<!-- @desc 删除文件夹确认弹窗 -->
 {#if showDeleteFolderConfirm}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -1855,7 +1855,7 @@
     </div>
 {/if}
 
-/** @desc 复制命名选项弹窗（buff 名带数字时的递增命名选择） */
+<!-- @desc 复制命名选项弹窗（buff 名带数字时的递增命名选择） -->
 {#if showCopyOptions}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -1893,7 +1893,7 @@
     </div>
 {/if}
 
-/** @desc 速查弹窗（新建 BUFF 场景：创建Buff入口）与引用速查（只读），以及 Buff 导入弹窗 */
+<!-- @desc 速查弹窗（新建 BUFF 场景：创建Buff入口）与引用速查（只读），以及 Buff 导入弹窗 -->
 <QuickLookup
     open={showLookup}
     {team}

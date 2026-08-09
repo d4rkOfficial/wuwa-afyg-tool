@@ -488,7 +488,7 @@
     })
 </script>
 
-/** @desc 窗口级事件：鼠标移动/松开（框选）、方向键滚动、快捷键切换默认滚动轴（输入框/文本域内不拦截） */
+<!-- @desc 窗口级事件：鼠标移动/松开（框选）、方向键滚动、快捷键切换默认滚动轴（输入框/文本域内不拦截） -->
 <svelte:window
     onmousemove={handleMouseMove}
     onmouseup={handleMouseUp}
@@ -506,7 +506,7 @@
     }}
 />
 
-/** @desc 表格根容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 */
+<!-- @desc 表格根容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="theme-scrollbar h-full overflow-auto pb-48"
@@ -543,7 +543,7 @@
     {#if damageEntries.length === 0}
         <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {/if}
-    /** @desc 逐组渲染：每个角色×直伤/非直伤一个子表（组内等宽） */
+    <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（组内等宽） -->
     {#each tableData as group, gi}
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
         <div class="mb-6">
@@ -783,7 +783,7 @@
     {/each}
 </div>
 
-/** @desc 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） */
+<!-- @desc 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） -->
 
 <style>
     /* 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） */

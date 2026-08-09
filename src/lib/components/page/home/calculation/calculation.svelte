@@ -86,10 +86,10 @@
     }
 </script>
 
-/** @desc Buff 配置弹窗（挂载于页面顶层，open 由 store 控制） */
+<!-- @desc Buff 配置弹窗（挂载于页面顶层，open 由 store 控制） -->
 <BuffModal open={showBuffModal} {team} onclose={handleCloseBuffModal} />
 
-/** @desc 视图切换：spread → 铺开表（传绑定映射/条件配置/回调用）；否则 → 下拉表（多传 buffDiffMode 差异模式） */
+<!-- @desc 视图切换：spread → 铺开表（传绑定映射/条件配置/回调用）；否则 → 下拉表（多传 buffDiffMode 差异模式） -->
 {#if calcViewMode === 'spread'}
     <SpreadTable
         {team}
