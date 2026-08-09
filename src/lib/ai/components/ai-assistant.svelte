@@ -91,8 +91,6 @@
     function stopDrag() {
         if (!dragging) return
         dragging = false
-        // 不写 localStorage：卡片拖动不改按钮记忆位置（按钮位置仅由 btnUp / 收起分支维护，
-        // 避免未收起就刷新时恢复出卡片位置）
     }
 
     // 收起态圆钮拖动（共用 dragPos；拖动后不触发展开）
@@ -126,7 +124,6 @@
 
     function btnUp() {
         btnDrag = false
-        if (btnMoved && dragPos) saveBtnPos(dragPos)
     }
 
     function btnClick() {
@@ -193,12 +190,10 @@
         const centerX = curLeft + pw / 2
         const centerY = curTop + ph / 2
         if (!wasCollapsed) {
-            // 展开：以按钮为中心向四周展开（新卡片中心 = 按钮中心），钳制到视口；
-            // 不写 localStorage——记忆位置始终是按钮位置（避免未收起就刷新时恢复出卡片位置）
+            // 展开：以按钮为中心向四周展开（新卡片中心 = 按钮中心），钳制到视口
             dragPos = clampToViewport({ x: centerX - w / 2, y: centerY - h / 2 }, w, h)
         } else if (e) {
-            // 收起：按钮中心对齐双击时的鼠标位置，钳制到视口；
-            // 不持久化——收起位置是临时行为，localStorage 记忆位置保持按钮拖动设置的值
+            // 收起：按钮中心对齐双击时的鼠标位置，钳制到视口（不持久化，位置为本次会话临时状态）
             dragPos = clampToViewport({ x: e.clientX - 24, y: e.clientY - 24 }, 48, 48)
         }
         // 位置与尺寸走同步过渡（视觉上向四周展开 / 向中心收起）
@@ -208,7 +203,6 @@
             collapsing = false
             collapsingTimer = null
         }, 420)
-        if (typeof localStorage !== 'undefined') localStorage.setItem('ai-assistant-open', size)
     }
 
     // 小卡片 ↔ 全尺寸卡片切换
@@ -221,7 +215,6 @@
             if (clamped && (clamped.x !== dragPos.x || clamped.y !== dragPos.y)) dragPos = clamped
             else if (!clamped) dragPos = null
         }
-        if (typeof localStorage !== 'undefined') localStorage.setItem('ai-assistant-open', size)
     }
 
     function clearConversation() {
@@ -400,33 +393,6 @@
         window.addEventListener('resize', update)
         return () => window.removeEventListener('resize', update)
     })
-
-    // 恢复记忆位置（仅接受带版本标记 v=2 的按钮位置，按按钮形态 48px 钳制；
-    // 旧版无版本标记的脏数据（曾写入展开卡片位置）一律清除回默认右下角）
-    const POS_KEY_V = 2
-
-    function saveBtnPos(pos: { x: number; y: number } | null) {
-        if (typeof localStorage === 'undefined') return
-        if (pos) localStorage.setItem('ai-assistant-pos', JSON.stringify({ v: POS_KEY_V, x: pos.x, y: pos.y }))
-        else localStorage.removeItem('ai-assistant-pos')
-    }
-
-    if (typeof localStorage !== 'undefined') {
-        try {
-            const saved = localStorage.getItem('ai-assistant-pos')
-            if (saved) {
-                const parsed = JSON.parse(saved) as { v?: number; x: number; y: number }
-                if (parsed.v === POS_KEY_V && Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) {
-                    dragPos = clampToViewport({ x: parsed.x, y: parsed.y }, 48, 48)
-                } else {
-                    // 旧版无版本标记的位置数据（可能是展开卡片位置）：清除，回默认右下角
-                    localStorage.removeItem('ai-assistant-pos')
-                }
-            }
-        } catch {
-            /* ignore */
-        }
-    }
 
     // 挂载时从本地库恢复持久化的 AI 配置（悬浮窗直接使用场景也生效）
     onMount(() => {
