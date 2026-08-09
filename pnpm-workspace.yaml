@@ -1,5 +1,9 @@
 packages:
     - '.'
+allowBuilds:
+    esbuild: true
+    workerd: true
 onlyBuiltDependencies:
     - '@tailwindcss/oxide'
     - esbuild
+    - workerd
