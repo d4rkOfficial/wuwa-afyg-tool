@@ -87,7 +87,8 @@ function makeSkillValues(
         let energy: string | undefined
         let tune: string | undefined
         const damage = skill.damage
-        if (damage) {
+        // 空伤害字典（纯增益技能）不参与倍率匹配/元素兜底
+        if (damage && Object.keys(damage).length > 0) {
             const mRaw = raw.match(/^([\d.]+)%(?:\*(\d+))?/)
             const pct = mRaw ? parseFloat(mRaw[1]) : NaN
             const mult = mRaw && mRaw[2] ? parseInt(mRaw[2], 10) : 1
@@ -244,19 +245,26 @@ function preprocessSkills(skills: SkillEntry[], elementName: string) {
                 const m = name.match(/^第(\d+)段(伤害)?$/)
                 if (m) v[0] = `常态攻击第${m[1]}段伤害`
             }
-            if (skill.type === '延奏技能' && !v[2] && elementName) v[2] = elementName
+            // 补元素仅限含 % 的倍率条目，避免把纯增益参数误标成伤害
+            if (skill.type === '延奏技能' && !v[2] && elementName && /%/.test(v[1])) v[2] = elementName
+        }
+        // 上游无伤害数据（damage 为空）的纯增益延奏：不推断倍率，直接跳过
+        if (skill.type === '延奏技能' && elementName && Object.keys(skill.damage ?? {}).length === 0) {
+            continue
         }
         if (skill.type === '延奏技能' && elementName) {
             const hasElement = skill.values.some(([, , el]) => el)
             if (!hasElement) {
-                const causeIdx = skill.desc.indexOf('造成')
-                const dmgIdx = skill.desc.indexOf('伤害', causeIdx + 1)
+                // desc 已在 transform 阶段 strip 标签并 interpolate 参数；正则锚定 %（<te href=NNN> 的 ID 不会被误当倍率）
+                const plain = skill.desc
+                const causeIdx = plain.indexOf('造成')
+                const dmgIdx = plain.indexOf('伤害', causeIdx + 1)
                 if (causeIdx >= 0 && dmgIdx > causeIdx) {
-                    const between = skill.desc.slice(causeIdx + 2, dmgIdx)
-                    const ratioMatch = between.match(/[\d+%.]+/)
+                    const between = plain.slice(causeIdx + 2, dmgIdx)
+                    const ratioMatch = between.match(/([\d.]+%)(?:\*(\d+))?/)
                     if (ratioMatch) {
-                        const ratioPart = ratioMatch[0]
-                        const after = between.slice(ratioMatch.index! + ratioPart.length)
+                        const ratioPart = ratioMatch[1]
+                        const after = between.slice(ratioMatch.index! + ratioMatch[0].length)
                         const unitMatch = after.match(/^(攻击|生命|防御|偏谐系数)/)
                         const unit = unitMatch ? unitMatch[1] : ''
                         const finalValue = ratioPart + (unit === '攻击' ? '' : unit)
@@ -313,14 +321,16 @@ export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
                 name: s.name ?? '',
                 type: st as SkillEntry['type'],
                 desc: strip(interpolate(s.desc ?? '', s.param ?? [])),
-                values: makeSkillValues(s)
+                values: makeSkillValues(s),
+                damage: s.damage
             })
         } else if (nt === 3 && (st === '延奏技能' || st === '谐度破坏')) {
             skills.push({
                 name: s.name ?? '',
                 type: st as SkillEntry['type'],
                 desc: strip(interpolate(s.desc ?? '', s.param ?? [])),
-                values: makeSkillValues(s)
+                values: makeSkillValues(s),
+                damage: s.damage
             })
         } else {
             const sd = s.desc ?? ''
@@ -389,15 +399,17 @@ export function transformCharacterInfoRich(data: ZhCharacterDetail): CharacterIn
             skills.push({
                 name: s.name ?? '',
                 type: st as SkillEntry['type'],
-                desc: interpolate(s.desc ?? '', s.param ?? []),
-                values: makeSkillValues(s)
+                desc: strip(interpolate(s.desc ?? '', s.param ?? [])),
+                values: makeSkillValues(s),
+                damage: s.damage
             })
         } else if (nt === 3 && (st === '延奏技能' || st === '谐度破坏')) {
             skills.push({
                 name: s.name ?? '',
                 type: st as SkillEntry['type'],
-                desc: interpolate(s.desc ?? '', s.param ?? []),
-                values: makeSkillValues(s)
+                desc: strip(interpolate(s.desc ?? '', s.param ?? [])),
+                values: makeSkillValues(s),
+                damage: s.damage
             })
         } else {
             const sd = s.desc ?? ''

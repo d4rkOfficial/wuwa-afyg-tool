@@ -66,6 +66,8 @@ export interface SkillEntry {
     // [name, value, element, energy, tune]：energy=共鸣能量；tune=偏谐值。
     // 段内多 hit 时以 'a+b' 连接（每个分量已 /100）
     values: [name: string, value: string, element: string, energy?: string, tune?: string][]
+    // 上游伤害字典（rate_lv/energy/weakness_lvl 等）；延奏倍率推断只对非空字典生效
+    damage?: Record<string, unknown>
 }
 
 export interface StatNode {
