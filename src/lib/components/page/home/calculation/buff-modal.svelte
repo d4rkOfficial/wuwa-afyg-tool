@@ -1,4 +1,5 @@
 <script lang="ts">
+    /** @desc BUFF 配置弹窗：左侧 Buff 块列表（叠层文件夹/拖拽排序/拖出删除）、右侧块编辑器（作用域/生效条件/乘区数值与引用/追加覆盖）、右栏乘区清单，含速查与导入入口 */
     import {
         getAllBuffSets,
         createBuffSet,
@@ -53,6 +54,7 @@
     let showRefLookup = $state(false)
     let showImport = $state(false)
 
+    /** @desc 挂载时注册 AI 面板「导入 Buff 集」与拖拽禁区回调（进入 AI 悬浮窗时取消拖拽） */
     onMount(() => {
         registerPanel(
             'buff-import',
@@ -67,6 +69,7 @@
         }
     })
 
+    /** @desc 拖拽状态：id/源索引/目标索引/是否拖出列表/拖拽模式（条目/文件夹/子项） */
     type DragState = {
         id: string
         idx: number
@@ -85,7 +88,7 @@
     let showCopyOptions = $state(false)
     let copyOptions = $state<string[]>([])
 
-    // ── Left sidebar resize ──
+    /** @desc ── 左侧栏宽度拖拽调节 ── */
     let leftWidth = $state(256)
     let resizingSidebar = $state(false)
     let resizeStartX = 0
@@ -112,6 +115,7 @@
         resizingSidebar = true
     }
 
+    /** @desc 全局 buff 的标签颜色：全队=黄，否则取归属角色元素色 */
     function globalBuffColor(buffSet: { scope: number[] | 'all' }): string {
         if (!Array.isArray(buffSet.scope) || buffSet.scope.length === 0) return '#eab308'
         const idx = buffSet.scope[0]
@@ -124,13 +128,14 @@
     let newName = $state('')
     let renameValue = $state('')
     let isEditingName = $state(false)
+    /** @desc 切换选中块时重置编辑态并同步重命名输入框 */
     $effect(() => {
         selectedBuffSetId
         isEditingName = false
         if (selectedBuffSet) renameValue = selectedBuffSet.name
     })
 
-    // ZoneRef modal state
+    /** @desc ── ZoneRef 引用配置弹窗状态 ── */
     let showRefModal = $state(false)
     let refZoneId = $state<string>('')
     let refCharacterIdx = $state<number>(0)
@@ -146,6 +151,7 @@
     let refHasUpper = $state(false)
     let refIsDiscrete = $state(false)
 
+    /** @desc 最大公约数（用于把百分比化简为分数） */
     function gcd(a: number, b: number): number {
         a = Math.abs(a)
         b = Math.abs(b)
@@ -157,6 +163,7 @@
         return a
     }
 
+    /** @desc 把百分比 pct 化简为 除数/乘数 分数形式（如 12% → ÷100×12） */
     function simplifyPct(pct: number): { divisor: number; multiplier: number } {
         if (pct === 0) return { divisor: 1, multiplier: 0 }
         const num = Math.round(pct)
@@ -169,6 +176,7 @@
     let buffSets = $derived(getAllBuffSets())
     let globalBuffSetIds = $derived(getGlobalBuffSetIds())
     let charIconMap = $derived(getCharIconMap())
+    /** @desc 全局 buff 排最前，其余保持原序 */
     let sortedBuffSets = $derived(
         [...buffSets].sort((a, b) => {
             const aG = globalBuffSetIds.includes(a.id) ? 0 : 1
@@ -177,6 +185,7 @@
         })
     )
 
+    /** @desc 分组列表：全局文件夹（皇冠）固定在前，其余按叠层规则 groupBuffSets 分组 */
     let groupedBuffSets = $derived.by(() => {
         const globalBuffs = sortedBuffSets.filter((bs) => globalBuffSetIds.includes(bs.id))
         const globalFolder: GroupedBuffSetItem[] =
@@ -194,6 +203,7 @@
         const nonGlobalItems = groupBuffSets(sortedBuffSets.filter((bs) => !globalBuffSetIds.includes(bs.id)))
         return [...globalFolder, ...nonGlobalItems]
     })
+    /** @desc 顶层条目展平（用于拖拽插入位置计算与文件夹计数） */
     let topLevelFlatItems = $derived.by(() => {
         const result: Array<{ key: string; type: 'item' | 'folder' }> = []
         for (const item of groupedBuffSets) {
@@ -209,6 +219,7 @@
     let topLevelIdxMap = $derived(new Map(topLevelFlatItems.map((x, i) => [x.key, i])))
     let topLevelCount = $derived(topLevelFlatItems.length)
 
+    /** @desc 当前选中的 Buff 块、其作用域对应角色勾选态、是否效应专属 */
     let selectedBuffSet = $derived(buffSets.find((s) => s.id === selectedBuffSetId) ?? null)
 
     let scopeChars = $derived.by(() => {
@@ -224,23 +235,27 @@
             selectedBuffSet.scope.length === 0
     )
 
+    /** @desc 引用弹窗相关派生：目标乘区定义/单位、当前乘区定义/单位 */
     let refTargetDef = $derived(ZONE_REF_MAP.get(refTargetZoneId) ?? ZONE_MAP.get(refTargetZoneId as any) ?? null)
     let refTargetDefUnit = $derived(refTargetDef?.unit === '%' ? '%' : '点')
     let currentZoneDef = $derived(ZONE_MAP.get(refZoneId as ZoneId) ?? null)
     let currentZoneUnit = $derived(currentZoneDef?.unit === '%' ? '%' : '点')
 
+    /** @desc 新建 Buff 块（空名兜底「未命名BUFF块」） */
     function handleCreateBuffSet() {
         const name = newName.trim() || '未命名BUFF块'
         createBuffSet(name)
         newName = ''
     }
 
+    /** @desc 删除当前 Buff 块 */
     function handleDeleteBuffSet() {
         if (!selectedBuffSetId) return
         deleteBuffSet(selectedBuffSetId)
         selectedBuffSetId = null
     }
 
+    /** @desc 并入/移出全局（并入成功提示作用域） */
     function handleToggleGlobal() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         const isGlobal = globalBuffSetIds.includes(selectedBuffSetId)
@@ -253,6 +268,7 @@
         }
     }
 
+    /** @desc 复制 Buff：在叠层文件夹内→层数+1 命名；名字带数字→列出递增命名选项；否则「名字 复制」 */
     function handleCopyBuffSet() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         const folder = groupedBuffSets.find(
@@ -291,6 +307,7 @@
         showCopyOptions = true
     }
 
+    /** @desc 确认复制（选中新块） */
     function confirmCopyBuff(name: string) {
         if (!selectedBuffSetId) return
         const newId = duplicateBuffSet(selectedBuffSetId, name)
@@ -298,12 +315,14 @@
         showCopyOptions = false
     }
 
+    /** @desc 双击重命名保存（空名兜底） */
     function handleRenameInline() {
         if (!selectedBuffSetId) return
         renameBuffSet(selectedBuffSetId, renameValue.trim() || '未命名BUFF块')
         isEditingName = false
     }
 
+    /** @desc 切换某角色的作用域；全部选中时归为 all */
     function handleToggleChar(idx: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         const current: number[] = selectedBuffSet.scope === 'all' ? [0, 1, 2] : (selectedBuffSet.scope as number[])
@@ -311,22 +330,26 @@
         setBuffSetScope(selectedBuffSetId, next.length === 3 ? 'all' : next)
     }
 
+    /** @desc 切换「效应专属」作用域（空数组=仅效应） */
     function handleToggleNonChar() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         setBuffSetScope(selectedBuffSetId, isNonCharBuff ? 'all' : [])
     }
 
+    /** @desc 是否为默认全局 buff（global- 前缀，锁定不可编辑条件） */
     function isDefaultGlobalBuff(): boolean {
         return !!selectedBuffSet && selectedBuffSet.id.startsWith('global-')
     }
 
     let condPanelOpen = $state(false)
 
+    /** @desc 展开/收起生效条件面板 */
     function toggleCondPanel() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         condPanelOpen = !condPanelOpen
     }
 
+    /** @desc 清除全部生效条件 */
     function clearCondition() {
         if (!selectedBuffSetId) return
         setBuffSetCondition(selectedBuffSetId, null)
@@ -334,6 +357,7 @@
         condPanelOpen = false
     }
 
+    /** @desc 生效条件摘要文案（链/精炼/属性/类型拼接） */
     const conditionSummary = $derived.by(() => {
         const cond = selectedBuffSet?.condition
         if (!cond) return ''
@@ -355,12 +379,13 @@
         return parts.join('，')
     })
 
-    // 参考角色必须恰好一个：设置了链/精炼但未选参考角色时，默认参考第一位
+    /** @desc 参考角色必须恰好一个：设置了链/精炼但未选参考角色时，默认参考第一位 */
     function ensureConditionRef() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (selectedBuffSet.conditionRefCharIdx === undefined) setBuffSetConditionRef(selectedBuffSetId, 0)
     }
 
+    /** @desc 设置共鸣链门槛（再次点击取消）；设置链/精炼时自动补参考角色 */
     function setBuffChain(min: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) return
@@ -372,6 +397,7 @@
         if (next.chain !== undefined || next.refinement !== undefined) ensureConditionRef()
     }
 
+    /** @desc 设置武器精炼门槛（再次点击取消） */
     function setBuffRefinement(min: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) return
@@ -383,6 +409,7 @@
         if (next.chain !== undefined || next.refinement !== undefined) ensureConditionRef()
     }
 
+    /** @desc 切换伤害属性条件（多选） */
     function toggleConditionElement(el: string) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) return
@@ -392,6 +419,7 @@
         setBuffSetCondition(selectedBuffSetId, { ...cond, elements: next })
     }
 
+    /** @desc 切换伤害类型条件（多选） */
     function toggleConditionDamageType(dt: string) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) return
@@ -401,6 +429,7 @@
         setBuffSetCondition(selectedBuffSetId, { ...cond, damageTypes: next })
     }
 
+    /** @desc 设置参考角色槽位（默认全局 buff 拒绝） */
     function setConditionRef(i: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) {
@@ -410,6 +439,7 @@
         setBuffSetConditionRef(selectedBuffSetId, i)
     }
 
+    /** @desc 打开引用配置弹窗：有现成引用则回填各字段，否则按当前乘区初始化（同目标时自动换一个可引用属性） */
     function openRefModal(zoneId: string) {
         const zone = selectedBuffSet?.zones.find((z) => z.zoneId === zoneId)
         refZoneId = zoneId
@@ -447,6 +477,7 @@
         showRefModal = true
     }
 
+    /** @desc 确认引用：由 除数/乘数 反算百分比并写入 */
     function handleConfirmRef() {
         if (!selectedBuffSetId) return
         const pct = refDivisor !== 0 ? (refMultiplier / refDivisor) * 100 : 0
@@ -465,12 +496,14 @@
         showRefModal = false
     }
 
+    /** @desc 清除引用 */
     function handleClearRef() {
         if (!selectedBuffSetId) return
         setBuffSetZoneRef(selectedBuffSetId, refZoneId, null)
         showRefModal = false
     }
 
+    /** @desc 折叠/展开叠层文件夹 */
     function toggleFolder(prefix: string) {
         const next = new Set(collapsedFolders)
         if (next.has(prefix)) {
@@ -481,7 +514,7 @@
         collapsedFolders = next
     }
 
-    // 拖动进入 AI 悬浮窗等"禁区"时取消拖拽（不触发 drop 的删除/重排/确认弹窗）
+    /** @desc 拖动进入 AI 悬浮窗等"禁区"时取消拖拽（不触发 drop 的删除/重排/确认弹窗） */
     function cancelBuffDrag() {
         if (!dragState) return
         dragState = null
@@ -491,6 +524,7 @@
         }
     }
 
+    /** @desc 开始拖拽：仅从拖拽把手开始（.drag-handle），记录源索引并展开全部文件夹（拖拽中便于定位） */
     function startDrag(e: PointerEvent, id: string, mode: 'item' | 'folder' | 'child', folderPrefix?: string) {
         if ((e.target as HTMLElement).closest('input')) return
         if (!(e.target as HTMLElement).closest('.drag-handle')) return
@@ -513,6 +547,7 @@
         dragState = { id, idx, dropIdx: idx, outside: false, mode, folderPrefix }
     }
 
+    /** @desc 拖拽移动：超出容器边缘 30px 判定为「拖出」（删除/删文件夹），否则按元素中心线计算插入位置 */
     function onDragMove(e: PointerEvent) {
         if (!dragState) return
         const container = (e.currentTarget as HTMLElement).closest('.buff-list-container') as HTMLElement | null
@@ -545,6 +580,7 @@
         dragState = { ...dragState, outside: false, dropIdx }
     }
 
+    /** @desc 拖拽结束：拖出→删除（文件夹弹确认）；拖入→重排（folder 整组移动/child 组内移动/item 顶层移动）；原地→选中 */
     function onDragEnd(e: PointerEvent) {
         if (!dragState) return
 
@@ -582,6 +618,7 @@
         dragState = null
     }
 
+    /** @desc 计算拖拽后的新顺序：folder=整组搬到 dropIdx 位置；child=组内重排；item=顶层重排 */
     function computeNewOrder(container: HTMLElement, state: DragState): string[] | null {
         if (state.mode === 'folder') {
             const prefix = state.id
@@ -650,6 +687,7 @@
         return withoutDragged
     }
 
+    /** @desc 确认删除文件夹：删除其全部子 Buff 并清空选中 */
     function confirmDeleteFolder() {
         const folder = groupedBuffSets.find((g) => g.type === 'folder' && g.prefix === deleteFolderPrefix)
         if (folder?.children) {
@@ -668,6 +706,7 @@
     let teamNames = $derived(team.map((s) => s.character ?? '?'))
 </script>
 
+/** @desc BUFF 配置弹窗根容器：遮罩 + 主卡片（标题栏/左侧列表/右侧编辑器/底部保存） */
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -682,6 +721,7 @@
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
+            /** @desc 标题栏：BUFF 配置 + 导入Buff集/速查入口 */
             <div
                 class="flex items-center justify-between px-5 py-3 border-b"
                 style="border-bottom: 1px solid var(--theme-divider-border);"
@@ -711,6 +751,8 @@
                     class="shrink-0 border-r flex flex-col"
                     style="width: {leftWidth}px; border-right: 1px solid var(--theme-divider-border);"
                 >
+                    /** @desc 左侧列表：叠层文件夹（可折叠/整体拖拽）+ 独立 buff
+                    块（可拖拽/拖出删除），插入位置显示指示条 */
                     <div class="theme-scrollbar flex-1 overflow-y-auto p-2 space-y-1 buff-list-container">
                         {#each groupedBuffSets as item (item.key)}
                             {#if item.type === 'folder'}
@@ -915,6 +957,7 @@
                             <div class="text-xs text-(--theme-modal-text)/30 text-center py-4">暂无 BUFF 块</div>
                         {/if}
                     </div>
+                    /** @desc 底部新建栏：输入名称 + 新建按钮 */
                     <div class="shrink-0 border-t p-2" style="border-top: 1px solid var(--theme-divider-border);">
                         <div class="flex gap-1">
                             <input
@@ -935,6 +978,7 @@
                         </div>
                     </div>
                 </div>
+                /** @desc 左栏宽度调节把手 */
                 <div
                     class="shrink-0 w-1 cursor-col-resize transition-colors hover:bg-(--theme-accent-bg)/50"
                     style="background: var(--theme-divider-border);"
@@ -947,6 +991,7 @@
                     {#if selectedBuffSet}
                         {@const isGlobal = globalBuffSetIds.includes(selectedBuffSet.id)}
                         {@const isDefaultGlobal = selectedBuffSet.id.startsWith('global-')}
+                        /** @desc 选中块头部：收藏/重命名（双击编辑）/复制/并入全局/移出全局/删除（全局块锁定只读） */
                         <!-- Buff name header -->
                         <div
                             class="shrink-0 px-3 py-2.5 border-b flex items-center gap-2"
@@ -1031,6 +1076,7 @@
                             {/if}
                         </div>
 
+                        /** @desc 作用域区：角色头像勾选（可吃到的角色）+ 效应专属切换（全局块锁定） */
                         <!-- Character scope -->
                         <div
                             class="shrink-0 px-3 pt-3 pb-2.5 border-b"
@@ -1113,6 +1159,7 @@
                             </div>
                         </div>
 
+                        /** @desc 生效条件区：折叠面板内配置 共鸣链/精炼/参考角色/伤害属性/伤害类型 */
                         <!-- 生效条件 -->
                         <div class="shrink-0 border-b" style="border-bottom: 1px solid var(--theme-divider-border);">
                             <button
@@ -1289,6 +1336,7 @@
                             {/if}
                         </div>
 
+                        /** @desc 乘区列表：已配置乘区的数值输入/引用展示/追加覆盖切换/引用配置入口 */
                         <!-- Zone list -->
                         <div class="theme-scrollbar flex-1 overflow-y-auto p-3 space-y-1">
                             {#each selectedBuffSet.zones as zone}
@@ -1397,6 +1445,7 @@
                         </div>
                     {/if}
                 </div>
+                /** @desc 右栏乘区清单：全部可配置乘区，点击加入/移出当前 Buff */
                 {#if selectedBuffSet}
                     <div
                         class="w-52 shrink-0 border-l flex flex-col"
@@ -1434,6 +1483,7 @@
                 {/if}
             </div>
 
+            /** @desc 底部：保存并关闭按钮 */
             <div
                 class="flex items-center justify-end gap-2 border-t px-5 py-3"
                 style="border-top: 1px solid var(--theme-divider-border);"
@@ -1451,6 +1501,7 @@
     </div>
 {/if}
 
+/** @desc 引用配置弹窗：选择引用角色/属性、阈值与换算规则（线性/离散、除乘）、上下限 clamp */
 {#if showRefModal}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -1769,6 +1820,7 @@
     </div>
 {/if}
 
+/** @desc 删除文件夹确认弹窗 */
 {#if showDeleteFolderConfirm}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -1803,6 +1855,7 @@
     </div>
 {/if}
 
+/** @desc 复制命名选项弹窗（buff 名带数字时的递增命名选择） */
 {#if showCopyOptions}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -1840,6 +1893,7 @@
     </div>
 {/if}
 
+/** @desc 速查弹窗（新建 BUFF 场景：创建Buff入口）与引用速查（只读），以及 Buff 导入弹窗 */
 <QuickLookup
     open={showLookup}
     {team}

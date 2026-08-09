@@ -1,4 +1,5 @@
 <script lang="ts">
+    /** @desc 速查弹窗：按队伍角色 tab 展示角色 Lv90 基础属性/武器/首位声骸/套装加成/技能数值(含偏谐与共鸣能量)/共鸣链，支持选中文本右键复制/创建BUFF/创建自定义直伤 */
     import { getCharacterInfo, getWeaponInfo, getEchoInfo, getEchoSetInfo } from '$lib/data/api'
     import {
         getCharacterIcons,
@@ -42,12 +43,14 @@
     let echoSkillData = $state<{ desc: string; values: [string, string, string][] } | null>(null)
     let setBonuses = $state<{ name: string; pieces: number[]; bonuses: Record<string, string> }[] | null>(null)
     let loading = $state(false)
+    /** @desc 各类图标缓存（角色/武器/声骸/套装/属性/武器类型） */
     let charIcons = $state<Record<string, string>>({})
     let weaponIcons = $state<Record<string, string>>({})
     let echoIcons = $state<Record<string, string>>({})
     let setIcons = $state<Record<string, string>>({})
     let elementIcons = $state<Record<string, string>>({})
     let weaponTypeIcons = $state<Record<string, string>>({})
+    /** @desc 右键菜单（复制/创建BUFF/跳转）状态 */
     let ctxShow = $state(false)
     let ctxX = $state(0)
     let ctxY = $state(0)
@@ -55,6 +58,7 @@
 
     let charNames = $derived(team.map((s) => s.character).filter((c): c is string => c !== null))
     let currentSlot = $derived(team[charIndex])
+    /** @desc 固有技能（名字不以「提升」结尾）与固有属性（以「提升」结尾，按名称+数值排序） */
     let inherentSkills = $derived(charData?.statNodes.filter((n) => !n.name.endsWith('提升')) ?? [])
     let statAttrs = $derived(charData?.statNodes.filter((n) => n.name.endsWith('提升')) ?? [])
     let sortedStatAttrs = $derived(
@@ -67,14 +71,17 @@
         })
     )
 
+    /** @desc 打开时预加载全部图标（失败项静默忽略） */
     $effect(() => {
         if (open) loadIcons()
     })
 
+    /** @desc 当前槽位有角色时拉取角色详情（切角色 tab 时自动触发） */
     $effect(() => {
         if (open && currentSlot.character) fetchData(currentSlot)
     })
 
+    /** @desc 并行加载六类图标映射 */
     async function loadIcons() {
         const results = await Promise.allSettled([
             getCharacterIcons(),
@@ -93,6 +100,7 @@
         if (wti.status === 'fulfilled') weaponTypeIcons = wti.value
     }
 
+    /** @desc 拉取角色/武器/声骸技能/套装加成数据（并行，失败静默）；套装按名字合并多件数段 */
     async function fetchData(slot: CharSlot) {
         if (!slot.character) return
         loading = true
@@ -134,6 +142,7 @@
         loading = false
     }
 
+    /** @desc 记录右键菜单位置并显示 */
     function handleCtxMenu(e: MouseEvent) {
         e.preventDefault()
         ctxX = e.clientX
@@ -141,12 +150,14 @@
         ctxShow = true
     }
 
+    /** @desc 复制选中文本到剪贴板 */
     function handleCopy() {
         const s = window.getSelection()?.toString()
         if (s) navigator.clipboard.writeText(s).catch(() => {})
         ctxShow = false
     }
 
+    /** @desc 用选中文本创建 Buff 块并关闭速查 */
     function handleCreateBuffFromSel() {
         const s = window.getSelection()?.toString()
         if (s) {
@@ -156,6 +167,7 @@
         ctxShow = false
     }
 
+    /** @desc 用选中文本创建自定义直伤并关闭速查 */
     function handleCreateCustomHit() {
         const s = window.getSelection()?.toString()
         if (s && onCreateCustomHit) {
@@ -165,6 +177,7 @@
         ctxShow = false
     }
 
+    /** @desc 滚动容器到顶/到底 */
     function handleScrollTop() {
         scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' })
         ctxShow = false
@@ -175,8 +188,10 @@
         ctxShow = false
     }
 
+    /** @desc 富文本渲染辅助：空串容错 / 转 HTML 并高亮数字 */
     const img = (p: string) => p || ''
     const rd = (s: string) => colorizeNumbers(richTextToHtml(s))
+    /** @desc 副属性数值格式化：小数（<1）转百分比 */
     const fmtSubVal = (v: string) => {
         const n = parseFloat(v)
         if (isNaN(n) || n >= 1) return v
@@ -184,6 +199,7 @@
     }
 </script>
 
+/** @desc 速查弹窗根容器：遮罩 + 居中卡片，ESC 关闭（stopPropagation 不冒泡关上层），全区域支持右键菜单 */
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -206,7 +222,9 @@
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
+            /** @desc 弹窗内容区：顶部吸顶标题栏 + 角色 tab 切换栏 + 滚动内容 + 底部渐变遮罩 */
             <div bind:this={scrollContainer} class="flex-1 overflow-y-auto rounded-xl hide-scrollbar">
+                /** @desc 标题栏：标题 + 关闭按钮 */
                 <div
                     class="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-3"
                     style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-color: var(--theme-divider-border);"
@@ -218,6 +236,7 @@
                         ><Icon icon="mdi:close" class="size-4" /></button
                     >
                 </div>
+                /** @desc 角色 tab 切换栏（带头像图标） */
                 <div
                     class="sticky top-13 z-10 flex gap-1 border-b px-5 py-2"
                     style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-color: var(--theme-divider-border);"
@@ -246,6 +265,8 @@
                         </button>
                     {/each}
                 </div>
+                /** @desc 内容主体：加载中/角色详情（基础属性/武器/首位声骸/套装加成/技能/固有技能/固有属性/共鸣链）/无角色提示
+                */
                 <div class="px-5 py-4">
                     {#if loading}
                         <div class="flex items-center justify-center py-16 text-sm text-(--theme-modal-text)/50">
@@ -253,6 +274,7 @@
                         </div>
                     {:else if charData}
                         <div class="space-y-5">
+                            /** @desc 角色头部：头像 + 名字 + 星级 + 属性 + 武器类型 */
                             <div class="flex items-center gap-3">
                                 {#if img(charIcons[currentSlot.character ?? ''])}<img
                                         src={img(charIcons[currentSlot.character ?? ''])}
@@ -286,6 +308,7 @@
                                         >{/if}
                                 </div>
                             </div>
+                            /** @desc 基础属性区：Lv90 生命/攻击/防御/谐度破坏增幅 */
                             <section>
                                 <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
                                     基础属性 (Lv90)
@@ -329,6 +352,7 @@
                                     </div>
                                 </div>
                             </section>
+                            /** @desc 武器区：图标/名字/星级/基础攻击/副属性 + 武器效果富文本 */
                             {#if currentSlot.weapon}
                                 <section>
                                     <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
@@ -376,6 +400,7 @@
                                     </div>
                                 </section>
                             {/if}
+                            /** @desc 首位声骸区：图标/名字/Cost/套装名 + 声骸技能描述 */
                             {#if currentSlot.echoes[0]?.name}
                                 <section>
                                     <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
@@ -409,6 +434,7 @@
                                     </div>
                                 </section>
                             {/if}
+                            /** @desc 套装加成区：逐套装展示已装备件数对应的加成描述 */
                             {#if setBonuses}
                                 <section>
                                     <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
@@ -446,6 +472,7 @@
                                     </div>
                                 </section>
                             {/if}
+                            /** @desc 技能区：普通技能（含倍率数值/偏谐值/共鸣能量明细）+ 固有技能 */
                             <section class="border-t pt-4 mt-4" style="border-color: var(--theme-divider-border);">
                                 <h3 class="mb-2 text-base font-semibold tracking-wider text-(--theme-modal-text)/50">
                                     技能
@@ -548,6 +575,7 @@
                                     {/each}
                                 </div>
                             </section>
+                            /** @desc 固有属性区：双列网格展示「XX提升」数值 */
                             {#if statAttrs.length > 0}
                                 <section>
                                     <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
@@ -569,6 +597,7 @@
                                     </div>
                                 </section>
                             {/if}
+                            /** @desc 共鸣链区：C1~C6 描述 */
                             {#if charData.chains.length > 0}
                                 <section class="border-t pt-4 mt-4" style="border-color: var(--theme-divider-border);">
                                     <h3
@@ -601,6 +630,7 @@
                         </div>
                     {/if}
                 </div>
+                /** @desc 底部渐变遮罩（提示可继续滚动） */
                 <div
                     class="sticky bottom-0 h-10 pointer-events-none"
                     style="background: linear-gradient(to top, var(--theme-modal-bg), transparent);"
@@ -610,6 +640,7 @@
     </div>
 {/if}
 
+/** @desc 右键菜单：复制选中文本 / 创建BUFF / 创建自定义直伤 / 跳转顶底（点击遮罩关闭） */
 {#if ctxShow}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -654,6 +685,8 @@
         </div>
     </div>
 {/if}
+
+/** @desc 富文本着色样式：属性标题/高亮/元素色/数字/上下标等全局样式 */
 
 <style>
     :global(.select-text) ::selection {
