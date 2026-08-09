@@ -91,15 +91,17 @@
     function stopDrag() {
         if (!dragging) return
         dragging = false
-        if (dragPos && typeof localStorage !== 'undefined') {
-            localStorage.setItem('ai-assistant-pos', JSON.stringify(dragPos))
-        }
+        // 不写 localStorage：卡片拖动不改按钮记忆位置（按钮位置仅由 btnUp / 收起分支维护，
+        // 避免未收起就刷新时恢复出卡片位置）
     }
 
     // 收起态圆钮拖动（共用 dragPos；拖动后不触发展开）
     let btnDrag = $state(false)
     let btnMoved = $state(false)
     let btnStart = $state({ mx: 0, my: 0, x: 0, y: 0 })
+    // 收起态悬浮钮 hover 状态（强调轮廓 + 放大 1.05；拖拽时放大 1.15）
+    let btnHover = $state(false)
+    const btnScale = $derived(size === 'collapsed' ? (btnDrag ? 1.15 : btnHover ? 1.05 : 1) : 1)
 
     function btnDown(e: PointerEvent) {
         // 阻止兼容 mouse 事件穿透到下层页面（避免拖动圆钮时触发排轴/拉表框选）
@@ -124,9 +126,7 @@
 
     function btnUp() {
         btnDrag = false
-        if (btnMoved && dragPos && typeof localStorage !== 'undefined') {
-            localStorage.setItem('ai-assistant-pos', JSON.stringify(dragPos))
-        }
+        if (btnMoved && dragPos) saveBtnPos(dragPos)
     }
 
     function btnClick() {
@@ -151,7 +151,6 @@
     }
 
     const aiConfig = $derived(getAiConfig())
-    const modelLabel = $derived(`${aiConfig.label} · ${aiConfig.model}`)
     // AI 助手是否启用（悬浮窗显隐）
     const aiEnabled = $derived(getGenPrefs().enabled)
     // GPU 合成加速（设置 → 交互相关）：拖拽定位用 transform 走合成层
@@ -175,16 +174,40 @@
         return `工程：${project}；视图：${view}${locked ? `；环节：${locked}` : ''}${panels ? `；弹窗：${panels}` : ''}`
     })
 
-    function toggle() {
-        size = size === 'collapsed' ? 'small' : 'collapsed'
-        // 展开瞬间按卡片尺寸重新钳制，保证面板不伸出屏幕
-        if (size !== 'collapsed' && dragPos) {
-            const w = size === 'small' ? smallW : cardW
-            const h = size === 'small' ? smallH : cardH
-            const clamped = clampToViewport(dragPos, w, h)
-            if (clamped && (clamped.x !== dragPos.x || clamped.y !== dragPos.y)) dragPos = clamped
-            else if (!clamped) dragPos = null
+    // 展开/收起过渡标记：切换瞬间给位置属性加 0.38s 过渡，实现「向四周展开 / 向中心收起」
+    let collapsing = $state(false)
+    let collapsingTimer: ReturnType<typeof setTimeout> | null = null
+
+    function toggle(e?: MouseEvent) {
+        const wasCollapsed = size === 'collapsed'
+        const prevSize = size
+        size = wasCollapsed ? 'small' : 'collapsed'
+        const w = size === 'small' ? smallW : cardW
+        const h = size === 'small' ? smallH : cardH
+        // 切换前形态的尺寸（按钮 48 / 小卡片 / 全尺寸）
+        const pw = prevSize === 'small' ? smallW : prevSize === 'large' ? cardW : 48
+        const ph = prevSize === 'small' ? smallH : prevSize === 'large' ? cardH : 48
+        // 当前形态的左上角与中心（默认位置按右下角推算）
+        const curLeft = dragPos ? dragPos.x : window.innerWidth - pw - 16
+        const curTop = dragPos ? dragPos.y : window.innerHeight - ph - 16
+        const centerX = curLeft + pw / 2
+        const centerY = curTop + ph / 2
+        if (!wasCollapsed) {
+            // 展开：以按钮为中心向四周展开（新卡片中心 = 按钮中心），钳制到视口；
+            // 不写 localStorage——记忆位置始终是按钮位置（避免未收起就刷新时恢复出卡片位置）
+            dragPos = clampToViewport({ x: centerX - w / 2, y: centerY - h / 2 }, w, h)
+        } else if (e) {
+            // 收起：按钮中心对齐双击时的鼠标位置，钳制到视口；
+            // 不持久化——收起位置是临时行为，localStorage 记忆位置保持按钮拖动设置的值
+            dragPos = clampToViewport({ x: e.clientX - 24, y: e.clientY - 24 }, 48, 48)
         }
+        // 位置与尺寸走同步过渡（视觉上向四周展开 / 向中心收起）
+        collapsing = true
+        if (collapsingTimer !== null) clearTimeout(collapsingTimer)
+        collapsingTimer = setTimeout(() => {
+            collapsing = false
+            collapsingTimer = null
+        }, 420)
         if (typeof localStorage !== 'undefined') localStorage.setItem('ai-assistant-open', size)
     }
 
@@ -378,26 +401,26 @@
         return () => window.removeEventListener('resize', update)
     })
 
-    // 展开卡片尺寸（非响应式场景，与 cardW/cardH 同逻辑）
-    function expandedCardSize(): { w: number; h: number } {
-        const w = typeof window !== 'undefined' ? window.innerWidth : 1280
-        const h = typeof window !== 'undefined' ? window.innerHeight : 800
-        const landscape = w > h
-        return {
-            w: landscape ? 480 : Math.max(280, w - 24),
-            h: landscape ? h - 24 : Math.min(h * 0.6, 560)
-        }
+    // 恢复记忆位置（仅接受带版本标记 v=2 的按钮位置，按按钮形态 48px 钳制；
+    // 旧版无版本标记的脏数据（曾写入展开卡片位置）一律清除回默认右下角）
+    const POS_KEY_V = 2
+
+    function saveBtnPos(pos: { x: number; y: number } | null) {
+        if (typeof localStorage === 'undefined') return
+        if (pos) localStorage.setItem('ai-assistant-pos', JSON.stringify({ v: POS_KEY_V, x: pos.x, y: pos.y }))
+        else localStorage.removeItem('ai-assistant-pos')
     }
 
-    // 恢复记忆位置（按展开卡片尺寸钳制，保证收起/展开都不出屏；越界/脏数据回退默认右下角）
     if (typeof localStorage !== 'undefined') {
         try {
             const saved = localStorage.getItem('ai-assistant-pos')
             if (saved) {
-                const parsed = JSON.parse(saved) as { x: number; y: number }
-                if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) {
-                    const cardSize = expandedCardSize()
-                    dragPos = clampToViewport({ x: parsed.x, y: parsed.y }, cardSize.w, cardSize.h)
+                const parsed = JSON.parse(saved) as { v?: number; x: number; y: number }
+                if (parsed.v === POS_KEY_V && Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) {
+                    dragPos = clampToViewport({ x: parsed.x, y: parsed.y }, 48, 48)
+                } else {
+                    // 旧版无版本标记的位置数据（可能是展开卡片位置）：清除，回默认右下角
+                    localStorage.removeItem('ai-assistant-pos')
                 }
             }
         } catch {
@@ -421,14 +444,21 @@
             : 'bottom-4 right-4'}"
         style="{dragPos
             ? gpuAccel
-                ? `left:0;top:0;transform: translate(${dragPos.x}px, ${dragPos.y}px);`
-                : `left:${dragPos.x}px;top:${dragPos.y}px;`
-            : ''}{gpuAccel && (dragging || btnDrag)
-            ? ' will-change: transform;'
+                ? `left:0;top:0;transform: translate(${dragPos.x}px, ${dragPos.y}px)${size === 'collapsed' ? ` scale(${btnScale})` : ''};`
+                : `left:${dragPos.x}px;top:${dragPos.y}px;${size === 'collapsed' ? `transform: scale(${btnScale});` : ''}`
+            : size === 'collapsed'
+              ? `transform: scale(${btnScale});`
+              : ''}{gpuAccel && (dragging || btnDrag) ? ' will-change: transform;' : ''}{size === 'collapsed' &&
+        btnScale > 1
+            ? ' box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 60%, transparent), 0 0 14px color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);'
             : ''}width:{curW}px;height:{curH}px;border-radius:{size === 'collapsed'
             ? '9999px'
-            : '0.75rem'};transition:width .38s cubic-bezier(.32,.72,.24,1),height .38s cubic-bezier(.32,.72,.24,1),border-radius .38s cubic-bezier(.32,.72,.24,1),background-color .38s cubic-bezier(.32,.72,.24,1);background:{size ===
-        'collapsed'
+            : '0.75rem'};transition:width .38s cubic-bezier(.32,.72,.24,1),height .38s cubic-bezier(.32,.72,.24,1),border-radius .38s cubic-bezier(.32,.72,.24,1),background-color .38s cubic-bezier(.32,.72,.24,1){btnDrag ||
+        dragging
+            ? ''
+            : ',transform 150ms ease,box-shadow 150ms ease'}{collapsing
+            ? ',transform .38s cubic-bezier(.32,.72,.24,1),left .38s cubic-bezier(.32,.72,.24,1),top .38s cubic-bezier(.32,.72,.24,1)'
+            : ''};background:{size === 'collapsed'
             ? 'var(--theme-accent-bg)'
             : 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'};color:{size === 'collapsed'
             ? 'var(--theme-accent-text-on-bg, #fff)'
@@ -451,6 +481,8 @@
                 onpointermove={btnMove}
                 onpointerup={btnUp}
                 onpointercancel={btnUp}
+                onpointerenter={() => (btnHover = true)}
+                onpointerleave={() => (btnHover = false)}
                 onclick={btnClick}
                 title="AI 助手（拖动可移动）"
             >
@@ -459,7 +491,7 @@
                 </div>
             </div>
         {:else}
-            <!-- 头部（可拖动） -->
+            <!-- 头部（可拖动；双击非按钮区域收起） -->
             <div
                 class="flex shrink-0 cursor-move touch-none select-none items-center gap-2 border-b px-3 py-2.5"
                 style="border-color: var(--theme-divider-border);"
@@ -467,12 +499,17 @@
                 onpointermove={moveDrag}
                 onpointerup={stopDrag}
                 onpointercancel={stopDrag}
+                ondblclick={(e) => {
+                    if (!(e.target as HTMLElement).closest('button')) toggle(e)
+                }}
             >
-                <Icon icon="mdi:robot-outline" class="size-5 text-(--theme-accent-text)" />
-                <span class="min-w-0 flex-1 truncate text-sm font-semibold">AI 助手</span>
-                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40" title={aiConfig.baseUrl}
-                    >{modelLabel}</span
-                >
+                <Icon icon="mdi:robot-outline" class="size-5 shrink-0 text-(--theme-accent-text)" />
+                <div class="min-w-0 flex-1 leading-tight">
+                    <div class="truncate text-sm font-semibold" title={aiConfig.baseUrl}>{aiConfig.model}</div>
+                    <div class="truncate text-[10px] text-(--theme-modal-text)/50" title={aiConfig.baseUrl}>
+                        {aiConfig.label}
+                    </div>
+                </div>
                 <button
                     onclick={clearConversation}
                     class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
@@ -486,13 +523,6 @@
                     title={size === 'small' ? '放大到全尺寸' : '缩小'}
                 >
                     <Icon icon={size === 'small' ? 'mdi:arrow-expand' : 'mdi:arrow-collapse'} class="size-4" />
-                </button>
-                <button
-                    onclick={toggle}
-                    class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
-                    title="收起"
-                >
-                    <Icon icon="mdi:chevron-down" class="size-4" />
                 </button>
             </div>
 
