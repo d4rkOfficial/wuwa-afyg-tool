@@ -76,6 +76,9 @@ let _elementIconMap = $state<Record<string, string>>({})
 let _charElementMap = $state<Record<string, string>>({})
 let _charWeaponTypeMap = $state<Record<string, string>>({})
 
+/** @desc 上次 init 的轻量键（数据/队伍/锁定未变时幂等短路，避免 save 回写触发全量重初始化） */
+let _lastInitKey = ''
+
 export function init(
     data: TimelineData | null,
     onupdate: (data: TimelineData) => void,
@@ -85,6 +88,12 @@ export function init(
     _onupdate = onupdate
     _team = team
     _locked = locked
+    // 幂等短路：数据指纹一致且队伍/锁定未变 → 跳过全量重建（不清菜单/宽度缓存/角色数据）
+    const dataFp = data ? timelineFingerprint(data) : 'null'
+    const teamFp = team.map((s) => `${s.character ?? ''}|${s.weapon ?? ''}`).join(',')
+    const key = `${dataFp}|${teamFp}|${locked}`
+    if (data && key === _lastInitKey) return
+    _lastInitKey = key
     if (data) {
         _refLines = data.refLines.map((rl) => ({
             ...rl,
@@ -130,6 +139,8 @@ export function init(
     }
     _lastCommitted = snap
     _estWidthCache.clear()
+    _estHeightCache.clear()
+    _estOpWidthCache.clear()
     loadCharElements()
 }
 
@@ -187,7 +198,13 @@ async function loadCharElements() {
 
 function save() {
     const snap = cloneData()
-    if (!_lastCommitted || JSON.stringify(_lastCommitted) !== JSON.stringify(snap)) {
+    // 快路径：指纹不同（长度/首尾 id 变化）必为变更，跳过全量 stringify 比较；
+    // 慢路径兜底：指纹相同但内容变化（如中间块位移）时精确比较，保证 undo 快照准确
+    const changed =
+        !_lastCommitted ||
+        timelineFingerprint(_lastCommitted) !== timelineFingerprint(snap) ||
+        JSON.stringify(_lastCommitted) !== JSON.stringify(snap)
+    if (changed) {
         if (_lastCommitted) {
             _undoStack.push(_lastCommitted)
             if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
@@ -353,15 +370,25 @@ function estimateInnerWidth(key: string, desc: string, chips = 0): number {
     return Math.max(56, inner + 22)
 }
 
+/** @desc 块宽估算缓存（key+desc → width；formatTimeline 每块调用，避免 O(N²) 同款查找） */
+const _estOpWidthCache = new Map<string, number>()
+
 function estimateOpBlockWidth(block: OpBlock): number {
     if (_blockWidths[block.id]) return _blockWidths[block.id]
+    const cacheKey = block.key + '\u0000' + block.desc + '\u0000' + block.intro + block.switchback
+    const cached = _estOpWidthCache.get(cacheKey)
+    if (cached !== undefined) return cached
     for (const b of _opBlocks) {
         if (b.id !== block.id && b.key === block.key && b.desc === block.desc && _blockWidths[b.id]) {
+            _estOpWidthCache.set(cacheKey, _blockWidths[b.id])
             return _blockWidths[b.id]
         }
     }
     const chips = (block.intro ? 1 : 0) + (block.switchback ? 1 : 0)
-    return estimateInnerWidth(block.key, block.desc, chips)
+    const result = estimateInnerWidth(block.key, block.desc, chips)
+    if (_estOpWidthCache.size > 500) _estOpWidthCache.clear()
+    _estOpWidthCache.set(cacheKey, result)
+    return result
 }
 
 export function quickInput(rawKey: string): string | null {
@@ -900,22 +927,43 @@ function estimateDamageWidth(d: DamageBlock): number {
     const maxChars = Math.max(...texts.map((t) => t.length), 0)
     const singleTagW = maxChars * 5.5 + 22
     const result = singleTagW + 8
+    // 上限防护：粘贴/频繁增删导致 id 持续增长时避免 Map 无界膨胀
+    if (_estWidthCache.size > 500) _estWidthCache.clear()
     _estWidthCache.set(d.id, result)
     return result
 }
 
 export function estimateDamageHeight(d: DamageBlock): number {
+    const cached = _estHeightCache.get(d.id)
+    if (cached !== undefined) return cached
     const count = d.skillHits.length + d.nonDirectEntries.length
     const TAG_HEIGHT = 18
     const PAD = 4
-    return count * TAG_HEIGHT + PAD
+    const result = count * TAG_HEIGHT + PAD
+    if (_estHeightCache.size > 500) _estHeightCache.clear()
+    _estHeightCache.set(d.id, result)
+    return result
 }
+
+// 伤害块高度缓存（与宽度缓存配套；结构变更时清理）
+const _estHeightCache = new Map<string, number>()
 
 export function getDamageBlocksStacked(): { block: DamageBlock; top: number; left: number }[] {
     const lastTrackIdx = getTRACKS().length - 1
+    // 一次性索引：sourceId → pos，替代每个伤害块的线性 find（拖拽帧成本 O(D×N) → O(D)）
+    const opPos = new Map<string, number>()
+    for (const b of _opBlocks) opPos.set(b.id, b.pos)
+    const refPos = new Map<string, number>()
+    for (const r of _refLines) refPos.set(r.id, r.pos)
     const blocks = _damageBlocks
         .filter((d) => d.trackIndex === lastTrackIdx && (d.skillHits.length > 0 || d.nonDirectEntries.length > 0))
-        .map((d) => ({ block: d, left: damageBlockLeft(d) }))
+        .map((d) => {
+            const left =
+                d.sourceType === 'ref'
+                    ? (_dragVisualPositions[d.sourceId] ?? refPos.get(d.sourceId) ?? 0)
+                    : (opPos.get(d.sourceId) ?? 0) - (_blockWidths[d.sourceId] ?? 56) / 2
+            return { block: d, left }
+        })
         .sort((a, b) => a.left - b.left)
 
     const GAP = 4
@@ -1281,6 +1329,13 @@ export function startBlockDrag(e: MouseEvent, blockId: string, mouseContentX?: n
     }
 }
 
+/** @desc 拖拽中块的视觉临时位置（非组拖不逐帧替换 _opBlocks，停止时一次性提交） */
+let _dragBlockVisualPositions = $state<Record<string, number>>({})
+
+export function getDragBlockVisualPositions() {
+    return _dragBlockVisualPositions
+}
+
 export function onBlockDrag(rawX: number) {
     if (!_dragBlockId) return
     const idx = _opBlocks.findIndex((b) => b.id === _dragBlockId)
@@ -1292,7 +1347,7 @@ export function onBlockDrag(rawX: number) {
         applyGroupDelta(clampedPos - _dragBlockStartPos)
         return
     }
-    _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: clampedPos } : b))
+    _dragBlockVisualPositions = { ..._dragBlockVisualPositions, [_dragBlockId]: clampedPos }
 }
 
 export function stopBlockDrag() {
@@ -1305,6 +1360,11 @@ export function stopBlockDrag() {
     }
     const idx = _opBlocks.findIndex((b) => b.id === _dragBlockId)
     if (idx >= 0) {
+        // 非组拖：先把拖拽期间的临时位置一次性提交到 _opBlocks
+        const visualPos = _dragBlockVisualPositions[_dragBlockId]
+        if (!_isGroupDrag && visualPos !== undefined && Math.abs(visualPos - _dragBlockStartPos) > 1) {
+            _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: visualPos } : b))
+        }
         const dragged = _opBlocks[idx]
         if (_isGroupDrag) {
             save()
@@ -1334,6 +1394,7 @@ export function stopBlockDrag() {
             save()
         }
     }
+    _dragBlockVisualPositions = {}
     _dragBlockInitialPositions = {}
     _dragRefInitialPositions = {}
     _isGroupDrag = false
@@ -1695,11 +1756,13 @@ export function setBlockSpecial(blockId: string, kind: 'none' | 'intro' | 'switc
 function enforceIntro() {
     const lastTrackIdx = getTRACKS().length - 1
     const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
+    // id → 有序索引 Map，替代每块 findIndex（快速模式每键调用，O(N²) → O(N log N)）
+    const idxOf = new Map(sorted.map((s, i) => [s.id, i]))
     let changed = false
     const updated = _opBlocks.map((b) => {
         if (!b.intro) return b
-        const idx = sorted.findIndex((s) => s.id === b.id)
-        if (idx <= 0) return b
+        const idx = idxOf.get(b.id)
+        if (idx === undefined || idx <= 0) return b
         const prev = sorted[idx - 1]
         if (prev.trackIndex === b.trackIndex) {
             changed = true
@@ -1751,19 +1814,34 @@ export function setOpBlockPos(blockId: string, pos: number): number | null {
 function enforceSwitchback() {
     const lastTrackIdx = getTRACKS().length - 1
     const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
+    const globalIdxOf = new Map(sorted.map((s, i) => [s.id, i]))
+    // 按轨道的有序索引（替代同轨 findIndex）
+    const trackSorted = new Map<number, OpBlock[]>()
+    const trackIdxOf = new Map<number, Map<string, number>>()
+    for (const b of sorted) {
+        let list = trackSorted.get(b.trackIndex)
+        let map = trackIdxOf.get(b.trackIndex)
+        if (!list || !map) {
+            list = []
+            map = new Map()
+            trackSorted.set(b.trackIndex, list)
+            trackIdxOf.set(b.trackIndex, map)
+        }
+        map.set(b.id, list.length)
+        list.push(b)
+    }
     let changed = false
     const updated = _opBlocks.map((b) => {
         if (!b.switchback || b.trackIndex >= lastTrackIdx) return b
 
-        const sameTrack = sorted.filter((s) => s.trackIndex === b.trackIndex)
-        const sameTrackIdx = sameTrack.findIndex((s) => s.id === b.id)
-        if (sameTrackIdx <= 0) {
+        const sameTrackIdx = trackIdxOf.get(b.trackIndex)?.get(b.id)
+        if (sameTrackIdx === undefined || sameTrackIdx <= 0) {
             changed = true
             return { ...b, switchback: false }
         }
 
-        const globalIdx = sorted.findIndex((s) => s.id === b.id)
-        if (globalIdx > 0 && sorted[globalIdx - 1].trackIndex === b.trackIndex) {
+        const globalIdx = globalIdxOf.get(b.id)
+        if (globalIdx !== undefined && globalIdx > 0 && sorted[globalIdx - 1].trackIndex === b.trackIndex) {
             changed = true
             return { ...b, switchback: false }
         }
@@ -1865,8 +1943,9 @@ export function reflowTrack(trackIndex: number) {
             result.push({ ...cur, pos: Math.max(0, Math.min(MAX_POS, newPos)) })
         }
     }
+    const resultById = new Map(result.map((r) => [r.id, r]))
     const updated = _opBlocks.map((b) => {
-        const nb = result.find((r) => r.id === b.id)
+        const nb = resultById.get(b.id)
         return nb ?? b
     })
     _opBlocks = updated
@@ -2507,21 +2586,17 @@ registerDragCancel(() => {
         _draggingId = null
         resetGroupDrag()
     }
-    // 块拖拽：恢复拖前位置
+    // 块拖拽：非组拖时 _opBlocks 未变（视觉位置在 _dragBlockVisualPositions），丢弃即还原；组拖恢复初始快照
     if (_dragBlockId) {
-        const block = _opBlocks.find((b) => b.id === _dragBlockId)
-        if (block) {
-            if (_isGroupDrag) {
-                _opBlocks = _opBlocks.map((b) =>
-                    _dragBlockInitialPositions[b.id] !== undefined ? { ...b, pos: _dragBlockInitialPositions[b.id] } : b
-                )
-                _refLines = _refLines.map((r) =>
-                    _dragRefInitialPositions[r.id] !== undefined ? { ...r, pos: _dragRefInitialPositions[r.id] } : r
-                )
-            } else if (Math.abs(block.pos - _dragBlockStartPos) > 0.5) {
-                _opBlocks = _opBlocks.map((b) => (b.id === _dragBlockId ? { ...b, pos: _dragBlockStartPos } : b))
-            }
+        if (_isGroupDrag) {
+            _opBlocks = _opBlocks.map((b) =>
+                _dragBlockInitialPositions[b.id] !== undefined ? { ...b, pos: _dragBlockInitialPositions[b.id] } : b
+            )
+            _refLines = _refLines.map((r) =>
+                _dragRefInitialPositions[r.id] !== undefined ? { ...r, pos: _dragRefInitialPositions[r.id] } : r
+            )
         }
+        _dragBlockVisualPositions = {}
         _dragBlockInitialPositions = {}
         _dragRefInitialPositions = {}
         _isGroupDrag = false

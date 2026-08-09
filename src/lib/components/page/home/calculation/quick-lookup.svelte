@@ -188,9 +188,17 @@
         ctxShow = false
     }
 
-    /** @desc 富文本渲染辅助：空串容错 / 转 HTML 并高亮数字 */
+    /** @desc 富文本渲染辅助：空串容错 / 转 HTML 并高亮数字（按描述文本 memo，避免重渲染时整页重复着色） */
     const img = (p: string) => p || ''
-    const rd = (s: string) => colorizeNumbers(richTextToHtml(s))
+    const _rdCache = new Map<string, string>()
+    const rd = (s: string) => {
+        const cached = _rdCache.get(s)
+        if (cached !== undefined) return cached
+        const html = colorizeNumbers(richTextToHtml(s))
+        if (_rdCache.size > 500) _rdCache.clear()
+        _rdCache.set(s, html)
+        return html
+    }
     /** @desc 副属性数值格式化：小数（<1）转百分比 */
     const fmtSubVal = (v: string) => {
         const n = parseFloat(v)

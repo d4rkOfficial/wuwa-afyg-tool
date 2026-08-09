@@ -37,6 +37,23 @@ let _fetchPromise: Promise<void> | null = null
 let _onupdate: ((state: CalcState) => void) | undefined = $state()
 
 /** @desc 初始化/重建整个 store：写入队伍与时间线、加载保存态（过滤[配置]自动块）、重建伤害条目、同步全局 buff；返回前清理孤儿绑定 */
+/** @desc 上次 init 的轻量指纹（数据未变时幂等短路，避免勾选回写触发全量重建） */
+let _lastInitKey = ''
+
+function initKey(
+    team: [CharSlot, CharSlot, CharSlot],
+    timelineData: TimelineData | null,
+    savedState: CalcState | null,
+    locked: boolean
+): string {
+    const tl = timelineData
+    const tlFp = tl ? `${tl.refLines.length}:${tl.opBlocks.length}:${tl.damageBlocks.length}` : 'null'
+    const st = savedState ? JSON.stringify(savedState) : null
+    const stFp = st ? `${st.length}:${st.slice(-64)}` : 'null'
+    const teamFp = team.map((s) => `${s.character ?? ''}|${s.weapon ?? ''}`).join(',')
+    return `${teamFp}|${tlFp}|${stFp}|${locked}`
+}
+
 export function init(
     team: [CharSlot, CharSlot, CharSlot],
     timelineData: TimelineData | null,
@@ -46,8 +63,14 @@ export function init(
 ) {
     _locked = locked
     _onupdate = onupdate
-    _initTeam = team
-    _initTimelineData = timelineData
+    const key = initKey(team, timelineData, savedState, locked)
+    if (key === _lastInitKey) {
+        // 幂等短路：数据未变（如 onupdate 回写自证），仅更新回调引用，跳过全量重建
+        _initTeam = team
+        _initTimelineData = timelineData
+        return
+    }
+    _lastInitKey = key
 
     const cached = getCharElementMap()
     const names = team.map((s) => s.character).filter(Boolean) as string[]
@@ -631,12 +654,13 @@ export function removeZoneFromBuffSet(setId: string, zoneId: string) {
     )
 }
 
-/** @desc 设置某乘区的数值 */
+/** @desc 设置某乘区的数值（$state 深代理原地修改，避免整数组替换触发无关重建） */
 export function setBuffSetZoneValue(setId: string, zoneId: string, value: number) {
     if (!assertUnlocked()) return
-    _buffSets = _buffSets.map((s) =>
-        s.id === setId ? { ...s, zones: s.zones.map((z) => (z.zoneId === (zoneId as any) ? { ...z, value } : z)) } : s
-    )
+    const bs = _buffSets.find((s) => s.id === setId)
+    if (!bs) return
+    const zone = bs.zones.find((z) => z.zoneId === (zoneId as any))
+    if (zone) zone.value = value
 }
 
 /** @desc ── Entry-BuffSet 绑定 ── */
@@ -649,6 +673,18 @@ export function getBuffSetIdsForEntry(entryId: string): string[] {
 export function setBuffSetIdsForEntry(entryId: string, setIds: string[]): boolean {
     if (!assertUnlocked()) return false
     _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: [...setIds] }
+    return true
+}
+
+/** @desc 批量覆写多个条目绑定的 Buff 集合（框选批量用；单次变更单次通知） */
+export function setBuffSetIdsForEntries(map: Record<string, string[]>): boolean {
+    if (!assertUnlocked()) return false
+    if (Object.keys(map).length === 0) return false
+    const next = { ..._damageEntryBuffSetIds }
+    for (const [entryId, setIds] of Object.entries(map)) {
+        next[entryId] = [...setIds]
+    }
+    _damageEntryBuffSetIds = next
     return true
 }
 

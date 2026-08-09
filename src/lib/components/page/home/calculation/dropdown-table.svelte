@@ -66,6 +66,8 @@
         Object.fromEntries(team.map((s, i) => [s.character ?? '', i]).filter(([name]) => name !== ''))
     )
     let entryCharIdx = $derived(selectedEntry?.character ? (charToIdx[selectedEntry.character] ?? -1) : -1)
+    /** @desc buffId → BuffSet 查找索引（替代渲染/差异计算中的线性 find） */
+    let buffById = $derived(new Map(buffSets.map((b) => [b.id, b])))
 
     /** @desc 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff） */
     const buffMatches = (bs: BuffSet | undefined, entry: DamageEntry): boolean => {
@@ -105,17 +107,13 @@
         for (let i = 0; i < damageEntries.length; i++) {
             const e = damageEntries[i]
 
-            const match = (sid: string) =>
-                buffMatches(
-                    buffSets.find((b) => b.id === sid),
-                    e
-                )
+            const match = (sid: string) => buffMatches(buffById.get(sid), e)
 
             const globalItems = (entryBuffSetIdMap[e.id] ?? [])
                 .filter((sid) => globalBuffSetIds.includes(sid) && match(sid))
                 .map((sid) => ({
                     setId: sid,
-                    name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                    name: buffById.get(sid)?.name ?? '',
                     type: 'global' as const
                 }))
 
@@ -130,7 +128,7 @@
                         .filter((sid) => !globalBuffSetIds.includes(sid) && match(sid))
                         .map((sid) => ({
                             setId: sid,
-                            name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                            name: buffById.get(sid)?.name ?? '',
                             type: 'same' as const
                         }))
                 ]
@@ -163,7 +161,7 @@
                         .filter((sid) => !globalBuffSetIds.includes(sid) && match(sid))
                         .map((sid) => ({
                             setId: sid,
-                            name: buffSets.find((b) => b.id === sid)?.name ?? '',
+                            name: buffById.get(sid)?.name ?? '',
                             type: 'added' as const
                         }))
                 ]
@@ -175,10 +173,10 @@
             const items: BuffDiffItem[] = []
             for (const id of curr)
                 if (!prev.has(id) && match(id))
-                    items.push({ setId: id, name: buffSets.find((b) => b.id === id)?.name ?? '', type: 'added' })
+                    items.push({ setId: id, name: buffById.get(id)?.name ?? '', type: 'added' })
             for (const id of prev)
                 if (!curr.has(id) && match(id))
-                    items.push({ setId: id, name: buffSets.find((b) => b.id === id)?.name ?? '', type: 'removed' })
+                    items.push({ setId: id, name: buffById.get(id)?.name ?? '', type: 'removed' })
             result[e.id] = items
         }
         return result
@@ -536,8 +534,8 @@
                                     {/if}
                                 {/each}
                             {:else}
-                                {#each (entryBuffSetIdMap[damageEntry.id] ?? []).filter( (sid) => buffMatches( buffSets.find((s) => s.id === sid), damageEntry ) ) as setId}
-                                    {@const buffSet = buffSets.find((s) => s.id === setId)}
+                                {#each (entryBuffSetIdMap[damageEntry.id] ?? []).filter( (sid) => buffMatches(buffById.get(sid), damageEntry) ) as setId}
+                                    {@const buffSet = buffById.get(setId)}
                                     {#if buffSet && !globalBuffSetIds.includes(setId)}
                                         <span
                                             class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"

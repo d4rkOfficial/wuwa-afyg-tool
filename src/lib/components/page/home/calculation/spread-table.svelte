@@ -26,6 +26,7 @@
         onToggle: (entryId: string, buffId: string) => void
         onToggleDamageType: (entryId: string, damageType: string) => void
         onSetEntryBuffSetIds: (entryId: string, ids: string[]) => void
+        onSetEntriesBuffSetIds?: (map: Record<string, string[]>) => void
     }
 
     let {
@@ -39,7 +40,8 @@
         hideConditionMismatch,
         onToggle,
         onToggleDamageType,
-        onSetEntryBuffSetIds
+        onSetEntryBuffSetIds,
+        onSetEntriesBuffSetIds
     }: Props = $props()
 
     /** @desc 普通 buff 列（非全局）与全局 buff 列（仅展示，不可勾选） */
@@ -104,6 +106,40 @@
         if (!scopeOk) return false
         if (!hideConditionMismatch) return true
         return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap)
+    }
+
+    /** @desc 可用性结果缓存：(entryId, buffId) → enabled；条件配置/隐藏开关/类型映射/角色索引引用未变时复用，避免每次重建全量重跑 conditionMet */
+    let _enabledCache = new Map<string, boolean>()
+    let _enabledCacheCtx: {
+        hide: boolean
+        profile: ConditionProfile | null
+        types: Record<string, string[]> | null
+        chars: Record<string, number> | null
+    } = { hide: false, profile: null, types: null, chars: null }
+
+    function buffEnabledForEntryCached(bs: BuffSet, entry: DamageEntry, charIdx: number): boolean {
+        const ctx = {
+            hide: hideConditionMismatch,
+            profile: conditionProfile,
+            types: entryDamageTypeMap,
+            chars: charToIdx
+        }
+        if (
+            ctx.hide !== _enabledCacheCtx.hide ||
+            ctx.profile !== _enabledCacheCtx.profile ||
+            ctx.types !== _enabledCacheCtx.types ||
+            ctx.chars !== _enabledCacheCtx.chars
+        ) {
+            _enabledCacheCtx = ctx
+            _enabledCache.clear()
+        }
+        const key = entry.id + '\u0000' + bs.id
+        let v = _enabledCache.get(key)
+        if (v === undefined) {
+            v = buffEnabledForEntry(bs, entry, charIdx)
+            _enabledCache.set(key, v)
+        }
+        return v
     }
 
     /** @desc 效应/处决/响应伤害实际读取的乘区（computeEffectEntry / computeTuneEntry）：效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；都不吃攻击/暴击/增伤/面板类 */
@@ -197,20 +233,20 @@
             let prevIdx = -Infinity
             for (const { entry, idx } of g.items) {
                 const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
+                // 绑定 Set 化：替代每 cell 的 includes
+                const boundSet = new Set(entryBuffSetIdMap[entry.id] ?? [])
                 const cells: CellData[] = []
                 for (let ci = 0; ci < columns.length; ci++) {
                     const bs = columns[ci]
-                    const enabled = buffEnabledForEntry(bs, entry, charIdx)
+                    const enabled = buffEnabledForEntryCached(bs, entry, charIdx)
                     // selected 反映真实绑定状态（含条件不匹配但已勾选的 buff，用于降透明度展示）
-                    const selected = (entryBuffSetIdMap[entry.id] ?? []).includes(bs.id)
+                    const selected = boundSet.has(bs.id)
                     cells.push({ buffId: bs.id, enabled, selected })
                     if (enabled) colStats[ci].enabled++
                     if (enabled && selected) colStats[ci].selected++
                 }
                 const enabledBuffIds = cells.filter((c) => c.enabled).map((c) => c.buffId)
-                const selectedCount = enabledBuffIds.filter((id) =>
-                    (entryBuffSetIdMap[entry.id] ?? []).includes(id)
-                ).length
+                const selectedCount = enabledBuffIds.filter((id) => boundSet.has(id)).length
                 rows.push({
                     entry,
                     cells,
@@ -227,7 +263,8 @@
                     const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
                     const isNonDirect = entry.isEffect || entry.isTuneBreak || entry.isTuneResponse
                     return (
-                        buffEnabledForEntry(gb, entry, charIdx) && (!isNonDirect || buffRelevantForNonDirect(gb, entry))
+                        buffEnabledForEntryCached(gb, entry, charIdx) &&
+                        (!isNonDirect || buffRelevantForNonDirect(gb, entry))
                     )
                 })
             )
@@ -497,13 +534,20 @@
         }
         if (byRow.size === 0) return
         const targetSelected = !anySelected
+        const batch = new Map<string, string[]>()
         for (const [row, buffIds] of byRow) {
             const cur = new Set(entryBuffSetIdMap[row.entry.id] ?? [])
             for (const id of buffIds) {
                 if (targetSelected) cur.add(id)
                 else cur.delete(id)
             }
-            onSetEntryBuffSetIds(row.entry.id, [...cur])
+            batch.set(row.entry.id, [...cur])
+        }
+        // 批量 API：N 行框选单次通知（无批量回调时逐行回退）
+        if (onSetEntriesBuffSetIds && batch.size > 1) {
+            onSetEntriesBuffSetIds(Object.fromEntries(batch))
+        } else {
+            for (const [entryId, ids] of batch) onSetEntryBuffSetIds(entryId, ids)
         }
     }
 
@@ -511,8 +555,11 @@
     let groupTableWidths = $state<Record<number, number>>({})
     let maxTableWidth = $state(0)
 
+    /** @desc 列结构指纹：仅列结构变化（增删列/组数）时重测等宽，脱离 tableData 全量重建（勾选不再触发测量） */
+    const colStructureKey = $derived(tableData.map((g) => g.visibleColIdx.join(',')).join('|'))
+
     $effect(() => {
-        tableData
+        colStructureKey
         const measure = () => {
             const tables = Array.from(document.querySelectorAll<HTMLElement>('[data-group-table]'))
             if (tables.length === 0) return

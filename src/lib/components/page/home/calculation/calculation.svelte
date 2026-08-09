@@ -7,6 +7,7 @@
         getBuffSetIdsForEntry,
         toggleBuffSetForEntry,
         setBuffSetIdsForEntry,
+        setBuffSetIdsForEntries,
         getShowBuffModal,
         setShowBuffModal,
         getCalcState,
@@ -84,6 +85,12 @@
         setBuffSetIdsForEntry(entryId, ids)
         onupdate(getCalcState())
     }
+
+    /** @desc 铺开表：批量覆写多条目的 Buff 绑定（框选批量用，单次持久化） */
+    function handleSpreadSetEntriesBuffSetIds(entries: Record<string, string[]>) {
+        if (!setBuffSetIdsForEntries(entries)) return
+        onupdate(getCalcState())
+    }
 </script>
 
 <!-- @desc Buff 配置弹窗（挂载于页面顶层，open 由 store 控制） -->
@@ -103,6 +110,7 @@
         onToggle={handleSpreadToggle}
         onToggleDamageType={handleSpreadToggleDamageType}
         onSetEntryBuffSetIds={handleSpreadSetEntryBuffSetIds}
+        onSetEntriesBuffSetIds={handleSpreadSetEntriesBuffSetIds}
     />
 {:else}
     <DropdownTable

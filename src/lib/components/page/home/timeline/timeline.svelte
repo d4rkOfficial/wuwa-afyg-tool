@@ -15,6 +15,7 @@
         setEditValue,
         getDraggingId,
         getDragBlockId,
+        getDragBlockVisualPositions,
         getIsGroupDrag,
         getBlockWidths,
         getCharIconMap,
@@ -131,6 +132,9 @@
     let uiBtnIconMap = $derived(new Map(getUiBtnIcons()))
     // 手柄图标（游戏原生，blockKey 为手柄 id 时使用）
     const gamepadIconMap = new Map(GAMEPAD_BUTTONS.filter((b) => b.icon).map((b) => [b.id, b.icon as string]))
+    // 查找索引：伤害层每帧渲染用 O(1) 替代 find（拖拽帧成本优化）
+    let teamByChar = $derived(new Map(team.map((s) => [s.character ?? '', s])))
+    let opBlockById = $derived(new Map(getOpBlocks().map((b) => [b.id, b])))
     let damageStack = $derived(getDamageBlocksStacked())
     let damageStackHeight = $derived.by(() => {
         let maxBottom = 0
@@ -185,12 +189,34 @@
         }
     }
 
+    // 时间轴视口度量缓存：mousemove 每帧读取（避免 layout 读），在滚动/尺寸变化时刷新
+    let tlMetrics = $state({ left: 0, top: 0, width: 0, height: 0, scrollLeft: 0 })
+
+    function refreshTimelineMetrics() {
+        if (!timelineEl) return
+        const r = timelineEl.getBoundingClientRect()
+        tlMetrics = {
+            left: r.left,
+            top: r.top,
+            width: r.width,
+            height: r.height,
+            scrollLeft: timelineEl.scrollLeft
+        }
+    }
+
+    $effect(() => {
+        timelineEl
+        refreshTimelineMetrics()
+        const obs = new ResizeObserver(refreshTimelineMetrics)
+        if (timelineEl) obs.observe(timelineEl)
+        return () => obs.disconnect()
+    })
+
     const onWindowMouseMove = (e: MouseEvent) => {
         if (!timelineEl) return
-        const rect = timelineEl.getBoundingClientRect()
-        const scrollL = timelineEl.scrollLeft
-        const rawX = e.clientX - rect.left + scrollL - 80
-        if (e.clientX >= rect.left && e.clientX <= rect.right) {
+        const rect = tlMetrics
+        const rawX = e.clientX - rect.left + rect.scrollLeft - 80
+        if (e.clientX >= rect.left && e.clientX <= rect.left + rect.width) {
             setPointerX(rawX)
         }
         if (getSelectionRect()) {
@@ -215,6 +241,7 @@
         if (!timelineEl) return
         e.preventDefault()
         timelineEl.scrollLeft += e.deltaY
+        refreshTimelineMetrics()
     }
 
     const onDamageWheel = (e: WheelEvent) => {
@@ -607,7 +634,8 @@
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
                                         class="absolute inset-y-0 flex items-center pointer-events-auto cursor-grab active:cursor-grabbing select-none"
-                                        style="left: {block.pos}px; transform: translateX(-50%) {isHighlighted
+                                        style="left: {getDragBlockVisualPositions()[block.id] ??
+                                            block.pos}px; transform: translateX(-50%) {isHighlighted
                                             ? 'translateY(-4px)'
                                             : ''}; z-index: {isHighlighted ? 20 : 5}; opacity: {isOtherBlockDimmed
                                             ? 0.4
@@ -717,12 +745,9 @@
                                                 use:measureDamageWidth={dmg.id}
                                             >
                                                 {#each dmg.skillHits as hit}
-                                                    {@const echoName = team.find((s) => s.character === hit.character)
-                                                        ?.echoes?.[0]?.name}
+                                                    {@const echoName = teamByChar.get(hit.character)?.echoes?.[0]?.name}
                                                     {@const srcOp =
-                                                        dmg.sourceType === 'op'
-                                                            ? getOpBlocks().find((b) => b.id === dmg.sourceId)
-                                                            : null}
+                                                        dmg.sourceType === 'op' ? opBlockById.get(dmg.sourceId) : null}
                                                     {@const srcChar =
                                                         dmg.sourceType === 'ref'
                                                             ? ''

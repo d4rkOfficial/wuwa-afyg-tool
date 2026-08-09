@@ -410,6 +410,29 @@ export function getPhaseOrder(): PhaseKey[] {
     return PHASE_ORDER
 }
 
-async function persist() {
-    await dbSet(PROJECTS_KEY, toPlain(projects))
+/** @desc 持久化轻量防抖：同帧多次更新（快速排轴连按/框选批量）合并为一次 IndexedDB 写（~100ms 窗口，pagehide 时立即 flush） */
+let _persistPending = false
+let _persistTimer: ReturnType<typeof setTimeout> | null = null
+
+function persist() {
+    if (_persistPending) return
+    _persistPending = true
+    if (_persistTimer !== null) clearTimeout(_persistTimer)
+    _persistTimer = setTimeout(() => {
+        _persistTimer = null
+        _persistPending = false
+        void dbSet(PROJECTS_KEY, toPlain(projects))
+    }, 100)
+}
+
+function flushPersist() {
+    if (_persistTimer === null) return
+    clearTimeout(_persistTimer)
+    _persistTimer = null
+    _persistPending = false
+    void dbSet(PROJECTS_KEY, toPlain(projects))
+}
+
+if (browser) {
+    window.addEventListener('pagehide', flushPersist)
 }
