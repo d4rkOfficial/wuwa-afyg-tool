@@ -10,7 +10,7 @@
     import Icon from '@iconify/svelte'
     import { ALGORITHM_HELP } from './consts'
     import { openHelp } from '$lib/data/help.svelte'
-    import { aggregateDirectDamageByType, type DirectDamageByType, DAMAGE_TYPE_CATEGORIES, TYPE_COLORS } from './utils'
+    import { aggregateDirectDamageByType, DAMAGE_TYPE_CATEGORIES, TYPE_COLORS } from './utils'
 
     interface Props {
         entries: ResultEntry[]
@@ -609,13 +609,6 @@
             ? directDamageByType[Math.min(selectedTypeChar, directDamageByType.length - 1)]
             : undefined
     )
-
-    /** @desc 无名角色组（效应伤害等无角色来源条目）的显示名：全部为效应伤害 →「效应」，否则 →「无名」 */
-    function aggLabel(agg: DirectDamageByType): string {
-        if (agg.character) return agg.character
-        const isAllEffect = agg.total > 0 && agg.byType['效应'] === agg.total
-        return isAllEffect ? '效应' : '无名'
-    }
     let typeCharts: Chart<'doughnut'>[] = []
     const typeChartCanvasMap = new Map<string, HTMLCanvasElement>()
 
@@ -1347,7 +1340,9 @@
             <div class="flex items-center gap-2 mb-3">
                 <Icon icon="mdi:chart-bar" class="size-4" style="color: var(--theme-accent-text);" />
                 <span class="text-sm font-medium" style="color: var(--theme-modal-text);">角色伤害类型占比</span>
-                <span class="text-[10px]" style="color: var(--theme-modal-text); opacity: 0.4;">（仅直伤）</span>
+                <span class="text-[10px]" style="color: var(--theme-modal-text); opacity: 0.4;"
+                    >（仅直伤，包括视为效应）</span
+                >
                 {#if directDamageByType.length > 1}
                     <div
                         class="ml-auto flex items-center gap-1 rounded-lg border px-1 py-1"
@@ -1368,7 +1363,7 @@
                                     ? 'var(--theme-accent-text-on-bg, #ffffff)'
                                     : ''};"
                             >
-                                {aggLabel(agg)}
+                                {agg.character}
                             </button>
                         {/each}
                     </div>
@@ -1385,7 +1380,7 @@
                 >
                     <div class="px-4 py-2.5 flex items-center justify-between">
                         <span class="text-xs font-semibold" style="color: var(--theme-modal-text);"
-                            >{aggLabel(activeTypeAgg)}</span
+                            >{activeTypeAgg.character}</span
                         >
                         <span class="text-[10px] tabular-nums" style="color: var(--theme-modal-text); opacity: 0.5;"
                             >{Math.round(activeTypeAgg.total).toLocaleString()}</span

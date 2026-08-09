@@ -75,7 +75,9 @@ export function aggregateDirectDamageByType(entries: ResultEntry[]): DirectDamag
     const indexMap = new Map<string, number>()
 
     for (const e of entries) {
-        if (e.damageTypes.length === 0) continue
+        // 排除：无伤害类型、纯效应条目（baseUnit === '效应系数'，无角色来源）、无角色来源直伤（无名组不生成）；
+        // 「视为效应」的直伤（有角色、baseUnit 非效应系数）保留
+        if (e.damageTypes.length === 0 || e.baseUnit === '效应系数' || !e.character) continue
         let idx = indexMap.get(e.character)
         if (idx === undefined) {
             idx = result.length
