@@ -11,6 +11,7 @@
     import { getDamageTypeEditMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
+    import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import Icon from '@iconify/svelte'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
 
@@ -383,6 +384,7 @@
 
     /** @desc 拖动进入 AI 悬浮窗等"禁区"时取消框选（不应用选中） */
     let unregisterDragCancel: (() => void) | null = null
+    const gpuAccel = $derived(getGpuAccel())
     onMount(() => {
         unregisterDragCancel = registerDragCancel(cancelSelection)
     })
@@ -640,10 +642,12 @@
     }}
 >
     {#if selRect}
-        <!-- 框选范围指示 -->
+        <!-- 框选范围指示（GPU 模式用 transform 定位走合成层） -->
         <div
             class="pointer-events-none fixed z-50"
-            style="left: {selRect.left}px; top: {selRect.top}px; width: {selRect.width}px; height: {selRect.height}px; background: color-mix(in srgb, var(--theme-accent-bg) 25%, transparent); border: 1px solid var(--theme-accent-bg);"
+            style="{gpuAccel
+                ? `transform: translate(${selRect.left}px, ${selRect.top}px);`
+                : `left: ${selRect.left}px; top: ${selRect.top}px;`} width: {selRect.width}px; height: {selRect.height}px; background: color-mix(in srgb, var(--theme-accent-bg) 25%, transparent); border: 1px solid var(--theme-accent-bg);"
         ></div>
     {/if}
     {#if damageEntries.length === 0}

@@ -8,6 +8,7 @@
     import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
     import { notifyCalcUpdate, getCalcState } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
+    import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import { cancelActiveDrags } from '$lib/utils/drag-guard'
     import { marked } from 'marked'
     import { getOpenPanelsSummary } from '../panels.svelte'
@@ -153,6 +154,8 @@
     const modelLabel = $derived(`${aiConfig.label} · ${aiConfig.model}`)
     // AI 助手是否启用（悬浮窗显隐）
     const aiEnabled = $derived(getGenPrefs().enabled)
+    // GPU 合成加速（设置 → 交互相关）：拖拽定位用 transform 走合成层
+    const gpuAccel = $derived(getGpuAccel())
     // 最新一条用户消息的展示索引（仅它可重试）
     const lastUserDisplayIdx = $derived.by(() => {
         for (let i = display.length - 1; i >= 0; i--) {
@@ -417,7 +420,11 @@
             ? ''
             : 'bottom-4 right-4'}"
         style="{dragPos
-            ? `left:${dragPos.x}px;top:${dragPos.y}px;`
+            ? gpuAccel
+                ? `transform: translate(${dragPos.x}px, ${dragPos.y}px);`
+                : `left:${dragPos.x}px;top:${dragPos.y}px;`
+            : ''}{gpuAccel && (dragging || btnDrag)
+            ? ' will-change: transform;'
             : ''}width:{curW}px;height:{curH}px;border-radius:{size === 'collapsed'
             ? '9999px'
             : '0.75rem'};transition:width .38s cubic-bezier(.32,.72,.24,1),height .38s cubic-bezier(.32,.72,.24,1),border-radius .38s cubic-bezier(.32,.72,.24,1),background-color .38s cubic-bezier(.32,.72,.24,1);background:{size ===

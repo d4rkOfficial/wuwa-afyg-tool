@@ -108,6 +108,7 @@
     import DamageList from './damage-list.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
+    import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import { getInputShortcutId, getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { addToast } from '$lib/data/toast.svelte'
 
@@ -136,6 +137,34 @@
     let teamByChar = $derived(new Map(team.map((s) => [s.character ?? '', s])))
     let opBlockById = $derived(new Map(getOpBlocks().map((b) => [b.id, b])))
     let damageStack = $derived(getDamageBlocksStacked())
+    // GPU 合成加速：开启时拖拽/动画用 transform 定位（合成层），关闭回退 left/top 布局定位
+    const gpuAccel = $derived(getGpuAccel())
+
+    function blockStyle(block: OpBlock, highlighted: boolean, dimmed: boolean, isDragTarget: boolean): string {
+        const visualPos = getDragBlockVisualPositions()[block.id] ?? block.pos
+        const rest = `z-index: ${highlighted ? 20 : 5}; opacity: ${dimmed ? 0.4 : 1}; transition: opacity 150ms ease;`
+        if (gpuAccel) {
+            const dx = visualPos - block.pos
+            return `left: ${block.pos}px; transform: translateX(${dx}px) translateX(-50%) ${
+                highlighted ? 'translateY(-4px)' : ''
+            }; ${rest}${isDragTarget ? ' will-change: transform;' : ''}`
+        }
+        return `left: ${visualPos}px; transform: translateX(-50%) ${highlighted ? 'translateY(-4px)' : ''}; ${rest}`
+    }
+
+    function refLineLeft(id: string, pos: number): string {
+        const x = vx(id, pos)
+        if (gpuAccel) return `left: ${pos}px; transform: translateX(${x - pos}px);`
+        return `left: ${x}px;`
+    }
+
+    function damageStackStyle(left: number, top: number, scale: number, dimmed: boolean, dragging: boolean): string {
+        const rest = `opacity: ${dimmed ? 0.4 : 1}; transform-origin: left center; transition: ${
+            dragging ? 'opacity 150ms ease' : 'transform 150ms ease, opacity 150ms ease'
+        };`
+        if (gpuAccel) return `transform: translate(${left}px, ${top}px) scale(${scale}); ${rest}`
+        return `left: ${left}px; top: ${top}px; transform: scale(${scale}); ${rest}`
+    }
     let damageStackHeight = $derived.by(() => {
         let maxBottom = 0
         for (const item of damageStack) {
@@ -634,12 +663,12 @@
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
                                         class="absolute inset-y-0 flex items-center pointer-events-auto cursor-grab active:cursor-grabbing select-none"
-                                        style="left: {getDragBlockVisualPositions()[block.id] ??
-                                            block.pos}px; transform: translateX(-50%) {isHighlighted
-                                            ? 'translateY(-4px)'
-                                            : ''}; z-index: {isHighlighted ? 20 : 5}; opacity: {isOtherBlockDimmed
-                                            ? 0.4
-                                            : 1}; transition: opacity 150ms ease;"
+                                        style={blockStyle(
+                                            block,
+                                            isHighlighted,
+                                            isOtherBlockDimmed,
+                                            getDragBlockId() === block.id && !isGroupDrag
+                                        )}
                                         data-block={block.id}
                                         onmousedown={(e) => {
                                             if (e.ctrlKey) {
@@ -734,11 +763,13 @@
                                             (getDragBlockId() !== null || isGroupDrag) && !isParentDragged}
                                         <div
                                             class="absolute cursor-default"
-                                            style="left: {left}px; top: {top}px; transform: scale({isParentDragged
-                                                ? 1.2
-                                                : 1}); opacity: {isDimmed
-                                                ? 0.4
-                                                : 1}; transform-origin: left center; transition: transform 150ms ease, opacity 150ms ease;"
+                                            style={damageStackStyle(
+                                                left,
+                                                top,
+                                                isParentDragged ? 1.2 : 1,
+                                                isDimmed,
+                                                getDragBlockId() !== null || getDraggingId() !== null
+                                            )}
                                         >
                                             <div
                                                 class="flex flex-col items-start gap-0.5 px-1 py-0.5"
@@ -816,10 +847,13 @@
                 {#each getRefLines() as rl}
                     <div
                         class="absolute top-0 bottom-0 border-l-2 border-dashed"
-                        style="left: {vx(rl.id, rl.pos)}px; border-left-color: {getDraggingId() === rl.id ||
+                        style="{refLineLeft(rl.id, rl.pos)}border-left-color: {getDraggingId() === rl.id ||
                         getSelectedRefLineIds()[rl.id]
                             ? 'var(--theme-accent-bg)'
-                            : 'color-mix(in srgb, var(--theme-timeline-text) 30%, transparent)'};"
+                            : 'color-mix(in srgb, var(--theme-timeline-text) 30%, transparent)'};{gpuAccel &&
+                        getDraggingId() === rl.id
+                            ? ' will-change: transform;'
+                            : ''}"
                     ></div>
                 {/each}
             </div>
@@ -829,7 +863,9 @@
                 {#each getRefLines() as rl}
                     <div
                         class="absolute top-0 h-full flex items-center pointer-events-auto"
-                        style="left: {vx(rl.id, rl.pos)}px; transform: translateX(-50%); white-space: nowrap;"
+                        style="{gpuAccel
+                            ? `left: ${rl.pos}px; transform: translateX(${vx(rl.id, rl.pos) - rl.pos}px) translateX(-50%);`
+                            : `left: ${vx(rl.id, rl.pos)}px; transform: translateX(-50%);`} white-space: nowrap;"
                     >
                         {#if getEditingId() === rl.id && !(rl.id === 'left' || rl.id === 'right')}
                             <input
@@ -877,8 +913,9 @@
                 {@const rectWidth = Math.abs(sr.currentX - sr.startX)}
                 <div
                     class="absolute pointer-events-none"
-                    style="top: 2rem; left: {5 * 16 +
-                        rectLeft}px; width: {rectWidth}px; bottom: 0; z-index: 7; background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent); border-left: 1px solid color-mix(in srgb, var(--theme-accent-bg) 40%, transparent); border-right: 1px solid color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);"
+                    style="{gpuAccel
+                        ? `transform: translateX(${5 * 16 + rectLeft}px);`
+                        : `left: ${5 * 16 + rectLeft}px;`} top: 2rem; width: {rectWidth}px; bottom: 0; z-index: 7; background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent); border-left: 1px solid color-mix(in srgb, var(--theme-accent-bg) 40%, transparent); border-right: 1px solid color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);"
                 ></div>
             {/if}
             <!-- Drag hot zone overlay -->
@@ -887,7 +924,9 @@
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         class="absolute inset-y-0 pointer-events-auto cursor-col-resize"
-                        style="left: {vx(rl.id, rl.pos) - 10}px; width: 20px;"
+                        style="{gpuAccel
+                            ? `left: ${rl.pos - 10}px; transform: translateX(${vx(rl.id, rl.pos) - rl.pos}px);`
+                            : `left: ${vx(rl.id, rl.pos) - 10}px;`} width: 20px;"
                         data-ref-line={rl.id}
                         onmousedown={(e) => {
                             if (e.ctrlKey) {

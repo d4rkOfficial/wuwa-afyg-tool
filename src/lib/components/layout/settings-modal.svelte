@@ -37,6 +37,7 @@
     } from '$lib/data/ai-prefs.svelte'
     import { GAMEPAD_BUTTONS } from '$lib/components/page/home/timeline/timeline.consts'
     import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
+    import { getGpuAccel, setGpuAccel } from '$lib/data/render-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
         applyLockedMods,
@@ -965,6 +966,37 @@
                         </div>
                     {:else if tab === 'interaction'}
                         <div>
+                            <!-- 渲染加速（GPU）：拖拽/动画走合成层 -->
+                            <div
+                                class="mb-4 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                style="border-color: var(--theme-divider-border);"
+                            >
+                                <div class="min-w-0">
+                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                        >渲染加速（GPU）</span
+                                    >
+                                    <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                        开启后排轴拖拽/框选/悬浮窗使用 GPU 合成（transform
+                                        定位），帧率更高；关闭回退传统布局定位
+                                    </span>
+                                </div>
+                                <button
+                                    onclick={() => setGpuAccel(!getGpuAccel())}
+                                    class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                    style="background: {getGpuAccel()
+                                        ? 'var(--theme-accent-bg)'
+                                        : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                    title="点击切换"
+                                >
+                                    <span
+                                        class="absolute top-0.5 size-4 rounded-full transition-all"
+                                        style="left: {getGpuAccel()
+                                            ? '18px'
+                                            : '2px'}; background: var(--theme-modal-bg);"
+                                    ></span>
+                                </button>
+                            </div>
+
                             <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">拉表视图</span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 选择拉表页面的 Buff 编辑方式；后续拉表/排轴等快捷键设置也将集中在此区域
