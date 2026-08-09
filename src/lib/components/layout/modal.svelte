@@ -43,11 +43,24 @@
 
     $effect(() => {
         if (!modalResizing) return
+        // rAF 节流：mousemove 只记录目标值，每帧合并一次写入
+        let pending: number | null = null
+        let target = modalWidth ?? 640
         const onMove = (e: MouseEvent) => {
             const vw = document.documentElement.clientWidth
-            modalWidth = Math.max(320, Math.min(vw - 40, e.clientX * 2))
+            target = Math.max(320, Math.min(vw - 40, e.clientX * 2))
+            if (pending !== null) return
+            pending = requestAnimationFrame(() => {
+                pending = null
+                modalWidth = target
+            })
         }
         const onUp = () => {
+            if (pending !== null) {
+                cancelAnimationFrame(pending)
+                pending = null
+            }
+            modalWidth = target
             modalResizing = false
         }
         window.addEventListener('mousemove', onMove)
@@ -55,6 +68,10 @@
         return () => {
             window.removeEventListener('mousemove', onMove)
             window.removeEventListener('mouseup', onUp)
+            if (pending !== null) {
+                cancelAnimationFrame(pending)
+                pending = null
+            }
         }
     })
 

@@ -105,10 +105,23 @@
 
     $effect(() => {
         if (!sidebarDragging) return
+        // rAF 节流：mousemove 只记录目标值，每帧合并一次写入（高刷屏避免每 mousemove 一次 layout）
+        let pending: number | null = null
+        let target = sidebarWidth
         const onMove = (e: MouseEvent) => {
-            sidebarWidth = e.clientX <= 144 ? 52 : Math.max(200, Math.min(400, e.clientX))
+            target = e.clientX <= 144 ? 52 : Math.max(200, Math.min(400, e.clientX))
+            if (pending !== null) return
+            pending = requestAnimationFrame(() => {
+                pending = null
+                sidebarWidth = target
+            })
         }
         const onUp = () => {
+            if (pending !== null) {
+                cancelAnimationFrame(pending)
+                pending = null
+            }
+            sidebarWidth = target
             sidebarDragging = false
         }
         window.addEventListener('mousemove', onMove)
@@ -116,6 +129,10 @@
         return () => {
             window.removeEventListener('mousemove', onMove)
             window.removeEventListener('mouseup', onUp)
+            if (pending !== null) {
+                cancelAnimationFrame(pending)
+                pending = null
+            }
         }
     })
 
