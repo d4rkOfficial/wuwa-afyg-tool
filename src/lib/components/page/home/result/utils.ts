@@ -1,8 +1,10 @@
 import type { ResultEntry } from './result.types'
 import type { DamageEntry } from '../calculation/calculation.types'
 
-// 自动推导伤害类型：按技能类型推断，常态攻击再按招式名分普攻/重击
+/** @desc 自动推导伤害类型：效应条目（isEffect）→「效应伤害」；其余按技能类型推断，常态攻击再按招式名分普攻/重击 */
 export function inferDamageTypes(entry: DamageEntry): string[] {
+    // 效应结算条目自动推导为「效应伤害」
+    if (entry.isEffect) return ['效应伤害']
     switch (entry.skillType) {
         case '常态攻击':
             return entry.hitName.includes('重击') ? ['重击伤害'] : ['普攻伤害']
