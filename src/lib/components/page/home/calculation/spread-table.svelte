@@ -646,7 +646,7 @@
         <div
             class="pointer-events-none fixed z-50"
             style="{gpuAccel
-                ? `transform: translate(${selRect.left}px, ${selRect.top}px);`
+                ? `left:0;top:0;transform: translate(${selRect.left}px, ${selRect.top}px);`
                 : `left: ${selRect.left}px; top: ${selRect.top}px;`} width: {selRect.width}px; height: {selRect.height}px; background: color-mix(in srgb, var(--theme-accent-bg) 25%, transparent); border: 1px solid var(--theme-accent-bg);"
         ></div>
     {/if}

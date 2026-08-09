@@ -421,7 +421,7 @@
             : 'bottom-4 right-4'}"
         style="{dragPos
             ? gpuAccel
-                ? `transform: translate(${dragPos.x}px, ${dragPos.y}px);`
+                ? `left:0;top:0;transform: translate(${dragPos.x}px, ${dragPos.y}px);`
                 : `left:${dragPos.x}px;top:${dragPos.y}px;`
             : ''}{gpuAccel && (dragging || btnDrag)
             ? ' will-change: transform;'

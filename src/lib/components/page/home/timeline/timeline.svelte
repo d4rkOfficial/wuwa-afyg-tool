@@ -162,7 +162,7 @@
         const rest = `opacity: ${dimmed ? 0.4 : 1}; transform-origin: left center; transition: ${
             dragging ? 'opacity 150ms ease' : 'transform 150ms ease, opacity 150ms ease'
         };`
-        if (gpuAccel) return `transform: translate(${left}px, ${top}px) scale(${scale}); ${rest}`
+        if (gpuAccel) return `left:0;top:0;transform: translate(${left}px, ${top}px) scale(${scale}); ${rest}`
         return `left: ${left}px; top: ${top}px; transform: scale(${scale}); ${rest}`
     }
     let damageStackHeight = $derived.by(() => {
@@ -914,7 +914,7 @@
                 <div
                     class="absolute pointer-events-none"
                     style="{gpuAccel
-                        ? `transform: translateX(${5 * 16 + rectLeft}px);`
+                        ? `left:0;transform: translateX(${5 * 16 + rectLeft}px);`
                         : `left: ${5 * 16 + rectLeft}px;`} top: 2rem; width: {rectWidth}px; bottom: 0; z-index: 7; background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent); border-left: 1px solid color-mix(in srgb, var(--theme-accent-bg) 40%, transparent); border-right: 1px solid color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);"
                 ></div>
             {/if}
