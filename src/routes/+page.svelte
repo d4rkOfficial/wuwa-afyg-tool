@@ -29,7 +29,7 @@
     } from '$lib/data/project.svelte'
     import { checkShare, importFromShareUrl, getShareLink } from '$lib/data/share.svelte'
     import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/consts'
-    import { clearCache } from '$lib/data/api'
+    import { clearCache, getCharacterInfo, getEchoInfo } from '$lib/data/api'
     import { browser } from '$app/environment'
     import type { PhaseKey, CharSlot } from '$lib/data/types'
     import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
@@ -99,6 +99,30 @@
     let showWorkshopFrame = $state(false)
     let showConditionModal = $state(false)
     let workshopFrameKey = $state(0)
+
+    // 阶段切换加载反馈：activePhase/showResult 变化时显示遮罩 spinner，同步初始化完成后最短 200ms 隐藏
+    let phaseLoading = $state(false)
+    let phaseLoadingTimer: ReturnType<typeof setTimeout> | null = null
+
+    $effect(() => {
+        activePhase
+        showResult
+        phaseLoading = true
+        if (phaseLoadingTimer !== null) {
+            clearTimeout(phaseLoadingTimer)
+            phaseLoadingTimer = null
+        }
+        void tick().then(() => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    phaseLoadingTimer = setTimeout(() => {
+                        phaseLoadingTimer = null
+                        phaseLoading = false
+                    }, 200)
+                })
+            })
+        })
+    })
 
     let sidebarWidth = $state(240)
     let sidebarDragging = $state(false)
@@ -449,6 +473,11 @@
             (state) => updateCalculation(state)
         )
         initConfig(p.phases.config.data as ConfigState | null, p.phases.config?.locked ?? false)
+        // 预热角色与声骸数据（IndexedDB 缓存）：减少排轴/拉表等阶段首次挂载的异步等待
+        for (const slot of p.team) {
+            if (slot.character) void getCharacterInfo(slot.character)
+            if (slot.echoes?.[0]?.name) void getEchoInfo(slot.echoes[0].name)
+        }
         // 恢复工程携带的链/阶配置（导入/分享下载的工程）
         setConditionProfile(p.conditionProfile ?? undefined)
         const order = getPhaseOrder()
@@ -765,6 +794,15 @@
             />
 
             <div class="flex-1 overflow-hidden relative">
+                {#if phaseLoading}
+                    <!-- 阶段切换加载反馈：遮罩 + spinner（不拦截交互） -->
+                    <div
+                        class="absolute inset-0 z-30 flex items-center justify-center pointer-events-none select-none"
+                        style="background: color-mix(in srgb, var(--theme-timeline-bg) 45%, transparent);"
+                    >
+                        <Icon icon="mdi:loading" class="size-7 animate-spin" style="color: var(--theme-accent-text);" />
+                    </div>
+                {/if}
                 {#key activeProject?.id}
                     {#if showResult}
                         <div class="h-full animate-shrink-in">
