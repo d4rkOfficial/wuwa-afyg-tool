@@ -32,6 +32,8 @@ export const DAMAGE_TYPE_CATEGORIES = [
     '变奏技能',
     '延奏技能',
     '声骸技能',
+    '协同',
+    '效应',
     '其它'
 ] as const
 
@@ -45,6 +47,8 @@ export const TYPE_COLORS: Record<DamageTypeCategory, string> = {
     变奏技能: '#86b8a0',
     延奏技能: '#7fb0ac',
     声骸技能: '#cd93b8',
+    协同: '#e0a458',
+    效应: '#c978e0',
     其它: '#9aa3ad'
 }
 
@@ -55,7 +59,9 @@ const FULL_TO_CATEGORY: Record<string, DamageTypeCategory> = {
     共鸣解放伤害: '共鸣解放',
     变奏技能伤害: '变奏技能',
     延奏技能伤害: '延奏技能',
-    声骸技能伤害: '声骸技能'
+    声骸技能伤害: '声骸技能',
+    协同攻击伤害: '协同',
+    效应伤害: '效应'
 }
 
 export interface DirectDamageByType {

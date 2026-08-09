@@ -10,6 +10,7 @@
     import { getAllDamageEntries, getCalcState, getConditionProfile } from '../calculation/calculation.store.svelte'
     import { getConfig } from '../config/config.store.svelte'
     import type { ResultEntry, CharSubstatAnalysis } from './result.types'
+    import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { getAlgorithm, ALGORITHMS_INFO } from './substat-algorithms'
     import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
     import { tick, untrack, onMount } from 'svelte'
@@ -300,6 +301,13 @@
                                 style="color: var(--theme-element-{entry.element}, #888)"
                             >
                                 {entry.displayName}
+                                {#each entry.damageTypes as dt}
+                                    <span
+                                        class="ml-1 rounded px-1 text-[9px] font-medium align-middle"
+                                        style="background: var(--theme-input-bg); color: var(--theme-modal-text)/60;"
+                                        >{DAMAGE_TYPE_SHORT[dt] ?? dt}</span
+                                    >
+                                {/each}
                             </td>
                             <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
                                 >{Math.round(entry.baseValue).toLocaleString()}</td

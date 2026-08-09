@@ -74,7 +74,7 @@ export function init(
                 Object.fromEntries(
                     Object.entries(savedState.damageEntryDamageTypes ?? {}).map(([id, types]) => [
                         id,
-                        types.map((t) => (t === '视为效应伤害' ? '其它类型伤害' : t))
+                        types.map((t) => (t === '视为效应伤害' ? '效应伤害' : t))
                     ])
                 )
             )

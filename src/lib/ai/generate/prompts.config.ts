@@ -120,7 +120,7 @@ export const CONDITION_REFINE_RULES_TEXT = `- "refinement":n：需武器精炼 �
 
 export const CONDITION_COMMON_RULES_TEXT = `- "elements":[...]：需伤害属性属于所列（物理/冷凝/热熔/导电/气动/衍射/湮灭），可多选。
   例：导电伤害加成（角色导电技能造成伤害时）→ "condition":{"elements":["导电"]}。
-- "damageTypes":[...]：需伤害类型属于所列（普攻伤害/重击伤害/共鸣技能伤害/共鸣解放伤害/声骸技能伤害/变奏技能伤害/延奏技能伤害/协同攻击伤害/其它类型伤害），可多选。
+- "damageTypes":[...]：需伤害类型属于所列（普攻伤害/重击伤害/共鸣技能伤害/共鸣解放伤害/声骸技能伤害/变奏技能伤害/延奏技能伤害/协同攻击伤害/效应伤害/其它类型伤害），可多选。
   例：共鸣技能伤害加成 → "condition":{"damageTypes":["共鸣技能伤害"]}。
 - 字段可并存，如 "condition":{"chain":3,"elements":["导电"]}。
 
