@@ -193,7 +193,7 @@
         const vw = window.innerWidth
         let nx = toolbarStart.x + (e.clientX - toolbarStart.mx)
         nx = Math.max(8, Math.min(nx, vw - w - 8))
-        const leftAnchor = sidebarWidth + 8
+        const leftAnchor = 8
         const rightAnchor = vw - w - 12
         if (Math.abs(nx - leftAnchor) < 48) nx = leftAnchor
         else if (Math.abs(nx - rightAnchor) < 48) nx = rightAnchor
@@ -631,6 +631,27 @@
         activePhase = phase
         showResult = false
         addToast(`${PHASE_LABELS[phase]} 已解锁`, 'info')
+    }
+
+    // 刷新结果（开启重载数据）时：先重解锁全部环节，再按原锁定状态逐个重锁——
+    // 重锁 timeline/config 会重新同步全局 buff 并把当前内存态写回工程，修复换工程后残留旧数据的问题
+    async function handleRelockAll() {
+        if (!activeProject) return
+        const order = getPhaseOrder()
+        const wasLocked = order.map((p) => activeProject!.phases[p]?.locked === true)
+        for (const phase of order) await unlockPhase(activeProject.id, phase)
+        for (let i = 0; i < order.length; i++) {
+            const phase = order[i]
+            if (!wasLocked[i]) continue
+            await lockPhase(phase)
+            if (phase === 'timeline') {
+                syncGlobalBuffs(activeProject.team.map((s) => s.character))
+                updateCalculation(getCalcState())
+            }
+            if (phase === 'config') {
+                updateConfig(getConfig())
+            }
+        }
     }
 
     function handleLockTab(phase: PhaseKey) {
@@ -1161,7 +1182,11 @@
                 {#if showResult}
                     <button
                         onclick={async () => {
-                            if (getReloadOnResultRefresh()) initForActiveProject()
+                            if (getReloadOnResultRefresh()) {
+                                initForActiveProject()
+                                await handleRelockAll()
+                                addToast('已重载数据并重新锁定全部环节', 'info')
+                            }
                             showResult = false
                             activePhase = 'team'
                             await tick()
