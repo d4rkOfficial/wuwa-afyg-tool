@@ -4,7 +4,7 @@
     import { fade } from 'svelte/transition'
     import { runAiTurn, type SessionEvent } from '../session'
     import { getAiConfig, loadAiConfig } from '../config.svelte'
-    import { loadGenPrefs, getGenPrefs } from '$lib/data/ai-prefs.svelte'
+    import { loadGenPrefs, getGenPrefs, getDangerMode } from '$lib/data/ai-prefs.svelte'
     import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
     import { notifyCalcUpdate, getCalcState } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
@@ -57,6 +57,8 @@
     let display = $state<DisplayMsg[]>([])
     // 危险操作确认卡片（显示在聊天框中，不遮罩弹窗）
     let confirmCard = $state<{ toolName: string; summary: string; resolve: (v: boolean) => void } | null>(null)
+    // 批量信任：一次指令回合内已批准过危险操作 → 后续危险操作直接放行（dangerMode=ask_once）
+    let turnDangerApproved = $state(false)
     let abortCtrl = $state<AbortController | null>(null)
 
     // 拖动位置（左上角坐标；null = 默认右下角）
@@ -233,6 +235,7 @@
         input = ''
         busy = true
         abortCtrl = new AbortController()
+        turnDangerApproved = false
         // 重试：回退到该条用户消息（含）之后全部内容，重新发送
         if (retryText) {
             let lastUserIdx = -1
@@ -282,7 +285,26 @@
                 },
                 onConfirm: (toolName, summary) =>
                     new Promise<boolean>((resolve) => {
-                        confirmCard = { toolName, summary, resolve }
+                        const mode = getDangerMode()
+                        // 无条件信任：直接放行
+                        if (mode === 'trust') {
+                            resolve(true)
+                            return
+                        }
+                        // 批量只询问一次：本回合已批准过 → 直接放行
+                        if (mode === 'ask_once' && turnDangerApproved) {
+                            addToast(`已按批量信任放行「${toolName}」`, 'info')
+                            resolve(true)
+                            return
+                        }
+                        confirmCard = {
+                            toolName,
+                            summary,
+                            resolve: (v) => {
+                                if (v && mode === 'ask_once') turnDangerApproved = true
+                                resolve(v)
+                            }
+                        }
                     }),
                 onEvent: (evt: SessionEvent) => {
                     if (evt.type === 'ai') {
@@ -354,10 +376,13 @@
         scrollToBottom()
     }
 
-    // AI 回复 Markdown 渲染（换行即 <br>）
+    // AI 回复 Markdown 渲染（换行即 <br>；链接新窗口打开）
     function renderMd(text: string): string {
         try {
-            return marked.parse(text, { breaks: true }) as string
+            const renderer = new marked.Renderer()
+            const link = renderer.link.bind(renderer)
+            renderer.link = (linkArg) => link(linkArg).replace('<a ', '<a target="_blank" rel="noreferrer" ')
+            return marked.parse(text, { breaks: true, renderer }) as string
         } catch {
             return text
         }
@@ -691,83 +716,92 @@
     .ai-md > :last-child {
         margin-bottom: 0;
     }
-    .ai-md p {
+    /* {@html} 注入的 Markdown 内容对 Svelte 作用域不可见，必须用 :global 才能匹配并保留 */
+    :global(.ai-md) {
+        user-select: text;
+        -webkit-user-select: text;
+    }
+    :global(.ai-md p) {
         margin: 0.25em 0;
     }
-    .ai-md h1,
-    .ai-md h2,
-    .ai-md h3,
-    .ai-md h4 {
+    :global(.ai-md h1),
+    :global(.ai-md h2),
+    :global(.ai-md h3),
+    :global(.ai-md h4) {
         margin: 0.5em 0 0.25em;
         font-weight: 600;
         line-height: 1.3;
     }
-    .ai-md h1 {
+    :global(.ai-md h1) {
         font-size: 1.1em;
     }
-    .ai-md h2 {
+    :global(.ai-md h2) {
         font-size: 1.05em;
     }
-    .ai-md h3,
-    .ai-md h4 {
+    :global(.ai-md h3),
+    :global(.ai-md h4) {
         font-size: 1em;
     }
-    .ai-md ul,
-    .ai-md ol {
+    :global(.ai-md ul),
+    :global(.ai-md ol) {
         margin: 0.25em 0;
         padding-left: 1.2em;
         list-style: disc;
     }
-    .ai-md ol {
+    :global(.ai-md ol) {
         list-style: decimal;
     }
-    .ai-md li {
+    :global(.ai-md li) {
         margin: 0.15em 0;
     }
-    .ai-md code {
+    :global(.ai-md code) {
         padding: 0.1em 0.35em;
         border-radius: 4px;
         font-size: 0.92em;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
         background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);
     }
-    .ai-md pre {
+    :global(.ai-md pre) {
         margin: 0.35em 0;
         padding: 0.5em 0.6em;
         border-radius: 6px;
         overflow-x: auto;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
         background: color-mix(in srgb, var(--theme-modal-bg) 80%, #000);
     }
-    .ai-md pre code {
+    :global(.ai-md pre code) {
         padding: 0;
         background: none;
     }
-    .ai-md strong {
+    :global(.ai-md strong) {
         font-weight: 600;
     }
-    .ai-md a {
+    :global(.ai-md a) {
         color: var(--theme-accent-text);
         text-decoration: underline;
     }
-    .ai-md blockquote {
+    :global(.ai-md blockquote) {
         margin: 0.35em 0;
         padding-left: 0.6em;
         border-left: 2px solid var(--theme-divider-border);
-        color: var(--theme-modal-text) / 70;
+        color: color-mix(in srgb, var(--theme-modal-text) 70%, transparent);
     }
-    .ai-md table {
+    :global(.ai-md table) {
         margin: 0.35em 0;
         border-collapse: collapse;
         width: 100%;
+        display: block;
+        overflow-x: auto;
     }
-    .ai-md th,
-    .ai-md td {
+    :global(.ai-md th),
+    :global(.ai-md td) {
         padding: 0.2em 0.5em;
         border: 1px solid var(--theme-divider-border);
     }
-    .ai-md th {
+    :global(.ai-md th) {
         font-weight: 600;
     }
-    .ai-md hr {
+    :global(.ai-md hr) {
         margin: 0.5em 0;
         border: 0;
         border-top: 1px solid var(--theme-divider-border);

@@ -28,7 +28,7 @@
         getPhaseOrder
     } from '$lib/data/project.svelte'
     import { getShareLink } from '$lib/data/share.svelte'
-    import { getGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
+    import { getGenPrefs, loadGenPrefs, updateGenPrefs, type DangerMode } from '$lib/data/ai-prefs.svelte'
     import { GAMEPAD_BUTTONS } from '$lib/components/page/home/timeline/timeline.consts'
     import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
     import {
@@ -119,6 +119,24 @@
         addToast(getGenPrefs().enabled ? 'AI 助手已启用' : 'AI 助手已禁用', 'success')
     }
 
+    const DANGER_MODE_OPTIONS: { value: DangerMode; label: string; desc: string }[] = [
+        { value: 'ask', label: '每次都询问', desc: '每个危险操作都弹确认' },
+        { value: 'ask_once', label: '批量只询问一次', desc: '一次指令内只确认一次，后续直接放行' },
+        { value: 'trust', label: '无条件信任', desc: '危险操作直接执行，不再确认' }
+    ]
+
+    async function setDangerMode(mode: DangerMode) {
+        await updateGenPrefs({ dangerMode: mode })
+        addToast(
+            mode === 'ask'
+                ? '已设为：危险操作每次都询问'
+                : mode === 'ask_once'
+                  ? '已设为：批量只询问一次'
+                  : '已设为：无条件信任（请谨慎使用）',
+            'success'
+        )
+    }
+
     function switchCalcViewMode(mode: 'dropdown' | 'spread') {
         setCalcViewMode(mode)
         addToast(mode === 'spread' ? '已切换为 buff 平铺模式' : '已切换为 buff 下拉模式', 'success')
@@ -154,6 +172,7 @@
             bgUrl = overrides.backgroundImage.startsWith('http') ? overrides.backgroundImage : ''
             refreshCacheCounts()
             loadAiConfig()
+            loadGenPrefs()
         }
     })
 
@@ -1414,6 +1433,52 @@
                                                 : '2px'}; background: var(--theme-modal-bg);"
                                         ></span>
                                     </button>
+                                </div>
+
+                                <!-- 危险操作权限（独立设置，立即保存） -->
+                                <div
+                                    class="rounded-lg border px-3 py-2.5"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                        >危险操作权限</span
+                                    >
+                                    <p class="mt-1 mb-2 text-[10px] text-(--theme-modal-text)/40">
+                                        AI 执行危险操作（删除工程、清空数据等）时的确认策略；「批量」=
+                                        一次指令内的多次调用只询问一次
+                                    </p>
+                                    <div class="flex flex-col gap-1">
+                                        {#each DANGER_MODE_OPTIONS as opt}
+                                            {@const active = getGenPrefs().dangerMode === opt.value}
+                                            <button
+                                                onclick={() => setDangerMode(opt.value)}
+                                                class={[
+                                                    'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
+                                                    active
+                                                        ? 'border-(--theme-accent-bg)'
+                                                        : 'hover:bg-(--theme-modal-text)/5'
+                                                ].join(' ')}
+                                                style={active
+                                                    ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
+                                                    : 'border-color: var(--theme-divider-border);'}
+                                            >
+                                                <Icon
+                                                    icon={active ? 'mdi:radiobox-marked' : 'mdi:radiobox-blank'}
+                                                    class={active
+                                                        ? 'size-3.5 shrink-0 text-(--theme-accent-text)'
+                                                        : 'size-3.5 shrink-0 text-(--theme-modal-text)/30'}
+                                                />
+                                                <span class="min-w-0 flex-1">
+                                                    <span class="block text-xs font-medium text-(--theme-modal-text)/80"
+                                                        >{opt.label}</span
+                                                    >
+                                                    <span class="block text-[10px] text-(--theme-modal-text)/40"
+                                                        >{opt.desc}</span
+                                                    >
+                                                </span>
+                                            </button>
+                                        {/each}
+                                    </div>
                                 </div>
 
                                 <!-- 配置文件设置 -->

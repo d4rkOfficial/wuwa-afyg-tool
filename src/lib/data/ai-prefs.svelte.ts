@@ -3,6 +3,8 @@ import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { DEFAULT_SYSTEM_PROMPT } from '$lib/ai/persona'
 
+export type DangerMode = 'ask' | 'ask_once' | 'trust'
+
 export interface AiGenPrefs {
     // 是否启用 AI 助手（悬浮窗显隐）
     enabled: boolean
@@ -10,6 +12,8 @@ export interface AiGenPrefs {
     namingRule: string
     // AI 助手人设提示词（system prompt，可自定义覆盖；清空 = 用默认人设）
     systemPrompt: string
+    // 危险操作确认策略：ask=每次都询问 / ask_once=一次指令内只询问一次 / trust=无条件信任
+    dangerMode: DangerMode
 }
 
 // share 端命名规范（默认值）：buff 名格式 [条件]<触发,附加条件>乘区1+乘区2+…+乘区n+层数
@@ -52,7 +56,8 @@ const LEGACY_PREFS_KEY = 'ai-naming-prefs'
 const DEFAULT_PREFS: AiGenPrefs = {
     enabled: true,
     namingRule: SHARE_NAMING_RULES,
-    systemPrompt: DEFAULT_SYSTEM_PROMPT
+    systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    dangerMode: 'ask'
 }
 
 let _prefs: AiGenPrefs = $state({ ...DEFAULT_PREFS })
@@ -68,6 +73,10 @@ export function getNamingRule(): string {
 
 export function getSystemPrompt(): string {
     return _prefs.systemPrompt.trim()
+}
+
+export function getDangerMode(): DangerMode {
+    return _prefs.dangerMode
 }
 
 export async function loadGenPrefs(): Promise<void> {
@@ -97,7 +106,9 @@ export async function loadGenPrefs(): Promise<void> {
             systemPrompt:
                 typeof d.systemPrompt === 'string' && d.systemPrompt.trim()
                     ? d.systemPrompt
-                    : DEFAULT_PREFS.systemPrompt
+                    : DEFAULT_PREFS.systemPrompt,
+            dangerMode:
+                d.dangerMode === 'ask_once' || d.dangerMode === 'trust' ? d.dangerMode : DEFAULT_PREFS.dangerMode
         }
     }
     _loaded = true
