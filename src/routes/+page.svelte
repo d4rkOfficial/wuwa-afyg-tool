@@ -160,13 +160,16 @@
         }
     })
 
-    // ── 简化底部工具栏：fixed 圆角胶囊，仅水平拖动，磁吸侧栏右缘 / 屏幕右缘 ──
+    // ── 简化底部工具栏：fixed 圆角矩形，仅水平拖动，磁吸侧栏右缘 / 屏幕右缘 ──
     const simplifyToolbar = $derived(getSimplifyToolbar())
     let toolbarEl = $state<HTMLElement | null>(null)
     let toolbarX = $state<number | null>(null)
     let toolbarDrag = $state(false)
     let toolbarDragMoved = $state(false)
+    let toolbarHover = $state(false)
     let toolbarStart = $state({ mx: 0, x: 0 })
+    // hover 放大 1.05、拖拽放大 1.15（同 AI 悬浮窗收起按钮）
+    const toolbarScale = $derived(toolbarDrag ? 1.15 : toolbarHover ? 1.05 : 1)
 
     function toolbarDown(e: PointerEvent) {
         if (!simplifyToolbar) return
@@ -934,12 +937,22 @@
                 onpointermove={toolbarMove}
                 onpointerup={toolbarUp}
                 onpointercancel={toolbarUp}
+                onpointerenter={() => (toolbarHover = true)}
+                onpointerleave={() => (toolbarHover = false)}
                 onclickcapture={toolbarClickCapture}
                 class={simplifyToolbar
-                    ? 'theme-glass-surface fixed bottom-3 z-40 flex cursor-grab touch-none select-none items-center gap-1 rounded-full border p-1.5 shadow-2xl active:cursor-grabbing'
+                    ? 'theme-glass-surface fixed bottom-3 z-40 flex cursor-grab touch-none select-none items-center gap-1 rounded-xl border p-1.5 shadow-2xl active:cursor-grabbing'
                     : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'}
                 style={simplifyToolbar
-                    ? `border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 10%, color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)); color: var(--theme-modal-text);${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 12px;'}${toolbarDrag ? ' will-change: left;' : ''}`
+                    ? `border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);transform: scale(${toolbarScale});${
+                          toolbarScale > 1
+                              ? ' box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 60%, transparent), 0 0 14px color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);'
+                              : ''
+                      }transition: ${
+                          toolbarDrag
+                              ? 'left 150ms ease'
+                              : 'transform 150ms ease, box-shadow 150ms ease, left 150ms ease'
+                      };${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 12px;'}${toolbarDrag ? ' will-change: transform, left;' : ''}`
                     : 'background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)'}
             >
                 <button
@@ -1134,7 +1147,7 @@
                 {#if simplifyToolbar}
                     <div
                         class="mx-1.5 h-5 w-px shrink-0"
-                        style="background: color-mix(in srgb, var(--theme-accent-bg) 30%, transparent);"
+                        style="background: color-mix(in srgb, var(--theme-modal-text) 15%, transparent);"
                     ></div>
                 {:else}
                     <div class="flex-1"></div>
