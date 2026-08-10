@@ -35,7 +35,9 @@
         getGpuAccel,
         setGpuAccel,
         getReloadOnResultRefresh,
-        setReloadOnResultRefresh
+        setReloadOnResultRefresh,
+        getReloadOnProfileChange,
+        setReloadOnProfileChange
     } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import {
@@ -1214,6 +1216,35 @@
                                     <span
                                         class="absolute top-0.5 size-4 rounded-full transition-all"
                                         style="left: {getReloadOnResultRefresh()
+                                            ? '18px'
+                                            : '2px'}; background: var(--theme-modal-bg);"
+                                    ></span>
+                                </button>
+                            </div>
+                            <!-- 链/阶变动重载数据：开启后调整共鸣链/精炼档位时自动重载本工程全部阶段数据 -->
+                            <div
+                                class="mt-2 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                style="border-color: var(--theme-divider-border);"
+                            >
+                                <div class="min-w-0">
+                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                        >链/阶变动重载数据</span
+                                    >
+                                    <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                        开启后调整角色共鸣链/武器精炼档位时，自动重载本工程全部阶段数据并重新锁定（更准确，耗时更长）；关闭仅更新档位配置
+                                    </span>
+                                </div>
+                                <button
+                                    onclick={() => setReloadOnProfileChange(!getReloadOnProfileChange())}
+                                    class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                    style="background: {getReloadOnProfileChange()
+                                        ? 'var(--theme-accent-bg)'
+                                        : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                    title="点击切换"
+                                >
+                                    <span
+                                        class="absolute top-0.5 size-4 rounded-full transition-all"
+                                        style="left: {getReloadOnProfileChange()
                                             ? '18px'
                                             : '2px'}; background: var(--theme-modal-bg);"
                                     ></span>

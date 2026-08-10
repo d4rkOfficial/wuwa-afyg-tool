@@ -7,7 +7,6 @@ import {
     ELEMENT_BONUS_MAP,
     TYPE_BONUS_MAP,
     ELEMENT_MAP,
-    DAMAGE_TYPE_SHORT,
     WEAPON_SUBSTAT_NAME_MAP,
     SUBSTAT_DECIMAL_TO_PCT
 } from '$lib/consts/game-terms'
@@ -208,8 +207,9 @@ export function computeCharStats(
                             elementDmg[el] = (elementDmg[el] ?? 0) + z.value
                         }
                     } else if (isTypeCond) {
+                        // 与计算引擎同源键（「共鸣解放伤害」→「共鸣解放」），并入声骸/武器副属性的同类型加成
                         for (const dt of cond.damageTypes ?? []) {
-                            const key = DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt
+                            const key = dt.replace('伤害', '')
                             typeDmg[key] = (typeDmg[key] ?? 0) + z.value
                         }
                     } else {

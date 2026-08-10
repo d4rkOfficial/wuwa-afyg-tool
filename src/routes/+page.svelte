@@ -25,6 +25,7 @@
         buildExportFile,
         parseProjectFile,
         archiveProject,
+        updateConditionProfile,
         ProjectParseError
     } from '$lib/data/project.svelte'
     import { checkShare, importFromShareUrl, getShareLink } from '$lib/data/share.svelte'
@@ -58,6 +59,7 @@
         getHideConditionMismatch,
         toggleHideConditionMismatch,
         setConditionProfile,
+        setProfileChangeListener,
         syncGlobalBuffs,
         getCalcState,
         createBuffSet,
@@ -73,7 +75,7 @@
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
     import { hideSplash } from '$lib/utils/splash'
     import favicon from '$lib/assets/favicon.svg'
-    import { getGpuAccel, getReloadOnResultRefresh } from '$lib/data/render-prefs.svelte'
+    import { getGpuAccel, getReloadOnResultRefresh, getReloadOnProfileChange } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
@@ -263,6 +265,10 @@
 
     // 注册本地弹窗状态供 AI 查看/开关（同步 onMount，卸载时注销）
     onMount(() => {
+        // 链/阶档位任何改动（弹窗/AI 工具）都写回当前工程，保证 init/重载 restore 恒为最新值
+        setProfileChangeListener(() => {
+            void updateConditionProfile()
+        })
         const panels: Array<[string, string, () => boolean, (v: boolean) => void]> = [
             ['quick-lookup', '速查', () => showLookup, (v) => (showLookup = v)],
             ['buff-library', 'Buff 库', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
@@ -517,13 +523,11 @@
         }
     }
 
-    function initForActiveProject() {
+    /** @desc 重载当前工程全部阶段数据（不改变视图状态）；initForActiveProject 与「链/阶变动重载数据」共用 */
+    function reloadActiveProjectStores() {
         setShowBuffModal(false)
         const p = getActiveProject()
-        if (!p) {
-            activePhase = 'team'
-            return
-        }
+        if (!p) return
         initTimeline(
             p.phases.timeline.data as TimelineData | null,
             () => {},
@@ -543,8 +547,17 @@
             if (slot.character) void getCharacterInfo(slot.character)
             if (slot.echoes?.[0]?.name) void getEchoInfo(slot.echoes[0].name)
         }
-        // 恢复工程携带的链/阶配置（导入/分享下载的工程）
+        // 恢复工程携带的链/阶配置（导入/分享下载的工程；档位改动已由 updateConditionProfile 写回，恒为最新）
         setConditionProfile(p.conditionProfile ?? undefined)
+    }
+
+    function initForActiveProject() {
+        reloadActiveProjectStores()
+        const p = getActiveProject()
+        if (!p) {
+            activePhase = 'team'
+            return
+        }
         const order = getPhaseOrder()
         let lastLocked = -1
         for (let i = order.length - 1; i >= 0; i--) {
@@ -652,6 +665,21 @@
                 updateConfig(getConfig())
             }
         }
+    }
+
+    /** @desc 重载数据并重新锁定全部环节（「刷新结果」与「链/阶变动」共用） */
+    async function handleReloadAllPhases() {
+        initForActiveProject()
+        await handleRelockAll()
+        addToast('已重载数据并重新锁定全部环节', 'info')
+    }
+
+    /** @desc 链/阶档位变动回调：开启「链/阶变动重载数据」时重载全部阶段数据（不跳转视图，结果页若已打开会自动重算） */
+    async function handleProfileReload() {
+        if (!getReloadOnProfileChange()) return
+        reloadActiveProjectStores()
+        await handleRelockAll()
+        addToast('链/阶变动，已重载数据并重新锁定全部环节', 'info')
     }
 
     function handleLockTab(phase: PhaseKey) {
@@ -1183,9 +1211,7 @@
                     <button
                         onclick={async () => {
                             if (getReloadOnResultRefresh()) {
-                                initForActiveProject()
-                                await handleRelockAll()
-                                addToast('已重载数据并重新锁定全部环节', 'info')
+                                await handleReloadAllPhases()
                             }
                             showResult = false
                             activePhase = 'team'
@@ -1257,6 +1283,9 @@
         configState={activeProject.phases.config.data as ConfigState | null}
         calcState={activeProject.phases.calculation.data as CalcState | null}
         onclose={() => (showCharDetail = false)}
+        onProfileReload={() => {
+            void handleProfileReload()
+        }}
     />
 {/if}
 

@@ -3,9 +3,11 @@ import { browser } from '$app/environment'
 
 const STORAGE_KEY = 'wuwa-afyg:render-prefs'
 const RELOAD_KEY = 'wuwa-afyg:render-prefs:reload-result'
+const RELOAD_PROFILE_KEY = 'wuwa-afyg:render-prefs:reload-profile'
 
 let _gpuAccel = $state(true)
 let _reloadOnResultRefresh = $state(false)
+let _reloadOnProfileChange = $state(false)
 
 // 模块加载时从 localStorage 恢复
 if (browser) {
@@ -18,6 +20,12 @@ if (browser) {
     try {
         const saved = localStorage.getItem(RELOAD_KEY)
         if (saved === '0' || saved === '1') _reloadOnResultRefresh = saved === '1'
+    } catch {
+        /* ignore */
+    }
+    try {
+        const saved = localStorage.getItem(RELOAD_PROFILE_KEY)
+        if (saved === '0' || saved === '1') _reloadOnProfileChange = saved === '1'
     } catch {
         /* ignore */
     }
@@ -39,4 +47,13 @@ export function getReloadOnResultRefresh(): boolean {
 export function setReloadOnResultRefresh(v: boolean): void {
     _reloadOnResultRefresh = v
     if (browser) localStorage.setItem(RELOAD_KEY, v ? '1' : '0')
+}
+
+export function getReloadOnProfileChange(): boolean {
+    return _reloadOnProfileChange
+}
+
+export function setReloadOnProfileChange(v: boolean): void {
+    _reloadOnProfileChange = v
+    if (browser) localStorage.setItem(RELOAD_PROFILE_KEY, v ? '1' : '0')
 }

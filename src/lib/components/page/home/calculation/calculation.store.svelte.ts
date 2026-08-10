@@ -749,6 +749,13 @@ export function getConditionProfile(): ConditionProfile {
     return _conditionProfile
 }
 
+/** @desc 链/阶档位变更回调（由 +page 注入写回工程，覆盖弹窗/AI 工具等全部改动路径，保证 restore 恒为最新） */
+let _profileChangeListener: (() => void) | undefined = $state()
+
+export function setProfileChangeListener(fn: (() => void) | undefined) {
+    _profileChangeListener = fn
+}
+
 /** @desc 从工程文件恢复链/阶配置（导入/加载工程时调用） */
 export function setConditionProfile(profile: ConditionProfile | undefined) {
     if (profile && Array.isArray(profile.chains) && Array.isArray(profile.refinements)) {
@@ -762,6 +769,7 @@ export function setConditionProfileChains(idx: number, value: number) {
         ..._conditionProfile,
         chains: _conditionProfile.chains.map((c, j) => (j === idx ? value : c))
     }
+    _profileChangeListener?.()
 }
 
 /** @desc 设置某角色槽位的武器精炼档位 */
@@ -770,6 +778,7 @@ export function setConditionProfileRefinements(idx: number, value: number) {
         ..._conditionProfile,
         refinements: _conditionProfile.refinements.map((r, j) => (j === idx ? value : r))
     }
+    _profileChangeListener?.()
 }
 
 /** @desc 隐藏不匹配开关的读取/切换 */

@@ -232,6 +232,14 @@ export async function updateCalculation(data: CalcState) {
     await persist()
 }
 
+/** @desc 把当前内存中的链/阶配置（getConditionProfile）写回当前工程并持久化，保证 init/重载时 restore 恒为最新值 */
+export async function updateConditionProfile() {
+    const project = projects.find((p) => p.id === activeId)
+    if (!project) return
+    project.conditionProfile = JSON.parse(JSON.stringify(getConditionProfile()))
+    await persist()
+}
+
 export async function updateCustomSkillHits(hits: Record<string, import('./types').CustomHit[]>) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return

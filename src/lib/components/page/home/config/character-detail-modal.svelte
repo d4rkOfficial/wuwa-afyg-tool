@@ -5,7 +5,7 @@
     import type { CalcState } from '../calculation/calculation.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/data/api'
-    import { ELEMENT_ORDER, WEAPON_SUBSTAT_NAME_MAP } from '$lib/consts/game-terms'
+    import { ELEMENT_ORDER, WEAPON_SUBSTAT_NAME_MAP, DAMAGE_TYPES } from '$lib/consts/game-terms'
     import {
         getConditionProfile,
         setConditionProfileChains,
@@ -16,17 +16,23 @@
     import { fallbackIcon } from '$lib/utils/icons'
     import Icon from '@iconify/svelte'
 
+    /** @desc 面板类型加成固定展示顺序：普攻/重击/共鸣技能/共鸣解放/变奏/延奏/声骸/协同，效应与其它不展示 */
+    const TYPE_DMG_ORDER = DAMAGE_TYPES.filter((dt) => dt !== '效应伤害' && dt !== '其它类型伤害')
+
     interface Props extends ComponentsProps {
         open: boolean
         team: [CharSlot, CharSlot, CharSlot]
         configState: ConfigState | null
         calcState: CalcState | null
         onclose?: () => void
+        /** @desc 链/阶档位变更后的回调（+page 注入，供「链/阶变动重载数据」使用） */
+        onProfileReload?: () => void
     }
 
     let {
         open,
         onclose,
+        onProfileReload,
         team,
         configState,
         calcState,
@@ -252,7 +258,10 @@
                 <div class="flex overflow-hidden rounded border" style="border-color: var(--theme-divider-border);">
                     {#each [0, 1, 2, 3, 4, 5, 6] as n}
                         <button
-                            onclick={() => setConditionProfileChains(activeTab, n)}
+                            onclick={() => {
+                                setConditionProfileChains(activeTab, n)
+                                onProfileReload?.()
+                            }}
                             class={[
                                 'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
                                 (conditionProfile.chains[activeTab] ?? 0) === n
@@ -271,7 +280,10 @@
                 <div class="flex overflow-hidden rounded border" style="border-color: var(--theme-divider-border);">
                     {#each [1, 2, 3, 4, 5] as n}
                         <button
-                            onclick={() => setConditionProfileRefinements(activeTab, n)}
+                            onclick={() => {
+                                setConditionProfileRefinements(activeTab, n)
+                                onProfileReload?.()
+                            }}
                             class={[
                                 'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
                                 (conditionProfile.refinements[activeTab] ?? 1) === n
@@ -295,7 +307,7 @@
                     {stat.atkTotal.toLocaleString()}
                     <span class="text-(--theme-modal-text)/30">
                         ({stat.atkWhite.toLocaleString()} +
-                    </span><span class="text-(--theme-modal-text)/30">{stat.atkGreen.toLocaleString()}</span><span
+                    </span><span class="text-(--theme-accent-text)">{stat.atkGreen.toLocaleString()}</span><span
                         class="text-(--theme-modal-text)/30">)</span
                     >
                 </span>
@@ -306,7 +318,7 @@
                     {stat.hpTotal.toLocaleString()}
                     <span class="text-(--theme-modal-text)/30">
                         ({stat.hpWhite.toLocaleString()} +
-                    </span><span class="text-(--theme-modal-text)/30">{stat.hpGreen.toLocaleString()}</span><span
+                    </span><span class="text-(--theme-accent-text)">{stat.hpGreen.toLocaleString()}</span><span
                         class="text-(--theme-modal-text)/30">)</span
                     >
                 </span>
@@ -317,7 +329,7 @@
                     {stat.defTotal.toLocaleString()}
                     <span class="text-(--theme-modal-text)/30">
                         ({stat.defWhite.toLocaleString()} +
-                    </span><span class="text-(--theme-modal-text)/30">{stat.defGreen.toLocaleString()}</span><span
+                    </span><span class="text-(--theme-accent-text)">{stat.defGreen.toLocaleString()}</span><span
                         class="text-(--theme-modal-text)/30">)</span
                     >
                 </span>
@@ -351,8 +363,10 @@
                     </div>
                 {/if}
             {/each}
-            {#each Object.entries(stat.typeDmg) as [type, v]}
-                {#if v > 0}
+            {#each TYPE_DMG_ORDER as dt}
+                {@const type = dt.replace('伤害', '')}
+                {@const v = stat.typeDmg[type]}
+                {#if v && v > 0}
                     <div class="flex items-center justify-between">
                         <span class="text-(--theme-modal-text)/50">{type}伤害加成</span>
                         <span class="tabular-nums text-(--theme-modal-text)/80">+{v}%</span>
