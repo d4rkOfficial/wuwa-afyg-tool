@@ -319,7 +319,7 @@
     {onclose}
     backdropClose={false}
     class={className}
-    style="width: min(94vw, 1160px); height: min(90vh, 760px); {mergedStyle}"
+    style="width: min(96vw, 1400px); height: min(90vh, 760px); {mergedStyle}"
 >
     {#snippet title()}
         编辑 Buff 预设
@@ -408,16 +408,25 @@
             <div class="flex min-w-0 flex-1 flex-col rounded-lg border border-(--theme-card-border)">
                 {#if activeBuff}
                     <div
-                        class="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2"
+                        class="flex shrink-0 flex-col gap-2 border-b px-3 py-2"
                         style="border-color: var(--theme-divider-border);"
                     >
-                        <input
-                            value={activeBuff.buffName}
-                            oninput={(e) => renameBuff(activeBuffIdx, (e.currentTarget as HTMLInputElement).value)}
-                            placeholder="Buff 名"
-                            class="min-w-0 flex-1 rounded border bg-(--theme-input-bg) px-2 py-1 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)"
-                            style="border-color: var(--theme-divider-border);"
-                        />
+                        <div class="flex items-center gap-2">
+                            <input
+                                value={activeBuff.buffName}
+                                oninput={(e) => renameBuff(activeBuffIdx, (e.currentTarget as HTMLInputElement).value)}
+                                placeholder="Buff 名"
+                                class="min-w-0 flex-1 rounded border bg-(--theme-input-bg) px-2 py-1 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)"
+                                style="border-color: var(--theme-divider-border);"
+                            />
+                            <button
+                                onclick={() => removeBuff(activeBuffIdx)}
+                                class="shrink-0 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                                title="删除该 Buff"
+                            >
+                                <Icon icon="mdi:delete-outline" class="size-3.5" />
+                            </button>
+                        </div>
                         <div
                             class="flex shrink-0 overflow-hidden rounded border"
                             style="border-color: var(--theme-divider-border);"
@@ -427,7 +436,7 @@
                                 <button
                                     onclick={() => setBuffScope(activeBuffIdx, t.value)}
                                     class={[
-                                        'px-2.5 py-1 text-xs transition-colors',
+                                        'flex-1 px-2.5 py-1 text-xs transition-colors',
                                         (activeBuff.scope ?? 'team') === t.value
                                             ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                             : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
@@ -437,13 +446,6 @@
                                 </button>
                             {/each}
                         </div>
-                        <button
-                            onclick={() => removeBuff(activeBuffIdx)}
-                            class="shrink-0 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
-                            title="删除该 Buff"
-                        >
-                            <Icon icon="mdi:delete-outline" class="size-3.5" />
-                        </button>
                     </div>
                     <div class="shrink-0 border-b" style="border-color: var(--theme-divider-border);">
                         <button

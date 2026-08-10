@@ -213,7 +213,11 @@ export async function addProfile(label: string, patch: Partial<AiProfile> = {}):
 }
 
 export async function deleteProfile(id: string): Promise<boolean> {
-    if (_config.profiles.length <= 1) return false
+    // 删除最后一个配置文件时自动恢复默认
+    if (_config.profiles.length <= 1) {
+        await resetAiConfig()
+        return true
+    }
     const idx = _config.profiles.findIndex((p) => p.id === id)
     if (idx === -1) return false
     const profiles = _config.profiles.filter((p) => p.id !== id)

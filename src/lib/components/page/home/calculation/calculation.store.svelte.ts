@@ -47,9 +47,11 @@ function initKey(
     locked: boolean
 ): string {
     const tl = timelineData
-    const tlFp = tl ? `${tl.refLines.length}:${tl.opBlocks.length}:${tl.damageBlocks.length}` : 'null'
+    const tlFp = tl
+        ? `${tl.refLines.length}:${tl.refLines[0]?.id ?? ''}:${tl.refLines[tl.refLines.length - 1]?.id ?? ''}|${tl.opBlocks.length}:${tl.opBlocks[0]?.id ?? ''}:${tl.opBlocks[tl.opBlocks.length - 1]?.id ?? ''}|${tl.damageBlocks.length}:${tl.damageBlocks[0]?.id ?? ''}:${tl.damageBlocks[tl.damageBlocks.length - 1]?.id ?? ''}`
+        : 'null'
     const st = savedState ? JSON.stringify(savedState) : null
-    const stFp = st ? `${st.length}:${st.slice(-64)}` : 'null'
+    const stFp = st ?? 'null'
     const teamFp = team.map((s) => `${s.character ?? ''}|${s.weapon ?? ''}`).join(',')
     return `${teamFp}|${tlFp}|${stFp}|${locked}`
 }
@@ -71,6 +73,8 @@ export function init(
         return
     }
     _lastInitKey = key
+    _initTeam = team
+    _initTimelineData = timelineData
 
     const cached = getCharElementMap()
     const names = team.map((s) => s.character).filter(Boolean) as string[]

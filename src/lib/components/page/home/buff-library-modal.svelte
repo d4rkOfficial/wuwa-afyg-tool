@@ -457,16 +457,6 @@
         </div>
     </div>
 
-    {#if editTarget}
-        <BuffEntityEditModal
-            open
-            entityType={editTarget.entityType}
-            entityName={editTarget.entityName}
-            initialBuffs={editTarget.buffs}
-            onclose={() => (editTarget = null)}
-        />
-    {/if}
-
     {#if confirmDelete}
         <Modal
             open
@@ -512,3 +502,13 @@
         }}
     />
 </Modal>
+
+{#if editTarget}
+    <BuffEntityEditModal
+        open
+        entityType={editTarget.entityType}
+        entityName={editTarget.entityName}
+        initialBuffs={editTarget.buffs}
+        onclose={() => (editTarget = null)}
+    />
+{/if}

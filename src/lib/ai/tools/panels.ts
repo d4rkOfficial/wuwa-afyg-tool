@@ -3,7 +3,7 @@ import { defineTool } from './registry'
 import { getPanelsState, openPanel } from '../panels.svelte'
 
 defineTool('get_panels_state', {
-    description: '查看当前所有弹窗面板的开关状态（BUFF配置/速查/Buff 库/设置/工坊/链阶配置/面板总览/导入 Buff 集等）。',
+    description: '查看当前所有弹窗面板的开关状态（BUFF配置/速查/Buff 库/设置/工坊/角色详情配置/导入 Buff 集等）。',
     parameters: { type: 'object', properties: {} },
     handler: () =>
         Object.entries(getPanelsState()).map(([name, open]) => ({
@@ -14,7 +14,7 @@ defineTool('get_panels_state', {
 
 defineTool('open_panel', {
     description:
-        '打开或关闭指定弹窗面板。panel 取 get_panels_state 返回的 name（如 buff-config/quick-lookup/buff-library/settings/workshop/condition-config/stat-overview/buff-import/damage-list 等）；open 默认 true。',
+        '打开或关闭指定弹窗面板。panel 取 get_panels_state 返回的 name（如 buff-config/quick-lookup/buff-library/settings/workshop/character-detail/buff-import/damage-list 等）；open 默认 true。',
     parameters: {
         type: 'object',
         properties: {
