@@ -192,9 +192,9 @@
         const w = toolbarEl?.offsetWidth ?? 0
         const vw = window.innerWidth
         let nx = toolbarStart.x + (e.clientX - toolbarStart.mx)
-        nx = Math.max(8, Math.min(nx, vw - w - 8))
-        const leftAnchor = 8
-        const rightAnchor = vw - w - 12
+        nx = Math.max(16, Math.min(nx, vw - w - 16))
+        const leftAnchor = 16
+        const rightAnchor = vw - w - 20
         if (Math.abs(nx - leftAnchor) < 48) nx = leftAnchor
         else if (Math.abs(nx - rightAnchor) < 48) nx = rightAnchor
         toolbarX = nx
@@ -219,7 +219,7 @@
         if (!simplifyToolbar) return
         const onResize = () => {
             if (toolbarX !== null && toolbarEl) {
-                toolbarX = Math.max(8, Math.min(toolbarX, window.innerWidth - toolbarEl.offsetWidth - 8))
+                toolbarX = Math.max(16, Math.min(toolbarX, window.innerWidth - toolbarEl.offsetWidth - 16))
             }
         }
         window.addEventListener('resize', onResize)
@@ -964,13 +964,13 @@
                 onpointerleave={() => (toolbarHover = false)}
                 onclickcapture={toolbarClickCapture}
                 class={simplifyToolbar
-                    ? 'theme-glass-surface fixed bottom-3 z-40 flex cursor-grab touch-none select-none items-center gap-1 rounded-xl border p-1.5 shadow-2xl active:cursor-grabbing'
+                    ? 'theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-xl border p-2 shadow-2xl active:cursor-grabbing'
                     : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'}
                 style={simplifyToolbar
                     ? `border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);${
                           toolbarX !== null && gpuAccel
                               ? `left: 0; transform: translate(${toolbarX}px, 0) scale(${toolbarScale});`
-                              : `transform: scale(${toolbarScale});${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 12px;'}`
+                              : `transform: scale(${toolbarScale});${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 20px;'}`
                       }${
                           toolbarScale > 1
                               ? ' box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 60%, transparent), 0 0 14px color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);'
@@ -985,9 +985,9 @@
                 <button
                     onclick={() => (showLookup = true)}
                     disabled={!teamPhaseLocked}
-                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
-                        ? 'rounded-full px-2.5'
-                        : 'rounded-lg px-3'}"
+                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
+                        ? 'rounded-full px-3 py-2'
+                        : 'rounded-lg px-3 py-1.5'}"
                     title="速查"
                 >
                     <Icon icon="mdi:book-search-outline" class="size-4 shrink-0" />
@@ -995,9 +995,9 @@
                 </button>
                 <button
                     onclick={() => (showCharDetail = true)}
-                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                        ? 'rounded-full px-2.5'
-                        : 'rounded-lg px-3'}"
+                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                        ? 'rounded-full px-3 py-2'
+                        : 'rounded-lg px-3 py-1.5'}"
                     title="角色详情配置"
                 >
                     <Icon icon="mdi:account-details" class="size-4 shrink-0" />
@@ -1007,9 +1007,9 @@
                     {#if activePhase === 'timeline'}
                         <button
                             onclick={() => setShowDamageList(true)}
-                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                                ? 'rounded-full px-2.5'
-                                : 'rounded-lg px-3'}"
+                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                                ? 'rounded-full px-3 py-2'
+                                : 'rounded-lg px-3 py-1.5'}"
                             title="查看所有伤害"
                         >
                             <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
@@ -1017,9 +1017,9 @@
                         </button>
                         <button
                             onclick={formatTimeline}
-                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                                ? 'rounded-full px-2.5'
-                                : 'rounded-lg px-3'}"
+                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                                ? 'rounded-full px-3 py-2'
+                                : 'rounded-lg px-3 py-1.5'}"
                             title="自动格式化：每个操作块右边界对齐下一个块（可跨角色）的左边界，参考线跟随其左右块"
                         >
                             <Icon icon="mdi:auto-fix" class="size-4 shrink-0" />
@@ -1028,9 +1028,9 @@
                         <div class="relative group">
                             <button
                                 onclick={toggleQuickMode}
-                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
-                                    ? 'rounded-full px-2.5'
-                                    : 'rounded-lg px-3'} {getQuickMode()
+                                class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-3 py-2'
+                                    : 'rounded-lg px-3 py-1.5'} {getQuickMode()
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getQuickMode()
@@ -1056,9 +1056,9 @@
                     {#if activePhase === 'calculation'}
                         <button
                             onclick={() => setShowBuffModal(true)}
-                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                                ? 'rounded-full px-2.5'
-                                : 'rounded-lg px-3'}"
+                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                                ? 'rounded-full px-3 py-2'
+                                : 'rounded-lg px-3 py-1.5'}"
                             title="BUFF配置"
                         >
                             <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
@@ -1067,9 +1067,9 @@
                         {#if getCalcViewMode() !== 'spread'}
                             <button
                                 onclick={toggleBuffDiffMode}
-                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
-                                    ? 'rounded-full px-2.5'
-                                    : 'rounded-lg px-3'} {getBuffDiffMode()
+                                class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-3 py-2'
+                                    : 'rounded-lg px-3 py-1.5'} {getBuffDiffMode()
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getBuffDiffMode()
@@ -1093,9 +1093,9 @@
                                     setDamageTypeEditMode(next)
                                     addToast(next ? '已切换为编辑伤害类型' : '已切换为仅查看伤害类型', 'success')
                                 }}
-                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
-                                    ? 'rounded-full px-2.5'
-                                    : 'rounded-lg px-3'} {getDamageTypeEditMode()
+                                class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-3 py-2'
+                                    : 'rounded-lg px-3 py-1.5'} {getDamageTypeEditMode()
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getDamageTypeEditMode()
@@ -1122,9 +1122,9 @@
                                         'success'
                                     )
                                 }}
-                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
-                                    ? 'rounded-full px-2.5'
-                                    : 'rounded-lg px-3'} {getScrollAxisDefault() === 'horizontal'
+                                class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-3 py-2'
+                                    : 'rounded-lg px-3 py-1.5'} {getScrollAxisDefault() === 'horizontal'
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getScrollAxisDefault() === 'horizontal'
@@ -1150,9 +1150,9 @@
                         {#if getCalcViewMode() !== 'spread'}
                             <button
                                 onclick={toggleHideConditionMismatch}
-                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
-                                    ? 'rounded-full px-2.5'
-                                    : 'rounded-lg px-3'} {getHideConditionMismatch()
+                                class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-3 py-2'
+                                    : 'rounded-lg px-3 py-1.5'} {getHideConditionMismatch()
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getHideConditionMismatch()
@@ -1199,9 +1199,9 @@
                             showResult = true
                             resultRefreshKey++
                         }}
-                        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                            ? 'rounded-full px-2.5'
-                            : 'rounded-lg px-3'}"
+                        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                            ? 'rounded-full px-3 py-2'
+                            : 'rounded-lg px-3 py-1.5'}"
                         title="刷新结果"
                     >
                         <Icon icon="mdi:refresh" class="size-4 shrink-0" />
@@ -1212,9 +1212,9 @@
                     <button
                         onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
                         disabled={!phaseLocked && !canLock}
-                        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
-                            ? 'rounded-full px-2.5'
-                            : 'rounded-lg px-3'}"
+                        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
+                            ? 'rounded-full px-3 py-2'
+                            : 'rounded-lg px-3 py-1.5'}"
                         title={phaseLocked ? '解锁' : '锁定'}
                     >
                         <Icon
