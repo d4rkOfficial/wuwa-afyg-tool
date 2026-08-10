@@ -1015,7 +1015,9 @@
                             </button>
                         {/if}
                     {/if}
-                {:else}
+                {/if}
+                <div class="flex-1"></div>
+                {#if showResult}
                     <button
                         onclick={async () => {
                             if (getReloadOnResultRefresh()) initForActiveProject()
@@ -1037,7 +1039,6 @@
                         刷新结果
                     </button>
                 {/if}
-                <div class="flex-1"></div>
                 {#if !showResult}
                     <button
                         onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
