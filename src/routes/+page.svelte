@@ -73,6 +73,7 @@
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
     import { hideSplash } from '$lib/utils/splash'
     import favicon from '$lib/assets/favicon.svg'
+    import { getReloadOnResultRefresh } from '$lib/data/render-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
     import BuffLibraryModal from '$lib/components/page/home/buff-library-modal.svelte'
@@ -1032,6 +1033,7 @@
                 {:else}
                     <button
                         onclick={async () => {
+                            if (getReloadOnResultRefresh()) initForActiveProject()
                             showResult = false
                             activePhase = 'team'
                             await tick()

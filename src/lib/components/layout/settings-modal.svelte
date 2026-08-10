@@ -37,7 +37,12 @@
     } from '$lib/data/ai-prefs.svelte'
     import { GAMEPAD_BUTTONS } from '$lib/components/page/home/timeline/timeline.consts'
     import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
-    import { getGpuAccel, setGpuAccel } from '$lib/data/render-prefs.svelte'
+    import {
+        getGpuAccel,
+        setGpuAccel,
+        getReloadOnResultRefresh,
+        setReloadOnResultRefresh
+    } from '$lib/data/render-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
         applyLockedMods,
@@ -1138,8 +1143,10 @@
                     {:else if tab === 'performance'}
                         <!-- 性能相关 -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">渲染性能</span>
-                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">控制拖拽/动画等交互的渲染方式</p>
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">性能设置</span>
+                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                控制交互渲染方式与刷新结果时的数据加载行为
+                            </p>
                             <!-- 渲染加速（GPU）：拖拽/动画走合成层 -->
                             <div
                                 class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
@@ -1165,6 +1172,35 @@
                                     <span
                                         class="absolute top-0.5 size-4 rounded-full transition-all"
                                         style="left: {getGpuAccel()
+                                            ? '18px'
+                                            : '2px'}; background: var(--theme-modal-bg);"
+                                    ></span>
+                                </button>
+                            </div>
+                            <!-- 刷新结果重载数据：开启后刷新结果时重新加载本工程全部阶段数据 -->
+                            <div
+                                class="mt-2 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                style="border-color: var(--theme-divider-border);"
+                            >
+                                <div class="min-w-0">
+                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                        >刷新结果重载数据</span
+                                    >
+                                    <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                        开启后点击「刷新结果」会重新加载本工程全部阶段数据及角色/声骸信息（更准确，耗时更长）；关闭仅重算结果（更快）
+                                    </span>
+                                </div>
+                                <button
+                                    onclick={() => setReloadOnResultRefresh(!getReloadOnResultRefresh())}
+                                    class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                    style="background: {getReloadOnResultRefresh()
+                                        ? 'var(--theme-accent-bg)'
+                                        : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                    title="点击切换"
+                                >
+                                    <span
+                                        class="absolute top-0.5 size-4 rounded-full transition-all"
+                                        style="left: {getReloadOnResultRefresh()
                                             ? '18px'
                                             : '2px'}; background: var(--theme-modal-bg);"
                                     ></span>
