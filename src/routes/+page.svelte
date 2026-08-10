@@ -73,7 +73,7 @@
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
     import { hideSplash } from '$lib/utils/splash'
     import favicon from '$lib/assets/favicon.svg'
-    import { getReloadOnResultRefresh } from '$lib/data/render-prefs.svelte'
+    import { getGpuAccel, getReloadOnResultRefresh } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
@@ -170,6 +170,8 @@
     let toolbarStart = $state({ mx: 0, x: 0 })
     // hover 放大 1.05、拖拽放大 1.15（同 AI 悬浮窗收起按钮）
     const toolbarScale = $derived(toolbarDrag ? 1.15 : toolbarHover ? 1.05 : 1)
+    // GPU 合成加速（设置 → 性能）：拖动定位用 transform 走合成层
+    const gpuAccel = $derived(getGpuAccel())
 
     function toolbarDown(e: PointerEvent) {
         if (!simplifyToolbar) return
@@ -944,7 +946,11 @@
                     ? 'theme-glass-surface fixed bottom-3 z-40 flex cursor-grab touch-none select-none items-center gap-1 rounded-xl border p-1.5 shadow-2xl active:cursor-grabbing'
                     : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'}
                 style={simplifyToolbar
-                    ? `border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);transform: scale(${toolbarScale});${
+                    ? `border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);${
+                          toolbarX !== null && gpuAccel
+                              ? `left: 0; transform: translate(${toolbarX}px, 0) scale(${toolbarScale});`
+                              : `transform: scale(${toolbarScale});${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 12px;'}`
+                      }${
                           toolbarScale > 1
                               ? ' box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 60%, transparent), 0 0 14px color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);'
                               : ''
@@ -952,7 +958,7 @@
                           toolbarDrag
                               ? 'left 150ms ease'
                               : 'transform 150ms ease, box-shadow 150ms ease, left 150ms ease'
-                      };${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 12px;'}${toolbarDrag ? ' will-change: transform, left;' : ''}`
+                      };${toolbarDrag ? (gpuAccel ? ' will-change: transform;' : ' will-change: left;') : ''}`
                     : 'background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)'}
             >
                 <button
