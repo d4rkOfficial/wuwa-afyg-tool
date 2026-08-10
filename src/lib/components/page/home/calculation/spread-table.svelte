@@ -761,6 +761,15 @@
                             </tr>
                         {/if}
                         <tr>
+                            {#if !hasFolder}
+                                <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
+                                <th
+                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-medium text-(--theme-modal-text)/50"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
+                                >
+                                    条目
+                                </th>
+                            {/if}
                             {#each group.visibleColIdx as ci, colPos}
                                 {@const bs = columns[ci]}
                                 {@const stat = group.colStats[ci]}
