@@ -1138,6 +1138,27 @@ function applyOverrideToStats(stats: CharacterComputed, zoneId: string, value: n
     }
 }
 
+/** @desc 按「本条目可见面板」解析 ref（转模）：本角色槽位用该条目的 partialStats（仅含绑定到本条目的 buff），
+ *  其它角色槽位沿用角色级 full stats（跨角色引用无时间轴粒度）；避免单条目绑定的 buff 泄漏到其它条目的转模 */
+function resolveRefsForEntry(
+    stats: CharacterComputed,
+    partialStats: CharacterComputed,
+    refSource: CharacterComputed[],
+    charIndex: number,
+    boundBuffSets: BuffSet[]
+): void {
+    const entryRefStats = refSource.slice()
+    if (charIndex >= 0) entryRefStats[charIndex] = partialStats
+    for (const bs of boundBuffSets) {
+        for (const z of bs.zones) {
+            if (!z.ref) continue
+            const resolved = resolveRefValue(z.ref, entryRefStats)
+            if (resolved === 0) continue
+            applyRefToStats(stats, z.zoneId, resolved)
+        }
+    }
+}
+
 // ── main entry point ──
 
 export function computeAll(
@@ -1213,14 +1234,7 @@ export function computeAll(
 
         // Resolve ref zones and apply to stats
         const stats = { ...partialStats }
-        for (const bs of boundBuffSets) {
-            for (const z of bs.zones) {
-                if (!z.ref) continue
-                const resolved = resolveRefValue(z.ref, charFullStats)
-                if (resolved === 0) continue
-                applyRefToStats(stats, z.zoneId, resolved)
-            }
-        }
+        resolveRefsForEntry(stats, partialStats, charFullStats, charIndex, boundBuffSets)
 
         // Apply override zones (set value directly, takes precedence over everything)
         for (const bs of boundBuffSets) {
@@ -1320,14 +1334,7 @@ export function computeOneEntry(
 
     // resolve ref zones
     const stats = { ...partialStats }
-    for (const bs of boundBuffSets) {
-        for (const z of bs.zones) {
-            if (!z.ref) continue
-            const resolved = resolveRefValue(z.ref, fullStats)
-            if (resolved === 0) continue
-            applyRefToStats(stats, z.zoneId, resolved)
-        }
-    }
+    resolveRefsForEntry(stats, partialStats, fullStats, charIndex, boundBuffSets)
 
     // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
     const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
