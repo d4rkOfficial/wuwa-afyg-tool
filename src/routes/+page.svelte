@@ -78,13 +78,12 @@
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
     import BuffLibraryModal from '$lib/components/page/home/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
-    import ConditionConfigModal from '$lib/components/page/home/condition-config-modal.svelte'
+    import CharacterDetailModal from '$lib/components/page/home/config/character-detail-modal.svelte'
     import AiAssistant from '$lib/ai/components/ai-assistant.svelte'
     import TeamConfig from '$lib/components/page/home/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
     import Config from '$lib/components/page/home/config/config.svelte'
-    import StatOverview from '$lib/components/page/home/config/stat-overview.svelte'
     import Result from '$lib/components/page/home/result/result.svelte'
     import PhaseTabs from '$lib/components/page/home/phase-tabs.svelte'
     import QuickLookup from '$lib/components/page/home/calculation/quick-lookup.svelte'
@@ -98,7 +97,6 @@
     let showBuffLibrary = $state(false)
     let showSettings = $state(false)
     let showWorkshopFrame = $state(false)
-    let showConditionModal = $state(false)
     let workshopFrameKey = $state(0)
 
     // 阶段切换加载反馈：activePhase/showResult 变化时显示遮罩 spinner，同步初始化完成后最短 200ms 隐藏
@@ -162,7 +160,7 @@
     })
 
     let showLookup = $state(false)
-    let showStatOverview = $state(false)
+    let showCharDetail = $state(false)
     let resultRefreshKey = $state(0)
     let renameModal = $state(false)
     let renameId = $state('')
@@ -204,8 +202,7 @@
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
             ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
             ['workshop-frame', '工坊页', () => showWorkshopFrame, (v) => (showWorkshopFrame = v)],
-            ['condition-config', '链/阶配置', () => showConditionModal, (v) => (showConditionModal = v)],
-            ['stat-overview', '角色面板总览', () => showStatOverview, (v) => (showStatOverview = v)],
+            ['character-detail', '角色详情配置', () => showCharDetail, (v) => (showCharDetail = v)],
             ['new-project', '新建工程', () => showNewModal, (v) => (showNewModal = v)],
             ['rename-project', '重命名工程', () => renameModal, (v) => (renameModal = v)],
             ['clone-project', '克隆工程', () => cloneModal, (v) => (cloneModal = v)],
@@ -499,8 +496,6 @@
     }
 
     let teamPhaseLocked = $derived(activeProject?.phases.team?.locked ?? false)
-    // 队伍中所有已配置角色都必须有武器，且队伍阶段已锁定，才能配置链/阶
-    let teamHasAllWeapons = $derived(activeProject ? activeProject.team.every((s) => !s.character || s.weapon) : false)
     let allPhasesLocked = $derived(
         activeProject ? getPhaseOrder().every((p) => activeProject!.phases[p]?.locked === true) : false
     )
@@ -853,14 +848,6 @@
                         </div>
                     {/if}
                 {/key}
-                {#if showStatOverview}
-                    <StatOverview
-                        team={activeProject.team}
-                        configState={activeProject.phases.config.data as ConfigState | null}
-                        calcState={activeProject.phases.calculation.data as CalcState | null}
-                        onclose={() => (showStatOverview = false)}
-                    />
-                {/if}
                 {#if !showResult && phaseLocked}
                     <div
                         class="absolute inset-0 z-40 flex items-center justify-center pointer-events-none select-none"
@@ -881,15 +868,22 @@
                 class="flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5"
                 style="background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)"
             >
+                <button
+                    onclick={() => (showLookup = true)}
+                    disabled={!teamPhaseLocked}
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none"
+                >
+                    <Icon icon="mdi:book-search-outline" class="size-4 shrink-0" />
+                    速查
+                </button>
+                <button
+                    onclick={() => (showCharDetail = true)}
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
+                >
+                    <Icon icon="mdi:account-details" class="size-4 shrink-0" />
+                    角色详情配置
+                </button>
                 {#if !showResult}
-                    <button
-                        onclick={() => (showLookup = true)}
-                        disabled={!teamPhaseLocked}
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none"
-                    >
-                        <Icon icon="mdi:book-search-outline" class="size-4 shrink-0" />
-                        速查
-                    </button>
                     {#if activePhase === 'timeline'}
                         <button
                             onclick={() => setShowDamageList(true)}
@@ -1021,15 +1015,6 @@
                             </button>
                         {/if}
                     {/if}
-                    {#if activePhase === 'config'}
-                        <button
-                            onclick={() => (showStatOverview = true)}
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
-                        >
-                            <Icon icon="mdi:account-details" class="size-4 shrink-0" />
-                            角色面板总览
-                        </button>
-                    {/if}
                 {:else}
                     <button
                         onclick={async () => {
@@ -1053,15 +1038,6 @@
                     </button>
                 {/if}
                 <div class="flex-1"></div>
-                <button
-                    onclick={() => (showConditionModal = true)}
-                    disabled={!teamPhaseLocked || !teamHasAllWeapons}
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none"
-                    title="队伍中所有角色配置武器并锁定队伍配置后可用；低于门槛的 buff 不生效"
-                >
-                    <Icon icon="mdi:card-account-details-star-outline" class="size-4 shrink-0" />
-                    链/阶配置
-                </button>
                 {#if !showResult}
                     <button
                         onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
@@ -1102,10 +1078,12 @@
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
 
 {#if activeProject}
-    <ConditionConfigModal
-        open={showConditionModal}
+    <CharacterDetailModal
+        open={showCharDetail}
         team={activeProject.team}
-        onclose={() => (showConditionModal = false)}
+        configState={activeProject.phases.config.data as ConfigState | null}
+        calcState={activeProject.phases.calculation.data as CalcState | null}
+        onclose={() => (showCharDetail = false)}
     />
 {/if}
 
