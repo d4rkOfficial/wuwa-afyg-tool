@@ -1,7 +1,7 @@
 <script lang="ts">
     import { fade } from 'svelte/transition'
     import { popOut } from '$lib/utils/motion'
-    import { getActiveId, getOverrides, updateOverride } from '$lib/theme'
+    import { getActiveId, getOverrides, setActiveTheme, getThemes, updateOverride } from '$lib/theme'
     import Icon from '@iconify/svelte'
     import {
         getKeyMapEntries,
@@ -73,6 +73,16 @@
     let tab = $state<'theme' | 'keymap' | 'interaction' | 'performance' | 'workshop' | 'archive' | 'cache' | 'ai'>(
         'theme'
     )
+
+    let currentTheme = $derived(getActiveId())
+
+    const toggleTheme = () => {
+        const next = currentTheme === 'dark' ? 'light' : 'dark'
+        setActiveTheme(next).then(() => {
+            const t = getThemes().find((th) => th.id === next)
+            addToast(`已切换至「${t?.name ?? next}」`, 'success')
+        })
+    }
 
     const SETTING_TABS = [
         { key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
@@ -467,9 +477,6 @@
     <div
         class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5))"
-        onclick={(e) => {
-            if (e.target === e.currentTarget) onclose()
-        }}
         onkeydown={(e) => {
             if (e.key === 'Escape') onclose()
         }}
@@ -543,6 +550,37 @@
                                         {c.name}
                                     </button>
                                 {/each}
+                            </div>
+                        </div>
+
+                        <!-- 昼夜切换 -->
+                        <div class="mb-5">
+                            <span class="mb-3 block text-xs font-medium text-(--theme-modal-text)/60">昼夜切换</span>
+                            <div
+                                class="flex items-center justify-between gap-3 rounded-lg border px-2.5 py-2"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="min-w-0">
+                                    <span class="block text-[11px] text-(--theme-modal-text)/60">深色主题</span>
+                                    <span class="block text-[9px] text-(--theme-modal-text)/35"
+                                        >与侧边栏按钮一致，全局明暗切换</span
+                                    >
+                                </div>
+                                <button
+                                    onclick={toggleTheme}
+                                    class="relative h-4.5 w-8 shrink-0 rounded-full transition-colors"
+                                    style="background: {currentTheme === 'dark'
+                                        ? 'var(--theme-accent-bg)'
+                                        : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                    title="点击切换昼夜"
+                                >
+                                    <span
+                                        class="absolute top-0.5 size-3.5 rounded-full transition-all"
+                                        style="left: {currentTheme === 'dark'
+                                            ? '16px'
+                                            : '2px'}; background: var(--theme-modal-bg);"
+                                    ></span>
+                                </button>
                             </div>
                         </div>
 
@@ -895,6 +933,36 @@
                                     </div>
                                 </div>
                             {/if}
+
+                            <div class="mt-4">
+                                <div class="mb-3 flex items-center gap-2">
+                                    <span
+                                        class="flex size-7 items-center justify-center rounded-lg bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                    >
+                                        <Icon icon="mdi:monitor" class="size-4" />
+                                    </span>
+                                    <div>
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >标题栏颜色</span
+                                        >
+                                        <span class="block text-[10px] text-(--theme-modal-text)/35"
+                                            >跟随主题自动适配（昼夜 / 黑白特例），同步 PWA theme-color</span
+                                        >
+                                    </div>
+                                </div>
+                                <div
+                                    class="flex items-center gap-2 rounded-lg border p-1.5 px-2.5"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <span
+                                        class="size-5 shrink-0 rounded border"
+                                        style="background: var(--theme-titlebar-bg); border-color: var(--theme-divider-border);"
+                                    ></span>
+                                    <span class="text-[11px] font-medium text-(--theme-modal-text)/60"
+                                        >跟随当前主题（{getActiveId() === 'light' ? '浅色' : '深色'}）</span
+                                    >
+                                </div>
+                            </div>
                         </div>
                     {:else if tab === 'keymap'}
                         <!-- Key mapping -->
@@ -1615,7 +1683,6 @@
         <div
             class="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm"
             style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-            onclick={() => (keyPickerFor = null)}
         >
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->

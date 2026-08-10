@@ -82,6 +82,19 @@ function applyThemeCSS() {
     root.style.setProperty('--theme-buff-green-text', isLight ? '#14532d' : '#22c55e')
 
     applyOverridesCSS(root)
+
+    // 标题栏颜色同步到 PWA theme-color（原生标题栏着色，移动端地址栏 / 桌面标题栏联动）
+    const titlebarBg =
+        root.style.getPropertyValue('--theme-titlebar-bg')?.trim() || theme.components.titlebar?.backgroundImage
+    if (titlebarBg) {
+        let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+        if (!meta) {
+            meta = document.createElement('meta')
+            meta.name = 'theme-color'
+            document.head.appendChild(meta)
+        }
+        meta.content = titlebarBg
+    }
 }
 
 function applyCritGradients(root: HTMLElement, hue: number | null) {
@@ -132,6 +145,9 @@ function applyAccentOverride(root: HTMLElement) {
         root.style.setProperty('--theme-track-2', isDark ? '#666' : '#999')
         root.style.setProperty('--theme-track-3', isDark ? '#777' : '#888')
         root.style.setProperty('--theme-track-4', isDark ? '#888' : '#777')
+        // 黑白特例：标题栏背景/文字同步为纯黑/纯白（对照昼夜）
+        root.style.setProperty('--theme-titlebar-bg', isDark ? '#000000' : '#ffffff')
+        root.style.setProperty('--theme-titlebar-text', isDark ? '#ffffff' : '#000000')
         applyCritGradients(root, null)
     } else if (typeof overrides.accentHue === 'number') {
         restoreElementColors()
@@ -204,6 +220,8 @@ function applyBgBlend(root: HTMLElement) {
                     root.style.setProperty(varName, 'transparent')
                     continue
                 }
+                // 排轴（timeline）因子减半：容器更透，角色头像/伤害绑定粘性列能透出背景图（列自身再叠低透明底）
+                const factor = key === 'timeline' ? overrides.bgOpacity * 0.5 : overrides.bgOpacity
                 if (
                     orig &&
                     !orig.startsWith('linear-gradient') &&
@@ -211,7 +229,7 @@ function applyBgBlend(root: HTMLElement) {
                     !orig.startsWith('repeating-linear-gradient') &&
                     !orig.startsWith('repeating-radial-gradient')
                 ) {
-                    root.style.setProperty(varName, `color-mix(in srgb, ${orig} ${overrides.bgOpacity}%, transparent)`)
+                    root.style.setProperty(varName, `color-mix(in srgb, ${orig} ${factor}%, transparent)`)
                 }
             }
         }

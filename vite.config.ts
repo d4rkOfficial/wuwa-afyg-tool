@@ -9,6 +9,7 @@ export default defineConfig({
         sveltekit(),
         SvelteKitPWA({
             registerType: 'autoUpdate',
+            devOptions: { enabled: true },
             manifest: {
                 name: '椰果工具箱',
                 short_name: '椰果',

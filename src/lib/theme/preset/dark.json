@@ -96,6 +96,10 @@
         "watermark": {
             "backgroundImage": "rgba(0,0,0,0.15)",
             "textColor": "rgba(255,255,255,0.08)"
+        },
+        "titlebar": {
+            "backgroundImage": "#18181b",
+            "textColor": "#e4e4e7"
         }
     }
 }

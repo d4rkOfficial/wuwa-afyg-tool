@@ -580,8 +580,8 @@
                 <!-- Header row -->
                 <div class="relative shrink-0 h-8 border-b" style="border-bottom-color: var(--theme-divider-border);">
                     <div
-                        class="sticky left-0 z-35 w-20 h-full bg-(--theme-timeline-bg)/80 border-r backdrop-blur-sm flex items-center justify-center"
-                        style="border-right-color: var(--theme-divider-border);"
+                        class="sticky left-0 z-35 w-20 h-full border-r backdrop-blur-sm flex items-center justify-center"
+                        style="background: color-mix(in srgb, var(--theme-timeline-bg) 40%, transparent); border-right-color: var(--theme-divider-border);"
                     >
                         {#if getQuickMode() && getQuickSpecial() !== 'none'}
                             <span
@@ -613,8 +613,8 @@
                     >
                         <!-- Sticky label column -->
                         <div
-                            class="sticky left-0 z-35 w-20 h-full bg-(--theme-timeline-bg)/60 border-r backdrop-blur-sm flex items-center justify-center"
-                            style="border-right-color: var(--theme-divider-border);"
+                            class="sticky left-0 z-35 w-20 h-full border-r backdrop-blur-sm flex items-center justify-center"
+                            style="background: color-mix(in srgb, var(--theme-timeline-bg) 40%, transparent); border-right-color: var(--theme-divider-border);"
                         >
                             {#if i < getTRACKS().length - 1}
                                 <div
