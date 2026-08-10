@@ -74,6 +74,7 @@
     import { hideSplash } from '$lib/utils/splash'
     import favicon from '$lib/assets/favicon.svg'
     import { getReloadOnResultRefresh } from '$lib/data/render-prefs.svelte'
+    import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
     import BuffLibraryModal from '$lib/components/page/home/buff-library-modal.svelte'
@@ -157,6 +158,67 @@
                 pending = null
             }
         }
+    })
+
+    // ── 简化底部工具栏：fixed 圆角胶囊，仅水平拖动，磁吸侧栏右缘 / 屏幕右缘 ──
+    const simplifyToolbar = $derived(getSimplifyToolbar())
+    let toolbarEl = $state<HTMLElement | null>(null)
+    let toolbarX = $state<number | null>(null)
+    let toolbarDrag = $state(false)
+    let toolbarDragMoved = $state(false)
+    let toolbarStart = $state({ mx: 0, x: 0 })
+
+    function toolbarDown(e: PointerEvent) {
+        if (!simplifyToolbar) return
+        e.preventDefault()
+        toolbarDrag = true
+        toolbarDragMoved = false
+        const curLeft = toolbarEl?.getBoundingClientRect().left ?? toolbarX ?? window.innerWidth - 140
+        toolbarStart = { mx: e.clientX, x: curLeft }
+        // 不用 setPointerCapture（会把合成 click 重定向到容器导致按钮无法点击），改 window 级监听
+        window.addEventListener('pointermove', toolbarMove)
+        window.addEventListener('pointerup', toolbarUp)
+        window.addEventListener('pointercancel', toolbarUp)
+    }
+
+    function toolbarMove(e: PointerEvent) {
+        if (!toolbarDrag) return
+        if (Math.abs(e.clientX - toolbarStart.mx) > 4) toolbarDragMoved = true
+        const w = toolbarEl?.offsetWidth ?? 0
+        const vw = window.innerWidth
+        let nx = toolbarStart.x + (e.clientX - toolbarStart.mx)
+        nx = Math.max(8, Math.min(nx, vw - w - 8))
+        const leftAnchor = sidebarWidth + 8
+        const rightAnchor = vw - w - 12
+        if (Math.abs(nx - leftAnchor) < 48) nx = leftAnchor
+        else if (Math.abs(nx - rightAnchor) < 48) nx = rightAnchor
+        toolbarX = nx
+    }
+
+    function toolbarUp() {
+        toolbarDrag = false
+        window.removeEventListener('pointermove', toolbarMove)
+        window.removeEventListener('pointerup', toolbarUp)
+        window.removeEventListener('pointercancel', toolbarUp)
+    }
+
+    // 拖动超过阈值后抑制本次按钮 click（capture 阶段拦截）
+    function toolbarClickCapture(e: MouseEvent) {
+        if (toolbarDragMoved) {
+            e.stopPropagation()
+            toolbarDragMoved = false
+        }
+    }
+
+    $effect(() => {
+        if (!simplifyToolbar) return
+        const onResize = () => {
+            if (toolbarX !== null && toolbarEl) {
+                toolbarX = Math.max(8, Math.min(toolbarX, window.innerWidth - toolbarEl.offsetWidth - 8))
+            }
+        }
+        window.addEventListener('resize', onResize)
+        return () => window.removeEventListener('resize', onResize)
     })
 
     let showLookup = $state(false)
@@ -864,86 +926,124 @@
                 {/if}
             </div>
 
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-                class="flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5"
-                style="background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)"
+                bind:this={toolbarEl}
+                role="toolbar"
+                onpointerdown={toolbarDown}
+                onpointermove={toolbarMove}
+                onpointerup={toolbarUp}
+                onpointercancel={toolbarUp}
+                onclickcapture={toolbarClickCapture}
+                class={simplifyToolbar
+                    ? 'theme-glass-surface fixed bottom-3 z-40 flex cursor-grab touch-none select-none items-center gap-1 rounded-full border p-1.5 shadow-2xl active:cursor-grabbing'
+                    : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'}
+                style={simplifyToolbar
+                    ? `border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 10%, color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)); color: var(--theme-modal-text);${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 12px;'}${toolbarDrag ? ' will-change: left;' : ''}`
+                    : 'background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)'}
             >
                 <button
                     onclick={() => (showLookup = true)}
                     disabled={!teamPhaseLocked}
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none"
+                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
+                        ? 'rounded-full px-2.5'
+                        : 'rounded-lg px-3'}"
+                    title="速查"
                 >
                     <Icon icon="mdi:book-search-outline" class="size-4 shrink-0" />
-                    速查
+                    {#if !simplifyToolbar}<span>速查</span>{/if}
                 </button>
                 <button
                     onclick={() => (showCharDetail = true)}
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
+                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                        ? 'rounded-full px-2.5'
+                        : 'rounded-lg px-3'}"
+                    title="角色详情配置"
                 >
                     <Icon icon="mdi:account-details" class="size-4 shrink-0" />
-                    角色详情配置
+                    {#if !simplifyToolbar}<span>角色详情配置</span>{/if}
                 </button>
                 {#if !showResult}
                     {#if activePhase === 'timeline'}
                         <button
                             onclick={() => setShowDamageList(true)}
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
+                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                                ? 'rounded-full px-2.5'
+                                : 'rounded-lg px-3'}"
+                            title="查看所有伤害"
                         >
                             <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
-                            查看所有伤害
+                            {#if !simplifyToolbar}<span>查看所有伤害</span>{/if}
                         </button>
                         <button
                             onclick={formatTimeline}
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
+                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                                ? 'rounded-full px-2.5'
+                                : 'rounded-lg px-3'}"
                             title="自动格式化：每个操作块右边界对齐下一个块（可跨角色）的左边界，参考线跟随其左右块"
                         >
                             <Icon icon="mdi:auto-fix" class="size-4 shrink-0" />
-                            格式化
+                            {#if !simplifyToolbar}<span>格式化</span>{/if}
                         </button>
                         <div class="relative group">
                             <button
                                 onclick={toggleQuickMode}
-                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getQuickMode()
+                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-2.5'
+                                    : 'rounded-lg px-3'} {getQuickMode()
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getQuickMode()
                                     ? 'var(--theme-accent-text)'
                                     : 'var(--theme-sidebar-text)'}"
+                                title="快速排轴"
                             >
                                 <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" />
-                                {getQuickMode()
-                                    ? '快速排轴(关闭' +
-                                      (getQuickSpecial() !== 'none'
-                                          ? `·${getQuickSpecial() === 'intro' ? '变奏' : '切回'}`
-                                          : '') +
-                                      ')'
-                                    : '快速排轴(开启)'}
+                                {#if !simplifyToolbar}
+                                    <span
+                                        >{getQuickMode()
+                                            ? '快速排轴(关闭' +
+                                              (getQuickSpecial() !== 'none'
+                                                  ? `·${getQuickSpecial() === 'intro' ? '变奏' : '切回'}`
+                                                  : '') +
+                                              ')'
+                                            : '快速排轴(开启)'}</span
+                                    >
+                                {/if}
                             </button>
                         </div>
                     {/if}
                     {#if activePhase === 'calculation'}
                         <button
                             onclick={() => setShowBuffModal(true)}
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
+                            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                                ? 'rounded-full px-2.5'
+                                : 'rounded-lg px-3'}"
+                            title="BUFF配置"
                         >
                             <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
-                            BUFF配置
+                            {#if !simplifyToolbar}<span>BUFF配置</span>{/if}
                         </button>
                         {#if getCalcViewMode() !== 'spread'}
                             <button
                                 onclick={toggleBuffDiffMode}
-                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getBuffDiffMode()
+                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-2.5'
+                                    : 'rounded-lg px-3'} {getBuffDiffMode()
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getBuffDiffMode()
                                     ? 'var(--theme-accent-text)'
                                     : 'var(--theme-sidebar-text)'}"
+                                title={getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}
                             >
                                 <Icon
                                     icon={getBuffDiffMode() ? 'mdi:swap-vertical-bold' : 'mdi:swap-vertical'}
                                     class="size-4 shrink-0"
                                 />
-                                {getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}
+                                {#if !simplifyToolbar}
+                                    <span>{getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}</span>
+                                {/if}
                             </button>
                         {/if}
                         {#if getCalcViewMode() === 'spread'}
@@ -953,7 +1053,9 @@
                                     setDamageTypeEditMode(next)
                                     addToast(next ? '已切换为编辑伤害类型' : '已切换为仅查看伤害类型', 'success')
                                 }}
-                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getDamageTypeEditMode()
+                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-2.5'
+                                    : 'rounded-lg px-3'} {getDamageTypeEditMode()
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getDamageTypeEditMode()
@@ -965,7 +1067,9 @@
                                     icon={getDamageTypeEditMode() ? 'mdi:pencil' : 'mdi:eye-off'}
                                     class="size-4 shrink-0"
                                 />
-                                {getDamageTypeEditMode() ? '伤害类型(编辑中)' : '伤害类型(仅查看)'}
+                                {#if !simplifyToolbar}
+                                    <span>{getDamageTypeEditMode() ? '伤害类型(编辑中)' : '伤害类型(仅查看)'}</span>
+                                {/if}
                             </button>
                             <button
                                 onclick={() => {
@@ -978,8 +1082,9 @@
                                         'success'
                                     )
                                 }}
-                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getScrollAxisDefault() ===
-                                'horizontal'
+                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-2.5'
+                                    : 'rounded-lg px-3'} {getScrollAxisDefault() === 'horizontal'
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getScrollAxisDefault() === 'horizontal'
@@ -993,13 +1098,21 @@
                                         : 'mdi:arrow-down'}
                                     class="size-4 shrink-0"
                                 />
-                                {getScrollAxisDefault() === 'horizontal' ? '默认横向滚动' : '默认纵向滚动'}
+                                {#if !simplifyToolbar}
+                                    <span
+                                        >{getScrollAxisDefault() === 'horizontal'
+                                            ? '默认横向滚动'
+                                            : '默认纵向滚动'}</span
+                                    >
+                                {/if}
                             </button>
                         {/if}
                         {#if getCalcViewMode() !== 'spread'}
                             <button
                                 onclick={toggleHideConditionMismatch}
-                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors {getHideConditionMismatch()
+                                class="inline-flex items-center gap-1.5 border py-1.5 text-sm transition-colors {simplifyToolbar
+                                    ? 'rounded-full px-2.5'
+                                    : 'rounded-lg px-3'} {getHideConditionMismatch()
                                     ? 'border-(--theme-accent-bg)'
                                     : 'border-(--theme-sidebar-text)/20'}"
                                 style="color: {getHideConditionMismatch()
@@ -1011,12 +1124,21 @@
                                     icon={getHideConditionMismatch() ? 'mdi:filter-off' : 'mdi:filter-outline'}
                                     class="size-4 shrink-0"
                                 />
-                                {getHideConditionMismatch() ? '可用Buff' : '全部Buff'}
+                                {#if !simplifyToolbar}
+                                    <span>{getHideConditionMismatch() ? '可用Buff' : '全部Buff'}</span>
+                                {/if}
                             </button>
                         {/if}
                     {/if}
                 {/if}
-                <div class="flex-1"></div>
+                {#if simplifyToolbar}
+                    <div
+                        class="mx-1.5 h-5 w-px shrink-0"
+                        style="background: color-mix(in srgb, var(--theme-accent-bg) 30%, transparent);"
+                    ></div>
+                {:else}
+                    <div class="flex-1"></div>
+                {/if}
                 {#if showResult}
                     <button
                         onclick={async () => {
@@ -1033,23 +1155,29 @@
                             showResult = true
                             resultRefreshKey++
                         }}
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40"
+                        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                            ? 'rounded-full px-2.5'
+                            : 'rounded-lg px-3'}"
+                        title="刷新结果"
                     >
                         <Icon icon="mdi:refresh" class="size-4 shrink-0" />
-                        刷新结果
+                        {#if !simplifyToolbar}<span>刷新结果</span>{/if}
                     </button>
                 {/if}
                 {#if !showResult}
                     <button
                         onclick={phaseLocked ? handleUnlockPhase : handleLockPhase}
                         disabled={!phaseLocked && !canLock}
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-(--theme-sidebar-text)/20 px-3 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none"
+                        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 py-1.5 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
+                            ? 'rounded-full px-2.5'
+                            : 'rounded-lg px-3'}"
+                        title={phaseLocked ? '解锁' : '锁定'}
                     >
                         <Icon
                             icon={phaseLocked ? 'mdi:lock-open-variant-outline' : 'mdi:lock-outline'}
                             class="size-4 shrink-0"
                         />
-                        {phaseLocked ? '解锁' : '锁定'}
+                        {#if !simplifyToolbar}<span>{phaseLocked ? '解锁' : '锁定'}</span>{/if}
                     </button>
                 {/if}
             </div>
