@@ -76,6 +76,8 @@
     import { hideSplash } from '$lib/utils/splash'
     import favicon from '$lib/assets/favicon.svg'
     import { getGpuAccel, getReloadOnResultRefresh, getReloadOnProfileChange } from '$lib/data/render-prefs.svelte'
+    import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
+    import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
@@ -170,8 +172,8 @@
     let toolbarDragMoved = $state(false)
     let toolbarHover = $state(false)
     let toolbarStart = $state({ mx: 0, x: 0 })
-    // hover 放大 1.05、拖拽放大 1.15（同 AI 悬浮窗收起按钮）
-    const toolbarScale = $derived(toolbarDrag ? 1.15 : toolbarHover ? 1.05 : 1)
+    // 仅真正拖动（>4px）时整体放大 1.15；普通点击不触发整体缩放（按钮自身 :active 放大）
+    const toolbarScale = $derived(toolbarDrag && toolbarDragMoved ? 1.15 : 1)
     // GPU 合成加速（设置 → 性能）：拖动定位用 transform 走合成层
     const gpuAccel = $derived(getGpuAccel())
 
@@ -265,6 +267,18 @@
 
     // 注册本地弹窗状态供 AI 查看/开关（同步 onMount，卸载时注销）
     onMount(() => {
+        // WS 远程接管宿主桥：切视图与 AI 同逻辑，视图名供状态推送
+        setWsHost({
+            requestView: (phase) => {
+                if (phase === 'result') {
+                    showResult = true
+                } else {
+                    activePhase = phase as PhaseKey
+                    showResult = false
+                }
+            },
+            view: () => (showResult ? 'result' : activePhase)
+        })
         // 链/阶档位任何改动（弹窗/AI 工具）都写回当前工程，保证 init/重载 restore 恒为最新值
         setProfileChangeListener(() => {
             void updateConditionProfile()
@@ -304,7 +318,23 @@
         loadShortcuts()
         loadWorkshop()
         checkShare()
-        await handleImportFromHash()
+        // 分享导入：#import_project=<url>（一次性，执行后清 hash）
+        registerHashAction({
+            key: 'import_project',
+            once: true,
+            run: async (url) => {
+                if (!url) return
+                const res = await importFromShareUrl(url)
+                if (res.ok && res.project) {
+                    await setActiveProject(res.project.id)
+                    initForActiveProject()
+                    addToast(`已从工坊导入「${res.project.name}」`, 'success')
+                } else {
+                    addToast(res.error ?? '分享已失效', 'error')
+                }
+            }
+        })
+        await runHashActions()
     })
 
     let projects = $derived(getProjects())
@@ -505,22 +535,6 @@
             initForActiveProject()
         }
         addToast(`工程「${p.name}」已归档`, 'success')
-    }
-
-    async function handleImportFromHash() {
-        const m = location.hash.match(/#import_project=([^&#]+)/)
-        if (!m) return
-        history.replaceState(null, '', location.pathname + location.search)
-        const url = decodeURIComponent(m[1])
-        if (!url) return
-        const res = await importFromShareUrl(url)
-        if (res.ok && res.project) {
-            await setActiveProject(res.project.id)
-            initForActiveProject()
-            addToast(`已从工坊导入「${res.project.name}」`, 'success')
-        } else {
-            addToast(res.error ?? '分享已失效', 'error')
-        }
     }
 
     /** @desc 重载当前工程全部阶段数据（不改变视图状态）；initForActiveProject 与「链/阶变动重载数据」共用 */
@@ -744,7 +758,9 @@
 
     <div class="flex flex-1 flex-col overflow-hidden">
         {#if !activeProject}
-            <div class="flex flex-1 flex-col items-center justify-center gap-8 px-8">
+            <div
+                class="flex flex-1 flex-col items-center justify-center gap-8 px-8 portrait:items-start portrait:justify-start portrait:overflow-x-auto"
+            >
                 <div class="flex flex-col items-center text-center">
                     <div class="relative mb-4">
                         <div
@@ -773,117 +789,93 @@
                             数据版本 {getWWVersion()}
                         </span>
                     </div>
-                    <p
-                        class="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-xs text-(--theme-card-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
-                    >
-                        <kbd
-                            class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium text-(--theme-card-text)"
-                            style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--theme-modal-text) 12%, transparent);"
-                        >
-                            <Icon icon="mdi:apple-keyboard-control" class="size-3" />
-                            Ctrl/Cmd
-                        </kbd>
-                        <span>+</span>
-                        <kbd
-                            class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium text-(--theme-card-text)"
-                            style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--theme-modal-text) 12%, transparent);"
-                        >
-                            <Icon icon="mdi:apple-keyboard-shift" class="size-3" />
-                            Shift
-                        </kbd>
-                        <span>+</span>
-                        <kbd
-                            class="rounded-md border px-1.5 py-0.5 text-[10px] font-medium text-(--theme-card-text)"
-                            style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--theme-modal-text) 12%, transparent);"
-                            >R</kbd
-                        >
-                        <span>尝试更新版本</span>
-                    </p>
                 </div>
-                <div class="grid w-full max-w-5xl grid-cols-4 gap-4">
+                <div
+                    class="grid w-full max-w-5xl grid-cols-4 gap-4 portrait:grid-cols-2 portrait:max-sm:grid-cols-1 portrait:gap-3 portrait:min-w-[560px] portrait:max-sm:min-w-[320px]"
+                >
                     <button
                         onclick={() => {
                             newName = ''
                             showNewModal = true
                         }}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused) portrait:p-4 portrait:gap-2"
                         style="animation-delay: 0ms"
                     >
                         <Icon
                             icon="mdi:plus"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)] portrait:size-7"
                             style="animation-delay: 90ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)] portrait:text-base"
                                 >创建工程</span
                             >
                             <span
-                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                class="portrait:hidden text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >从空白开始，配置配队、排轴与伤害计算</span
                             >
                         </div>
                     </button>
                     <button
                         onclick={() => (showWorkshopFrame = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused) portrait:p-4 portrait:gap-2"
                         style="animation-delay: 55ms"
                     >
                         <Icon
                             icon="mdi:storefront-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)] portrait:size-7"
                             style="animation-delay: 145ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)] portrait:text-base"
                                 >椰果工坊</span
                             >
                             <span
-                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                class="portrait:hidden text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >前往社区站点浏览、分享与下载工程</span
                             >
                         </div>
                     </button>
                     <button
                         onclick={() => (showBuffLibrary = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused) portrait:p-4 portrait:gap-2"
                         style="animation-delay: 110ms"
                     >
                         <Icon
                             icon="mdi:view-dashboard-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)] portrait:size-7"
                             style="animation-delay: 200ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)] portrait:text-base"
                                 >Buff 集</span
                             >
                             <span
-                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                class="portrait:hidden text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >管理本地增益，拉表时一键导入</span
                             >
                         </div>
                     </button>
                     <button
                         onclick={() => (showSettings = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused) portrait:p-4 portrait:gap-2"
                         style="animation-delay: 165ms"
                     >
                         <Icon
                             icon="mdi:cog-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)] portrait:size-7"
                             style="animation-delay: 255ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)] portrait:text-base"
                                 >设置</span
                             >
                             <span
-                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                class="portrait:hidden text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >主题、按键图标与工坊设置</span
                             >
                         </div>
@@ -992,10 +984,10 @@
                 onpointerleave={() => (toolbarHover = false)}
                 onclickcapture={toolbarClickCapture}
                 class={simplifyToolbar
-                    ? 'theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-xl border p-2 shadow-2xl active:cursor-grabbing'
+                    ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-xl border p-2 shadow-2xl active:cursor-grabbing'
                     : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'}
                 style={simplifyToolbar
-                    ? `border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);${
+                    ? `interpolate-size: allow-keywords; border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);${
                           toolbarX !== null && gpuAccel
                               ? `left: 0; transform: translate(${toolbarX}px, 0) scale(${toolbarScale});`
                               : `transform: scale(${toolbarScale});${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 20px;'}`
@@ -1006,7 +998,7 @@
                       }transition: ${
                           toolbarDrag
                               ? 'left 150ms ease'
-                              : 'transform 150ms ease, box-shadow 150ms ease, left 150ms ease'
+                              : 'transform 150ms ease, box-shadow 150ms ease, left 150ms ease, width 250ms ease'
                       };${toolbarDrag ? (gpuAccel ? ' will-change: transform;' : ' will-change: left;') : ''}`
                     : 'background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text)'}
             >
@@ -1600,5 +1592,18 @@
         :global(.icon-pop) {
             animation: none;
         }
+    }
+
+    /* ── 简化底部工具栏（悬浮模式）── */
+    /* 按钮点击/按住时按钮自身放大（hover 不放大）；保留原有颜色过渡 */
+    .simplified-toolbar > button {
+        transition:
+            transform 150ms ease,
+            color 150ms ease,
+            background-color 150ms ease,
+            border-color 150ms ease;
+    }
+    .simplified-toolbar > button:active:not(:disabled) {
+        transform: scale(1.15);
     }
 </style>

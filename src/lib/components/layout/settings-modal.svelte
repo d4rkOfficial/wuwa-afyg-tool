@@ -1062,7 +1062,7 @@
                                 <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">工具栏</span>
                                 <div
                                     class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-                                    style="border-color: var(--theme-divider-border);"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="min-w-0">
                                         <span class="block text-xs font-medium text-(--theme-modal-text)/70"
@@ -1165,7 +1165,7 @@
                             <!-- 渲染加速（GPU）：拖拽/动画走合成层 -->
                             <div
                                 class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-                                style="border-color: var(--theme-divider-border);"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="min-w-0">
                                     <span class="block text-xs font-medium text-(--theme-modal-text)/70"
@@ -1195,7 +1195,7 @@
                             <!-- 刷新结果重载数据：开启后刷新结果时重新加载本工程全部阶段数据 -->
                             <div
                                 class="mt-2 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-                                style="border-color: var(--theme-divider-border);"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="min-w-0">
                                     <span class="block text-xs font-medium text-(--theme-modal-text)/70"
@@ -1224,7 +1224,7 @@
                             <!-- 链/阶变动重载数据：开启后调整共鸣链/精炼档位时自动重载本工程全部阶段数据 -->
                             <div
                                 class="mt-2 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-                                style="border-color: var(--theme-divider-border);"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="min-w-0">
                                     <span class="block text-xs font-medium text-(--theme-modal-text)/70"
@@ -1439,7 +1439,7 @@
                                 <!-- 启用 AI 助手（独立开关，立即保存） -->
                                 <div
                                     class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-                                    style="border-color: var(--theme-divider-border);"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="min-w-0">
                                         <span class="block text-xs font-medium text-(--theme-modal-text)/70"
@@ -1469,7 +1469,7 @@
                                 <!-- 危险操作权限（独立设置，立即保存） -->
                                 <div
                                     class="rounded-lg border px-3 py-2.5"
-                                    style="border-color: var(--theme-divider-border);"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <span class="block text-xs font-medium text-(--theme-modal-text)/70"
                                         >危险操作权限</span
@@ -1515,7 +1515,7 @@
                                 <!-- 配置文件设置 -->
                                 <div
                                     class="rounded-lg border px-3 py-2.5"
-                                    style="border-color: var(--theme-divider-border);"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="mb-2 flex items-center justify-between">
                                         <span class="text-xs font-medium text-(--theme-modal-text)/70"
@@ -1598,7 +1598,7 @@
                                 <!-- 提示词设置 -->
                                 <div
                                     class="rounded-lg border px-3 py-2.5"
-                                    style="border-color: var(--theme-divider-border);"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <span class="text-xs font-medium text-(--theme-modal-text)/70">提示词设置</span>
                                     <p class="mb-2 mt-1 text-[10px] text-(--theme-modal-text)/40">

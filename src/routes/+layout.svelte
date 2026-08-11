@@ -1,6 +1,13 @@
 <script lang="ts">
     import { browser } from '$app/environment'
     import { clearCache } from '$lib/data/api'
+    import { connectWs, disconnectWs } from '$lib/ws-remote/ws-remote.svelte'
+    import {
+        parseHashParams,
+        registerHashAction,
+        runHashActions,
+        initHashActions
+    } from '$lib/utils/hash-actions.svelte'
     import { onMount } from 'svelte'
     import './layout.css'
     import favicon from '$lib/assets/favicon.svg'
@@ -14,8 +21,8 @@
     let { children } = $props()
 
     if (browser) {
-        const hash = globalThis.location.hash
-        if (hash === '#reset-cache') {
+        // 紧急 hash：必须在应用初始化前同步执行（清缓存后立即重载）
+        if (parseHashParams(globalThis.location.hash).some((p) => p.key === 'reset-cache')) {
             clearCache()
             globalThis.history.replaceState(null, '', globalThis.location.pathname + globalThis.location.search)
             globalThis.location.reload()
@@ -24,8 +31,23 @@
 
     onMount(() => {
         loadThemes()
+        let detachHash = () => {}
+        if (browser) {
+            // WS 远程接管：hash 携带目标则连接，移除则断开（由统一 hash 分发管理）
+            registerHashAction({
+                key: 'websocket',
+                run: (value) => connectWs(value),
+                cleanup: () => disconnectWs()
+            })
+            runHashActions()
+            detachHash = initHashActions()
+        }
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+        }
+        return () => {
+            detachHash()
+            disconnectWs()
         }
     })
 </script>

@@ -84,7 +84,6 @@ pnpm run preview
 ## API
 
 API 基于 [nanoka](https://ww.nanoka.cc) 精简提纯，随版本自动更新。
-详情见 [API测试页(afyg)](https://wuwa-afyg-tool.200503.xyz/api-test) 或者 [API测试页(hpyg)](https://wuwa-hpyg-tool.200503.xyz/api-test)。
 
 ## 声明
 

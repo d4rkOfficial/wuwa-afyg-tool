@@ -3,6 +3,19 @@
     import type { Project, PhaseKey } from '$lib/data/types'
     import { canEditPhase, getPhaseOrder } from '$lib/data/project.svelte'
     import { openHelp } from '$lib/data/help.svelte'
+    import Modal from '$lib/components/layout/modal.svelte'
+    import {
+        getWsTarget,
+        getWsStatus,
+        getWsUrl,
+        getWsLastError,
+        getWsToolCount,
+        getWsRecentTools,
+        disconnectWs,
+        connectWs,
+        pushState
+    } from '$lib/ws-remote/ws-remote.svelte'
+    import { getPanelsState } from '$lib/ai/panels.svelte'
 
     let workflowHelpItems = [
         {
@@ -78,6 +91,43 @@
             disabledReason: TAB_REASONS[key]
         }))
     )
+
+    // ── WS 远程接管：状态读取 + 状态推送 ──
+    let wsTarget = $derived(getWsTarget())
+    let wsStatus = $derived(getWsStatus())
+    let wsUrl = $derived(getWsUrl())
+    let wsLastError = $derived(getWsLastError())
+    let wsToolCount = $derived(getWsToolCount())
+    let wsRecentTools = $derived(getWsRecentTools())
+    let wsModal = $state(false)
+
+    const WS_ICON = {
+        idle: 'mdi:access-point-off',
+        connecting: 'mdi:lan-connect',
+        connected: 'mdi:access-point',
+        error: 'mdi:lan-disconnect'
+    } as const
+
+    const WS_LABEL = {
+        idle: '未连接',
+        connecting: '连接中',
+        connected: '已连接',
+        error: '连接失败'
+    } as const
+
+    /** @desc 工程/视图/锁定/弹窗变化时向 WS 服务器推送最新状态（顶栏常驻期间实时同步） */
+    $effect(() => {
+        if (getWsStatus() !== 'connected') return
+        project.id
+        project.phases.team?.locked
+        project.phases.timeline?.locked
+        project.phases.calculation?.locked
+        project.phases.config?.locked
+        active
+        showResult
+        getPanelsState()
+        pushState()
+    })
 </script>
 
 <div
@@ -163,12 +213,131 @@
         结果
     </button>
     <div class="flex-1"></div>
-    <button
-        onclick={() => openHelp('使用帮助', workflowHelpItems)}
-        class="flex items-center justify-center rounded-full size-7 text-sm transition-colors hover:bg-(--theme-tabs-text)/10"
-        style="color: var(--theme-accent-text);"
-        title="使用帮助"
-    >
-        <Icon icon="mdi:help-circle-outline" class="size-4" />
-    </button>
+    {#if wsTarget}
+        <!-- WS 远程接管：顶替帮助按钮，点击打开状态弹窗 -->
+        <button
+            onclick={() => (wsModal = true)}
+            class="flex size-7 items-center justify-center rounded-full text-sm transition-colors hover:bg-(--theme-tabs-text)/10"
+            style="color: {wsStatus === 'connected'
+                ? 'var(--theme-accent-text)'
+                : wsStatus === 'error'
+                  ? '#ef4444'
+                  : 'var(--theme-tabs-text)/40'};"
+            title="WS 远程接管（{wsStatus === 'connected' ? wsUrl : wsLastError || WS_LABEL[wsStatus]}）"
+        >
+            <Icon icon={WS_ICON[wsStatus]} class="size-4" />
+        </button>
+    {:else}
+        <button
+            onclick={() => openHelp('使用帮助', workflowHelpItems)}
+            class="flex size-7 items-center justify-center rounded-full text-sm transition-colors hover:bg-(--theme-tabs-text)/10"
+            style="color: var(--theme-accent-text);"
+            title="使用帮助"
+        >
+            <Icon icon="mdi:help-circle-outline" class="size-4" />
+        </button>
+    {/if}
 </div>
+
+<Modal open={wsModal} onclose={() => (wsModal = false)} style="max-width: min(92vw, 440px);">
+    {#snippet title()}
+        <div class="flex items-center justify-between gap-3 pr-4">
+            <span class="flex items-center gap-2">
+                <Icon
+                    icon={WS_ICON[wsStatus]}
+                    class="size-4.5"
+                    style="color: {wsStatus === 'connected'
+                        ? 'var(--theme-accent-text)'
+                        : wsStatus === 'error'
+                          ? '#ef4444'
+                          : 'var(--theme-modal-text)/40'};"
+                />
+                WS 远程接管
+            </span>
+            <span
+                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-normal"
+                style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: {wsStatus ===
+                'connected'
+                    ? 'var(--theme-accent-text)'
+                    : wsStatus === 'error'
+                      ? '#ef4444'
+                      : 'var(--theme-modal-text)/60'};"
+            >
+                <span
+                    class="size-1.5 rounded-full"
+                    style="background: {wsStatus === 'connected'
+                        ? 'var(--theme-accent-bg)'
+                        : wsStatus === 'error'
+                          ? '#ef4444'
+                          : 'var(--theme-modal-text)/40'};"
+                ></span>
+                {WS_LABEL[wsStatus]}
+            </span>
+        </div>
+    {/snippet}
+
+    <!-- 连接信息 -->
+    <div
+        class="space-y-2.5 rounded-xl border p-3.5 text-xs"
+        style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 3%, transparent);"
+    >
+        <div class="flex items-center justify-between gap-3">
+            <span class="shrink-0 text-(--theme-modal-text)/50">地址</span>
+            <span class="truncate tabular-nums text-(--theme-modal-text)/80">{wsUrl || wsTarget}</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+            <span class="shrink-0 text-(--theme-modal-text)/50">已执行工具</span>
+            <span class="tabular-nums text-(--theme-modal-text)/80">{wsToolCount} 次</span>
+        </div>
+        {#if wsLastError && wsStatus !== 'connected'}
+            <div class="break-words text-red-400">⚠ {wsLastError}</div>
+        {/if}
+    </div>
+
+    <!-- 最近工具调用 -->
+    {#if wsRecentTools.length > 0}
+        <div class="mt-4">
+            <div class="mb-2 flex items-center justify-between">
+                <span class="text-[10px] font-medium tracking-wider text-(--theme-modal-text)/40">最近工具调用</span>
+                <span class="text-[10px] text-(--theme-modal-text)/30"
+                    >最近 {Math.min(wsRecentTools.length, 10)} 条</span
+                >
+            </div>
+            <div class="rounded-xl border px-1" style="border-color: var(--theme-divider-border);">
+                {#each wsRecentTools.slice(0, 10) as t}
+                    <div class="flex items-center justify-between gap-3 px-2.5 py-1.5 text-[11px]">
+                        <span
+                            class="truncate font-mono"
+                            style="color: {t.ok ? 'var(--theme-accent-text)' : '#ef4444'};"
+                        >
+                            {t.ok ? '✓' : '✗'}
+                            {t.tool}
+                        </span>
+                        <span class="shrink-0 tabular-nums text-(--theme-modal-text)/40">
+                            {new Date(t.time).toLocaleTimeString('zh-CN', { hour12: false })}
+                        </span>
+                    </div>
+                {/each}
+            </div>
+        </div>
+    {/if}
+
+    {#snippet footer()}
+        <div class="flex gap-2.5 pt-4">
+            <button
+                onclick={() => disconnectWs()}
+                class="flex-1 rounded-lg border px-3 py-2 text-xs transition-colors hover:brightness-110"
+                style="border-color: var(--theme-divider-border); color: var(--theme-modal-text)/70;"
+            >
+                断开连接
+            </button>
+            <button
+                onclick={() => connectWs(wsTarget)}
+                class="flex-1 rounded-lg px-3 py-2 text-xs transition-colors hover:brightness-110"
+                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+            >
+                重新连接
+            </button>
+        </div>
+    {/snippet}
+</Modal>
