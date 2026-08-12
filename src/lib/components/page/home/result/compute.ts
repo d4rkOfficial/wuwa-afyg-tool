@@ -277,6 +277,8 @@ interface CharacterComputed {
     finalDmg: number
     dmgTakenInc: number
     customMult: number
+    /** @desc 特殊乘区（连乘）：每个来源独立乘算 (1 + value/100)，最终与 customMult 组合为统一特殊乘区 **/
+    customFinalDmgMul: number
     dmgRedPen: number
     extraRatio: number
     elementBonus: Record<string, number>
@@ -383,6 +385,7 @@ function computeCharacterStats(
     let finalDmg = 0,
         dmgTakenInc = 0
     let customMult = 0,
+        customFinalDmgMul = 1,
         dmgRedPen = 0,
         extraRatio = 0
 
@@ -421,6 +424,9 @@ function computeCharacterStats(
                     break
                 case 'customFinalDmg':
                     customMult += value
+                    break
+                case 'customFinalDmgMul':
+                    customFinalDmgMul *= 1 + value / 100
                     break
                 case 'dmgRedPen':
                     dmgRedPen += value
@@ -468,6 +474,7 @@ function computeCharacterStats(
         finalDmg,
         dmgTakenInc,
         customMult,
+        customFinalDmgMul,
         dmgRedPen,
         extraRatio,
         elementBonus: acc.elementBonus,
@@ -545,7 +552,7 @@ function computeResultEntry(
     const bonus = 1 + totalDmgBonus / 100
     const vulnerability = 1 + stats.dmgTakenInc / 100
     const finalDmg = 1 + stats.finalDmg / 100
-    const customMult = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
+    const customMult = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
     const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * stats.tuneStrainLayer
 
     // crit (cap at 100%)
@@ -762,7 +769,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
 
     // final dmg & custom mult
     const finalDmgDec = stats.finalDmg / 100
-    const customMultVal = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
+    const customMultVal = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
 
     // vulnerability zone (易伤区)
     const vulnerability = 1 + stats.dmgTakenInc / 100
@@ -877,6 +884,7 @@ function emptyCharacterStats(): CharacterComputed {
         finalDmg: 0,
         dmgTakenInc: 0,
         customMult: 0,
+        customFinalDmgMul: 1,
         dmgRedPen: 0,
         elementBonus: {},
         typeBonus: {}
@@ -925,7 +933,7 @@ function computeEffectEntry(
 
     /** @desc 终伤区 & 特殊乘区：1 + 终伤%；自定义倍率（≠0 才生效） */
     const finalDmgDec = stats.finalDmg / 100
-    const customMultVal = stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1
+    const customMultVal = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
 
     /** @desc ── 汇总：基础值 × 各乘区乘积 = 单段期望伤害（无易伤区，效应伤害不吃易伤）── */
     const totalPerHit = baseValue * defMulti * resMulti * dmgRedMulti * deepen * (1 + finalDmgDec) * customMultVal
@@ -1031,6 +1039,9 @@ function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number
         case 'customFinalDmg':
             stats.customMult += value
             break
+        case 'customFinalDmgMul':
+            stats.customFinalDmgMul *= 1 + value / 100
+            break
         case 'dmgRedPen':
             stats.dmgRedPen += value
             break
@@ -1107,6 +1118,9 @@ function applyOverrideToStats(stats: CharacterComputed, zoneId: string, value: n
             break
         case 'customFinalDmg':
             stats.customMult = value
+            break
+        case 'customFinalDmgMul':
+            stats.customFinalDmgMul = 1 + value / 100
             break
         case 'dmgRedPen':
             stats.dmgRedPen = value

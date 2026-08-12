@@ -154,7 +154,8 @@
         'dmgRedPen',
         'dmgTakenInc',
         'finalDmg',
-        'customFinalDmg'
+        'customFinalDmg',
+        'customFinalDmgMul'
     ])
     const TUNE_RELEVANT_ZONES = new Set([
         'extraRatio',
@@ -166,7 +167,8 @@
         'dmgRedPen',
         'dmgTakenInc',
         'finalDmg',
-        'customFinalDmg'
+        'customFinalDmg',
+        'customFinalDmgMul'
     ])
 
     /** @desc 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff） */
