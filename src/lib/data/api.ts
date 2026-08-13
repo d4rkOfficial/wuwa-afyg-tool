@@ -118,6 +118,7 @@ function warmImageCache(urls: string[]) {
 // ── Static icon maps ──
 
 const ELEMENT_ICONS: Record<string, string> = {
+    物理: '/icons/element/物理.webp',
     冷凝: '/icons/element/冷凝.webp',
     热熔: '/icons/element/热熔.webp',
     导电: '/icons/element/导电.webp',
