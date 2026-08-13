@@ -40,6 +40,7 @@
     let dragState = $state<{ ci: number; si: number; idx: number; dropIdx: number; outside: boolean } | null>(null)
     let mainStatMenuPos = $state<{ left: number; top: number; width: number } | null>(null)
     let mainStatMenuEl: HTMLElement | undefined = $state()
+    let mainStatOverlayEl: HTMLDivElement | undefined = $state()
 
     function getMainStatTrigger(ci: number, si: number): HTMLButtonElement | null {
         return document.querySelector(`[data-main-stat-trigger="${ci}:${si}"]`)
@@ -58,6 +59,7 @@
         const el = getMainStatTrigger(ci, si)
         if (!el) return
         const r = el.getBoundingClientRect()
+        // 先按视口坐标暂存；渲染后 rAF 里再换算为相对遮罩容器（fixed 定位受 glass surface backdrop-filter 影响）
         mainStatMenuPos = { left: r.left, top: r.bottom + 4, width: r.width }
         showMainStatMenu = { ci, si }
     }
@@ -68,22 +70,35 @@
         return config.characters[ci]?.echoes[si] ?? null
     })
 
+    // 打开期间监听页面级滚动：任何滚动（含 window scroll）都关闭菜单，避免菜单残留错位
     $effect(() => {
-        if (!showMainStatMenu || !mainStatMenuEl || !mainStatMenuPos) return
+        if (!showMainStatMenu) return
+        const onScroll = () => closeMainStatMenu()
+        window.addEventListener('scroll', onScroll, true)
+        return () => window.removeEventListener('scroll', onScroll, true)
+    })
+
+    $effect(() => {
+        if (!showMainStatMenu || !mainStatMenuEl || !mainStatOverlayEl) return
         requestAnimationFrame(() => {
             const el = mainStatMenuEl
-            const pos = mainStatMenuPos
+            const overlay = mainStatOverlayEl
             const menu = showMainStatMenu
-            if (!el || !pos || !menu) return
-            const r = el.getBoundingClientRect()
+            if (!el || !overlay || !menu) return
+            const br = getMainStatTrigger(menu.ci, menu.si)?.getBoundingClientRect()
+            const or = overlay.getBoundingClientRect()
+            if (!br) return
             const cw = document.documentElement.clientWidth
             const ch = document.documentElement.clientHeight
-            if (r.right > cw - 8) el.style.left = cw - r.width - 8 + 'px'
-            if (r.bottom > ch - 8) {
-                const btn = getMainStatTrigger(menu.ci, menu.si)
-                const btnRect = btn?.getBoundingClientRect()
-                el.style.top = btnRect ? btnRect.top - r.height - 4 + 'px' : ch - r.height - 8 + 'px'
-            }
+            const menuW = br.width
+            const menuH = el.offsetHeight
+            let left = br.left - or.left
+            let top = br.bottom + 4 - or.top
+            if (br.right > cw - 8) left = cw - menuW - 8 - or.left
+            if (br.bottom + 4 + menuH > ch - 8) top = br.top - menuH - 4 - or.top
+            el.style.left = left + 'px'
+            el.style.top = top + 'px'
+            el.style.width = menuW + 'px'
         })
     })
 
@@ -107,9 +122,9 @@
     const COST_OPTIONS = [4, 3, 1]
 
     function costBtnCls(cost: number): string {
-        if (cost === 4) return 'bg-fuchsia-500/15 text-fuchsia-500'
-        if (cost === 3) return 'bg-indigo-500/15 text-indigo-500'
-        return 'bg-sky-500/15 text-sky-500'
+        if (cost === 4) return 'bg-(--theme-accent-bg)/25 text-(--theme-accent-text)'
+        if (cost === 3) return 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+        return 'bg-(--theme-accent-bg)/8 text-(--theme-accent-text)'
     }
 
     function handleSetCost(ci: number, si: number, cost: number) {
@@ -507,6 +522,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
+            bind:this={mainStatOverlayEl}
             class="fixed inset-0 z-50"
             role="presentation"
             onclick={closeMainStatMenu}

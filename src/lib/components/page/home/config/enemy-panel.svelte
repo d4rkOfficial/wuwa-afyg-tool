@@ -141,11 +141,18 @@
                 {@const val = config.enemy.resistances[el]}
                 {@const color = elementColor(el)}
                 <div
-                    class="flex flex-col gap-1.5 rounded-lg border p-2.5"
+                    class="relative overflow-hidden rounded-lg border p-2.5"
                     style="background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, {color} 15%, transparent) 100%); border-color: color-mix(in srgb, {color} 25%, transparent);"
                 >
-                    <span class="text-xs font-medium" style="color: {color}">{el}</span>
-                    <div class="flex items-stretch gap-1">
+                    <!-- 抗性值数字叠底 -->
+                    <div
+                        class="pointer-events-none absolute inset-y-0 right-1 flex select-none items-center overflow-hidden"
+                    >
+                        <span class="text-6xl font-black leading-none opacity-[0.07]" style="color: {color}">{val}</span
+                        >
+                    </div>
+                    <span class="relative z-1 text-xs font-bold" style="color: {color}">{el}</span>
+                    <div class="relative z-1 mt-1.5 flex items-stretch gap-1">
                         <div class="flex items-center gap-1 flex-1 min-w-0">
                             <input
                                 type="number"

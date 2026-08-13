@@ -26,9 +26,7 @@ vite.config.ts.timestamp-*
 .tmp/
 .tmp
 *Tempopencode*.*
-
-# Test Pages
-routes/test
+rename-output
 
 # Log
 *.log
