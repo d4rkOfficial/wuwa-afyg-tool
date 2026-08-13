@@ -98,9 +98,11 @@
     ] as const
 
     const COLOR_PRESETS = [
-        { name: '默认', hue: null as number | 'mono' | null },
+        { name: '默认', hue: 190 as number | 'mono' | null },
+        { name: '靛蓝', hue: null as number | 'mono' | null },
+        { name: '品红', hue: 345 as number | 'mono' | null },
         { name: '橘红', hue: 28 as number | 'mono' | null },
-        { name: '品红', hue: 330 as number | 'mono' | null },
+        { name: '橙黄', hue: 90 as number | 'mono' | null },
         { name: '墨绿', hue: 150 as number | 'mono' | null },
         { name: '黑白', hue: 'mono' as const }
     ]
@@ -514,7 +516,25 @@
                                 class="flex gap-1 rounded-lg border p-1"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
-                                {#each COLOR_PRESETS as c}
+                                {#each COLOR_PRESETS.slice(0, -1) as c}
+                                    {@const style = getPresetStyle(c.hue)}
+                                    <button
+                                        onclick={() => updateOverride('accentHue', c.hue)}
+                                        class="flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors"
+                                        style="background: {overrides.accentHue === c.hue
+                                            ? style.bg
+                                            : 'transparent'}; color: {overrides.accentHue === c.hue
+                                            ? style.text
+                                            : 'var(--theme-modal-text)/60'};"
+                                    >
+                                        {c.name}
+                                    </button>
+                                {/each}
+                                <div
+                                    class="mx-1.5 my-1 w-px shrink-0"
+                                    style="background: var(--theme-divider-border);"
+                                ></div>
+                                {#each COLOR_PRESETS.slice(-1) as c}
                                     {@const style = getPresetStyle(c.hue)}
                                     <button
                                         onclick={() => updateOverride('accentHue', c.hue)}

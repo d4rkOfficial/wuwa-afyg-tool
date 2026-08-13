@@ -226,7 +226,7 @@ function main() {
     lines.push('| key | 说明 | 取值 |')
     lines.push('| --- | --- | --- |')
     lines.push('| `theme_mode` | 明暗模式 | dark / light |')
-    lines.push('| `theme_accent_hue` | 主色调 | default / orange / magenta / green / mono 或 0-360 整数 |')
+    lines.push('| `theme_accent_hue` | 主色调 | default(青色) / orange(橘红) / orangeyellow(橘黄) / magenta(品红) / cyan(青色别名) / indigo(靛蓝) / green(墨绿) / mono(黑白) 或 0-360 整数 |')
     lines.push('| `theme_background_image` | 背景图 | http(s):// 地址 / data:image 数据 / 空串清除 |')
     lines.push('| `theme_bg_opacity` | 卡片透明度 | 30-100 |')
     lines.push('| `theme_bg_blur` | 毛玻璃强度 | 0-32 |')

@@ -58,9 +58,12 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
         label: '主色调',
         apply: async (v) => {
             const nameMap: Record<string, number | 'mono' | null> = {
-                default: null,
+                default: 190, // 默认 = 青色
                 orange: 28,
-                magenta: 330,
+                orangeyellow: 90, // 橙黄（偏黄）
+                magenta: 345, // 品红（偏粉）
+                cyan: 190, // 青色别名（与默认同色）
+                indigo: null, // 靛蓝 = 主题内置色
                 green: 150,
                 mono: 'mono'
             }
@@ -72,7 +75,9 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
             } else {
                 hue = toNum(v, 'theme_accent_hue')
                 if (!Number.isInteger(hue) || hue! < 0 || hue! > 360)
-                    throw new Error('theme_accent_hue 须为 0-360 的整数，或 default/orange/magenta/green/mono')
+                    throw new Error(
+                        'theme_accent_hue 须为 0-360 的整数，或 default/orange/orangeyellow/magenta/cyan/indigo/green/mono'
+                    )
             }
             await updateOverride('accentHue', hue)
             return hue
@@ -221,7 +226,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default/orange/magenta/green/mono 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(0-100)、calc_view(dropdown/spread)、simplify_toolbar、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(0-100)、calc_view(dropdown/spread)、simplify_toolbar、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。',
     parameters: {
         type: 'object',
         properties: {

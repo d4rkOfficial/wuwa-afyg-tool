@@ -10,7 +10,7 @@ const OVERRIDES_KEY = 'theme-overrides'
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
 const DEFAULT_OVERRIDES: ThemeOverrides = {
-    accentHue: null,
+    accentHue: 190,
     backgroundImage: '',
     bgOpacity: 85,
     bgBlur: 4,
