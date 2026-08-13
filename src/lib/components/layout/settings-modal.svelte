@@ -37,7 +37,19 @@
         getReloadOnResultRefresh,
         setReloadOnResultRefresh,
         getReloadOnProfileChange,
-        setReloadOnProfileChange
+        setReloadOnProfileChange,
+        getMagneticPointer,
+        setMagneticPointer,
+        getMagneticFollow,
+        setMagneticFollow,
+        getMagneticSensitivity,
+        setMagneticSensitivity,
+        getMagneticSpin,
+        setMagneticSpin,
+        getMagneticWobble,
+        setMagneticWobble,
+        getMagneticBorderWidth,
+        setMagneticBorderWidth
     } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import {
@@ -1108,6 +1120,192 @@
                                         ></span>
                                     </button>
                                 </div>
+                            </div>
+
+                            <div class="mt-5">
+                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">交互效果</span
+                                >
+                                <div
+                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >磁力光标</span
+                                        >
+                                        <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                            开启后鼠标移至按钮/链接等可点击元素上时，光标变形框住元素并带磁力吸附
+                                        </span>
+                                    </div>
+                                    <button
+                                        onclick={() => setMagneticPointer(!getMagneticPointer())}
+                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                        style="background: {getMagneticPointer()
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 size-4 rounded-full transition-all"
+                                            style="left: {getMagneticPointer()
+                                                ? '18px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+                                {#if getMagneticPointer()}
+                                    <div
+                                        class="mt-2 space-y-2.5 rounded-lg border px-3 py-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <div>
+                                            <span
+                                                class="mb-1 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                            >
+                                                <span class="flex items-center gap-1.5"
+                                                    ><Icon icon="mdi:gesture-tap" class="size-3.5" />跟手性</span
+                                                >
+                                                <span class="font-mono text-(--theme-accent-text)"
+                                                    >{getMagneticFollow()}ms</span
+                                                >
+                                            </span>
+                                            <input
+                                                aria-label="磁力光标跟手性"
+                                                type="range"
+                                                min="50"
+                                                max="400"
+                                                step="10"
+                                                value={getMagneticFollow()}
+                                                oninput={(e) =>
+                                                    setMagneticFollow(Number((e.target as HTMLInputElement).value))}
+                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                            />
+                                            <div
+                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                            >
+                                                <span>跟手</span><span>拖尾</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span
+                                                class="mb-1 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                            >
+                                                <span class="flex items-center gap-1.5"
+                                                    ><Icon icon="mdi:crosshairs-gps" class="size-3.5" />灵敏度</span
+                                                >
+                                                <span class="font-mono text-(--theme-accent-text)"
+                                                    >×{getMagneticSensitivity().toFixed(2)}</span
+                                                >
+                                            </span>
+                                            <input
+                                                aria-label="磁力光标灵敏度"
+                                                type="range"
+                                                min="0.05"
+                                                max="0.3"
+                                                step="0.05"
+                                                value={getMagneticSensitivity()}
+                                                oninput={(e) =>
+                                                    setMagneticSensitivity(
+                                                        Number((e.target as HTMLInputElement).value)
+                                                    )}
+                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                            />
+                                            <div
+                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                            >
+                                                <span>磁吸强</span><span>跟手快</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span
+                                                class="mb-1 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                            >
+                                                <span class="flex items-center gap-1.5"
+                                                    ><Icon icon="mdi:rotate-3d" class="size-3.5" />旋转速度</span
+                                                >
+                                                <span class="font-mono text-(--theme-accent-text)"
+                                                    >{getMagneticSpin()}s/圈</span
+                                                >
+                                            </span>
+                                            <input
+                                                aria-label="磁力光标旋转速度"
+                                                type="range"
+                                                min="4"
+                                                max="30"
+                                                step="1"
+                                                value={getMagneticSpin()}
+                                                oninput={(e) =>
+                                                    setMagneticSpin(Number((e.target as HTMLInputElement).value))}
+                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                            />
+                                            <div
+                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                            >
+                                                <span>快</span><span>慢</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span
+                                                class="mb-1 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                            >
+                                                <span class="flex items-center gap-1.5"
+                                                    ><Icon icon="mdi:wave" class="size-3.5" />吸附晃动强度</span
+                                                >
+                                                <span class="font-mono text-(--theme-accent-text)"
+                                                    >{getMagneticWobble()}{getMagneticWobble() > 0
+                                                        ? '/10'
+                                                        : '（关闭）'}</span
+                                                >
+                                            </span>
+                                            <input
+                                                aria-label="磁力光标吸附晃动强度"
+                                                type="range"
+                                                min="0"
+                                                max="10"
+                                                step="1"
+                                                value={getMagneticWobble()}
+                                                oninput={(e) =>
+                                                    setMagneticWobble(Number((e.target as HTMLInputElement).value))}
+                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                            />
+                                            <div
+                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                            >
+                                                <span>关闭</span><span>强</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span
+                                                class="mb-1 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                            >
+                                                <span class="flex items-center gap-1.5"
+                                                    ><Icon icon="mdi:border-style" class="size-3.5" />描边粗细</span
+                                                >
+                                                <span class="font-mono text-(--theme-accent-text)"
+                                                    >{getMagneticBorderWidth()}px</span
+                                                >
+                                            </span>
+                                            <input
+                                                aria-label="磁力光标描边粗细"
+                                                type="range"
+                                                min="0.5"
+                                                max="3"
+                                                step="0.5"
+                                                value={getMagneticBorderWidth()}
+                                                oninput={(e) =>
+                                                    setMagneticBorderWidth(
+                                                        Number((e.target as HTMLInputElement).value)
+                                                    )}
+                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                            />
+                                            <div
+                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                            >
+                                                <span>细</span><span>粗</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {/if}
                             </div>
 
                             <div class="mt-5">

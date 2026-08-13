@@ -57,6 +57,25 @@
     }
 }
 
+/* 磁力光标开启时隐藏原生鼠标（input/textarea 由磁力光标的 text 模式接管；减弱动态效果时恢复） */
+html.magnetic-cursor,
+html.magnetic-cursor * {
+    cursor: none !important;
+}
+
+/* number 输入框的上下步进按钮是伪元素，* 选择器不覆盖，需单独隐藏 */
+html.magnetic-cursor input::-webkit-outer-spin-button,
+html.magnetic-cursor input::-webkit-inner-spin-button {
+    cursor: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.magnetic-cursor,
+    html.magnetic-cursor * {
+        cursor: auto !important;
+    }
+}
+
 @font-face {
     font-family: 'FangXinShu';
     src: url('/fonts/fang-xin-shu.ttf') format('truetype');
