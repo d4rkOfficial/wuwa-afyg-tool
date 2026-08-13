@@ -130,6 +130,7 @@
 
     let sidebarWidth = $state(240)
     let sidebarDragging = $state(false)
+    let sidebarDividerHover = $state(false)
 
     $effect(() => {
         if (!sidebarDragging) return
@@ -737,7 +738,17 @@
     <button
         aria-label="调整侧栏宽度"
         class="shrink-0 w-1 cursor-col-resize"
-        style="background: color-mix(in srgb, var(--theme-sidebar-bg) 80%, transparent);"
+        style="background: {sidebarDragging
+            ? 'var(--theme-accent-bg)'
+            : sidebarDividerHover
+              ? 'color-mix(in srgb, var(--theme-accent-bg) 45%, transparent)'
+              : 'color-mix(in srgb, var(--theme-sidebar-bg) 80%, transparent)'};{sidebarDragging
+            ? ' box-shadow: 0 0 10px color-mix(in srgb, var(--theme-accent-bg) 55%, transparent);'
+            : sidebarDividerHover
+              ? ' box-shadow: 0 0 8px color-mix(in srgb, var(--theme-accent-bg) 30%, transparent);'
+              : ''}"
+        onmouseenter={() => (sidebarDividerHover = true)}
+        onmouseleave={() => (sidebarDividerHover = false)}
         onmousedown={(e) => {
             e.preventDefault()
             if (sidebarWidth === 52) {

@@ -70,10 +70,15 @@
         return config.characters[ci]?.echoes[si] ?? null
     })
 
-    // 打开期间监听页面级滚动：任何滚动（含 window scroll）都关闭菜单，避免菜单残留错位
+    // 打开期间监听页面级滚动：任何滚动（含 window scroll）都关闭菜单，避免菜单残留错位；
+    // 菜单自身内部滚动（滚动选项列表）不触发关闭
     $effect(() => {
         if (!showMainStatMenu) return
-        const onScroll = () => closeMainStatMenu()
+        const onScroll = (e: Event) => {
+            const t = e.target as HTMLElement | null
+            if (t && mainStatMenuEl?.contains(t)) return
+            closeMainStatMenu()
+        }
         window.addEventListener('scroll', onScroll, true)
         return () => window.removeEventListener('scroll', onScroll, true)
     })
@@ -530,10 +535,10 @@
         >
             <div
                 bind:this={mainStatMenuEl}
-                class="animate-pop-in theme-scrollbar absolute max-h-48 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
+                class="animate-pop-in theme-scrollbar absolute max-h-48 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-xl"
                 style="left: {mainStatMenuPos?.left ?? 0}px; top: {mainStatMenuPos?.top ??
                     0}px; width: {mainStatMenuPos?.width ??
-                    0}px; background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
+                    0}px; background: color-mix(in srgb, var(--theme-modal-bg) 82%, transparent); border-color: var(--theme-divider-border);"
                 onclick={(e) => e.stopPropagation()}
             >
                 <button
