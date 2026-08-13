@@ -43,6 +43,8 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《鸣潮》拉表工具（椰果工
 10. 生效条件 condition（与 buffName/scope 平级，可选，无门槛不输出）：{CONDITION_RULES}
 11. buffName 命名：{NAMING_RULES}
 12. 尤其要注意延奏类 Buff 是全队能吃还是只有队友能吃，这里很容易出错。
+13. 特殊终伤区分：文案明确为"多个来源相乘计算/连乘"的终伤用 customFinalDmgMul（乘算特殊终伤），
+    普通相加语义的终伤/倍率用 customFinalDmg；拿不准时调用 get_naming_rules。
 
 需要黑话词典、命名规则、few-shot 示例、效应表、scope 判定细则、生效条件规则或转模(ref)规则时，调用对应工具获取。`
 
@@ -79,7 +81,7 @@ scope 用 effect_only 且 exclusive=true，并映射到加深/终伤区乘区（
 
 真实例证：
 - 长离（热熔）：施放重击时"热熔伤害加成提升"→ 这是角色自身属性增伤，scope=self，归入 bonusDmg；不是 effect_only。
-- 卡卡罗（导电）命座："杀戮武装状态持续期间，导电伤害加成提升25%"→ 条件性状态增益，仍归 bonusDmg（属性增伤），
+- 卡卡罗（导电）共鸣链（俗称命座）："杀戮武装状态持续期间，导电伤害加成提升25%"→ 条件性状态增益，仍归 bonusDmg（属性增伤），
   并非"聚爆/电磁伤害"那种效应结算，scope=self。
 - 只有当文案明确指"某效应造成的伤害"（如"聚爆效应伤害提升"）才用 effect_only。`
 
@@ -90,19 +92,19 @@ export const SCOPE_RULES_TEXT = `受影响者（scope）判定：
 - self_except：作用在除施放者外的成员。文案特征："其他角色""其余共鸣者"（当前数据较少见，出现时用）。
 - team：作用在全队/登场角色/队伍中的角色。文案特征："队伍中的角色""全队""所有共鸣者""登场角色"。
   例1："队伍中的角色攻击提升20%"→ team。
-  例2：维里奈命座"队伍中登场角色额外获得持续回复生命"→ 该回复是治疗/回血，不属于 buff 乘区，不输出。
+  例2：维里奈共鸣链（俗称命座）"队伍中登场角色额外获得持续回复生命"→ 该回复是治疗/回血，不属于 buff 乘区，不输出。
 - effect_only：只在特定效应/共鸣链/状态存在时生效，或文案明确指"某效应伤害"。配合 exclusive=true。
 - 兜底：文案未说明归属时，默认 team。
 
 真实例证（区分 self / team）：
-- 长离命座"循我所望：获得【离火】时，长离的暴击提升25%"→ 长离自己 → self。
-- 长离命座"饰我所言：施放变奏技能后，队伍中的角色攻击提升20%"→ 全队 → team。
+- 长离共鸣链"循我所望：获得【离火】时，长离的暴击提升25%"→ 长离自己 → self。
+- 长离共鸣链"饰我所言：施放变奏技能后，队伍中的角色攻击提升20%"→ 全队 → team。
 - 维里奈"自然的献礼：施放重击…时，队伍中的角色攻击提升20%"→ team。
-- 卡卡罗命座"集群威胁：施放延奏技能时，队伍中的角色导电伤害加成提升20%"→ team。`
+- 卡卡罗共鸣链"集群威胁：施放延奏技能时，队伍中的角色导电伤害加成提升20%"→ team。`
 
 // ── 生效条件判定细则（get_condition_rules 工具返回；按实体类型裁剪）──
 export const CONDITION_CHAIN_RULES_TEXT = `- "chain":n：需角色共鸣链 ≥ n（n 取 1-6）。仅角色实体的增益使用。
-  例：散华第 3 链命座效果 → "condition":{"chain":3}。
+  例：散华第 3 链共鸣链效果 → "condition":{"chain":3}。
 第 1 链视为基础配置，无需标注（从第 2 链起才需要条件）。`
 
 export const CONDITION_REFINE_RULES_TEXT = `- "refinement":n：需武器精炼 ≥ n（n 取 1-5）。仅武器实体的增益使用。
@@ -110,7 +112,7 @@ export const CONDITION_REFINE_RULES_TEXT = `- "refinement":n：需武器精炼 �
 
 武器精炼拆分规则（务必遵守）：
 1. 武器效果只要按精炼阶给出不同数值（如"精炼1-5阶：10%/12%/14%/16%/20%"），默认拆成 5 条 buff，
-   每条 condition={"refinement":n}（n=1-5），buff 名带阶数（[赫奕1阶]…[赫奕5阶]）。
+   每条 condition={"refinement":n}（n=1-5），buff 名带阶数（赫奕1阶…赫奕5阶）。
 2. 每阶 value 填"该阶与上一阶的增量"（1 阶填其本身值）：工具箱按"精炼 ≥n 全部生效"叠加计算，
    只有填增量才能得到正确累计（例：10/12/14/16/20 → 1阶=10、2阶=2、3阶=2、4阶=2、5阶=4）。
 3. 5 个阶数值完全一致时，合并为一条 buff，不设 condition。
@@ -125,9 +127,9 @@ export const CONDITION_COMMON_RULES_TEXT = `- "elements":[...]：需伤害属性
 - 字段可并存，如 "condition":{"chain":3,"elements":["导电"]}。
 
 判定要点：
-1. 只有文案明确写"第 X 链/命座 X/共鸣链 X"、"精炼 X 阶/X 阶效果"、属性/伤害类型限定且确有门槛才加对应条件；
+1. 只有文案明确写"第 X 链/共鸣链 X"（俗称命座）、"精炼 X 阶/X 阶效果"、属性/伤害类型限定且确有门槛才加对应条件；
    普通技能、固有属性、无门槛的武器基础效果一律不设 condition。
-2. 角色命座效果 → chain（按角色链规则）；武器各精炼档位效果 → refinement（按武器精炼拆分规则）；
+2. 角色共鸣链效果 → chain（按角色链规则）；武器各精炼档位效果 → refinement（按武器精炼拆分规则）；
    属性限定 → elements；伤害类型限定 → damageTypes。
 3. "每层+X%、可叠 N 层"是叠层不是条件：拆成多层 buff，每层填该层增量（见命名规则），不要误用 condition。
 4. 不要为整个实体统一加条件。`
@@ -160,7 +162,7 @@ export const EXAMPLES_TEXT = `—— 示例1（角色固有属性合并）——
 {"buffs":[{"buffName":"散华 攻击","scope":"self","exclusive":false,"zones":[{"zoneId":"atkPct","value":7.8,"ref":null,"override":false}]},{"buffName":"散华 增伤(冷凝)","scope":"self","exclusive":false,"zones":[{"zoneId":"bonusDmg","value":6,"ref":null,"override":false}]}]}
 说明：同一乘区多处数值合并（1.8+1.8+4.2=7.8；1.8+4.2=6）；冷凝伤害加成归入增伤区 bonusDmg；命中自己 → scope=self。buff 名仅为示意，实际命名以用户定义的命名规则为准。
 
-—— 示例2（角色命座，含 scope 判定与叠层拆分）——
+—— 示例2（角色共鸣链（俗称命座），含 scope 判定与叠层拆分）——
 输入（角色的 chains 节选）：
 [{"name":"孤身孑然","desc":"施放第5段普攻时，散华自身暴击提升15%，持续10秒。"},{"name":"目视异常","desc":"散华攻击生命低于70%的目标时，造成的伤害提升35%。"},{"name":"曙色天光","desc":"引爆【冰棱】或【冰川】后，队伍中的角色攻击提升10%，持续20秒，可叠加2层。"}]
 输出（示意命名，实际以用户命名规则为准）：
@@ -191,8 +193,8 @@ export const EXAMPLES_TEXT = `—— 示例1（角色固有属性合并）——
 {"buffs":[{"buffName":"武器额外倍率","scope":"self","exclusive":false,"zones":[{"zoneId":"extraRatio","value":0,"ref":{"targetZoneId":"totalAtk","pct":40,"refOwner":"owner"},"override":false}]}]}
 说明：武器效果"装备者当前攻击"→ refOwner="owner"。
 
-—— 示例7（角色命座，含生效条件 chain）——
-输入（角色的 chains 节选，注意命座所属链数）：
+—— 示例7（角色共鸣链，含生效条件 chain）——
+输入（角色的 chains 节选，注意共鸣链所属链数）：
 [{"name":"暖雾","desc":"第1链：散华攻击提升8%。"},{"name":"孤影","desc":"第3链：散华暴击伤害提升20%。"}]
 输出：
 {"buffs":[{"buffName":"暖雾","scope":"self","exclusive":false,"zones":[{"zoneId":"atkPct","value":8,"ref":null,"override":false}]},{"buffName":"孤影","scope":"self","exclusive":false,"condition":{"chain":3},"zones":[{"zoneId":"critDmg","value":20,"ref":null,"override":false}]}]}
@@ -214,7 +216,13 @@ export const EXAMPLES_TEXT = `—— 示例1（角色固有属性合并）——
 输入：{"skills":[{"name":"共鸣技能","desc":"根据自身攻击超出 1000 的部分的 2% 提升共鸣技能伤害，至少提升 5%"}]}
 输出：
 {"buffs":[{"buffName":"共鸣技能增伤(转模)","scope":"self","exclusive":false,"zones":[{"zoneId":"bonusDmg","value":0,"ref":{"targetZoneId":"totalAtk","threshold":1000,"pct":2,"lower":5,"refOwner":"self"},"override":false}]}]}
-说明："超出 1000 的部分的 2%"→threshold=1000 + pct=2（线性）；"至少提升 5%"→lower=5；value 填 0。`
+说明："超出 1000 的部分的 2%"→threshold=1000 + pct=2（线性）；"至少提升 5%"→lower=5；value 填 0。
+
+—— 示例11（特殊终伤·乘算 customFinalDmgMul）——
+输入：{"skills":[{"name":"共鸣技能","desc":"施放共鸣技能时，自身造成的伤害提升10%，此效果与其它同类型效果相乘计算。"}]}
+输出：
+{"buffs":[{"buffName":"共鸣技能终伤(乘算)","scope":"self","exclusive":false,"zones":[{"zoneId":"customFinalDmgMul","value":10,"ref":null,"override":false}]}]}
+说明：文案明确"与其它效果相乘/连乘"→ customFinalDmgMul（乘算特殊终伤，各来源独立乘算 1+v/100）；普通相加语义的终伤用 customFinalDmg。`
 
 // ── 默认黑话词典（get_slang_dict 工具返回；每行：原叫法=黑话；行尾可用 // 注释）──
 export const DEFAULT_SLANG_DICT = `普攻=A

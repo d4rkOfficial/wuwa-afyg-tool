@@ -17,7 +17,7 @@
     let {
         open,
         onclose,
-        backdropClose = true,
+        backdropClose = false,
         backgroundImage,
         textColor,
         class: className,

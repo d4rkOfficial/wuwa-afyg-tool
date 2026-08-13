@@ -114,7 +114,7 @@
     let aiActiveId = $derived(getActiveProfileId())
     let aiEditTarget = $state<AiProfile | null>(null)
     let aiDeleteConfirm = $state<AiProfile | null>(null)
-    let promptEditKind = $state<'naming' | 'persona' | null>(null)
+    let promptEditKind = $state<'naming' | 'persona' | 'slang' | null>(null)
 
     async function toggleAiEnabled() {
         await updateGenPrefs({ enabled: !getGenPrefs().enabled })
@@ -1621,6 +1621,29 @@
                                             </div>
                                             <button
                                                 onclick={() => (promptEditKind = 'naming')}
+                                                class="inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                            >
+                                                <Icon icon="mdi:pencil-outline" class="size-3" />
+                                                编辑
+                                            </button>
+                                        </div>
+                                        <div
+                                            class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            <div class="min-w-0 flex-1">
+                                                <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                    >黑话词典</span
+                                                >
+                                                <span
+                                                    class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
+                                                >
+                                                    官方/生僻叫法 → 玩家黑话；生成 Buff 时用于命名优化
+                                                </span>
+                                            </div>
+                                            <button
+                                                onclick={() => (promptEditKind = 'slang')}
                                                 class="inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
                                                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                                             >

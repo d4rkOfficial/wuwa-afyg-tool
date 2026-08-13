@@ -234,7 +234,7 @@ export const GENERATE_TOOLS: ToolDefinition[] = [
         function: {
             name: 'get_character_terms',
             description:
-                '按需获取某角色的结构化术语速查：效果名【】、触发关键词（Highlight）、术语链接，以及每条技能/命座/固有去标签后的纯文本摘要。用于识别 buff 名称的触发来源与归属、以及判定元素/效果。',
+                '按需获取某角色的结构化术语速查：效果名【】、触发关键词（Highlight）、术语链接，以及每条技能/共鸣链（俗称命座）/固有去标签后的纯文本摘要。用于识别 buff 名称的触发来源与归属、以及判定元素/效果。',
             parameters: {
                 type: 'object',
                 properties: { entityName: { type: 'string', description: '角色名称（中文）' } },
@@ -317,7 +317,7 @@ export const GENERATE_TOOLS: ToolDefinition[] = [
         function: {
             name: 'get_condition_rules',
             description:
-                '获取 Buff 生效条件（condition）的取值与判定细则（角色共鸣链 chain / 武器精炼 refinement / 伤害属性 elements / 伤害类型 damageTypes，多字段可并存）。当某增益确实存在命座/精炼门槛或属性/类型限定时调用。',
+                '获取 Buff 生效条件（condition）的取值与判定细则（角色共鸣链 chain / 武器精炼 refinement / 伤害属性 elements / 伤害类型 damageTypes，多字段可并存）。当某增益确实存在共鸣链/精炼门槛或属性/类型限定时调用。',
             parameters: { type: 'object', properties: {} }
         }
     },
@@ -361,6 +361,7 @@ export interface GenerateToolContext {
     entityType: GenerateEntityType
     entityName: string
     namingRule: string
+    slangDict: string
     data: GenerateDataSource
 }
 
@@ -447,7 +448,7 @@ export async function executeGenerateTool(
         case 'get_ref_rules':
             return REF_RULES_TEXT
         case 'get_slang_dict':
-            return DEFAULT_SLANG_DICT
+            return ctx.slangDict?.trim() || DEFAULT_SLANG_DICT
         case 'get_naming_rules':
             return renderNamingRules(namingRule)
         case 'get_examples':

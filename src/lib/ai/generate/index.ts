@@ -28,6 +28,8 @@ export interface GenerateBuffSetOptions {
     reasoningEffort?: 'low' | 'medium' | 'high'
     // 用户自定义命名规则（可能为空：用默认兜底）
     namingRule?: string
+    // 用户自定义黑话词典（可能为空：用默认词典）
+    slangDict?: string
     systemPrompt?: string
     initialTaskPrompt?: string
     data: GenerateDataSource
@@ -51,6 +53,7 @@ export async function generateBuffSet(options: GenerateBuffSetOptions): Promise<
     const systemTemplate = options.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
     const initialTaskTemplate = options.initialTaskPrompt?.trim() || DEFAULT_INITIAL_TASK_PROMPT
     const namingRule = options.namingRule?.trim() ?? ''
+    const slangDict = options.slangDict?.trim() ?? ''
     const data = options.data
     const history = Array.isArray(options.history) ? options.history : []
     const newUserMessage = options.newUserMessage?.trim() || ''
@@ -64,7 +67,7 @@ export async function generateBuffSet(options: GenerateBuffSetOptions): Promise<
     if (!ENTITY_TYPES.includes(entityType as GenerateEntityType)) throw new Error('无效的实体类型')
     if (!entityName) throw new Error('实体名不能为空')
 
-    const toolContext = { entityType: entityType as GenerateEntityType, entityName, namingRule, data }
+    const toolContext = { entityType: entityType as GenerateEntityType, entityName, namingRule, slangDict, data }
 
     progress(`开始生成：${entityName}`)
 

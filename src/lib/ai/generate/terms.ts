@@ -12,7 +12,7 @@ export interface CharacterTerms {
     highlights: string[]
     // <te href=N> 术语链接
     terms: TermItem[]
-    // 每条技能/命座/固有去标签后的纯文本短描述（压缩空白）
+    // 每条技能/共鸣链/固有去标签后的纯文本短描述（压缩空白）
     entries: Array<{ name: string; text: string }>
 }
 

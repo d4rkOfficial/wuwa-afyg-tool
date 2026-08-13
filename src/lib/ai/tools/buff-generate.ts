@@ -6,6 +6,7 @@ import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$l
 import { importBuffSets } from '$lib/components/page/home/calculation/calculation.store.svelte'
 import type { ImportBuffInput } from '$lib/components/page/home/calculation/calculation.store.svelte'
 import { generateBuffSet } from '../generate'
+import { getSlangDict } from '$lib/data/ai-prefs.svelte'
 import {
     createLibraryDataSource,
     createProjectDataSource,
@@ -99,7 +100,7 @@ defineTool('search_entities', {
 
 defineTool('get_entity_info', {
     description:
-        '查询实体的官方游戏数据详情：角色（技能/命座/固有属性）、武器（效果）、声骸（技能）、套装（各件数加成）。用于向用户说明实体机制、核对生成内容，或判断该实体适合生成哪些 Buff。',
+        '查询实体的官方游戏数据详情：角色（技能/共鸣链（俗称命座）/固有属性）、武器（效果）、声骸（技能）、套装（各件数加成）。用于向用户说明实体机制、核对生成内容，或判断该实体适合生成哪些 Buff。',
     parameters: {
         type: 'object',
         properties: {
@@ -147,7 +148,7 @@ defineTool('set_naming_rule', {
 
 defineTool('generate_entity_buffs', {
     description:
-        '为本地 Buff 库中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地库（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/命座/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。',
+        '为本地 Buff 库中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地库（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。',
     dangerous: true,
     parameters: {
         type: 'object',
@@ -177,6 +178,7 @@ defineTool('generate_entity_buffs', {
             entityType,
             entityName,
             namingRule: rule,
+            slangDict: getSlangDict(),
             data: createLibraryDataSource(),
             onProgress: (t) => ctx.onGenerateProgress?.(t)
         })
@@ -246,6 +248,7 @@ defineTool('generate_project_buffs', {
                 entityType: e.entityType,
                 entityName: e.entityName,
                 namingRule: rule,
+                slangDict: getSlangDict(),
                 data: createProjectDataSource(),
                 onProgress: (t) => ctx.onGenerateProgress?.(t)
             })
