@@ -52,6 +52,8 @@
     import { loadKeyMap } from '$lib/data/keymap.svelte'
     import { loadShortcuts } from '$lib/data/shortcuts.svelte'
     import { getShareBase, loadWorkshop } from '$lib/data/workshop.svelte'
+    import { getToyProfile, initToyProfileBridge } from '$lib/bilibili-toy/profile.svelte'
+    import { buildWorkshopFrameSrc } from '$lib/bilibili-toy/identity'
     import {
         setShowBuffModal,
         getBuffDiffMode,
@@ -108,6 +110,12 @@
     let showSettings = $state(false)
     let showWorkshopFrame = $state(false)
     let workshopFrameKey = $state(0)
+
+    let toyProfile = $derived(getToyProfile())
+
+    // 工坊 iframe 地址：非 Toy 环境无身份 hash，src 与原先完全一致（界面不变）；
+    // 身份（postMessage 手势后）到达时 src 变化，iframe 自动重新导航带上 #toy hash
+    let workshopFrameSrc = $derived(buildWorkshopFrameSrc(getShareBase(), getToyProfile().data))
 
     // 工坊 iframe 弹窗打开时强制恢复系统光标（磁力光标瞬时抑制）
     $effect(() => {
@@ -315,6 +323,7 @@
 
     onMount(async () => {
         hideSplash()
+        initToyProfileBridge()
         await ensureVersion()
         if (browser) {
             const prev = localStorage.getItem('wuwa-afyg:version')
@@ -800,9 +809,25 @@
                         椰果工具箱
                     </h2>
                     <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                        <span class="text-sm text-(--theme-card-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]">
-                            鸣潮社区公益工具
-                        </span>
+                        {#if toyProfile.data}
+                            <span
+                                class="flex items-center gap-1.5 text-sm text-(--theme-card-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                            >
+                                <img
+                                    src={toyProfile.data.avatar}
+                                    alt={toyProfile.data.nickname}
+                                    class="size-5 rounded-full object-cover"
+                                    referrerpolicy="no-referrer"
+                                />
+                                你好，{toyProfile.data.nickname}
+                            </span>
+                        {:else}
+                            <span
+                                class="text-sm text-(--theme-card-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                            >
+                                鸣潮社区公益工具
+                            </span>
+                        {/if}
                         <span
                             class="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-(--theme-accent-text)"
                             style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);"
@@ -1369,7 +1394,7 @@
                     </button>
                 </div>
                 {#key workshopFrameKey}
-                    <iframe src={getShareBase()} title="椰果工坊" class="min-h-0 w-full flex-1 border-0"></iframe>
+                    <iframe src={workshopFrameSrc} title="椰果工坊" class="min-h-0 w-full flex-1 border-0"></iframe>
                 {/key}
             </div>
         </div>

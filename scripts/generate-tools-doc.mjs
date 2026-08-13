@@ -147,7 +147,9 @@ function extractGenerateTools(src) {
 }
 
 function escapeMd(s) {
-    return String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ')
+    return String(s ?? '')
+        .replace(/\|/g, '\\|')
+        .replace(/\n/g, ' ')
 }
 
 function paramTable(params) {
@@ -164,7 +166,9 @@ function main() {
     let total = 0
     const dangerous = []
 
-    for (const file of fs.readdirSync(TOOLS_DIR).filter((f) => f.endsWith('.ts') && f !== 'index.ts' && f !== 'registry.ts')) {
+    for (const file of fs
+        .readdirSync(TOOLS_DIR)
+        .filter((f) => f.endsWith('.ts') && f !== 'index.ts' && f !== 'registry.ts')) {
         const src = fs.readFileSync(path.join(TOOLS_DIR, file), 'utf8')
         const tools = extractDefineToolBlocks(src)
         if (!tools.length) continue
@@ -187,7 +191,9 @@ function main() {
     lines.push(`> 本文档由 \`scripts/generate-tools-doc.mjs\` 从工具源码自动生成，共 **${total}** 个工具。`)
     lines.push('> 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`')
     lines.push('')
-    lines.push('AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。')
+    lines.push(
+        'AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。'
+    )
     lines.push('')
     lines.push('## 危险工具')
     lines.push('')
@@ -226,7 +232,9 @@ function main() {
     lines.push('| key | 说明 | 取值 |')
     lines.push('| --- | --- | --- |')
     lines.push('| `theme_mode` | 明暗模式 | dark / light |')
-    lines.push('| `theme_accent_hue` | 主色调 | default(青色) / orange(橘红) / orangeyellow(橘黄) / magenta(品红) / cyan(青色别名) / indigo(靛蓝) / green(墨绿) / mono(黑白) 或 0-360 整数 |')
+    lines.push(
+        '| `theme_accent_hue` | 主色调 | default(青色) / orange(橘红) / orangeyellow(橘黄) / magenta(品红) / cyan(青色别名) / indigo(靛蓝) / green(墨绿) / mono(黑白) 或 0-360 整数 |'
+    )
     lines.push('| `theme_background_image` | 背景图 | http(s):// 地址 / data:image 数据 / 空串清除 |')
     lines.push('| `theme_bg_opacity` | 卡片透明度 | 30-100 |')
     lines.push('| `theme_bg_blur` | 毛玻璃强度 | 0-32 |')
