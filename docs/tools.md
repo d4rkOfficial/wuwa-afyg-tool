@@ -598,7 +598,7 @@ _无参数_
 ### `set_setting`
 
 
-修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(0-100)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、magnetic_follow(50-400ms)、magnetic_sensitivity(0.05-0.3)、magnetic_spin(4-30s/圈)、magnetic_wobble(0-10，0=关闭)、magnetic_border(0.5-3px 内部描边)、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。
+修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(0-100)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。
 
 | 参数 | 必填 | 类型 | 说明 |
 | --- | --- | --- | --- |
@@ -875,11 +875,6 @@ _无参数_
 | `calc_view` | 拉表视图 | dropdown / spread |
 | `simplify_toolbar` | 简化底部工具栏 | true / false |
 | `magnetic_pointer` | 磁力光标 | true / false |
-| `magnetic_follow` | 磁力光标跟手性 | 50-400（ms，越小越跟手） |
-| `magnetic_sensitivity` | 磁力光标灵敏度 | 0.05-0.3（越大越跟手） |
-| `magnetic_spin` | 磁力光标旋转速度 | 4-30（s/圈，越小越快） |
-| `magnetic_wobble` | 磁力光标吸附晃动强度 | 0-10（0=关闭） |
-| `magnetic_border` | 磁力光标内部描边粗细 | 0.5-3（px，四角边框固定 2px） |
 | `gpu_accel` | 渲染加速（GPU） | true / false |
 | `reload_on_result_refresh` | 刷新结果重载数据 | true / false |
 | `reload_on_profile_change` | 链/阶变动重载数据 | true / false |

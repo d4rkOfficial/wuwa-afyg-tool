@@ -75,7 +75,12 @@
     import { getConfig, init as initConfig } from '$lib/components/page/home/config/config.store.svelte'
     import { hideSplash } from '$lib/utils/splash'
     import favicon from '$lib/assets/favicon.svg'
-    import { getGpuAccel, getReloadOnResultRefresh, getReloadOnProfileChange } from '$lib/data/render-prefs.svelte'
+    import {
+        getGpuAccel,
+        getReloadOnResultRefresh,
+        getReloadOnProfileChange,
+        setMagneticForcedOff
+    } from '$lib/data/render-prefs.svelte'
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
     import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
@@ -103,6 +108,11 @@
     let showSettings = $state(false)
     let showWorkshopFrame = $state(false)
     let workshopFrameKey = $state(0)
+
+    // 工坊 iframe 弹窗打开时强制恢复系统光标（磁力光标瞬时抑制）
+    $effect(() => {
+        setMagneticForcedOff(showWorkshopFrame)
+    })
 
     // 阶段切换加载反馈：activePhase/showResult 变化时显示遮罩 spinner，同步初始化完成后最短 200ms 隐藏
     let phaseLoading = $state(false)

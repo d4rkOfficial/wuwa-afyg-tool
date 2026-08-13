@@ -12,17 +12,7 @@ import {
     setReloadOnProfileChange,
     setReloadOnResultRefresh,
     setMagneticPointer,
-    getMagneticPointer,
-    setMagneticFollow,
-    getMagneticFollow,
-    setMagneticSensitivity,
-    getMagneticSensitivity,
-    setMagneticSpin,
-    getMagneticSpin,
-    setMagneticWobble,
-    getMagneticWobble,
-    setMagneticBorderWidth,
-    getMagneticBorderWidth
+    getMagneticPointer
 } from '$lib/data/render-prefs.svelte'
 import {
     addWorkshop,
@@ -171,48 +161,7 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
             return b
         }
     },
-    magnetic_follow: {
-        label: '磁力光标跟手性',
-        apply: async (v) => {
-            const n = clampNum(v, 'magnetic_follow', 50, 400)
-            setMagneticFollow(n)
-            return n
-        }
-    },
-    magnetic_sensitivity: {
-        label: '磁力光标灵敏度',
-        apply: async (v) => {
-            const n = toNum(v, 'magnetic_sensitivity')
-            if (n < 0.05 || n > 0.3) throw new Error('magnetic_sensitivity 的值须在 0.05-0.3 之间')
-            setMagneticSensitivity(n)
-            return n
-        }
-    },
-    magnetic_spin: {
-        label: '磁力光标旋转速度',
-        apply: async (v) => {
-            const n = clampNum(v, 'magnetic_spin', 4, 30)
-            setMagneticSpin(n)
-            return n
-        }
-    },
-    magnetic_wobble: {
-        label: '磁力光标吸附晃动强度',
-        apply: async (v) => {
-            const n = clampNum(v, 'magnetic_wobble', 0, 10)
-            setMagneticWobble(n)
-            return n
-        }
-    },
-    magnetic_border: {
-        label: '磁力光标内部描边粗细',
-        apply: async (v) => {
-            const n = toNum(v, 'magnetic_border')
-            if (n < 0.5 || n > 3) throw new Error('magnetic_border 的值须在 0.5-3 之间')
-            setMagneticBorderWidth(n)
-            return n
-        }
-    },
+
     // ── 性能相关 ──
     gpu_accel: {
         label: '渲染加速（GPU）',
@@ -239,6 +188,15 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
         }
     }
 }
+
+/** 已固定不可调的参数 key：set_setting 调用静默忽略（不报错） */
+const FIXED_SETTING_KEYS = new Set([
+    'magnetic_follow',
+    'magnetic_sensitivity',
+    'magnetic_spin',
+    'magnetic_wobble',
+    'magnetic_border'
+])
 
 /** 已知但禁止修改的 key → 设置面板位置提示 */
 const DENIED_HINTS: Record<string, string> = {
@@ -276,12 +234,7 @@ defineTool('get_settings_state', {
             interaction: {
                 calcView: getCalcViewMode(),
                 simplifyToolbar: getSimplifyToolbar(),
-                magneticPointer: getMagneticPointer(),
-                magneticFollow: getMagneticFollow(),
-                magneticSensitivity: getMagneticSensitivity(),
-                magneticSpin: getMagneticSpin(),
-                magneticWobble: getMagneticWobble(),
-                magneticBorder: getMagneticBorderWidth()
+                magneticPointer: getMagneticPointer()
             },
             performance: {
                 gpuAccel: getGpuAccel(),
@@ -297,7 +250,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(0-100)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、magnetic_follow(50-400ms)、magnetic_sensitivity(0.05-0.3)、magnetic_spin(4-30s/圈)、magnetic_wobble(0-10，0=关闭)、magnetic_border(0.5-3px 内部描边)、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(0-100)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。',
     parameters: {
         type: 'object',
         properties: {
@@ -308,6 +261,10 @@ defineTool('set_setting', {
     },
     handler: async (args) => {
         const key = str(args.key)
+        // 磁力光标参数已固定（跟手性/旋转/灵敏度/描边/晃动）：调用静默忽略，不报错
+        if (FIXED_SETTING_KEYS.has(key)) {
+            return { key, ignored: true, message: '该设置已固定，无法修改' }
+        }
         const def = KEY_APPLYERS[key]
         if (!def) {
             // 已知被禁止的设置 → 给出具体位置；未知 key → 通用提示

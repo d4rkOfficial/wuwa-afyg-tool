@@ -1,20 +1,17 @@
 <script lang="ts">
-    import {
-        getMagneticBorderWidth,
-        getMagneticFollow,
-        getMagneticPointer,
-        getMagneticSensitivity,
-        getMagneticSpin,
-        getMagneticWobble
-    } from '$lib/data/render-prefs.svelte'
+    import { getMagneticForcedOff, getMagneticPointer } from '$lib/data/render-prefs.svelte'
     import { getActiveId, getOverrides } from '$lib/theme'
 
+    // 磁力光标参数已固定（不可在设置/工具中调整）
+    const FOLLOW_MS = 50 // 跟手性：固定跟手
+    const SENSITIVITY = 0.05 // 灵敏度：磁吸最强
+    const SPIN_S = 4 // 旋转速度：最快
+    const WOBBLE = 10 // 吸附晃动：最强
+    const BORDER_W = 3 // 描边粗细：3px
+
     let enabled = $derived(getMagneticPointer())
-    let followMs = $derived(getMagneticFollow())
-    let sensitivity = $derived(getMagneticSensitivity())
-    let spin = $derived(getMagneticSpin())
-    let wobble = $derived(getMagneticWobble())
-    let borderWidth = $derived(getMagneticBorderWidth())
+    // 瞬时抑制（工坊 iframe 弹窗等）：强制恢复系统光标
+    let forcedOff = $derived(getMagneticForcedOff())
 
     // 磁力目标：按钮类 = 有点击事件的元素（a/button/select/role=button/summary/onclick + 显式 cursor:pointer 的元素），
     // 动态渲染的元素由事件委托覆盖
@@ -62,7 +59,7 @@
     // 旋转方向：按住拖动时按位移主轴判定（右/下→逆时针，左/上→顺时针）
     let spinCcw = $state(false)
     let lastPointer = $state({ x: 0, y: 0 })
-    let follow = $derived(DRAG_MODES.has(mode) || pressed ? 0 : followMs)
+    let follow = $derived(DRAG_MODES.has(mode) || pressed ? 0 : FOLLOW_MS)
 
     const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -116,7 +113,7 @@
         if (currentTarget === el) return
         currentTarget = el as HTMLElement
         setSize((el as HTMLElement).getBoundingClientRect())
-        if (wobble > 0) attachKey++
+        if (WOBBLE > 0) attachKey++
     }
 
     function detachTarget() {
@@ -162,7 +159,7 @@
             const rect = currentTarget.getBoundingClientRect()
             const cx = rect.left + rect.width / 2
             const cy = rect.top + rect.height / 2
-            const k = sensitivity
+            const k = SENSITIVITY
             x = cx + (x - cx) * k
             y = cy + (y - cy) * k
         } else if (pressed && pressOffset) {
@@ -250,9 +247,9 @@
     $effect(() => {
         if (!pointerEl) return
         pointerEl.style.setProperty('--mp-follow', `${follow}ms`)
-        pointerEl.style.setProperty('--mp-spin', `${spin}s`)
-        pointerEl.style.setProperty('--mp-wobble-amp', `${wobble * 0.6}px`)
-        pointerEl.style.setProperty('--mp-border-w', `${borderWidth}px`)
+        pointerEl.style.setProperty('--mp-spin', `${SPIN_S}s`)
+        pointerEl.style.setProperty('--mp-wobble-amp', `${WOBBLE * 0.6}px`)
+        pointerEl.style.setProperty('--mp-border-w', `${BORDER_W}px`)
         // 边框色：非黑白配色 = 亮化的主题色（混白 55%）；黑白（mono）配色 昼白夜黑（反色）
         const isDark = getActiveId() !== 'light'
         const hue = getOverrides().accentHue
@@ -272,14 +269,14 @@
     // 开启磁力光标时隐藏原生鼠标（input/textarea 由磁力光标的 text 模式接管）；reduced-motion 时不隐藏
     $effect(() => {
         const root = document.documentElement
-        const on = enabled && !reducedMotion()
+        const on = enabled && !forcedOff && !reducedMotion()
         if (on) root.classList.add('magnetic-cursor')
         else root.classList.remove('magnetic-cursor')
         return () => root.classList.remove('magnetic-cursor')
     })
 
     $effect(() => {
-        if (!enabled || reducedMotion()) return
+        if (!enabled || forcedOff || reducedMotion()) return
         const onPointerDown = (e: PointerEvent) => {
             pressed = true
             lastPointer = { x: e.clientX, y: e.clientY }
@@ -327,9 +324,9 @@
     })
 </script>
 
-{#if enabled}
+{#if enabled && !forcedOff}
     <div bind:this={pointerEl} class="magnetic-pointer" data-mode={mode} class:mp-spin-ccw={spinCcw} aria-hidden="true">
-        <span class="mp-corners" class:mp-wobble={mode === 'pointer' && wobble > 0}>
+        <span class="mp-corners" class:mp-wobble={mode === 'pointer' && WOBBLE > 0}>
             {#key attachKey}
                 <span class="mp-corner"></span><span class="mp-corner"></span><span class="mp-corner"></span><span
                     class="mp-corner"
