@@ -136,3 +136,8 @@ export async function updateGenPrefs(patch: Partial<AiGenPrefs>): Promise<void> 
     _prefs = { ..._prefs, ...patch }
     if (browser) await dbSet(PREFS_KEY, _prefs)
 }
+
+/** 会话级启用开关（仅内存，不持久化；Toy 环境进入时关闭 AI 助手用） */
+export function setAiEnabledSession(v: boolean): void {
+    _prefs.enabled = v
+}

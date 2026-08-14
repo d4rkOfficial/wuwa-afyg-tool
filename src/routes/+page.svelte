@@ -69,6 +69,7 @@
     } from '$lib/components/page/home/calculation/calculation.store.svelte'
     import {
         getCalcViewMode,
+        setCalcViewMode,
         getDamageTypeEditMode,
         setDamageTypeEditMode,
         getScrollAxisDefault,
@@ -81,8 +82,19 @@
         getGpuAccel,
         getReloadOnResultRefresh,
         getReloadOnProfileChange,
-        setMagneticForcedOff
+        setMagneticForcedOff,
+        setMagneticPointer
     } from '$lib/data/render-prefs.svelte'
+    import { loadGenPrefs, setAiEnabledSession } from '$lib/data/ai-prefs.svelte'
+    import {
+        initToyEnvironmentBridge,
+        onToyEnter,
+        isFirstVisit,
+        markVisited,
+        isToyMobile,
+        isMagneticToySet,
+        markMagneticToySet
+    } from '$lib/bilibili-toy/environment.svelte'
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
     import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
@@ -324,6 +336,22 @@
     onMount(async () => {
         hideSplash()
         initToyProfileBridge()
+        initToyEnvironmentBridge()
+        // 首次进入（任意端）：拉表默认平铺模式
+        if (isFirstVisit()) {
+            setCalcViewMode('spread')
+            markVisited()
+        }
+        // 进入 Toy 环境（消息异步到达，每会话首次触发）：
+        // - 关闭 AI 助手（会话级，不持久化）
+        // - 首次在 Toy 手机环境进入 → 关闭磁力光标（一次性持久设定）
+        onToyEnter(() => {
+            void loadGenPrefs().then(() => setAiEnabledSession(false))
+            if (isToyMobile() && !isMagneticToySet()) {
+                setMagneticPointer(false)
+                markMagneticToySet()
+            }
+        })
         await ensureVersion()
         if (browser) {
             const prev = localStorage.getItem('wuwa-afyg:version')

@@ -29,11 +29,9 @@ export function initToyProfileBridge() {
     if (!browser) return
     window.addEventListener('message', (e) => {
         const msg = e.data as { type?: string; profile?: ToyProfile } | null
-        // 调试日志：打印所有消息的来源与类型，便于定位 Toy 壳页真实 origin
-        if (!msg || msg.type !== 'toy-profile' || !isTrustedOrigin(e.origin)) {
-            console.warn('[toy-profile] rejected:', { origin: e.origin, type: msg?.type ?? '(no type)' })
-            return
-        }
+        // 非可信域直接忽略（不发日志）；可信域内非 toy-profile 消息（如 toy-environment）静默，避免误报
+        if (!isTrustedOrigin(e.origin)) return
+        if (!msg || msg.type !== 'toy-profile') return
         const incoming = msg.profile
         if (incoming) {
             // 头像 URL 规范化：SDK 可能返回协议相对（//i0.hdslb.com/...），
@@ -41,11 +39,6 @@ export function initToyProfileBridge() {
             // 且透传给工坊时会被其 https:// 校验拒绝
             incoming.avatar = incoming.avatar.replace(/^\/\//, 'https:')
         }
-        console.log('[toy-profile] accepted:', {
-            origin: e.origin,
-            nickname: msg.profile?.nickname,
-            avatar: incoming?.avatar
-        })
         profile.data = incoming ?? null
     })
 }
