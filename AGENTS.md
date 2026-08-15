@@ -43,3 +43,5 @@
 
 1. `pnpm run format`
 2. `pnpm run check`
+
+无需运行 test。

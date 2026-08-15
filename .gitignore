@@ -7,6 +7,7 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+*-output
 
 # OS
 .DS_Store
@@ -26,11 +27,13 @@ vite.config.ts.timestamp-*
 .tmp/
 .tmp
 *Tempopencode*.*
-rename-output
+.tmp*
 
 # Log
 *.log
 
 # Secret
-AGENTS.md
 .opencode/
+
+# Local pnpm store
+.pnpm-store/

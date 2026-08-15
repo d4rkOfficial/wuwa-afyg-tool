@@ -1,4 +1,6 @@
 import { browser } from '$app/environment'
+import { DATA_CDN_CACHE_NAME } from '$lib/api/consts'
+import { getCurrentProviderId as getProviderId, providerQuery } from '$lib/api/provider'
 import type {
     Character,
     Weapon,
@@ -15,11 +17,24 @@ const LIST_TTL = 7 * 24 * 60 * 60 * 1000
 const INFO_TTL = 7 * 24 * 60 * 60 * 1000
 const ICON_TTL = 7 * 24 * 60 * 60 * 1000
 
+const DEFAULT_PROVIDER = 'nanoka'
+
+/** 当前上游作用域（默认 nanoka）。用于让缓存命名空间与上游绑定。 */
+function providerScope(): string {
+    const id = getProviderId()
+    return id === DEFAULT_PROVIDER ? '' : id + '/'
+}
+
+/** 在本地 API 路径后附加 ?provider= 查询参数（仅非默认上游时）。 */
+function withProviderUrl(path: string): string {
+    return path + providerQuery()
+}
+
 const memoryCache = new Map<string, unknown>()
 const inFlight = new Map<string, Promise<unknown>>()
 
 function cacheKey(cat: string, entity: string, name?: string): string {
-    return `${PREFIX}${cat}:${entity}${name ? ':' + name : ''}`
+    return `${PREFIX}${providerScope()}${cat}:${entity}${name ? ':' + name : ''}`
 }
 
 function getLocal<T>(k: string, ttl: number): T | null {
@@ -84,8 +99,9 @@ async function fetchBatchIcons(entity: string): Promise<Record<string, string>> 
     if (inFlight.has(k)) return inFlight.get(k) as Promise<Record<string, string>>
 
     const promise = (async () => {
-        const res = await fetch(`/api/v1/batch-icons/${entity}`)
-        if (!res.ok) throw new Error(`API ${res.status}: /api/v1/batch-icons/${entity}`)
+        const url = withProviderUrl(`/api/v1/batch-icons/${entity}`)
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`API ${res.status}: ${url}`)
         const data: Record<string, string> = await res.json()
         memoryCache.set(k, data)
         setLocal(k, data)
@@ -103,7 +119,7 @@ async function fetchBatchIcons(entity: string): Promise<Record<string, string>> 
 
 function warmImageCache(urls: string[]) {
     if (typeof caches === 'undefined') return
-    caches.open('nanoka-cdn').then((cache) => {
+    caches.open(DATA_CDN_CACHE_NAME).then((cache) => {
         for (const url of urls) {
             cache.match(url).then((hit) => {
                 if (!hit)
@@ -197,19 +213,19 @@ const UI_BTN_ICONS: Record<string, string> = {
 // ── Lists ──
 
 export function getCharacterList(): Promise<Character[]> {
-    return fetchJSON<Character[]>('/api/v1/list/character', cacheKey('list', 'character'), LIST_TTL)
+    return fetchJSON<Character[]>(withProviderUrl('/api/v1/list/character'), cacheKey('list', 'character'), LIST_TTL)
 }
 
 export function getWeaponList(): Promise<Weapon[]> {
-    return fetchJSON<Weapon[]>('/api/v1/list/weapon', cacheKey('list', 'weapon'), LIST_TTL)
+    return fetchJSON<Weapon[]>(withProviderUrl('/api/v1/list/weapon'), cacheKey('list', 'weapon'), LIST_TTL)
 }
 
 export function getEchoList(): Promise<Echo[]> {
-    return fetchJSON<Echo[]>('/api/v1/list/echo', cacheKey('list', 'echo'), LIST_TTL)
+    return fetchJSON<Echo[]>(withProviderUrl('/api/v1/list/echo'), cacheKey('list', 'echo'), LIST_TTL)
 }
 
 export function getEchoSetList(): Promise<EchoSetItem[]> {
-    return fetchJSON<EchoSetItem[]>('/api/v1/list/echo-set', cacheKey('list', 'echo-set'), LIST_TTL)
+    return fetchJSON<EchoSetItem[]>(withProviderUrl('/api/v1/list/echo-set'), cacheKey('list', 'echo-set'), LIST_TTL)
 }
 
 // ── Icons ──
@@ -246,7 +262,7 @@ export function getUiBtnIcons(): Promise<Record<string, string>> {
 
 export function getCharacterInfo(name: string): Promise<CharacterInfo> {
     return fetchJSON<CharacterInfo>(
-        `/api/v2/info/character/${encodeURIComponent(name)}`,
+        withProviderUrl(`/api/v2/info/character/${encodeURIComponent(name)}`),
         cacheKey('info', 'character-v2', name),
         INFO_TTL
     )
@@ -254,7 +270,7 @@ export function getCharacterInfo(name: string): Promise<CharacterInfo> {
 
 export function getWeaponInfo(name: string): Promise<WeaponInfo> {
     return fetchJSON<WeaponInfo>(
-        `/api/v1/info/weapon/${encodeURIComponent(name)}`,
+        withProviderUrl(`/api/v1/info/weapon/${encodeURIComponent(name)}`),
         cacheKey('info', 'weapon', name),
         INFO_TTL
     )
@@ -262,7 +278,7 @@ export function getWeaponInfo(name: string): Promise<WeaponInfo> {
 
 export function getEchoInfo(name: string): Promise<EchoInfo> {
     return fetchJSON<EchoInfo>(
-        `/api/v1/info/echo/${encodeURIComponent(name)}`,
+        withProviderUrl(`/api/v1/info/echo/${encodeURIComponent(name)}`),
         cacheKey('info', 'echo', name),
         INFO_TTL
     )
@@ -270,7 +286,7 @@ export function getEchoInfo(name: string): Promise<EchoInfo> {
 
 export function getEchoSetInfo(name: string): Promise<EchoSetInfo> {
     return fetchJSON<EchoSetInfo>(
-        `/api/v1/info/echo-set/${encodeURIComponent(name)}`,
+        withProviderUrl(`/api/v1/info/echo-set/${encodeURIComponent(name)}`),
         cacheKey('info', 'echo-set', name),
         INFO_TTL
     )
@@ -309,7 +325,7 @@ export async function clearCacheCategory(kind: CacheCategory): Promise<void> {
     } else {
         clearCache('batch-icons')
         if (typeof caches !== 'undefined') {
-            await caches.delete('nanoka-cdn').catch(() => {})
+            await caches.delete(DATA_CDN_CACHE_NAME).catch(() => {})
         }
     }
 }

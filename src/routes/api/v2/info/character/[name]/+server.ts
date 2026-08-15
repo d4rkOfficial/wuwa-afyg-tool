@@ -1,20 +1,19 @@
-import { CACHE_CONTROL, ensureVersion, getWWVersion } from '$lib/api/consts'
-import { fetchData, fetchZhData, createJsonResponse } from '$lib/api/fetch'
-import { transformCharacterInfoRich, findEntryByName } from '$lib/api/utils'
-import type { NanokaCharacter, ZhCharacterDetail } from '$lib/api/types'
+import { CACHE_CONTROL } from '$lib/api/consts'
+import { createJsonResponse } from '$lib/api/fetch'
+import { getProvider, providerIdFromUrl } from '$lib/api/provider'
 
-export const GET = async ({ params }: { params: { name: string } }) => {
+export const GET = async ({ params, url }: { params: { name: string }; url?: URL }) => {
     const { name } = params
     if (!name) return createJsonResponse({ error: 'Missing name parameter' }, 400)
 
     try {
-        const list = await fetchData<Record<string, NanokaCharacter>>('/character.json')
-        const found = findEntryByName(list, name)
-        if (!found) return createJsonResponse({ error: 'Character not found' }, 404)
-        await ensureVersion()
-        const data = await fetchZhData<ZhCharacterDetail>(`/character/${found[0]}.json`, getWWVersion())
-        return createJsonResponse(transformCharacterInfoRich(data), 200, { 'Cache-Control': CACHE_CONTROL })
+        const provider = getProvider(url ? providerIdFromUrl(url) : undefined)
+        // v2 使用富文本描述（保留原始描述文本），目前仅角色详情有此富数据。
+        const data = await provider.getCharacterInfo(name, { rich: true })
+        return createJsonResponse(data, 200, { 'Cache-Control': CACHE_CONTROL })
     } catch (e) {
-        return createJsonResponse({ error: 'Failed to fetch data: ' + String(e) }, 500)
+        const msg = String(e)
+        const status = /not found/i.test(msg) ? 404 : 500
+        return createJsonResponse({ error: status === 404 ? msg : 'Failed to fetch data: ' + msg }, status)
     }
 }

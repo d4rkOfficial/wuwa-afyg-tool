@@ -377,9 +377,9 @@ export function getAllBuffSets(): BuffSet[] {
     return _buffSets
 }
 
-/** @desc 新建空 Buff 块（随机 id，默认全队作用域） */
-export function createBuffSet(name: string) {
-    if (!assertUnlocked()) return
+/** @desc 新建空 Buff 块（随机 id，默认全队作用域），返回新块 id */
+export function createBuffSet(name: string): string | undefined {
+    if (!assertUnlocked()) return undefined
     const buffSet: BuffSet = {
         id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name,
@@ -387,6 +387,7 @@ export function createBuffSet(name: string) {
         scope: 'all'
     }
     _buffSets = [..._buffSets, buffSet]
+    return buffSet.id
 }
 
 /** @desc 导入接口类型：外部（工坊 share / AI）传入的 Buff 结构，scope 用 share 语义（self/self_except/team/effect_only） */
@@ -634,6 +635,44 @@ export function deleteBuffSet(id: string) {
         if (filtered.length > 0) next[entryId] = filtered
     }
     _damageEntryBuffSetIds = next
+}
+
+/** @desc 批量删除 Buff 块（跳过全局 buff），同时清理所有条目上的绑定 */
+export function deleteBuffSets(ids: string[]) {
+    if (!assertUnlocked()) return
+    const targets = ids.filter((id) => !_globalBuffSetIds.includes(id))
+    if (targets.length === 0) return
+    const idSet = new Set(targets)
+    _buffSets = _buffSets.filter((s) => !idSet.has(s.id))
+    const next: Record<string, string[]> = {}
+    for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
+        const filtered = setIds.filter((sid) => !idSet.has(sid))
+        if (filtered.length > 0) next[entryId] = filtered
+    }
+    _damageEntryBuffSetIds = next
+}
+
+/** @desc 批量并入/移出全局（跳过 global- 内置块），并入时清理条目绑定并重建全局自动绑定 */
+export function setBuffSetsGlobal(ids: string[], global: boolean): boolean {
+    if (!assertUnlocked()) return false
+    const targets = ids.filter((id) => !id.startsWith('global-') && _buffSets.some((s) => s.id === id))
+    if (targets.length === 0) return false
+    const idSet = new Set(targets)
+    _buffSets = _buffSets.map((s) => (idSet.has(s.id) ? { ...s, global } : s))
+    _globalBuffSetIds = global
+        ? [..._globalBuffSetIds.filter((sid) => !idSet.has(sid)), ...targets]
+        : _globalBuffSetIds.filter((sid) => !idSet.has(sid))
+    if (global) {
+        const next: Record<string, string[]> = {}
+        for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
+            const filtered = setIds.filter((sid) => !idSet.has(sid))
+            if (filtered.length > 0) next[entryId] = filtered
+        }
+        _damageEntryBuffSetIds = next
+    }
+    syncGlobalBuffs((_initTeam ?? []).map((s) => s.character))
+    if (_onupdate) _onupdate(getCalcState())
+    return true
 }
 
 /** @desc 重命名 Buff 块 */

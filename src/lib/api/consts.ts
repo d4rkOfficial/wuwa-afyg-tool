@@ -1,53 +1,13 @@
 import { browser } from '$app/environment'
 
-export const NANOKA_BASE = 'https://static.nanoka.cc'
+/** 分享服务基地址（独立于数据上游） */
 export const SHARE_BASE = 'https://wuwa-afyg-share.200503.xyz'
-
-const VERSION_KEY = 'wuwa-afyg:ww-version'
-
-let _wwVersion = browser ? (localStorage.getItem(VERSION_KEY) ?? '3.5') : '3.5'
-
-export function getWWVersion() {
-    return _wwVersion
-}
-
-export function getDataBase() {
-    return `${NANOKA_BASE}/ww/${_wwVersion}`
-}
-
-let _versionPromise: Promise<void> | null = null
-
-export function resetVersionPromise() {
-    _versionPromise = null
-}
-
-export async function ensureVersion() {
-    if (!_versionPromise) {
-        _versionPromise = (async () => {
-            try {
-                const ctrl = new AbortController()
-                const timer = setTimeout(() => ctrl.abort(), 5000)
-                const res = await fetch(browser ? '/api/v1/version/latest' : `${NANOKA_BASE}/manifest.json`, {
-                    signal: ctrl.signal
-                })
-                clearTimeout(timer)
-                const text = await res.text()
-                if (text) {
-                    const parsed = JSON.parse(text)
-                    _wwVersion = typeof parsed === 'string' ? parsed : (parsed.ww?.latest ?? _wwVersion)
-                    if (browser) localStorage.setItem(VERSION_KEY, _wwVersion)
-                }
-            } catch {
-                // keep fallback
-            }
-        })()
-    }
-    return _versionPromise
-}
-
-export const ZH_DATA_BASE = `${NANOKA_BASE}/ww`
-export const ASSET_BASE = `${NANOKA_BASE}/assets/ww`
 
 export const CACHE_CONTROL = 'public, s-maxage=600, stale-while-revalidate=86400'
 
+/** PWA 运行时缓存数据上游 CDN 图片/静态资源的 Cache Storage 名称 */
+export const DATA_CDN_CACHE_NAME = 'data-cdn'
+
 export { ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP } from '$lib/consts/game-terms'
+
+// 上游选择键（provider/index.ts 实际使用；此处不声明实现，避免与适配器模块耦合）

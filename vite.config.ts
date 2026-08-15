@@ -3,6 +3,11 @@ import { sveltekit } from '@sveltejs/kit/vite'
 import { SvelteKitPWA } from '@vite-pwa/sveltekit'
 import { defineConfig } from 'vite'
 
+// 数据上游图片/静态资源的 CDN 源（与 provider 的图标源一致）。
+// 默认 nanoka；切换上游时，若新上游的图标源不同，同步调整此值。
+const DATA_CDN_ORIGIN = 'https://static.nanoka.cc'
+const dataCdnPattern = new RegExp('^' + DATA_CDN_ORIGIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+
 export default defineConfig({
     plugins: [
         tailwindcss(),
@@ -38,10 +43,10 @@ export default defineConfig({
                         }
                     },
                     {
-                        urlPattern: /^https:\/\/static\.nanoka\.cc\/assets\/ww\//,
+                        urlPattern: dataCdnPattern,
                         handler: 'StaleWhileRevalidate',
                         options: {
-                            cacheName: 'nanoka-cdn',
+                            cacheName: 'data-cdn',
                             expiration: { maxEntries: 2000, maxAgeSeconds: 30 * 24 * 60 * 60 },
                             cacheableResponse: { statuses: [0, 200] }
                         }

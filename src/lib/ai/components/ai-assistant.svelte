@@ -388,21 +388,18 @@
         }
     }
 
-    // 响应式卡片尺寸：横屏（宽>高）高度占满屏幕；竖屏（高>宽）宽度占满屏幕
-    let winW = $state(typeof window !== 'undefined' ? window.innerWidth : 1280)
+    // 卡片尺寸：固定横屏形态（宽度固定，高度随窗口占满）
     let winH = $state(typeof window !== 'undefined' ? window.innerHeight : 800)
-    const isLandscape = $derived(winW > winH)
-    const cardW = $derived(isLandscape ? 480 : Math.max(280, winW - 24))
-    const cardH = $derived(isLandscape ? winH - 24 : Math.min(winH * 0.6, 560))
+    const cardW = 480
+    const cardH = $derived(winH - 24)
     // 默认展开的小卡片尺寸
-    const smallW = $derived(isLandscape ? 380 : Math.max(280, winW - 24))
-    const smallH = $derived(isLandscape ? 460 : Math.min(winH * 0.45, 420))
+    const smallW = 380
+    const smallH = 460
     const curW = $derived(size === 'collapsed' ? 48 : size === 'small' ? smallW : cardW)
     const curH = $derived(size === 'collapsed' ? 48 : size === 'small' ? smallH : cardH)
     let expandedH = $state(600)
     $effect(() => {
         const update = () => {
-            winW = window.innerWidth
             winH = window.innerHeight
             expandedH = cardH
             // 窗口尺寸变化（或展开/收起切换）时按当前形态尺寸修正悬浮窗位置
@@ -430,7 +427,7 @@
 {#if aiEnabled}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="theme-glass-surface fixed z-40 flex flex-col overflow-hidden border shadow-2xl {dragPos
+        class="ai-assistant theme-glass-surface fixed z-40 flex flex-col overflow-hidden border shadow-2xl {dragPos
             ? ''
             : 'bottom-4 right-4'}"
         style="{dragPos

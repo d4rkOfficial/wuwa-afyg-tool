@@ -10,6 +10,7 @@
     import { slide } from 'svelte/transition'
     import favicon from '$lib/assets/favicon.svg'
     import { getShareState } from '$lib/data/share.svelte'
+    import { getEggMode } from '$lib/data/egg-prefs.svelte'
 
     interface Props {
         projects: Project[]
@@ -207,8 +208,14 @@
         style="border-color: var(--theme-divider-border);"
         onclick={onhome}
     >
-        <img src={favicon} alt="椰果工具箱" class="size-5 shrink-0" />
-        {#if !compact}<span class="text-sm font-semibold tracking-tight">椰果工具箱</span>{/if}
+        <img
+            src={getEggMode() ? '/icons/egg/yaya.png' : favicon}
+            alt={getEggMode() ? '萌萌人工具箱' : '椰果工具箱'}
+            class="size-5 shrink-0"
+        />
+        {#if !compact}<span class="text-sm font-semibold tracking-tight"
+                >{getEggMode() ? '萌萌人工具箱' : '椰果工具箱'}</span
+            >{/if}
         <div class="flex-1"></div>
         {#if !compact}
             <button

@@ -6,6 +6,7 @@
         label: string
         action: () => void
         icon?: string
+        disabled?: boolean
     }
 
     interface Props extends ComponentsProps {
@@ -68,16 +69,20 @@
             {#each items as item}
                 <button
                     role="menuitem"
+                    disabled={item.disabled}
                     onclick={() => handleItemClick(item)}
                     class={[
                         'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors',
-                        'hover:bg-(--theme-context-menu-bg-focused) hover:text-(--theme-context-menu-text-focused)',
-                        'focus-visible:bg-(--theme-context-menu-bg-focused) focus-visible:text-(--theme-context-menu-text-focused)',
+                        item.disabled
+                            ? 'cursor-not-allowed opacity-40'
+                            : 'hover:bg-(--theme-context-menu-bg-focused) hover:text-(--theme-context-menu-text-focused) focus-visible:bg-(--theme-context-menu-bg-focused) focus-visible:text-(--theme-context-menu-text-focused)',
                         'focus-visible:outline-none'
                     ].join(' ')}
                 >
                     {#if item.icon === 'mdi:rename-outline'}
                         <Icon icon="mdi:rename-outline" class="size-4 shrink-0" />
+                    {:else if item.icon === 'mdi:rename-box'}
+                        <Icon icon="mdi:rename-box" class="size-4 shrink-0" />
                     {:else if item.icon === 'mdi:content-copy'}
                         <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
                     {:else if item.icon === 'mdi:file-export'}
@@ -88,6 +93,10 @@
                         <Icon icon="mdi:archive-outline" class="size-4 shrink-0" />
                     {:else if item.icon === 'mdi:delete-outline'}
                         <Icon icon="mdi:delete-outline" class="size-4 shrink-0" />
+                    {:else if item.icon === 'mdi:crown-outline'}
+                        <Icon icon="mdi:crown-outline" class="size-4 shrink-0" />
+                    {:else if item.icon === 'mdi:minus-circle-outline'}
+                        <Icon icon="mdi:minus-circle-outline" class="size-4 shrink-0" />
                     {/if}
                     {item.label}
                 </button>

@@ -83,7 +83,9 @@ pnpm run preview
 
 ## API
 
-API 基于 [nanoka](https://ww.nanoka.cc) 精简提纯，随版本自动更新。
+API 基于 [nanoka](https://ww.nanoka.cc) 精简提纯，随版本自动更新。上游以
+`DataProvider` 适配器模式接入（`src/lib/api/provider/`），接入新上游的流程与
+数据质量验收标准见 [docs/upstream-integration.md](docs/upstream-integration.md)。
 
 ## 声明
 

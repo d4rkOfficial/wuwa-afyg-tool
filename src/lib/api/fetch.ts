@@ -1,17 +1,4 @@
-import { getDataBase, ZH_DATA_BASE, ensureVersion } from './consts'
-
-export const fetchData = async <T>(path: string): Promise<T> => {
-    await ensureVersion()
-    const res = await fetch(getDataBase() + path)
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-    return res.json()
-}
-
-export const fetchZhData = async <T>(path: string, version: string): Promise<T> => {
-    const res = await fetch(`${ZH_DATA_BASE}/${version}/zh${path}`)
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-    return res.json()
-}
+// 上游抓取已收敛到 $lib/api/provider/* 适配器中；这里只保留与上游无关的通用工具。
 
 export const createJsonResponse = (data: unknown, status = 200, extraHeaders?: Record<string, string>) =>
     new Response(JSON.stringify(data), {

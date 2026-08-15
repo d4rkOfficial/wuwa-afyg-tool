@@ -9,6 +9,7 @@ import {
     getEchoInfo,
     getEchoSetInfo
 } from '$lib/data/api'
+import { providerQuery } from '$lib/api/provider'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getAllBuffSets } from '$lib/components/page/home/calculation/calculation.store.svelte'
 import {
@@ -87,7 +88,7 @@ export function createLibraryDataSource(): GenerateDataSource {
             }
         },
         async getCharacterTerms(entityName) {
-            const res = await fetch(`/api/v2/info/character/${encodeURIComponent(entityName)}`, {
+            const res = await fetch(`/api/v2/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store'
             })
@@ -149,7 +150,7 @@ export function createProjectDataSource(): GenerateDataSource {
             }
         },
         async getCharacterTerms(entityName) {
-            const res = await fetch(`/api/v2/info/character/${encodeURIComponent(entityName)}`, {
+            const res = await fetch(`/api/v2/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store'
             })

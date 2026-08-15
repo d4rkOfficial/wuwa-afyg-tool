@@ -21,6 +21,14 @@
         resetWorkshop
     } from '$lib/data/workshop.svelte'
     import {
+        getProviderOptions,
+        getActiveProviderId,
+        setActiveProvider,
+        resetActiveProvider,
+        getProviderVersions,
+        loadProviderVersions
+    } from '$lib/data/provider-prefs.svelte'
+    import {
         getArchivedProjects,
         unarchiveProject,
         deleteProject,
@@ -74,7 +82,7 @@
 
     let { open, onclose }: Props = $props()
 
-    let tab = $state<'theme' | 'keymap' | 'interaction' | 'performance' | 'workshop' | 'archive' | 'cache' | 'ai'>(
+    let tab = $state<'theme' | 'keymap' | 'interaction' | 'performance' | 'connection' | 'archive' | 'cache' | 'ai'>(
         'theme'
     )
 
@@ -93,7 +101,7 @@
         { key: 'keymap', label: '按键图标', icon: 'mdi:keyboard-outline' },
         { key: 'interaction', label: '交互相关', icon: 'mdi:tune-variant' },
         { key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
-        { key: 'workshop', label: '工坊设置', icon: 'mdi:storefront-outline' },
+        { key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
         { key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
         { key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
         { key: 'ai', label: '助手设置', icon: 'mdi:robot-outline' }
@@ -359,6 +367,36 @@
         addToast('已恢复默认工坊实例', 'success')
     }
 
+    // ── 上游数据源（连接配置） ──
+    let providerOptions = $derived(getProviderOptions())
+    let activeProviderId = $derived(getActiveProviderId())
+    let providerVersions = $derived(getProviderVersions())
+
+    // 进入“连接配置”页时加载各上游最新版本
+    let loadedVersionTab = false
+    $effect(() => {
+        if (tab === 'connection' && !loadedVersionTab) {
+            loadedVersionTab = true
+            void loadProviderVersions()
+        }
+    })
+
+    function handleSwitchProvider(id: string) {
+        if (!setActiveProvider(id)) {
+            addToast('未知的数据源', 'error')
+            return
+        }
+        addToast('已切换数据源，列表/详情缓存将按新源重新加载', 'info')
+        // 数据可能随上游不同，清空本地缓存以便重新拉取
+        import('$lib/data/api').then((m) => m.clearCache())
+    }
+
+    function handleResetProvider() {
+        resetActiveProvider()
+        addToast('已恢复默认数据源（nanoka）', 'success')
+        import('$lib/data/api').then((m) => m.clearCache())
+    }
+
     // ── Archive management ──
     let archivedProjects = $derived(getArchivedProjects())
     let confirmDelete = $state<{ id: string; name: string } | null>(null)
@@ -465,7 +503,7 @@
         out:fade={{ duration: 130 }}
     >
         <div
-            class="animate-pop-in theme-glass-surface relative flex h-[min(720px,92dvh)] w-[640px] max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl sm:h-[560px] sm:max-h-[90vh]"
+            class="animate-pop-in theme-glass-surface relative flex h-[560px] max-h-[90vh] w-[640px] max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
@@ -485,10 +523,10 @@
                 </button>
             </div>
 
-            <div class="flex min-h-0 flex-1 flex-col sm:flex-row">
+            <div class="flex min-h-0 flex-1 flex-row">
                 <!-- Sidebar -->
                 <div
-                    class="flex w-full shrink-0 gap-1 overflow-x-auto border-b p-2 [scrollbar-width:none] sm:w-40 sm:flex-col sm:overflow-x-visible sm:border-r sm:border-b-0 sm:p-3 [&::-webkit-scrollbar]:hidden"
+                    class="flex w-40 shrink-0 flex-col gap-1 border-r p-3"
                     style="border-color: var(--theme-divider-border);"
                 >
                     {#each SETTING_TABS as t}
@@ -508,7 +546,7 @@
 
                 <!-- Content -->
                 <div
-                    class="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 [scrollbar-width:none] sm:p-6 [&::-webkit-scrollbar]:hidden"
+                    class="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 >
                     {#if tab === 'theme'}
                         <!-- Accent color -->
@@ -1306,10 +1344,59 @@
                                 </button>
                             </div>
                         </div>
-                    {:else if tab === 'workshop'}
-                        <!-- Workshop settings -->
+                    {:else if tab === 'connection'}
+                        <!-- Connection settings: 上游数据源 + 工坊/分享源 -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">工坊设置</span>
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">上游数据源</span>
+                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                选择角色/武器/声骸等数据的来源；切换后列表与详情缓存会按新源重新加载
+                            </p>
+                            <div class="flex flex-col gap-2">
+                                {#each providerOptions as opt}
+                                    <div
+                                        class={[
+                                            'flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors',
+                                            opt.id === activeProviderId
+                                                ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
+                                                : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
+                                        ].join(' ')}
+                                        onclick={() => handleSwitchProvider(opt.id)}
+                                        title="点击切换该数据源"
+                                    >
+                                        <Icon
+                                            icon={opt.id === activeProviderId
+                                                ? 'mdi:radiobox-marked'
+                                                : 'mdi:radiobox-blank'}
+                                            class="size-4 shrink-0 text-(--theme-accent-text)"
+                                        />
+                                        <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)"
+                                            >{opt.label}</span
+                                        >
+                                        <span
+                                            class="shrink-0 rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                            title="最新数据版本"
+                                        >
+                                            {providerVersions[opt.id] || opt.id}
+                                        </span>
+                                    </div>
+                                {/each}
+                            </div>
+                            <div class="mt-3">
+                                <button
+                                    onclick={handleResetProvider}
+                                    class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <Icon icon="mdi:restore" class="size-3.5" />
+                                    恢复默认
+                                </button>
+                            </div>
+
+                            <div class="my-4 border-t" style="border-color: var(--theme-divider-border);"></div>
+
+                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60"
+                                >工坊 / 分享源</span
+                            >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 配置椰果工坊实例；单选使用，可删除或新增，分享与工坊列表将使用当前选中实例
                             </p>

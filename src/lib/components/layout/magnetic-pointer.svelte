@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { browser } from '$app/environment'
     import { getMagneticForcedOff, getMagneticPointer } from '$lib/data/render-prefs.svelte'
     import { getActiveId, getOverrides } from '$lib/theme'
 
@@ -13,11 +14,14 @@
     // 瞬时抑制（工坊 iframe 弹窗等）：强制恢复系统光标
     let forcedOff = $derived(getMagneticForcedOff())
 
-    // 磁力目标：按钮类 = 有点击事件的元素（a/button/select/role=button/summary/onclick + 显式 cursor:pointer 的元素），
-    // 动态渲染的元素由事件委托覆盖
-    const TARGET_SELECTOR = 'a, button, select, [role="button"], summary, [onclick], [data-magnetic]'
-    // 磁力光标自身除外（文本编辑类由 text 模式接管，不再整体豁免）
-    const EXCLUDE_SELECTOR = '.magnetic-pointer'
+    // 磁力目标：按钮类 = 有点击事件的元素（a/button/select/role=button/summary + 显式 cursor:pointer 的元素），
+    // 动态渲染的元素由事件委托覆盖。注意：Svelte 5 的 onclick={} 编译为 addEventListener，
+    // DOM 上不产生 onclick 属性，因此选择器不含 [onclick]；非标准交互元素用 [data-magnetic] 手动标记。
+    const TARGET_SELECTOR = 'a, button, select, [role="button"], summary, [data-magnetic]'
+    // 磁力光标自身除外（文本编辑类由 text 模式接管，不再整体豁免）。
+    // 底部工具栏悬浮窗 / AI 悬浮窗整体豁免：它们是拖拽型浮层，hover 时保持默认
+    // 四角+点（不显示 grab/move 字形），按住拖动时由 dragging 圆环接管。
+    const EXCLUDE_SELECTOR = '.magnetic-pointer, .simplified-toolbar, .ai-assistant'
     // 拖拽/滑动类光标 → 展示对应光标样式，不框选不磁吸
     const RESIZE_H = new Set(['col-resize', 'ew-resize'])
     const RESIZE_V = new Set(['row-resize', 'ns-resize'])
@@ -35,7 +39,7 @@
         | 'crosshair'
         | 'range'
 
-    // 拖动/滑动类模式：过渡 0ms，光标实时贴手
+    // 拖动/滑动/文本输入类模式：过渡 0ms，光标实时贴手；按下时精确对准（text 不记录偏移，避免 I-beam 脱节）
     const DRAG_MODES: ReadonlySet<PointerMode> = new Set([
         'grab',
         'move',
@@ -43,8 +47,33 @@
         'resize-v',
         'resize-diag',
         'crosshair',
-        'range'
+        'range',
+        'text'
     ])
+
+    // 触摸主指针设备（手机/平板）：磁力光标对触摸无意义，自动禁用（含运行中切换检测）
+    let coarsePointer = $state(false)
+    // 减弱动态效果：跟随系统设置实时变化（CSS 兜底 + JS 状态同步）
+    let reducedMotion = $state(false)
+
+    $effect(() => {
+        if (!browser) return
+        const coarse = window.matchMedia('(pointer: coarse)')
+        const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+        coarsePointer = coarse.matches
+        reducedMotion = motion.matches
+        const onCoarse = (e: MediaQueryListEvent) => (coarsePointer = e.matches)
+        const onMotion = (e: MediaQueryListEvent) => (reducedMotion = e.matches)
+        coarse.addEventListener('change', onCoarse)
+        motion.addEventListener('change', onMotion)
+        return () => {
+            coarse.removeEventListener('change', onCoarse)
+            motion.removeEventListener('change', onMotion)
+        }
+    })
+
+    // 实际生效条件：开关开启 + 未强制关闭 + 非触摸设备 + 未减弱动态效果
+    let active = $derived(enabled && !forcedOff && !coarsePointer && !reducedMotion)
 
     let pointerEl = $state<HTMLDivElement | null>(null)
     let dotEl = $state<HTMLDivElement | null>(null)
@@ -53,15 +82,21 @@
     // 左键按住：外框过渡 0ms、跳过磁吸，保持按下瞬间的相对偏移"接近"中心点（拖拽模式除外，需精确对准）
     let pressed = $state(false)
     let pressOffset = $state<{ x: number; y: number } | null>(null)
+    // 拖动中（按下后位移超过阈值）：隐藏磁力光标并恢复系统光标，松手后重新显示。
+    // 阈值避免单纯点击（按下即松开）导致光标闪烁。
+    let dragging = $state(false)
+    let dragStart = $state({ x: 0, y: 0 })
     let framePos = $state({ x: 0, y: 0 })
     // 吸附晃动：每次框选新目标时递增，触发 #key 重建让晃动动画重播
     let attachKey = $state(0)
     // 旋转方向：按住拖动时按位移主轴判定（右/下→逆时针，左/上→顺时针）
     let spinCcw = $state(false)
     let lastPointer = $state({ x: 0, y: 0 })
+    // 最近一次鼠标位置（scroll/尺寸变化时复用重算吸附位置）
+    let lastMouse = $state({ x: 0, y: 0 })
+    // rAF 节流：高频 pointermove 合并到每帧一次，避免磁吸时每事件强制 reflow
+    let moveRaf: number | null = null
     let follow = $derived(DRAG_MODES.has(mode) || pressed ? 0 : FOLLOW_MS)
-
-    const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     function modeForCursor(cursor: string): PointerMode {
         if (cursor === 'text') return 'text'
@@ -75,23 +110,40 @@
     }
 
     /**
+     * 解析元素声明的光标 token（如 col-resize / grab / pointer）。
+     * 注意：磁力光标开启时 layout.css 会对全 DOM 施加 `cursor: none !important`，
+     * getComputedStyle().cursor 恒为 none，无法用于光标语义检测——必须从
+     * Tailwind cursor-* 类名或内联 style 解析，才能识别拖拽线/拖拽手柄等元素。
+     */
+    function cursorToken(el: Element): string {
+        const cls = typeof el.className === 'string' ? el.className : ''
+        const m = cls.match(/(?:^|\s)cursor-([a-z-]+)/)
+        if (m) return m[1]
+        const styleAttr = el.getAttribute('style') || ''
+        const sm = styleAttr.match(/cursor\s*:\s*([a-z-]+)/i)
+        return sm ? sm[1].toLowerCase() : ''
+    }
+
+    /**
      * 向上查找磁力目标：
      * - 命中标签/属性选择器 → 框选该元素
      * - cursor:pointer 仅认显式声明（Tailwind cursor-pointer 类或内联样式），排除继承（子元素穿透到父元素时框选父元素）
      * - 命中拖拽/滑动类光标 → 整条路径不磁吸
+     * - disabled / aria-disabled / cursor:not-allowed → 不可交互，不磁吸
      */
     function findMagneticTarget(el: Element | null): HTMLElement | null {
         let cur: Element | null = el
         while (cur && cur !== document.body) {
-            const cs = getComputedStyle(cur)
-            if (modeForCursor(cs.cursor) !== 'default' && modeForCursor(cs.cursor) !== 'pointer') return null
-            if (cur.matches(TARGET_SELECTOR)) return cur as HTMLElement
-            if (cs.cursor === 'pointer') {
-                const cls = typeof cur.className === 'string' ? cur.className : ''
-                const styleAttr = cur.getAttribute('style') || ''
-                if (cls.includes('cursor-pointer') || /cursor\s*:\s*pointer/i.test(styleAttr)) {
-                    return cur as HTMLElement
-                }
+            const token = cursorToken(cur)
+            if (token === 'not-allowed') return null
+            if (modeForCursor(token) !== 'default' && modeForCursor(token) !== 'pointer') return null
+            if (cur.matches(TARGET_SELECTOR)) {
+                if (cur.matches(':disabled, [aria-disabled="true"]')) return null
+                return cur as HTMLElement
+            }
+            if (token === 'pointer') {
+                if (cur.matches(':disabled, [aria-disabled="true"]')) return null
+                return cur as HTMLElement
             }
             cur = cur.parentElement
         }
@@ -136,7 +188,55 @@
         return { x, y }
     }
 
+    /** 计算并应用外框位置（rAF 帧内执行一次；scroll/resize/目标尺寸变化时复用） */
+    function updateFrame(mx: number, my: number) {
+        if (!pointerEl) return
+        let x = mx
+        let y = my
+        // 拖动中：圆环中心钉在鼠标位置（与 mp-dot 中心点重合），忽略按下偏移与磁吸
+        if (dragging) {
+            x = mx
+            y = my
+            // 磁力吸附（仅 pointer 模式，即真正可点击目标）：目标上时光标向目标中心 lerp，
+            // 鼠标在按钮内移动时光标钉在按钮上。resize/grab/move 等拖拽光标（如 sidebar 拖拽线）
+            // 不放大吸附——外框保持固定大小，避免拖拽线上出现放大边框。
+        } else if (!pressed && !dragging && mode === 'pointer' && currentTarget && currentTarget.isConnected) {
+            // 磁力吸附：目标上时光标向目标中心 lerp（灵敏度 = 跟手系数），鼠标在按钮内移动时光标钉在按钮上
+            const rect = currentTarget.getBoundingClientRect()
+            // 目标尺寸变化（hover 缩放/布局变化）时刷新外框尺寸，避免框与目标脱节
+            const pad = Math.max(8, innerWidth / 100)
+            const wantW = Math.max(28, rect.width + pad)
+            const wantH = Math.max(28, rect.height + pad)
+            const curW = parseFloat(pointerEl.style.getPropertyValue('--mp-w')) || 28
+            const curH = parseFloat(pointerEl.style.getPropertyValue('--mp-h')) || 28
+            if (Math.abs(wantW - curW) > 1 || Math.abs(wantH - curH) > 1) setSize(rect)
+            const cx = rect.left + rect.width / 2
+            const cy = rect.top + rect.height / 2
+            const k = SENSITIVITY
+            x = cx + (x - cx) * k
+            y = cy + (y - cy) * k
+        } else if (pressed && pressOffset) {
+            // 左键按住（未达拖动阈值）：按按下瞬间的相对偏移跟随（接近但不重合）
+            x += pressOffset.x
+            y += pressOffset.y
+        }
+        // 外框不离开屏幕边界
+        const clamped = clampFrame(x, y)
+        x = clamped.x
+        y = clamped.y
+        framePos = { x, y }
+        pointerEl.style.transform = `translate(${x}px, ${y}px)`
+        // 拖动中：中心点跟随 clamp 后的圆环中心，保证小圆点始终在圆形框正中（屏幕边缘也不脱心）
+        if (dragging) dotEl?.style.setProperty('transform', `translate(${x}px, ${y}px)`)
+    }
+
     function onMove(e: PointerEvent) {
+        // 按住后位移超过阈值 → 判定为拖动（外框切换为圆形闭合边框样式）；单纯点击不触发
+        if (pressed && !dragging && Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) > 4) {
+            dragging = true
+            // 圆形闭合边框：固定 28px 圆（不受吸附目标尺寸影响）
+            resetSize()
+        }
         // 按住拖动时按位移主轴更新旋转方向：右/下→逆时针，左/上→顺时针
         if (pressed) {
             const dx = e.clientX - lastPointer.x
@@ -150,28 +250,25 @@
         }
         // 中心点：始终钉在鼠标实时位置（无过渡）
         dotEl?.style.setProperty('transform', `translate(${e.clientX}px, ${e.clientY}px)`)
-        if (!pointerEl) return
-        let x = e.clientX
-        let y = e.clientY
-        // 磁力吸附：目标上时光标向目标中心 lerp（灵敏度 = 跟手系数），鼠标在按钮内移动时光标钉在按钮上；
-        // 左键按住时跳过磁吸，按按下瞬间的相对偏移跟随（接近但不重合）
-        if (!pressed && currentTarget && currentTarget.isConnected) {
-            const rect = currentTarget.getBoundingClientRect()
-            const cx = rect.left + rect.width / 2
-            const cy = rect.top + rect.height / 2
-            const k = SENSITIVITY
-            x = cx + (x - cx) * k
-            y = cy + (y - cy) * k
-        } else if (pressed && pressOffset) {
-            x += pressOffset.x
-            y += pressOffset.y
+        lastMouse = { x: e.clientX, y: e.clientY }
+        // rAF 节流：高频 pointermove 合并到每帧一次，磁吸时的 getBoundingClientRect/reflow 不再每事件触发
+        if (moveRaf === null) {
+            moveRaf = requestAnimationFrame(() => {
+                moveRaf = null
+                updateFrame(lastMouse.x, lastMouse.y)
+            })
         }
-        // 外框不离开屏幕边界
-        const clamped = clampFrame(x, y)
-        x = clamped.x
-        y = clamped.y
-        framePos = { x, y }
-        pointerEl.style.transform = `translate(${x}px, ${y}px)`
+    }
+
+    /** 滚动/目标位移时按最近鼠标位置重算吸附（滚动容器内滚动后外框仍跟随目标） */
+    function onAnyScroll() {
+        if (!pointerEl || !currentTarget || !currentTarget.isConnected) return
+        if (moveRaf === null) {
+            moveRaf = requestAnimationFrame(() => {
+                moveRaf = null
+                updateFrame(lastMouse.x, lastMouse.y)
+            })
+        }
     }
 
     /**
@@ -181,7 +278,7 @@
     function findDragMode(el: Element | null): PointerMode | null {
         let cur: Element | null = el
         while (cur && cur !== document.body) {
-            const m = modeForCursor(getComputedStyle(cur).cursor)
+            const m = modeForCursor(cursorToken(cur))
             if (m !== 'default' && m !== 'pointer') return m
             cur = cur.parentElement
         }
@@ -219,7 +316,7 @@
             mode = dragMode
             return
         }
-        const cursor = getComputedStyle(target).cursor
+        const cursor = cursorToken(target)
         const cursorMode = modeForCursor(cursor)
         if (cursorMode !== 'default' && cursorMode !== 'pointer') {
             // 拖拽/文本/移动等动作：展示对应光标样式，不框选不磁吸
@@ -266,19 +363,21 @@
         pointerEl.style.setProperty('--mp-border', border)
     })
 
-    // 开启磁力光标时隐藏原生鼠标（input/textarea 由磁力光标的 text 模式接管）；reduced-motion 时不隐藏
+    // 开启磁力光标时隐藏原生鼠标（input/textarea 由磁力光标的 text 模式接管）；reduced-motion 时不隐藏。
+    // 拖动中磁力光标变为圆形闭合边框样式（不隐藏），系统光标保持隐藏。
     $effect(() => {
         const root = document.documentElement
-        const on = enabled && !forcedOff && !reducedMotion()
-        if (on) root.classList.add('magnetic-cursor')
+        if (active) root.classList.add('magnetic-cursor')
         else root.classList.remove('magnetic-cursor')
         return () => root.classList.remove('magnetic-cursor')
     })
 
     $effect(() => {
-        if (!enabled || forcedOff || reducedMotion()) return
+        if (!active) return
         const onPointerDown = (e: PointerEvent) => {
             pressed = true
+            dragging = false
+            dragStart = { x: e.clientX, y: e.clientY }
             lastPointer = { x: e.clientX, y: e.clientY }
             // 拖拽模式精确对准拖动点，不记录偏移；其余模式记录按下瞬间外框与鼠标的相对偏移（接近不重合）
             if (!DRAG_MODES.has(mode) && !pressOffset) {
@@ -288,6 +387,7 @@
         const onPointerUp = () => {
             pressed = false
             pressOffset = null
+            dragging = false
         }
         // 捕获阶段监听：部分浮层对事件调用 stopPropagation / pointerdown preventDefault 会抑制兼容 mousemove，
         // pointermove 在 pointer capture 与 preventDefault 场景下始终派发，保证磁力光标始终跟随鼠标
@@ -298,6 +398,16 @@
         window.addEventListener('blur', onPointerUp)
         window.addEventListener('mouseover', onOver, true)
         window.addEventListener('mouseout', onOut, true)
+        // 捕获阶段监听滚动：滚动容器内目标位移后仍保持吸附（timeline/spread-table 等横向滚动区域）
+        window.addEventListener('scroll', onAnyScroll, true)
+        // 目标元素被移除（弹窗/动态列表关闭）时立即解除吸附并复位模式，避免外框残留
+        const removedObserver = new MutationObserver(() => {
+            if (currentTarget && !currentTarget.isConnected) {
+                detachTarget()
+                mode = 'default'
+            }
+        })
+        removedObserver.observe(document.body, { childList: true, subtree: true })
         // 窗口尺寸变化时重新钳制外框位置
         const onResize = () => {
             if (!pointerEl) return
@@ -314,18 +424,33 @@
             window.removeEventListener('blur', onPointerUp)
             window.removeEventListener('mouseover', onOver, true)
             window.removeEventListener('mouseout', onOut, true)
+            window.removeEventListener('scroll', onAnyScroll, true)
             window.removeEventListener('resize', onResize)
+            removedObserver.disconnect()
+            if (moveRaf !== null) {
+                cancelAnimationFrame(moveRaf)
+                moveRaf = null
+            }
             currentTarget = null
             mode = 'default'
             pressed = false
             pressOffset = null
+            dragging = false
             spinCcw = false
         }
     })
 </script>
 
-{#if enabled && !forcedOff}
-    <div bind:this={pointerEl} class="magnetic-pointer" data-mode={mode} class:mp-spin-ccw={spinCcw} aria-hidden="true">
+{#if active}
+    <!-- 拖动中切换为圆形闭合边框样式（mp-dragging），中心点保持显示 -->
+    <div
+        bind:this={pointerEl}
+        class="magnetic-pointer"
+        class:mp-dragging={dragging}
+        data-mode={mode}
+        class:mp-spin-ccw={spinCcw}
+        aria-hidden="true"
+    >
         <span class="mp-corners" class:mp-wobble={mode === 'pointer' && WOBBLE > 0}>
             {#key attachKey}
                 <span class="mp-corner"></span><span class="mp-corner"></span><span class="mp-corner"></span><span
@@ -355,7 +480,8 @@
     <div
         bind:this={dotEl}
         class="mp-dot"
-        class:mp-dot-hidden={mode === 'crosshair' || mode === 'range'}
+        class:mp-dot-hidden={mode === 'crosshair' || mode === 'range' || mode === 'text' || mode === 'resize-h'}
+        class:mp-dragging={dragging}
         aria-hidden="true"
     ></div>
 {/if}
@@ -376,6 +502,31 @@
             width var(--mp-follow, 0.2s) ease-out,
             height var(--mp-follow, 0.2s) ease-out,
             transform var(--mp-follow, 0.2s) ease-out;
+    }
+
+    /* 拖动中：外框变为固定 28px 圆形闭合边框（不随吸附目标/容器放大），
+       颜色与磁力光标一致（主题亮化描边 + accent 发光），中心点由 mp-dot 呈现 */
+    .magnetic-pointer.mp-dragging {
+        width: 28px !important;
+        height: 28px !important;
+        top: -14px !important;
+        left: -14px !important;
+        border-radius: 9999px;
+        border: 2px solid var(--mp-border, #ffffff);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);
+        background: transparent;
+        animation: none;
+    }
+
+    .magnetic-pointer.mp-dragging .mp-corners,
+    .magnetic-pointer.mp-dragging .mp-corner,
+    .magnetic-pointer.mp-dragging .mp-glyph {
+        display: none !important;
+    }
+
+    /* 拖动中中心点始终显示（覆盖 crosshair/range 的隐藏规则） */
+    .mp-dot.mp-dragging {
+        display: block !important;
     }
 
     /* 中心点：钉在鼠标实时位置（无过渡）；十字/拖动条模式隐藏（保证空心准星视觉） */

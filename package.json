@@ -12,6 +12,8 @@
         "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
         "lint": "prettier --check .",
         "format": "prettier --write .",
+        "test": "node --import ./scripts/test/preload.mjs scripts/test/run-provider-tests.ts",
+        "test:watch": "node --import ./scripts/test/preload.mjs --watch scripts/test/run-provider-tests.ts",
         "download-icons": "node scripts/download-static-icons.mjs",
         "generate-icons": "node scripts/generate-icons.mjs",
         "collect-icons": "node scripts/collect-mdi-icons.mjs"
@@ -24,6 +26,7 @@
         "@sveltejs/kit": "^2.63.0",
         "@sveltejs/vite-plugin-svelte": "^7.1.2",
         "@tailwindcss/vite": "^4.3.0",
+        "@types/node": "^26.2.0",
         "@types/prismjs": "^1.26.6",
         "@vite-pwa/sveltekit": "^1.1.0",
         "prettier": "^3.8.3",
@@ -33,7 +36,8 @@
         "svelte-check": "^4.6.0",
         "tailwindcss": "^4.3.0",
         "typescript": "^6.0.3",
-        "vite": "^8.0.16"
+        "vite": "^8.0.16",
+        "vitest": "^4.1.10"
     },
     "dependencies": {
         "@sveltejs/adapter-cloudflare": "^7.2.9",

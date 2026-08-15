@@ -29,7 +29,7 @@
         ProjectParseError
     } from '$lib/data/project.svelte'
     import { checkShare, importFromShareUrl, getShareLink } from '$lib/data/share.svelte'
-    import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/consts'
+    import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/client-version'
     import { clearCache, getCharacterInfo, getEchoInfo } from '$lib/data/api'
     import { browser } from '$app/environment'
     import type { PhaseKey, CharSlot } from '$lib/data/types'
@@ -38,6 +38,7 @@
     import type { ConfigState } from '$lib/components/page/home/config/config.types'
     import { PHASE_LABELS } from '$lib/consts/game-terms'
     import { addToast } from '$lib/data/toast.svelte'
+    import { getEggMode, setEggMode } from '$lib/data/egg-prefs.svelte'
     import { preloadCharElements } from '$lib/data/char-elements.svelte'
     import {
         loadIcons,
@@ -124,6 +125,21 @@
     let workshopFrameKey = $state(0)
 
     let toyProfile = $derived(getToyProfile())
+
+    // ── 彩蛋：短时间内连续点击版本号 badge 5 次 → 切换萌萌人工具箱 ──
+    const EGG_CLICK_WINDOW_MS = 2000
+    const EGG_CLICK_COUNT = 5
+    let eggClicks: number[] = []
+    function handleEggBadgeClick() {
+        const now = Date.now()
+        eggClicks = eggClicks.filter((t) => now - t <= EGG_CLICK_WINDOW_MS)
+        eggClicks.push(now)
+        if (eggClicks.length >= EGG_CLICK_COUNT) {
+            eggClicks = []
+            setEggMode(true)
+            addToast('彩蛋已解锁：萌萌人工具箱！', 'success')
+        }
+    }
 
     // 工坊 iframe 地址：非 Toy 环境无身份 hash，src 与原先完全一致（界面不变）；
     // 身份（postMessage 手势后）到达时 src 变化，iframe 自动重新导航带上 #toy hash
@@ -816,9 +832,7 @@
 
     <div class="flex flex-1 flex-col overflow-hidden">
         {#if !activeProject}
-            <div
-                class="flex flex-1 flex-col items-center justify-center gap-8 px-8 portrait:items-start portrait:justify-start portrait:overflow-x-auto"
-            >
+            <div class="flex flex-1 flex-col items-center justify-center gap-8 px-8">
                 <div class="flex flex-col items-center text-center">
                     <div class="relative mb-4">
                         <div
@@ -826,15 +840,15 @@
                             aria-hidden="true"
                         ></div>
                         <img
-                            src={favicon}
-                            alt="椰果工具箱"
+                            src={getEggMode() ? '/icons/egg/yaya.png' : favicon}
+                            alt={getEggMode() ? '萌萌人工具箱' : '椰果工具箱'}
                             class="relative size-20 rounded-2xl object-contain drop-shadow-[0_0_10px_var(--theme-halo-color)]"
                         />
                     </div>
                     <h2
                         class="mb-2 text-3xl font-bold tracking-tight text-(--theme-card-text) [text-shadow:_0_0_8px_var(--theme-halo-color)]"
                     >
-                        椰果工具箱
+                        {getEggMode() ? '萌萌人工具箱' : '椰果工具箱'}
                     </h2>
                     <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
                         {#if toyProfile.data}
@@ -856,100 +870,101 @@
                                 鸣潮社区公益工具
                             </span>
                         {/if}
-                        <span
-                            class="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-(--theme-accent-text)"
+                        <button
+                            type="button"
+                            class="cursor-pointer rounded-md px-1.5 py-0.5 text-[11px] font-medium text-(--theme-accent-text)"
                             style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);"
+                            title="数据版本"
+                            onclick={handleEggBadgeClick}
                         >
                             数据版本 {getWWVersion()}
-                        </span>
+                        </button>
                     </div>
                 </div>
-                <div
-                    class="grid w-full max-w-5xl grid-cols-4 gap-4 portrait:grid-cols-2 portrait:max-sm:grid-cols-1 portrait:gap-3 portrait:min-w-[560px] portrait:max-sm:min-w-[320px]"
-                >
+                <div class="grid w-full max-w-5xl grid-cols-4 gap-4">
                     <button
                         onclick={() => {
                             newName = ''
                             showNewModal = true
                         }}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused) portrait:p-4 portrait:gap-2"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                         style="animation-delay: 0ms"
                     >
                         <Icon
                             icon="mdi:plus"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)] portrait:size-7"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                             style="animation-delay: 90ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)] portrait:text-base"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
                                 >创建工程</span
                             >
                             <span
-                                class="portrait:hidden text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >从空白开始，配置配队、排轴与伤害计算</span
                             >
                         </div>
                     </button>
                     <button
                         onclick={() => (showWorkshopFrame = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused) portrait:p-4 portrait:gap-2"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                         style="animation-delay: 55ms"
                     >
                         <Icon
                             icon="mdi:storefront-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)] portrait:size-7"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                             style="animation-delay: 145ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)] portrait:text-base"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
                                 >椰果工坊</span
                             >
                             <span
-                                class="portrait:hidden text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >前往社区站点浏览、分享与下载工程</span
                             >
                         </div>
                     </button>
                     <button
                         onclick={() => (showBuffLibrary = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused) portrait:p-4 portrait:gap-2"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                         style="animation-delay: 110ms"
                     >
                         <Icon
                             icon="mdi:view-dashboard-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)] portrait:size-7"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                             style="animation-delay: 200ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)] portrait:text-base"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
                                 >Buff 集</span
                             >
                             <span
-                                class="portrait:hidden text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >管理本地增益，拉表时一键导入</span
                             >
                         </div>
                     </button>
                     <button
                         onclick={() => (showSettings = true)}
-                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused) portrait:p-4 portrait:gap-2"
+                        class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
                         style="animation-delay: 165ms"
                     >
                         <Icon
                             icon="mdi:cog-outline"
-                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)] portrait:size-7"
+                            class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                             style="animation-delay: 255ms"
                         />
                         <div class="flex flex-col gap-1">
                             <span
-                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)] portrait:text-base"
+                                class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
                                 >设置</span
                             >
                             <span
-                                class="portrait:hidden text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                                class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
                                 >主题、按键图标与工坊设置</span
                             >
                         </div>
