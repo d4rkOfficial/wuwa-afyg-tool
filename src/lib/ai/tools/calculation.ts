@@ -229,7 +229,7 @@ defineTool('toggle_damage_type', {
 })
 
 defineTool('get_condition_profile', {
-    description: '获取当前链/阶配置（每个角色的共鸣链 0-6 与武器精炼 1-5）及“可用Buff”过滤开关状态。',
+    description: '获取当前链/阶配置（每个角色的共鸣链 0-6 与武器精炼 0-5，0=未精炼）及“可用Buff”过滤开关状态。',
     parameters: { type: 'object', properties: {} },
     handler: () => ({
         chains: getConditionProfile().chains,
@@ -260,17 +260,17 @@ defineTool('set_chain', {
 })
 
 defineTool('set_refinement', {
-    description: '设置指定角色槽位（1-3）的武器精炼阶数（1-5）。',
+    description: '设置指定角色槽位（1-3）的武器精炼阶数（0-5，0=未精炼、不触发专武 1-5 阶 buff）。',
     parameters: {
         type: 'object',
-        properties: { slot: { type: 'number' }, value: { type: 'number', description: '阶数 1-5' } },
+        properties: { slot: { type: 'number' }, value: { type: 'number', description: '阶数 0-5' } },
         required: ['slot', 'value']
     },
     handler: (args, ctx) => {
         const slot = Number(args.slot)
         const value = Number(args.value)
         if (!Number.isInteger(slot) || slot < 1 || slot > 3) throw new Error('slot 须为 1-3')
-        if (!Number.isInteger(value) || value < 1 || value > 5) throw new Error('value 须为 1-5')
+        if (!Number.isInteger(value) || value < 0 || value > 5) throw new Error('value 须为 0-5')
         setConditionProfileRefinements(slot - 1, value)
         ctx.notifyCalc?.()
         return { slot, refinements: getConditionProfile().refinements }

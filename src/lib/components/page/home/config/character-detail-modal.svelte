@@ -15,6 +15,7 @@
     import Modal from '$lib/components/layout/modal.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import Icon from '@iconify/svelte'
+    import { openHelp } from '$lib/data/help.svelte'
 
     /** @desc 面板类型加成固定展示顺序：普攻/重击/共鸣技能/共鸣解放/变奏/延奏/声骸/协同，效应与其它不展示 */
     const TYPE_DMG_ORDER = DAMAGE_TYPES.filter((dt) => dt !== '效应伤害' && dt !== '其它类型伤害')
@@ -95,6 +96,27 @@
     })
 
     const conditionProfile = $derived(getConditionProfile())
+
+    /** @desc 链/阶生效条件帮助文案（武器行问号按钮调起全局帮助面板） */
+    let refineHelpItems = [
+        {
+            name: '生效条件总则',
+            description: '角色看共鸣链、武器看精炼',
+            content: '低于生效条件（角色 buff 看共鸣链、武器 buff 看佩戴者武器精炼）的 buff 不生效，实时反映在结果中。'
+        },
+        {
+            name: '角色共鸣链',
+            description: '链 ≥ n 才生效',
+            content:
+                '带共鸣链条件的角色 buff（如「一链」效果）要求该角色共鸣链档位 ≥ n（0-6）。档位低于条件的 buff 不生效。'
+        },
+        {
+            name: '武器精炼（含 0 阶）',
+            description: '精炼 ≥ n 才生效',
+            content:
+                '带精炼条件的武器 buff（如「精炼1阶暴击伤害」）要求佩戴者武器精炼档位 ≥ n（0-5）。档位设为 0（未穿戴专武）时 0 < 1，专武 1-5 阶 buff 全部不触发。武器无阶数区分的基础效果（如攻击提升）不受影响、仍生效；默认档位仍为 1 阶。'
+        }
+    ]
 
     let stats = $derived<Array<CharStats | null>>(
         team.map((slot, i) => computeCharStats(slot, i, charInfoMap, weaponInfoMap, configState, calcState))
@@ -278,8 +300,9 @@
             <div class="mt-1.5 flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">武器</span>
                 <div class="flex overflow-hidden rounded border" style="border-color: var(--theme-divider-border);">
-                    {#each [1, 2, 3, 4, 5] as n}
+                    {#each [0, 1, 2, 3, 4, 5] as n}
                         <button
+                            title={n === 0 ? '未精炼（不触发专武精炼 buff）' : undefined}
                             onclick={() => {
                                 setConditionProfileRefinements(activeTab, n)
                                 onProfileReload?.()
@@ -296,6 +319,14 @@
                     {/each}
                 </div>
                 <span class="flex h-6 w-4 items-center text-[11px] font-medium text-(--theme-accent-text)">阶</span>
+                <button
+                    onclick={() => openHelp('链/阶生效条件说明', refineHelpItems)}
+                    class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--theme-modal-text)/10"
+                    style="color: var(--theme-accent-text);"
+                    title="链/阶生效条件说明"
+                >
+                    <Icon icon="mdi:help-circle-outline" class="size-4" />
+                </button>
             </div>
         </div>
 
@@ -383,9 +414,5 @@
                 </div>
             {/if}
         </div>
-
-        <p class="mt-3 text-[10px] text-(--theme-modal-text)/40">
-            低于生效条件（角色 buff 看共鸣链、武器 buff 看佩戴者武器精炼）的 buff 不生效，实时反映在结果中。
-        </p>
     {/if}
 </Modal>
