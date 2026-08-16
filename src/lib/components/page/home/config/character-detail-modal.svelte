@@ -278,8 +278,9 @@
             <div class="mt-1.5 flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">武器</span>
                 <div class="flex overflow-hidden rounded border" style="border-color: var(--theme-divider-border);">
-                    {#each [1, 2, 3, 4, 5] as n}
+                    {#each [0, 1, 2, 3, 4, 5] as n}
                         <button
+                            title={n === 0 ? '未精炼（不触发专武精炼 buff）' : undefined}
                             onclick={() => {
                                 setConditionProfileRefinements(activeTab, n)
                                 onProfileReload?.()
@@ -385,7 +386,8 @@
         </div>
 
         <p class="mt-3 text-[10px] text-(--theme-modal-text)/40">
-            低于生效条件（角色 buff 看共鸣链、武器 buff 看佩戴者武器精炼）的 buff 不生效，实时反映在结果中。
+            低于生效条件（角色 buff 看共鸣链、武器 buff 看佩戴者武器精炼）的 buff 不生效，实时反映在结果中。武器精炼 0
+            阶表示未精炼，不触发专武 1-5 阶 buff。
         </p>
     {/if}
 </Modal>
