@@ -6,7 +6,6 @@ import {
     ELEMENT_ORDER,
     ELEMENT_BONUS_MAP,
     TYPE_BONUS_MAP,
-    ELEMENT_MAP,
     WEAPON_SUBSTAT_NAME_MAP,
     SUBSTAT_DECIMAL_TO_PCT
 } from '$lib/consts/game-terms'
@@ -38,8 +37,17 @@ export interface CharStats {
 export function charElementColorOf(name: string, charInfoMap: Record<string, CharacterInfo>): string {
     const info = charInfoMap[name]
     if (!info) return '#71717a'
-    const el = (ELEMENT_MAP as Record<string, string>)[info.element] ?? ''
-    return el ? `var(--theme-element-${el})` : '#71717a'
+    // info.element 已是属性中文名（如「冷凝」），与主题变量 --theme-element-* 的键一一对应
+    return `var(--theme-element-${info.element})`
+}
+
+/** @desc 武器副词条展示文案：攻击%/生命%/防御% 按比值 ×100 并保留两位小数（百分号在数字后），其余类型原样拼接 */
+export const formatWeaponSubstat = (substat: { name: string; value: string }): string => {
+    const canonicalName = WEAPON_SUBSTAT_NAME_MAP[substat.name] ?? substat.name
+    if (!SUBSTAT_DECIMAL_TO_PCT.has(canonicalName)) return `${canonicalName} ${substat.value}`
+    const raw = parseFloat(substat.value)
+    const pct = raw < 1 ? raw * 100 : raw
+    return `${canonicalName.replace('%', '')} ${pct.toFixed(2)}%`
 }
 
 export function computeCharStats(

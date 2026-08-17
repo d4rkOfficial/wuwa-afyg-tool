@@ -5,13 +5,13 @@
     import type { CalcState } from '../calculation/calculation.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/data/api'
-    import { ELEMENT_ORDER, WEAPON_SUBSTAT_NAME_MAP, DAMAGE_TYPES } from '$lib/consts/game-terms'
+    import { ELEMENT_ORDER, DAMAGE_TYPES } from '$lib/consts/game-terms'
     import {
         getConditionProfile,
         setConditionProfileChains,
         setConditionProfileRefinements
     } from '../calculation/calculation.store.svelte'
-    import { computeCharStats, charElementColorOf, type CharStats } from './character-detail-utils'
+    import { computeCharStats, charElementColorOf, formatWeaponSubstat, type CharStats } from './character-detail-utils'
     import Modal from '$lib/components/layout/modal.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import Icon from '@iconify/svelte'
@@ -106,15 +106,15 @@
         },
         {
             name: '角色共鸣链',
-            description: '链 ≥ n 才生效',
+            description: '共鸣链 ≥ n链 才生效',
             content:
                 '带共鸣链条件的角色 buff（如「一链」效果）要求该角色共鸣链档位 ≥ n（0-6）。档位低于条件的 buff 不生效。'
         },
         {
-            name: '武器精炼（含 0 阶）',
-            description: '精炼 ≥ n 才生效',
+            name: '武器精炼',
+            description: '武器 ≥ n阶 才生效（含 0 阶特殊情况说明）',
             content:
-                '带精炼条件的武器 buff（如「精炼1阶暴击伤害」）要求佩戴者武器精炼档位 ≥ n（0-5）。档位设为 0（未穿戴专武）时 0 < 1，专武 1-5 阶 buff 全部不触发。武器无阶数区分的基础效果（如攻击提升）不受影响、仍生效；默认档位仍为 1 阶。'
+                '带精炼条件的武器 buff 要求佩戴者武器精炼档位 ≥ n（0-5）。默认档位为 1 阶。通常来说，奶妈带专武但想模拟协奏武器时，武器阶数设置为0阶。'
         }
     ]
 
@@ -259,9 +259,7 @@
                         >
                         <span class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40">
                             {#if wInfo}
-                                攻击 +{wInfo.lv90BaseAtk} · {WEAPON_SUBSTAT_NAME_MAP[wInfo.substat.name] ??
-                                    wInfo.substat.name}
-                                {wInfo.substat.value}
+                                攻击 +{wInfo.lv90BaseAtk} · {formatWeaponSubstat(wInfo.substat)}
                             {:else}
                                 武器数据未加载
                             {/if}
