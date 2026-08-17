@@ -25,7 +25,7 @@ import {
     ADD_OFFSET,
     MIN_GAP,
     SNAP_PX,
-    MAX_POS,
+    MAX_TIME,
     NON_DIRECT_CONFIGS,
     NON_DIRECT_ELEMENT,
     BUTTON_KEY_ORDER,
@@ -44,7 +44,7 @@ import { registerDragCancel } from '$lib/utils/drag-guard'
 let _refLines = $state<RefLine[]>([
     { id: 'left', time: '', pos: 0 },
     { id: 'c1', time: '临时参考线', pos: SIDE_PAD + 12.5 * PPS },
-    { id: 'right', time: '结束', pos: SIDE_PAD + 150 * PPS }
+    { id: 'right', time: '结束', pos: SIDE_PAD + MAX_TIME * PPS }
 ])
 let _opBlocks = $state<OpBlock[]>([])
 let _damageBlocks = $state<DamageBlock[]>([])
@@ -113,7 +113,7 @@ export function init(
         _refLines = [
             { id: 'left', time: '', pos: 0 },
             { id: 'c1', time: '临时参考线', pos: SIDE_PAD + 12.5 * PPS },
-            { id: 'right', time: '结束', pos: SIDE_PAD + 150 * PPS }
+            { id: 'right', time: '结束', pos: SIDE_PAD + MAX_TIME * PPS }
         ]
         _opBlocks = []
         _damageBlocks = []
@@ -421,7 +421,7 @@ export function quickAddRefLine(openEdit: boolean): boolean {
         const bw = _blockWidths[b.id] ?? 56
         maxRight = Math.max(maxRight, b.pos + bw / 2)
     }
-    const cx = Math.max(SIDE_PAD, Math.min(MAX_POS, maxRight > 0 ? maxRight : SIDE_PAD))
+    const cx = Math.max(SIDE_PAD, Math.min(getMaxPos(), maxRight > 0 ? maxRight : SIDE_PAD))
     const i = _refLines.findIndex((r) => r.pos > cx)
     const insertIdx = i === -1 ? _refLines.length : i
     const prevX = i > 0 ? _refLines[i - 1].pos : -Infinity
@@ -562,7 +562,7 @@ export function setBlockWidths(v: Record<string, number>) {
         if (!width) continue
         const right = _quickPendingRight[id]
         _opBlocks = _opBlocks.map((b) =>
-            b.id === id ? { ...b, pos: Math.max(0, Math.min(MAX_POS, right + width / 2)) } : b
+            b.id === id ? { ...b, pos: Math.max(0, Math.min(getMaxPos(), right + width / 2)) } : b
         )
         delete _quickPendingRight[id]
         corrected = true
@@ -577,7 +577,7 @@ export function setBlockWidth(id: string, width: number) {
     if (right !== undefined) {
         delete _quickPendingRight[id]
         _opBlocks = _opBlocks.map((b) =>
-            b.id === id ? { ...b, pos: Math.max(0, Math.min(MAX_POS, right + width / 2)) } : b
+            b.id === id ? { ...b, pos: Math.max(0, Math.min(getMaxPos(), right + width / 2)) } : b
         )
         save()
     }
@@ -854,9 +854,16 @@ export function getSkillPickerOrder() {
     return Array.from(_skillPickerSelected)
 }
 
+/** @desc 当前有效编辑右边界：跟随末条参考线（结束线）位置动态扩展，永不小于左侧起始位置 */
+export function getMaxPos(): number {
+    const last = _refLines[_refLines.length - 1]
+    const endPos = last?.pos ?? SIDE_PAD + MAX_TIME * PPS
+    return Math.max(SIDE_PAD, endPos)
+}
+
 export function getTableWidth() {
     const last = _refLines[_refLines.length - 1]
-    return 80 + (_dragVisualPositions[last?.id] ?? last?.pos ?? SIDE_PAD + 150 * PPS) + RIGHT_EXTRA
+    return 80 + (_dragVisualPositions[last?.id] ?? last?.pos ?? SIDE_PAD + MAX_TIME * PPS) + RIGHT_EXTRA
 }
 
 export function getSegments() {
@@ -1060,7 +1067,7 @@ export function addAfter(id: string) {
 
 export function addRefLineAt(x: number): boolean {
     if (!assertUnlocked()) return false
-    const cx = Math.max(SIDE_PAD, Math.min(MAX_POS, x))
+    const cx = Math.max(SIDE_PAD, Math.min(getMaxPos(), x))
     const i = _refLines.findIndex((r) => r.pos > cx)
     const insertIdx = i === -1 ? _refLines.length : i
     const prevX = i > 0 ? _refLines[i - 1].pos : -Infinity
@@ -1157,7 +1164,7 @@ export function setRefLinePos(id: string, pos: number): number | null {
     if (isBoundary(id)) return null
     const idx = _refLines.findIndex((r) => r.id === id)
     if (idx < 0) return null
-    const cx = Math.max(SIDE_PAD, Math.min(MAX_POS, pos))
+    const cx = Math.max(SIDE_PAD, Math.min(getMaxPos(), pos))
     const minX = idx > 0 ? vx(_refLines[idx - 1].id, _refLines[idx - 1].pos) + MIN_GAP : -Infinity
     const maxX = idx < _refLines.length - 1 ? vx(_refLines[idx + 1].id, _refLines[idx + 1].pos) - MIN_GAP : Infinity
     if (cx < minX || cx > maxX) return null
@@ -1189,7 +1196,7 @@ export function startDrag(e: MouseEvent, id: string) {
 export function onDrag(rawX: number) {
     if (!_draggingId) return
     if (_isGroupDrag) {
-        const delta = Math.max(0, Math.min(MAX_POS, rawX)) - _dragRefStartPos
+        const delta = Math.max(0, Math.min(getMaxPos(), rawX)) - _dragRefStartPos
         applyGroupDelta(delta)
         return
     }
@@ -1239,7 +1246,7 @@ function applyGroupDelta(delta: number) {
     if (Object.keys(initBlocks).length > 0) {
         _opBlocks = _opBlocks.map((b) =>
             initBlocks[b.id] !== undefined
-                ? { ...b, pos: Math.max(0, Math.min(MAX_POS, initBlocks[b.id]! + delta)) }
+                ? { ...b, pos: Math.max(0, Math.min(getMaxPos(), initBlocks[b.id]! + delta)) }
                 : b
         )
     }
@@ -1261,7 +1268,7 @@ function applyGroupDelta(delta: number) {
                     }
                 }
                 const p = initPos + delta
-                const clamped = Math.max(0, prevWall + MIN_GAP, Math.min(MAX_POS, nextWall - MIN_GAP, p))
+                const clamped = Math.max(0, prevWall + MIN_GAP, Math.min(getMaxPos(), nextWall - MIN_GAP, p))
                 return { ...r, pos: clamped }
             })
             .sort((a, b) => a.pos - b.pos)
@@ -1342,7 +1349,7 @@ export function onBlockDrag(rawX: number) {
     if (idx < 0) return
     const centerX = rawX - _dragBlockOffset
     const pos = snapBlockX(centerX, _dragBlockId, _blockWidths[_dragBlockId] ?? 0)
-    const clampedPos = Math.max(0, Math.min(MAX_POS, pos))
+    const clampedPos = Math.max(0, Math.min(getMaxPos(), pos))
     if (_isGroupDrag) {
         applyGroupDelta(clampedPos - _dragBlockStartPos)
         return
@@ -1383,7 +1390,7 @@ export function stopBlockDrag() {
                         ob.id === _dragBlockId
                             ? {
                                   ...ob,
-                                  pos: Math.max(0, Math.min(MAX_POS, pushRight ? bRight + dw / 2 : bLeft - dw / 2))
+                                  pos: Math.max(0, Math.min(getMaxPos(), pushRight ? bRight + dw / 2 : bLeft - dw / 2))
                               }
                             : ob
                     )
@@ -1553,10 +1560,10 @@ function insertGroupAt(
         }
         if (nextShift === shift) break
         shift = nextShift
-        if (shift > MAX_POS) break
+        if (shift > getMaxPos()) break
     }
     const groupW = anchor - groupLeft
-    if (shift > MAX_POS - groupW) {
+    if (shift > getMaxPos() - groupW) {
         return null
     }
 
@@ -1565,11 +1572,11 @@ function insertGroupAt(
     const newBlocks = blocks.map((b) => {
         const w = widths[b.id] ?? 56
         const o = blockOffsets.get(b.id)!
-        return { ...b, id: `b${now}-${counter++}`, pos: Math.max(0, Math.min(MAX_POS, shift + o + w / 2)) }
+        return { ...b, id: `b${now}-${counter++}`, pos: Math.max(0, Math.min(getMaxPos(), shift + o + w / 2)) }
     })
     const newRefs = refs.map((r) => {
         const o = refOffsets.get(r.id)!
-        return { ...r, id: `c${now}-${counter++}`, pos: Math.max(0, Math.min(MAX_POS - MIN_GAP, shift + o)) }
+        return { ...r, id: `c${now}-${counter++}`, pos: Math.max(0, Math.min(getMaxPos() - MIN_GAP, shift + o)) }
     })
     const newBlockIds = newBlocks.map((b) => b.id)
     const newRefIds = newRefs.map((r) => r.id)
@@ -1805,7 +1812,7 @@ export function setOpBlockPos(blockId: string, pos: number): number | null {
     if (!assertUnlocked()) return null
     const idx = _opBlocks.findIndex((b) => b.id === blockId)
     if (idx < 0) return null
-    const clamped = Math.max(0, Math.min(MAX_POS, pos))
+    const clamped = Math.max(0, Math.min(getMaxPos(), pos))
     _opBlocks = _opBlocks.map((b) => (b.id === blockId ? { ...b, pos: clamped } : b))
     save()
     return clamped
@@ -1875,7 +1882,7 @@ export function confirmBlockDesc() {
                     const lastTrackIdx = getTRACKS().length - 1
                     if (b.trackIndex >= lastTrackIdx) return b
                     const bl = b.pos - (_blockWidths[b.id] ?? 0) / 2
-                    if (bl >= oldRight) return { ...b, pos: Math.max(0, Math.min(MAX_POS, b.pos + shift)) }
+                    if (bl >= oldRight) return { ...b, pos: Math.max(0, Math.min(getMaxPos(), b.pos + shift)) }
                     return b
                 })
             }
@@ -1940,7 +1947,7 @@ export function reflowTrack(trackIndex: number) {
             const cw = _blockWidths[cur.id] ?? 0
             const prx = prev.pos + pw / 2
             const newPos = prx + 1 + cw / 2
-            result.push({ ...cur, pos: Math.max(0, Math.min(MAX_POS, newPos)) })
+            result.push({ ...cur, pos: Math.max(0, Math.min(getMaxPos(), newPos)) })
         }
     }
     const resultById = new Map(result.map((r) => [r.id, r]))
@@ -1989,7 +1996,7 @@ export function formatTimeline() {
     const newPosById: Record<string, number> = {}
     let cursor = items[0].left
     for (const it of items) {
-        const pos = Math.max(0, Math.min(MAX_POS, cursor + it.w / 2))
+        const pos = Math.max(0, Math.min(getMaxPos(), cursor + it.w / 2))
         widthById[it.block.id] = it.w
         newPosById[it.block.id] = pos
         cursor = pos + it.w / 2
@@ -2015,7 +2022,7 @@ export function formatTimeline() {
     const finalRefs: RefLine[] = []
     let prev = -Infinity
     for (const { rl, pos } of placed) {
-        const p = rl.id === 'left' ? 0 : Math.max(prev + MIN_GAP, Math.min(MAX_POS, pos))
+        const p = rl.id === 'left' ? 0 : Math.max(prev + MIN_GAP, Math.min(getMaxPos(), pos))
         finalRefs.push({ ...rl, pos: p })
         prev = p
     }

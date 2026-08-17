@@ -28,6 +28,7 @@
         getTrackMenu,
         getTRACKS,
         getTableWidth,
+        getMaxPos,
         vx,
         damageBlockLeft,
         getDamageBlocksStacked,
@@ -89,18 +90,7 @@
         setQuickCharIndex
     } from './timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
-    import {
-        SIDE_PAD,
-        PPS,
-        SNAP_PX,
-        MIN_GAP,
-        MIN_TIME,
-        MAX_TIME,
-        MAX_POS,
-        NON_DIRECT_ELEMENT,
-        TRACK_COLORS,
-        GAMEPAD_BUTTONS
-    } from './timeline.consts'
+    import { SIDE_PAD, NON_DIRECT_ELEMENT, TRACK_COLORS, GAMEPAD_BUTTONS } from './timeline.consts'
     import type { OpBlock, DamageBlock } from './timeline.types'
     import ContextMenu from './context-menu.svelte'
     import SkillPicker from './skill-picker.svelte'
@@ -317,7 +307,7 @@
         const rect = timelineEl.getBoundingClientRect()
         const scrollL = timelineEl.scrollLeft
         const x = e.clientX - rect.left + scrollL - 80
-        const pos2 = Math.max(SIDE_PAD, Math.min(MAX_POS, x))
+        const pos2 = Math.max(SIDE_PAD, Math.min(getMaxPos(), x))
         setTrackMenu({ x: e.clientX, y: e.clientY, trackIndex: i, pos: pos2 })
     }
 

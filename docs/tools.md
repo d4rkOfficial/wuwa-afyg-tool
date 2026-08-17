@@ -709,21 +709,21 @@ _无参数_
 
 ### `move_op_block`
 
-把已有操作块移动到指定位置：position 为 {time: 秒}（绝对时间 0-150）或 {anchor: 块 id, side: before/after（默认 after）, offset?: 秒}（相对某块）。移动后自动消除同轨道重叠。
+把已有操作块移动到指定位置：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块 id, side: before/after（默认 after）, offset?: 秒}（相对某块）。移动后自动消除同轨道重叠。
 
 | 参数       | 必填   | 类型                     | 说明                                   |
 | ---------- | ------ | ------------------------ | -------------------------------------- |
 | `blockId`  | **是** | string                   | 操作块 id（get_timeline_summary 获取） |
-| `position` | **是** | object（before / after） | 绝对时间（秒，0-150）                  |
+| `position` | **是** | object（before / after） | 绝对时间（秒，0 至当前结束线）         |
 
 ### `move_ref_line`
 
-把已有参考线移动到指定位置：position 为 {time: 秒}（绝对时间 0-150）或 {anchor: 块 id, side: before/after, offset?: 秒}（相对某块）。与相邻参考线保持最小间距，过近会报错。
+把已有参考线移动到指定位置：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块 id, side: before/after, offset?: 秒}（相对某块）。与相邻参考线保持最小间距，过近会报错。
 
 | 参数       | 必填   | 类型                     | 说明                                   |
 | ---------- | ------ | ------------------------ | -------------------------------------- |
 | `id`       | **是** | string                   | 参考线 id（get_timeline_summary 获取） |
-| `position` | **是** | object（before / after） | 绝对时间（秒，0-150）                  |
+| `position` | **是** | object（before / after） | 绝对时间（秒，0 至当前结束线）         |
 
 ### `add_ref_line`
 

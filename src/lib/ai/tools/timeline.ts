@@ -22,17 +22,12 @@ import {
     setDamageBlockNonDirectEntries,
     setOpBlockPos,
     setRefLinePos,
+    getMaxPos,
     getCustomSkillHits,
     getTimelineState
 } from '$lib/components/page/home/timeline/timeline.store.svelte'
 import { updateTimeline } from '$lib/data/project.svelte'
-import {
-    BUTTON_KEY_ORDER,
-    NON_DIRECT_CONFIGS,
-    SIDE_PAD,
-    MAX_POS,
-    PPS
-} from '$lib/components/page/home/timeline/timeline.consts'
+import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/components/page/home/timeline/timeline.consts'
 import type { SkillHit, NonDirectEntry } from '$lib/components/page/home/timeline/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
@@ -82,7 +77,8 @@ function appendPos(): number {
 function resolvePosition(position: Record<string, unknown>): number {
     if (position.time !== undefined) {
         const t = Number(position.time)
-        if (!Number.isFinite(t) || t < 0 || t > 150) throw new Error('time 须为 0-150 秒')
+        const maxT = Math.floor((getMaxPos() - SIDE_PAD) / PPS)
+        if (!Number.isFinite(t) || t < 0 || t > maxT) throw new Error(`time 须为 0-${maxT} 秒`)
         return SIDE_PAD + t * PPS
     }
     const anchorId = str(position.anchor)
@@ -370,7 +366,7 @@ defineTool('reflow_track', {
 
 defineTool('move_op_block', {
     description:
-        '把已有操作块移动到指定位置：position 为 {time: 秒}（绝对时间 0-150）或 {anchor: 块 id, side: before/after（默认 after）, offset?: 秒}（相对某块）。移动后自动消除同轨道重叠。',
+        '把已有操作块移动到指定位置：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块 id, side: before/after（默认 after）, offset?: 秒}（相对某块）。移动后自动消除同轨道重叠。',
     parameters: {
         type: 'object',
         properties: {
@@ -378,7 +374,7 @@ defineTool('move_op_block', {
             position: {
                 type: 'object',
                 properties: {
-                    time: { type: 'number', description: '绝对时间（秒，0-150）' },
+                    time: { type: 'number', description: '绝对时间（秒，0 至当前结束线）' },
                     anchor: { type: 'string', description: '目标块 id' },
                     side: { type: 'string', enum: ['before', 'after'] },
                     offset: { type: 'number', description: '相对偏移（秒，默认 0）' }
@@ -404,7 +400,7 @@ defineTool('move_op_block', {
 
 defineTool('move_ref_line', {
     description:
-        '把已有参考线移动到指定位置：position 为 {time: 秒}（绝对时间 0-150）或 {anchor: 块 id, side: before/after, offset?: 秒}（相对某块）。与相邻参考线保持最小间距，过近会报错。',
+        '把已有参考线移动到指定位置：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块 id, side: before/after, offset?: 秒}（相对某块）。与相邻参考线保持最小间距，过近会报错。',
     parameters: {
         type: 'object',
         properties: {
@@ -412,7 +408,7 @@ defineTool('move_ref_line', {
             position: {
                 type: 'object',
                 properties: {
-                    time: { type: 'number', description: '绝对时间（秒，0-150）' },
+                    time: { type: 'number', description: '绝对时间（秒，0 至当前结束线）' },
                     anchor: { type: 'string', description: '目标块 id' },
                     side: { type: 'string', enum: ['before', 'after'] },
                     offset: { type: 'number', description: '相对偏移（秒，默认 0）' }
@@ -444,7 +440,7 @@ defineTool('add_ref_line', {
         for (const b of getOpBlocks()) {
             maxRight = Math.max(maxRight, b.pos + BLOCK_W / 2)
         }
-        const x = Math.max(SIDE_PAD, Math.min(MAX_POS, maxRight > 0 ? maxRight : SIDE_PAD))
+        const x = Math.max(SIDE_PAD, Math.min(getMaxPos(), maxRight > 0 ? maxRight : SIDE_PAD))
         const ok = addRefLineAt(x)
         if (!ok) throw new Error('空间不足，无法创建参考线（与相邻参考线过近）')
         await updateTimeline(getTimelineState())
