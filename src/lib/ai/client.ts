@@ -4,7 +4,7 @@ const DEEPSEEK_BASE = 'https://api.deepseek.com'
 const MODEL = 'deepseek-v4-flash'
 const TIMEOUT_MS = 240000
 const MAX_TOKENS = 65536
-// 支持浏览器直连（已配置 CORS）的 host；其余走站点代理
+// 支持浏览器直连（已配置 CORS）的 host；本地服务与白名单 host 直连，其余走站点代理
 const DIRECT_BASE_HOSTS = ['api.deepseek.com']
 
 export interface ChatMessage {
@@ -85,7 +85,10 @@ export interface StreamOptions {
 
 function needsProxy(base: string): boolean {
     try {
-        return !DIRECT_BASE_HOSTS.includes(new URL(base).host)
+        const u = new URL(base)
+        // 本地服务（Ollama/LM Studio/vLLM 等）默认开放 CORS，浏览器直连即可
+        if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return false
+        return !DIRECT_BASE_HOSTS.includes(u.host)
     } catch {
         return true
     }

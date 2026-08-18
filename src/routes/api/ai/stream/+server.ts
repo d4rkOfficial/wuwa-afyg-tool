@@ -1,8 +1,13 @@
-// AI 流式转发代理：无 CORS 的端点（opencode 等）经此同源转发，Vercel serverless 无 CPU 时长限制
+// AI 流式转发代理：无 CORS 的端点（火山方舟/Kimi/GLM/MiniMax/任意 OpenAI 兼容服务）经此同源转发。
+// 放行策略：开发环境（dev）完全放行；生产环境放行任意 https 公网地址，但拦截内网/回环/保留地址
+// （防 SSRF，见 proxy-guard.ts），重定向逐跳复查后继续转发。
 import { json } from '@sveltejs/kit'
+import { dev } from '$app/environment'
+import { assertPublicHttps, MAX_REDIRECTS } from '$lib/ai/proxy-guard'
 
-// 允许转发的上游（与设置弹窗快捷端点保持一致，可扩展）
-const ALLOWED_ORIGINS = ['https://api.deepseek.com', 'https://opencode.ai']
+const BASE_HEADERS = {
+    'Content-Type': 'application/json'
+}
 
 export async function POST({ request }: { request: Request }) {
     let input: { baseUrl?: string; apiKey?: string; body?: Record<string, unknown> }
@@ -19,49 +24,72 @@ export async function POST({ request }: { request: Request }) {
     if (!apiKey) return json({ type: 'error', message: '缺少 API Key' }, { status: 400 })
     if (!body || typeof body !== 'object') return json({ type: 'error', message: '缺少请求体' }, { status: 400 })
 
-    let allowed = false
+    let u: URL
     try {
-        const u = new URL(baseUrl)
-        allowed = ALLOWED_ORIGINS.some(
-            (o) =>
-                u.origin === o ||
-                (o === 'https://opencode.ai' && u.hostname === 'opencode.ai' && u.pathname.startsWith('/zen/'))
-        )
+        u = new URL(baseUrl)
     } catch {
-        /* 非法 URL */
-    }
-    if (!allowed) return json({ type: 'error', message: '服务地址不在允许列表' }, { status: 400 })
-
-    let upstream: Response
-    try {
-        upstream = await fetch(`${baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${apiKey}`
-            },
-            body: JSON.stringify(body)
-        })
-    } catch (e) {
-        return json(
-            { type: 'error', message: `上游请求失败：${e instanceof Error ? e.message : String(e)}` },
-            { status: 502 }
-        )
+        return json({ type: 'error', message: '服务地址不是合法 URL' }, { status: 400 })
     }
 
-    if (!upstream.ok) {
-        const text = await upstream.text()
-        return new Response(text, {
-            status: upstream.status,
-            headers: { 'Content-Type': 'application/json' }
-        })
-    }
+    const headers = { ...BASE_HEADERS, Authorization: `Bearer ${apiKey}` }
 
-    return new Response(upstream.body, {
-        status: 200,
-        headers: {
-            'Content-Type': 'text/event-stream; charset=utf-8',
-            'Cache-Control': 'no-store'
+    let current = u
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+        if (!dev) {
+            const err = await assertPublicHttps(current)
+            if (err) return json({ type: 'error', message: err }, { status: 400 })
         }
-    })
+
+        let upstream: Response
+        try {
+            // 以目录前缀拼接：baseUrl 末尾有无斜杠皆可（去掉尾斜杠避免 // 双斜杠）
+            const target = `${current.href.replace(/\/+$/, '')}/chat/completions`
+            upstream = await fetch(target, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body),
+                redirect: 'manual'
+            })
+        } catch (e) {
+            // undici 会把 DNS/TLS/连接失败包装成 "fetch failed"，底层原因在 e.cause 上
+            const err = e instanceof Error ? e : new Error(String(e))
+            const cause = err.cause instanceof Error ? err.cause : null
+            const code = cause && 'code' in cause ? ` (${(cause as { code?: unknown }).code ?? ''})` : ''
+            return json(
+                { type: 'error', message: `上游请求失败：${cause ? cause.message + code : err.message}` },
+                { status: 502 }
+            )
+        }
+
+        // 逐跳复查重定向目标，防止被引到内网
+        const location = upstream.headers.get('location')
+        if (upstream.status >= 300 && upstream.status < 400 && location) {
+            let next: URL
+            try {
+                next = new URL(location, current.href)
+            } catch {
+                return json({ type: 'error', message: '上游返回了非法重定向地址' }, { status: 502 })
+            }
+            current = next
+            continue
+        }
+
+        if (!upstream.ok) {
+            const text = await upstream.text()
+            return new Response(text, {
+                status: upstream.status,
+                headers: { 'Content-Type': 'application/json' }
+            })
+        }
+
+        return new Response(upstream.body, {
+            status: 200,
+            headers: {
+                'Content-Type': 'text/event-stream; charset=utf-8',
+                'Cache-Control': 'no-store'
+            }
+        })
+    }
+
+    return json({ type: 'error', message: '转发重定向次数过多' }, { status: 502 })
 }

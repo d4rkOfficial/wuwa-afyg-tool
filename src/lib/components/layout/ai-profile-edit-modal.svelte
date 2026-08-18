@@ -3,6 +3,7 @@
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import { updateProfile, type AiProfile } from '$lib/ai/config.svelte'
+    import { AI_PROVIDER_PRESETS, type AiProviderPreset } from '$lib/consts/ai-providers'
     import { addToast } from '$lib/data/toast.svelte'
 
     interface Props extends ComponentsProps {
@@ -34,6 +35,8 @@
     )
 
     let draft = $state<AiProfile | null>(null)
+    let providerPickerOpen = $state(false)
+    let providerPickerAnchor = $state<HTMLElement | undefined>()
 
     $effect(() => {
         if (open && profile) {
@@ -41,27 +44,44 @@
         }
     })
 
+    // 点击图标按钮以外的区域时收起提供商弹层
+    $effect(() => {
+        if (!providerPickerOpen) return
+        const onDown = (e: PointerEvent) => {
+            if (providerPickerAnchor && !providerPickerAnchor.contains(e.target as Node)) providerPickerOpen = false
+        }
+        window.addEventListener('pointerdown', onDown, true)
+        return () => window.removeEventListener('pointerdown', onDown, true)
+    })
+
     const canSave = $derived(Boolean(draft && draft.label.trim() && draft.baseUrl.trim() && draft.model.trim()))
 
-    function isDeepSeekBaseUrl(url: string): boolean {
+    /** @desc 当前填写的服务地址命中的提供商预设（按 origin 匹配），用于快捷端点高亮与 API Key 指引 */
+    const matchedPreset = $derived.by(() => {
+        if (!draft?.baseUrl) return undefined
         try {
-            return new URL(url).host === 'api.deepseek.com'
+            const origin = new URL(draft.baseUrl).origin
+            return AI_PROVIDER_PRESETS.find((p) => {
+                try {
+                    return new URL(p.baseUrl).origin === origin
+                } catch {
+                    return false
+                }
+            })
         } catch {
-            return false
+            return undefined
         }
-    }
-
-    function isOpencodeBaseUrl(url: string): boolean {
-        try {
-            return new URL(url).host === 'opencode.ai'
-        } catch {
-            return false
-        }
-    }
+    })
 
     function setDraft(patch: Partial<AiProfile>) {
         if (!draft) return
         draft = { ...draft, ...patch }
+    }
+
+    /** @desc 快捷选择主流提供商：自动填入服务地址与模型示例 */
+    function applyPreset(preset: AiProviderPreset) {
+        setDraft({ baseUrl: preset.baseUrl, model: preset.modelHint })
+        providerPickerOpen = false
     }
 
     async function handleSave() {
@@ -117,14 +137,65 @@
             </label>
             <label class="block">
                 <span class="mb-1 block text-xs text-(--theme-modal-text)/60">AI 服务地址</span>
-                <input
-                    type="url"
-                    value={draft.baseUrl}
-                    oninput={(e) => setDraft({ baseUrl: (e.currentTarget as HTMLInputElement).value })}
-                    placeholder="https://api.deepseek.com"
-                    class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
-                    style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
-                />
+                <div class="relative flex items-stretch gap-1.5" bind:this={providerPickerAnchor}>
+                    <input
+                        type="url"
+                        value={draft.baseUrl}
+                        oninput={(e) => setDraft({ baseUrl: (e.currentTarget as HTMLInputElement).value })}
+                        placeholder="https://api.deepseek.com"
+                        class="min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                        style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                    />
+                    <button
+                        type="button"
+                        title="选择主流提供商预设"
+                        onclick={() => (providerPickerOpen = !providerPickerOpen)}
+                        class={[
+                            'flex size-8 shrink-0 items-center justify-center rounded-lg border transition-colors',
+                            providerPickerOpen
+                                ? 'text-(--theme-accent-text)'
+                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                        ].join(' ')}
+                        style="background: var(--theme-input-bg); border-color: {providerPickerOpen
+                            ? 'color-mix(in srgb, var(--theme-accent-bg) 40%, transparent)'
+                            : 'var(--theme-divider-border)'};"
+                    >
+                        <Icon icon="mdi:view-grid-outline" class="size-4" />
+                    </button>
+                    {#if providerPickerOpen}
+                        <div
+                            class="animate-pop-in theme-scrollbar absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border py-1 shadow-xl"
+                            style="background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
+                        >
+                            <div class="px-2.5 py-1 text-[10px] text-(--theme-modal-text)/40">
+                                主流提供商（点击自动填入服务地址与模型示例）
+                            </div>
+                            {#each AI_PROVIDER_PRESETS as preset}
+                                <button
+                                    type="button"
+                                    onclick={() => applyPreset(preset)}
+                                    title={preset.baseUrl}
+                                    class={[
+                                        'flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors',
+                                        matchedPreset?.id === preset.id
+                                            ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
+                                            : 'text-(--theme-modal-text)/80 hover:bg-(--theme-input-bg)'
+                                    ].join(' ')}
+                                >
+                                    <span class="min-w-0 flex-1 truncate text-xs">{preset.label}</span>
+                                    <span class="max-w-[55%] truncate text-[10px] text-(--theme-modal-text)/35">
+                                        {preset.baseUrl}
+                                    </span>
+                                </button>
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
+                {#if matchedPreset?.guide}
+                    <p class="mt-1 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                        {matchedPreset.guide}
+                    </p>
+                {/if}
             </label>
             <label class="block">
                 <span class="mb-1 block text-xs text-(--theme-modal-text)/60">模型名</span>
@@ -132,7 +203,7 @@
                     type="text"
                     value={draft.model}
                     oninput={(e) => setDraft({ model: (e.currentTarget as HTMLInputElement).value })}
-                    placeholder="deepseek-v4-flash"
+                    placeholder={matchedPreset?.modelHint ?? 'deepseek-v4-flash'}
                     class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
@@ -147,27 +218,20 @@
                     class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
-                {#if isDeepSeekBaseUrl(draft.baseUrl)}
+                {#if matchedPreset}
                     <p class="mt-1 text-[10px] text-(--theme-modal-text)/40">
-                        API Key 在
-                        <a
-                            href="https://platform.deepseek.com"
-                            target="_blank"
-                            rel="noreferrer"
-                            class="text-(--theme-accent-text) hover:underline">DeepSeek 开放平台</a
-                        >
-                        获取
-                    </p>
-                {:else if isOpencodeBaseUrl(draft.baseUrl)}
-                    <p class="mt-1 text-[10px] text-(--theme-modal-text)/40">
-                        API Key 在
-                        <a
-                            href="https://opencode.ai/auth"
-                            target="_blank"
-                            rel="noreferrer"
-                            class="text-(--theme-accent-text) hover:underline">opencode Workspace</a
-                        >
-                        获取
+                        {#if matchedPreset.apiKeyHref}
+                            API Key 在
+                            <a
+                                href={matchedPreset.apiKeyHref}
+                                target="_blank"
+                                rel="noreferrer"
+                                class="text-(--theme-accent-text) hover:underline">{matchedPreset.apiKeyLabel}</a
+                            >
+                            获取
+                        {:else}
+                            {matchedPreset.apiKeyLabel}
+                        {/if}
                     </p>
                 {/if}
             </label>

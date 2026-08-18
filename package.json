@@ -27,7 +27,6 @@
         "@sveltejs/vite-plugin-svelte": "^7.1.2",
         "@tailwindcss/vite": "^4.3.0",
         "@types/node": "^26.2.0",
-        "@types/prismjs": "^1.26.6",
         "@vite-pwa/sveltekit": "^1.1.0",
         "prettier": "^3.8.3",
         "prettier-plugin-svelte": "^4.1.0",
@@ -42,13 +41,6 @@
     "dependencies": {
         "@sveltejs/adapter-cloudflare": "^7.2.9",
         "chart.js": "^4.5.1",
-        "marked": "^18.0.9",
-        "prismjs": "^1.30.0"
-    },
-    "pnpm": {
-        "onlyBuiltDependencies": [
-            "esbuild",
-            "workerd"
-        ]
+        "marked": "^18.0.9"
     }
 }

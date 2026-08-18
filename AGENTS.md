@@ -25,7 +25,7 @@
 - 所有独立组件必须暴露 `style` 和 `class` prop，支持外部定制，参考`src/lib/types/component-props.ts`
 - 尽量使用 TailwindCSS 而不是 `<style>` 样式
 - 不依赖外部 UI 库，所有控件使用原生 HTML + TailwindCSS 实现
-    - 允许的例外：`@iconify/svelte`（图标渲染）、`prismjs`（代码高亮）
+    - 允许的例外：`@iconify/svelte`（图标渲染）
 - Snippet 通过闭包访问父作用域的响应式状态（`$state`/`$derived`），避免使用带类型的 snippet 参数
 - 主题托管在 `$lib/theme`，通过 CSS 自定义属性（`--theme-{key}-{prop}`）驱动；组件中使用 `bg-[var(--theme-{key}-bg)]` / `text-[var(--theme-{key}-text)]`，不要直接 import theme store
 

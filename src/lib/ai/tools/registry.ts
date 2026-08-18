@@ -37,14 +37,23 @@ export function defineTool(
         handler: ToolHandler['handler']
     }
 ): void {
-    definitions.push({
-        type: 'function',
-        function: {
-            name,
-            description: spec.description,
-            parameters: spec.parameters ?? { type: 'object', properties: {} }
-        }
-    })
+    // 幂等注册：同名工具已存在时原地替换而非追加。模块级数组会在开发模式
+    // HMR 重跑副作用模块（或同一模块被多入口重复求值）时叠加同名定义，
+    // 部分提供商（如 xAI/Grok）会以 400「Duplicate function definition」拒绝
+    const existing = definitions.find((d) => d.function.name === name)
+    if (existing) {
+        existing.function.description = spec.description
+        existing.function.parameters = spec.parameters ?? { type: 'object', properties: {} }
+    } else {
+        definitions.push({
+            type: 'function',
+            function: {
+                name,
+                description: spec.description,
+                parameters: spec.parameters ?? { type: 'object', properties: {} }
+            }
+        })
+    }
     handlers.set(name, { dangerous: spec.dangerous, handler: spec.handler })
 }
 

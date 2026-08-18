@@ -25,22 +25,6 @@ const DEFAULT_PROFILES: AiProfile[] = [
         model: 'deepseek-v4-flash',
         apiKey: '',
         reasoningEffort: 'medium'
-    },
-    {
-        id: 'opencode-go',
-        label: 'opencode-go',
-        baseUrl: 'https://opencode.ai/zen/go/v1',
-        model: 'deepseek-v4-flash',
-        apiKey: '',
-        reasoningEffort: 'medium'
-    },
-    {
-        id: 'opencode-free',
-        label: 'opencode 免费',
-        baseUrl: 'https://opencode.ai/zen/v1',
-        model: 'deepseek-v4-flash-free',
-        apiKey: '',
-        reasoningEffort: 'medium'
     }
 ]
 
