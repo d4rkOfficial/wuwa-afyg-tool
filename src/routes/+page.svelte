@@ -99,6 +99,7 @@
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
     import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
+    import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/page/home/workshop-modal.svelte'
     import BuffLibraryModal from '$lib/components/page/home/buff-library-modal.svelte'
@@ -487,6 +488,11 @@
     function openDelete(id: string) {
         const p = projects.find((pr) => pr.id === id)
         if (!p) return
+        if (!getConfirmDeletes()) {
+            deleteId = id
+            handleDelete()
+            return
+        }
         deleteId = id
         deleteName = p.name
         deleteModal = true

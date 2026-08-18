@@ -3,6 +3,7 @@
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
+    import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import {
         getBuffEntities,
         getBuffLibraryLoading,
@@ -219,6 +220,16 @@
         confirmDelete = null
     }
 
+    /** @desc 请求删除：关闭二次确认时直接删除，否则弹出确认 */
+    function requestDelete(entity: BuffLibraryEntity) {
+        if (!getConfirmDeletes()) {
+            confirmDelete = entity
+            void handleDelete()
+            return
+        }
+        confirmDelete = entity
+    }
+
     function handleClear() {
         clearBuffLibrary()
         addToast('已清空本地 buff 预设', 'success')
@@ -258,7 +269,13 @@
                 </button>
                 {#if entities.length > 0}
                     <button
-                        onclick={() => (showClearConfirm = true)}
+                        onclick={() => {
+                            if (getConfirmDeletes()) {
+                                showClearConfirm = true
+                            } else {
+                                void handleClear()
+                            }
+                        }}
                         class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
                     >
                         <Icon icon="mdi:delete-sweep-outline" class="size-3.5" />
@@ -442,7 +459,7 @@
                                     onclick={(e) => {
                                         e.stopPropagation()
                                         const existing = entityKeyMap.get(`${row.entityType}/${row.entityName}`)
-                                        if (existing) confirmDelete = existing
+                                        if (existing) requestDelete(existing)
                                     }}
                                     class="shrink-0 rounded p-1 text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
                                     title="删除"

@@ -35,6 +35,7 @@
     import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
+    import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import Icon from '@iconify/svelte'
     import QuickLookup from './quick-lookup.svelte'
     import BuffImportModal from '../buff-import-modal.svelte'
@@ -632,7 +633,11 @@
                 if (folder?.children && folder.children.length > 0) {
                     deleteFolderPrefix = dragState!.id
                     deleteFolderCount = folder.children.length
-                    showDeleteFolderConfirm = true
+                    if (getConfirmDeletes()) {
+                        showDeleteFolderConfirm = true
+                    } else {
+                        confirmDeleteFolder()
+                    }
                 }
                 if (savedCollapsedState !== null) {
                     collapsedFolders = savedCollapsedState
@@ -821,7 +826,7 @@
             items.push({
                 label: `删除${count > 0 ? `（${count} 项）` : ''}`,
                 icon: 'mdi:delete-outline',
-                action: () => (showMultiDeleteConfirm = true)
+                action: () => requestMultiDelete()
             })
             return items
         }
@@ -1009,6 +1014,16 @@
         multiSelectedIds = new Set()
         showMultiDeleteConfirm = false
         if (selectedBuffSetId && ids.includes(selectedBuffSetId)) selectedBuffSetId = null
+    }
+
+    /** @desc 请求多选批量删除：关闭二次确认时直接删除，否则弹出确认 */
+    function requestMultiDelete() {
+        if (multiSelectedIds.size === 0) return
+        if (getConfirmDeletes()) {
+            showMultiDeleteConfirm = true
+        } else {
+            confirmMultiDelete()
+        }
     }
 
     /** @desc 多选批量并入全局 */
@@ -1650,7 +1665,7 @@
                                     </button>
                                     <button
                                         type="button"
-                                        onclick={() => (showMultiDeleteConfirm = true)}
+                                        onclick={() => requestMultiDelete()}
                                         class="ml-auto flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 transition-colors hover:bg-red-500/10"
                                         title="删除"
                                     >

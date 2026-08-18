@@ -50,6 +50,7 @@
         setMagneticPointer
     } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
+    import { getConfirmDeletes, setConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
         applyLockedMods,
@@ -172,6 +173,7 @@
 
     function handleDeleteAiProfile(profile: AiProfile) {
         aiDeleteConfirm = profile
+        if (!getConfirmDeletes()) void doDeleteAiProfile()
     }
 
     async function doDeleteAiProfile() {
@@ -412,6 +414,7 @@
         const p = archivedProjects.find((pr) => pr.id === id)
         if (!p) return
         confirmDelete = { id, name: p.name }
+        if (!getConfirmDeletes()) void doArchiveDelete()
     }
 
     function closeArchiveDelete() {
@@ -1176,6 +1179,39 @@
                                         <span
                                             class="absolute top-0.5 size-4 rounded-full transition-all"
                                             style="left: {getMagneticPointer()
+                                                ? '18px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mt-5">
+                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">删除行为</span
+                                >
+                                <div
+                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >删除前二次确认</span
+                                        >
+                                        <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                            关闭后删除工程、Buff、排轴等对象时跳过二次确认弹窗，直接删除；默认开启
+                                        </span>
+                                    </div>
+                                    <button
+                                        onclick={() => setConfirmDeletes(!getConfirmDeletes())}
+                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                        style="background: {getConfirmDeletes()
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 size-4 rounded-full transition-all"
+                                            style="left: {getConfirmDeletes()
                                                 ? '18px'
                                                 : '2px'}; background: var(--theme-modal-bg);"
                                         ></span>

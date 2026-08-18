@@ -43,6 +43,7 @@
         getBlockKeyPickerId,
         setBlockKeyPickerId
     } from './timeline.store.svelte'
+    import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
     import { ORIGINAL_BUTTON_KEYS, GAMEPAD_BUTTONS } from './timeline.consts'
     import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
@@ -338,7 +339,13 @@
             {@render shortcut('Ctrl+C')}
         </button>
         <button
-            onclick={() => (confirmMultiAction = 'delete')}
+            onclick={() => {
+                if (getConfirmDeletes()) {
+                    confirmMultiAction = 'delete'
+                } else {
+                    removeSelection()
+                }
+            }}
             class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:delete" class="size-4 shrink-0" />
