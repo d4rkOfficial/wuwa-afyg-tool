@@ -37,8 +37,80 @@ function cacheKey(cat: string, entity: string, name?: string): string {
     return `${PREFIX}${providerScope()}${cat}:${entity}${name ? ':' + name : ''}`
 }
 
-function getLocal<T>(k: string, ttl: number): T | null {
+// ── IndexedDB 持久缓存：结构化克隆（免大 JSON 反复 stringify/parse），localStorage 仅作回退/迁移 ──
+const IDB_NAME = 'wuwa-afyg-cache'
+const IDB_STORE = 'kv'
+let _idbPromise: Promise<IDBDatabase> | null = null
+
+function openIDB(): Promise<IDBDatabase> {
+    if (_idbPromise) return _idbPromise
+    _idbPromise = new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('IndexedDB unavailable'))
+            return
+        }
+        const req = indexedDB.open(IDB_NAME, 1)
+        req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE)
+        req.onsuccess = () => resolve(req.result)
+        req.onerror = () => reject(req.error ?? new Error('IndexedDB open failed'))
+    })
+    _idbPromise.catch(() => {
+        _idbPromise = null
+    })
+    return _idbPromise
+}
+
+function idbRun<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+    return openIDB().then(
+        (db) =>
+            new Promise<T>((resolve, reject) => {
+                const tx = db.transaction(IDB_STORE, mode)
+                const req = fn(tx.objectStore(IDB_STORE))
+                req.onsuccess = () => resolve(req.result)
+                req.onerror = () => reject(req.error)
+            })
+    )
+}
+
+async function idbGet<T>(k: string): Promise<{ data: T; ts: number } | null> {
+    try {
+        return (await idbRun<{ data: T; ts: number } | undefined>('readonly', (s) => s.get(k))) ?? null
+    } catch {
+        return null
+    }
+}
+
+async function idbSet(k: string, entry: { data: unknown; ts: number }): Promise<void> {
+    await idbRun('readwrite', (s) => s.put(entry, k))
+}
+
+async function idbDelete(k: string): Promise<void> {
+    try {
+        await idbRun('readwrite', (s) => s.delete(k))
+    } catch {}
+}
+
+async function idbKeys(): Promise<string[]> {
+    try {
+        return (await idbRun<IDBValidKey[]>('readonly', (s) => s.getAllKeys())).filter(
+            (k): k is string => typeof k === 'string'
+        )
+    } catch {
+        return []
+    }
+}
+
+/** @desc 读持久缓存：IndexedDB 优先（结构化克隆，免 JSON.parse），localStorage 兜底并迁移到 IDB */
+async function getLocal<T>(k: string, ttl: number): Promise<T | null> {
     if (!browser) return null
+    const hit = await idbGet<T>(k)
+    if (hit) {
+        if (Date.now() - hit.ts > ttl) {
+            void idbDelete(k)
+            return null
+        }
+        return hit.data
+    }
     try {
         const raw = localStorage.getItem(k)
         if (!raw) return null
@@ -47,24 +119,34 @@ function getLocal<T>(k: string, ttl: number): T | null {
             localStorage.removeItem(k)
             return null
         }
+        // 迁移到 IDB 后移除 localStorage 旧条目（避免后续重复 parse 与计数重复）
+        idbSet(k, entry)
+            .then(() => {
+                try {
+                    localStorage.removeItem(k)
+                } catch {}
+            })
+            .catch(() => {})
         return entry.data as T
     } catch {
         return null
     }
 }
 
+/** @desc 写持久缓存：IDB 优先；IDB 不可用时回退 localStorage */
 function setLocal(k: string, data: unknown): void {
     if (!browser) return
-    try {
-        localStorage.setItem(k, JSON.stringify({ data, ts: Date.now() }))
-    } catch {
-        /* silently ignore quota errors; list/info data is small */
-    }
+    const entry = { data, ts: Date.now() }
+    idbSet(k, entry).catch(() => {
+        try {
+            localStorage.setItem(k, JSON.stringify(entry))
+        } catch {}
+    })
 }
 
 async function fetchJSON<T>(url: string, cacheK: string, ttl: number): Promise<T> {
     if (memoryCache.has(cacheK)) return memoryCache.get(cacheK) as T
-    const cached = getLocal<T>(cacheK, ttl)
+    const cached = await getLocal<T>(cacheK, ttl)
     if (cached) {
         memoryCache.set(cacheK, cached)
         return cached
@@ -91,7 +173,7 @@ async function fetchJSON<T>(url: string, cacheK: string, ttl: number): Promise<T
 async function fetchBatchIcons(entity: string): Promise<Record<string, string>> {
     const k = cacheKey('batch-icons', entity)
     if (memoryCache.has(k)) return memoryCache.get(k) as Record<string, string>
-    const cached = getLocal<Record<string, string>>(k, ICON_TTL)
+    const cached = await getLocal<Record<string, string>>(k, ICON_TTL)
     if (cached) {
         memoryCache.set(k, cached)
         return cached
@@ -296,15 +378,7 @@ export function getEchoSetInfo(name: string): Promise<EchoSetInfo> {
 
 export function clearCache(category?: string, entity?: string): void {
     if (!browser) return
-    if (!category) {
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-            const k = localStorage.key(i)
-            if (k?.startsWith(PREFIX)) localStorage.removeItem(k)
-        }
-        memoryCache.clear()
-        return
-    }
-    const prefix = cacheKey(category, entity ?? '')
+    const prefix = category ? cacheKey(category, entity ?? '') : PREFIX
     for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i)
         if (k?.startsWith(prefix)) localStorage.removeItem(k)
@@ -312,12 +386,20 @@ export function clearCache(category?: string, entity?: string): void {
     for (const k of memoryCache.keys()) {
         if (k.startsWith(prefix)) memoryCache.delete(k)
     }
+    // 同步清内存/localStorage 后异步清 IDB（调用方无需等待，稍后收敛）
+    void idbKeys().then((keys) => {
+        for (const k of keys) {
+            if (k.startsWith(prefix)) void idbDelete(k)
+        }
+    })
 }
 
 export type CacheCategory = 'list' | 'info' | 'image'
 
 /** 分类清理接口数据缓存（仅清理 wuwa-afyg:v2: 命名空间，不影响用户工程/预设） */
 export async function clearCacheCategory(kind: CacheCategory): Promise<void> {
+    const lsPrefix =
+        kind === 'list' ? cacheKey('list', '') : kind === 'info' ? cacheKey('info', '') : cacheKey('batch-icons', '')
     if (kind === 'list') {
         clearCache('list')
     } else if (kind === 'info') {
@@ -328,16 +410,22 @@ export async function clearCacheCategory(kind: CacheCategory): Promise<void> {
             await caches.delete(DATA_CDN_CACHE_NAME).catch(() => {})
         }
     }
+    // 等待 IDB 侧清理完成（settings 面板随后刷新计数）
+    const keys = await idbKeys()
+    for (const k of keys) {
+        if (k.startsWith(lsPrefix)) await idbDelete(k)
+    }
 }
 
-/** 统计某类缓存的 localStorage 条目数 */
-export function countCacheCategory(kind: CacheCategory): number {
+/** 统计某类缓存的 IDB + localStorage 条目数 */
+export async function countCacheCategory(kind: CacheCategory): Promise<number> {
     if (!browser) return 0
     const prefix =
         kind === 'list' ? cacheKey('list', '') : kind === 'info' ? cacheKey('info', '') : cacheKey('batch-icons', '')
-    let count = 0
+    const idbCount = (await idbKeys()).filter((k) => k.startsWith(prefix)).length
+    let lsCount = 0
     for (let i = 0; i < localStorage.length; i++) {
-        if (localStorage.key(i)?.startsWith(prefix)) count++
+        if (localStorage.key(i)?.startsWith(prefix)) lsCount++
     }
-    return count
+    return idbCount + lsCount
 }

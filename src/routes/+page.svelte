@@ -663,20 +663,45 @@
         addToast(`${PHASE_LABELS[phase]} 已锁定`, 'success')
     }
 
-    // 刷新结果（开启重载数据时先重解锁全部环节再按原锁定状态重锁）：逐阶段重挂载后刷新结果页
+    // 上次刷新时的工程数据指纹：数据未变时跳过逐阶段重挂（init 幂等短路，重挂只是重渲染+重测量）
+    let _lastRefreshFp = ''
+
+    function projectDataFingerprint(): string {
+        const p = getActiveProject()
+        if (!p) return 'null'
+        const tl = p.phases.timeline.data as TimelineData | null
+        const tlFp = tl
+            ? `${tl.refLines.length}:${tl.opBlocks.length}:${tl.damageBlocks.length}:${tl.damageBlocks[0]?.id ?? ''}:${
+                  tl.damageBlocks[tl.damageBlocks.length - 1]?.id ?? ''
+              }`
+            : 'null'
+        return JSON.stringify([
+            p.team,
+            tlFp,
+            JSON.stringify(p.phases.calculation.data ?? null),
+            JSON.stringify(p.phases.config.data ?? null)
+        ])
+    }
+
+    // 刷新结果（开启重载数据时先重解锁全部环节再按原锁定状态重锁）：数据有变才逐阶段重挂载，随后刷新结果页
     async function handleRefreshResult() {
         if (getReloadOnResultRefresh()) {
             await handleReloadAllPhases()
         }
+        const fp = projectDataFingerprint()
+        const dataUnchanged = fp === _lastRefreshFp
+        _lastRefreshFp = fp
         showResult = false
-        activePhase = 'team'
-        await tick()
-        activePhase = 'timeline'
-        await tick()
-        activePhase = 'calculation'
-        await tick()
-        activePhase = 'config'
-        await tick()
+        if (!dataUnchanged) {
+            activePhase = 'team'
+            await tick()
+            activePhase = 'timeline'
+            await tick()
+            activePhase = 'calculation'
+            await tick()
+            activePhase = 'config'
+            await tick()
+        }
         showResult = true
         resultRefreshKey++
     }

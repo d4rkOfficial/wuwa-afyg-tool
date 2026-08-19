@@ -33,7 +33,7 @@
         vx,
         damageBlockLeft,
         getDamageBlocksStacked,
-        setDamageWidth,
+        setDamageWidths,
         getSegments,
         elementColor,
         estimateDamageHeight,
@@ -46,7 +46,7 @@
         confirmEdit,
         confirmBlockDesc,
         handleBlockDblclick,
-        setBlockWidth,
+        setBlockWidths,
         setContextMenu,
         setTrackMenu,
         setBlockMenu,
@@ -282,9 +282,32 @@
         }
     }
 
+    // 块宽测量批量提交：首帧 N 个块各自 setBlockWidth/setDamageWidth 会触发 N 次整表重排
+    // （damageStack $derived 随每次写重算）；先入 pending，微任务统一写一次 store
+    let pendingBlockWidths = new Map<string, number>()
+    let pendingDamageWidths = new Map<string, number>()
+    let widthFlushScheduled = false
+
+    function scheduleWidthFlush() {
+        if (widthFlushScheduled) return
+        widthFlushScheduled = true
+        queueMicrotask(() => {
+            widthFlushScheduled = false
+            if (pendingBlockWidths.size > 0) {
+                setBlockWidths(Object.fromEntries(pendingBlockWidths))
+                pendingBlockWidths.clear()
+            }
+            if (pendingDamageWidths.size > 0) {
+                setDamageWidths(Object.fromEntries(pendingDamageWidths))
+                pendingDamageWidths.clear()
+            }
+        })
+    }
+
     function measureWidth(node: HTMLElement, blockId: string) {
         const set = () => {
-            setBlockWidth(blockId, node.offsetWidth)
+            pendingBlockWidths.set(blockId, node.offsetWidth)
+            scheduleWidthFlush()
         }
         set()
         const ro = new ResizeObserver(set)
@@ -292,7 +315,10 @@
     }
 
     function measureDamageWidth(node: HTMLElement, blockId: string) {
-        const set = () => setDamageWidth(blockId, node.offsetWidth)
+        const set = () => {
+            pendingDamageWidths.set(blockId, node.offsetWidth)
+            scheduleWidthFlush()
+        }
         set()
         const ro = new ResizeObserver(set)
         return { destroy: () => ro.disconnect() }
@@ -624,6 +650,7 @@
                                             src={getCharIconMap()[name]}
                                             alt={name}
                                             draggable="false"
+                                            decoding="async"
                                             use:fallbackIcon={'/icons/placeholder-character.svg'}
                                             class="h-full w-full object-cover"
                                         />
@@ -710,6 +737,7 @@
                                                     src={blockIcon}
                                                     alt={effKey}
                                                     draggable="false"
+                                                    decoding="async"
                                                     class="size-10 object-contain shrink-0"
                                                 />
                                             {:else}

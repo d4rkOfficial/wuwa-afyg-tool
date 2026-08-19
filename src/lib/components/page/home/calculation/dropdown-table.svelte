@@ -452,7 +452,8 @@
                         expandedEntryId === damageEntry.id ? '' : 'hover:bg-(--theme-modal-text)/5',
                         expandedEntryId !== null && expandedEntryId !== damageEntry.id ? 'opacity-40' : ''
                     ].join(' ')}
-                    style={'border-color: var(--theme-divider-border);' +
+                    style={'content-visibility: auto; contain-intrinsic-size: 30px;' +
+                        'border-color: var(--theme-divider-border);' +
                         (expandedEntryId === damageEntry.id
                             ? 'background: color-mix(in srgb, var(--theme-accent-bg) 10%, transparent);'
                             : '')}

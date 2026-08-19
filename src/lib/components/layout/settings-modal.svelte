@@ -187,7 +187,7 @@
     $effect(() => {
         if (open) {
             bgUrl = overrides.backgroundImage.startsWith('http') ? overrides.backgroundImage : ''
-            refreshCacheCounts()
+            void refreshCacheCounts()
             loadAiConfig()
             loadGenPrefs()
         }
@@ -474,11 +474,11 @@
     // ── Cache management ──
     let cacheCounts = $state({ list: 0, info: 0, image: 0 })
 
-    function refreshCacheCounts() {
+    async function refreshCacheCounts() {
         cacheCounts = {
-            list: countCacheCategory('list'),
-            info: countCacheCategory('info'),
-            image: countCacheCategory('image')
+            list: await countCacheCategory('list'),
+            info: await countCacheCategory('info'),
+            image: await countCacheCategory('image')
         }
     }
 
@@ -490,7 +490,7 @@
 
     async function handleClearCache(kind: CacheCategory) {
         await clearCacheCategory(kind)
-        refreshCacheCounts()
+        await refreshCacheCounts()
         addToast(`已清理${CACHE_LABELS.find((c) => c.key === kind)?.label ?? ''}`, 'success')
     }
 </script>

@@ -916,6 +916,11 @@ export function setDamageWidth(id: string, width: number) {
     _damageWidths[id] = width
 }
 
+/** @desc 批量写入伤害块宽度（挂载首帧一次提交，避免逐块触发整表重排） */
+export function setDamageWidths(map: Record<string, number>) {
+    _damageWidths = { ..._damageWidths, ...map }
+}
+
 // 估算宽度缓存：排布内层会对同一块反复调用，按 id 缓存避免重复计算
 const _estWidthCache = new Map<string, number>()
 
@@ -975,31 +980,32 @@ export function getDamageBlocksStacked(): { block: DamageBlock; top: number; lef
 
     const GAP = 4
     const result: { block: DamageBlock; top: number; left: number }[] = []
+    // 活跃已排列表（按盒右缘升序）：右缘 ≤ 当前块左缘的项永久移出，
+    // 使「水平重叠 + 纵向避让」的内层循环从全量 O(N) 收敛到活跃集（平均常数级）
+    const placed: { boxLeft: number; boxRight: number; top: number; height: number }[] = []
     for (const item of blocks) {
         const hB = estimateDamageHeight(item.block)
         const wB = _damageWidths[item.block.id] ?? estimateDamageWidth(item.block)
+        const left = item.left
+        const boxL = left - wB / 2
+        const boxR = left + wB / 2
+        while (placed.length > 0 && placed[0].boxRight <= boxL) placed.shift()
+        const overlaps = (p: { boxLeft: number; boxRight: number }) => p.boxLeft < boxR && boxL < p.boxRight
 
         const candidateSet = new Set<number>()
         candidateSet.add(0)
-        for (const placed of result) {
-            const wA = _damageWidths[placed.block.id] ?? estimateDamageWidth(placed.block)
-            if (Math.abs(placed.left - item.left) < (wA + wB) / 2) {
-                candidateSet.add(placed.top + estimateDamageHeight(placed.block) + GAP)
-            }
+        for (const p of placed) {
+            if (overlaps(p)) candidateSet.add(p.top + p.height + GAP)
         }
 
         const candidates = [...candidateSet].sort((a, b) => a - b)
         let top = candidates[candidates.length - 1]
         for (const y of candidates) {
             let valid = true
-            for (const placed of result) {
-                const wA = _damageWidths[placed.block.id] ?? estimateDamageWidth(placed.block)
-                if (Math.abs(placed.left - item.left) < (wA + wB) / 2) {
-                    const hA = estimateDamageHeight(placed.block)
-                    if (y < placed.top + hA + GAP && placed.top < y + hB + GAP) {
-                        valid = false
-                        break
-                    }
+            for (const p of placed) {
+                if (overlaps(p) && y < p.top + p.height + GAP && p.top < y + hB + GAP) {
+                    valid = false
+                    break
                 }
             }
             if (valid) {
@@ -1009,6 +1015,8 @@ export function getDamageBlocksStacked(): { block: DamageBlock; top: number; lef
         }
 
         result.push({ block: item.block, top, left: item.left })
+        placed.push({ boxLeft: boxL, boxRight: boxR, top, height: hB })
+        placed.sort((a, b) => a.boxRight - b.boxRight)
     }
     return result
 }

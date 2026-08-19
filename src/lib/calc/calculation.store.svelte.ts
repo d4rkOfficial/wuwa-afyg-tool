@@ -4,8 +4,8 @@ import type { TimelineData } from './timeline.types'
 import type { CharSlot } from '$lib/types/project'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { NON_DIRECT_ELEMENT } from './timeline.consts'
-import { getSkillCache, getCharElementMap } from './timeline.store.svelte'
-import { getCharacterInfo } from '$lib/api/data-cache'
+import { getSkillCache } from './timeline.store.svelte'
+import { getCharElementMap, ensureCharElements } from '$lib/data/char-elements.svelte'
 import { addToast } from '$lib/data/toast.svelte'
 import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
 import type { ConditionProfile } from './compute'
@@ -29,11 +29,9 @@ function assertUnlocked(): boolean {
     }
     return true
 }
-let _calcElementMap = $state<Record<string, string>>({})
 let _initTeam: [CharSlot, CharSlot, CharSlot] | null = null
 let _initTimelineData: TimelineData | null = null
 let _globalBuffSetIds = $state<string[]>([])
-let _fetchPromise: Promise<void> | null = null
 let _onupdate: ((state: CalcState) => void) | undefined = $state()
 
 /** @desc 初始化/重建整个 store：写入队伍与时间线、加载保存态（过滤[配置]自动块）、重建伤害条目、同步全局 buff；返回前清理孤儿绑定 */
@@ -76,35 +74,29 @@ export function init(
     _initTeam = team
     _initTimelineData = timelineData
 
-    const cached = getCharElementMap()
     const names = team.map((s) => s.character).filter(Boolean) as string[]
-    const needsFetch = names.some((n) => !cached[n])
-    if (!needsFetch && Object.keys(cached).length > 0) {
-        _calcElementMap = cached
-    } else {
-        _calcElementMap = { ...cached }
-        queueElementFetch(names)
-    }
-
     _entries = buildDamageEntries(team, timelineData)
+    if (names.length > 0) {
+        // 元素图异步就绪后重建一次条目（补齐 damageElement）；与排轴页共用共享元素图，
+        // 由 data/char-elements 去重在途请求，避免重复抓取与条目二次构建竞态
+        void ensureCharElements(names).then(() => {
+            if (_initTeam && _initTimelineData) _entries = buildDamageEntries(_initTeam, _initTimelineData)
+        })
+    }
     if (savedState) {
         const autoIds = (savedState.buffSets ?? []).filter((bs) => bs.name.startsWith('[配置]')).map((bs) => bs.id)
-        _buffSets = JSON.parse(
-            JSON.stringify((savedState.buffSets ?? []).filter((bs) => !bs.name.startsWith('[配置]')))
-        )
-        _damageEntryBuffSetIds = JSON.parse(JSON.stringify(savedState.damageEntryBuffSetIds ?? {}))
+        // 一次深拷贝导出三个子集，避免对保存态反复 JSON 序列化
+        const saved = JSON.parse(JSON.stringify(savedState)) as CalcState
+        _buffSets = (saved.buffSets ?? []).filter((bs) => !bs.name.startsWith('[配置]'))
+        _damageEntryBuffSetIds = saved.damageEntryBuffSetIds ?? {}
         for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
             _damageEntryBuffSetIds[entryId] = setIds.filter((sid) => !autoIds.includes(sid))
         }
-        _damageEntryDamageTypes = JSON.parse(
-            JSON.stringify(
-                Object.fromEntries(
-                    Object.entries(savedState.damageEntryDamageTypes ?? {}).map(([id, types]) => [
-                        id,
-                        types.map((t) => (t === '视为效应伤害' ? '效应伤害' : t))
-                    ])
-                )
-            )
+        _damageEntryDamageTypes = Object.fromEntries(
+            Object.entries(saved.damageEntryDamageTypes ?? {}).map(([id, types]) => [
+                id,
+                types.map((t) => (t === '视为效应伤害' ? '效应伤害' : t))
+            ])
         )
     } else {
         _buffSets = []
@@ -136,25 +128,6 @@ function pruneOrphanedBindings(): boolean {
     if (buff) _damageEntryBuffSetIds = buff
     if (types) _damageEntryDamageTypes = types
     return changed
-}
-
-/** @desc 批量拉取角色元素信息（用于伤害条目补全元素），完成后重建伤害条目（元素决定伤害属性/图标颜色） */
-async function queueElementFetch(names: string[]) {
-    if (_fetchPromise) return _fetchPromise
-    _fetchPromise = (async () => {
-        const map: Record<string, string> = {}
-        const results = await Promise.allSettled(names.map((n) => getCharacterInfo(n)))
-        for (let i = 0; i < names.length; i++) {
-            const r = results[i]
-            if (r.status === 'fulfilled') map[names[i]] = r.value.element
-        }
-        _calcElementMap = map
-        if (_initTeam && _initTimelineData) {
-            _entries = buildDamageEntries(_initTeam, _initTimelineData)
-        }
-    })()
-    await _fetchPromise
-    _fetchPromise = null
 }
 
 /** @desc 从时间线数据构建全部伤害条目：遍历 damageBlocks 中的 skillHits（解析倍率成分→按基础类型分组，含固定值条目）与非直伤条目（响应/处决/效应：查技能缓存取倍率、按元素归类、效应层数映射） */
@@ -219,7 +192,7 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         ratioValue: ratioSum * (hit.hits ?? 1),
                         ratioUnit: '%',
                         damageBaseType: baseType,
-                        damageElement: hit.element || _calcElementMap[hit.character] || '',
+                        damageElement: hit.element || getCharElementMap()[hit.character] || '',
                         sourceTimelineBlockId: db.sourceId,
                         hits: hit.hits ?? 1
                     },
@@ -243,7 +216,7 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         ratioValue: flatTotal * (hit.hits ?? 1),
                         ratioUnit: 'fixed',
                         damageBaseType: '固定',
-                        damageElement: hit.element || _calcElementMap[hit.character] || '',
+                        damageElement: hit.element || getCharElementMap()[hit.character] || '',
                         sourceTimelineBlockId: db.sourceId,
                         hits: hit.hits ?? 1
                     },
@@ -842,7 +815,7 @@ export function reorderNonGlobalBuffSets(orderedIds: string[]) {
 /** @desc ── 持久化 ── */
 
 export function getCalcElementMap() {
-    return _calcElementMap
+    return getCharElementMap()
 }
 
 export function getGlobalBuffSetIds(): string[] {
