@@ -75,8 +75,9 @@ export function init(
     _initTimelineData = timelineData
 
     const names = team.map((s) => s.character).filter(Boolean) as string[]
+    const haveAllElements = names.every((n) => getCharElementMap()[n])
     _entries = buildDamageEntries(team, timelineData)
-    if (names.length > 0) {
+    if (names.length > 0 && !haveAllElements) {
         // 元素图异步就绪后重建一次条目（补齐 damageElement）；与排轴页共用共享元素图，
         // 由 data/char-elements 去重在途请求，避免重复抓取与条目二次构建竞态
         void ensureCharElements(names).then(() => {
