@@ -1078,6 +1078,16 @@
                             </div>
                             <div class="mt-3 flex items-center gap-2">
                                 <button
+                                    onclick={() => (tab = 'interaction')}
+                                    class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-accent-text) transition-colors hover:brightness-125"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);"
+                                    title="跳转到「交互相关」页配置快速排轴输入键与界面快捷键"
+                                >
+                                    <Icon icon="mdi:tune-variant" class="size-3.5" />
+                                    界面快捷键设置
+                                    <Icon icon="mdi:arrow-right" class="size-3" />
+                                </button>
+                                <button
                                     onclick={() => resetKeyMap()}
                                     class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                                     style="border-color: var(--theme-divider-border);"
