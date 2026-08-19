@@ -140,7 +140,7 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
         content: '';
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, var(--theme-bg-mask-opacity, 0));
+        background: var(--theme-bg-mask, transparent);
         pointer-events: none;
         z-index: -1;
     }
@@ -193,5 +193,12 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
     .w-icon {
         filter: var(--theme-w-icon-filter, none);
         transition: filter 0.2s;
+    }
+    /* 霓虹灯字体：所有文本与图标以 currentColor 发光 */
+    .neon-text * {
+        text-shadow: 0 0 var(--theme-neon-glow, 6px) currentColor !important;
+    }
+    .neon-text svg {
+        filter: drop-shadow(0 0 var(--theme-neon-glow, 6px) currentColor) !important;
     }
 }

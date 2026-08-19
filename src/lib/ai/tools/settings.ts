@@ -130,7 +130,7 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
     theme_bg_image_mask: {
         label: '背景图遮罩',
         apply: async (v) => {
-            const n = clampNum(v, 'theme_bg_image_mask', 0, 100)
+            const n = clampNum(v, 'theme_bg_image_mask', -100, 100)
             await updateOverride('bgImageMask', n)
             return n
         }
@@ -250,7 +250,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(0-100)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。',
     parameters: {
         type: 'object',
         properties: {

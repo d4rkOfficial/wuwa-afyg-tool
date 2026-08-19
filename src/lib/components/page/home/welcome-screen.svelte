@@ -1,110 +1,39 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
-    import { getWWVersion } from '$lib/api/client-version'
-    import { getEggMode, setEggMode } from '$lib/data/egg-prefs.svelte'
-    import { addToast } from '$lib/data/toast.svelte'
-    import favicon from '$lib/assets/favicon.svg'
-    import type { ToyProfile } from '$lib/bilibili-toy/profile.svelte'
+    import { getActiveId, getOverrides } from '$lib/theme/theme.svelte'
 
     interface Props extends ComponentsProps {
-        profile: ToyProfile | null
-        onCreate: () => void
         onWorkshopFrame: () => void
         onBuffLibrary: () => void
         onSettings: () => void
     }
-    let {
-        profile,
-        onCreate,
-        onWorkshopFrame,
-        onBuffLibrary,
-        onSettings,
-        class: className,
-        style: styleProp
-    }: Props = $props()
+    let { onWorkshopFrame, onBuffLibrary, onSettings, class: className, style: styleProp }: Props = $props()
 
-    // ── 彩蛋：短时间内连续点击版本号 badge 5 次 → 切换萌萌人工具箱 ──
-    const EGG_CLICK_WINDOW_MS = 2000
-    const EGG_CLICK_COUNT = 5
-    let eggClicks: number[] = []
-    function handleEggBadgeClick() {
-        const now = Date.now()
-        eggClicks = eggClicks.filter((t) => now - t <= EGG_CLICK_WINDOW_MS)
-        eggClicks.push(now)
-        if (eggClicks.length >= EGG_CLICK_COUNT) {
-            eggClicks = []
-            setEggMode(true)
-            addToast('彩蛋已解锁：萌萌人工具箱！', 'success')
-        }
-    }
+    const isDark = $derived(getActiveId() !== 'light')
+    const isMono = $derived(getOverrides().accentHue === 'mono')
 </script>
 
 <div class="flex flex-1 flex-col items-center justify-center gap-8 px-8 {className}" style={styleProp}>
     <div class="flex flex-col items-center text-center">
-        <div class="relative mb-4">
-            <div class="absolute inset-0 rounded-full bg-(--theme-accent-bg)/25 blur-2xl" aria-hidden="true"></div>
-            <img
-                src={getEggMode() ? '/icons/egg/yaya.png' : favicon}
-                alt={getEggMode() ? '萌萌人工具箱' : '椰果工具箱'}
-                class="relative size-20 rounded-2xl object-contain drop-shadow-[0_0_10px_var(--theme-halo-color)]"
-            />
-        </div>
         <h2
-            class="mb-2 text-3xl font-bold tracking-tight text-(--theme-card-text) [text-shadow:_0_0_8px_var(--theme-halo-color)]"
+            class="mb-2 text-5xl font-extrabold tracking-tight"
+            style="color: {isMono ? 'var(--theme-accent-text)' : 'var(--theme-card-text)'}; -webkit-text-stroke: {isDark
+                ? '2px #000'
+                : '2px #fff'}; paint-order: stroke fill;"
         >
-            {getEggMode() ? '萌萌人工具箱' : '椰果工具箱'}
+            鸣潮社区公益工具
         </h2>
-        <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-            {#if profile}
-                <span
-                    class="flex items-center gap-1.5 text-sm text-(--theme-card-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
-                >
-                    <img
-                        src={profile.avatar}
-                        alt={profile.nickname}
-                        class="size-5 rounded-full object-cover"
-                        referrerpolicy="no-referrer"
-                    />
-                    你好，{profile.nickname}
-                </span>
-            {:else}
-                <span class="text-sm text-(--theme-card-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]">
-                    鸣潮社区公益工具
-                </span>
-            {/if}
-            <button
-                type="button"
-                class="cursor-pointer rounded-md px-1.5 py-0.5 text-[11px] font-medium text-(--theme-accent-text)"
-                style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);"
-                title="数据版本"
-                onclick={handleEggBadgeClick}
-            >
-                数据版本 {getWWVersion()}
-            </button>
-        </div>
-    </div>
-    <div class="grid w-full max-w-5xl grid-cols-4 gap-4">
-        <button
-            onclick={onCreate}
-            class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
-            style="animation-delay: 0ms"
+        <p
+            class="text-3xl font-extrabold tracking-tight"
+            style="color: var(--theme-accent-text); -webkit-text-stroke: {isDark
+                ? '2px #000'
+                : '2px #fff'}; paint-order: stroke fill;"
         >
-            <Icon
-                icon="mdi:plus"
-                class="icon-pop size-9 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
-                style="animation-delay: 90ms"
-            />
-            <div class="flex flex-col gap-1">
-                <span
-                    class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
-                    >创建工程</span
-                >
-                <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
-                    >从空白开始，配置配队、排轴与伤害计算</span
-                >
-            </div>
-        </button>
+            让排轴、拉表、配装对比、伤害计算更简单！
+        </p>
+    </div>
+    <div class="grid w-full max-w-5xl grid-cols-3 gap-4">
         <button
             onclick={onWorkshopFrame}
             class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
@@ -118,10 +47,10 @@
             <div class="flex flex-col gap-1">
                 <span
                     class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
-                    >椰果工坊</span
+                    >工坊</span
                 >
                 <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
-                    >前往社区站点浏览、分享与下载工程</span
+                    >前往工坊，分享你的轴表工程</span
                 >
             </div>
         </button>
@@ -141,7 +70,7 @@
                     >Buff 集</span
                 >
                 <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
-                    >管理本地增益，拉表时一键导入</span
+                    >配置 Buff 集，拉表时一键导入</span
                 >
             </div>
         </button>
@@ -161,7 +90,7 @@
                     >设置</span
                 >
                 <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
-                    >主题、按键图标与工坊设置</span
+                    >主题、交互、AI助手等个性化设置</span
                 >
             </div>
         </button>

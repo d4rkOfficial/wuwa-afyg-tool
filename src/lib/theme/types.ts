@@ -22,7 +22,8 @@ export interface ThemeOverrides {
     bgDim: number
     // 背景图自身的独立控制（与玻璃表面分开）：背景图模糊、背景图遮罩强度
     bgImageBlur: number
-    bgImageMask: number
+    bgImageMask: number // -100(压暗) ~ 0(原图) ~ 100(明亮)
+    neonText: number // 0=关, 1-100=霓虹灯强度
 }
 
 export type ThemeComponentKey =

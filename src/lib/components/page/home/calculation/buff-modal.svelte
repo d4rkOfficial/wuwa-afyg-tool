@@ -804,7 +804,7 @@
         itemMenuOpen = true
     }
 
-    /** @desc 单个 buff 右键菜单项：多选状态 → 批量操作；否则 → 收藏/重命名/复制/全局/删除 */
+    /** @desc 单个 buff 右键菜单项：多选状态 → 批量操作；否则 → 重命名/复制/全局/删除 */
     let itemMenuItems = $derived.by(() => {
         const id = itemMenuTargetId
         if (!id) return []
@@ -836,14 +836,7 @@
         const isGlobal = globalBuffSetIds.includes(id)
         const isDefaultGlobal = id.startsWith('global-')
         // 内置默认全局块（global- 前缀）：仅可查看，全部操作禁用
-        const items: { label: string; action: () => void; icon: string; disabled?: boolean }[] = [
-            {
-                label: bs.starred ? '取消收藏' : '收藏',
-                icon: bs.starred ? 'mdi:star' : 'mdi:star-outline',
-                disabled: isDefaultGlobal,
-                action: () => toggleBuffSetStarred(id)
-            }
-        ]
+        const items: { label: string; action: () => void; icon: string; disabled?: boolean }[] = []
         if (!isGlobal) {
             items.push({
                 label: '重命名',

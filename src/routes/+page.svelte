@@ -41,7 +41,7 @@
     import { loadKeyMap } from '$lib/data/keymap.svelte'
     import { loadShortcuts } from '$lib/data/shortcuts.svelte'
     import { loadWorkshop } from '$lib/data/workshop.svelte'
-    import { getToyProfile, initToyProfileBridge } from '$lib/bilibili-toy/profile.svelte'
+    import { initToyProfileBridge } from '$lib/bilibili-toy/profile.svelte'
     import {
         setShowBuffModal,
         setConditionProfile,
@@ -92,8 +92,6 @@
     let showBuffLibrary = $state(false)
     let showSettings = $state(false)
     let showWorkshopFrame = $state(false)
-
-    let toyProfile = $derived(getToyProfile())
 
     // 阶段切换加载反馈：activePhase/showResult 变化时显示遮罩 spinner，同步初始化完成后最短 200ms 隐藏
     let phaseLoading = $state(false)
@@ -763,11 +761,6 @@
     <div class="flex flex-1 flex-col overflow-hidden">
         {#if !activeProject}
             <WelcomeScreen
-                profile={toyProfile.data}
-                onCreate={() => {
-                    newName = ''
-                    showNewModal = true
-                }}
                 onWorkshopFrame={() => (showWorkshopFrame = true)}
                 onBuffLibrary={() => (showBuffLibrary = true)}
                 onSettings={() => (showSettings = true)}

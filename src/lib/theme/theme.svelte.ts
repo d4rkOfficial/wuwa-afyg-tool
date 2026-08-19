@@ -16,7 +16,8 @@ const DEFAULT_OVERRIDES: ThemeOverrides = {
     bgBlur: 4,
     bgDim: 0,
     bgImageBlur: 4,
-    bgImageMask: 0
+    bgImageMask: 0,
+    neonText: 0
 }
 
 const TRANSLUCENT_SURFACES = new Set([
@@ -195,9 +196,15 @@ function applyBgBlend(root: HTMLElement) {
     root.style.setProperty('--theme-glass-blur', `${overrides.bgBlur}px`)
     // 背景图自身的独立控制（遮罩层）：模糊与遮罩强度，与玻璃表面（毛玻璃强度/背景暗度）分开
     root.style.setProperty('--theme-bg-image-blur', `${overrides.bgImageBlur}px`)
-    // 仅在有背景图时压暗背景图本身（黑色半透明），无背景图时复位为 0
-    const maskOpacity = overrides.backgroundImage ? (Math.max(0, Math.min(100, overrides.bgImageMask)) / 100) * 0.6 : 0
-    root.style.setProperty('--theme-bg-mask-opacity', String(maskOpacity))
+    // 背景图遮罩：负值=压暗(黑半透)，正值=明亮(白半透)，0=原图
+    const v = Math.max(-100, Math.min(100, overrides.bgImageMask))
+    const maskValue =
+        v < 0
+            ? `rgba(0,0,0,${(Math.abs(v) / 100) * 0.6})`
+            : v > 0
+              ? `rgba(255,255,255,${(v / 100) * 0.35})`
+              : 'transparent'
+    root.style.setProperty('--theme-bg-mask', maskValue)
     // 暗度只压暗玻璃表面背后的区域（backdrop brightness），背景图本身保持原亮度形成对比；
     // 无背景图时复位为 1，避免先调暗度再删背景后玻璃表面被残留压暗（暗度滑块仅在有背景图时可见，用户无法自行复位）
     const glassBrightness = overrides.backgroundImage
@@ -254,6 +261,9 @@ function applyBgBlend(root: HTMLElement) {
 function applyOverridesCSS(root: HTMLElement) {
     applyAccentOverride(root)
     applyBgBlend(root)
+    const neonOn = overrides.neonText > 0
+    root.classList.toggle('neon-text', neonOn)
+    root.style.setProperty('--theme-neon-glow', neonOn ? `${(overrides.neonText / 100) * 10}px` : '0px')
 }
 
 function setCSSVar(root: HTMLElement, key: string, prop: string, value?: string) {
@@ -279,6 +289,10 @@ export async function loadThemes() {
 
     const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
     if (ov) {
+        // 迁移旧版 bgImageMask（0-100 仅压暗滑块）→ 新版 -100~100 双极滑块
+        if (typeof ov.data.bgImageMask === 'number' && (ov.data as any).bgImageMask > 0) {
+            ;(ov.data as any).bgImageMask = -(ov.data.bgImageMask as number)
+        }
         overrides = { ...DEFAULT_OVERRIDES, ...ov.data }
         // 旧版未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃
         const bg = overrides.backgroundImage
@@ -308,9 +322,9 @@ export async function setActiveTheme(id: string) {
         const prevId = activeId
         activeId = id
         await dbSet(ACTIVE_KEY, id)
-        // 白天↔黑夜互切：卡片透明度与背景图遮罩镜像对调（透明度 0↔70 即 bgOpacity 130-bgOpacity；遮罩 0↔100 即 bgImageMask 100-bgImageMask）
+        // 白天↔黑夜互切：卡片透明度镜像对调；背景图遮罩正负反转（明亮↔压暗）
         if ((prevId === 'light' && id === 'dark') || (prevId === 'dark' && id === 'light')) {
-            overrides = { ...overrides, bgOpacity: 130 - overrides.bgOpacity, bgImageMask: 100 - overrides.bgImageMask }
+            overrides = { ...overrides, bgOpacity: 130 - overrides.bgOpacity, bgImageMask: -overrides.bgImageMask }
             await dbSet(OVERRIDES_KEY, toPlain(overrides))
         }
         applyThemeCSS()
@@ -335,6 +349,11 @@ export async function updateOverride<K extends keyof ThemeOverrides>(key: K, val
         key === 'bgImageMask'
     )
         applyBgBlend(root)
+    if (key === 'neonText') {
+        const on = overrides.neonText > 0
+        root.classList.toggle('neon-text', on)
+        root.style.setProperty('--theme-neon-glow', on ? `${(overrides.neonText / 100) * 10}px` : '0px')
+    }
 }
 
 export function getComponentTheme(key: ThemeComponentKey): ComponentTheme {

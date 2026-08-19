@@ -732,7 +732,11 @@
                                         <!-- 背景图遮罩层（与工作区一致，由背景图遮罩控制） -->
                                         <div
                                             class="absolute inset-0"
-                                            style="background: rgba(0,0,0,{(overrides.bgImageMask / 100) * 0.6});"
+                                            style="background: {overrides.bgImageMask < 0
+                                                ? `rgba(0,0,0,${(Math.abs(overrides.bgImageMask) / 100) * 0.6})`
+                                                : overrides.bgImageMask > 0
+                                                  ? `rgba(255,255,255,${(overrides.bgImageMask / 100) * 0.35})`
+                                                  : 'transparent'};"
                                         ></div>
                                     {:else}
                                         <!-- 无背景图时的中性预览底：玻璃卡片效果仍可实时预览 -->
@@ -956,13 +960,17 @@
                                                                 />背景图遮罩</span
                                                             >
                                                             <span class="font-mono text-(--theme-accent-text)"
-                                                                >{overrides.bgImageMask}%</span
+                                                                >{overrides.bgImageMask === 0
+                                                                    ? '原图'
+                                                                    : overrides.bgImageMask > 0
+                                                                      ? `明亮 ${overrides.bgImageMask}%`
+                                                                      : `压暗 ${Math.abs(overrides.bgImageMask)}%`}</span
                                                             >
                                                         </span>
                                                         <input
                                                             aria-label="背景图遮罩"
                                                             type="range"
-                                                            min="0"
+                                                            min="-100"
                                                             max="100"
                                                             step="1"
                                                             value={overrides.bgImageMask}
@@ -976,7 +984,7 @@
                                                         <div
                                                             class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
                                                         >
-                                                            <span>原图</span><span>压暗</span>
+                                                            <span>压暗</span><span>原图</span><span>明亮</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1013,6 +1021,56 @@
                                     <span class="text-[11px] font-medium text-(--theme-modal-text)/60"
                                         >跟随当前主题（{getActiveId() === 'light' ? '浅色' : '深色'}）</span
                                     >
+                                </div>
+                            </div>
+
+                            <div class="mt-4">
+                                <div class="mb-3 flex items-center gap-2">
+                                    <span
+                                        class="flex size-7 items-center justify-center rounded-lg bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                    >
+                                        <Icon icon="mdi:star" class="size-4" />
+                                    </span>
+                                    <div>
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >霓虹灯字体</span
+                                        >
+                                        <span class="block text-[10px] text-(--theme-modal-text)/35"
+                                            >所有文本与图标以当前颜色发光</span
+                                        >
+                                    </div>
+                                </div>
+                                <div
+                                    class="rounded-lg border p-3"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div>
+                                        <span
+                                            class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                        >
+                                            <span>发光强度</span>
+                                            <span class="font-mono text-(--theme-accent-text)"
+                                                >{overrides.neonText}%</span
+                                            >
+                                        </span>
+                                        <input
+                                            aria-label="霓虹灯强度"
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            value={overrides.neonText}
+                                            oninput={(e) =>
+                                                updateOverride(
+                                                    'neonText',
+                                                    Number((e.target as HTMLInputElement).value)
+                                                )}
+                                            class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                        />
+                                        <div class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25">
+                                            <span>关</span><span>强烈</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
