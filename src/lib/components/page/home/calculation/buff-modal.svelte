@@ -20,7 +20,7 @@
         toggleBuffSetStarred,
         setBuffSetGlobal,
         setBuffSetsGlobal
-    } from './calculation.store.svelte'
+    } from '$lib/calc/calculation.store.svelte'
     import {
         ZONE_DEFS,
         ZONE_MAP,
@@ -28,31 +28,32 @@
         ZONE_REF_MAP,
         groupBuffSets,
         LAYERED_BUFF_PATTERN
-    } from './calculation.consts'
-    import type { ZoneId, GroupedBuffSetItem } from './calculation.consts'
-    import type { CharSlot } from '$lib/data/types'
-    import type { ZoneRef, BuffSet, BuffCondition } from './calculation.types'
+    } from '$lib/calc/calculation.consts'
+    import type { ZoneId, GroupedBuffSetItem } from '$lib/calc/calculation.consts'
+    import type { CharSlot } from '$lib/types/project'
+    import type { ZoneRef, BuffSet, BuffCondition } from '$lib/calc/calculation.types'
     import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
-    import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
+    import { getCharIconMap, elementColor } from '$lib/calc/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import Icon from '@iconify/svelte'
-    import QuickLookup from './quick-lookup.svelte'
-    import BuffImportModal from '../buff-import-modal.svelte'
+    import QuickLookup from '$lib/components/layout/quick-lookup.svelte'
+    import BuffImportModal from './buff-import-modal.svelte'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
     import { slide } from 'svelte/transition'
     import { onMount, onDestroy } from 'svelte'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { registerDragCancel } from '$lib/utils/drag-guard'
+    import type { ComponentsProps } from '$lib/types'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         open: boolean
         team: [CharSlot, CharSlot, CharSlot]
         onclose: () => void
     }
 
-    let { open, team, onclose }: Props = $props()
+    let { open, team, onclose, class: className, style: styleProp }: Props = $props()
 
     let showLookup = $state(false)
     let showRefLookup = $state(false)
@@ -1043,8 +1044,8 @@
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
         onkeydown={(e) => e.key === 'Escape' && onclose()}
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->

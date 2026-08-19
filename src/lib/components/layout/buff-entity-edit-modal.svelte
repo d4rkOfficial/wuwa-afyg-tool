@@ -2,12 +2,7 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import {
-        ZONE_DEFS,
-        ZONE_MAP,
-        ZONE_REF_DEFS,
-        ZONE_REF_MAP
-    } from '$lib/components/page/home/calculation/calculation.consts'
+    import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
     import type {
         BuffEntityType,
         BuffLibraryBuff,

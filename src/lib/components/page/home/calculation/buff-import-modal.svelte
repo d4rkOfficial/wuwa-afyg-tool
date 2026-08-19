@@ -12,11 +12,11 @@
         setPiecesOf
     } from '$lib/data/buff-library.svelte'
     import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
-    import { importBuffSets } from './calculation/calculation.store.svelte'
-    import { ZONE_MAP } from './calculation/calculation.consts'
-    import { buildEntityImportItems } from './buff-import-utils'
+    import { importBuffSets } from '$lib/calc/calculation.store.svelte'
+    import { ZONE_MAP } from '$lib/calc/calculation.consts'
+    import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
     import { addToast } from '$lib/data/toast.svelte'
-    import type { CharSlot } from '$lib/data/types'
+    import type { CharSlot } from '$lib/types/project'
 
     interface Props extends ComponentsProps {
         open: boolean

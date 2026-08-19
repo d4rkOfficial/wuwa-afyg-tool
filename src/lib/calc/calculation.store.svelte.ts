@@ -1,14 +1,14 @@
 /** @desc 拉表页状态 store：持有伤害条目/Buff 块/条目绑定/生效配置等全局响应式状态，提供 CRUD 与持久化快照接口 */
 import type { BuffSet, BuffZoneValue, CalcState, DamageEntry, BuffCondition } from './calculation.types'
-import type { TimelineData } from '../timeline/timeline.types'
-import type { CharSlot } from '$lib/data/types'
-import { parseValueString } from '$lib/consts/parse-value-string'
-import { NON_DIRECT_ELEMENT } from '../timeline/timeline.consts'
-import { getSkillCache, getCharElementMap } from '../timeline/timeline.store.svelte'
-import { getCharacterInfo } from '$lib/data/api'
+import type { TimelineData } from './timeline.types'
+import type { CharSlot } from '$lib/types/project'
+import { parseValueString } from '$lib/utils/parse-value-string'
+import { NON_DIRECT_ELEMENT } from './timeline.consts'
+import { getSkillCache, getCharElementMap } from './timeline.store.svelte'
+import { getCharacterInfo } from '$lib/api/data-cache'
 import { addToast } from '$lib/data/toast.svelte'
 import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
-import type { ConditionProfile } from '../result/compute'
+import type { ConditionProfile } from './compute'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffSet[]>([])

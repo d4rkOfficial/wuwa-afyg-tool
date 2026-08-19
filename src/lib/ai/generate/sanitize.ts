@@ -1,8 +1,8 @@
 // 生成结果清洗：白名单过滤乘区/引用/scope/condition、数值归一化、去重（移植自 wuwa-afyg-share）
-import { ZONE_MAP, ZONE_REF_MAP } from '$lib/components/page/home/calculation/calculation.consts'
+import { ZONE_MAP, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
-import type { BuffCondition } from '$lib/components/page/home/calculation/calculation.types'
+import type { BuffCondition } from '$lib/calc/calculation.types'
 
 export const BUFF_SCOPES = ['self', 'self_except', 'team', 'effect_only'] as const
 export type BuffScope = (typeof BUFF_SCOPES)[number]

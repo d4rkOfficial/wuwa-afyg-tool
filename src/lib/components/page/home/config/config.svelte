@@ -10,28 +10,29 @@
         moveSubstat,
         updateSubstatValue,
         getCalcState
-    } from './config.store.svelte'
-    import { RESISTANCE_KEYS } from './config.consts'
+    } from '$lib/calc/config.store.svelte'
+    import { RESISTANCE_KEYS } from '$lib/calc/config.consts'
     import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
     import { simulateEnhancement } from '$lib/consts/substat-roll-data'
     import { addToast } from '$lib/data/toast.svelte'
-    import type { CharSlot } from '$lib/data/types'
-    import type { ConfigState } from './config.types'
-    import { getCharIconMap, elementColor } from '../timeline/timeline.store.svelte'
+    import type { CharSlot } from '$lib/types/project'
+    import type { ConfigState } from '$lib/calc/config.types'
+    import { getCharIconMap, elementColor } from '$lib/calc/timeline.store.svelte'
     import EnemyPanel from './enemy-panel.svelte'
     import RandomEnhanceModal from './random-enhance-modal.svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import type { ComponentsProps } from '$lib/types'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         data: ConfigState | null
         locked?: boolean
         onupdate: (state: ConfigState) => void
     }
 
-    let { team, data, locked = false, onupdate }: Props = $props()
+    let { team, data, locked = false, onupdate, class: className, style: styleProp }: Props = $props()
 
     let activeTab = $state<'char0' | 'char1' | 'char2' | 'enemy'>('char0')
     let showMainStatMenu = $state<{ ci: number; si: number } | null>(null)
@@ -254,8 +255,8 @@
 </script>
 
 <div
-    class="theme-glass-surface flex h-full flex-col p-5"
-    style="background: var(--theme-modal-bg); color: var(--theme-modal-text)"
+    class="theme-glass-surface flex h-full flex-col p-5 {className}"
+    style="background: var(--theme-modal-bg); color: var(--theme-modal-text); {styleProp || ''}"
 >
     <!-- Tabs -->
     <div class="flex gap-2 mb-4">

@@ -1,4 +1,4 @@
-import type { CharSlot } from '$lib/data/types'
+import type { CharSlot } from '$lib/types/project'
 import { updateCustomSkillHits } from '$lib/data/project.svelte'
 import type { SkillEntry } from '$lib/api/types'
 import {
@@ -7,7 +7,7 @@ import {
     getCharacterIcons,
     getElementIcons,
     getUiBtnIcons as apiGetUiBtnIcons
-} from '$lib/data/api'
+} from '$lib/api/data-cache'
 import type {
     RefLine,
     OpBlock,
@@ -33,7 +33,7 @@ import {
     GAMEPAD_BUTTONS
 } from './timeline.consts'
 import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$lib/consts/tune-data'
-import { parseValueString, sumRatioNum } from '$lib/consts/parse-value-string'
+import { parseValueString, sumRatioNum } from '$lib/utils/parse-value-string'
 import { addToast } from '$lib/data/toast.svelte'
 import { setCharElements } from '$lib/data/char-elements.svelte'
 import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'

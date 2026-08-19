@@ -1,9 +1,10 @@
 <script lang="ts">
     import type { Echo } from '$lib/api/types'
+    import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         open: boolean
         onclose: () => void
         onselect: (echo: Echo | null) => void
@@ -12,7 +13,7 @@
         currentName?: string
     }
 
-    let { open, onclose, onselect, echoes, icons, currentName }: Props = $props()
+    let { open, onclose, onselect, echoes, icons, currentName, class: className, style: styleProp }: Props = $props()
 
     let query = $state('')
     let localSelected = $state<Echo | null>(null)
@@ -68,8 +69,8 @@
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
         onkeydown={(e) => {
             if (e.key === 'Escape') onclose()
         }}

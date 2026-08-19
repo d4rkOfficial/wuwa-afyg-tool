@@ -20,11 +20,11 @@
         removeCustomHit,
         applySkillHits,
         switchSkillPickerTab
-    } from './timeline.store.svelte'
+    } from '$lib/calc/timeline.store.svelte'
     import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
-    import type { CustomHit } from './timeline.types'
+    import type { CustomHit } from '$lib/calc/timeline.types'
     import { addToast } from '$lib/data/toast.svelte'
-    import QuickLookup from '../calculation/quick-lookup.svelte'
+    import QuickLookup from '$lib/components/layout/quick-lookup.svelte'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { focusTrap } from '$lib/utils/focus-trap'

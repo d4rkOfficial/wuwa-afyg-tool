@@ -1,8 +1,8 @@
-import type { DamageEntry, BuffSet, ZoneRef } from '../calculation/calculation.types'
-import type { ConfigState, EchoSlotConfig } from '../config/config.types'
+import type { DamageEntry, BuffSet, ZoneRef } from './calculation.types'
+import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone } from './result.types'
-import type { CharSlot } from '$lib/data/types'
+import type { CharSlot } from '$lib/types/project'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
     NON_DIRECT_ELEMENT,
@@ -20,7 +20,7 @@ function clamp(v: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, v))
 }
 
-import type { EnemyConfig } from '../config/config.types'
+import type { EnemyConfig } from './config.types'
 
 import { inferDamageTypes } from './utils'
 

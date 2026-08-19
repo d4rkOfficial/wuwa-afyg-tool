@@ -3,7 +3,7 @@ import { browser, version } from '$app/environment'
 import { buildTools, executeTool } from '$lib/ai/tools'
 import { getPanelsState } from '$lib/ai/panels.svelte'
 import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
-import { getCalcState, notifyCalcUpdate } from '$lib/components/page/home/calculation/calculation.store.svelte'
+import { getCalcState, notifyCalcUpdate } from '$lib/calc/calculation.store.svelte'
 import { addToast } from '$lib/data/toast.svelte'
 
 export type WsStatus = 'idle' | 'connecting' | 'connected' | 'error'

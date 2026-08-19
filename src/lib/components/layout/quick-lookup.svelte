@@ -1,6 +1,6 @@
 <script lang="ts">
     /** @desc 速查弹窗：按队伍角色 tab 展示角色 Lv90 基础属性/武器/首位声骸/套装加成/技能数值(含偏谐与共鸣能量)/共鸣链，支持选中文本右键复制/创建BUFF/创建自定义直伤 */
-    import { getCharacterInfo, getWeaponInfo, getEchoInfo, getEchoSetInfo } from '$lib/data/api'
+    import { getCharacterInfo, getWeaponInfo, getEchoInfo, getEchoSetInfo } from '$lib/api/data-cache'
     import {
         getCharacterIcons,
         getWeaponIcons,
@@ -8,16 +8,17 @@
         getEchoSetIcons,
         getElementIcons,
         getWeaponTypeIcons
-    } from '$lib/data/api'
+    } from '$lib/api/data-cache'
     import { richTextToHtml, colorizeNumbers } from '$lib/utils/rich-text'
     import { ELEMENT_COLORS } from '$lib/consts/game-terms'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-    import type { CharSlot } from '$lib/data/types'
+    import type { CharSlot } from '$lib/types/project'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { focusTrap } from '$lib/utils/focus-trap'
+    import type { ComponentsProps } from '$lib/types'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         open: boolean
         team: [CharSlot, CharSlot, CharSlot]
         onCreateBuff?: (name: string) => void
@@ -34,7 +35,9 @@
         onCreateCustomHit,
         showBuffOption = true,
         showCustomHitOption = true,
-        onclose
+        onclose,
+        class: className,
+        style: styleProp
     }: Props = $props()
 
     let charIndex = $state(0)
@@ -211,8 +214,8 @@
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-70 flex items-center justify-center select-text backdrop-blur-sm"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
+        class="animate-fade-in fixed inset-0 z-70 flex items-center justify-center select-text backdrop-blur-sm {className}"
         onkeydown={(e) => {
             if (e.key === 'Escape') {
                 onclose()

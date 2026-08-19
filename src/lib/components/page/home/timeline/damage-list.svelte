@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getShowDamageList, setShowDamageList, getDamageList } from './timeline.store.svelte'
+    import { getShowDamageList, setShowDamageList, getDamageList } from '$lib/calc/timeline.store.svelte'
 </script>
 
 {#if getShowDamageList()}

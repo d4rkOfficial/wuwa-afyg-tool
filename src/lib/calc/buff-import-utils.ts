@@ -1,8 +1,8 @@
 // Buff 导入纯函数（手动导入弹窗 / AI 工具共用）：定位实体归属槽位 + 构造带 ownerIdx 的导入条目
 import type { BuffLibraryEntity, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
-import type { CharSlot } from '$lib/data/types'
-import type { ImportBuffInput } from './calculation/calculation.store.svelte'
-import type { BuffCondition } from './calculation/calculation.types'
+import type { CharSlot } from '$lib/types/project'
+import type { ImportBuffInput } from './calculation.store.svelte'
+import type { BuffCondition } from './calculation.types'
 
 export type { BuffLibraryEntity }
 

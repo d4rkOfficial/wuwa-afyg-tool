@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Character } from '$lib/api/types'
+    import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { ELEMENT_ORDER } from '$lib/consts/game-terms'
@@ -10,7 +11,7 @@
         fourStar: Character[]
     }
 
-    interface Props {
+    interface Props extends ComponentsProps {
         open: boolean
         onclose: () => void
         onselect: (character: Character | null) => void
@@ -20,7 +21,17 @@
         currentName?: string
     }
 
-    let { open, onclose, onselect, characters, icons, elementIcons = {}, currentName }: Props = $props()
+    let {
+        open,
+        onclose,
+        onselect,
+        characters,
+        icons,
+        elementIcons = {},
+        currentName,
+        class: className,
+        style: styleProp
+    }: Props = $props()
 
     let query = $state('')
     let groupRefs: Record<string, HTMLDivElement | null> = {}
@@ -89,8 +100,8 @@
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
         onkeydown={(e) => {
             if (e.key === 'Escape') onclose()
         }}

@@ -1,5 +1,5 @@
 // 提示词渲染：注入乘区白名单/引用白名单/生效条件（按实体类型裁剪）/用户命名规则
-import { ZONE_DEFS, ZONE_REF_DEFS } from '$lib/components/page/home/calculation/calculation.consts'
+import { ZONE_DEFS, ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
 import {
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_INITIAL_TASK_PROMPT,

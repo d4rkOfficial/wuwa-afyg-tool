@@ -2,7 +2,7 @@
     import { untrack } from 'svelte'
     import Icon from '@iconify/svelte'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
-    import type { Project, PhaseKey } from '$lib/data/types'
+    import type { Project, PhaseKey } from '$lib/types/project'
     import { setActiveTheme, getActiveId as getActiveThemeId, getThemes } from '$lib/theme'
     import { addToast } from '$lib/data/toast.svelte'
     import { getCharElementMap } from '$lib/data/char-elements.svelte'
@@ -11,8 +11,9 @@
     import favicon from '$lib/assets/favicon.svg'
     import { getShareState } from '$lib/data/share.svelte'
     import { getEggMode } from '$lib/data/egg-prefs.svelte'
+    import type { ComponentsProps } from '$lib/types'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         projects: Project[]
         activeId: string
         width?: number
@@ -45,7 +46,9 @@
         onexport,
         onarchive,
         ondelete,
-        onselect
+        onselect,
+        class: className,
+        style: styleProp
     }: Props = $props()
 
     let ctxMenuOpen = $state(false)
@@ -197,10 +200,11 @@
 </script>
 
 <aside
-    class="theme-glass-surface flex h-full shrink-0 flex-col border-r"
+    class="theme-glass-surface flex h-full shrink-0 flex-col border-r {className}"
     style="width: {width}px;{dragging
         ? ''
-        : ' transition: width 0.15s ease;'} background: color-mix(in srgb, var(--theme-sidebar-bg) 80%, transparent); color: var(--theme-sidebar-text); border-color: var(--theme-divider-border, rgba(255,255,255,0.1))"
+        : ' transition: width 0.15s ease;'} background: color-mix(in srgb, var(--theme-sidebar-bg) 80%, transparent); color: var(--theme-sidebar-text); border-color: var(--theme-divider-border, rgba(255,255,255,0.1)); {styleProp ||
+        ''}"
     oncontextmenu={(e) => e.preventDefault()}
 >
     <div

@@ -1,10 +1,11 @@
 <script lang="ts">
-    import type { SelectedSet } from '$lib/data/types'
+    import type { SelectedSet } from '$lib/types/project'
     import type { EchoSetItem } from '$lib/api/types'
+    import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         open: boolean
         onclose: () => void
         onconfirm: (sets: SelectedSet[]) => void
@@ -14,7 +15,17 @@
         icons?: Record<string, string>
     }
 
-    let { open, onclose, onconfirm, echoSets, pinnedSets, initialSets, icons = {} }: Props = $props()
+    let {
+        open,
+        onclose,
+        onconfirm,
+        echoSets,
+        pinnedSets,
+        initialSets,
+        icons = {},
+        class: className,
+        style: styleProp
+    }: Props = $props()
 
     let selected = $state<SelectedSet[]>([])
 
@@ -95,8 +106,8 @@
 {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
         onclick={(e) => {
             if (e.target === e.currentTarget) onclose()
         }}

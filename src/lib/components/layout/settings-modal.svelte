@@ -10,7 +10,7 @@
         physicalLabel,
         type KeyMapEntry
     } from '$lib/data/keymap.svelte'
-    import { getUiBtnIcons, clearCacheCategory, countCacheCategory, type CacheCategory } from '$lib/data/api'
+    import { getUiBtnIcons, clearCacheCategory, countCacheCategory, type CacheCategory } from '$lib/api/data-cache'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         getWorkshopInstances,
@@ -37,7 +37,7 @@
     } from '$lib/data/project.svelte'
     import { getShareLink } from '$lib/data/share.svelte'
     import { getGenPrefs, loadGenPrefs, updateGenPrefs, type DangerMode } from '$lib/data/ai-prefs.svelte'
-    import { GAMEPAD_BUTTONS } from '$lib/components/page/home/timeline/timeline.consts'
+    import { GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
     import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
     import {
         getGpuAccel,
@@ -75,13 +75,14 @@
     import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
     import AiProfileEditModal from '$lib/components/layout/ai-profile-edit-modal.svelte'
     import AiPromptEditModal from '$lib/components/layout/ai-prompt-edit-modal.svelte'
+    import type { ComponentsProps } from '$lib/types'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         open: boolean
         onclose: () => void
     }
 
-    let { open, onclose }: Props = $props()
+    let { open, onclose, class: className, style: styleProp }: Props = $props()
 
     let tab = $state<'theme' | 'keymap' | 'interaction' | 'performance' | 'connection' | 'archive' | 'cache' | 'ai'>(
         'theme'
@@ -390,13 +391,13 @@
         }
         addToast('已切换数据源，列表/详情缓存将按新源重新加载', 'info')
         // 数据可能随上游不同，清空本地缓存以便重新拉取
-        import('$lib/data/api').then((m) => m.clearCache())
+        import('$lib/api/data-cache').then((m) => m.clearCache())
     }
 
     function handleResetProvider() {
         resetActiveProvider()
         addToast('已恢复默认数据源（nanoka）', 'success')
-        import('$lib/data/api').then((m) => m.clearCache())
+        import('$lib/api/data-cache').then((m) => m.clearCache())
     }
 
     // ── Archive management ──
@@ -498,8 +499,8 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5))"
+        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
+        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
         onkeydown={(e) => {
             if (e.key === 'Escape') onclose()
         }}

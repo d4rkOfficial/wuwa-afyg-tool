@@ -1,10 +1,10 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
-import { getConditionProfile } from '$lib/components/page/home/calculation/calculation.store.svelte'
-import type { Project, CharSlot, EchoSlot, PhaseKey, SelectedSet, ResultAnalysisData } from './types'
-import type { TimelineData } from '$lib/components/page/home/timeline/timeline.types'
-import type { CalcState } from '$lib/components/page/home/calculation/calculation.types'
-import type { ConfigState } from '$lib/components/page/home/config/config.types'
+import { getConditionProfile } from '$lib/calc/calculation.store.svelte'
+import type { Project, CharSlot, EchoSlot, PhaseKey, SelectedSet, ResultAnalysisData } from '$lib/types/project'
+import type { TimelineData } from '$lib/calc/timeline.types'
+import type { CalcState } from '$lib/calc/calculation.types'
+import type { ConfigState } from '$lib/calc/config.types'
 
 const PROJECTS_KEY = 'projects'
 const ACTIVE_KEY = 'project-active'
@@ -240,7 +240,7 @@ export async function updateConditionProfile() {
     await persist()
 }
 
-export async function updateCustomSkillHits(hits: Record<string, import('./types').CustomHit[]>) {
+export async function updateCustomSkillHits(hits: Record<string, import('$lib/types/project').CustomHit[]>) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
     project.customSkillHits = hits

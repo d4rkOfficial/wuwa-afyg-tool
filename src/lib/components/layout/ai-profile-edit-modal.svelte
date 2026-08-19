@@ -3,7 +3,7 @@
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import { updateProfile, type AiProfile } from '$lib/ai/config.svelte'
-    import { AI_PROVIDER_PRESETS, type AiProviderPreset } from '$lib/consts/ai-providers'
+    import { AI_PROVIDER_PRESETS, type AiProviderPreset } from '$lib/ai/ai-providers'
     import { addToast } from '$lib/data/toast.svelte'
 
     interface Props extends ComponentsProps {

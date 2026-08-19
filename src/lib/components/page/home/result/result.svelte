@@ -1,32 +1,33 @@
 <script lang="ts">
-    import type { CharSlot, ResultAnalysisData } from '$lib/data/types'
-    import type { CalcState } from '../calculation/calculation.types'
-    import type { ConfigState } from '../config/config.types'
+    import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
+    import type { CalcState } from '$lib/calc/calculation.types'
+    import type { ConfigState } from '$lib/calc/config.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-    import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/data/api'
-    import { getCharElementMap } from '../timeline/timeline.store.svelte'
+    import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
+    import { getCharElementMap } from '$lib/calc/timeline.store.svelte'
     import { getActiveProject, updateResultAnalysis } from '$lib/data/project.svelte'
-    import { computeAll as computeAllDamage } from './compute'
-    import { getAllDamageEntries, getCalcState, getConditionProfile } from '../calculation/calculation.store.svelte'
-    import { getConfig } from '../config/config.store.svelte'
-    import type { ResultEntry, CharSubstatAnalysis } from './result.types'
+    import { computeAll as computeAllDamage } from '$lib/calc/compute'
+    import { getAllDamageEntries, getCalcState, getConditionProfile } from '$lib/calc/calculation.store.svelte'
+    import { getConfig } from '$lib/calc/config.store.svelte'
+    import type { ResultEntry, CharSubstatAnalysis } from '$lib/calc/result.types'
     import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
-    import { getAlgorithm, ALGORITHMS_INFO } from './substat-algorithms'
-    import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
+    import { getAlgorithm, ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
+    import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
     import { tick, untrack, onMount } from 'svelte'
+    import type { ComponentsProps } from '$lib/types'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import DataAnalysisModal from './data-analysis-modal.svelte'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         calcState: CalcState | null
         configState: ConfigState | null
         refreshKey?: number
     }
 
-    let { team, calcState, configState, refreshKey = 0 }: Props = $props()
+    let { team, calcState, configState, refreshKey = 0, class: className, style: styleProp }: Props = $props()
 
     const RIG_GRAD_TEXT =
         'background: var(--theme-rigcrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
@@ -219,7 +220,10 @@
     }
 </script>
 
-<div class="flex h-full flex-col" style="background: var(--theme-modal-bg); color: var(--theme-modal-text)">
+<div
+    class="flex h-full flex-col {className}"
+    style="background: var(--theme-modal-bg); color: var(--theme-modal-text); {styleProp || ''}"
+>
     {#if loading}
         <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">计算中…</div>
     {:else if entries.length === 0}
@@ -272,9 +276,8 @@
                     >
                         <th class="text-left font-medium py-2 px-3">来源</th>
                         <th class="text-left font-medium py-2 px-3">条目</th>
-                        <th class="text-right font-medium py-2 px-3">基础值</th>
-                        <th class="text-right font-medium py-2 px-3">单位</th>
                         <th class="text-right font-medium py-2 px-3">倍率</th>
+                        <th class="text-right font-medium py-2 px-3">单位</th>
                         <th class="text-right font-medium py-2 px-3">暴击</th>
                         <th class="text-right font-medium py-2 px-3">不暴击</th>
                         <th class="text-right font-medium py-2 px-3">期望</th>
@@ -310,13 +313,10 @@
                                 {/each}
                             </td>
                             <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
-                                >{Math.round(entry.baseValue).toLocaleString()}</td
-                            >
-                            <td class="py-1.5 px-3 text-right text-(--theme-modal-text)/60">{entry.baseUnit}</td>
-                            <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
                                 >{((entry.ratioNum / entry.hits) * 100).toFixed(2)}%{#if entry.hits > 1}
                                     ×{entry.hits}{/if}</td
                             >
+                            <td class="py-1.5 px-3 text-right text-(--theme-modal-text)/60">{entry.baseUnit}</td>
                             <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
                                 >{entry.canCrit ? entry.critPerHit.toLocaleString() : '—'}</td
                             >
@@ -335,7 +335,7 @@
                         </tr>
                         {#if expandedEntry === entry.id}
                             <tr style="background: var(--theme-input-bg);">
-                                <td colspan="9" class="p-0">
+                                <td colspan="8" class="p-0">
                                     <div
                                         transition:slide|local={{ duration: 200 }}
                                         class="border-b px-6 py-3 space-y-3 text-xs text-(--theme-modal-text)/60"

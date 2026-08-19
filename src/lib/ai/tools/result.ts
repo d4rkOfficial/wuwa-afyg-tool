@@ -1,14 +1,10 @@
 // 结果域工具（Phase 4）：读取当前配置下的伤害计算结果
 import { defineTool } from './registry'
-import { computeAll } from '$lib/components/page/home/result/compute'
-import {
-    getAllDamageEntries,
-    getCalcState,
-    getConditionProfile
-} from '$lib/components/page/home/calculation/calculation.store.svelte'
-import { getConfig } from '$lib/components/page/home/config/config.store.svelte'
+import { computeAll } from '$lib/calc/compute'
+import { getAllDamageEntries, getCalcState, getConditionProfile } from '$lib/calc/calculation.store.svelte'
+import { getConfig } from '$lib/calc/config.store.svelte'
 import { getActiveProject } from '$lib/data/project.svelte'
-import { getCharacterInfo, getWeaponInfo } from '$lib/data/api'
+import { getCharacterInfo, getWeaponInfo } from '$lib/api/data-cache'
 
 defineTool('get_result_summary', {
     description:

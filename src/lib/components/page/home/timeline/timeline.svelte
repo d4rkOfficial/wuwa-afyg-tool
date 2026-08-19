@@ -1,7 +1,8 @@
 <script lang="ts">
     import { untrack } from 'svelte'
-    import type { CharSlot } from '$lib/data/types'
-    import type { TimelineData } from './timeline.types'
+    import type { ComponentsProps } from '$lib/types'
+    import type { CharSlot } from '$lib/types/project'
+    import type { TimelineData } from '$lib/calc/timeline.types'
     import {
         init,
         getRefLines,
@@ -88,10 +89,10 @@
         applySkillHits,
         applyNonDirectEntries,
         setQuickCharIndex
-    } from './timeline.store.svelte'
-    import { remapDuplicatedDamageBuffs } from '../calculation/calculation.store.svelte'
-    import { SIDE_PAD, NON_DIRECT_ELEMENT, TRACK_COLORS, GAMEPAD_BUTTONS } from './timeline.consts'
-    import type { OpBlock, DamageBlock } from './timeline.types'
+    } from '$lib/calc/timeline.store.svelte'
+    import { remapDuplicatedDamageBuffs } from '$lib/calc/calculation.store.svelte'
+    import { SIDE_PAD, NON_DIRECT_ELEMENT, TRACK_COLORS, GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
+    import type { OpBlock, DamageBlock } from '$lib/calc/timeline.types'
     import ContextMenu from './context-menu.svelte'
     import SkillPicker from './skill-picker.svelte'
     import NonDirectPicker from './non-direct-picker.svelte'
@@ -102,14 +103,14 @@
     import { getInputShortcutId, getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { addToast } from '$lib/data/toast.svelte'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         locked: boolean
         data: TimelineData | null
         onupdate: (data: TimelineData) => void
     }
 
-    let { team, locked, data, onupdate }: Props = $props()
+    let { team, locked, data, onupdate, class: className, style: styleProp }: Props = $props()
 
     let timelineEl: HTMLDivElement | undefined = $state()
     let editInput: HTMLInputElement | undefined = $state()
@@ -558,7 +559,10 @@
     }}
 />
 
-<div class="theme-glass-surface flex h-full flex-col bg-(--theme-timeline-bg) text-(--theme-timeline-text)">
+<div
+    class="theme-glass-surface flex h-full flex-col bg-(--theme-timeline-bg) text-(--theme-timeline-text) {className}"
+    style={styleProp}
+>
     <div
         class="theme-scrollbar flex-1 overflow-x-auto overflow-y-hidden"
         bind:this={timelineEl}

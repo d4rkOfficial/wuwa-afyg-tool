@@ -2,17 +2,18 @@
     import { onMount, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Chart from 'chart.js/auto'
-    import { PPS } from '../timeline/timeline.consts'
-    import { getCharElementMap, getRefLines, getOpBlocks } from '../timeline/timeline.store.svelte'
-    import type { ResultEntry, CharSummary, CharSubstatAnalysis } from './result.types'
-    import type { CharSlot, ResultAnalysisData } from '$lib/data/types'
-    import type { AlgorithmId, AlgorithmInfo } from './substat-algorithms/types'
+    import { PPS } from '$lib/calc/timeline.consts'
+    import { getCharElementMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
+    import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
+    import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
     import Icon from '@iconify/svelte'
-    import { ALGORITHM_HELP } from './consts'
+    import { ALGORITHM_HELP } from '$lib/calc/result.consts'
     import { openHelp } from '$lib/data/help.svelte'
-    import { aggregateDirectDamageByType, DAMAGE_TYPE_CATEGORIES, TYPE_COLORS } from './utils'
+    import { aggregateDirectDamageByType, DAMAGE_TYPE_CATEGORIES, TYPE_COLORS } from '$lib/calc/utils'
+    import type { ComponentsProps } from '$lib/types'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         entries: ResultEntry[]
         charSummaries: CharSummary[]
         team: [CharSlot, CharSlot, CharSlot]
@@ -43,7 +44,9 @@
         noCritEntryIds,
         onSelectAlgorithm,
         onUpdateResultAnalysis,
-        onclose
+        onclose,
+        class: className,
+        style: styleProp
     }: Props = $props()
 
     let charElements = $derived(getCharElementMap())
@@ -696,8 +699,8 @@
 
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <div
-    class="animate-fade-in fixed inset-0 z-50 flex items-start justify-center pt-12 pb-8 overflow-hidden backdrop-blur-sm"
-    style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
+    class="animate-fade-in fixed inset-0 z-50 flex items-start justify-center pt-12 pb-8 overflow-hidden backdrop-blur-sm {className}"
+    style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
     role="presentation"
 >
     <!-- svelte-ignore a11y_no_static_element_interactions -->

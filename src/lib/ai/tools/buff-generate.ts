@@ -2,9 +2,9 @@
 import { defineTool } from './registry'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { getBuffEntities, updateEntityBuffs, ENTITY_TYPES, loadBuffLibrary } from '$lib/data/buff-library.svelte'
-import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$lib/data/api'
-import { importBuffSets } from '$lib/components/page/home/calculation/calculation.store.svelte'
-import type { ImportBuffInput } from '$lib/components/page/home/calculation/calculation.store.svelte'
+import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$lib/api/data-cache'
+import { importBuffSets } from '$lib/calc/calculation.store.svelte'
+import type { ImportBuffInput } from '$lib/calc/calculation.store.svelte'
 import { generateBuffSet } from '../generate'
 import { getSlangDict } from '$lib/data/ai-prefs.svelte'
 import {
@@ -14,7 +14,7 @@ import {
     type GeneratedBuff
 } from '../generate/tools'
 import { getNamingRule, loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
-import { ownerIdxFor } from '$lib/components/page/home/buff-import-utils'
+import { ownerIdxFor } from '$lib/calc/buff-import-utils'
 import { getAiConfig } from '../config.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()

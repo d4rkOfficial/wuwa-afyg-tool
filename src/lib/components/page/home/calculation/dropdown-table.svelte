@@ -11,20 +11,21 @@
         getDamageTypesForEntry,
         toggleDamageTypeForEntry,
         setDamageTypesForEntry
-    } from './calculation.store.svelte'
-    import { inferDamageTypes } from '../result/utils'
-    import { conditionMet } from '../result/compute'
+    } from '$lib/calc/calculation.store.svelte'
+    import { inferDamageTypes } from '$lib/calc/utils'
+    import { conditionMet } from '$lib/calc/compute'
     import { addToast } from '$lib/data/toast.svelte'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
-    import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, groupBuffSets, LAYERED_BUFF_PATTERN } from './calculation.consts'
-    import type { GroupedBuffSetItem } from './calculation.consts'
-    import type { BuffSet, DamageEntry } from './calculation.types'
-    import type { ConditionProfile } from '../result/compute'
-    import type { CharSlot } from '$lib/data/types'
-    import type { CalcState } from './calculation.types'
+    import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, groupBuffSets, LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
+    import type { GroupedBuffSetItem } from '$lib/calc/calculation.consts'
+    import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+    import type { ConditionProfile } from '$lib/calc/compute'
+    import type { CharSlot } from '$lib/types/project'
+    import type { CalcState } from '$lib/calc/calculation.types'
+    import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         damageEntries: DamageEntry[]
         buffSets: BuffSet[]
@@ -47,7 +48,9 @@
         conditionProfile,
         hideConditionMismatch,
         buffDiffMode,
-        onupdate
+        onupdate,
+        class: className,
+        style: styleProp
     }: Props = $props()
 
     let expandedEntryId = $state<string | null>(null)
@@ -404,8 +407,8 @@
 <!-- @desc 表格容器：Ctrl+滚轮横向滚动，背景为弹窗底色 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="theme-scrollbar h-full overflow-auto pb-48"
-    style="background: var(--theme-modal-bg);"
+    class="theme-scrollbar h-full overflow-auto pb-48 {className}"
+    style="background: var(--theme-modal-bg); {styleProp || ''}"
     bind:this={calcContainer}
     onwheel={(e) => {
         if (e.ctrlKey) {

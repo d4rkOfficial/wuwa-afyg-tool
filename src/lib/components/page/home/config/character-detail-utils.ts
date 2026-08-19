@@ -1,6 +1,6 @@
-import type { CharSlot } from '$lib/data/types'
-import type { ConfigState } from './config.types'
-import type { CalcState } from '../calculation/calculation.types'
+import type { CharSlot } from '$lib/types/project'
+import type { ConfigState } from '$lib/calc/config.types'
+import type { CalcState } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import {
     ELEMENT_ORDER,
@@ -10,7 +10,7 @@ import {
     SUBSTAT_DECIMAL_TO_PCT
 } from '$lib/consts/game-terms'
 import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
-import { getConditionProfile } from '../calculation/calculation.store.svelte'
+import { getConditionProfile } from '$lib/calc/calculation.store.svelte'
 
 export interface CharStats {
     name: string

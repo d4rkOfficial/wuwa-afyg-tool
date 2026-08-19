@@ -1,16 +1,16 @@
 <script lang="ts">
-    import type { CharSlot } from '$lib/data/types'
+    import type { CharSlot } from '$lib/types/project'
     import type { ComponentsProps } from '$lib/types'
-    import type { ConfigState } from './config.types'
-    import type { CalcState } from '../calculation/calculation.types'
+    import type { ConfigState } from '$lib/calc/config.types'
+    import type { CalcState } from '$lib/calc/calculation.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-    import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/data/api'
+    import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
     import { ELEMENT_ORDER, DAMAGE_TYPES } from '$lib/consts/game-terms'
     import {
         getConditionProfile,
         setConditionProfileChains,
         setConditionProfileRefinements
-    } from '../calculation/calculation.store.svelte'
+    } from '$lib/calc/calculation.store.svelte'
     import { computeCharStats, charElementColorOf, formatWeaponSubstat, type CharStats } from './character-detail-utils'
     import Modal from '$lib/components/layout/modal.svelte'
     import { fallbackIcon } from '$lib/utils/icons'

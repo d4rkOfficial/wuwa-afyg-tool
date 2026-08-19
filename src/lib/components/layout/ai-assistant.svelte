@@ -2,17 +2,18 @@
     import { onMount } from 'svelte'
     import Icon from '@iconify/svelte'
     import { fade } from 'svelte/transition'
-    import { runAiTurn, type SessionEvent } from '../session'
-    import { getAiConfig, loadAiConfig } from '../config.svelte'
+    import { runAiTurn, type SessionEvent } from '../../ai/session'
+    import { getAiConfig, loadAiConfig } from '../../ai/config.svelte'
     import { loadGenPrefs, getGenPrefs, getDangerMode } from '$lib/data/ai-prefs.svelte'
     import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
-    import { notifyCalcUpdate, getCalcState } from '$lib/components/page/home/calculation/calculation.store.svelte'
+    import { notifyCalcUpdate, getCalcState } from '$lib/calc/calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import { cancelActiveDrags } from '$lib/utils/drag-guard'
     import { marked } from 'marked'
-    import { getOpenPanelsSummary } from '../panels.svelte'
-    import { DeepSeekError, type ChatMessage } from '../client'
+    import { getOpenPanelsSummary } from '../../ai/panels.svelte'
+    import { DeepSeekError, type ChatMessage } from '../../ai/client'
+    import type { ComponentsProps } from '$lib/types'
 
     interface ToolCard {
         name: string
@@ -31,7 +32,7 @@
         tab?: 'chat' | 'reasoning' | 'tools'
     }
 
-    interface Props {
+    interface Props extends ComponentsProps {
         // 宿主视图状态（+page 传入，用户切换时 AI 可感知）
         viewPhase?: string
         viewShowResult?: boolean
@@ -39,7 +40,13 @@
         onRequestView?: (phase: string) => void
     }
 
-    let { viewPhase = 'team', viewShowResult = false, onRequestView }: Props = $props()
+    let {
+        viewPhase = 'team',
+        viewShowResult = false,
+        onRequestView,
+        class: className,
+        style: styleProp
+    }: Props = $props()
 
     const VIEW_LABELS: Record<string, string> = {
         team: '队伍',
@@ -429,7 +436,7 @@
     <div
         class="ai-assistant theme-glass-surface fixed z-40 flex flex-col overflow-hidden border shadow-2xl {dragPos
             ? ''
-            : 'bottom-4 right-4'}"
+            : 'bottom-4 right-4'} {className}"
         style="{dragPos
             ? gpuAccel
                 ? `left:0;top:0;transform: translate(${dragPos.x}px, ${dragPos.y}px)${size === 'collapsed' ? ` scale(${btnScale})` : ''};`
@@ -450,7 +457,7 @@
             ? 'var(--theme-accent-bg)'
             : 'color-mix(in srgb, var(--theme-modal-bg) 78%, transparent)'};color:{size === 'collapsed'
             ? 'var(--theme-accent-text-on-bg, #fff)'
-            : 'var(--theme-modal-text)'};border-color:var(--theme-divider-border);"
+            : 'var(--theme-modal-text)'};border-color:var(--theme-divider-border);${styleProp || ''}"
         onmousedown={(e) => e.stopPropagation()}
         onmousemove={(e) => e.stopPropagation()}
         onmouseup={(e) => e.stopPropagation()}

@@ -14,7 +14,7 @@
         SHARE_SORT_LABELS,
         type ShareProject
     } from '$lib/data/share.svelte'
-    import { getCharIconMap } from './timeline/timeline.store.svelte'
+    import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { shortName } from '$lib/utils/character'
 

@@ -1,9 +1,9 @@
 // 队伍域写入工具（Phase 1 补全）：设置槽位角色/武器/首位声骸/触发套装，校验逻辑与 UI 选择器一致
 import { defineTool } from './registry'
 import { getActiveProject, updateTeam, isPhaseReadonly } from '$lib/data/project.svelte'
-import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$lib/data/api'
+import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$lib/api/data-cache'
 import type { Character } from '$lib/api/types'
-import type { CharSlot, EchoSlot, SelectedSet } from '$lib/data/types'
+import type { CharSlot, EchoSlot, SelectedSet } from '$lib/types/project'
 import { HECATE_ECHO } from '$lib/consts/game-terms'
 
 const str = (v: unknown): string => String(v ?? '').trim()

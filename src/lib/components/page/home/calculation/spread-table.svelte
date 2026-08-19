@@ -1,21 +1,22 @@
 <script lang="ts">
     /** @desc 铺开表（拉表铺开模式）：按角色×直伤/非直伤分组，Buff 作列、条目作行，支持单元格/行列头三态勾选、框选批量、叠层文件夹列线区分 */
     import { onMount, onDestroy } from 'svelte'
-    import type { BuffSet, DamageEntry } from './calculation.types'
-    import type { CharSlot } from '$lib/data/types'
-    import type { ConditionProfile } from '../result/compute'
-    import { conditionMet } from '../result/compute'
-    import { inferDamageTypes } from '../result/utils'
-    import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, LAYERED_BUFF_PATTERN } from './calculation.consts'
-    import { getCalcElementMap } from './calculation.store.svelte'
+    import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+    import type { CharSlot } from '$lib/types/project'
+    import type { ConditionProfile } from '$lib/calc/compute'
+    import { conditionMet } from '$lib/calc/compute'
+    import { inferDamageTypes } from '$lib/calc/utils'
+    import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
+    import { getCalcElementMap } from '$lib/calc/calculation.store.svelte'
     import { getDamageTypeEditMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import Icon from '@iconify/svelte'
+    import type { ComponentsProps } from '$lib/types'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         damageEntries: DamageEntry[]
         buffSets: BuffSet[]
@@ -42,7 +43,9 @@
         onToggle,
         onToggleDamageType,
         onSetEntryBuffSetIds,
-        onSetEntriesBuffSetIds
+        onSetEntriesBuffSetIds,
+        class: className,
+        style: styleProp
     }: Props = $props()
 
     /** @desc 普通 buff 列（非全局）与全局 buff 列（仅展示，不可勾选） */
@@ -619,7 +622,8 @@
 <!-- @desc 表格根容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="theme-scrollbar h-full overflow-auto pb-48"
+    class="theme-scrollbar h-full overflow-auto pb-48 {className}"
+    style={styleProp}
     bind:this={rootEl}
     onmousedown={handleMouseDown}
     onclickcapture={handleClickCapture}

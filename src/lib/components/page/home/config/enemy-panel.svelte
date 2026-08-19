@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { getConfig, updateEnemy, updateResistance } from './config.store.svelte'
-    import { RESISTANCE_KEYS } from './config.consts'
-    import { getElementIcons } from '$lib/data/api'
+    import { getConfig, updateEnemy, updateResistance } from '$lib/calc/config.store.svelte'
+    import { RESISTANCE_KEYS } from '$lib/calc/config.consts'
+    import { getElementIcons } from '$lib/api/data-cache'
     import Icon from '@iconify/svelte'
 
     let config = $derived(getConfig())

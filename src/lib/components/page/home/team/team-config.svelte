@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { CharSlot, SelectedSet } from '$lib/data/types'
+    import type { CharSlot, SelectedSet } from '$lib/types/project'
     import type { Character, Weapon, Echo, EchoSetItem } from '$lib/api/types'
     import { addToast } from '$lib/data/toast.svelte'
     import Icon from '@iconify/svelte'
@@ -14,22 +14,23 @@
         getEchoSetIcons,
         getElementIcons,
         getWeaponTypeIcons
-    } from '$lib/data/api'
+    } from '$lib/api/data-cache'
     import CharacterPicker from './pickers/character-picker.svelte'
     import WeaponPicker from './pickers/weapon-picker.svelte'
     import EchoPicker from './pickers/echo-picker.svelte'
     import SetPicker from './set-picker.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { HECATE_ECHO } from '$lib/consts/game-terms'
+    import type { ComponentsProps } from '$lib/types'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         onupdate: (team: [CharSlot, CharSlot, CharSlot]) => void
         locked?: boolean
         onreset?: () => void
     }
 
-    let { team: _team, onupdate, locked = false, onreset }: Props = $props()
+    let { team: _team, onupdate, locked = false, onreset, class: className, style: styleProp }: Props = $props()
 
     function makeSlot(): CharSlot {
         return {
@@ -283,8 +284,8 @@
 </script>
 
 <div
-    class="theme-glass-surface flex h-full flex-col p-6"
-    style="background: var(--theme-modal-bg); color: var(--theme-modal-text)"
+    class="theme-glass-surface flex h-full flex-col p-6 {className}"
+    style="background: var(--theme-modal-bg); color: var(--theme-modal-text); {styleProp || ''}"
 >
     <div class="flex min-h-0 flex-1 gap-4">
         {#each localTeam as slot, i}

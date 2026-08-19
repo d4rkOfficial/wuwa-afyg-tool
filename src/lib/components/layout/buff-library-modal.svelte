@@ -31,7 +31,7 @@
         getWeaponIcons,
         getEchoIcons,
         getEchoSetIcons
-    } from '$lib/data/api'
+    } from '$lib/api/data-cache'
     import type { Character, Weapon, Echo, EchoSetItem } from '$lib/api/types'
     import { fallbackIcon } from '$lib/utils/icons'
     import { fade } from 'svelte/transition'

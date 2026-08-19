@@ -25,10 +25,10 @@ import {
     getMaxPos,
     getCustomSkillHits,
     getTimelineState
-} from '$lib/components/page/home/timeline/timeline.store.svelte'
+} from '$lib/calc/timeline.store.svelte'
 import { updateTimeline } from '$lib/data/project.svelte'
-import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/components/page/home/timeline/timeline.consts'
-import type { SkillHit, NonDirectEntry } from '$lib/components/page/home/timeline/timeline.types'
+import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/calc/timeline.consts'
+import type { SkillHit, NonDirectEntry } from '$lib/calc/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 const BLOCK_W = 60

@@ -7,7 +7,7 @@ import {
     parseProjectFile,
     ProjectParseError
 } from '$lib/data/project.svelte'
-import type { Project } from '$lib/data/types'
+import type { Project } from '$lib/types/project'
 
 export interface ShareTeamPreview {
     names: string[]

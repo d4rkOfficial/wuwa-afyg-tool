@@ -16,9 +16,9 @@
         charHasTuneSkills,
         charHasResponseSkill,
         applyNonDirectEntries
-    } from './timeline.store.svelte'
-    import { getCharIconMap } from './timeline.store.svelte'
-    import { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from './timeline.consts'
+    } from '$lib/calc/timeline.store.svelte'
+    import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
+    import { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from '$lib/calc/timeline.consts'
     import { fallbackIcon } from '$lib/utils/icons'
     import { focusTrap } from '$lib/utils/focus-trap'
 </script>

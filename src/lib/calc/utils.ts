@@ -1,5 +1,5 @@
 import type { ResultEntry } from './result.types'
-import type { DamageEntry } from '../calculation/calculation.types'
+import type { DamageEntry } from './calculation.types'
 
 /** @desc 自动推导伤害类型：效应条目（isEffect）→「效应伤害」；其余按技能类型推断，常态攻击再按招式名分普攻/重击 */
 export function inferDamageTypes(entry: DamageEntry): string[] {

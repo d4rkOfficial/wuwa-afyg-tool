@@ -1,4 +1,4 @@
-import { getCharacterInfo } from './api'
+import { getCharacterInfo } from '$lib/api/data-cache'
 
 let _charElementMap = $state<Record<string, string>>(loadCache())
 

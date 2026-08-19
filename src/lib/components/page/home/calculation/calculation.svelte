@@ -18,16 +18,17 @@
         getBuffDiffMode,
         getConditionProfile,
         getHideConditionMismatch
-    } from './calculation.store.svelte'
-    import type { CharSlot } from '$lib/data/types'
-    import type { TimelineData } from '../timeline/timeline.types'
-    import type { CalcState } from './calculation.types'
+    } from '$lib/calc/calculation.store.svelte'
+    import type { CharSlot } from '$lib/types/project'
+    import type { TimelineData } from '$lib/calc/timeline.types'
+    import type { CalcState } from '$lib/calc/calculation.types'
     import BuffModal from './buff-modal.svelte'
     import SpreadTable from './spread-table.svelte'
     import DropdownTable from './dropdown-table.svelte'
     import { getCalcViewMode } from '$lib/data/calc-view.svelte'
+    import type { ComponentsProps } from '$lib/types'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         timelineData: TimelineData | null
         calcState: CalcState | null
@@ -35,7 +36,15 @@
         onupdate: (state: CalcState) => void
     }
 
-    let { team, timelineData, calcState, locked = false, onupdate }: Props = $props()
+    let {
+        team,
+        timelineData,
+        calcState,
+        locked = false,
+        onupdate,
+        class: className,
+        style: styleProp
+    }: Props = $props()
 
     /** @desc 依赖变化时（队伍/时间线/外部状态/锁定）重新初始化 store（untrack 避免重复执行 $effect 自依赖） */
     $effect(() => {
@@ -93,36 +102,38 @@
     }
 </script>
 
-<!-- @desc Buff 配置弹窗（挂载于页面顶层，open 由 store 控制） -->
-<BuffModal open={showBuffModal} {team} onclose={handleCloseBuffModal} />
+<div class="flex h-full flex-col {className}" style={styleProp}>
+    <!-- @desc Buff 配置弹窗（挂载于页面顶层，open 由 store 控制） -->
+    <BuffModal open={showBuffModal} {team} onclose={handleCloseBuffModal} />
 
-<!-- @desc 视图切换：spread → 铺开表（传绑定映射/条件配置/回调用）；否则 → 下拉表（多传 buffDiffMode 差异模式） -->
-{#if calcViewMode === 'spread'}
-    <SpreadTable
-        {team}
-        {damageEntries}
-        {buffSets}
-        {entryBuffSetIdMap}
-        {entryDamageTypeMap}
-        {globalBuffSetIds}
-        conditionProfile={getConditionProfile()}
-        hideConditionMismatch={getHideConditionMismatch()}
-        onToggle={handleSpreadToggle}
-        onToggleDamageType={handleSpreadToggleDamageType}
-        onSetEntryBuffSetIds={handleSpreadSetEntryBuffSetIds}
-        onSetEntriesBuffSetIds={handleSpreadSetEntriesBuffSetIds}
-    />
-{:else}
-    <DropdownTable
-        {team}
-        {damageEntries}
-        {buffSets}
-        {entryBuffSetIdMap}
-        {entryDamageTypeMap}
-        {globalBuffSetIds}
-        conditionProfile={getConditionProfile()}
-        hideConditionMismatch={getHideConditionMismatch()}
-        buffDiffMode={getBuffDiffMode()}
-        {onupdate}
-    />
-{/if}
+    <!-- @desc 视图切换：spread → 铺开表（传绑定映射/条件配置/回调用）；否则 → 下拉表（多传 buffDiffMode 差异模式） -->
+    {#if calcViewMode === 'spread'}
+        <SpreadTable
+            {team}
+            {damageEntries}
+            {buffSets}
+            {entryBuffSetIdMap}
+            {entryDamageTypeMap}
+            {globalBuffSetIds}
+            conditionProfile={getConditionProfile()}
+            hideConditionMismatch={getHideConditionMismatch()}
+            onToggle={handleSpreadToggle}
+            onToggleDamageType={handleSpreadToggleDamageType}
+            onSetEntryBuffSetIds={handleSpreadSetEntryBuffSetIds}
+            onSetEntriesBuffSetIds={handleSpreadSetEntriesBuffSetIds}
+        />
+    {:else}
+        <DropdownTable
+            {team}
+            {damageEntries}
+            {buffSets}
+            {entryBuffSetIdMap}
+            {entryDamageTypeMap}
+            {globalBuffSetIds}
+            conditionProfile={getConditionProfile()}
+            hideConditionMismatch={getHideConditionMismatch()}
+            buffDiffMode={getBuffDiffMode()}
+            {onupdate}
+        />
+    {/if}
+</div>

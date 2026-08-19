@@ -1,30 +1,30 @@
-import type { DamageEntry, BuffSet } from '../../calculation/calculation.types'
-import type { ConfigState, EchoSlotConfig } from '../../config/config.types'
+import type { DamageEntry, BuffSet } from '../calculation.types'
+import type { ConfigState, EchoSlotConfig } from '../config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { CharSlot } from '$lib/data/types'
+import type { CharSlot } from '$lib/types/project'
 import type { CharSubstatAnalysis, SubstatContribution, EchoContribution } from '../result.types'
-import { computeAll, getCharFullStatsForChar, computeOneEntry, cloneEchoesWithoutAllSubstats } from '../compute'
+import {
+    computeAll,
+    getCharFullStatsForChar,
+    computeOneEntry,
+    cloneEchoesWithoutSubstat,
+    cloneEchoesWithoutAllSubstats
+} from '../compute'
 
-function cloneEchoesWithIncreasedSubstat(
-    echoes: EchoSlotConfig[],
-    echoIdx: number,
-    substatIdx: number,
-    delta: number
-): EchoSlotConfig[] {
+function factorial(n: number): number {
+    let r = 1
+    for (let i = 2; i <= n; i++) r *= i
+    return r
+}
+
+function buildSubsetEchoes(echoes: EchoSlotConfig[], echoIdx: number, keepIndices: number[]): EchoSlotConfig[] {
     return echoes.map((echo, ei) => {
         if (ei !== echoIdx) return echo
         return {
             ...echo,
-            substats: echo.substats.map((sub, si) => {
-                if (si !== substatIdx) return sub
-                return { ...sub, value: sub.value + delta }
-            })
+            substats: echo.substats.filter((_, si) => keepIndices.includes(si))
         }
     })
-}
-
-function getEpsilon(value: number): number {
-    return Math.max(0.5, Math.abs(value) * 0.05)
 }
 
 export function computeSubstatContributions(
@@ -80,7 +80,10 @@ export function computeSubstatContributions(
             )
         })
 
-        function computeDamageForEchoes(modEchoes: EchoSlotConfig[]): {
+        function computeDamageForEchoes(
+            modEchoes: EchoSlotConfig[],
+            rig: boolean
+        ): {
             norm: number
             rigVal: number
             noCritVal: number
@@ -117,7 +120,7 @@ export function computeSubstatContributions(
                     weaponInfoMap
                 )
                 norm += re.totalDamageRaw
-                rigVal += rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamageRaw
+                rigVal += rig && rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamageRaw
                 noCritVal += noCritEntryIds.has(re.id) ? re.nonCritPerHit : re.totalDamageRaw
             }
             return { norm, rigVal, noCritVal }
@@ -127,39 +130,63 @@ export function computeSubstatContributions(
         const allSubstats: SubstatContribution[] = []
 
         const emptyEchoes = cloneEchoesWithoutAllSubstats(echoes)
-        const emptyDamage = computeDamageForEchoes(emptyEchoes)
+        const emptyDamage = computeDamageForEchoes(emptyEchoes, true)
 
         for (let ei = 0; ei < echoes.length; ei++) {
             const echo = echoes[ei]
-            if (echo.substats.length === 0) continue
+            const k = echo.substats.length
+            if (k === 0) continue
+
+            // precompute v(S) for all 2^k subsets
+            const subsetCache = new Map<string, { norm: number; rigVal: number; noCritVal: number }>()
+            for (let mask = 0; mask < 1 << k; mask++) {
+                const keep: number[] = []
+                for (let i = 0; i < k; i++) {
+                    if (mask & (1 << i)) keep.push(i)
+                }
+                const modEchoes = buildSubsetEchoes(echoes, ei, keep)
+                const dmg = computeDamageForEchoes(modEchoes, true)
+                subsetCache.set(mask.toString(), dmg)
+            }
+
+            // precompute Shapley weights for subset sizes
+            const weights: number[] = []
+            for (let s = 0; s < k; s++) {
+                weights[s] = (factorial(s) * factorial(k - s - 1)) / factorial(k)
+            }
 
             const echoSubstats: SubstatContribution[] = []
 
-            for (let si = 0; si < echo.substats.length; si++) {
+            for (let si = 0; si < k; si++) {
                 const sub = echo.substats[si]
-                const epsilon = getEpsilon(sub.value)
+                let shapleyNorm = 0
+                let shapleyRig = 0
+                let shapleyNoCrit = 0
 
-                const modified = cloneEchoesWithIncreasedSubstat(echoes, ei, si, epsilon)
-                const boosted = computeDamageForEchoes(modified)
+                for (let mask = 0; mask < 1 << k; mask++) {
+                    if (mask & (1 << si)) continue
 
-                const derivNorm = (boosted.norm - baselineNorm) / epsilon
-                const derivRig = (boosted.rigVal - baselineRig) / epsilon
-                const derivNoCrit = (boosted.noCritVal - baselineNoCrit) / epsilon
+                    const s = popcount(mask)
+                    const maskWith = mask | (1 << si)
 
-                const contribNorm = derivNorm * sub.value
-                const contribRig = derivRig * sub.value
-                const contribNoCrit = derivNoCrit * sub.value
+                    const vS = subsetCache.get(mask.toString())!
+                    const vSwith = subsetCache.get(maskWith.toString())!
+
+                    shapleyNorm += weights[s] * (vSwith.norm - vS.norm)
+                    shapleyRig += weights[s] * (vSwith.rigVal - vS.rigVal)
+                    shapleyNoCrit += weights[s] * (vSwith.noCritVal - vS.noCritVal)
+                }
 
                 echoSubstats.push({
                     type: sub.type,
                     value: sub.value,
                     unit: sub.unit,
-                    contributionNorm: contribNorm,
-                    contributionRig: contribRig,
-                    contribPctNorm: baselineNorm > 0 ? (contribNorm / baselineNorm) * 100 : 0,
-                    contribPctRig: baselineRig > 0 ? (contribRig / baselineRig) * 100 : 0,
-                    contributionNoCrit: contribNoCrit,
-                    contribPctNoCrit: baselineNoCrit > 0 ? (contribNoCrit / baselineNoCrit) * 100 : 0
+                    contributionNorm: shapleyNorm,
+                    contributionRig: shapleyRig,
+                    contribPctNorm: baselineNorm > 0 ? (shapleyNorm / baselineNorm) * 100 : 0,
+                    contribPctRig: baselineRig > 0 ? (shapleyRig / baselineRig) * 100 : 0,
+                    contributionNoCrit: shapleyNoCrit,
+                    contribPctNoCrit: baselineNoCrit > 0 ? (shapleyNoCrit / baselineNoCrit) * 100 : 0
                 })
             }
 
@@ -224,4 +251,11 @@ export function computeSubstatContributions(
             aggregated
         }
     })
+}
+
+function popcount(x: number): number {
+    x = x - ((x >>> 1) & 0x55555555)
+    x = (x & 0x33333333) + ((x >>> 2) & 0x33333333)
+    x = (x + (x >>> 4)) & 0x0f0f0f0f
+    return (x * 0x01010101) >>> 24
 }

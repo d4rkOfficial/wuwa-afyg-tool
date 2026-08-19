@@ -1,15 +1,16 @@
 <script lang="ts">
     import { ROLLABLE_TYPES, simulateEnhancement } from '$lib/consts/substat-roll-data'
     import type { EchoStat } from '$lib/types/game-data'
+    import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
 
-    interface Props {
+    interface Props extends ComponentsProps {
         existingTypes: string[]
         onclose: () => void
         onresult: (result: { substats: EchoStat[]; attempts: number }) => void
     }
 
-    let { existingTypes, onclose, onresult }: Props = $props()
+    let { existingTypes, onclose, onresult, class: className, style: styleProp }: Props = $props()
 
     const available = ROLLABLE_TYPES.filter((t) => !existingTypes.includes(t))
     const PRESELECT = available.filter((t) => t === '暴击率' || t === '暴击伤害')
@@ -39,8 +40,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
-    style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-    class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+    style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
+    class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
     onclick={() => !running && onclose()}
 >
     <!-- svelte-ignore a11y_click_events_have_key_events -->

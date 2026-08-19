@@ -1,6 +1,7 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
-    import type { Project, PhaseKey } from '$lib/data/types'
+    import type { ComponentsProps } from '$lib/types'
+    import type { Project, PhaseKey } from '$lib/types/project'
     import { canEditPhase, getPhaseOrder } from '$lib/data/project.svelte'
     import { openHelp } from '$lib/data/help.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
@@ -60,7 +61,7 @@
         config: '等待拉表锁定'
     }
 
-    interface Props {
+    interface Props extends ComponentsProps {
         project: Project
         active: PhaseKey
         onchange: (key: PhaseKey) => void
@@ -79,7 +80,9 @@
         resultEnabled = false,
         onresult,
         onunlock,
-        onlock
+        onlock,
+        class: className,
+        style: styleProp
     }: Props = $props()
 
     let tabs = $derived<PhaseTab[]>(
@@ -131,8 +134,9 @@
 </script>
 
 <div
-    class="theme-glass-surface flex items-center gap-1 border-b px-3"
-    style="background: var(--theme-tabs-bg); color: var(--theme-tabs-text); border-color: var(--theme-divider-border)"
+    class="theme-glass-surface flex items-center gap-1 border-b px-3 {className}"
+    style="background: var(--theme-tabs-bg); color: var(--theme-tabs-text); border-color: var(--theme-divider-border); {styleProp ||
+        ''}"
 >
     {#each tabs as tab}
         {@const isActive = !showResult && active === tab.key}

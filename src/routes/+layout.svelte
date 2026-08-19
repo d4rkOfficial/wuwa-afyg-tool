@@ -1,6 +1,6 @@
 <script lang="ts">
     import { browser } from '$app/environment'
-    import { clearCache } from '$lib/data/api'
+    import { clearCache } from '$lib/api/data-cache'
     import { connectWs, disconnectWs } from '$lib/ws-remote/ws-remote.svelte'
     import {
         parseHashParams,

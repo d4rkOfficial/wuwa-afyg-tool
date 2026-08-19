@@ -9,7 +9,7 @@ import {
     updateSubstatValue,
     updateEnemy,
     updateResistance
-} from '$lib/components/page/home/config/config.store.svelte'
+} from '$lib/calc/config.store.svelte'
 import { getActiveProject, updateConfig } from '$lib/data/project.svelte'
 import { MAIN_STAT_POOL } from '$lib/consts/stat-data'
 

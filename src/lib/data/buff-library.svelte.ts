@@ -2,7 +2,7 @@ import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { getShareBase } from './workshop.svelte'
-import type { BuffCondition, BuffZoneValue } from '$lib/components/page/home/calculation/calculation.types'
+import type { BuffCondition, BuffZoneValue } from '$lib/calc/calculation.types'
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
 

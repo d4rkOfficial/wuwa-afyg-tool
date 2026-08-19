@@ -1,7 +1,7 @@
-import type { DamageEntry, BuffSet } from '../../calculation/calculation.types'
-import type { ConfigState } from '../../config/config.types'
+import type { DamageEntry, BuffSet } from '../calculation.types'
+import type { ConfigState } from '../config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { CharSlot } from '$lib/data/types'
+import type { CharSlot } from '$lib/types/project'
 import type { CharSubstatAnalysis } from '../result.types'
 
 export type AlgorithmId = 'single-loss' | 'shapley' | 'partial-derivative'
