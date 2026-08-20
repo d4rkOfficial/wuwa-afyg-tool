@@ -22,7 +22,8 @@ export type SubstatAlgorithm = (
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
     rigCritEntryIds: Set<string>,
-    noCritEntryIds: Set<string>
+    noCritEntryIds: Set<string>,
+    missEntryIds: Set<string>
 ) => CharSubstatAnalysis[]
 
 export const ALGORITHMS_INFO: AlgorithmInfo[] = [

@@ -37,7 +37,8 @@ export function computeSubstatContributions(
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
     rigCritEntryIds: Set<string>,
-    noCritEntryIds: Set<string>
+    noCritEntryIds: Set<string>,
+    missEntryIds: Set<string>
 ): CharSubstatAnalysis[] {
     const allEntries = computeAll(
         damageEntries,
@@ -53,8 +54,9 @@ export function computeSubstatContributions(
     const charNames = team.map((s) => s.character).filter((c): c is string => c !== null)
 
     return charNames.map((charName, ci) => {
-        const charEntries = allEntries.filter((e) => e.character === charName)
-        const charDmgEntries = damageEntries.filter((e) => e.character === charName)
+        // 未命中条目伤害恒为 0，直接过滤（等价于归零，占比/贡献口径不变）
+        const charEntries = allEntries.filter((e) => e.character === charName && !missEntryIds.has(e.id))
+        const charDmgEntries = damageEntries.filter((e) => e.character === charName && !missEntryIds.has(e.id))
 
         const baselineNorm = charEntries.reduce((s, e) => s + e.totalDamageRaw, 0)
         const baselineRig = charEntries.reduce((s, e) => {

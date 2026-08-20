@@ -60,6 +60,10 @@ export interface ResultEntry {
 
     // resolved damage types (拉表配置优先，否则推断)；非直伤为空
     damageTypes: string[]
+
+    // 溯源辅助（可选，低耦合）：增伤区的元素/类型拆分（%），仅直伤条目回填
+    elBonus?: number
+    typeBonus?: number
 }
 
 export interface CharSummary {

@@ -19,6 +19,8 @@
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import DataAnalysisModal from './data-analysis-modal.svelte'
+    import DamageTraceView from './damage-trace-view.svelte'
+    import type { DamageTraceCtx } from '$lib/calc/damage-trace'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
@@ -33,6 +35,7 @@
         'background: var(--theme-rigcrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
     const NOCRIT_GRAD_TEXT =
         'background: var(--theme-nocrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
+    const MISS_TEXT = 'color: var(--theme-modal-text); opacity: 0.45; text-decoration: line-through;'
 
     let charInfoMap = $state<Record<string, CharacterInfo>>({})
     let weaponInfoMap = $state<Record<string, WeaponInfo>>({})
@@ -45,6 +48,19 @@
     let resultAnalysis = $derived(getActiveProject()?.resultAnalysis)
     let rigCritEntryIds = $state<string[]>([])
     let noCritEntryIds = $state<string[]>([])
+    let missEntryIds = $state<string[]>([])
+
+    // 分段还原/乘区溯源上下文：与 computeAll 同源（拉表/配置 store），保证口径一致
+    let traceCtx = $derived<DamageTraceCtx>({
+        buffSets: getCalcState().buffSets,
+        damageEntryBuffSetIds: getCalcState().damageEntryBuffSetIds,
+        damageEntryDamageTypes: getCalcState().damageEntryDamageTypes,
+        configState: getConfig(),
+        team,
+        charInfoMap,
+        weaponInfoMap,
+        conditionProfile: getConditionProfile()
+    })
 
     $effect(() => {
         calcState
@@ -100,6 +116,7 @@
         }
         rigCritEntryIds = getActiveProject()?.resultAnalysis?.rigCritEntryIds ?? []
         noCritEntryIds = getActiveProject()?.resultAnalysis?.noCritEntryIds ?? []
+        missEntryIds = getActiveProject()?.resultAnalysis?.missEntryIds ?? []
         computeAll()
         loading = false
     }
@@ -130,7 +147,12 @@
     function applyModes(sourceEntries: ResultEntry[]) {
         const rigIds = new Set(rigCritEntryIds)
         const noCritIds = new Set(noCritEntryIds)
+        const missIds = new Set(missEntryIds)
         entries = sourceEntries.map((e) => {
+            // 未命中优先：该段伤害恒为 0（暴击/不暴击列保留理论值，期望/总伤/基准归零）
+            if (missIds.has(e.id)) {
+                return { ...e, expectedPerHit: 0, totalDamage: 0, totalDamageRaw: 0 }
+            }
             if (rigIds.has(e.id)) {
                 return { ...e, expectedPerHit: e.critPerHit, totalDamage: e.critPerHit }
             }
@@ -141,14 +163,22 @@
         })
     }
 
-    function setEntryMode(id: string, mode: 'expect' | 'crit' | 'nocrit') {
+    function setEntryMode(id: string, mode: 'expect' | 'crit' | 'nocrit' | 'miss') {
         let rig = rigCritEntryIds.includes(id) ? rigCritEntryIds.filter((i) => i !== id) : rigCritEntryIds
         let noCrit = noCritEntryIds.includes(id) ? noCritEntryIds.filter((i) => i !== id) : noCritEntryIds
+        let miss = missEntryIds.includes(id) ? missEntryIds.filter((i) => i !== id) : missEntryIds
         if (mode === 'crit' && !rig.includes(id)) rig = [...rig, id]
         if (mode === 'nocrit' && !noCrit.includes(id)) noCrit = [...noCrit, id]
+        if (mode === 'miss' && !miss.includes(id)) miss = [...miss, id]
         rigCritEntryIds = rig
         noCritEntryIds = noCrit
-        updateResultAnalysis({ timings: resultAnalysis?.timings ?? [], rigCritEntryIds: rig, noCritEntryIds: noCrit })
+        missEntryIds = miss
+        updateResultAnalysis({
+            timings: resultAnalysis?.timings ?? [],
+            rigCritEntryIds: rig,
+            noCritEntryIds: noCrit,
+            missEntryIds: miss
+        })
         applyModes(cleanEntries)
     }
 
@@ -192,7 +222,8 @@
                 charInfoMap,
                 weaponInfoMap,
                 new Set(rigCritEntryIds),
-                new Set(noCritEntryIds)
+                new Set(noCritEntryIds),
+                new Set(missEntryIds)
             )
             analysisComputing = false
         }, 0)
@@ -340,11 +371,13 @@
                             >
                             <td
                                 class="py-1.5 px-3 text-right tabular-nums font-medium"
-                                style={rigCritEntryIds.includes(entry.id)
-                                    ? RIG_GRAD_TEXT
-                                    : noCritEntryIds.includes(entry.id)
-                                      ? NOCRIT_GRAD_TEXT
-                                      : 'color: var(--theme-accent-text)'}>{entry.expectedPerHit.toLocaleString()}</td
+                                style={missEntryIds.includes(entry.id)
+                                    ? MISS_TEXT
+                                    : rigCritEntryIds.includes(entry.id)
+                                      ? RIG_GRAD_TEXT
+                                      : noCritEntryIds.includes(entry.id)
+                                        ? NOCRIT_GRAD_TEXT
+                                        : 'color: var(--theme-accent-text)'}>{entry.expectedPerHit.toLocaleString()}</td
                             >
                             <td class="py-1.5 w-8"></td>
                         </tr>
@@ -363,234 +396,54 @@
                                             <div class="font-bold font-sans text-(--theme-accent-text)">
                                                 最终 = {entry.baseValue.toLocaleString()}
                                             </div>
-                                        {:else if entry.baseUnit.startsWith('偏谐系数')}
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                基础值 = {entry.baseValue.toLocaleString()}
-                                            </div>
-                                            <div class="font-mono space-y-0.5 pl-3 text-(--theme-modal-text)/60">
-                                                <div>
-                                                    偏谐系数 {entry.baseAtk.toLocaleString()}
-                                                </div>
-                                                {#if entry.extraRatio > 0}
-                                                    <div>
-                                                        × 倍率 ({((entry.ratioNum / entry.hits) * 100).toFixed(2)}% + {entry.extraRatio}%(额外)){#if entry.hits > 1}
-                                                            × {entry.hits}
-                                                        {/if}
-                                                        = {(
-                                                            entry.ratioNum * 100 +
-                                                            entry.extraRatio * entry.hits
-                                                        ).toFixed(2)}% = {entry.baseValue.toLocaleString()}
-                                                    </div>
-                                                {:else}
-                                                    <div>
-                                                        × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
-                                                            2
-                                                        )}%{#if entry.hits > 1}
-                                                            × {entry.hits}
-                                                        {/if}
-                                                        = {entry.baseValue.toLocaleString()}
-                                                    </div>
-                                                {/if}
-                                            </div>
-                                            {#if entry.multiplierZones.length}
-                                                <div
-                                                    class="grid gap-x-6 gap-y-1"
-                                                    style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));"
-                                                >
-                                                    {#each entry.multiplierZones as zone}
-                                                        <div
-                                                            class="grid grid-cols-[auto_1fr_auto] gap-x-1 items-center"
-                                                        >
-                                                            <span
-                                                                class="font-sans text-right text-(--theme-modal-text)/40"
-                                                                >{zone.label}</span
-                                                            >
-                                                            <span class="text-center font-mono">{zone.detail}</span>
-                                                            <span
-                                                                class="text-right font-mono text-(--theme-accent-text)"
-                                                                >= {zone.value.toFixed(4)}</span
-                                                            >
-                                                        </div>
-                                                    {/each}
-                                                </div>
-                                            {/if}
+                                        {:else if entry.baseUnit.startsWith('偏谐系数') || entry.baseUnit === '效应系数'}
+                                            <DamageTraceView
+                                                {entry}
+                                                ctx={traceCtx}
+                                                missed={missEntryIds.includes(entry.id)}
+                                            />
                                             <div
-                                                class="text-center font-mono text-(--theme-accent-text) pt-1 border-t border-(--theme-divider-border)/30"
+                                                class="shrink-0 self-start inline-flex items-center rounded-lg border overflow-hidden"
+                                                style="border-color: var(--theme-divider-border);"
                                             >
-                                                {entry.baseValue.toLocaleString()}
-                                                {#each entry.multiplierZones as zone}
-                                                    × {zone.value.toFixed(4)}
-                                                {/each}
-                                                = {entry.expectedPerHit.toLocaleString()}
-                                            </div>
-                                            <div class="font-bold font-sans text-(--theme-accent-text)">
-                                                最终 = {entry.expectedPerHit.toLocaleString()}
-                                            </div>
-                                        {:else if entry.baseUnit === '效应系数'}
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                基础值 = {entry.baseValue.toLocaleString()}
-                                            </div>
-                                            <div class="font-mono space-y-0.5 pl-3 text-(--theme-modal-text)/60">
-                                                <div>
-                                                    效应系数 {entry.baseAtk.toLocaleString()}
-                                                </div>
-                                                {#if entry.extraRatio > 0}
-                                                    <div>
-                                                        × 倍率 ({((entry.ratioNum / entry.hits) * 100).toFixed(2)}% + {entry.extraRatio}%(额外)){#if entry.hits > 1}
-                                                            × {entry.hits}
-                                                        {/if}
-                                                        = {(
-                                                            entry.ratioNum * 100 +
-                                                            entry.extraRatio * entry.hits
-                                                        ).toFixed(2)}% = {entry.baseValue.toLocaleString()}
-                                                    </div>
-                                                {:else}
-                                                    <div>
-                                                        × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
-                                                            2
-                                                        )}%{#if entry.hits > 1}
-                                                            × {entry.hits}
-                                                        {/if}
-                                                        = {entry.baseValue.toLocaleString()}
-                                                    </div>
-                                                {/if}
-                                            </div>
-                                            {#if entry.multiplierZones.length}
-                                                <div
-                                                    class="grid gap-x-6 gap-y-1"
-                                                    style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));"
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        setEntryMode(entry.id, 'expect')
+                                                    }}
+                                                    class="px-3 py-2 text-sm font-medium transition-colors"
+                                                    style="background: {!missEntryIds.includes(entry.id)
+                                                        ? 'var(--theme-accent-bg)'
+                                                        : 'transparent'}; color: {!missEntryIds.includes(entry.id)
+                                                        ? 'var(--theme-accent-text-on-bg, #ffffff)'
+                                                        : 'var(--theme-modal-text)/40'};"
                                                 >
-                                                    {#each entry.multiplierZones as zone}
-                                                        <div
-                                                            class="grid grid-cols-[auto_1fr_auto] gap-x-1 items-center"
-                                                        >
-                                                            <span
-                                                                class="font-sans text-right text-(--theme-modal-text)/40"
-                                                                >{zone.label}</span
-                                                            >
-                                                            <span class="text-center font-mono">{zone.detail}</span>
-                                                            <span
-                                                                class="text-right font-mono text-(--theme-accent-text)"
-                                                                >= {zone.value.toFixed(4)}</span
-                                                            >
-                                                        </div>
-                                                    {/each}
-                                                </div>
-                                            {/if}
-                                            <div
-                                                class="text-center font-mono text-(--theme-accent-text) pt-1 border-t border-(--theme-divider-border)/30"
-                                            >
-                                                {entry.baseValue.toLocaleString()}
-                                                {#each entry.multiplierZones as zone}
-                                                    × {zone.value.toFixed(4)}
-                                                {/each}
-                                                = {entry.expectedPerHit.toLocaleString()}
-                                            </div>
-                                            <div class="font-bold font-sans text-(--theme-accent-text)">
-                                                最终 = {entry.expectedPerHit.toLocaleString()}
+                                                    期望
+                                                </button>
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        setEntryMode(entry.id, 'miss')
+                                                    }}
+                                                    class="px-3 py-2 text-sm font-medium transition-colors border-l"
+                                                    title="该段伤害直接归零（未命中）"
+                                                    style="background: {missEntryIds.includes(entry.id)
+                                                        ? 'color-mix(in srgb, var(--theme-modal-text) 24%, transparent)'
+                                                        : 'transparent'}; color: {missEntryIds.includes(entry.id)
+                                                        ? 'var(--theme-modal-text)'
+                                                        : 'var(--theme-modal-text)/40'}; border-color: var(--theme-divider-border);"
+                                                >
+                                                    未命中
+                                                </button>
                                             </div>
                                         {:else}
                                             <!-- Direct damage entry -->
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
-                                                基础值 = {entry.baseValue.toLocaleString()}
-                                            </div>
-                                            <div class="font-mono space-y-0.5 pl-3 text-(--theme-modal-text)/60">
-                                                {#if entry.baseUnit === '攻击'}
-                                                    <div>
-                                                        基础ATK {entry.baseAtk.toLocaleString()} × (1 + {entry.atkPctSum.toFixed(
-                                                            1
-                                                        )}%) + {entry.atkFlatSum.toLocaleString()} = {entry.totalAtk.toLocaleString()}
-                                                    </div>
-                                                {:else if entry.baseUnit === '生命'}
-                                                    <div>
-                                                        基础HP {entry.baseHp.toLocaleString()} × (1 + {entry.hpPctSum.toFixed(
-                                                            1
-                                                        )}%) + {entry.hpFlatSum.toLocaleString()} = {entry.totalHp.toLocaleString()}
-                                                    </div>
-                                                {:else if entry.baseUnit === '防御'}
-                                                    <div>
-                                                        基础DEF {entry.baseDef.toLocaleString()} × (1 + {entry.defPctSum.toFixed(
-                                                            1
-                                                        )}%) + {entry.defFlatSum.toLocaleString()} = {entry.totalDef.toLocaleString()}
-                                                    </div>
-                                                {/if}
-                                                {#if entry.extraRatio > 0}
-                                                    <div>
-                                                        × 倍率 ({((entry.ratioNum / entry.hits) * 100).toFixed(2)}% + {entry.extraRatio}%(额外)){#if entry.hits > 1}
-                                                            × {entry.hits}
-                                                        {/if}
-                                                        = {(
-                                                            entry.ratioNum * 100 +
-                                                            entry.extraRatio * entry.hits
-                                                        ).toFixed(2)}% = {entry.baseValue.toLocaleString()}
-                                                    </div>
-                                                {:else}
-                                                    <div>
-                                                        × 倍率 {((entry.ratioNum / entry.hits) * 100).toFixed(
-                                                            2
-                                                        )}%{#if entry.hits > 1}
-                                                            × {entry.hits}
-                                                        {/if}
-                                                        = {entry.baseValue.toLocaleString()}
-                                                    </div>
-                                                {/if}
-                                            </div>
-                                            {#if entry.multiplierZones.length}
-                                                <div
-                                                    class="grid gap-x-6 gap-y-1"
-                                                    style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));"
-                                                >
-                                                    {#each entry.multiplierZones as zone}
-                                                        <div
-                                                            class="grid grid-cols-[auto_1fr_auto] gap-x-1 items-center"
-                                                        >
-                                                            <span
-                                                                class="font-sans text-right text-(--theme-modal-text)/40"
-                                                                >{zone.label}</span
-                                                            >
-                                                            <span class="text-center font-mono">{zone.detail}</span>
-                                                            <span
-                                                                class="text-right font-mono text-(--theme-accent-text)"
-                                                                >= {zone.value.toFixed(4)}</span
-                                                            >
-                                                        </div>
-                                                    {/each}
-                                                </div>
-                                            {/if}
-                                            <div
-                                                class="text-center font-mono text-(--theme-accent-text) pt-1 border-t border-(--theme-divider-border)/30"
-                                            >
-                                                {entry.baseValue.toLocaleString()}
-                                                {#each entry.multiplierZones as zone}
-                                                    × {zone.value.toFixed(4)}
-                                                {/each}
-                                                = {entry.nonCritPerHit.toLocaleString()}
-                                            </div>
+                                            <DamageTraceView
+                                                {entry}
+                                                ctx={traceCtx}
+                                                missed={missEntryIds.includes(entry.id)}
+                                            />
                                             <div class="flex items-start gap-4">
-                                                <div class="font-sans space-y-0.5 flex-1">
-                                                    {#if rigCritEntryIds.includes(entry.id)}
-                                                        <div class="font-bold" style={RIG_GRAD_TEXT}>
-                                                            期望 = 暴击 = {entry.critPerHit.toLocaleString()}
-                                                        </div>
-                                                    {:else if noCritEntryIds.includes(entry.id)}
-                                                        <div class="font-bold" style={NOCRIT_GRAD_TEXT}>
-                                                            期望 = 不暴击 = {entry.nonCritPerHit.toLocaleString()}
-                                                        </div>
-                                                    {:else}
-                                                        <div>不暴击 = {entry.nonCritPerHit.toLocaleString()}</div>
-                                                        <div>
-                                                            暴击 = {entry.nonCritPerHit.toLocaleString()} × {(
-                                                                entry.critDmg * 100
-                                                            ).toFixed(1)}% = {entry.critPerHit.toLocaleString()}
-                                                        </div>
-                                                        <div class="font-bold" style="color: var(--theme-accent-text)">
-                                                            期望 = {entry.nonCritPerHit.toLocaleString()} × (1 + {(
-                                                                entry.critRate * 100
-                                                            ).toFixed(1)}% × {((entry.critDmg - 1) * 100).toFixed(1)}%)
-                                                            = {entry.expectedPerHit.toLocaleString()}
-                                                        </div>
-                                                    {/if}
-                                                </div>
                                                 <div
                                                     class="shrink-0 self-start inline-flex items-center rounded-lg border overflow-hidden"
                                                     style="border-color: var(--theme-divider-border);"
@@ -602,11 +455,14 @@
                                                         }}
                                                         class="px-3 py-2 text-sm font-medium transition-colors"
                                                         style="background: {!rigCritEntryIds.includes(entry.id) &&
-                                                        !noCritEntryIds.includes(entry.id)
+                                                        !noCritEntryIds.includes(entry.id) &&
+                                                        !missEntryIds.includes(entry.id)
                                                             ? 'var(--theme-accent-bg)'
                                                             : 'transparent'}; color: {!rigCritEntryIds.includes(
                                                             entry.id
-                                                        ) && !noCritEntryIds.includes(entry.id)
+                                                        ) &&
+                                                        !noCritEntryIds.includes(entry.id) &&
+                                                        !missEntryIds.includes(entry.id)
                                                             ? 'var(--theme-accent-text-on-bg, #ffffff)'
                                                             : 'var(--theme-modal-text)/40'};"
                                                     >
@@ -639,6 +495,21 @@
                                                             : 'var(--theme-modal-text)/40'}; border-color: var(--theme-divider-border);"
                                                     >
                                                         不暴
+                                                    </button>
+                                                    <button
+                                                        onclick={(e) => {
+                                                            e.stopPropagation()
+                                                            setEntryMode(entry.id, 'miss')
+                                                        }}
+                                                        class="px-3 py-2 text-sm font-medium transition-colors border-l"
+                                                        title="该段伤害直接归零（未命中）"
+                                                        style="background: {missEntryIds.includes(entry.id)
+                                                            ? 'color-mix(in srgb, var(--theme-modal-text) 24%, transparent)'
+                                                            : 'transparent'}; color: {missEntryIds.includes(entry.id)
+                                                            ? 'var(--theme-modal-text)'
+                                                            : 'var(--theme-modal-text)/40'}; border-color: var(--theme-divider-border);"
+                                                    >
+                                                        未命中
                                                     </button>
                                                 </div>
                                             </div>

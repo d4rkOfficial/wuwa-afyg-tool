@@ -277,7 +277,7 @@ interface CharacterComputed {
     finalDmg: number
     dmgTakenInc: number
     customMult: number
-    /** @desc 特殊乘区（连乘）：每个来源独立乘算 (1 + value/100)，最终与 customMult 组合为统一特殊乘区 **/
+    /** @desc 特殊区（连乘）：每个来源独立乘算 (1 + value/100)，最终与 customMult 组合为统一特殊区 **/
     customFinalDmgMul: number
     dmgRedPen: number
     extraRatio: number
@@ -326,7 +326,8 @@ export function conditionMet(
     return true
 }
 
-function getBoundBuffSets(
+/** @desc 返回某伤害条目实际生效的 Buff 集（按范围+条件过滤），溯源模块复用同一口径 */
+export function getBoundBuffSets(
     entry: DamageEntry,
     charIndex: number,
     buffSets: BuffSet[],
@@ -629,7 +630,7 @@ function computeResultEntry(
                     : tuneStrainMulti.toFixed(4)
         },
         { label: '终伤区', value: finalDmg, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
-        { label: '特殊乘区', value: customMult, detail: customMult.toFixed(4) }
+        { label: '特殊区', value: customMult, detail: customMult.toFixed(4) }
     ]
 
     return {
@@ -681,7 +682,10 @@ function computeResultEntry(
         critPerHit,
         canCrit: entry.damageBaseType !== '偏谐系数',
         multiplierZones: multZones,
-        damageTypes
+        damageTypes,
+        // 溯源辅助：增伤区元素/类型拆分（%）
+        elBonus,
+        typeBonus: typeBonusSum
     }
 }
 
@@ -792,7 +796,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         { label: '谐度增幅区', value: tuneBreakZone, detail: `(1 + ${stats.totalTuneBreakBoost.toFixed(1)}%)` },
         { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
         { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
-        { label: '特殊乘区', value: customMultVal, detail: customMultVal.toFixed(4) }
+        { label: '特殊区', value: customMultVal, detail: customMultVal.toFixed(4) }
     ]
 
     return {
@@ -931,7 +935,7 @@ function computeEffectEntry(
     /** @desc 加深区：1 + 加深%（效应吃加深、不吃谐度增幅） */
     const deepen = 1 + stats.deepenDmg / 100
 
-    /** @desc 终伤区 & 特殊乘区：1 + 终伤%；自定义倍率（≠0 才生效） */
+    /** @desc 终伤区 & 特殊区：1 + 终伤%；自定义倍率（≠0 才生效） */
     const finalDmgDec = stats.finalDmg / 100
     const customMultVal = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
 
@@ -946,7 +950,7 @@ function computeEffectEntry(
         { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
         { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
         { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
-        { label: '特殊乘区', value: customMultVal, detail: customMultVal.toFixed(4) }
+        { label: '特殊区', value: customMultVal, detail: customMultVal.toFixed(4) }
     ]
 
     /** @desc
