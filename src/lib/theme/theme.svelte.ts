@@ -6,6 +6,7 @@ import lightPreset from './preset/light.json'
 
 const ACTIVE_KEY = 'theme-active'
 const OVERRIDES_KEY = 'theme-overrides'
+const MASK_MIGRATED_KEY = 'theme-bgmask-migrated-v2'
 
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
@@ -288,11 +289,16 @@ export async function loadThemes() {
     }
 
     const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
-    if (ov) {
-        // 迁移旧版 bgImageMask（0-100 仅压暗滑块）→ 新版 -100~100 双极滑块
-        if (typeof ov.data.bgImageMask === 'number' && (ov.data as any).bgImageMask > 0) {
+    // 旧版 bgImageMask（0-100 仅压暗滑块）→ 新版 -100~100 双极滑块 的一次性迁移。
+    // 用标记位保证只迁移一次：否则每次加载都会把新版「明亮」(正) 误判为旧版「压暗」取负，导致设置明亮后重进变成压暗
+    const maskMigrated = await dbGet<boolean>(MASK_MIGRATED_KEY)
+    if (!maskMigrated?.data) {
+        if (ov && typeof ov.data.bgImageMask === 'number' && (ov.data as any).bgImageMask > 0) {
             ;(ov.data as any).bgImageMask = -(ov.data.bgImageMask as number)
         }
+        await dbSet(MASK_MIGRATED_KEY, true)
+    }
+    if (ov) {
         overrides = { ...DEFAULT_OVERRIDES, ...ov.data }
         // 旧版未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃
         const bg = overrides.backgroundImage
