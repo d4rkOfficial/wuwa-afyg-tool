@@ -174,11 +174,35 @@ export function computeCharStats(
                 if ((getConditionProfile().refinements[refIdx] ?? 1) < cond.refinement) continue
             }
         }
-        // 条件属性/类型加成：bonusDmg 按 condition 分流到对应元素/类型，否则计入全伤害
-        const isElementCond = Array.isArray(cond?.elements) && cond.elements.length > 0
-        const isTypeCond = Array.isArray(cond?.damageTypes) && cond.damageTypes.length > 0
+        // 软条件（伤害属性/伤害类型）语义：
+        // - 面板数值（攻击/生命/防御/充能/偏谐/双暴等非加成项）：带任何软条件一律不计入面板
+        // - bonusDmg（加成）：仅「单一属性条件」或「单一类型条件」时分流计入对应属性/类型加成；
+        //   属性与类型条件并存时不进入任何加成；无软条件时计入全伤害加成
+        const hasElementCond = Array.isArray(cond?.elements) && cond.elements.length > 0
+        const hasTypeCond = Array.isArray(cond?.damageTypes) && cond.damageTypes.length > 0
+        const hasSoftCond = hasElementCond || hasTypeCond
         for (const z of bs.zones) {
-            switch (z.zoneId) {
+            const zoneId = z.zoneId
+            if (zoneId === 'bonusDmg') {
+                if (hasElementCond && hasTypeCond) continue
+                if (hasElementCond) {
+                    for (const el of cond.elements ?? []) {
+                        elementDmg[el] = (elementDmg[el] ?? 0) + z.value
+                    }
+                } else if (hasTypeCond) {
+                    // 与计算引擎同源键（「共鸣解放伤害」→「共鸣解放」），并入声骸/武器副属性的同类型加成
+                    for (const dt of cond.damageTypes ?? []) {
+                        const key = dt.replace('伤害', '')
+                        typeDmg[key] = (typeDmg[key] ?? 0) + z.value
+                    }
+                } else {
+                    bonusDmg += z.value
+                }
+                continue
+            }
+            // 非加成面板数值：带任何软条件一律不计入面板
+            if (hasSoftCond) continue
+            switch (zoneId) {
                 case 'atkFlat':
                     flatAtk += z.value
                     break
@@ -208,21 +232,6 @@ export function computeCharStats(
                     break
                 case 'tuneBreakBoost':
                     tune += z.value
-                    break
-                case 'bonusDmg':
-                    if (isElementCond) {
-                        for (const el of cond.elements ?? []) {
-                            elementDmg[el] = (elementDmg[el] ?? 0) + z.value
-                        }
-                    } else if (isTypeCond) {
-                        // 与计算引擎同源键（「共鸣解放伤害」→「共鸣解放」），并入声骸/武器副属性的同类型加成
-                        for (const dt of cond.damageTypes ?? []) {
-                            const key = dt.replace('伤害', '')
-                            typeDmg[key] = (typeDmg[key] ?? 0) + z.value
-                        }
-                    } else {
-                        bonusDmg += z.value
-                    }
                     break
             }
         }

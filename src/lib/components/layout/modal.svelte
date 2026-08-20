@@ -39,48 +39,14 @@
 
     let modalEl = $state<HTMLElement | undefined>()
     let modalWidth = $state<number | null>(null)
-    let modalResizing = $state(false)
 
-    $effect(() => {
-        if (!modalResizing) return
-        // rAF 节流：mousemove 只记录目标值，每帧合并一次写入
-        let pending: number | null = null
-        let target = modalWidth ?? 640
-        const onMove = (e: MouseEvent) => {
-            const vw = document.documentElement.clientWidth
-            target = Math.max(320, Math.min(vw - 40, e.clientX * 2))
-            if (pending !== null) return
-            pending = requestAnimationFrame(() => {
-                pending = null
-                modalWidth = target
-            })
-        }
-        const onUp = () => {
-            if (pending !== null) {
-                cancelAnimationFrame(pending)
-                pending = null
-            }
-            modalWidth = target
-            modalResizing = false
-        }
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', onUp)
-        return () => {
-            window.removeEventListener('mousemove', onMove)
-            window.removeEventListener('mouseup', onUp)
-            if (pending !== null) {
-                cancelAnimationFrame(pending)
-                pending = null
-            }
-        }
-    })
-
-    function handleResizeStart(e: MouseEvent) {
-        e.preventDefault()
-        if (modalEl) {
-            modalWidth = modalEl.getBoundingClientRect().width
-        }
-        modalResizing = true
+    /** @desc 双击左侧拖拽线：瞬间切换「最宽」（视口宽 - 40px）与「最紧凑」（自适应内容宽度）两种模式 */
+    function toggleModalWidth() {
+        const vw = document.documentElement.clientWidth
+        const max = Math.max(320, vw - 40)
+        const current = modalWidth ?? modalEl?.getBoundingClientRect().width ?? 640
+        // 已在最宽 → 切回最紧凑（null = 未拉伸，宽度自适应内容）；否则 → 切到最宽
+        modalWidth = current >= max - 4 ? null : max
     }
 
     function handleBackdropClick(e: MouseEvent) {
@@ -127,8 +93,9 @@
                 <Icon icon="mdi:close" class="size-4.5" />
             </button>
             <div
-                class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 transition-colors hover:bg-(--theme-accent-bg)/50 rounded-r-xl"
-                onmousedown={handleResizeStart}
+                class="absolute left-0 top-0 bottom-0 w-1 cursor-pointer z-10 transition-colors hover:bg-(--theme-accent-bg)/50 rounded-l-xl"
+                ondblclick={toggleModalWidth}
+                title="双击切换最紧凑/最宽"
             ></div>
             {#if title}
                 <div class="mb-4 pr-6 text-base font-semibold {footer ? 'shrink-0' : ''}">

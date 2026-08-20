@@ -56,6 +56,21 @@
         if (refreshKey > 0) untrack(() => computeAll())
     })
 
+    // 链/阶档位变化（含从数据分析弹窗打开角色详情配置修改）→ 轻量重算 entries；
+    // 数据分析弹窗打开时同步刷新词条贡献分析；指纹避免挂载期与 loadData 重复计算
+    let _profileFp = ''
+    $effect(() => {
+        const p = getConditionProfile()
+        const fp = `${p.chains.join(',')}|${p.refinements.join(',')}`
+        if (fp === _profileFp) return
+        _profileFp = fp
+        if (loading) return
+        untrack(() => {
+            computeAll()
+            if (showDataAnalysis) scheduleAnalysis()
+        })
+    })
+
     async function loadData() {
         loading = true
         try {
