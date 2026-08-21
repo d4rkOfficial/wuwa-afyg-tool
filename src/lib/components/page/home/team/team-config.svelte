@@ -293,9 +293,7 @@
             {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
                 class="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border p-6"
-                style={slot.character && eColor
-                    ? `background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, ${eColor} 18%, transparent) 100%); border-color: color-mix(in srgb, ${eColor} 50%, transparent)`
-                    : 'background: var(--theme-context-menu-bg); border-color: var(--theme-card-border)'}
+                style="background: var(--theme-card-bg); border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent)"
             >
                 <div class="pointer-events-none absolute inset-0 flex select-none items-center justify-center">
                     <span class="text-[280px] font-black leading-none opacity-[0.08] text-(--theme-accent-text)"
@@ -320,7 +318,6 @@
                     <div class="flex min-h-full flex-col gap-3">
                         <!-- Character -->
                         <div class="flex shrink-0 flex-1 flex-col">
-                            <span class="mb-1 block text-sm text-(--theme-muted-text)">角色</span>
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
@@ -335,19 +332,21 @@
                                 ].join(' ')}
                                 onclick={() => openPicker(i, 'character')}
                             >
+                                <span class="picker-badge">角色</span>
                                 {#if slot.character && characterIcons[slot.character]}
                                     <img
                                         src={characterIcons[slot.character]}
                                         alt={slot.character}
                                         use:fallbackIcon={'/icons/placeholder-character.svg'}
-                                        class="size-14 shrink-0 rounded-full object-cover"
+                                        class="size-14 shrink-0 rounded-full object-cover ring-2"
+                                        style={eColor ? `--tw-ring-color: ${eColor}` : ''}
                                     />
                                 {/if}
                                 <div class="flex flex-col min-w-0 flex-1">
                                     <span
                                         class:opacity-40={!slot.character}
                                         class:text-[var(--theme-muted-text)]={!slot.character}
-                                        class=""
+                                        style={slot.character && eColor ? `color: ${eColor}` : ''}
                                     >
                                         {slot.character || (locked ? '未设置' : '点击选择')}
                                     </span>
@@ -380,7 +379,6 @@
 
                         <!-- Weapon -->
                         <div class="flex shrink-0 flex-1 flex-col">
-                            <span class="mb-1 block text-sm text-(--theme-muted-text)">武器</span>
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
@@ -395,6 +393,7 @@
                                     .join(' ')}
                                 onclick={() => openPicker(i, 'weapon')}
                             >
+                                <span class="picker-badge">武器</span>
                                 {#if slot.weapon && weaponIcons[slot.weapon]}
                                     <img
                                         src={weaponIcons[slot.weapon]}
@@ -430,7 +429,6 @@
 
                         <!-- First Echo -->
                         <div class="flex shrink-0 flex-1 flex-col">
-                            <span class="mb-1 block text-sm text-(--theme-muted-text)">首位声骸</span>
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
@@ -445,6 +443,7 @@
                                     .join(' ')}
                                 onclick={() => openPicker(i, 'echo')}
                             >
+                                <span class="picker-badge">首位声骸</span>
                                 {#if slot.echoes[0].name && echoIcons[slot.echoes[0].name]}
                                     <img
                                         src={echoIcons[slot.echoes[0].name]}
@@ -471,7 +470,6 @@
 
                         <!-- Trigger Sets -->
                         <div class="flex shrink-0 flex-1 flex-col">
-                            <span class="mb-1 block text-sm text-(--theme-muted-text)">触发套装</span>
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
@@ -486,6 +484,7 @@
                                     .join(' ')}
                                 onclick={() => openPicker(i, 'sets')}
                             >
+                                <span class="picker-badge">触发套装</span>
                                 {#if slot.triggerSets.length > 0}
                                     <div class="flex flex-wrap items-center gap-2">
                                         {#each slot.triggerSets as set}
@@ -570,5 +569,22 @@
     }
     .hide-scrollbar::-webkit-scrollbar {
         display: none;
+    }
+    /* 选择框右上角角标：圆角矩形，背景取主题文本色、文字取主题背景色（自然形成 mono 反色：黑夜白底黑字/白天黑底白字） */
+    .picker-badge {
+        position: absolute;
+        right: 0.375rem;
+        top: 0.375rem;
+        z-index: 5;
+        padding: 0.0625rem 0.4375rem;
+        border-radius: 0.3125rem;
+        font-size: 0.625rem;
+        line-height: 1rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        background: var(--theme-modal-text);
+        color: var(--theme-modal-bg);
+        opacity: 0.75;
+        pointer-events: none;
     }
 </style>
