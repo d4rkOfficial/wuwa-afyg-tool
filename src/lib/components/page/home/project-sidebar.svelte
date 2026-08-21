@@ -130,9 +130,13 @@
         return p?.lockedTeamKey ?? null
     })
 
-    function charColor(name: string): string {
-        const el = charElementMap[name]
-        return el ? `var(--theme-element-${el})` : '#888'
+    /** 队伍渐变图标的单色分量：属性色，mixPct>0 时按比例与黑/白混合（暗色主题加深、亮色主题提亮） */
+    const teamStopColor = (name: string, mixPct: number): string => {
+        const el = name ? charElementMap[name] : undefined
+        const base = el ? `var(--theme-element-${el})` : '#555'
+        if (mixPct <= 0) return base
+        const mixColor = currentTheme === 'light' ? 'white' : 'black'
+        return `color-mix(in srgb, ${base} ${100 - mixPct}%, ${mixColor})`
     }
 
     interface TeamGroup {
@@ -167,34 +171,24 @@
         return { groups: sortedGroups, ungrouped: raw }
     })
 
-    let prevActiveId = $state(activeId)
+    let prevGroupKey = $state<string | null>(untrack(() => activeGroupKey))
 
     $effect(() => {
-        const current = activeId
-        if (current !== prevActiveId) {
-            prevActiveId = current
-            const activeProject = untrack(() => projects.find((p) => p.id === current))
-            const key = activeProject?.lockedTeamKey
-            if (key) {
-                untrack(() => {
-                    const next = new Set(expandedKeys)
-                    if (!next.has(key)) {
-                        next.add(key)
-                        expandedKeys = next
-                    }
-                })
-            }
+        const current = activeGroupKey
+        if (current === prevGroupKey) return
+        prevGroupKey = current
+        // 手风琴：活动项目的分组 key 变化时（切换活动项目，或锁定 team 后从未分组进入队伍文件夹），
+        // 展开 / 切换到其所属队伍文件夹
+        if (current && !expandedKeys.has(current)) {
+            untrack(() => {
+                expandedKeys = new Set([current])
+            })
         }
     })
 
     function toggleGroup(key: string) {
-        const next = new Set(expandedKeys)
-        if (next.has(key)) {
-            next.delete(key)
-        } else {
-            next.add(key)
-        }
-        expandedKeys = next
+        // 手风琴：每次只展开一个队伍文件夹（已在展开则收起，否则替换为新展开项）
+        expandedKeys = expandedKeys.has(key) ? new Set() : new Set([key])
     }
 </script>
 
@@ -233,7 +227,7 @@
     </div>
 
     <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pt-2">
-        {#each grouped.groups as group (group.key)}
+        {#each grouped.groups as group, i (group.key)}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
@@ -253,18 +247,24 @@
                     onmouseenter={() => (hoveredHeaderKey = group.key)}
                     onmouseleave={() => (hoveredHeaderKey = null)}
                 >
-                    <svg viewBox="0 0 42 16" class="size-4.5 shrink-0">
-                        {#each [0, 1, 2] as i}
-                            {@const name = group.displayNames[i] ?? ''}
-                            <rect
-                                x={i * 14 + 1}
-                                y="0"
-                                width="10"
-                                height="16"
-                                rx="2.5"
-                                fill={name ? charColor(name) : '#555'}
-                            />
-                        {/each}
+                    <svg viewBox="0 0 16 16" class="size-4.5 shrink-0">
+                        <defs>
+                            <linearGradient id="teamGrad-{i}" x1="0" y1="0" x2="1" y2="1">
+                                <stop
+                                    offset="0%"
+                                    style={`stop-color: ${teamStopColor(group.displayNames[0] ?? '', 0)}`}
+                                />
+                                <stop
+                                    offset="50%"
+                                    style={`stop-color: ${teamStopColor(group.displayNames[1] ?? '', 25)}`}
+                                />
+                                <stop
+                                    offset="100%"
+                                    style={`stop-color: ${teamStopColor(group.displayNames[2] ?? '', 25)}`}
+                                />
+                            </linearGradient>
+                        </defs>
+                        <rect x="0" y="0" width="16" height="16" rx="3" fill={`url(#teamGrad-${i})`} />
                     </svg>
                     {#if !compact}
                         <span class="flex flex-1 items-center gap-0 truncate">
@@ -315,10 +315,8 @@
                 <div
                     class="flex w-full cursor-default items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--theme-sidebar-text)/60"
                 >
-                    <svg viewBox="0 0 42 16" class="size-4.5 shrink-0">
-                        {#each [0, 1, 2] as i}
-                            <rect x={i * 14 + 1} y="0" width="10" height="16" rx="2.5" fill="#555" />
-                        {/each}
+                    <svg viewBox="0 0 16 16" class="size-4.5 shrink-0">
+                        <rect x="0" y="0" width="16" height="16" rx="3" fill="#555" />
                     </svg>
                     {#if !compact}
                         <span class="truncate flex-1">未锁定配队</span>
