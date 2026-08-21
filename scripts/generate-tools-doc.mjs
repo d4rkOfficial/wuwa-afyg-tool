@@ -18,7 +18,7 @@ const DOMAIN_LABELS = {
     'calculation.ts': '拉表',
     'config.ts': '配装',
     'result.ts': '结果',
-    'buff-library.ts': 'Buff 库',
+    'buff-library.ts': 'Buff 集',
     'buff-generate.ts': 'Buff 生成',
     'panels.ts': '面板',
     'view.ts': '视图',

@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **86** 个工具。
+> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **101** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
@@ -68,7 +68,7 @@ _无参数_
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-为本地 Buff 库中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地库（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。
+为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地集（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。
 
 | 参数         | 必填   | 类型   | 说明                                 |
 | ------------ | ------ | ------ | ------------------------------------ |
@@ -88,19 +88,19 @@ _无参数_
 | `entityType` | 否   | string | 可选：只处理该实体类型               |
 | `namingRule` | 否   | string | 可选：用户新定义的命名规则（会记住） |
 
-## Buff 库
+## Buff 集
 
 ### `sync_buff_library_from_share`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-从工坊同步最新 Buff 集到本地库。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。
+从工坊同步最新 Buff 集到本地集。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。
 
 _无参数_
 
 ### `list_buff_entities`
 
-列出本地 Buff 库的实体（可按类型过滤）：实体名、类型、来源（share/custom）、Buff 数量。
+列出本地 Buff 集的实体（可按类型过滤）：实体名、类型、来源（share/custom）、Buff 数量。
 
 | 参数         | 必填 | 类型   | 说明                                  |
 | ------------ | ---- | ------ | ------------------------------------- |
@@ -108,7 +108,7 @@ _无参数_
 
 ### `get_entity_buffs`
 
-查看本地 Buff 库中指定实体的全部 Buff 详情（名称、作用范围、生效条件、乘区与数值、引用）。
+查看本地 Buff 集中指定实体的全部 Buff 详情（名称、作用范围、生效条件、乘区与数值、引用）。
 
 | 参数         | 必填   | 类型   | 说明 |
 | ------------ | ------ | ------ | ---- |
@@ -119,7 +119,7 @@ _无参数_
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-整体覆写本地 Buff 库中指定实体的 Buff 列表（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self\|self_except\|team\|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。
+整体覆写本地 Buff 集中指定实体的 Buff 列表（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self\|self_except\|team\|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。
 
 | 参数         | 必填   | 类型   | 说明 |
 | ------------ | ------ | ------ | ---- |
@@ -131,7 +131,7 @@ _无参数_
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-从本地 Buff 库删除指定实体（不可恢复）。
+从本地 Buff 集删除指定实体（不可恢复）。
 
 | 参数         | 必填   | 类型   | 说明 |
 | ------------ | ------ | ------ | ---- |
@@ -142,7 +142,7 @@ _无参数_
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-清空整个本地 Buff 库（所有实体与 Buff，不可恢复）。
+清空整个本地 Buff 集（所有实体与 Buff，不可恢复）。
 
 _无参数_
 
@@ -264,7 +264,7 @@ _无参数_
 
 ### `import_entity_buffs`
 
-把本地 Buff 库中指定实体（角色/武器/首位声骸/套装）的全部 Buff 导入当前工程（导入后可再绑定到条目）。entityType 取值：character/weapon/echo/1set/2set/3set/4set/5set。
+把本地 Buff 集中指定实体（角色/武器/首位声骸/套装）的全部 Buff 导入当前工程（导入后可再绑定到条目）。entityType 取值：character/weapon/echo/1set/2set/3set/4set/5set。
 
 | 参数         | 必填   | 类型   | 说明     |
 | ------------ | ------ | ------ | -------- |
@@ -414,7 +414,7 @@ _无参数_
 
 ### `get_panels_state`
 
-查看当前所有弹窗面板的开关状态（BUFF配置/速查/Buff 库/设置/工坊/角色详情配置/导入 Buff 集等）。
+查看当前所有弹窗面板的开关状态（BUFF配置/速查/Buff 集/设置/工坊/角色详情配置/导入 Buff 集等）。
 
 _无参数_
 
@@ -527,9 +527,27 @@ _无参数_
 
 ### `get_buff_library_summary`
 
-获取本地 Buff 库概览：实体数量、按类型分布、数据来源（工坊同步/自定义）。
+获取本地 Buff 集概览：实体数量、按类型分布、数据来源（工坊同步/自定义）。
 
 _无参数_
+
+## registry.test
+
+### `__dup_test`
+
+第一版
+
+| 参数 | 必填 | 类型   | 说明 |
+| ---- | ---- | ------ | ---- |
+| `a`  | 否   | string |      |
+
+### `__dup_test`
+
+第二版
+
+| 参数 | 必填 | 类型   | 说明 |
+| ---- | ---- | ------ | ---- |
+| `b`  | 否   | string |      |
 
 ## 结果
 
@@ -539,17 +557,31 @@ _无参数_
 
 _无参数_
 
+### `get_result_entry_breakdown`
+
+查询单条伤害结果条目及其全部乘区溯源（每段的数值与来源：基础值/白值/绿值、增伤/加深/易伤/抗性/防御/免伤/集谐/终伤/特殊/暴击等乘区，各乘区的 buff 来源与折算贡献）。entryId 用 get_result_summary 获取。用于回答“这条伤害是怎么算出来的”“哪个 buff 贡献最大”“为什么这条伤害偏低”。
+
+| 参数      | 必填   | 类型   | 说明                                   |
+| --------- | ------ | ------ | -------------------------------------- |
+| `entryId` | **是** | string | 伤害条目 id（get_result_summary 获取） |
+
+### `get_data_analysis`
+
+查询结果页「数据分析」弹窗的全部分析结果：全队总伤害与 DPS、队伍伤害占比（各角色）、各角色直伤类型占比（普攻/重击/共技/共解等）、三种词条贡献算法（single-loss 单减损 / shapley 夏普利 / partial-derivative 偏导）的副词条贡献明细。用于回答“队伍 DPS 多少”“各角色伤害占比”“该优先升什么词条”“三算法结论是否一致”。
+
+_无参数_
+
 ## 设置
 
 ### `get_settings_state`
 
-读取当前允许 AI 修改的设置状态（外观主题/交互-拉表视图与工具栏/工坊实例/性能相关）。其余设置（按键图标、界面快捷键、归档、缓存、助手设置等）不允许 AI 修改，需用户手动打开「设置」面板调整。
+读取当前设置状态——覆盖「设置」弹窗全部可配置项：外观主题、按键图标、交互、性能、工坊、连接配置（数据源）、缓存、助手设置。具体子项可用专用工具查询（get_keymap/get_shortcuts/get_ai_profiles/get_cache_counts）。
 
 _无参数_
 
 ### `set_setting`
 
-修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(0-100)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change。其它设置一律拒绝。
+修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。
 
 | 参数    | 必填   | 类型     | 说明                           |
 | ------- | ------ | -------- | ------------------------------ |
@@ -565,6 +597,63 @@ _无参数_
 | `action` | **是** | string（switch / add / remove / reset） | 操作类型                    |
 | `id`     | 否     | string                                  | 实例 id（switch/remove 用） |
 | `url`    | 否     | string                                  | 实例地址（add 用）          |
+
+### `get_keymap`
+
+读取按键图标映射（每个操作动作 → 显示的键盘/鼠标图标 key）。返回所有按键映射条目。
+
+_无参数_
+
+### `set_keymap_entry`
+
+修改单个按键图标映射。id 为操作动作 id（如 attack/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseRight/Q/E/R/F/T/SpaceBar）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。
+
+| 参数       | 必填   | 类型   | 说明                                    |
+| ---------- | ------ | ------ | --------------------------------------- |
+| `id`       | **是** | string | 操作动作 id（见 get_keymap 返回）       |
+| `blockKey` | 否     | string | 图标 key（如 MouseLeft/Q/SpaceBar）     |
+| `physical` | 否     | string | 物理按键（单个小写字母 a-z 或空格 " "） |
+
+### `get_shortcuts`
+
+读取界面快捷键映射（排轴/拉表各操作的快捷键）。返回所有快捷键定义及其当前绑定键。
+
+_无参数_
+
+### `set_shortcut`
+
+修改单个界面快捷键绑定。id 为快捷键定义 id（见 get_shortcuts 返回）；key 为新的快捷键组合（如 "ctrl+s"、"shift+enter"、"a"）。修饰键（Ctrl/Shift/Alt）用 + 连接，主键小写。若与同组其他快捷键冲突将报错。
+
+| 参数  | 必填   | 类型   | 说明                                      |
+| ----- | ------ | ------ | ----------------------------------------- |
+| `id`  | **是** | string | 快捷键定义 id                             |
+| `key` | **是** | string | 新快捷键组合（如 ctrl+s、a、shift+enter） |
+
+### `get_ai_profiles`
+
+读取 AI 配置文件列表（每个含服务地址/模型/思考强度，apiKey 仅返回是否已设置不暴露明文）及当前激活的配置 id。
+
+_无参数_
+
+### `manage_ai_profile`
+
+管理 AI 配置文件：add=新建（传 label，可选 baseUrl/model/apiKey/reasoningEffort）、switch=切换激活（传 id）、update=修改（传 id + 可选字段）、delete=删除（传 id，至少保留 1 个）。reasoningEffort 须为 low/medium/high。返回操作结果（apiKey 永远不回显明文）。
+
+| 参数              | 必填   | 类型                                     | 说明                                                     |
+| ----------------- | ------ | ---------------------------------------- | -------------------------------------------------------- |
+| `action`          | **是** | string（add / switch / update / delete） | 操作类型                                                 |
+| `id`              | 否     | string                                   | 配置 id（switch/update/delete 用）                       |
+| `label`           | 否     | string                                   | 配置名称（add 用，update 可选）                          |
+| `baseUrl`         | 否     | string                                   | 服务地址（add/update 可选，如 https://api.deepseek.com） |
+| `model`           | 否     | string                                   | 模型名（add/update 可选）                                |
+| `apiKey`          | 否     | string                                   | API Key（add/update 可选；空串=清除）                    |
+| `reasoningEffort` | 否     | string（low / medium / high）            | 思考强度（add/update 可选）                              |
+
+### `get_cache_counts`
+
+读取各类缓存条目数（列表/详情/图像）。可用 set_setting key=clear_cache 清理（值 list/info/image/all）。
+
+_无参数_
 
 ## 队伍
 
@@ -755,6 +844,38 @@ _无参数_
 | --------- | ---- | ------ | -------------------------------------- |
 | `blockId` | 否   | string | 操作块 id（get_timeline_summary 获取） |
 | `entries` | 否   | array  |                                        |
+
+### `get_ref_line_timings`
+
+查询时间参考线记点状态：哪些参考线已启用为时间记点、各自的秒数（null=未填写/未解析，不参与 DPS 分段）。秒数来源：自动推导（从参考线命名解析）或自定义覆盖。结果按参考线在时间轴上的位置排序。
+
+_无参数_
+
+### `enable_ref_line_timing`
+
+启用某条参考线作为时间记点（加入 timings）。启用时秒数自动推导：按参考线命名解析时间片段（如 "1m30s"→90、"起手"→null 未解析）；结束线（id=right）默认 120s。若该参考线已启用则幂等返回当前状态。
+
+| 参数        | 必填   | 类型   | 说明                                      |
+| ----------- | ------ | ------ | ----------------------------------------- |
+| `refLineId` | **是** | string | 参考线 id（用 get_timeline_summary 查询） |
+
+### `disable_ref_line_timing`
+
+禁用某条参考线的时间记点（从 timings 移除，不再参与 DPS 分段）。若该参考线未启用则幂等返回。
+
+| 参数        | 必填   | 类型   | 说明      |
+| ----------- | ------ | ------ | --------- |
+| `refLineId` | **是** | string | 参考线 id |
+
+### `set_ref_line_timing_seconds`
+
+设置已启用记点的秒数。mode=auto：按参考线命名自动推导（清空自定义覆盖，回到自动解析值；命名无时间片段则秒数为 null「未填写」）；mode=custom：手动填秒数（须 ≥ 0，负数/空串视为清除→null「未填写」）。若该参考线尚未启用，会先自动启用再设秒数。
+
+| 参数        | 必填   | 类型                    | 说明                                                         |
+| ----------- | ------ | ----------------------- | ------------------------------------------------------------ |
+| `refLineId` | **是** | string                  | 参考线 id                                                    |
+| `mode`      | **是** | string（auto / custom） | auto=自动推导（从命名解析），custom=自定义秒数               |
+| `seconds`   | 否     | number                  | 秒数（mode=custom 时必填，≥0；留空/负数→清除为 null 未填写） |
 
 ## 视图
 

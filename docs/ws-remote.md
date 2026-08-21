@@ -47,7 +47,7 @@ exec set_team_character {"slot":1,"character":"散华"}
 ## 权限模型
 
 - 带 hash 访问即视为授权，**直接连接、无确认弹窗**
-- 危险工具（删除工程、归档、清空 Buff 库等）**无条件放行**，与 AI 助手的危险操作权限设置无关
+- 危险工具（删除工程、归档、清空 Buff 集等）**无条件放行**，与 AI 助手的危险操作权限设置无关
 - 服务端可调用全部工具，包括修改工程/排轴/拉表/配装数据与切换视图
 
 ## 消息协议
@@ -115,16 +115,17 @@ exec set_team_character {"slot":1,"character":"散华"}
 
 86 个工具，与 AI 助手完全一致，按领域分组（可用 `node scripts/ws-demo-server.mjs` 后输入 `tools` 查看完整清单，或参考 `src/lib/ai/tools/`）：
 
-| 领域         | 工具（节选）                                                                                                                                                                                                |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 工程         | `list_projects` `get_project_state` `get_team` `create_project` `rename_project` `set_active_project` `archive_project` `delete_project` `clone_project` `lock_phase` `unlock_phase`                        |
-| 队伍         | `get_team_catalog` `set_team_character` `set_team_weapon` `set_team_first_echo` `set_team_trigger_sets`                                                                                                     |
-| 排轴         | `get_timeline_summary` `get_char_skills` `add_op_block` `bind_damage_to_block` `bind_non_direct_to_block` `remove_op_block` `move_op_block` `add_ref_line` `format_timeline` `undo_timeline` 等             |
-| 拉表         | `get_damage_entries` `get_buff_sets` `create_buff_set` `rename_buff_set` `delete_buff_set` `bind_buff_to_entry` `set_buff_zone` `set_buff_zone_ref` `set_chain` `set_refinement` `get_condition_profile` 等 |
-| 配装         | `get_config_summary` `set_echo_cost` `set_main_stat` `add_substat` `remove_substat` `update_substat_value` `update_enemy` `update_resistance`                                                               |
-| 结果         | `get_result_summary`                                                                                                                                                                                        |
-| 视图/弹窗    | `switch_view` `get_panels_state` `open_panel`                                                                                                                                                               |
-| Buff 库/生成 | `list_buff_entities` `get_entity_buffs` `update_entity_buffs` `list_entities` `search_entities` `generate_entity_buffs` `generate_project_buffs` 等                                                         |
+| 领域         | 工具（节选）                                                                                                                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 工程         | `list_projects` `get_project_state` `get_team` `create_project` `rename_project` `set_active_project` `archive_project` `delete_project` `clone_project` `lock_phase` `unlock_phase`                                                                                                                    |
+| 队伍         | `get_team_catalog` `set_team_character` `set_team_weapon` `set_team_first_echo` `set_team_trigger_sets`                                                                                                                                                                                                 |
+| 排轴         | `get_timeline_summary` `get_char_skills` `add_op_block` `bind_damage_to_block` `bind_non_direct_to_block` `remove_op_block` `move_op_block` `add_ref_line` `get_ref_line_timings` `enable_ref_line_timing` `disable_ref_line_timing` `set_ref_line_timing_seconds` `format_timeline` `undo_timeline` 等 |
+| 拉表         | `get_damage_entries` `get_buff_sets` `create_buff_set` `rename_buff_set` `delete_buff_set` `bind_buff_to_entry` `set_buff_zone` `set_buff_zone_ref` `set_chain` `set_refinement` `get_condition_profile` 等                                                                                             |
+| 配装         | `get_config_summary` `set_echo_cost` `set_main_stat` `add_substat` `remove_substat` `update_substat_value` `update_enemy` `update_resistance`                                                                                                                                                           |
+| 结果         | `get_result_summary` `get_result_entry_breakdown` `get_data_analysis`                                                                                                                                                                                                                                   |
+| 设置         | `get_settings_state` `set_setting` `manage_workshop` `get_keymap` `set_keymap_entry` `get_shortcuts` `set_shortcut` `get_ai_profiles` `manage_ai_profile` `get_cache_counts`                                                                                                                            |
+| 视图/弹窗    | `switch_view` `get_panels_state` `open_panel`                                                                                                                                                                                                                                                           |
+| Buff 集/生成 | `list_buff_entities` `get_entity_buffs` `update_entity_buffs` `list_entities` `search_entities` `generate_entity_buffs` `generate_project_buffs` 等                                                                                                                                                     |
 
 ## 示例服务端（scripts/ws-demo-server.mjs）
 
