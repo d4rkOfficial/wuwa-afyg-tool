@@ -1,5 +1,3 @@
-import { browser } from '$app/environment'
-
 /** 分享服务基地址（独立于数据上游） */
 export const SHARE_BASE = 'https://wuwa-afyg-share.200503.xyz'
 

@@ -16,10 +16,6 @@ import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
 
 // ── helpers ──
 
-function clamp(v: number, min: number, max: number): number {
-    return Math.max(min, Math.min(max, v))
-}
-
 import type { EnemyConfig } from './config.types'
 
 import { inferDamageTypes } from './utils'

@@ -43,12 +43,14 @@ export function computeSubstatContributions(
         const charDmgEntries = damageEntries.filter((e) => e.character === charName && !missEntryIds.has(e.id))
 
         const baselineNorm = charEntries.reduce((s, e) => s + e.totalDamageRaw, 0)
-        const baselineRig = charEntries.reduce((s, e) => {
-            return s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamageRaw)
-        }, 0)
-        const baselineNoCrit = charEntries.reduce((s, e) => {
-            return s + (noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw)
-        }, 0)
+        const baselineRig = charEntries.reduce(
+            (s, e) => s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamageRaw),
+            0
+        )
+        const baselineNoCrit = charEntries.reduce(
+            (s, e) => s + (noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw),
+            0
+        )
 
         const echoes = configState.characters[ci]?.echoes ?? []
 

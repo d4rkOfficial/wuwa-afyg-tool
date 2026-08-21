@@ -3,13 +3,7 @@ import type { ConfigState, EchoSlotConfig } from '../config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharSubstatAnalysis, SubstatContribution, EchoContribution } from '../result.types'
-import {
-    computeAll,
-    getCharFullStatsForChar,
-    computeOneEntry,
-    cloneEchoesWithoutSubstat,
-    cloneEchoesWithoutAllSubstats
-} from '../compute'
+import { computeAll, getCharFullStatsForChar, computeOneEntry, cloneEchoesWithoutAllSubstats } from '../compute'
 
 function factorial(n: number): number {
     let r = 1
@@ -59,12 +53,14 @@ export function computeSubstatContributions(
         const charDmgEntries = damageEntries.filter((e) => e.character === charName && !missEntryIds.has(e.id))
 
         const baselineNorm = charEntries.reduce((s, e) => s + e.totalDamageRaw, 0)
-        const baselineRig = charEntries.reduce((s, e) => {
-            return s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamageRaw)
-        }, 0)
-        const baselineNoCrit = charEntries.reduce((s, e) => {
-            return s + (noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw)
-        }, 0)
+        const baselineRig = charEntries.reduce(
+            (s, e) => s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamageRaw),
+            0
+        )
+        const baselineNoCrit = charEntries.reduce(
+            (s, e) => s + (noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw),
+            0
+        )
 
         const echoes = configState.characters[ci]?.echoes ?? []
 
@@ -255,9 +251,10 @@ export function computeSubstatContributions(
     })
 }
 
-function popcount(x: number): number {
-    x = x - ((x >>> 1) & 0x55555555)
-    x = (x & 0x33333333) + ((x >>> 2) & 0x33333333)
-    x = (x + (x >>> 4)) & 0x0f0f0f0f
-    return (x * 0x01010101) >>> 24
+function popcount(value: number): number {
+    // SWAR 位计数：复用中间值而非重赋值入参（纯函数式约束）
+    const a = value - ((value >>> 1) & 0x55555555)
+    const b = (a & 0x33333333) + ((a >>> 2) & 0x33333333)
+    const c = (b + (b >>> 4)) & 0x0f0f0f0f
+    return (c * 0x01010101) >>> 24
 }

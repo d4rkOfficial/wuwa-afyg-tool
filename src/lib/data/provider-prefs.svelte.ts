@@ -15,7 +15,7 @@ export interface ProviderOption {
 let _activeId = $state<string>(getCurrentProviderId())
 let _options = $state<ProviderOption[]>(listProviders())
 // 每个上游的最新版本（badge 展示用），providerId → version
-let _versions = $state<Record<string, string>>({})
+const _versions = $state<Record<string, string>>({})
 
 export function getProviderOptions(): ProviderOption[] {
     return _options

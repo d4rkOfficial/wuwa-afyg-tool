@@ -204,7 +204,6 @@ function getView(): string {
 
 function buildState(view: string) {
     const p = getActiveProject()
-    const order = ['team', 'timeline', 'calculation', 'config'] as const
     return {
         project: p ? { id: p.id, name: p.name } : null,
         view,

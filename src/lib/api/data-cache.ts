@@ -22,7 +22,7 @@ const DEFAULT_PROVIDER = 'nanoka'
 /** 当前上游作用域（默认 nanoka）。用于让缓存命名空间与上游绑定。 */
 function providerScope(): string {
     const id = getProviderId()
-    return id === DEFAULT_PROVIDER ? '' : id + '/'
+    return id === DEFAULT_PROVIDER ? '' : `${id}/`
 }
 
 /** 在本地 API 路径后附加 ?provider= 查询参数（仅非默认上游时）。 */
@@ -34,7 +34,7 @@ const memoryCache = new Map<string, unknown>()
 const inFlight = new Map<string, Promise<unknown>>()
 
 function cacheKey(cat: string, entity: string, name?: string): string {
-    return `${PREFIX}${providerScope()}${cat}:${entity}${name ? ':' + name : ''}`
+    return `${PREFIX}${providerScope()}${cat}:${entity}${name ? `:${name}` : ''}`
 }
 
 // ── IndexedDB 持久缓存：结构化克隆（免大 JSON 反复 stringify/parse），localStorage 仅作回退/迁移 ──

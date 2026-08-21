@@ -30,7 +30,7 @@ import {
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
-import { ZONE_DEFS, ZONE_MAP, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import { ZONE_MAP, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import type { ZoneRef } from '$lib/calc/calculation.types'
 

@@ -53,7 +53,7 @@ export async function ensureVersion() {
 
 export async function fetchManifest(): Promise<NanokaManifest> {
     const res = await fetch(`${NANOKA_BASE}/manifest.json`)
-    if (!res.ok) throw new Error('HTTP ' + res.status)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
 }
 

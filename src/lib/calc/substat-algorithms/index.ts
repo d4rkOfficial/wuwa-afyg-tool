@@ -6,7 +6,7 @@ import { computeSubstatContributions as partialDerivative } from './partial-deri
 
 const algorithms: Record<AlgorithmId, SubstatAlgorithm> = {
     'single-loss': singleLoss,
-    shapley: shapley,
+    shapley,
     'partial-derivative': partialDerivative
 }
 

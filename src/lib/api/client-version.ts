@@ -23,7 +23,7 @@ export async function ensureVersion(): Promise<void> {
     if (!_versionPromise) {
         _versionPromise = (async () => {
             try {
-                const res = await fetch('/api/v1/version/latest' + providerQuery())
+                const res = await fetch(`/api/v1/version/latest${providerQuery()}`)
                 if (res.ok) {
                     const v: unknown = await res.json()
                     if (typeof v === 'string' && v) {

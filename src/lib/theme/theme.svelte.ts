@@ -40,7 +40,7 @@ let themes = $state<Theme[]>([])
 let activeId = $state<string>('')
 let overrides = $state<ThemeOverrides>({ ...DEFAULT_OVERRIDES })
 
-let bgOriginals = new Map<string, string>()
+const bgOriginals = new Map<string, string>()
 
 const toPlain = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 
@@ -293,8 +293,8 @@ export async function loadThemes() {
     // 用标记位保证只迁移一次：否则每次加载都会把新版「明亮」(正) 误判为旧版「压暗」取负，导致设置明亮后重进变成压暗
     const maskMigrated = await dbGet<boolean>(MASK_MIGRATED_KEY)
     if (!maskMigrated?.data) {
-        if (ov && typeof ov.data.bgImageMask === 'number' && (ov.data as any).bgImageMask > 0) {
-            ;(ov.data as any).bgImageMask = -(ov.data.bgImageMask as number)
+        if (ov && typeof ov.data.bgImageMask === 'number' && ov.data.bgImageMask > 0) {
+            ov.data.bgImageMask = -ov.data.bgImageMask
         }
         await dbSet(MASK_MIGRATED_KEY, true)
     }

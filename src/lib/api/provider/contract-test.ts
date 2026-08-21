@@ -15,7 +15,7 @@ function isNonEmptyString(v: unknown): boolean {
 }
 
 export function runContractTests(provider: DataProvider): void {
-    describe('DataProvider contract: ' + provider.id, () => {
+    describe(`DataProvider contract: ${provider.id}`, () => {
         it('exposes id and label', () => {
             assert.ok(isNonEmptyString(provider.id))
             assert.ok(isNonEmptyString(provider.label))

@@ -203,14 +203,12 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
     if (options.newUserMessage?.trim()) messages.push({ role: 'user', content: options.newUserMessage.trim() })
 
     let text = ''
-    let reasoning = ''
     const useResponses = supportsResponsesWebSearch(cfg.baseUrl, cfg.model)
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         if (useResponses) {
             const r = await runResponsesRound(cfg, messages, tools, toolContext, emit, options, systemPrompt)
             text = r.text
-            reasoning = r.reasoning
             if (r.done) break
             continue
         }
@@ -227,7 +225,6 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
                     emit({ type: 'ai', text: delta.content })
                 }
                 if (delta.reasoning) {
-                    reasoning += delta.reasoning
                     emit({ type: 'reasoning', text: delta.reasoning })
                 }
             }

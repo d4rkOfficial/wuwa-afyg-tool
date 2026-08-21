@@ -42,6 +42,15 @@
 每次任务结束必须依次运行：
 
 1. `pnpm run format`
-2. `pnpm run check`
+2. `pnpm run lint:eslint`（ESLint 必须零错误通过）
+3. `pnpm run check`
 
 无需运行 test。
+
+### 5.1 ESLint 函数式约束
+
+- 配置文件：`eslint.config.js`（flat config）
+- **纯逻辑层**（`src/lib` 下 `calc/` `api/` `utils/` `consts/` `types/` `ai/generate/` `ai/tools/` 的 `.ts`，排除 `*.svelte.ts` / `*.test.ts`）强制函数式偏好：`prefer-const` `prefer-arrow-callback` `prefer-template` `object-shorthand` `arrow-body-style` `no-var` `no-param-reassign`
+- **UI / store 层**（`*.svelte`、`*.svelte.ts`）仅基础解析，不做函数式约束（Runes 响应式状态保留可变性）
+- 新增纯逻辑函数时遵守：入参不可重赋值（`no-param-reassign`）、优先 `const`、优先箭头函数
+- Svelte 最佳实践规则（`svelte/recommended`）默认未启用（避免淹没函数式信号）；如需启用，将 `eslint.config.js` 中 `'flat/base'` 换成 `'flat/recommended'`

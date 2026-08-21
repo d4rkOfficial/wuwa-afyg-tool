@@ -1,4 +1,3 @@
-import type { EchoStat } from '$lib/types/game-data'
 import type { EchoSlotConfig, CharEchoConfig, EnemyConfig, ConfigState } from './config.types'
 import { ELEMENTS } from '$lib/consts/game-terms'
 import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'

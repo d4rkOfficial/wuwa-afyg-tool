@@ -118,7 +118,7 @@ export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
             if (folderKeys.has(key) && !seenFolders.has(key)) {
                 seenFolders.add(key)
                 result.push({
-                    key: 'folder:' + key,
+                    key: `folder:${key}`,
                     type: 'folder',
                     name: m[1] + LAYERED_BUFF_VAR + m[3],
                     prefix: key,

@@ -3,7 +3,6 @@ import type { ConfigState } from '$lib/calc/config.types'
 import type { CalcState } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import {
-    ELEMENT_ORDER,
     ELEMENT_BONUS_MAP,
     TYPE_BONUS_MAP,
     WEAPON_SUBSTAT_NAME_MAP,
@@ -78,8 +77,8 @@ export function computeCharStats(
     let critRate = 5
     let critDmg = 150
     let healBonus = 0
-    let elementDmg: Record<string, number> = {}
-    let typeDmg: Record<string, number> = {}
+    const elementDmg: Record<string, number> = {}
+    const typeDmg: Record<string, number> = {}
     let bonusDmg = 0
 
     function add(type: string, value: number) {

@@ -37,7 +37,7 @@ const realFetch = globalThis.fetch
 
 describe('nanoka provider', () => {
     beforeEach(() => {
-        globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        globalThis.fetch = async (input: RequestInfo | URL, _init?: RequestInit) => {
             const url = String(input)
             for (const [matcher, factory] of ROUTES) {
                 if (matcher.test(url)) {

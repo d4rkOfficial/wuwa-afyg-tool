@@ -8,6 +8,7 @@ import { getSkillCache } from './timeline.store.svelte'
 import { getCharElementMap, ensureCharElements } from '$lib/data/char-elements.svelte'
 import { addToast } from '$lib/data/toast.svelte'
 import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
+import type { ZoneId } from './calculation.consts'
 import type { ConditionProfile } from './compute'
 
 let _entries = $state<DamageEntry[]>([])
@@ -557,7 +558,7 @@ export function setBuffSetZoneOverride(setId: string, zoneId: string, override: 
             ? {
                   ...s,
                   zones: s.zones.map((z) =>
-                      z.zoneId === (zoneId as any)
+                      z.zoneId === (zoneId as ZoneId)
                           ? { ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }
                           : z
                   )
@@ -659,7 +660,7 @@ export function renameBuffSet(id: string, name: string) {
 export function addZoneToBuffSet(setId: string, zoneId: string) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) =>
-        s.id === setId ? { ...s, zones: [...s.zones, { zoneId: zoneId as any, value: 0 } as BuffZoneValue] } : s
+        s.id === setId ? { ...s, zones: [...s.zones, { zoneId: zoneId as ZoneId, value: 0 } as BuffZoneValue] } : s
     )
 }
 
@@ -667,7 +668,7 @@ export function addZoneToBuffSet(setId: string, zoneId: string) {
 export function removeZoneFromBuffSet(setId: string, zoneId: string) {
     if (!assertUnlocked()) return
     _buffSets = _buffSets.map((s) =>
-        s.id === setId ? { ...s, zones: s.zones.filter((z) => z.zoneId !== (zoneId as any)) } : s
+        s.id === setId ? { ...s, zones: s.zones.filter((z) => z.zoneId !== (zoneId as ZoneId)) } : s
     )
 }
 
@@ -676,7 +677,7 @@ export function setBuffSetZoneValue(setId: string, zoneId: string, value: number
     if (!assertUnlocked()) return
     const bs = _buffSets.find((s) => s.id === setId)
     if (!bs) return
-    const zone = bs.zones.find((z) => z.zoneId === (zoneId as any))
+    const zone = bs.zones.find((z) => z.zoneId === (zoneId as ZoneId))
     if (zone) zone.value = value
 }
 
