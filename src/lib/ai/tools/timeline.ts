@@ -26,8 +26,9 @@ import {
     getCustomSkillHits,
     getTimelineState
 } from '$lib/calc/timeline.store.svelte'
-import { updateTimeline } from '$lib/data/project.svelte'
+import { updateTimeline, updateResultAnalysis, getActiveProject } from '$lib/data/project.svelte'
 import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/calc/timeline.consts'
+import { resolveRefLineSeconds, type RefLineLike } from '$lib/calc/ref-line-timing'
 import type { SkillHit, NonDirectEntry } from '$lib/calc/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
@@ -548,5 +549,161 @@ defineTool('bind_non_direct_to_block', {
         setDamageBlockNonDirectEntries(blockId, entries)
         await updateTimeline(getTimelineState())
         return { bound: entries.length, blockId }
+    }
+})
+
+// ── 时间参考线记点（结果分析用，timings 持久在 resultAnalysis）──
+
+/** @desc 取当前工程的 timings（resultAnalysis.timings，缺省为空数组） */
+const getTimings = (): { refLineId: string; seconds: number | null }[] => {
+    const p = getActiveProject()
+    return p?.resultAnalysis?.timings ? JSON.parse(JSON.stringify(p.resultAnalysis.timings)) : []
+}
+
+defineTool('get_ref_line_timings', {
+    description:
+        '查询时间参考线记点状态：哪些参考线已启用为时间记点、各自的秒数（null=未填写/未解析，不参与 DPS 分段）。秒数来源：自动推导（从参考线命名解析）或自定义覆盖。结果按参考线在时间轴上的位置排序。',
+    parameters: { type: 'object', properties: {} },
+    handler: () => {
+        const timings = getTimings()
+        const refLines = getRefLines()
+        const sorted = [...timings]
+            .filter((t) => refLines.some((r) => r.id === t.refLineId))
+            .sort((a, b) => {
+                const ap = refLines.find((r) => r.id === a.refLineId)?.pos ?? 0
+                const bp = refLines.find((r) => r.id === b.refLineId)?.pos ?? 0
+                return ap - bp
+            })
+        return {
+            timings: sorted.map((t) => {
+                const rl = refLines.find((r) => r.id === t.refLineId)
+                return {
+                    refLineId: t.refLineId,
+                    refLineName: rl?.time ?? '',
+                    seconds: t.seconds,
+                    status: t.seconds === null ? '未填写（不参与分段）' : '已填写'
+                }
+            }),
+            totalEnabled: sorted.length,
+            validCount: sorted.filter((t) => t.seconds !== null).length,
+            hint: 'seconds=null 表示「未填写」（名称无时间片段）；用 enable_ref_line_timing 启用、disable_ref_line_timing 禁用、set_ref_line_timing_seconds 设自定义秒数。'
+        }
+    }
+})
+
+defineTool('enable_ref_line_timing', {
+    description:
+        '启用某条参考线作为时间记点（加入 timings）。启用时秒数自动推导：按参考线命名解析时间片段（如 "1m30s"→90、"起手"→null 未解析）；结束线（id=right）默认 120s。若该参考线已启用则幂等返回当前状态。',
+    parameters: {
+        type: 'object',
+        properties: { refLineId: { type: 'string', description: '参考线 id（用 get_timeline_summary 查询）' } },
+        required: ['refLineId']
+    },
+    handler: async (args) => {
+        const id = str(args.refLineId)
+        const refLines = getRefLines()
+        if (!refLines.some((r) => r.id === id))
+            throw new Error(`参考线 ${id} 不存在，可用 get_timeline_summary 查询可用参考线`)
+        const project = getActiveProject()
+        if (!project) throw new Error('当前没有活动工程')
+        const timings = getTimings()
+        if (timings.some((t) => t.refLineId === id)) {
+            return { refLineId: id, alreadyEnabled: true, timings }
+        }
+        const seconds = resolveRefLineSeconds(id, refLines as RefLineLike[], timings)
+        const next = [...timings, { refLineId: id, seconds }]
+        await updateResultAnalysis({
+            ...project.resultAnalysis,
+            timings: next
+        })
+        return {
+            refLineId: id,
+            enabled: true,
+            seconds,
+            status: seconds === null ? '未填写（名称无时间片段，需手动设秒数）' : '自动推导',
+            timings: next
+        }
+    }
+})
+
+defineTool('disable_ref_line_timing', {
+    description: '禁用某条参考线的时间记点（从 timings 移除，不再参与 DPS 分段）。若该参考线未启用则幂等返回。',
+    parameters: {
+        type: 'object',
+        properties: { refLineId: { type: 'string', description: '参考线 id' } },
+        required: ['refLineId']
+    },
+    handler: async (args) => {
+        const id = str(args.refLineId)
+        const project = getActiveProject()
+        if (!project) throw new Error('当前没有活动工程')
+        const timings = getTimings()
+        if (!timings.some((t) => t.refLineId === id)) {
+            return { refLineId: id, alreadyDisabled: true, timings }
+        }
+        const next = timings.filter((t) => t.refLineId !== id)
+        await updateResultAnalysis({
+            ...project.resultAnalysis,
+            timings: next
+        })
+        return { refLineId: id, disabled: true, timings: next }
+    }
+})
+
+defineTool('set_ref_line_timing_seconds', {
+    description:
+        '设置已启用记点的秒数。mode=auto：按参考线命名自动推导（清空自定义覆盖，回到自动解析值；命名无时间片段则秒数为 null「未填写」）；mode=custom：手动填秒数（须 ≥ 0，负数/空串视为清除→null「未填写」）。若该参考线尚未启用，会先自动启用再设秒数。',
+    parameters: {
+        type: 'object',
+        properties: {
+            refLineId: { type: 'string', description: '参考线 id' },
+            mode: {
+                type: 'string',
+                enum: ['auto', 'custom'],
+                description: 'auto=自动推导（从命名解析），custom=自定义秒数'
+            },
+            seconds: { type: 'number', description: '秒数（mode=custom 时必填，≥0；留空/负数→清除为 null 未填写）' }
+        },
+        required: ['refLineId', 'mode']
+    },
+    handler: async (args) => {
+        const id = str(args.refLineId)
+        const mode = str(args.mode)
+        const refLines = getRefLines()
+        if (!refLines.some((r) => r.id === id))
+            throw new Error(`参考线 ${id} 不存在，可用 get_timeline_summary 查询可用参考线`)
+        const project = getActiveProject()
+        if (!project) throw new Error('当前没有活动工程')
+        const timings = getTimings()
+
+        let seconds: number | null
+        if (mode === 'auto') {
+            seconds = resolveRefLineSeconds(id, refLines as RefLineLike[], timings)
+        } else if (mode === 'custom') {
+            const raw = args.seconds
+            if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) {
+                seconds = null
+            } else {
+                seconds = raw
+            }
+        } else {
+            throw new Error('mode 须为 auto/custom')
+        }
+
+        // 若未启用 → 先加入；已启用 → 覆盖秒数
+        const next = timings.some((t) => t.refLineId === id)
+            ? timings.map((t) => (t.refLineId === id ? { ...t, seconds } : t))
+            : [...timings, { refLineId: id, seconds }]
+        await updateResultAnalysis({
+            ...project.resultAnalysis,
+            timings: next
+        })
+        return {
+            refLineId: id,
+            mode,
+            seconds,
+            status: seconds === null ? '未填写（不参与分段）' : '已填写',
+            timings: next
+        }
     }
 })
