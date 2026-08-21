@@ -66,26 +66,34 @@
     const refLineHelpItems: { name: string; description: string; content: string }[] = [
         {
             name: '命名解析',
-            description: '参考线名称中的数字自动转为秒数',
+            description: '从名称中提取最像时间的片段',
             content:
-                '启用参考线作为时间记点时，会解析其名称并自动填入秒数：名称含数字即填入第一个数字；数字紧邻单位时按单位换算——分 / min / m ×60，秒 / sec / s ×1，帧 / f ÷100（1 秒 = 100 帧）。支持混合单位，如「1min30s50f」= 60 + 30 + 0.5 = 90.5 秒。'
+                '数字紧邻单位（分/秒/帧、min/sec/m/s/f）即为时间片段，可在名称任意位置；多个片段取最后一个；裸数字仅独立片段（不与中文/字母紧贴，如「启动 60」=60s，「循环2」不算）才解析。混合单位如「1m30s50f」= 90.5 秒（1 秒 = 100 帧）。'
         },
         {
             name: '相对加算',
-            description: '数字前带 + 号时按上一记点加算',
-            content:
-                '若数字前有加号（如 +25s、+25s30f），启用该记点时，时间 = 上一记点的秒数 + 解析出的秒数，而不是绝对时间。'
+            description: '时间片段前紧邻 + 号 → 相对上一记点追加',
+            content: '若时间片段前紧邻 + 号（如 +25s、启动+30s、启动 +30s），时间 = 上一记点 + 片段值。'
         },
         {
-            name: '单调约束',
-            description: '绝对时间不得早于上一记点',
-            content:
-                '若后续参考线解析出绝对时间，但数值早于上一记点，则自动填入与上一记点相同的时间，保证各记点时间单调递增。'
+            name: '单调追加',
+            description: '绝对时间早于上一记点 → 自动改为追加',
+            content: '绝对时间若早于上一记点，自动按追加处理：时间 = 上一记点 + 片段值，保证各记点时间单调递增。'
+        },
+        {
+            name: '结束线',
+            description: '结束线默认 120s，不足则每次 +30s',
+            content: '排轴末尾的「结束」线启用后默认 120s；若 ≤ 上一记点则每次 +30s，直至大于上一记点。'
+        },
+        {
+            name: '未填写',
+            description: '名称无时间片段 → 不参与分段，可手动填',
+            content: '名称不含时间片段时，记点显示「未填写」、不计入 DPS 分段；可在输入框手动填秒数后参与。'
         }
     ]
 
     // ── timing state ──
-    let timings = $state<{ refLineId: string; seconds: number }[]>([])
+    let timings = $state<{ refLineId: string; seconds: number | null }[]>([])
 
     $effect(() => {
         timings = resultAnalysis?.timings ?? []
@@ -108,40 +116,73 @@
         return map
     })
 
-    /** @desc 参考线命名 → 时间解析：数字+单位（分/秒/帧、min/sec/m/s/f），'+' 前缀表示相对上一记点加算 */
-    function parseRefLineSeconds(raw: string): { relative: boolean; seconds: number } | null {
-        if (!raw) return null
-        const relative = /^\s*\+/.test(raw)
-        const body = raw.replace(/^\s*\+/, '').trim()
-        const firstNum = body.match(/\d+(?:\.\d+)?/)
-        if (!firstNum) return null
-        // 数字紧邻单位 → 解析整段「数字+单位」序列（支持 1min30s50f 等混合单位；1 秒 = 100 帧）
-        const rest = body.slice((firstNum.index ?? 0) + firstNum[0].length).trimStart()
-        if (/^(?:分|秒|帧|min|sec|m|s|f)/.test(rest)) {
-            let seconds = 0
-            let matched = false
-            const re = /(\d+(?:\.\d+)?)\s*(分|秒|帧|min|sec|m|s|f)/g
-            let m: RegExpExecArray | null
-            while ((m = re.exec(body)) !== null) {
-                matched = true
-                const v = parseFloat(m[1])
-                const u = m[2]
-                if (u === '分' || u === 'min' || u === 'm') seconds += v * 60
-                else if (u === '帧' || u === 'f') seconds += v / 100
-                else seconds += v // 秒 / sec / s
-            }
-            return matched ? { relative, seconds } : null
-        }
-        // 数字无单位 → 直接作为秒数
-        return { relative, seconds: parseFloat(firstNum[0]) }
+    /** @desc 时间片段前（可隔空格）紧邻 '+' → 相对追加 */
+    function hasAdjacentPlus(raw: string, fragStart: number): boolean {
+        let i = fragStart - 1
+        while (i >= 0 && /\s/.test(raw[i])) i--
+        return i >= 0 && raw[i] === '+'
     }
 
-    /** @desc 启用参考线作为时间记点时，按其命名解析秒数（相对加算/绝对），并施加单调约束 */
-    function resolveRefLineSeconds(id: string): number {
+    /** @desc 参考线命名 → 时间片段：按「最像时间」原则提取
+     *  1) 数字紧邻单位（分/秒/帧/min/sec/m/s/f）即时间片段，可在名称任意位置；相邻片段合并（1m30s50f）
+     *  2) 裸数字仅独立片段（前后不与中文/字母/数字紧贴）才算
+     *  3) 多个片段取最后一个；带单位优先于裸数字
+     *  返回 { relative, seconds }；无时间片段返回 null
+     */
+    function parseRefLineSeconds(raw: string): { relative: boolean; seconds: number } | null {
+        if (!raw) return null
+        const UNIT_PAT = /(\d+(?:\.\d+)?)\s*(分|秒|帧|min|sec|m|s|f)/g
+
+        // 单位片段：数字 + 紧邻单位
+        const unitHits: { start: number; end: number; seconds: number }[] = []
+        let m: RegExpExecArray | null
+        while ((m = UNIT_PAT.exec(raw)) !== null) {
+            const v = parseFloat(m[1])
+            const u = m[2]
+            const sec = u === '分' || u === 'min' || u === 'm' ? v * 60 : u === '帧' || u === 'f' ? v / 100 : v
+            unitHits.push({ start: m.index, end: m.index + m[0].length, seconds: sec })
+        }
+        // 合并相邻单位片段（允许空白间隔）：1m30s50f / 1m 30s
+        const merged: { start: number; end: number; seconds: number }[] = []
+        for (const h of unitHits) {
+            const last = merged[merged.length - 1]
+            if (last && raw.slice(last.end, h.start).trim() === '') {
+                last.end = h.end
+                last.seconds += h.seconds
+            } else {
+                merged.push({ ...h })
+            }
+        }
+        // 有单位片段 → 带单位优先，取最后一个
+        if (merged.length > 0) {
+            const frag = merged[merged.length - 1]
+            return { relative: hasAdjacentPlus(raw, frag.start), seconds: frag.seconds }
+        }
+
+        // 无单位片段 → 独立裸数字（前后不与中文/字母/数字紧贴）取最后一个
+        const NUM_PAT = /\d+(?:\.\d+)?/g
+        const bare: { start: number; end: number; value: number }[] = []
+        while ((m = NUM_PAT.exec(raw)) !== null) {
+            const before = raw[m.index - 1] ?? ''
+            const after = raw[m.index + m[0].length] ?? ''
+            if (/[\u4e00-\u9fffA-Za-z0-9]/.test(before) || /[\u4e00-\u9fffA-Za-z0-9]/.test(after)) continue
+            bare.push({ start: m.index, end: m.index + m[0].length, value: parseFloat(m[0]) })
+        }
+        if (bare.length > 0) {
+            const frag = bare[bare.length - 1]
+            return { relative: hasAdjacentPlus(raw, frag.start), seconds: frag.value }
+        }
+        return null
+    }
+
+    /** @desc 启用参考线作为时间记点时，按其命名解析秒数：
+     *  结束线默认 120s（≤ 上一记点则 +30s 直到大于）；名称无时间片段返回 null（未解析，不参与分段）
+     */
+    function resolveRefLineSeconds(id: string): number | null {
         const rl = refLines.find((r) => r.id === id)
         const raw = rl?.time ?? ''
-        // 候选集合 = 现有记点 + 新记点，按参考线位置排序
-        const candidate = [...timings, { refLineId: id, seconds: 0 }]
+        // 候选集合 = 现有记点 + 新记点（秒数置 null），按参考线位置排序
+        const candidate = [...timings, { refLineId: id, seconds: null }]
             .filter((t) => refLines.some((r) => r.id === t.refLineId))
             .sort((a, b) => {
                 const aRl = refLines.find((r) => r.id === a.refLineId)
@@ -149,12 +190,27 @@
                 return (aRl?.pos ?? 0) - (bRl?.pos ?? 0)
             })
         const idx = candidate.findIndex((t) => t.refLineId === id)
-        const prevSeconds = idx > 0 ? candidate[idx - 1].seconds : 0
+        // 上一有效记点（跳过未解析的「未填写」记点）
+        let prevSeconds = 0
+        for (let i = idx - 1; i >= 0; i--) {
+            if (candidate[i].seconds !== null) {
+                prevSeconds = candidate[i].seconds!
+                break
+            }
+        }
+
+        // 结束线：默认 120s，不满足「> 上一记点」则每次 +30s 直到满足
+        if (id === 'right') {
+            let sec = 120
+            while (sec <= prevSeconds) sec += 30
+            return sec
+        }
+
         const parsed = parseRefLineSeconds(raw)
-        if (!parsed) return prevSeconds + 25 // 无法解析 → 相对上一记点 +25s
+        if (!parsed) return null
         let seconds = parsed.relative ? prevSeconds + parsed.seconds : parsed.seconds
-        // 单调约束：绝对时间不得早于上一记点（早于则与上一记点相等）
-        if (!parsed.relative && seconds < prevSeconds) seconds = prevSeconds
+        // 绝对时间早于上一记点 → 改走相对追加
+        if (!parsed.relative && seconds < prevSeconds) seconds = prevSeconds + parsed.seconds
         return seconds
     }
 
@@ -166,10 +222,12 @@
         }
     }
 
+    /** @desc 手动填秒数：空/非法/负数 → 未解析(null)；合法则作为覆盖值 */
     function updateSeconds(id: string, raw: string) {
         const val = parseFloat(raw)
-        if (isNaN(val) || val < 0) return
-        timings = timings.map((t) => (t.refLineId === id ? { ...t, seconds: val } : t))
+        timings = timings.map((t) =>
+            t.refLineId === id ? { ...t, seconds: raw.trim() !== '' && !isNaN(val) && val >= 0 ? val : null } : t
+        )
     }
 
     // sorted timings by ref line pos (timeline order)
@@ -183,13 +241,26 @@
             })
     )
 
+    // 已填写秒数的记点（「未填写」记点不参与 DPS 分段/曲线）
+    let validTimings = $derived(sortedTimings.filter((t) => t.seconds !== null))
+
+    /** @desc 该记点之前的最近一个已填写秒数（供输入 min / 提示） */
+    function prevValidSeconds(selIdx: number): number {
+        if (selIdx <= 0) return 0
+        for (let i = selIdx - 1; i >= 0; i--) {
+            const s = sortedTimings[i].seconds
+            if (s !== null) return s
+        }
+        return 0
+    }
+
     // 总时长与总 DPS（强调 DPS）
-    let totalDur = $derived(sortedTimings.length > 0 ? sortedTimings[sortedTimings.length - 1].seconds : 0)
+    let totalDur = $derived(validTimings.length > 0 ? validTimings[validTimings.length - 1].seconds! : 0)
     let overallDps = $derived(totalDur > 0 ? totalDamage / totalDur : null)
 
     // ── DPS segments ──
     let segments = $derived.by(() => {
-        if (sortedTimings.length === 0) return []
+        if (validTimings.length === 0) return []
 
         const result: {
             startSeconds: number
@@ -201,10 +272,10 @@
 
         let prevRefPos = 0
         let prevSeconds = 0
-        for (const t of sortedTimings) {
+        for (const t of validTimings) {
             const rl = refLines.find((r) => r.id === t.refLineId)
             if (!rl) continue
-            const span = t.seconds - prevSeconds
+            const span = t.seconds! - prevSeconds
             if (span <= 0) continue
             const currentRefPos = rl.pos
             const segEntries = entries.filter((e) => {
@@ -223,13 +294,13 @@
             }
             result.push({
                 startSeconds: prevSeconds,
-                endSeconds: t.seconds,
+                endSeconds: t.seconds!,
                 totalDamage: totalDmg,
                 charDamages: charDmg,
                 otherDamage: otherDmg
             })
             prevRefPos = currentRefPos
-            prevSeconds = t.seconds
+            prevSeconds = t.seconds!
         }
 
         return result
@@ -264,20 +335,20 @@
             .map((e) => ({ entry: e, pos: blockPosMap.get(e.sourceTimelineBlockId) }))
             .filter((x): x is { entry: ResultEntry; pos: number } => x.pos !== undefined)
             .sort((a, b) => a.pos - b.pos)
-        const totalDur = sortedTimings.length > 0 ? sortedTimings[sortedTimings.length - 1].seconds : 150
+        const totalDur = validTimings.length > 0 ? validTimings[validTimings.length - 1].seconds! : 150
 
         const segs: { startPos: number; endPos: number; startSec: number; endSec: number }[] = []
-        if (sortedTimings.length === 0) {
+        if (validTimings.length === 0) {
             segs.push({ startPos: -Infinity, endPos: Infinity, startSec: 0, endSec: totalDur })
         } else {
             let prevPos = 0
             let prevSec = 0
-            for (const t of sortedTimings) {
+            for (const t of validTimings) {
                 const rl = refLines.find((r) => r.id === t.refLineId)
                 if (!rl) continue
-                segs.push({ startPos: prevPos, endPos: rl.pos, startSec: prevSec, endSec: t.seconds })
+                segs.push({ startPos: prevPos, endPos: rl.pos, startSec: prevSec, endSec: t.seconds! })
                 prevPos = rl.pos
-                prevSec = t.seconds
+                prevSec = t.seconds!
             }
             segs.push({ startPos: prevPos, endPos: Infinity, startSec: prevSec, endSec: totalDur })
         }
@@ -312,8 +383,8 @@
         if (!curveCanvas || curveEvents.length === 0) return
         curveChart?.destroy()
         const textColor = cssVar('--theme-modal-text', '#e2e8f0')
-        const totalDur = sortedTimings.length > 0 ? sortedTimings[sortedTimings.length - 1].seconds : 150
-        const hasTicks = sortedTimings.length > 0
+        const totalDur = validTimings.length > 0 ? validTimings[validTimings.length - 1].seconds! : 150
+        const hasTicks = validTimings.length > 0
 
         const rigData: { x: number; y: number }[] = []
         const normData: { x: number; y: number }[] = []
@@ -899,7 +970,8 @@
                                     {#each refLines as rl}
                                         {@const isSelected = timings.some((t) => t.refLineId === rl.id)}
                                         {@const selIdx = sortedTimings.findIndex((t) => t.refLineId === rl.id)}
-                                        {@const prevSeconds = selIdx > 0 ? sortedTimings[selIdx - 1].seconds : 0}
+                                        {@const timing = timings.find((t) => t.refLineId === rl.id)}
+                                        {@const prevV = prevValidSeconds(selIdx)}
                                         <div
                                             class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs select-none transition-colors"
                                             style="border-color: {isSelected
@@ -915,21 +987,27 @@
                                             {#if isSelected}
                                                 <input
                                                     type="number"
-                                                    value={timings.find((t) => t.refLineId === rl.id)?.seconds ?? 0}
+                                                    value={timing?.seconds ?? ''}
+                                                    placeholder="未填"
                                                     oninput={(e) =>
                                                         updateSeconds(rl.id, (e.target as HTMLInputElement).value)}
-                                                    min={prevSeconds}
+                                                    min={prevV}
                                                     step="0.1"
                                                     class="w-16 rounded border px-1.5 py-0.5 text-right text-[11px] tabular-nums outline-none"
                                                     style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                                     onclick={(e) => e.stopPropagation()}
                                                 />
                                                 <span class="text-[10px] opacity-40">秒</span>
-                                                {#if selIdx > 0}
+                                                {#if timing?.seconds === null}
+                                                    <span class="text-[10px] whitespace-nowrap" style="color: #f59e0b;"
+                                                        >未填写</span
+                                                    >
+                                                {/if}
+                                                {#if selIdx > 0 && prevV > 0}
                                                     <span
                                                         class="text-[10px]"
                                                         style="color: var(--theme-accent-text); opacity: 0.6;"
-                                                        >(≥ {prevSeconds.toFixed(1)}s)</span
+                                                        >(≥ {prevV.toFixed(1)}s)</span
                                                     >
                                                 {/if}
                                             {/if}
@@ -1103,7 +1181,7 @@
                         {#if curveTab === 'window'}
                             <span style="opacity: 0.4;">窗口 {CURVE_WINDOW_SEC}s · 采样 {CURVE_SAMPLE_SEC}s</span>
                         {/if}
-                        {#if !timings.length}
+                        {#if !validTimings.length}
                             <span style="opacity: 0.4;">默认 X 轴总时长 150s，配置时间记点后按记点显示刻度</span>
                         {/if}
                         <span style="opacity: 0.35;">期望 = 暴击加权；凹暴/不暴仅作用于所选条目</span>
@@ -1153,17 +1231,24 @@
                             class="flex h-3 w-full overflow-hidden rounded-full"
                             style="background: color-mix(in srgb, var(--theme-input-bg) 85%, transparent);"
                         >
-                            {#each sortedSummaries as cs, i}
-                                <div
-                                    class="h-full transition-all"
-                                    style="width: {totalDamage > 0
-                                        ? ((cs.totalDamage / totalDamage) * 100).toFixed(2)
-                                        : 0}%; background: {sortedPieColors[i]};"
-                                    title="{cs.character || '其它'} {totalDamage > 0
-                                        ? ((cs.totalDamage / totalDamage) * 100).toFixed(1)
-                                        : 0}%"
-                                ></div>
-                            {/each}
+                            {#if totalDamage > 0}
+                                {#each sortedSummaries as cs, i}
+                                    {#if i > 0}
+                                        <!-- 段间分割：取弹窗背景色（昼夜主题随 --theme-modal-bg 自动切换），使颜色交界清晰 -->
+                                        <div
+                                            class="w-0.5 shrink-0"
+                                            style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent);"
+                                        ></div>
+                                    {/if}
+                                    <div
+                                        class="h-full transition-all"
+                                        style="flex-grow: {cs.totalDamage}; background: {sortedPieColors[i]};"
+                                        title="{cs.character || '其它'} {((cs.totalDamage / totalDamage) * 100).toFixed(
+                                            1
+                                        )}%"
+                                    ></div>
+                                {/each}
+                            {/if}
                         </div>
                         <div class="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
                             {#each sortedSummaries as cs, i}

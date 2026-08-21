@@ -51,7 +51,8 @@ export interface Project {
 export type { PhaseKey } from '$lib/consts/game-terms'
 
 export interface ResultAnalysisData {
-    timings: { refLineId: string; seconds: number }[]
+    /** 时间记点：seconds 为 null 表示「未填写」（名称未解析出时间，不参与分段），可手动填秒数 */
+    timings: { refLineId: string; seconds: number | null }[]
     rigCritEntryIds?: string[]
     noCritEntryIds?: string[]
     missEntryIds?: string[]
