@@ -1,4 +1,4 @@
-// 本地 Buff 库域工具（Phase 2）：同步、查询、编辑、删除
+// 本地 Buff 集域工具（Phase 2）：同步、查询、编辑、删除
 import { defineTool } from './registry'
 import {
     getBuffEntities,
@@ -15,7 +15,7 @@ const SCOPES: BuffLibraryScope[] = ['self', 'self_except', 'team', 'effect_only'
 
 defineTool('sync_buff_library_from_share', {
     description:
-        '从工坊同步最新 Buff 集到本地库。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。',
+        '从工坊同步最新 Buff 集到本地集。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。',
     dangerous: true,
     parameters: { type: 'object', properties: {} },
     handler: async () => {
@@ -26,7 +26,7 @@ defineTool('sync_buff_library_from_share', {
 })
 
 defineTool('list_buff_entities', {
-    description: '列出本地 Buff 库的实体（可按类型过滤）：实体名、类型、来源（share/custom）、Buff 数量。',
+    description: '列出本地 Buff 集的实体（可按类型过滤）：实体名、类型、来源（share/custom）、Buff 数量。',
     parameters: {
         type: 'object',
         properties: { entityType: { type: 'string', description: '可选：character/weapon/echo/1set-5set' } },
@@ -47,7 +47,7 @@ defineTool('list_buff_entities', {
 })
 
 defineTool('get_entity_buffs', {
-    description: '查看本地 Buff 库中指定实体的全部 Buff 详情（名称、作用范围、生效条件、乘区与数值、引用）。',
+    description: '查看本地 Buff 集中指定实体的全部 Buff 详情（名称、作用范围、生效条件、乘区与数值、引用）。',
     parameters: {
         type: 'object',
         properties: {
@@ -78,7 +78,7 @@ defineTool('get_entity_buffs', {
 
 defineTool('update_entity_buffs', {
     description:
-        '整体覆写本地 Buff 库中指定实体的 Buff 列表（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self|self_except|team|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。',
+        '整体覆写本地 Buff 集中指定实体的 Buff 列表（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self|self_except|team|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。',
     dangerous: true,
     parameters: {
         type: 'object',
@@ -125,7 +125,7 @@ defineTool('update_entity_buffs', {
 })
 
 defineTool('delete_buff_entity', {
-    description: '从本地 Buff 库删除指定实体（不可恢复）。',
+    description: '从本地 Buff 集删除指定实体（不可恢复）。',
     dangerous: true,
     parameters: {
         type: 'object',
@@ -141,7 +141,7 @@ defineTool('delete_buff_entity', {
 })
 
 defineTool('clear_buff_library', {
-    description: '清空整个本地 Buff 库（所有实体与 Buff，不可恢复）。',
+    description: '清空整个本地 Buff 集（所有实体与 Buff，不可恢复）。',
     dangerous: true,
     parameters: { type: 'object', properties: {} },
     handler: () => {

@@ -288,7 +288,7 @@ defineTool('toggle_condition_mismatch_hide', {
 
 defineTool('import_entity_buffs', {
     description:
-        '把本地 Buff 库中指定实体（角色/武器/首位声骸/套装）的全部 Buff 导入当前工程（导入后可再绑定到条目）。entityType 取值：character/weapon/echo/1set/2set/3set/4set/5set。',
+        '把本地 Buff 集中指定实体（角色/武器/首位声骸/套装）的全部 Buff 导入当前工程（导入后可再绑定到条目）。entityType 取值：character/weapon/echo/1set/2set/3set/4set/5set。',
     parameters: {
         type: 'object',
         properties: {
@@ -301,7 +301,7 @@ defineTool('import_entity_buffs', {
         const entityType = str(args.entityType)
         const entityName = str(args.entityName)
         const entity = getBuffEntities().find((e) => e.entityType === entityType && e.entityName === entityName)
-        if (!entity) throw new Error(`本地 Buff 库中未找到「${entityName}」`)
+        if (!entity) throw new Error(`本地 Buff 集中未找到「${entityName}」`)
         const items = buildEntityImportItems(entity, getActiveProject()?.team)
         const count = importBuffSets(items, -1, 3)
         ctx.notifyCalc?.()

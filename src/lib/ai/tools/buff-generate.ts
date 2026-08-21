@@ -148,7 +148,7 @@ defineTool('set_naming_rule', {
 
 defineTool('generate_entity_buffs', {
     description:
-        '为本地 Buff 库中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地库（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。',
+        '为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地集（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。',
     dangerous: true,
     parameters: {
         type: 'object',
@@ -168,7 +168,7 @@ defineTool('generate_entity_buffs', {
         const entity = getBuffEntities().find((e) => e.entityType === entityType && e.entityName === entityName)
         if (!entity)
             throw new Error(
-                `本地 Buff 库中未找到「${entityName}」（可先 sync_buff_library_from_share 或让用户手动导入）`
+                `本地 Buff 集中未找到「${entityName}」（可先 sync_buff_library_from_share 或让用户手动导入）`
             )
         const { rule, missing } = await resolveNamingRule(str(args.namingRule))
         if (missing) throw new Error(NEEDS_RULE_MSG)

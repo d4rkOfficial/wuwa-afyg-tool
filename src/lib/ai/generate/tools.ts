@@ -37,7 +37,7 @@ function validEntityType(v: unknown): v is GenerateEntityType {
     return typeof v === 'string' && (ENTITY_TYPES as readonly string[]).includes(v)
 }
 
-// ── 数据源（按生成目标注入：本地 Buff 库 / 当前工程）──
+// ── 数据源（按生成目标注入：本地 Buff 集 / 当前工程）──
 
 export interface BuffSetRowLike {
     buff_name: string
@@ -62,7 +62,7 @@ function includesQuery(name: string, query: string): boolean {
     return !query || name.includes(query)
 }
 
-// 本地 Buff 库模式：get_buff_sets 查库内已收录实体
+// 本地 Buff 集模式：get_buff_sets 查库内已收录实体
 export function createLibraryDataSource(): GenerateDataSource {
     return {
         async listEntities(entityType) {
@@ -243,7 +243,7 @@ export const GENERATE_TOOLS: ToolDefinition[] = [
         function: {
             name: 'get_buff_sets',
             description:
-                '查询已收录的 Buff 集（本地 Buff 库或当前工程拉表）。可按实体类型/实体名精确过滤，或用 query 模糊搜索实体名或 buff 名。返回现有 buff 的 buff_name/scope/exclusive/乘区数值，用于对比、去重或核对。',
+                '查询已收录的 Buff 集（本地 Buff 集或当前工程拉表）。可按实体类型/实体名精确过滤，或用 query 模糊搜索实体名或 buff 名。返回现有 buff 的 buff_name/scope/exclusive/乘区数值，用于对比、去重或核对。',
             parameters: {
                 type: 'object',
                 properties: {

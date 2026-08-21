@@ -221,7 +221,7 @@ defineTool('unlock_phase', {
 })
 
 defineTool('get_buff_library_summary', {
-    description: '获取本地 Buff 库概览：实体数量、按类型分布、数据来源（工坊同步/自定义）。',
+    description: '获取本地 Buff 集概览：实体数量、按类型分布、数据来源（工坊同步/自定义）。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const entities = getBuffEntities()
