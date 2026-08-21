@@ -894,7 +894,7 @@
                                             >
                                         {:else}
                                             <span
-                                                class="line-clamp-2 w-max max-w-24 break-words text-center text-[10px] leading-3 text-(--theme-modal-text)/60"
+                                                class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] leading-3 text-(--theme-modal-text)/60"
                                                 title={bs.name}>{bs.name}</span
                                             >
                                         {/if}

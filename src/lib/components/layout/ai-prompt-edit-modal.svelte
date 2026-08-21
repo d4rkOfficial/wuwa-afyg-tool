@@ -154,7 +154,7 @@
 
         <!-- 可调用工具列表 -->
         <div
-            class="theme-scrollbar w-40 shrink-0 overflow-y-auto rounded-lg border p-2 max-h-[320px]"
+            class="theme-scrollbar w-40 shrink-0 overflow-y-auto rounded-lg border p-2 max-h-80"
             style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
         >
             <div class="mb-1.5 flex items-center gap-1 text-[10px] font-medium text-(--theme-modal-text)/50">

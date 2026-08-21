@@ -28,7 +28,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-60 flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if ((e.target as HTMLElement) === e.currentTarget) setNonDirectPickerBlockId(null)
         }}
@@ -37,7 +37,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -53,7 +53,7 @@
                 <h2 class="text-sm font-semibold">配置非直伤</h2>
             </div>
             <div class="theme-scrollbar flex-1 overflow-y-auto p-4 space-y-3">
-                <div class="text-[11px] font-semibold text-[var(--theme-modal-text)]/60 tracking-wider">处决/响应</div>
+                <div class="text-[11px] font-semibold text-(--theme-modal-text)/60 tracking-wider">处决/响应</div>
                 {#each NON_DIRECT_CONFIGS.filter((c) => c.name === '谐度破坏' || c.category === '响应') as cfg}
                     {@const isTuneBreak = cfg.name === '谐度破坏'}
                     {@const isResp = cfg.category === '响应'}
@@ -64,10 +64,10 @@
                                 class={[
                                     'h-7 rounded-md px-3 text-xs font-medium transition-colors whitespace-nowrap',
                                     getNonDirectPickerSelected().has(cfg.name)
-                                        ? 'text-[var(--theme-accent-text-on-bg)]'
+                                        ? 'text-(--theme-accent-text-on-bg)'
                                         : disabled
-                                          ? 'text-[var(--theme-modal-text)]/20 cursor-not-allowed'
-                                          : 'text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/[0.1]'
+                                          ? 'text-(--theme-modal-text)/20 cursor-not-allowed'
+                                          : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/10'
                                 ].join(' ')}
                                 style={getNonDirectPickerSelected().has(cfg.name)
                                     ? 'background: var(--theme-accent-bg);'
@@ -98,7 +98,7 @@
                                                 responderDisabled
                                                     ? 'opacity-10 cursor-not-allowed'
                                                     : !selected
-                                                      ? 'ring-1 ring-[var(--theme-divider-border)] opacity-60'
+                                                      ? 'ring-1 ring-(--theme-divider-border) opacity-60'
                                                       : ''
                                             ].join(' ')}
                                             style={!responderDisabled && selected
@@ -129,7 +129,7 @@
                                                     class="size-full object-cover"
                                                 />
                                             {:else}
-                                                <span class="text-[10px] font-bold text-[var(--theme-modal-text)]"
+                                                <span class="text-[10px] font-bold text-(--theme-modal-text)"
                                                     >{name[0]}</span
                                                 >
                                             {/if}
@@ -142,7 +142,7 @@
                 {/each}
 
                 <div class="pt-3 border-t" style="border-top-color: var(--theme-divider-border);">
-                    <div class="text-[11px] font-semibold text-[var(--theme-modal-text)]/60 tracking-wider mb-3">
+                    <div class="text-[11px] font-semibold text-(--theme-modal-text)/60 tracking-wider mb-3">
                         效应结算
                     </div>
                     <div class="flex flex-col gap-2">
@@ -161,13 +161,13 @@
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     <div class="flex items-center justify-between gap-2">
-                                        <span class="text-xs text-[var(--theme-modal-text)] truncate">{cfg.name}</span>
+                                        <span class="text-xs text-(--theme-modal-text) truncate">{cfg.name}</span>
                                         <span class="flex items-center gap-3 shrink-0">
-                                            <span class="text-xs text-[var(--theme-modal-text)]/50 tabular-nums"
+                                            <span class="text-xs text-(--theme-modal-text)/50 tabular-nums"
                                                 >层数 {layers}/{cfg.max}</span
                                             >
                                             <span class="flex items-center gap-1.5">
-                                                <span class="text-xs text-[var(--theme-modal-text)]/50">段数</span>
+                                                <span class="text-xs text-(--theme-modal-text)/50">段数</span>
                                                 <input
                                                     type="number"
                                                     min="1"
@@ -186,7 +186,7 @@
                                                             )
                                                         )
                                                     }}
-                                                    class="w-12 h-6 bg-[var(--theme-modal-bg)]/60 text-xs text-[var(--theme-modal-text)] text-center rounded outline-none border tabular-nums disabled:opacity-30"
+                                                    class="w-12 h-6 bg-(--theme-modal-bg)/60 text-xs text-(--theme-modal-text) text-center rounded outline-none border tabular-nums disabled:opacity-30"
                                                     style="border-color: var(--theme-divider-border);"
                                                 />
                                             </span>
@@ -216,10 +216,10 @@
                                             style="background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                         >
                                             <div class="flex items-center justify-between gap-2">
-                                                <span class="text-xs text-[var(--theme-modal-text)]/60 truncate"
+                                                <span class="text-xs text-(--theme-modal-text)/60 truncate"
                                                     >电磁爆发</span
                                                 >
-                                                <span class="text-[10px] text-[var(--theme-modal-text)]/40 shrink-0"
+                                                <span class="text-[10px] text-(--theme-modal-text)/40 shrink-0"
                                                     >随电磁段数 ×{hits}</span
                                                 >
                                             </div>
@@ -249,7 +249,7 @@
                 style="border-top-color: var(--theme-divider-border);"
             >
                 <button
-                    class="h-7 rounded-md px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);"
                     onclick={() => setNonDirectPickerBlockId(null)}>取消</button
                 >

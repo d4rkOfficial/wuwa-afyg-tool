@@ -291,7 +291,7 @@
                 <button
                     onclick={() => setBlockSpecial(bm.blockId, opt.value)}
                     class="flex-1 rounded px-2 py-1 text-xs font-medium transition-colors {special === opt.value
-                        ? 'bg-(--theme-accent-bg) text-[var(--theme-accent-text-on-bg)]'
+                        ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
                         : 'text-(--theme-context-menu-text)/70 hover:bg-(--theme-context-menu-bg-focused)'}"
                 >
                     {opt.label}

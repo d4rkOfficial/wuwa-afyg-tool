@@ -294,7 +294,7 @@
             <span class="tabular-nums text-(--theme-modal-text)/80">{wsToolCount} 次</span>
         </div>
         {#if wsLastError && wsStatus !== 'connected'}
-            <div class="break-words text-red-400">⚠ {wsLastError}</div>
+            <div class="wrap-break-word text-red-400">⚠ {wsLastError}</div>
         {/if}
     </div>
 

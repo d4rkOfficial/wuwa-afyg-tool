@@ -193,7 +193,7 @@
                 >
                     <!-- 顶部高光线（元素色，弱） -->
                     <div
-                        class="pointer-events-none absolute inset-x-2 top-0 h-px bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--card-color)_20%,transparent)] to-transparent"
+                        class="pointer-events-none absolute inset-x-2 top-0 h-px bg-linear-to-r from-transparent via-[color-mix(in_srgb,var(--card-color)_20%,transparent)] to-transparent"
                     ></div>
                     <!-- 大数值水印（遮罩层，放大带 %，百分号缩小靠下） -->
                     <div

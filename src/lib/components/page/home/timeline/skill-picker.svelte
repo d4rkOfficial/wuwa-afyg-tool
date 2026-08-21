@@ -98,7 +98,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-60 flex items-center justify-center backdrop-blur-sm"
         onclick={(e) => {
             if ((e.target as HTMLElement) === e.currentTarget) {
                 setSkillPickerBlockId(null)
@@ -110,7 +110,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-[var(--theme-modal-text)] shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -130,8 +130,8 @@
                         {#each getTeamCharNames() as name}
                             <button
                                 class="size-7 rounded-full overflow-hidden {getSkillPickerCharacter() === name
-                                    ? 'ring-2 ring-[var(--theme-accent-bg)]'
-                                    : 'ring-1 ring-[var(--theme-divider-border)]'}"
+                                    ? 'ring-2 ring-(--theme-accent-bg)'
+                                    : 'ring-1 ring-(--theme-divider-border)'}"
                                 onclick={() => switchSkillPickerTab(name)}
                             >
                                 {#if getCharIconMap()[name]}
@@ -144,7 +144,7 @@
                                     />
                                 {:else}
                                     <span
-                                        class="flex size-full items-center justify-center text-[10px] font-medium text-[var(--theme-modal-text)]/60 bg-[var(--theme-modal-bg)]/80"
+                                        class="flex size-full items-center justify-center text-[10px] font-medium text-(--theme-modal-text)/60 bg-(--theme-modal-bg)/80"
                                         >{name[0]}</span
                                     >
                                 {/if}
@@ -158,22 +158,22 @@
             <div class="theme-scrollbar flex-1 overflow-y-auto p-2">
                 {#if getSkillPickerLoading()}
                     <div class="flex items-center justify-center py-8">
-                        <span class="text-xs text-[var(--theme-modal-text)]/50">加载中…</span>
+                        <span class="text-xs text-(--theme-modal-text)/50">加载中…</span>
                     </div>
                 {:else if getSkillPickerGroups().length === 0}
                     <div class="flex items-center justify-center py-8">
-                        <span class="text-xs text-[var(--theme-modal-text)]/50">无可用倍率数据</span>
+                        <span class="text-xs text-(--theme-modal-text)/50">无可用倍率数据</span>
                     </div>
                 {:else}
                     <div class="space-y-1">
                         {#each getSkillPickerGroups() as group}
                             <div
-                                class="text-[10px] font-semibold text-[var(--theme-modal-text)]/50 uppercase tracking-wider px-2 pt-2 pb-1 flex items-center justify-between"
+                                class="text-[10px] font-semibold text-(--theme-modal-text)/50 uppercase tracking-wider px-2 pt-2 pb-1 flex items-center justify-between"
                             >
                                 <span>
                                     {group.type} ({group.hits.length})
                                     {#if group.type === '谐度破坏'}
-                                        <span class="text-[var(--theme-modal-text)]/50 font-normal normal-case"
+                                        <span class="text-(--theme-modal-text)/50 font-normal normal-case"
                                             >(请到非直伤配置中配置)</span
                                         >
                                     {/if}
@@ -181,7 +181,7 @@
                                 {#if group.type === '自定义'}
                                     <button
                                         onclick={() => openAddCustom(getSkillPickerCharacter())}
-                                        class="text-[var(--theme-accent-text)] hover:text-[var(--theme-accent-text)] text-[10px] flex items-center gap-0.5"
+                                        class="text-(--theme-accent-text) hover:text-(--theme-accent-text) text-[10px] flex items-center gap-0.5"
                                     >
                                         <Icon icon="mdi:plus" class="size-3" /> 添加
                                     </button>
@@ -211,12 +211,12 @@
                                     class={[
                                         'flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors',
                                         group.type === '谐度破坏' || isResponseHit
-                                            ? 'opacity-40 cursor-not-allowed select-none text-[var(--theme-modal-text)]/60'
+                                            ? 'opacity-40 cursor-not-allowed select-none text-(--theme-modal-text)/60'
                                             : getSkillPickerSelected().has(key)
-                                              ? 'bg-[var(--theme-input-bg)] text-[var(--theme-modal-text)]'
-                                              : 'text-[var(--theme-modal-text)]/60 hover:bg-[var(--theme-modal-text)]/[0.05]',
+                                              ? 'bg-(--theme-input-bg) text-(--theme-modal-text)'
+                                              : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
                                         group.type !== '谐度破坏' && !isResponseHit
-                                            ? 'focus-visible:outline-none focus-visible:bg-[var(--theme-modal-text)]/[0.05] focus-visible:ring-1 focus-visible:ring-[var(--theme-accent-bg)]'
+                                            ? 'focus-visible:outline-none focus-visible:bg-(--theme-modal-text)/5 focus-visible:ring-1 focus-visible:ring-(--theme-accent-bg)'
                                             : ''
                                     ].join(' ')}
                                     onclick={() => {
@@ -237,7 +237,7 @@
                                             0 &&
                                         group.type !== '谐度破坏' &&
                                         !isResponseHit
-                                            ? 'bg-[var(--theme-accent-bg)] text-[var(--theme-accent-text-on-bg)]'
+                                            ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
                                             : 'border'}"
                                         style="border-color: {order > 0 && group.type !== '谐度破坏' && !isResponseHit
                                             ? 'transparent'
@@ -250,12 +250,12 @@
                                     <span class="flex-1 truncate" title={displayName}>
                                         {displayName}
                                         {#if isResponseHit}
-                                            <span class="text-[var(--theme-modal-text)]/50 font-normal normal-case ml-1"
+                                            <span class="text-(--theme-modal-text)/50 font-normal normal-case ml-1"
                                                 >(请到非直伤配置中配置)</span
                                             >
                                         {/if}
                                     </span>
-                                    <span class="text-[var(--theme-modal-text)]/50"
+                                    <span class="text-(--theme-modal-text)/50"
                                         >{hit.ratio}{#if hit.element}<span
                                                 class="ml-1"
                                                 style="color: var(--theme-element-{hit.element}, #888)"
@@ -264,7 +264,7 @@
                                     >
                                     {#if getSkillPickerSelected().has(key) && group.type !== '谐度破坏' && !isResponseHit}
                                         <span class="flex items-center gap-1" onclick={(e) => e.stopPropagation()}>
-                                            <span class="text-xs text-[var(--theme-modal-text)]/50">×</span>
+                                            <span class="text-xs text-(--theme-modal-text)/50">×</span>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -276,7 +276,7 @@
                                                         [key]: Math.max(0, isNaN(v) ? 1 : v)
                                                     })
                                                 }}
-                                                class="w-10 h-6 bg-[var(--theme-modal-bg)]/60 text-xs text-[var(--theme-modal-text)] text-center rounded outline-none border tabular-nums"
+                                                class="w-10 h-6 bg-(--theme-modal-bg)/60 text-xs text-(--theme-modal-text) text-center rounded outline-none border tabular-nums"
                                                 style="border-color: var(--theme-divider-border);"
                                             />
                                         </span>
@@ -287,7 +287,7 @@
                                                 e.stopPropagation()
                                                 removeCustomHit(getSkillPickerCharacter(), hit.name)
                                             }}
-                                            class="shrink-0 rounded p-0.5 text-[var(--theme-modal-text)]/40 transition-colors hover:text-red-500"
+                                            class="shrink-0 rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
                                             ><Icon icon="mdi:close" class="size-3.5" /></button
                                         >
                                     {/if}
@@ -305,7 +305,7 @@
             >
                 <div class="flex items-center gap-1">
                     <button
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                         onclick={() => openAddCustom(getSkillPickerCharacter())}
                     >
                         <Icon icon="mdi:plus-circle-outline" class="size-3.5" />
@@ -313,7 +313,7 @@
                     </button>
                     <button
                         onclick={() => (showLookup = true)}
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--theme-accent-text)] transition-colors hover:bg-[var(--theme-modal-text)]/[0.05]"
+                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                     >
                         <Icon icon="mdi:magnify" class="size-3.5" />
                         速查
@@ -321,7 +321,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <button
-                        class="h-7 rounded-md bg-[var(--theme-modal-bg)]/60 px-3 text-xs text-[var(--theme-modal-text)]/60 transition-colors hover:bg-[var(--theme-modal-text)]/[0.1]"
+                        class="h-7 rounded-md bg-(--theme-modal-bg)/60 px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                         onclick={() => {
                             setSkillPickerBlockId(null)
                             setSkillPickerIsRef(false)
@@ -343,7 +343,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm"
+        class="animate-fade-in fixed inset-0 z-70 flex items-center justify-center backdrop-blur-sm"
         onkeydown={(e) => {
             if (e.key === 'Escape') {
                 showCustomModal = false
@@ -355,7 +355,7 @@
         <div
             use:focusTrap={{ initial: 'input' }}
             tabindex="-1"
-            class="animate-pop-in rounded-xl border p-5 shadow-xl w-[28rem]"
+            class="animate-pop-in rounded-xl border p-5 shadow-xl w-md"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -365,8 +365,9 @@
 
             <div class="space-y-4">
                 <div>
-                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">名称</label>
+                    <label for="custom-name" class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">名称</label>
                     <input
+                        id="custom-name"
                         type="text"
                         bind:value={customName}
                         placeholder="输入名称"
@@ -376,7 +377,8 @@
                 </div>
 
                 <div ondblclick={() => (hasFlat = true)}>
-                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">固定值</label>
+                    <label for="custom-flat" class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">固定值</label
+                    >
                     <div class="flex items-center rounded-md border" style="border-color: var(--theme-divider-border);">
                         <button
                             onclick={() => (hasFlat = !hasFlat)}
@@ -394,6 +396,7 @@
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <input
+                                id="custom-flat"
                                 type="number"
                                 bind:value={customFlat}
                                 readonly={!hasFlat}
@@ -409,7 +412,9 @@
                 </div>
 
                 <div ondblclick={() => (hasPct = true)}>
-                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">百分比值</label>
+                    <label for="custom-pct" class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5"
+                        >百分比值</label
+                    >
                     <div class="flex items-center rounded-md border" style="border-color: var(--theme-divider-border);">
                         <button
                             onclick={() => (hasPct = !hasPct)}
@@ -427,6 +432,7 @@
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <input
+                                id="custom-pct"
                                 type="number"
                                 bind:value={customPct}
                                 readonly={!hasPct}
@@ -476,8 +482,8 @@
                     </div>
                 </div>
 
-                <div>
-                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">属性</label>
+                <div role="group" aria-label="属性">
+                    <span class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">属性</span>
                     <div class="flex flex-wrap gap-1.5">
                         {#each ELEMENTS as el}
                             <button

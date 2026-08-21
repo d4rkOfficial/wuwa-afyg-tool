@@ -36,7 +36,7 @@
     <div class="grid w-full max-w-5xl grid-cols-3 gap-4">
         <button
             onclick={onWorkshopFrame}
-            class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+            class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-(--theme-card-shadow) transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
             style="animation-delay: 55ms"
         >
             <Icon
@@ -46,17 +46,17 @@
             />
             <div class="flex flex-col gap-1">
                 <span
-                    class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
+                    class="text-lg font-semibold text-(--theme-card-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
                     >工坊</span
                 >
-                <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                <span class="text-[15px] text-(--theme-muted-text) [text-shadow:0_0_2px_var(--theme-halo-color)]"
                     >前往工坊，分享你的轴表工程</span
                 >
             </div>
         </button>
         <button
             onclick={onBuffLibrary}
-            class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+            class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-(--theme-card-shadow) transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
             style="animation-delay: 110ms"
         >
             <Icon
@@ -66,17 +66,17 @@
             />
             <div class="flex flex-col gap-1">
                 <span
-                    class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
+                    class="text-lg font-semibold text-(--theme-card-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
                     >Buff 集</span
                 >
-                <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                <span class="text-[15px] text-(--theme-muted-text) [text-shadow:0_0_2px_var(--theme-halo-color)]"
                     >配置 Buff 集，拉表时一键导入</span
                 >
             </div>
         </button>
         <button
             onclick={onSettings}
-            class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-[var(--theme-card-shadow)] transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
+            class="card-pop-in group flex flex-col items-start gap-3 rounded-2xl border border-(--theme-card-border) bg-(--theme-card-bg) p-6 text-left theme-glass-surface shadow-(--theme-card-shadow) transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)"
             style="animation-delay: 165ms"
         >
             <Icon
@@ -86,10 +86,10 @@
             />
             <div class="flex flex-col gap-1">
                 <span
-                    class="text-lg font-semibold text-(--theme-card-text) [text-shadow:_0_0_3px_var(--theme-halo-color)]"
+                    class="text-lg font-semibold text-(--theme-card-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
                     >设置</span
                 >
-                <span class="text-[15px] text-(--theme-muted-text) [text-shadow:_0_0_2px_var(--theme-halo-color)]"
+                <span class="text-[15px] text-(--theme-muted-text) [text-shadow:0_0_2px_var(--theme-halo-color)]"
                     >主题、交互、AI助手等个性化设置</span
                 >
             </div>

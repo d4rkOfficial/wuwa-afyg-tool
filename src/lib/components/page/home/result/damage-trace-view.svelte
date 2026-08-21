@@ -239,7 +239,7 @@
             role="tooltip"
             onpointerenter={clearClose}
             onpointerleave={scheduleClose}
-            class="fixed z-[100] w-72 max-w-[85vw] overflow-hidden rounded-lg border shadow-2xl backdrop-blur-xl"
+            class="fixed z-100 w-72 max-w-[85vw] overflow-hidden rounded-lg border shadow-2xl backdrop-blur-xl"
             style="left: {tip.left}px; top: {tip.top}px; background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
         >
             <div
