@@ -59,7 +59,7 @@
         getReloadOnProfileChange,
         setMagneticPointer
     } from '$lib/data/render-prefs.svelte'
-    import { loadGenPrefs, setAiEnabledSession } from '$lib/data/ai-prefs.svelte'
+    import { loadGenPrefs, setAiEnabledSession, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
     import { initToyEnvironmentBridge, onToyEnter, isToyMobile } from '$lib/bilibili-toy/environment.svelte'
     import { isFirstVisit, markVisited, isMagneticToySet, markMagneticToySet } from '$lib/data/toy-prefs.svelte'
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
@@ -212,7 +212,7 @@
         })
         const panels: Array<[string, string, () => boolean, (v: boolean) => void]> = [
             ['quick-lookup', '速查', () => showLookup, (v) => (showLookup = v)],
-            ['buff-library', 'Buff 库', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
+            ['buff-library', 'Buff 集', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
             ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
             ['workshop-frame', '工坊页', () => showWorkshopFrame, (v) => (showWorkshopFrame = v)],
@@ -233,9 +233,11 @@
         hideSplash()
         initToyProfileBridge()
         initToyEnvironmentBridge()
-        // 首次进入（任意端）：拉表默认平铺模式
+        // 首次进入（任意端）：拉表默认平铺模式；禁用磁力光标；禁用 AI 助手（一次性持久设定，用户可在设置中重新开启）
         if (isFirstVisit()) {
             setCalcViewMode('spread')
+            setMagneticPointer(false)
+            void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
             markVisited()
         }
         // 进入 Toy 环境（消息异步到达，每会话首次触发）：
@@ -840,17 +842,34 @@
                     {/if}
                 {/key}
                 {#if !showResult && phaseLocked}
-                    <div
-                        class="absolute inset-0 z-40 flex items-center justify-center pointer-events-none select-none"
-                        style="background: var(--theme-watermark-bg, rgba(0,0,0,0.1))"
-                    >
-                        <div
-                            class="flex items-center gap-6 text-[7.5rem] font-bold tracking-widest"
-                            style="transform: rotate(-30deg); color: var(--theme-watermark-text, rgba(255,255,255,0.1))"
+                    <!-- 已锁定遮罩：纯透明背景 + SVG pattern 平铺小字「已锁定」。整层 opacity-10 封顶，
+                         文字取 currentColor（主题文本色），保证任何主题/任何变量解析下都只弱显示、不遮挡内容 -->
+                    <div class="absolute inset-0 z-40 pointer-events-none select-none opacity-10">
+                        <svg
+                            class="absolute inset-0 size-full"
+                            aria-hidden="true"
+                            style="color: var(--theme-modal-text);"
                         >
-                            <Icon icon="mdi:lock" class="size-32" />
-                            已锁定
-                        </div>
+                            <defs>
+                                <pattern
+                                    id="lockWatermark"
+                                    patternUnits="userSpaceOnUse"
+                                    width="170"
+                                    height="120"
+                                    patternTransform="rotate(-30)"
+                                >
+                                    <text
+                                        x="16"
+                                        y="74"
+                                        fill="currentColor"
+                                        font-size="26"
+                                        font-weight="700"
+                                        letter-spacing="4">已锁定</text
+                                    >
+                                </pattern>
+                            </defs>
+                            <rect width="100%" height="100%" fill="url(#lockWatermark)" />
+                        </svg>
                     </div>
                 {/if}
             </div>

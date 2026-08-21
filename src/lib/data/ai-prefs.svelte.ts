@@ -3,6 +3,7 @@ import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { DEFAULT_SYSTEM_PROMPT } from '$lib/ai/persona'
 import { DEFAULT_SLANG_DICT } from '$lib/ai/generate/prompts.config'
+import { isFirstVisit } from '$lib/data/toy-prefs.svelte'
 
 export type DangerMode = 'ask' | 'ask_once' | 'trust'
 
@@ -65,7 +66,7 @@ const DEFAULT_PREFS: AiGenPrefs = {
     dangerMode: 'ask'
 }
 
-let _prefs: AiGenPrefs = $state({ ...DEFAULT_PREFS })
+let _prefs: AiGenPrefs = $state({ ...DEFAULT_PREFS, enabled: !isFirstVisit() })
 let _loaded = false
 
 export function getGenPrefs(): AiGenPrefs {
