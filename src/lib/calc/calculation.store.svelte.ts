@@ -460,7 +460,7 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
 }
 
 /** @desc 自然排序：数字段按数值比较（1层 < 2层 < 10层 < 11层），其余按 unicode 码点比较 */
-function compareNatural(a: string, b: string): number {
+export function compareNatural(a: string, b: string): number {
     let i = 0
     let j = 0
     while (i < a.length && j < b.length) {

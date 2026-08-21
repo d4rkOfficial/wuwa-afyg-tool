@@ -75,6 +75,9 @@ export { DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
 /** @desc 叠层 Buff 命名模式：匹配「前缀+数字+后缀」（如 3+30%/6+75% 这类按层数展开的同源倍率条目） */
 export const LAYERED_BUFF_PATTERN = /^(.+?)(\d+)([^\d]*)$/
 
+/** @desc 叠层文件夹中「数字变量」的通用占位名（表头/文件夹名中代表随层数变化的数字） */
+export const LAYERED_BUFF_VAR = '?'
+
 /** @desc 分组条目：folder=叠层文件夹（同前缀 ≥2 条自动归组），item=普通 Buff 条目 */
 export interface GroupedBuffSetItem {
     key: string
@@ -117,7 +120,7 @@ export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
                 result.push({
                     key: 'folder:' + key,
                     type: 'folder',
-                    name: m[1] + 'N' + m[3],
+                    name: m[1] + LAYERED_BUFF_VAR + m[3],
                     prefix: key,
                     prefixText: m[1],
                     suffixText: m[3],

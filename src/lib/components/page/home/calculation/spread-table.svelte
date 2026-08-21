@@ -6,8 +6,13 @@
     import type { ConditionProfile } from '$lib/calc/compute'
     import { conditionMet } from '$lib/calc/compute'
     import { inferDamageTypes } from '$lib/calc/utils'
-    import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
-    import { getCalcElementMap } from '$lib/calc/calculation.store.svelte'
+    import {
+        DAMAGE_TYPES,
+        DAMAGE_TYPE_SHORT,
+        LAYERED_BUFF_PATTERN,
+        LAYERED_BUFF_VAR
+    } from '$lib/calc/calculation.consts'
+    import { getCalcElementMap, compareNatural } from '$lib/calc/calculation.store.svelte'
     import { getDamageTypeEditMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
@@ -48,8 +53,43 @@
         style: styleProp
     }: Props = $props()
 
-    /** @desc 普通 buff 列（非全局）与全局 buff 列（仅展示，不可勾选） */
-    const columns = $derived(buffSets.filter((b) => !globalBuffSetIds.includes(b.id)))
+    /** @desc 普通 buff 列（非全局）与全局 buff 列（仅展示，不可勾选）；列序做最终排序使同文件夹列连续：
+     *  非文件夹在前、文件夹在后；文件夹按成员数升序（越多越靠后）、同级按前缀+后缀自然排序 */
+    const rawColumns = $derived(buffSets.filter((b) => !globalBuffSetIds.includes(b.id)))
+
+    const columns = $derived.by(() => {
+        const pattern = LAYERED_BUFF_PATTERN
+        const keyOf = (b: BuffSet): string | null => {
+            const m = b.name.match(pattern)
+            return m ? m[1] + m[3] : null
+        }
+        const groupOf = new Map<string, BuffSet[]>()
+        const order: string[] = []
+        for (const b of rawColumns) {
+            const k = keyOf(b)
+            if (k) {
+                if (!groupOf.has(k)) {
+                    groupOf.set(k, [])
+                    order.push(k)
+                }
+                groupOf.get(k)!.push(b)
+            }
+        }
+        const folderSet = new Set(order.filter((k) => groupOf.get(k)!.length >= 2))
+        const items = rawColumns.filter((b) => {
+            const k = keyOf(b)
+            return !k || !folderSet.has(k)
+        })
+        const folders = order
+            .filter((k) => folderSet.has(k))
+            .sort((ka, kb) => {
+                const ca = groupOf.get(ka)!.length
+                const cb = groupOf.get(kb)!.length
+                if (ca !== cb) return ca - cb
+                return compareNatural(ka, kb)
+            })
+        return [...items, ...folders.flatMap((k) => groupOf.get(k)!)]
+    })
     const globalBuffs = $derived(buffSets.filter((b) => globalBuffSetIds.includes(b.id)))
 
     /** @desc 叠层分组信息：buffId → 组（同「前缀+后缀」≥2 条成组；仅用于表头分组展示与分隔线，列本身仍每层一列） */
@@ -397,6 +437,21 @@
         unregisterDragCancel?.()
     })
 
+    /** @desc 渐进渲染：首帧不立刻铺满所有行，逐帧新增 chunk 行，避免打开大表/切换工程时单帧阻塞卡顿。
+     *  box-select/行列高亮均依赖 data-row/data-col，行分批挂载不影响交互。 */
+    const maxGroupRows = $derived(tableData.reduce((m, g) => Math.max(m, g.rows.length), 0))
+    const ROW_CHUNK = 24
+    // 首帧即显示一个 chunk（小表一次到位无闪烁），超出后逐帧续播，避免大表单帧阻塞卡顿
+    let visibleRows = $state(ROW_CHUNK)
+    $effect(() => {
+        if (visibleRows >= maxGroupRows) return
+        // 每帧最多揭示 ROW_CHUNK 行，逐帧推进直到铺满（小表一次到位；数据切换后自动续播）
+        const raf = requestAnimationFrame(() => {
+            visibleRows = Math.min(visibleRows + ROW_CHUNK, maxGroupRows)
+        })
+        return () => cancelAnimationFrame(raf)
+    })
+
     /** @desc mousedown：记录框选起点单元格（仅左键）；起点为 folder 列时进入层级框选模式 */
     function handleMouseDown(e: MouseEvent) {
         if (e.button !== 0) return
@@ -719,27 +774,49 @@
                                     {@const bs = columns[ci]}
                                     {@const grp = folderGroupOf.get(bs.id)}
                                     {#if grp}
-                                        {@const groupCis = group.visibleColIdx.filter(
-                                            (x) => folderGroupOf.get(columns[x].id)?.key === grp.key
-                                        )}
-                                        {#if groupCis[0] === ci}
-                                            {@const tailCi = groupCis[groupCis.length - 1]}
-                                            {@const tailPos = group.visibleColIdx.indexOf(tailCi)}
+                                        {@const runLen = (() => {
+                                            // 该组在可见列中的「连续段」长度：左右扩展，遇到不同组/普通列即停
+                                            let right = 1
+                                            for (let k = colPos + 1; k < group.visibleColIdx.length; k++) {
+                                                if (
+                                                    folderGroupOf.get(columns[group.visibleColIdx[k]].id)?.key ===
+                                                    grp.key
+                                                )
+                                                    right++
+                                                else break
+                                            }
+                                            let left = 0
+                                            for (let k = colPos - 1; k >= 0; k--) {
+                                                if (
+                                                    folderGroupOf.get(columns[group.visibleColIdx[k]].id)?.key ===
+                                                    grp.key
+                                                )
+                                                    left++
+                                                else break
+                                            }
+                                            return { len: left + right, isStart: left === 0 }
+                                        })()}
+                                        {#if runLen.isStart}
+                                            {@const tailPos = colPos + runLen.len - 1}
                                             {@const nextId =
                                                 tailPos + 1 < group.visibleColIdx.length
                                                     ? columns[group.visibleColIdx[tailPos + 1]]?.id
                                                     : undefined}
+                                            {@const grpHeader =
+                                                grp.suffix.length <= 3
+                                                    ? grp.prefix
+                                                    : grp.prefix + LAYERED_BUFF_VAR + grp.suffix}
                                             <th
-                                                colspan={groupCis.length}
+                                                colspan={runLen.len}
                                                 class="sticky top-0 z-30 h-6 p-0 text-center"
                                                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
-                                                    columns[tailCi].id,
+                                                    columns[group.visibleColIdx[tailPos]].id,
                                                     nextId
                                                 )}"
                                             >
                                                 <span
                                                     class="block truncate px-1 text-[10px] font-semibold text-(--theme-modal-text)/70"
-                                                    title={grp.prefix}>{grp.prefix}</span
+                                                    title={grpHeader}>{grpHeader}</span
                                                 >
                                             </th>
                                         {/if}
@@ -809,10 +886,11 @@
                                             : ''}"
                                     >
                                         {#if grp}
+                                            {@const grpSub = grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum}
                                             <span
                                                 class="text-[11px] font-bold leading-none tabular-nums"
                                                 style="color: var(--theme-modal-text)/70;"
-                                                title={bs.name}>{layerNum}</span
+                                                title={bs.name}>{grpSub}</span
                                             >
                                         {:else}
                                             <span
@@ -839,147 +917,151 @@
                                 highlight?.gi === gi && highlight.kind === 'row' && highlight.index === ri}
                             {@const rowHighlightActive = highlight?.gi === gi && highlight.kind === 'row'}
                             {@const colHighlightActive = highlight?.gi === gi && highlight.kind === 'col'}
-                            <tr
-                                class:split-row={row.splitBefore}
-                                class="border-b {rowHighlightActive && !rowHighlighted
-                                    ? 'opacity-40 transition-opacity'
-                                    : ''}"
-                                style="border-bottom: 1px dashed var(--theme-divider-border);{rowHighlightActive &&
-                                rowHighlighted
-                                    ? ` background: ${HIGHLIGHT_BG};`
-                                    : ''}"
-                            >
-                                <td
-                                    class="sticky left-0 z-20 cursor-pointer select-none px-2 py-1 border-r transition-colors"
-                                    style="border-color: var(--theme-divider-border); background: {rowHighlighted
-                                        ? HIGHLIGHT_BG
-                                        : 'color-mix(in srgb, var(--theme-modal-bg) 92%, transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;{rowHighlighted
-                                        ? ' box-shadow: inset 3px 0 0 var(--theme-accent-bg);'
+                            {#if ri < visibleRows}
+                                <tr
+                                    class:split-row={row.splitBefore}
+                                    class="border-b {rowHighlightActive && !rowHighlighted
+                                        ? 'opacity-40 transition-opacity'
                                         : ''}"
-                                    title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${row.selectedCount}/${row.enabledBuffIds.length}）`}
-                                    onclick={() => clickRowHeader(gi, ri)}
-                                    oncontextmenu={(e) => onRowHeaderContextMenu(e, gi, ri)}
+                                    style="border-bottom: 1px dashed var(--theme-divider-border);{rowHighlightActive &&
+                                    rowHighlighted
+                                        ? ` background: ${HIGHLIGHT_BG};`
+                                        : ''}"
                                 >
-                                    <div
-                                        class="flex w-full items-center gap-1.5 py-0.5 text-left transition-colors hover:bg-(--theme-modal-text)/5"
-                                    >
-                                        <span
-                                            class="truncate text-(--theme-modal-text)"
-                                            style="color: var(--theme-element-{row.entry.damageElement}, #888);"
-                                            >{row.entry.displayName}</span
-                                        >
-                                    </div>
-                                    <!-- 视为：伤害类型（可切换 编辑 / 仅查看）；stopPropagation 避免触发行高亮 -->
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <div
-                                        class="flex flex-wrap gap-0.5 px-0.5 pb-0.5"
-                                        onclick={(e) => e.stopPropagation()}
-                                    >
-                                        {#if getDamageTypeEditMode()}
-                                            {#each DAMAGE_TYPES as dt}
-                                                {@const selected = (entryDamageTypeMap[row.entry.id] ?? []).includes(
-                                                    dt
-                                                )}
-                                                <button
-                                                    onclick={() => onToggleDamageType(row.entry.id, dt)}
-                                                    title={dt}
-                                                    class="rounded px-1 text-[10px] leading-tight transition-colors"
-                                                    style={selected
-                                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 25%, transparent); color: var(--theme-accent-text);'
-                                                        : 'background: var(--theme-input-bg); color: var(--theme-modal-text)/50; hover: background: var(--theme-modal-text)/10;'}
-                                                    >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
-                                                        dt}</button
-                                                >
-                                            {/each}
-                                        {:else}
-                                            <span
-                                                class="text-[10px] font-bold leading-tight text-(--theme-modal-text)/70"
-                                                >伤害类型：</span
-                                            >
-                                            {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
-                                                <span
-                                                    class="rounded px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
-                                                    style="background: var(--theme-input-bg);"
-                                                    >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
-                                                        dt}</span
-                                                >
-                                            {/each}
-                                        {/if}
-                                        {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
-                                            {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
-                                            {#if inferred.length > 0}
-                                                <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
-                                                    >自动推导：{inferred
-                                                        .map(
-                                                            (t) =>
-                                                                DAMAGE_TYPE_SHORT[
-                                                                    t as keyof typeof DAMAGE_TYPE_SHORT
-                                                                ] ?? t
-                                                        )
-                                                        .join('/')}</span
-                                                >
-                                            {/if}
-                                        {/if}
-                                    </div>
-                                </td>
-                                {#each group.visibleColIdx as ci, colPos}
-                                    {@const cell = row.cells[ci]}
-                                    {@const bs = columns[ci]}
-                                    {@const colHighlighted =
-                                        highlight?.gi === gi && highlight.kind === 'col' && highlight.index === ci}
-                                    {@const cellInHighlight =
-                                        (rowHighlightActive && highlight?.index === ri) ||
-                                        (colHighlightActive && highlight?.index === ci)}
                                     <td
-                                        class="min-w-9 p-0 text-center {colHighlightActive && !colHighlighted
-                                            ? 'opacity-40 transition-opacity'
+                                        class="sticky left-0 z-20 cursor-pointer select-none px-2 py-1 border-r transition-colors"
+                                        style="border-color: var(--theme-divider-border); background: {rowHighlighted
+                                            ? HIGHLIGHT_BG
+                                            : 'color-mix(in srgb, var(--theme-modal-bg) 92%, transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;{rowHighlighted
+                                            ? ' box-shadow: inset 3px 0 0 var(--theme-accent-bg);'
                                             : ''}"
-                                        style="{colBorderStyle(
-                                            bs.id,
-                                            colPos + 1 < group.visibleColIdx.length
-                                                ? columns[group.visibleColIdx[colPos + 1]]?.id
-                                                : undefined
-                                        )}{colHighlightActive && colHighlighted ? ` background: ${HIGHLIGHT_BG};` : ''}"
-                                        data-group={gi}
-                                        data-row={ri}
-                                        data-col={ci}
+                                        title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${row.selectedCount}/${row.enabledBuffIds.length}）`}
+                                        onclick={() => clickRowHeader(gi, ri)}
+                                        oncontextmenu={(e) => onRowHeaderContextMenu(e, gi, ri)}
                                     >
-                                        {#if cell.enabled}
-                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                            <button
-                                                onclick={() => toggleCell(row, cell)}
-                                                title={cell.selected ? `取消勾选：${bs.name}` : `勾选：${bs.name}`}
-                                                class="flex min-h-6 w-full items-center justify-center px-1 py-1 transition-colors hover:bg-(--theme-modal-text)/10"
+                                        <div
+                                            class="flex w-full items-center gap-1.5 py-0.5 text-left transition-colors hover:bg-(--theme-modal-text)/5"
+                                        >
+                                            <span
+                                                class="truncate text-(--theme-modal-text)"
+                                                style="color: var(--theme-element-{row.entry.damageElement}, #888);"
+                                                >{row.entry.displayName}</span
                                             >
-                                                {#if cell.selected}
-                                                    {#if cellInHighlight}
-                                                        <span
-                                                            class="line-clamp-2 text-[10px] leading-tight"
-                                                            style="color: var(--theme-accent-text);">{bs.name}</span
-                                                        >
-                                                    {:else}
-                                                        <Icon
-                                                            icon="mdi:check"
-                                                            class="size-3.5 shrink-0"
-                                                            style="color: var(--theme-accent-text);"
-                                                        />
-                                                    {/if}
+                                        </div>
+                                        <!-- 视为：伤害类型（可切换 编辑 / 仅查看）；stopPropagation 避免触发行高亮 -->
+                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                        <div
+                                            class="flex flex-wrap gap-0.5 px-0.5 pb-0.5"
+                                            onclick={(e) => e.stopPropagation()}
+                                        >
+                                            {#if getDamageTypeEditMode()}
+                                                {#each DAMAGE_TYPES as dt}
+                                                    {@const selected = (
+                                                        entryDamageTypeMap[row.entry.id] ?? []
+                                                    ).includes(dt)}
+                                                    <button
+                                                        onclick={() => onToggleDamageType(row.entry.id, dt)}
+                                                        title={dt}
+                                                        class="rounded px-1 text-[10px] leading-tight transition-colors"
+                                                        style={selected
+                                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 25%, transparent); color: var(--theme-accent-text);'
+                                                            : 'background: var(--theme-input-bg); color: var(--theme-modal-text)/50; hover: background: var(--theme-modal-text)/10;'}
+                                                        >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
+                                                            dt}</button
+                                                    >
+                                                {/each}
+                                            {:else}
+                                                <span
+                                                    class="text-[10px] font-bold leading-tight text-(--theme-modal-text)/70"
+                                                    >伤害类型：</span
+                                                >
+                                                {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
+                                                    <span
+                                                        class="rounded px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
+                                                        style="background: var(--theme-input-bg);"
+                                                        >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
+                                                            dt}</span
+                                                    >
+                                                {/each}
+                                            {/if}
+                                            {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
+                                                {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
+                                                {#if inferred.length > 0}
+                                                    <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
+                                                        >自动推导：{inferred
+                                                            .map(
+                                                                (t) =>
+                                                                    DAMAGE_TYPE_SHORT[
+                                                                        t as keyof typeof DAMAGE_TYPE_SHORT
+                                                                    ] ?? t
+                                                            )
+                                                            .join('/')}</span
+                                                    >
                                                 {/if}
-                                            </button>
-                                        {:else}
-                                            <!-- 不可用（作用域/条件不匹配）不显示文字 -->
-                                            <span class="block h-6 w-full"></span>
-                                        {/if}
+                                            {/if}
+                                        </div>
                                     </td>
-                                {/each}
-                                {#if groupTableWidths[gi] < maxTableWidth}
-                                    <!-- 填充列：吸收剩余空间；无内容无交互，不参与框选（无 data-col） -->
-                                    <td
-                                        class="p-0"
-                                        style="border-left: 1px dashed var(--theme-divider-border); width: 100%;"
-                                    ></td>
-                                {/if}
-                            </tr>
+                                    {#each group.visibleColIdx as ci, colPos}
+                                        {@const cell = row.cells[ci]}
+                                        {@const bs = columns[ci]}
+                                        {@const colHighlighted =
+                                            highlight?.gi === gi && highlight.kind === 'col' && highlight.index === ci}
+                                        {@const cellInHighlight =
+                                            (rowHighlightActive && highlight?.index === ri) ||
+                                            (colHighlightActive && highlight?.index === ci)}
+                                        <td
+                                            class="min-w-9 p-0 text-center {colHighlightActive && !colHighlighted
+                                                ? 'opacity-40 transition-opacity'
+                                                : ''}"
+                                            style="{colBorderStyle(
+                                                bs.id,
+                                                colPos + 1 < group.visibleColIdx.length
+                                                    ? columns[group.visibleColIdx[colPos + 1]]?.id
+                                                    : undefined
+                                            )}{colHighlightActive && colHighlighted
+                                                ? ` background: ${HIGHLIGHT_BG};`
+                                                : ''}"
+                                            data-group={gi}
+                                            data-row={ri}
+                                            data-col={ci}
+                                        >
+                                            {#if cell.enabled}
+                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                                <button
+                                                    onclick={() => toggleCell(row, cell)}
+                                                    title={cell.selected ? `取消勾选：${bs.name}` : `勾选：${bs.name}`}
+                                                    class="flex min-h-6 w-full items-center justify-center px-1 py-1 transition-colors hover:bg-(--theme-modal-text)/10"
+                                                >
+                                                    {#if cell.selected}
+                                                        {#if cellInHighlight}
+                                                            <span
+                                                                class="line-clamp-2 text-[10px] leading-tight"
+                                                                style="color: var(--theme-accent-text);">{bs.name}</span
+                                                            >
+                                                        {:else}
+                                                            <Icon
+                                                                icon="mdi:check"
+                                                                class="size-3.5 shrink-0"
+                                                                style="color: var(--theme-accent-text);"
+                                                            />
+                                                        {/if}
+                                                    {/if}
+                                                </button>
+                                            {:else}
+                                                <!-- 不可用（作用域/条件不匹配）不显示文字 -->
+                                                <span class="block h-6 w-full"></span>
+                                            {/if}
+                                        </td>
+                                    {/each}
+                                    {#if groupTableWidths[gi] < maxTableWidth}
+                                        <!-- 填充列：吸收剩余空间；无内容无交互，不参与框选（无 data-col） -->
+                                        <td
+                                            class="p-0"
+                                            style="border-left: 1px dashed var(--theme-divider-border); width: 100%;"
+                                        ></td>
+                                    {/if}
+                                </tr>
+                            {/if}
                         {/each}
                     </tbody>
                 </table>
