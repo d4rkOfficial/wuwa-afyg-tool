@@ -32,8 +32,8 @@ import {
     BLOCK_H_PAD,
     GAMEPAD_BUTTONS
 } from './timeline.consts'
-import { getEffectMultiplier, getEffectBurstMultiplier, getTuneDamage } from '$lib/consts/tune-data'
-import { parseValueString, sumRatioNum } from '$lib/utils/parse-value-string'
+import { getEffectMultiplier, getEffectBurstMultiplier } from '$lib/consts/tune-data'
+import { parseValueString } from '$lib/utils/parse-value-string'
 import { addToast } from '$lib/data/toast.svelte'
 import { setCharElements } from '$lib/data/char-elements.svelte'
 import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
@@ -525,7 +525,7 @@ let _selectionRect = $state<{ startX: number; currentX: number } | null>(null)
 let _quickMode = $state(false)
 let _quickCharIndex = $state(0)
 let _quickStack: { type: 'op' | 'ref'; id: string }[] = []
-let _quickPendingRight: Record<string, number> = {}
+const _quickPendingRight: Record<string, number> = {}
 
 export function getTrackMenu() {
     return _trackMenu
@@ -720,8 +720,8 @@ let _nonDirectPickerSelected = $state<Set<string>>(new Set())
 let _nonDirectPickerResponders = $state<Record<string, string[]>>({})
 let _nonDirectPickerBurstLayers = $state<Record<string, number>>({})
 let _nonDirectPickerTuneTrigger = $state<string | null>(null)
-let _skillCache = $state<Record<string, SkillPickerGroup[]>>({})
-let _echoSkillCache = $state<Record<string, { values: [string, string, string][] }>>({})
+const _skillCache = $state<Record<string, SkillPickerGroup[]>>({})
+const _echoSkillCache = $state<Record<string, { values: [string, string, string][] }>>({})
 let _customSkillHits = $state<Record<string, CustomHit[]>>({})
 
 export function getShowDamageList() {
@@ -2491,7 +2491,6 @@ function buildDamageList() {
                 const hits = dianci?.hits ?? 1
                 const mult = getEffectMultiplier('电磁效应', layers)
                 const burstMult = getEffectBurstMultiplier('电磁效应', burstLayers)
-                const total = mult + burstMult
                 entries.push({
                     character: '无',
                     name: `电磁效应${layers}层+爆发${burstLayers}层${hits > 1 ? `×${hits}段` : ''}`,
@@ -2577,7 +2576,7 @@ function buildDamageList() {
         .sort((a, b) => a.x - b.x || a.time - b.time)
 }
 
-let _damageList = $derived(buildDamageList())
+const _damageList = $derived(buildDamageList())
 
 export function getDamageList() {
     return _damageList

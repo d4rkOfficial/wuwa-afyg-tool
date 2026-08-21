@@ -507,7 +507,7 @@
         out:fade={{ duration: 130 }}
     >
         <div
-            class="animate-pop-in theme-glass-surface relative flex h-[560px] max-h-[90vh] w-[640px] max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl"
+            class="animate-pop-in theme-glass-surface relative flex h-140 max-h-[90vh] w-160 max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
@@ -538,7 +538,7 @@
                             onclick={() => (tab = t.key)}
                             class="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors {tab ===
                             t.key
-                                ? 'text-[var(--theme-accent-text-on-bg)]'
+                                ? 'text-(--theme-accent-text-on-bg)'
                                 : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
                             style={tab === t.key ? 'background: var(--theme-accent-bg);' : ''}
                         >
@@ -549,9 +549,7 @@
                 </div>
 
                 <!-- Content -->
-                <div
-                    class="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                >
+                <div class="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 scrollbar-none [&::-webkit-scrollbar]:hidden">
                     {#if tab === 'theme'}
                         <!-- Accent color -->
                         <div class="mb-5">
@@ -753,7 +751,7 @@
                                             (overrides.bgDim / 100) * 0.6});"
                                     >
                                         <div
-                                            class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent"
+                                            class="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/45 to-transparent"
                                         ></div>
                                         <div class="flex items-center gap-2">
                                             <span
@@ -1979,7 +1977,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm"
+            class="animate-fade-in fixed inset-0 z-70 flex items-center justify-center backdrop-blur-sm"
             style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
         >
             <!-- svelte-ignore a11y_click_events_have_key_events -->
