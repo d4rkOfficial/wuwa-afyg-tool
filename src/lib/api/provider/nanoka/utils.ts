@@ -25,7 +25,8 @@ import type {
     ZhCharacterDetail,
     ZhWeaponDetail,
     ZhEchoDetail,
-    ZhSonataDetail
+    ZhSonataDetail,
+    ZhDamageEntry
 } from './types'
 
 // ── Helpers ──
@@ -68,6 +69,76 @@ function interpolate(text: string, params: string[]): string {
     return text.replace(/\{(\d+)\}/g, (_, i) => params[Number(i)] ?? `{${i}}`)
 }
 
+/** @desc 单个倍率分量（"85.18%" / "42.59%*3"）与 damage 条目的匹配结果 */
+interface RatioMatch {
+    entry: ZhDamageEntry
+    /** 本分量的命中总倍数：mult(行内 *N) × extraHits(聚合倍率/估算倍数) */
+    hitFactor: number
+}
+
+/**
+ * @desc 把单个倍率分量匹配到技能 damage 字典中的条目。
+ * 行参数与 rate_lv 同下标（idx 即技能等级位），依次尝试：
+ * 1) 精确匹配 rate_lv[idx] === round(pct*100)；
+ * 2) 聚合倍率回退（如 100.00% = 4×25.00%，取倍数最小的单段值）；
+ * 3) 比例估算（±15% 容差）。
+ * 匹配不到返回 null。
+ */
+const matchRatioComponent = (part: string, damage: Record<string, ZhDamageEntry>, idx: number): RatioMatch | null => {
+    const mRaw = part.match(/^([\d.]+)%(?:\*(\d+))?/)
+    if (!mRaw) return null
+    const pct = parseFloat(mRaw[1])
+    const mult = mRaw[2] ? parseInt(mRaw[2], 10) : 1
+    const target = Math.round(pct * 100)
+
+    let matchedKey: string | null = null
+    let extraHits = 1
+    for (const dk of Object.keys(damage)) {
+        const dv = damage[dk]
+        if (dv.rate_lv && dv.rate_lv[idx] === target) {
+            matchedKey = dk
+            break
+        }
+    }
+    if (!matchedKey) {
+        for (const dk of Object.keys(damage)) {
+            const dv = damage[dk]
+            const rate = dv.rate_lv?.[idx] ?? 0
+            if (rate <= 0) continue
+            const k = Math.round(target / rate)
+            if (k < 2 || k > 10) continue
+            const diff = Math.abs(target - rate * k)
+            if (diff <= 10 && (!matchedKey || k < extraHits)) {
+                matchedKey = dk
+                extraHits = k
+            }
+        }
+    }
+    if (!matchedKey) {
+        let bestKey: string | null = null
+        let bestDiff = Infinity
+        for (const dk of Object.keys(damage)) {
+            const dv = damage[dk]
+            const rate = dv.rate_lv?.[idx] ?? 0
+            if (rate <= 0) continue
+            const kf = target / rate
+            const k = Math.round(kf)
+            if (k < 1 || k > 10) continue
+            const diff = Math.abs(target - rate * k)
+            if (diff < bestDiff) {
+                bestDiff = diff
+                bestKey = dk
+            }
+        }
+        if (bestKey && bestDiff <= target * 0.15) {
+            matchedKey = bestKey
+            extraHits = target / (damage[bestKey].rate_lv?.[idx] ?? 1)
+        }
+    }
+    if (!matchedKey) return null
+    return { entry: damage[matchedKey], hitFactor: mult * extraHits }
+}
+
 function makeSkillValues(
     skill: ZhCharacterDetail['skill_trees'][string]['skill']
 ): [name: string, value: string, element: string, energy?: string, tune?: string][] {
@@ -95,86 +166,33 @@ function makeSkillValues(
         const damage = skill.damage
         // 空伤害字典（纯增益技能）不参与倍率匹配/元素兜底
         if (damage && Object.keys(damage).length > 0) {
-            const mRaw = raw.match(/^([\d.]+)%(?:\*(\d+))?/)
-            const pct = mRaw ? parseFloat(mRaw[1]) : NaN
-            const mult = mRaw && mRaw[2] ? parseInt(mRaw[2], 10) : 1
-            if (!isNaN(pct)) {
-                const target = Math.round(pct * 100)
-                let matchedKey: string | null = null
-                let extraHits = 1
-                for (const dk of Object.keys(damage)) {
-                    const dv = damage[dk]
-                    if (dv.rate_lv && dv.rate_lv[idx] === target) {
-                        matchedKey = dk
-                        break
-                    }
+            // 行首为百分比才视为伤害倍率行（耐力/冷却/治疗等纯数值行不参与匹配）；
+            // 段内多 hit 以 '+' 连接各分量，逐分量匹配并按 *N 对齐后累加出能量/偏谐合计（已 /100）。
+            if (/^[\d.]+%/.test(raw)) {
+                let energyTotal = 0
+                let tuneTotal = 0
+                let matchedAny = false
+                let firstElement: number | undefined
+                for (const part of raw.split('+')) {
+                    const m = matchRatioComponent(part.trim(), damage, idx)
+                    if (!m) continue
+                    matchedAny = true
+                    if (firstElement === undefined) firstElement = m.entry.element
+                    if (typeof m.entry.energy === 'number') energyTotal += (m.entry.energy / 100) * m.hitFactor
+                    if (typeof m.entry.weakness_lvl === 'number')
+                        tuneTotal += (m.entry.weakness_lvl / 100) * m.hitFactor
                 }
-                if (!matchedKey) {
-                    for (const dk of Object.keys(damage)) {
-                        const dv = damage[dk]
-                        const rate = dv.rate_lv?.[idx] ?? 0
-                        if (rate <= 0) continue
-                        const kf = target / rate
-                        const k = Math.round(kf)
-                        if (k < 2 || k > 10) continue
-                        const diff = Math.abs(target - rate * k)
-                        if (diff <= 10 && (!matchedKey || k < extraHits)) {
-                            matchedKey = dk
-                            extraHits = k
-                        }
+                if (matchedAny) {
+                    if (firstElement !== undefined) element = ELEMENT_MAP[firstElement] ?? ''
+                    // 返回该伤害行的能量/偏谐合计结果（非多项式表达式），保留 2 位小数精度
+                    const fmtTotal = (n: number): string | undefined => {
+                        const rounded = Number(n.toFixed(2))
+                        return rounded > 0 ? String(rounded) : undefined
                     }
-                }
-                let isEstimate = false
-                if (!matchedKey) {
-                    let bestKey: string | null = null
-                    let bestDiff = Infinity
-                    for (const dk of Object.keys(damage)) {
-                        const dv = damage[dk]
-                        const rate = dv.rate_lv?.[idx] ?? 0
-                        if (rate <= 0) continue
-                        const kf = target / rate
-                        const k = Math.round(kf)
-                        if (k < 1 || k > 10) continue
-                        const diff = Math.abs(target - rate * k)
-                        if (diff < bestDiff) {
-                            bestDiff = diff
-                            bestKey = dk
-                        }
-                    }
-                    if (bestKey && bestDiff <= target * 0.15) {
-                        matchedKey = bestKey
-                        extraHits = target / (damage[bestKey].rate_lv?.[idx] ?? 1)
-                        isEstimate = true
-                    }
-                }
-                if (matchedKey) {
-                    const prefix = matchedKey.slice(0, -2)
-                    const group = Object.values(damage).filter((_, i) => Object.keys(damage)[i].slice(0, -2) === prefix)
-                    const first = isEstimate || extraHits > 1 ? damage[matchedKey] : (group[0] ?? damage[matchedKey])
-                    element = ELEMENT_MAP[first.element] ?? ''
-                    const hitFactor = mult * extraHits
-                    const fmtTune = (raw: number) => {
-                        const v = raw / 100
-                        return v > 0 ? (hitFactor > 1 ? `${v}*${hitFactor}` : String(v)) : undefined
-                    }
-                    if (isEstimate) {
-                        if (typeof first.energy === 'number') {
-                            const est = ((first.energy / 100) * hitFactor).toFixed(2)
-                            energy = Number(est) > 0 ? est : undefined
-                        }
-                        if (typeof first.weakness_lvl === 'number') {
-                            const est = ((first.weakness_lvl / 100) * hitFactor).toFixed(2)
-                            tune = Number(est) > 0 ? est : undefined
-                        }
-                    } else {
-                        if (typeof first.energy === 'number') {
-                            energy = fmtTune(first.energy)
-                        }
-                        if (typeof first.weakness_lvl === 'number') {
-                            tune = fmtTune(first.weakness_lvl)
-                        }
-                    }
+                    energy = fmtTotal(energyTotal)
+                    tune = fmtTotal(tuneTotal)
                 } else {
+                    // 兜底：仍匹配不到时取技能内首个伤害条目的元素（同技能内伤害属性一致），能量/偏谐留空
                     const first = Object.values(damage)[0]
                     if (first) element = ELEMENT_MAP[first.element] ?? ''
                 }
@@ -366,7 +384,7 @@ export function transformWeaponInfo(data: ZhWeaponDetail): WeaponInfo {
     const atkStat = arr?.[0] ?? { value: 0 }
     const subStat = arr?.[1] ?? { name: '', value: 0, is_percent: false }
 
-    const subValue = subStat.is_percent ? (subStat.value / 100).toFixed(2) + '%' : String(subStat.value)
+    const subValue = subStat.is_percent ? `${(subStat.value / 100).toFixed(2)}%` : String(subStat.value)
 
     let desc = data.effect ?? ''
     if (data.param) {
@@ -399,7 +417,7 @@ function makeEchoSkillValues(skill: ZhEchoDetail['skill']): [name: string, value
     for (const [, dmg] of Object.entries(skill.damage)) {
         const lastIdx = dmg.rate_lv ? dmg.rate_lv.length - 1 : 0
         const rateVal = dmg.rate_lv?.[lastIdx] ?? 0
-        const pct = (rateVal / 100).toFixed(2) + '%'
+        const pct = `${(rateVal / 100).toFixed(2)}%`
         const suffix = dmg.related_property === '攻击' ? '' : dmg.related_property
         const value = suffix ? pct + suffix : pct
         const element = ELEMENT_MAP[dmg.element] ?? ''

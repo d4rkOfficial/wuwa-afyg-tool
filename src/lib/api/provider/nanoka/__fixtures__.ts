@@ -131,6 +131,46 @@ export const characterDetail: ZhCharacterDetail = {
                     }
                 }
             }
+        }),
+        n3: skillTreeLeaf({
+            node_type: 2,
+            skill: {
+                name: '多段轰击',
+                type: '共鸣技能',
+                desc: '造成{0}%+{1}%伤害',
+                param: ['60', '40'],
+                level: {
+                    '1': {
+                        name: '技能伤害',
+                        param: [['60.00%*2+40.00%*3']],
+                        format: '{0}'
+                    }
+                },
+                damage: {
+                    d1: {
+                        element: 3,
+                        related_property: '攻击',
+                        type: 0,
+                        rate_lv: [6000],
+                        energy: 50,
+                        element_power: 0,
+                        hardness_lv: 10000,
+                        tough_lv: 0,
+                        weakness_lvl: 1000
+                    },
+                    d2: {
+                        element: 3,
+                        related_property: '攻击',
+                        type: 0,
+                        rate_lv: [4000],
+                        energy: 30,
+                        element_power: 0,
+                        hardness_lv: 10000,
+                        tough_lv: 0,
+                        weakness_lvl: 800
+                    }
+                }
+            }
         })
     },
     chains: {

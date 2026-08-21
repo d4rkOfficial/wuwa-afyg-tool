@@ -35,7 +35,7 @@ export interface SkillEntry {
     type: '常态攻击' | '共鸣技能' | '共鸣解放' | '共鸣回路' | '变奏技能' | '延奏技能' | '谐度破坏'
     desc: string
     // [name, value, element, energy, tune]：energy=共鸣能量；tune=偏谐值。
-    // 段内多 hit 时以 'a+b' 连接（每个分量已 /100）
+    // energy/tune 为该伤害行全部 hit 的合计结果（已 /100，直接是最终数值而非 *N/多项式表达式）
     values: [name: string, value: string, element: string, energy?: string, tune?: string][]
     // 上游伤害字典（rate_lv/energy/weakness_lvl 等）；延奏倍率推断只对非空字典生效
     damage?: Record<string, unknown>

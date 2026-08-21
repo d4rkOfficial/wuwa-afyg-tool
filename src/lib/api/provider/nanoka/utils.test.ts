@@ -101,7 +101,7 @@ describe('transformCharacterInfo', () => {
         assert.deepEqual(out.lv90BaseStats, { hp: 10000, atk: 340, def: 440, tuneBreakBoost: 10 })
         assert.deepEqual(out.statNodes, [{ name: '共鸣回路·律', desc: '层数叠加。' }])
         assert.deepEqual(out.chains, [{ name: '止戈', desc: '共鸣技能伤害30%' }])
-        assert.equal(out.skills.length, 2)
+        assert.equal(out.skills.length, 3)
     })
 
     it('strips rich-text tags and builds skill values incl. energy', () => {
@@ -112,6 +112,14 @@ describe('transformCharacterInfo', () => {
         const outro = out.skills.find((s) => s.name === '苍云覆海')
         // 延奏技能无 level 数据：从 desc 文本推断出伤害条目（热熔元素）
         assert.deepEqual(outro?.values, [['延奏技能伤害', '200%', '热熔', undefined, undefined]])
+    })
+
+    it('sums energy/tune across multi-component (a+b) rows and returns the final total', () => {
+        const out = transformCharacterInfo(characterDetail)
+        const skill = out.skills.find((s) => s.name === '多段轰击')
+        // 60.00%*2 → rate 6000/energy 50/weakness 1000；40.00%*3 → rate 4000/energy 30/weakness 800
+        // energy = 0.5×2 + 0.3×3 = 1.9；tune = 10×2 + 8×3 = 44
+        assert.deepEqual(skill?.values, [['共鸣技能伤害', '60.00%*2+40.00%*3', '导电', '1.9', '44']])
     })
 })
 
