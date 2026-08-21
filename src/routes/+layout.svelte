@@ -16,7 +16,6 @@
     import MagneticPointer from '$lib/components/layout/magnetic-pointer.svelte'
     import { loadThemes } from '$lib/theme'
     import { registerIcons } from '$lib/utils/icons'
-    import { getEggMode } from '$lib/data/egg-prefs.svelte'
 
     registerIcons()
 
@@ -55,8 +54,7 @@
 </script>
 
 <svelte:head>
-    <!-- 彩蛋解锁时 favicon 同步切换（浏览器标签页图标刷新） -->
-    <link rel="icon" href={getEggMode() ? '/icons/egg/yaya.png' : favicon} />
+    <link rel="icon" href={favicon} />
 </svelte:head>
 {@render children()}
 <Toast />
