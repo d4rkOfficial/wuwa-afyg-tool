@@ -677,7 +677,7 @@
 <!-- @desc 表格根容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="theme-scrollbar h-full overflow-auto pb-48 {className}"
+    class="theme-scrollbar snap-scroll-y h-full overflow-auto pb-48 {className}"
     style={styleProp}
     bind:this={rootEl}
     onmousedown={handleMouseDown}
@@ -718,7 +718,7 @@
     {#each tableData as group, gi}
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
         {@const hasFolder = group.visibleColIdx.some((ci) => folderGroupOf.has(columns[ci].id))}
-        <div class="mb-6">
+        <div class="snap-group mb-6">
             <div>
                 <!-- 表格主体底色不透明（单元格区域保持透明）；上/右/下 = 昼夜色双实线（随明暗主题），右上/右下圆角；左 = 常规分隔线 -->
                 <table

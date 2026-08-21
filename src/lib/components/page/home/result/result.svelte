@@ -313,7 +313,7 @@
         </div>
 
         <!-- Detail table -->
-        <div class="theme-scrollbar flex-1 overflow-y-auto pb-48" bind:this={tableContainer}>
+        <div class="theme-scrollbar snap-scroll-y flex-1 overflow-y-auto pb-48" bind:this={tableContainer}>
             <table class="w-full text-xs">
                 <thead>
                     <tr
@@ -335,7 +335,7 @@
                         <tr
                             onclick={() => toggleExpand(entry.id, i)}
                             data-entry-id={entry.id}
-                            class="cursor-pointer border-b transition-colors hover:bg-(--theme-modal-text)/3"
+                            class="snap-row cursor-pointer border-b transition-colors hover:bg-(--theme-modal-text)/3"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <td

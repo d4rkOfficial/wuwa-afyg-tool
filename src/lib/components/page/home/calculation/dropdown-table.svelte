@@ -407,7 +407,7 @@
 <!-- @desc 表格容器：Ctrl+滚轮横向滚动，背景为弹窗底色 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="theme-scrollbar h-full overflow-auto pb-48 {className}"
+    class="theme-scrollbar snap-scroll-y h-full overflow-auto pb-48 {className}"
     style="background: var(--theme-modal-bg); {styleProp || ''}"
     bind:this={calcContainer}
     onwheel={(e) => {
@@ -448,7 +448,7 @@
                     onclick={() => handleToggleExpand(damageEntry.id, i)}
                     data-entry-id={damageEntry.id}
                     class={[
-                        'cursor-pointer border-b transition-colors',
+                        'snap-row cursor-pointer border-b transition-colors',
                         expandedEntryId === damageEntry.id ? '' : 'hover:bg-(--theme-modal-text)/5',
                         expandedEntryId !== null && expandedEntryId !== damageEntry.id ? 'opacity-40' : ''
                     ].join(' ')}
