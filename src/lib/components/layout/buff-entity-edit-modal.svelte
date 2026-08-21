@@ -735,7 +735,7 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in theme-scrollbar rounded-xl border p-5 shadow-xl w-[30rem] max-h-[88vh] overflow-y-auto"
+            class="animate-pop-in theme-scrollbar rounded-xl border p-5 shadow-xl w-120 max-h-[88vh] overflow-y-auto"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -752,8 +752,8 @@
 
             <div class="space-y-4">
                 <!-- Zone selector -->
-                <div>
-                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用属性</label>
+                <div role="group" aria-label="引用属性">
+                    <span class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用属性</span>
                     <div class="relative">
                         <button
                             onclick={() => (showRefZoneMenu = !showRefZoneMenu)}

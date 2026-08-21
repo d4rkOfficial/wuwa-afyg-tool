@@ -2265,7 +2265,7 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-xl border p-5 shadow-xl w-[28rem]"
+            class="animate-pop-in rounded-xl border p-5 shadow-xl w-md"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -2282,8 +2282,8 @@
 
             <div class="space-y-4">
                 <!-- Character selector (top) -->
-                <div>
-                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用角色</label>
+                <div role="group" aria-label="引用角色">
+                    <span class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用角色</span>
                     <div class="flex gap-2">
                         {#each team as slot, i}
                             <button
@@ -2315,8 +2315,8 @@
                 </div>
 
                 <!-- Zone selector (below) -->
-                <div>
-                    <label class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用属性</label>
+                <div role="group" aria-label="引用属性">
+                    <span class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用属性</span>
                     <div class="relative">
                         <button
                             onclick={() => (showRefZoneMenu = !showRefZoneMenu)}

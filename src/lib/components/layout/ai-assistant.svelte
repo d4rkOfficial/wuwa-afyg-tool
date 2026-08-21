@@ -472,6 +472,9 @@
             <!-- 收起态：图标居中（可点击/拖动，拖动不触发展开） -->
             <div
                 class="flex h-full w-full cursor-grab touch-none select-none items-center justify-center"
+                role="button"
+                tabindex="0"
+                aria-label="AI 助手（点击展开，拖动可移动）"
                 onpointerdown={btnDown}
                 onpointermove={btnMove}
                 onpointerup={btnUp}
@@ -479,6 +482,12 @@
                 onpointerenter={() => (btnHover = true)}
                 onpointerleave={() => (btnHover = false)}
                 onclick={btnClick}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        btnClick()
+                    }
+                }}
                 title="AI 助手（拖动可移动）"
             >
                 <div transition:fade class="flex h-full w-full items-center justify-center">
@@ -534,7 +543,7 @@
                         {@const isLastUser = i === lastUserDisplayIdx}
                         <div class="flex justify-end">
                             <div
-                                class="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm px-3 py-2 text-xs leading-relaxed"
+                                class="max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-2xl rounded-br-sm px-3 py-2 text-xs leading-relaxed"
                                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                             >
                                 {m.text}
@@ -557,7 +566,7 @@
                         {@const activeTab = m.tab ?? 'chat'}
                         <div class="flex justify-start">
                             <div
-                                class="ai-md max-w-[92%] break-words rounded-2xl rounded-bl-sm px-3 py-2 text-xs leading-relaxed"
+                                class="ai-md max-w-[92%] wrap-break-word rounded-2xl rounded-bl-sm px-3 py-2 text-xs leading-relaxed"
                                 style="background: var(--theme-input-bg);"
                             >
                                 {#if hasReasoning || hasTools}
@@ -653,7 +662,7 @@
                         </div>
                         <div class="mt-1.5 rounded-lg px-2.5 py-2 text-xs" style="background: var(--theme-input-bg);">
                             <div class="font-medium text-(--theme-accent-text)">{confirmCard.toolName}</div>
-                            <div class="mt-0.5 break-words text-(--theme-modal-text)/60">{confirmCard.summary}</div>
+                            <div class="mt-0.5 wrap-break-word text-(--theme-modal-text)/60">{confirmCard.summary}</div>
                         </div>
                         <div class="mt-2.5 flex justify-end gap-2">
                             <button
