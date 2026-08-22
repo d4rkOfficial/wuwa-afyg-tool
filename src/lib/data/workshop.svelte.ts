@@ -9,7 +9,7 @@ export interface WorkshopInstance {
 
 const KEY = 'workshop'
 
-const DEFAULT_URLS = [SHARE_BASE, 'http://localhost:3000']
+const DEFAULT_URLS = [SHARE_BASE, 'https://wuwa-standard.200503.xyz']
 
 function normalizeUrl(url: string): string {
     return url.trim().replace(/\/+$/, '')
