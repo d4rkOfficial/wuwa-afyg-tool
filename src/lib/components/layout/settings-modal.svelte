@@ -1922,7 +1922,7 @@
                                                 <span
                                                     class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
                                                 >
-                                                    官方/生僻叫法 → 玩家黑话；生成 Buff 时用于命名优化
+                                                    官方/生僻叫法 → 玩家黑话；
                                                 </span>
                                             </div>
                                             <button

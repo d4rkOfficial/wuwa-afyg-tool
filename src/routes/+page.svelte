@@ -182,6 +182,21 @@
         // 开启侧边栏速查功能：关闭弹窗式速查（避免残留态在关闭功能后弹出）
         if (sidebarLookupEnabled && showLookup) showLookup = false
     })
+
+    // 速查开/关时联动侧栏宽度：开启→自动延展到最长；关闭→若几乎最宽则自动收窄
+    let prevSidebarLookupOpen = false
+    $effect(() => {
+        const nowOpen = sidebarLookupOpen
+        if (nowOpen === prevSidebarLookupOpen) return
+        if (nowOpen) {
+            // 开启速查：侧栏未至最长档则延展
+            if (sidebarWidth < sidebarMaxExpanded - 1) sidebarWidth = sidebarMaxExpanded
+        } else {
+            // 关闭速查：侧栏几乎最宽（容差 24px）则收窄回较短档
+            if (sidebarWidth >= sidebarMaxExpanded - 24) sidebarWidth = sidebarShortExpanded
+        }
+        prevSidebarLookupOpen = nowOpen
+    })
     let showCharDetail = $state(false)
     let resultRefreshKey = $state(0)
     let renameModal = $state(false)
