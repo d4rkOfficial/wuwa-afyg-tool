@@ -33,6 +33,7 @@
         teamPhaseLocked: boolean
         phaseLocked: boolean
         canLock: boolean
+        sidebarLookupEnabled?: boolean
         onLookup: () => void
         onCharDetail: () => void
         onRefresh: () => void
@@ -45,6 +46,7 @@
         teamPhaseLocked,
         phaseLocked,
         canLock,
+        sidebarLookupEnabled = false,
         onLookup,
         onCharDetail,
         onRefresh,
@@ -151,17 +153,19 @@
           };${toolbarDrag ? (gpuAccel ? ' will-change: transform;' : ' will-change: left;') : ''}${styleProp ? '; ' + styleProp : ''}`
         : `background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text);${styleProp ? ' ' + styleProp : ''}`}
 >
-    <button
-        onclick={onLookup}
-        disabled={!teamPhaseLocked}
-        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
-            ? 'rounded-full px-3 py-2'
-            : 'rounded-lg px-3 py-1.5'}"
-        title="速查"
-    >
-        <Icon icon="mdi:book-search-outline" class="size-4 shrink-0" />
-        {#if !simplifyToolbar}<span>速查</span>{/if}
-    </button>
+    {#if !sidebarLookupEnabled}
+        <button
+            onclick={onLookup}
+            disabled={!teamPhaseLocked}
+            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
+                ? 'rounded-full px-3 py-2'
+                : 'rounded-lg px-3 py-1.5'}"
+            title="速查"
+        >
+            <Icon icon="mdi:book-search-outline" class="size-4 shrink-0" />
+            {#if !simplifyToolbar}<span>速查</span>{/if}
+        </button>
+    {/if}
     <button
         onclick={onCharDetail}
         class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar

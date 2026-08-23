@@ -2,7 +2,8 @@
     import { untrack } from 'svelte'
     import Icon from '@iconify/svelte'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
-    import type { Project, PhaseKey } from '$lib/types/project'
+    import QuickLookupContent from '$lib/components/layout/quick-lookup-content.svelte'
+    import type { Project, PhaseKey, CharSlot } from '$lib/types/project'
     import { setActiveTheme, getActiveId as getActiveThemeId, getThemes } from '$lib/theme'
     import { addToast } from '$lib/data/toast.svelte'
     import { getCharElementMap } from '$lib/data/char-elements.svelte'
@@ -17,6 +18,14 @@
         activeId: string
         width?: number
         dragging?: boolean
+        sidebarLookupEnabled?: boolean
+        sidebarLookupOpen?: boolean
+        sidebarWide?: boolean
+        team?: [CharSlot, CharSlot, CharSlot]
+        onCreateBuff?: (name: string) => void
+        showBuffOption?: boolean
+        onToggleSidebarLookup?: () => void
+        onToggleSidebarWidth?: () => void
         oncreate: () => void
         onimport: () => void
         onhome: () => void
@@ -35,6 +44,14 @@
         activeId,
         width = 240,
         dragging = false,
+        sidebarLookupEnabled = false,
+        sidebarLookupOpen = false,
+        sidebarWide = false,
+        team,
+        onCreateBuff,
+        showBuffOption = false,
+        onToggleSidebarLookup,
+        onToggleSidebarWidth,
         oncreate,
         onimport,
         onhome,
@@ -59,6 +76,9 @@
     let actionsCollapsed = $state(false)
 
     let compact = $derived(width <= 144)
+    /** @desc 速查页占满主体（非紧凑 + 速查开启）；紧凑模式速查开启时仅隐藏工程列表、保留底部按钮 */
+    let lookupPage = $derived(sidebarLookupOpen && !compact)
+    let lookupCompactHidden = $derived(sidebarLookupOpen && compact)
 
     function handleContextMenu(e: MouseEvent, id: string) {
         e.preventDefault()
@@ -209,6 +229,30 @@
         {#if !compact}<span class="text-sm font-semibold tracking-tight">椰果工具箱</span>{/if}
         <div class="flex-1"></div>
         {#if !compact}
+            {#if sidebarLookupEnabled && activeId}
+                <button
+                    onclick={(e) => {
+                        e.stopPropagation()
+                        onToggleSidebarLookup?.()
+                    }}
+                    class="rounded p-1 transition-colors hover:bg-white/5 {sidebarLookupOpen
+                        ? 'text-(--theme-accent-text)'
+                        : 'text-(--theme-sidebar-text)/40 hover:text-(--theme-sidebar-text)/70'}"
+                    title="速查"
+                >
+                    <Icon icon="mdi:book-search-outline" class="size-4" />
+                </button>
+            {/if}
+            <button
+                onclick={(e) => {
+                    e.stopPropagation()
+                    onToggleSidebarWidth?.()
+                }}
+                class="rounded p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-white/5"
+                title={sidebarWide ? '收窄侧栏' : '展宽侧栏'}
+            >
+                <Icon icon={sidebarWide ? 'mdi:arrow-collapse' : 'mdi:arrow-expand'} class="size-4" />
+            </button>
             <button
                 onclick={(e) => {
                     e.stopPropagation()
@@ -226,194 +270,213 @@
         {/if}
     </div>
 
-    <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pt-2">
-        {#each grouped.groups as group, i (group.key)}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-                class={[
-                    'overflow-hidden rounded-lg transition-colors',
-                    hoveredHeaderKey === group.key ? 'bg-(--theme-sidebar-text)/5' : ''
-                ].join(' ')}
-            >
+    {#if lookupPage && team}
+        <!-- @desc 侧边栏速查页：角色 switch 行置于底部 -->
+        <div class="flex min-h-0 flex-1 flex-col">
+            <QuickLookupContent
+                {team}
+                {onCreateBuff}
+                {showBuffOption}
+                showCustomHitOption={false}
+                tabBarPosition="bottom"
+                onclose={onToggleSidebarLookup}
+            />
+        </div>
+    {:else if !lookupCompactHidden}
+        <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pt-2">
+            {#each grouped.groups as group, i (group.key)}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                     class={[
-                        'flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-sm transition-colors',
-                        group.key === activeGroupKey
-                            ? 'text-(--theme-sidebar-text)/90'
-                            : 'text-(--theme-sidebar-text)/60 hover:text-(--theme-sidebar-text)/90'
+                        'overflow-hidden rounded-lg transition-colors',
+                        hoveredHeaderKey === group.key ? 'bg-(--theme-sidebar-text)/5' : ''
                     ].join(' ')}
-                    onclick={() => toggleGroup(group.key)}
-                    onmouseenter={() => (hoveredHeaderKey = group.key)}
-                    onmouseleave={() => (hoveredHeaderKey = null)}
                 >
-                    <svg viewBox="0 0 16 16" class="size-4.5 shrink-0">
-                        <defs>
-                            <linearGradient id="teamGrad-{i}" x1="0" y1="0" x2="1" y2="1">
-                                <stop
-                                    offset="0%"
-                                    style={`stop-color: ${teamStopColor(group.displayNames[0] ?? '', 0)}`}
-                                />
-                                <stop
-                                    offset="50%"
-                                    style={`stop-color: ${teamStopColor(group.displayNames[1] ?? '', 25)}`}
-                                />
-                                <stop
-                                    offset="100%"
-                                    style={`stop-color: ${teamStopColor(group.displayNames[2] ?? '', 25)}`}
-                                />
-                            </linearGradient>
-                        </defs>
-                        <rect x="0" y="0" width="16" height="16" rx="3" fill={`url(#teamGrad-${i})`} />
-                    </svg>
-                    {#if !compact}
-                        <span class="flex flex-1 items-center gap-0 truncate">
-                            {#each group.displayNames as name, i}
-                                {#if i > 0}<span class="text-(--theme-sidebar-text)/40 shrink-0">/</span>{/if}
-                                <span class="shrink-0">{shortName(name)}</span>
-                            {/each}
-                        </span>
-                        <Icon
-                            icon={expandedKeys.has(group.key) ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-                            class="size-4 shrink-0 text-(--theme-sidebar-text)/40"
-                        />
-                    {/if}
-                </div>
-                {#if expandedKeys.has(group.key)}
-                    <div transition:slide|local={{ duration: 200 }} class="space-y-0.5 pb-1">
-                        {#each group.projects as project (project.id)}
-                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                            <!-- svelte-ignore a11y_no_static_element_interactions -->
-                            <div
-                                onclick={() => selectProject(project.id)}
-                                oncontextmenu={(e) => handleContextMenu(e, project.id)}
-                                class={[
-                                    'flex w-full cursor-pointer items-center text-sm transition-colors rounded-lg',
-                                    compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
-                                    project.id === activeId
-                                        ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
-                                        : 'text-(--theme-sidebar-text)/60 hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90'
-                                ].join(' ')}
-                            >
-                                {#if compact}
-                                    <span
-                                        class="flex size-6 items-center justify-center rounded-md bg-(--theme-sidebar-text)/10 text-xs"
-                                        >{project.name[0]}</span
-                                    >
-                                {:else}
-                                    <span class="truncate flex-1">{project.name}</span>
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                {/if}
-            </div>
-        {/each}
-
-        {#if grouped.ungrouped.length > 0}
-            <div class="space-y-0.5">
-                <div
-                    class="flex w-full cursor-default items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--theme-sidebar-text)/60"
-                >
-                    <svg viewBox="0 0 16 16" class="size-4.5 shrink-0">
-                        <rect x="0" y="0" width="16" height="16" rx="3" fill="#555" />
-                    </svg>
-                    {#if !compact}
-                        <span class="truncate flex-1">未锁定配队</span>
-                    {/if}
-                </div>
-                {#each grouped.ungrouped as project (project.id)}
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
-                        onclick={() => selectProject(project.id)}
-                        oncontextmenu={(e) => handleContextMenu(e, project.id)}
                         class={[
-                            'flex w-full cursor-pointer items-center text-sm transition-colors rounded-lg',
-                            compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
-                            project.id === activeId
-                                ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
-                                : 'text-(--theme-sidebar-text)/60 hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90'
+                            'flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-sm transition-colors',
+                            group.key === activeGroupKey
+                                ? 'text-(--theme-sidebar-text)/90'
+                                : 'text-(--theme-sidebar-text)/60 hover:text-(--theme-sidebar-text)/90'
                         ].join(' ')}
+                        onclick={() => toggleGroup(group.key)}
+                        onmouseenter={() => (hoveredHeaderKey = group.key)}
+                        onmouseleave={() => (hoveredHeaderKey = null)}
                     >
-                        {#if compact}
-                            <span
-                                class="flex size-6 items-center justify-center rounded-md bg-(--theme-sidebar-text)/10 text-xs"
-                                >{project.name[0]}</span
-                            >
-                        {:else}
-                            <span class="truncate flex-1">{project.name}</span>
+                        <svg viewBox="0 0 16 16" class="size-4.5 shrink-0">
+                            <defs>
+                                <linearGradient id="teamGrad-{i}" x1="0" y1="0" x2="1" y2="1">
+                                    <stop
+                                        offset="0%"
+                                        style={`stop-color: ${teamStopColor(group.displayNames[0] ?? '', 0)}`}
+                                    />
+                                    <stop
+                                        offset="50%"
+                                        style={`stop-color: ${teamStopColor(group.displayNames[1] ?? '', 25)}`}
+                                    />
+                                    <stop
+                                        offset="100%"
+                                        style={`stop-color: ${teamStopColor(group.displayNames[2] ?? '', 25)}`}
+                                    />
+                                </linearGradient>
+                            </defs>
+                            <rect x="0" y="0" width="16" height="16" rx="3" fill={`url(#teamGrad-${i})`} />
+                        </svg>
+                        {#if !compact}
+                            <span class="flex flex-1 items-center gap-0 truncate">
+                                {#each group.displayNames as name, i}
+                                    {#if i > 0}<span class="text-(--theme-sidebar-text)/40 shrink-0">/</span>{/if}
+                                    <span class="shrink-0">{shortName(name)}</span>
+                                {/each}
+                            </span>
+                            <Icon
+                                icon={expandedKeys.has(group.key) ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                                class="size-4 shrink-0 text-(--theme-sidebar-text)/40"
+                            />
                         {/if}
                     </div>
-                {/each}
-            </div>
-        {/if}
-    </div>
+                    {#if expandedKeys.has(group.key)}
+                        <div transition:slide|local={{ duration: 200 }} class="space-y-0.5 pb-1">
+                            {#each group.projects as project (project.id)}
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <div
+                                    onclick={() => selectProject(project.id)}
+                                    oncontextmenu={(e) => handleContextMenu(e, project.id)}
+                                    class={[
+                                        'flex w-full cursor-pointer items-center text-sm transition-colors rounded-lg',
+                                        compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
+                                        project.id === activeId
+                                            ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
+                                            : 'text-(--theme-sidebar-text)/60 hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90'
+                                    ].join(' ')}
+                                >
+                                    {#if compact}
+                                        <span
+                                            class="flex size-6 items-center justify-center rounded-md bg-(--theme-sidebar-text)/10 text-xs"
+                                            >{project.name[0]}</span
+                                        >
+                                    {:else}
+                                        <span class="truncate flex-1">{project.name}</span>
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
+            {/each}
 
-    <div
-        class="shrink-0 border-t px-2 pt-2 pb-3 space-y-0.5"
-        style="box-shadow: 0 -4px 12px -2px color-mix(in srgb, var(--theme-sidebar-bg) 45%, transparent); border-color: var(--theme-divider-border)"
-    >
-        {#if compact}
-            <button
-                onclick={oncreate}
-                class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                title="新建工程"
-            >
-                <Icon icon="mdi:plus" class="size-4 shrink-0" />
-            </button>
-            <button
-                onclick={onimport}
-                class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                title="从本地导入"
-            >
-                <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
-            </button>
-            <button
-                onclick={onworkshop}
-                class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                title="从工坊导入"
-            >
-                <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
-            </button>
-        {:else}
-            <button
-                onclick={() => (actionsCollapsed = !actionsCollapsed)}
-                class="flex w-full shrink-0 items-center justify-center rounded-md py-1 text-(--theme-sidebar-text)/40 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/80"
-                title={actionsCollapsed ? '展开操作' : '收起操作'}
-            >
-                <Icon icon={actionsCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="size-3.5 shrink-0" />
-            </button>
-            {#if !actionsCollapsed}
-                <div transition:slide|local={{ duration: 200 }} class="space-y-0.5">
-                    <button
-                        onclick={oncreate}
-                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                        title="新建工程"
+            {#if grouped.ungrouped.length > 0}
+                <div class="space-y-0.5">
+                    <div
+                        class="flex w-full cursor-default items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--theme-sidebar-text)/60"
                     >
-                        <Icon icon="mdi:plus" class="size-4 shrink-0" />
-                        <span>新建工程</span>
-                    </button>
-                    <button
-                        onclick={onimport}
-                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                        title="从本地导入"
-                    >
-                        <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
-                        <span>从本地导入</span>
-                    </button>
-                    <button
-                        onclick={onworkshop}
-                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
-                        title="从工坊导入"
-                    >
-                        <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
-                        <span>从工坊导入</span>
-                    </button>
+                        <svg viewBox="0 0 16 16" class="size-4.5 shrink-0">
+                            <rect x="0" y="0" width="16" height="16" rx="3" fill="#555" />
+                        </svg>
+                        {#if !compact}
+                            <span class="truncate flex-1">未锁定配队</span>
+                        {/if}
+                    </div>
+                    {#each grouped.ungrouped as project (project.id)}
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div
+                            onclick={() => selectProject(project.id)}
+                            oncontextmenu={(e) => handleContextMenu(e, project.id)}
+                            class={[
+                                'flex w-full cursor-pointer items-center text-sm transition-colors rounded-lg',
+                                compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
+                                project.id === activeId
+                                    ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
+                                    : 'text-(--theme-sidebar-text)/60 hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90'
+                            ].join(' ')}
+                        >
+                            {#if compact}
+                                <span
+                                    class="flex size-6 items-center justify-center rounded-md bg-(--theme-sidebar-text)/10 text-xs"
+                                    >{project.name[0]}</span
+                                >
+                            {:else}
+                                <span class="truncate flex-1">{project.name}</span>
+                            {/if}
+                        </div>
+                    {/each}
                 </div>
             {/if}
-        {/if}
-    </div>
+        </div>
+    {/if}
+
+    {#if !lookupPage && !lookupCompactHidden}
+        <div
+            class="shrink-0 border-t px-2 pt-2 pb-3 space-y-0.5"
+            style="box-shadow: 0 -4px 12px -2px color-mix(in srgb, var(--theme-sidebar-bg) 45%, transparent); border-color: var(--theme-divider-border)"
+        >
+            {#if compact}
+                <button
+                    onclick={oncreate}
+                    class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    title="新建工程"
+                >
+                    <Icon icon="mdi:plus" class="size-4 shrink-0" />
+                </button>
+                <button
+                    onclick={onimport}
+                    class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    title="从本地导入"
+                >
+                    <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
+                </button>
+                <button
+                    onclick={onworkshop}
+                    class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    title="从工坊导入"
+                >
+                    <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+                </button>
+            {:else}
+                <button
+                    onclick={() => (actionsCollapsed = !actionsCollapsed)}
+                    class="flex w-full shrink-0 items-center justify-center rounded-md py-1 text-(--theme-sidebar-text)/40 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/80"
+                    title={actionsCollapsed ? '展开操作' : '收起操作'}
+                >
+                    <Icon
+                        icon={actionsCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'}
+                        class="size-3.5 shrink-0"
+                    />
+                </button>
+                {#if !actionsCollapsed}
+                    <div transition:slide|local={{ duration: 200 }} class="space-y-0.5">
+                        <button
+                            onclick={oncreate}
+                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            title="新建工程"
+                        >
+                            <Icon icon="mdi:plus" class="size-4 shrink-0" />
+                            <span>新建工程</span>
+                        </button>
+                        <button
+                            onclick={onimport}
+                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            title="从本地导入"
+                        >
+                            <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
+                            <span>从本地导入</span>
+                        </button>
+                        <button
+                            onclick={onworkshop}
+                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            title="从工坊导入"
+                        >
+                            <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+                            <span>从工坊导入</span>
+                        </button>
+                    </div>
+                {/if}
+            {/if}
+        </div>
+    {/if}
 </aside>
 
 <ContextMenu x={ctxX} y={ctxY} items={ctxMenuItems} open={ctxMenuOpen} onclose={() => (ctxMenuOpen = false)} />

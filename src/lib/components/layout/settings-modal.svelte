@@ -50,7 +50,12 @@
         setMagneticPointer
     } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
-    import { getConfirmDeletes, setConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
+    import {
+        getConfirmDeletes,
+        setConfirmDeletes,
+        getSidebarLookup,
+        setSidebarLookup
+    } from '$lib/data/interaction-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
         applyLockedMods,
@@ -1213,6 +1218,39 @@
                                         <span
                                             class="absolute top-0.5 size-4 rounded-full transition-all"
                                             style="left: {getSimplifyToolbar()
+                                                ? '18px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mt-5">
+                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">侧边栏</span>
+                                <div
+                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >侧边栏速查</span
+                                        >
+                                        <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                            开启后底部工具栏的速查按钮隐藏，改由侧边栏顶部按钮切换速查页（替代工程目录）；侧栏可拖宽至
+                                            600px，紧凑模式下速查开启时仅保留新建/导入按钮
+                                        </span>
+                                    </div>
+                                    <button
+                                        onclick={() => setSidebarLookup(!getSidebarLookup())}
+                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                        style="background: {getSidebarLookup()
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 size-4 rounded-full transition-all"
+                                            style="left: {getSidebarLookup()
                                                 ? '18px'
                                                 : '2px'}; background: var(--theme-modal-bg);"
                                         ></span>
