@@ -15,13 +15,12 @@
   <img src="src\lib\assets\favicon.svg" alt="SvelteKit">
 </p>
 
-主站：[https://wuwa-藕粉椰果-tool.200503.xyz/](https://wuwa-afyg-tool.200503.xyz/)
-
-副站：[https://wuwa-活泼椰果-tool.200503.xyz/](https://wuwa-hpyg-tool.200503.xyz/)
+主站：[凹分椰果](https://wuwa-afyg-tool.200503.xyz/) | 副站：[滑坡椰果](https://wuwa-hpyg-tool.200503.xyz/)
 
 ### 另见：椰果工坊
 
-[d4rkOfficial/wuwa-afyg-share](https://github.com/d4rkOfficial/wuwa-afyg-share)
+基于Supabase：[d4rkOfficial/wuwa-afyg-share](https://github.com/d4rkOfficial/wuwa-afyg-share)
+基于Github-Issues：[CoconutToolBox/wuwa-afyg-share-github](https://github.com/CoconutToolBox/wuwa-afyg-share-github)（推荐）
 
 配合 椰果工具箱 使用的《鸣潮》工程分享平台。
 
