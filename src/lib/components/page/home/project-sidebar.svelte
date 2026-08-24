@@ -18,7 +18,6 @@
         activeId: string
         width?: number
         dragging?: boolean
-        sidebarLookupEnabled?: boolean
         sidebarLookupOpen?: boolean
         sidebarWide?: boolean
         team?: [CharSlot, CharSlot, CharSlot]
@@ -44,7 +43,6 @@
         activeId,
         width = 240,
         dragging = false,
-        sidebarLookupEnabled = false,
         sidebarLookupOpen = false,
         sidebarWide = false,
         team,
@@ -229,7 +227,7 @@
         {#if !compact}<span class="text-sm font-semibold tracking-tight">椰果工具箱</span>{/if}
         <div class="flex-1"></div>
         {#if !compact}
-            {#if sidebarLookupEnabled && activeId}
+            {#if activeId}
                 <button
                     onclick={(e) => {
                         e.stopPropagation()

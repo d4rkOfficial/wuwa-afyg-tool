@@ -65,7 +65,7 @@
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
     import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
-    import { getConfirmDeletes, getSidebarLookup } from '$lib/data/interaction-prefs.svelte'
+    import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
@@ -78,7 +78,6 @@
     import Config from '$lib/components/page/home/config/config.svelte'
     import Result from '$lib/components/page/home/result/result.svelte'
     import PhaseTabs from '$lib/components/page/home/phase-tabs.svelte'
-    import QuickLookup from '$lib/components/layout/quick-lookup.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
     import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
     import Icon from '@iconify/svelte'
@@ -129,7 +128,7 @@
         let pending: number | null = null
         let target = sidebarWidth
         const onMove = (e: MouseEvent) => {
-            target = e.clientX <= 144 ? 52 : Math.max(200, Math.min(sidebarLookupEnabled ? 600 : 400, e.clientX))
+            target = e.clientX <= 144 ? 52 : Math.max(200, Math.min(600, e.clientX))
             if (pending !== null) return
             pending = requestAnimationFrame(() => {
                 pending = null
@@ -158,31 +157,20 @@
 
     // ── 简化底部工具栏：fixed 圆角矩形，仅水平拖动，磁吸侧栏右缘 / 屏幕右缘（拖拽状态机见 toolbar.svelte）──
     const simplifyToolbar = $derived(getSimplifyToolbar())
-    // 侧边栏速查：开启后底部工具栏速查按钮隐藏，速查改由侧边栏承载（无活动工程或关闭功能时同步收起）
-    const sidebarLookupEnabled = $derived(getSidebarLookup())
 
-    // 侧栏展开宽度档位：较短（常规工程目录）与最长（功能开启 600 / 关闭 400，速查舒适浏览）
+    // 侧栏展开宽度档位：较短（常规工程目录）与最长（600，速查舒适浏览；侧边栏速查默认开启无需设置）
     const sidebarShortExpanded = 240
-    const sidebarMaxExpanded = $derived(sidebarLookupEnabled ? 600 : 400)
+    const sidebarMaxExpanded = 600
     const sidebarWide = $derived(sidebarWidth >= sidebarMaxExpanded - 1)
     function toggleSidebarWidth() {
         sidebarWidth = sidebarWide ? sidebarShortExpanded : sidebarMaxExpanded
     }
 
-    let showLookup = $state(false)
     let sidebarLookupOpen = $state(false)
 
     $effect(() => {
         // 无活动工程：侧边栏速查收起（顶部 toggle 按钮也依赖活动工程隐藏）
         if (!activeProject && sidebarLookupOpen) sidebarLookupOpen = false
-    })
-    $effect(() => {
-        // 关闭侧边栏速查功能：同步收起侧边栏速查
-        if (!sidebarLookupEnabled && sidebarLookupOpen) sidebarLookupOpen = false
-    })
-    $effect(() => {
-        // 开启侧边栏速查功能：关闭弹窗式速查（避免残留态在关闭功能后弹出）
-        if (sidebarLookupEnabled && showLookup) showLookup = false
     })
 
     // 速查开/关时联动侧栏宽度：开启→自动延展到最长；关闭→若几乎最宽则自动收窄
@@ -252,12 +240,7 @@
             void updateConditionProfile()
         })
         const panels: Array<[string, string, () => boolean, (v: boolean) => void]> = [
-            [
-                'quick-lookup',
-                '速查',
-                () => (sidebarLookupEnabled ? sidebarLookupOpen : showLookup),
-                (v) => (sidebarLookupEnabled ? (sidebarLookupOpen = v) : (showLookup = v))
-            ],
+            ['quick-lookup', '速查', () => sidebarLookupOpen, (v) => (sidebarLookupOpen = v)],
             ['buff-library', 'Buff 集', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
             ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
@@ -767,7 +750,6 @@
         {activeId}
         width={sidebarWidth}
         dragging={sidebarDragging}
-        {sidebarLookupEnabled}
         {sidebarLookupOpen}
         {sidebarWide}
         onToggleSidebarLookup={() => (sidebarLookupOpen = !sidebarLookupOpen)}
@@ -947,11 +929,8 @@
                 {simplifyToolbar}
                 {activePhase}
                 {showResult}
-                {teamPhaseLocked}
                 {phaseLocked}
                 {canLock}
-                {sidebarLookupEnabled}
-                onLookup={() => (showLookup = true)}
                 onCharDetail={() => (showCharDetail = true)}
                 onRefresh={handleRefreshResult}
                 onLockToggle={() => (phaseLocked ? handleUnlockPhase() : handleLockPhase())}
@@ -959,21 +938,6 @@
         {/if}
     </div>
 </div>
-
-{#if activeProject && !sidebarLookupEnabled}
-    <QuickLookup
-        open={showLookup}
-        team={activeProject.team}
-        showBuffOption={activePhase === 'calculation' && !showResult}
-        showCustomHitOption={false}
-        onCreateBuff={(name) => {
-            createBuffSet(name)
-            showLookup = false
-            setShowBuffModal(true)
-        }}
-        onclose={() => (showLookup = false)}
-    />
-{/if}
 
 <svelte:head><title>椰果工具箱</title></svelte:head>
 

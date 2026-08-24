@@ -30,11 +30,8 @@
         simplifyToolbar: boolean
         activePhase: PhaseKey
         showResult: boolean
-        teamPhaseLocked: boolean
         phaseLocked: boolean
         canLock: boolean
-        sidebarLookupEnabled?: boolean
-        onLookup: () => void
         onCharDetail: () => void
         onRefresh: () => void
         onLockToggle: () => void
@@ -43,11 +40,8 @@
         simplifyToolbar,
         activePhase,
         showResult,
-        teamPhaseLocked,
         phaseLocked,
         canLock,
-        sidebarLookupEnabled = false,
-        onLookup,
         onCharDetail,
         onRefresh,
         onLockToggle,
@@ -134,7 +128,7 @@
     onclickcapture={toolbarClickCapture}
     class={`${
         simplifyToolbar
-            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-xl border p-2 shadow-2xl active:cursor-grabbing'
+            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-[9999] flex cursor-grab touch-none select-none items-center gap-1.5 rounded-xl border p-2 shadow-2xl active:cursor-grabbing'
             : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'
     } ${className || ''}`}
     style={simplifyToolbar
@@ -153,19 +147,6 @@
           };${toolbarDrag ? (gpuAccel ? ' will-change: transform;' : ' will-change: left;') : ''}${styleProp ? '; ' + styleProp : ''}`
         : `background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text);${styleProp ? ' ' + styleProp : ''}`}
 >
-    {#if !sidebarLookupEnabled}
-        <button
-            onclick={onLookup}
-            disabled={!teamPhaseLocked}
-            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
-                ? 'rounded-full px-3 py-2'
-                : 'rounded-lg px-3 py-1.5'}"
-            title="速查"
-        >
-            <Icon icon="mdi:book-search-outline" class="size-4 shrink-0" />
-            {#if !simplifyToolbar}<span>速查</span>{/if}
-        </button>
-    {/if}
     <button
         onclick={onCharDetail}
         class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
