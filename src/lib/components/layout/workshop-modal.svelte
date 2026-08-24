@@ -21,9 +21,11 @@
     interface Props extends ComponentsProps {
         open: boolean
         onclose?: () => void
+        /** 点击列表项「详情」时回调（code → 工坊 /share/xxx 详情页） */
+        ondetail?: (code: string) => void
     }
 
-    let { open, onclose, backgroundImage, textColor, class: className, style: styleProp }: Props = $props()
+    let { open, onclose, ondetail, backgroundImage, textColor, class: className, style: styleProp }: Props = $props()
 
     let mergedStyle = $derived(
         [
@@ -82,18 +84,9 @@
             addToast(`分享链接：${link}`, 'success')
         }
     }
-
-    function formatTime(iso: string) {
-        return new Date(iso).toLocaleString('zh-CN', {
-            month: 'numeric',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        })
-    }
 </script>
 
-<Modal {open} {onclose} backdropClose={false} class={className} style="width: min(90vw, 640px); {mergedStyle}">
+<Modal {open} {onclose} backdropClose={false} class={className} style="width: min(94vw, 1040px); {mergedStyle}">
     {#snippet title()}
         椰果工坊 · 社区工程
     {/snippet}
@@ -205,17 +198,22 @@
                                 <span>·</span>
                             {/if}
                             <span class="shrink-0">{item.authorName}</span>
-                            <span>·</span>
-                            <span class="shrink-0">{formatTime(item.createdAt)}</span>
                         </div>
                     </div>
                     <button
                         onclick={() => handleShare(item)}
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-(--theme-card-border) px-3 py-1.5 text-sm text-(--theme-layout-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                        class="inline-flex shrink-0 items-center rounded-lg border border-(--theme-card-border) px-2.5 py-1.5 text-(--theme-layout-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                         title="复制分享链接"
                     >
                         <Icon icon="mdi:share-variant" class="size-4" />
-                        分享
+                    </button>
+                    <button
+                        onclick={() => ondetail?.(item.code)}
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-(--theme-card-border) px-3 py-1.5 text-sm text-(--theme-layout-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                        title="查看详情"
+                    >
+                        <Icon icon="mdi:information-outline" class="size-4" />
+                        详情
                     </button>
                     <button
                         onclick={() => handleDownload(item.code, item.title)}

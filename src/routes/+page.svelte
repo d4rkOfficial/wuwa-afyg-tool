@@ -92,6 +92,8 @@
     let showBuffLibrary = $state(false)
     let showSettings = $state(false)
     let showWorkshopFrame = $state(false)
+    /** @desc 工坊 iframe 弹窗的目标路径（空 = 工坊首页；如 /share/xxx = 详情页） */
+    let workshopFramePath = $state('')
 
     // 阶段切换加载反馈：activePhase/showResult 变化时显示遮罩 spinner，同步初始化完成后最短 200ms 隐藏
     let phaseLoading = $state(false)
@@ -259,7 +261,15 @@
             ['buff-library', 'Buff 集', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
             ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
-            ['workshop-frame', '工坊页', () => showWorkshopFrame, (v) => (showWorkshopFrame = v)],
+            [
+                'workshop-frame',
+                '工坊页',
+                () => showWorkshopFrame,
+                (v) => {
+                    if (v) workshopFramePath = ''
+                    showWorkshopFrame = v
+                }
+            ],
             ['character-detail', '角色详情配置', () => showCharDetail, (v) => (showCharDetail = v)],
             ['new-project', '新建工程', () => showNewModal, (v) => (showNewModal = v)],
             ['rename-project', '重命名工程', () => renameModal, (v) => (renameModal = v)],
@@ -768,7 +778,7 @@
             sidebarLookupOpen = false
             setShowBuffModal(true)
         }}
-        showBuffOption={activePhase === 'calculation'}
+        showBuffOption={activePhase === 'calculation' && !showResult}
         oncreate={() => {
             newName = ''
             showNewModal = true
@@ -819,7 +829,10 @@
     <div class="flex flex-1 flex-col overflow-hidden">
         {#if !activeProject}
             <WelcomeScreen
-                onWorkshopFrame={() => (showWorkshopFrame = true)}
+                onWorkshopFrame={() => {
+                    workshopFramePath = ''
+                    showWorkshopFrame = true
+                }}
                 onBuffLibrary={() => (showBuffLibrary = true)}
                 onSettings={() => (showSettings = true)}
             />
@@ -951,7 +964,7 @@
     <QuickLookup
         open={showLookup}
         team={activeProject.team}
-        showBuffOption={activePhase === 'calculation'}
+        showBuffOption={activePhase === 'calculation' && !showResult}
         showCustomHitOption={false}
         onCreateBuff={(name) => {
             createBuffSet(name)
@@ -964,7 +977,14 @@
 
 <svelte:head><title>椰果工具箱</title></svelte:head>
 
-<WorkshopModal open={showWorkshop} onclose={() => (showWorkshop = false)} />
+<WorkshopModal
+    open={showWorkshop}
+    onclose={() => (showWorkshop = false)}
+    ondetail={(code) => {
+        workshopFramePath = `/share/${code}`
+        showWorkshopFrame = true
+    }}
+/>
 
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
 
@@ -996,7 +1016,11 @@
     }}
 />
 
-<WorkshopFrameModal open={showWorkshopFrame} onclose={() => (showWorkshopFrame = false)} />
+<WorkshopFrameModal
+    open={showWorkshopFrame}
+    onclose={() => (showWorkshopFrame = false)}
+    path={workshopFramePath || undefined}
+/>
 
 <svelte:window
     onkeydown={(e) => {

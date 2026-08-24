@@ -69,8 +69,8 @@ export const MAIN_STAT_POOL: Record<number, StatOption[]> = {
         { label: '暴击伤害', maxValue: 44, unit: '%' },
         { label: '攻击%', maxValue: 33, unit: '%' },
         { label: '生命%', maxValue: 33, unit: '%' },
-        { label: '防御%', maxValue: 41.8, unit: '%' },
-        { label: '治疗加成', maxValue: 26.4, unit: '%' }
+        { label: '防御%', maxValue: 41.8, unit: '%' }
+        // { label: '治疗加成', maxValue: 26.4, unit: '%' }
     ],
     3: [
         ...MAIN_STAT_ELEMENT_BONUS,

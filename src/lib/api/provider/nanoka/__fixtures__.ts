@@ -82,7 +82,7 @@ export const characterDetail: ZhCharacterDetail = {
             skill: {
                 name: '轻云起',
                 type: '常态攻击',
-                desc: '连续挥砍，造成{0}%伤害',
+                desc: '<color=Highlight>连续挥砍</color>，造成{0}%伤害',
                 param: ['120'],
                 level: {
                     '1': {

@@ -3,6 +3,7 @@ import type { ConfigState } from '../config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharSubstatAnalysis } from '../result.types'
+import type { ConditionProfile } from '../compute'
 
 export type AlgorithmId = 'single-loss' | 'shapley' | 'partial-derivative'
 
@@ -23,7 +24,8 @@ export type SubstatAlgorithm = (
     weaponInfoMap: Record<string, WeaponInfo>,
     rigCritEntryIds: Set<string>,
     noCritEntryIds: Set<string>,
-    missEntryIds: Set<string>
+    missEntryIds: Set<string>,
+    conditionProfile?: ConditionProfile
 ) => CharSubstatAnalysis[]
 
 export const ALGORITHMS_INFO: AlgorithmInfo[] = [

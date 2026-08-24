@@ -37,18 +37,6 @@
             .join(';')
     )
 
-    let modalEl = $state<HTMLElement | undefined>()
-    let modalWidth = $state<number | null>(null)
-
-    /** @desc 双击左侧拖拽线：瞬间切换「最宽」（视口宽 - 40px）与「最紧凑」（自适应内容宽度）两种模式 */
-    function toggleModalWidth() {
-        const vw = document.documentElement.clientWidth
-        const max = Math.max(320, vw - 40)
-        const current = modalWidth ?? modalEl?.getBoundingClientRect().width ?? 640
-        // 已在最宽 → 切回最紧凑（null = 未拉伸，宽度自适应内容）；否则 → 切到最宽
-        modalWidth = current >= max - 4 ? null : max
-    }
-
     function handleBackdropClick(e: MouseEvent) {
         if (backdropClose && e.target === e.currentTarget) onclose?.()
     }
@@ -69,7 +57,6 @@
         out:fade={{ duration: 130 }}
     >
         <div
-            bind:this={modalEl}
             class={[
                 'animate-pop-in theme-glass-surface theme-scrollbar relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
                 footer ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
@@ -78,9 +65,7 @@
             ]
                 .filter(Boolean)
                 .join(' ')}
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); max-width: calc(100vw - 40px); {modalWidth
-                ? `width: ${modalWidth}px`
-                : ''}; {mergedStyle}"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); max-width: calc(100vw - 40px); {mergedStyle}"
             role="dialog"
             aria-modal="true"
             out:popOut
@@ -92,11 +77,6 @@
             >
                 <Icon icon="mdi:close" class="size-4.5" />
             </button>
-            <div
-                class="absolute left-0 top-0 bottom-0 w-1 cursor-pointer z-10 transition-colors hover:bg-(--theme-accent-bg)/50 rounded-l-xl"
-                ondblclick={toggleModalWidth}
-                title="双击切换最紧凑/最宽"
-            ></div>
             {#if title}
                 <div class="mb-4 pr-6 text-base font-semibold {footer ? 'shrink-0' : ''}">
                     {@render title()}

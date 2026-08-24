@@ -3,7 +3,14 @@ import type { ConfigState, EchoSlotConfig } from '../config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharSubstatAnalysis, SubstatContribution, EchoContribution } from '../result.types'
-import { computeAll, getCharFullStatsForChar, computeOneEntry, cloneEchoesWithoutAllSubstats } from '../compute'
+import type { ConditionProfile } from '../compute'
+import {
+    computeAll,
+    getCharFullStatsForChar,
+    computeOneEntry,
+    cloneEchoesWithoutAllSubstats,
+    DEFAULT_CONDITION_PROFILE
+} from '../compute'
 
 function cloneEchoesWithIncreasedSubstat(
     echoes: EchoSlotConfig[],
@@ -38,7 +45,8 @@ export function computeSubstatContributions(
     weaponInfoMap: Record<string, WeaponInfo>,
     rigCritEntryIds: Set<string>,
     noCritEntryIds: Set<string>,
-    missEntryIds: Set<string>
+    missEntryIds: Set<string>,
+    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
 ): CharSubstatAnalysis[] {
     const allEntries = computeAll(
         damageEntries,
@@ -48,7 +56,8 @@ export function computeSubstatContributions(
         configState,
         team,
         charInfoMap,
-        weaponInfoMap
+        weaponInfoMap,
+        conditionProfile
     )
 
     const charNames = team.map((s) => s.character).filter((c): c is string => c !== null)
@@ -80,7 +89,8 @@ export function computeSubstatContributions(
                 damageEntryBuffSetIds,
                 charInfoMap,
                 team,
-                weaponInfoMap
+                weaponInfoMap,
+                conditionProfile
             )
         })
 
@@ -99,7 +109,8 @@ export function computeSubstatContributions(
                     damageEntryBuffSetIds,
                     charInfoMap,
                     team,
-                    weaponInfoMap
+                    weaponInfoMap,
+                    conditionProfile
                 )
             })
 
@@ -118,7 +129,8 @@ export function computeSubstatContributions(
                     configState,
                     team,
                     charInfoMap,
-                    weaponInfoMap
+                    weaponInfoMap,
+                    conditionProfile
                 )
                 norm += re.totalDamageRaw
                 rigVal += rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamageRaw

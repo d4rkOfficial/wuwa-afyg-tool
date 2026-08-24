@@ -130,6 +130,12 @@ describe('transformCharacterInfoRich', () => {
         assert.deepEqual(out.statNodes, [{ name: '共鸣回路·律', desc: '层数叠加。' }])
         assert.deepEqual(out.chains, [{ name: '止戈', desc: '共鸣技能伤害30%' }])
     })
+
+    it('keeps rich-text tags in skills desc (regression: 普通技能高亮不应丢失)', () => {
+        const out = transformCharacterInfoRich(characterDetail)
+        const normal = out.skills.find((s) => s.name === '轻云起')
+        assert.equal(normal?.desc, '<color=Highlight>连续挥砍</color>，造成120%伤害')
+    })
 })
 
 describe('transformWeaponInfo', () => {

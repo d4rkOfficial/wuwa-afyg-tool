@@ -223,7 +223,8 @@
                 weaponInfoMap,
                 new Set(rigCritEntryIds),
                 new Set(noCritEntryIds),
-                new Set(missEntryIds)
+                new Set(missEntryIds),
+                getConditionProfile()
             )
             analysisComputing = false
         }, 0)

@@ -27,7 +27,7 @@ export interface CharStats {
     recharge: number
     critRate: number
     critDmg: number
-    healBonus: number
+    // healBonus: number
     elementDmg: Record<string, number>
     typeDmg: Record<string, number>
     bonusDmg: number
@@ -76,7 +76,7 @@ export function computeCharStats(
     let recharge = 100
     let critRate = 5
     let critDmg = 150
-    let healBonus = 0
+    // let healBonus = 0
     const elementDmg: Record<string, number> = {}
     const typeDmg: Record<string, number> = {}
     let bonusDmg = 0
@@ -110,9 +110,9 @@ export function computeCharStats(
             case '共鸣效率':
                 recharge += value
                 break
-            case '治疗加成':
-                healBonus += value
-                break
+            // case '治疗加成':
+            //     healBonus += value
+            //     break
             default:
                 if (type in ELEMENT_BONUS_MAP) {
                     const el = ELEMENT_BONUS_MAP[type]
@@ -256,7 +256,7 @@ export function computeCharStats(
         recharge,
         critRate,
         critDmg,
-        healBonus,
+        // healBonus,
         elementDmg,
         typeDmg,
         bonusDmg

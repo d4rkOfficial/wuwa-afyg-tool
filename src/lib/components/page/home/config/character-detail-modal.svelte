@@ -125,13 +125,20 @@
     const slot = $derived(team[activeTab])
     const charName = $derived(slot?.character ?? null)
     const stat = $derived(stats[activeTab])
+    // 是否存在任一「加成」项（元素/类型/全属性），用于在面板数据与加成分组间渲染分割线
+    const hasBonus = $derived(
+        !!stat &&
+            (stat.bonusDmg > 0 ||
+                ELEMENT_ORDER.some((el) => (stat.elementDmg[el] ?? 0) > 0) ||
+                TYPE_DMG_ORDER.some((dt) => (stat.typeDmg[dt.replace('伤害', '')] ?? 0) > 0))
+    )
 </script>
 
 <Modal
     {open}
     {onclose}
     class={className}
-    style="max-width: min(92vw, 520px); {backgroundImage ? `background: ${backgroundImage}` : ''}; {textColor
+    style="width: min(92vw, 520px); {backgroundImage ? `background: ${backgroundImage}` : ''}; {textColor
         ? `color: ${textColor}`
         : ''}; {styleProp || ''}"
 >
@@ -377,11 +384,16 @@
                     {stat.critRate.toFixed(1)}% / {stat.critDmg.toFixed(1)}%
                 </span>
             </div>
+            <!-- 治疗加成（已注释，不进入角色详情配置）
             {#if stat.healBonus > 0}
                 <div class="flex items-center justify-between">
                     <span class="text-(--theme-modal-text)/50">治疗加成</span>
                     <span class="tabular-nums text-(--theme-modal-text)/80">+{stat.healBonus}%</span>
                 </div>
+            {/if}
+            -->
+            {#if hasBonus}
+                <div class="my-2 border-t" style="border-color: var(--theme-divider-border);"></div>
             {/if}
             {#each ELEMENT_ORDER as el}
                 {@const v = stat.elementDmg[el]}
@@ -403,11 +415,8 @@
                 {/if}
             {/each}
             {#if stat.bonusDmg > 0}
-                <div
-                    class="flex items-center justify-between pt-1"
-                    style="border-top: 1px solid var(--theme-divider-border);"
-                >
-                    <span class="text-(--theme-modal-text)/50">全伤害加成</span>
+                <div class="flex items-center justify-between">
+                    <span class="text-(--theme-modal-text)/50">全属性伤害加成</span>
                     <span class="tabular-nums text-(--theme-accent-text)">+{stat.bonusDmg}%</span>
                 </div>
             {/if}

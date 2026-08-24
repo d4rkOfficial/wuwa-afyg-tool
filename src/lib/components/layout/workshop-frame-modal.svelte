@@ -11,14 +11,15 @@
     interface Props extends ComponentsProps {
         open: boolean
         onclose: () => void
+        /** 工坊内路径（如 /share/xxx），留空则打开工坊首页 */
+        path?: string
     }
-    let { open, onclose, class: className, style: styleProp }: Props = $props()
+    let { open, onclose, path, class: className, style: styleProp }: Props = $props()
 
     let workshopFrameKey = $state(0)
 
-    // 工坊 iframe 地址：非 Toy 环境无身份 hash，src 与原先完全一致（界面不变）；
-    // 身份（postMessage 手势后）到达时 src 变化，iframe 自动重新导航带上 #toy hash
-    let workshopFrameSrc = $derived(buildWorkshopFrameSrc(getShareBase(), getToyProfile().data))
+    /** @desc 工坊 iframe 地址：base + 目标路径（详情页等）+ #toy 身份 hash */
+    let workshopFrameSrc = $derived(buildWorkshopFrameSrc(`${getShareBase()}${path ?? ''}`, getToyProfile().data))
 
     // 工坊 iframe 弹窗打开时强制恢复系统光标（磁力光标瞬时抑制）
     $effect(() => {
@@ -61,7 +62,7 @@
                         <Icon icon="mdi:refresh" class="size-4.5" />
                     </button>
                     <a
-                        href={getShareBase()}
+                        href={`${getShareBase()}${path ?? ''}`}
                         target="_blank"
                         rel="noreferrer"
                         class="rounded p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"

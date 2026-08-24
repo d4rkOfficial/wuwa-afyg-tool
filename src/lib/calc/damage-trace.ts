@@ -229,11 +229,11 @@ function collectBaseParts(
         }
     }
 
-    // 若按来源贡献求和与绿值有缺口（引用/覆盖乘区等），补一个「其它」占位
+    // 若按来源贡献求和与面板总值有缺口（引用/覆盖乘区等），补一个「其它」占位
+    // contribSum 含白值来源，故基准用面板总值 totalStat（而非已减白值的 green），避免多扣一个白值
     const contribSum = parts.reduce((s, p) => s + (p.contribution ?? 0), 0)
     const totalStat = kind === 'hp' ? entry.totalHp : kind === 'def' ? entry.totalDef : entry.totalAtk
-    const green = Math.max(0, totalStat - baseWhite)
-    const gap = Math.round(green) - Math.round(contribSum)
+    const gap = Math.round(totalStat) - Math.round(contribSum)
     if (Math.abs(gap) > 1) {
         parts.push({
             sourceType: 'panel',

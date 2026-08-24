@@ -268,7 +268,7 @@ export function preprocessSkills(skills: SkillEntry[], elementName: string) {
         if (skill.type === '延奏技能' && elementName) {
             const hasElement = skill.values.some(([, , el]) => el)
             if (!hasElement) {
-                const plain = skill.desc
+                const plain = strip(skill.desc)
                 const causeIdx = plain.indexOf('造成')
                 const dmgIdx = plain.indexOf('伤害', causeIdx + 1)
                 if (causeIdx >= 0 && dmgIdx > causeIdx) {
@@ -340,7 +340,7 @@ function transformCharacterInfoCommon(data: ZhCharacterDetail, rich: boolean): C
             skills.push({
                 name: s.name ?? '',
                 type: st as SkillEntry['type'],
-                desc: strip(interpolate(s.desc ?? '', s.param ?? [])),
+                desc: rich ? interpolate(s.desc ?? '', s.param ?? []) : strip(interpolate(s.desc ?? '', s.param ?? [])),
                 values: makeSkillValues(s),
                 damage: s.damage
             })
@@ -348,7 +348,7 @@ function transformCharacterInfoCommon(data: ZhCharacterDetail, rich: boolean): C
             skills.push({
                 name: s.name ?? '',
                 type: st as SkillEntry['type'],
-                desc: strip(interpolate(s.desc ?? '', s.param ?? [])),
+                desc: rich ? interpolate(s.desc ?? '', s.param ?? []) : strip(interpolate(s.desc ?? '', s.param ?? [])),
                 values: makeSkillValues(s),
                 damage: s.damage
             })

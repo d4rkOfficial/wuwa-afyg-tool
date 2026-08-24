@@ -132,7 +132,7 @@
     }
 </script>
 
-<Modal {open} {onclose} class={className} style="max-width: min(92vw, 720px); {mergedStyle}">
+<Modal {open} {onclose} class={className} style="width: min(92vw, 720px); {mergedStyle}">
     {#snippet title()}
         导入 Buff 集
     {/snippet}

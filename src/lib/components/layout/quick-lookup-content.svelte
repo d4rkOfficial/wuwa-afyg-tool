@@ -72,6 +72,9 @@
             return numA - numB
         })
     )
+    /** @desc 普通技能数与技能区卡片总数（普通 + 固有），用于「跳转下一技能」按钮的末项判定 */
+    let skillsLen = $derived(charData?.skills.length ?? 0)
+    let skillCount = $derived(skillsLen + inherentSkills.length)
 
     /** @desc 挂载即预加载全部图标（失败项静默忽略） */
     $effect(() => {
@@ -188,6 +191,16 @@
     function handleScrollBottom() {
         if (scrollContainer) scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' })
         ctxShow = false
+    }
+
+    /** @desc 平滑滚动到下一个技能卡片（仅滚动速查内容容器，避免带动外层页面） */
+    function jumpToSkill(nextIdx: number) {
+        const el = scrollContainer?.querySelector<HTMLElement>(`[data-skill-index="${nextIdx}"]`)
+        if (el && scrollContainer) {
+            const top =
+                el.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop
+            scrollContainer.scrollTo({ top, behavior: 'smooth' })
+        }
     }
 
     /** @desc 富文本渲染辅助：空串容错 / 转 HTML 并高亮数字（按描述文本 memo，避免重渲染时整页重复着色） */
@@ -434,9 +447,10 @@
                     <section class="border-t pt-4 mt-4" style="border-color: var(--theme-divider-border);">
                         <h3 class="mb-2 text-base font-semibold tracking-wider text-(--theme-modal-text)/50">技能</h3>
                         <div class="space-y-3">
-                            {#each charData.skills as skill}
+                            {#each charData.skills as skill, i}
                                 <div
                                     class="rounded-lg border"
+                                    data-skill-index={i}
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div
@@ -448,6 +462,15 @@
                                             >{skill.type}</span
                                         >
                                         <span>{skill.name}</span>
+                                        {#if i + 1 < skillCount}
+                                            <button
+                                                onclick={() => jumpToSkill(i + 1)}
+                                                class="ml-auto rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)/80"
+                                                title="跳转到下一个技能"
+                                            >
+                                                <Icon icon="mdi:chevron-down" class="size-4" />
+                                            </button>
+                                        {/if}
                                     </div>
                                     <div
                                         class="border-t px-3 py-2 text-sm text-(--theme-modal-text)/60 leading-relaxed"
@@ -501,9 +524,10 @@
                                     {/if}
                                 </div>
                             {/each}
-                            {#each inherentSkills as skill}
+                            {#each inherentSkills as skill, j}
                                 <div
                                     class="rounded-lg border"
+                                    data-skill-index={skillsLen + j}
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div
@@ -515,6 +539,15 @@
                                             >固有技能</span
                                         >
                                         <span>{skill.name}</span>
+                                        {#if skillsLen + j + 1 < skillCount}
+                                            <button
+                                                onclick={() => jumpToSkill(skillsLen + j + 1)}
+                                                class="ml-auto rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)/80"
+                                                title="跳转到下一个技能"
+                                            >
+                                                <Icon icon="mdi:chevron-down" class="size-4" />
+                                            </button>
+                                        {/if}
                                     </div>
                                     <div
                                         class="border-t px-3 py-2 text-sm text-(--theme-modal-text)/60 leading-relaxed"
@@ -659,8 +692,7 @@
 
 <style>
     :global(.select-text) ::selection {
-        background: var(--theme-modal-text);
-        color: var(--theme-modal-bg);
+        background: color-mix(in srgb, var(--theme-modal-text) 25%, transparent);
     }
     :global(.rich-color-title) {
         color: var(--theme-layout-text);
