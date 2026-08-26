@@ -748,7 +748,16 @@
                 {/if}
             </div>
             <button
-                onclick={() => onCompare?.()}
+                onclick={() => {
+                    // 切换前先把局部 timings（含模式）写回，保证对比弹窗读到最新时间记点
+                    onUpdateResultAnalysis({
+                        timings,
+                        rigCritEntryIds,
+                        noCritEntryIds,
+                        missEntryIds: resultAnalysis?.missEntryIds ?? []
+                    })
+                    onCompare?.()
+                }}
                 disabled={!comparisonEligible}
                 class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:opacity-70"
                 style="color: var(--theme-accent-text);"

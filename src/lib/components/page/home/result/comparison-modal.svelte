@@ -299,6 +299,12 @@
         return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
     }
 
+    /** @desc 角色元素名 → 主题色（getCharElementMap 返回元素名如「冷凝」，需转 --theme-element-* 颜色） */
+    function elementColor(character: string | null | undefined): string {
+        const el = charElements[character ?? '']
+        return el ? cssVar(`--theme-element-${el}`, '#888') : '#888'
+    }
+
     function drawCurve() {
         if (!curveCanvas) return
         curveChart?.destroy()
@@ -382,7 +388,7 @@
                         data: configs.map(
                             (c) => c.charSummaries.find((s) => s.character === slot.character)?.totalDamage ?? 0
                         ),
-                        backgroundColor: charElements[slot.character ?? ''] ?? PALETTE[si % PALETTE.length],
+                        backgroundColor: elementColor(slot.character),
                         stack: 'team'
                     }))
                 },
