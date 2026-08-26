@@ -705,11 +705,11 @@
                     </section>
 
                     {#if points.length > 0}
-                        <!-- ── 配置 + 总伤 + DPS 卡片组（并排）── -->
-                        <section class="flex gap-3 overflow-x-auto">
+                        <!-- ── 配置 + DPS + 总伤 卡片组（并排）── -->
+                        <section class="theme-scrollbar flex gap-3 overflow-x-auto">
                             {#each configs as c}
                                 <div
-                                    class="min-w-44 flex-1 rounded-lg border p-3"
+                                    class="min-w-44 flex-1 shrink-0 rounded-lg border p-3"
                                     style="border-color: {c.accent}; background: var(--theme-card-bg);"
                                 >
                                     <div
@@ -719,17 +719,18 @@
                                         <span class="size-2.5 rounded-full" style="background: {c.accent};"
                                         ></span>{c.label}
                                     </div>
-                                    <div class="mt-2 space-y-1 text-xs">
-                                        <div class="flex items-center justify-between">
-                                            <span class="opacity-50">总伤</span><span class="tabular-nums font-medium"
-                                                >{fmt(c.totalDamage)}</span
+                                    <div class="mt-2 space-y-1.5">
+                                        <div class="flex items-end justify-between gap-2">
+                                            <span class="pb-0.5 text-xs opacity-50">DPS</span><span
+                                                class="text-2xl font-bold leading-none tabular-nums"
+                                                style="color: {c.accent};"
+                                                >{totalDur > 0 ? fmt(c.totalDamage / totalDur) : '—'}</span
                                             >
                                         </div>
-                                        <div class="flex items-center justify-between">
-                                            <span class="opacity-50">DPS</span><span
+                                        <div class="flex items-center justify-between text-xs">
+                                            <span class="opacity-50">总伤</span><span
                                                 class="tabular-nums font-medium"
-                                                style="color: var(--theme-accent-text);"
-                                                >{totalDur > 0 ? fmt(c.totalDamage / totalDur) : '—'}</span
+                                                style="color: {c.accent};">{fmt(c.totalDamage)}</span
                                             >
                                         </div>
                                     </div>
