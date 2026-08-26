@@ -666,59 +666,6 @@
                         <div class="h-56"><canvas bind:this={curveCanvas}></canvas></div>
                     </section>
 
-                    <!-- ── 伤害占比（常驻，条形图）：全队占比 + 每角色直伤类型占比 ── -->
-                    <section
-                        class="rounded-lg border p-3"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
-                    >
-                        <div class="mb-2 flex items-center gap-2">
-                            <span class="text-xs font-semibold uppercase tracking-wider opacity-50">全队伤害占比</span>
-                            <div
-                                class="ml-auto flex items-center gap-1 rounded-lg border p-0.5 text-[11px]"
-                                style="border-color: var(--theme-divider-border);"
-                            >
-                                <button
-                                    onclick={() => (shareMode = 'total')}
-                                    class="rounded px-2 py-0.5 {shareMode === 'total' ? 'font-medium' : 'opacity-60'}"
-                                    style={shareMode === 'total'
-                                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
-                                        : ''}>看总伤</button
-                                >
-                                <button
-                                    onclick={() => (shareMode = 'pct')}
-                                    class="rounded px-2 py-0.5 {shareMode === 'pct' ? 'font-medium' : 'opacity-60'}"
-                                    style={shareMode === 'pct'
-                                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
-                                        : ''}>看占比</button
-                                >
-                            </div>
-                        </div>
-                        <div style="height: {Math.max(180, barConfigs.length * 44)}px;">
-                            <canvas bind:this={teamShareCanvas}></canvas>
-                        </div>
-                    </section>
-
-                    <section
-                        class="rounded-lg border p-3"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
-                    >
-                        <div class="mb-2 text-xs font-semibold uppercase tracking-wider opacity-50">
-                            角色直伤类型伤害占比
-                        </div>
-                        <div class="space-y-4">
-                            {#each team as slot, si}
-                                <div>
-                                    <div class="mb-1 text-xs opacity-60">
-                                        {slot.character ?? `槽${si + 1}`}
-                                    </div>
-                                    <div style="height: {Math.max(140, barConfigs.length * 44)}px;">
-                                        <canvas bind:this={charTypeCanvases[String(si)]}></canvas>
-                                    </div>
-                                </div>
-                            {/each}
-                        </div>
-                    </section>
-
                     {#if points.length > 0}
                         <!-- ── 配置 + DPS + 总伤 卡片组（并排）── -->
                         <section class="theme-scrollbar flex gap-3 overflow-x-auto">
@@ -801,6 +748,59 @@
                             <span>选择对比配置后展示配置卡片与分段 DPS</span>
                         </div>
                     {/if}
+
+                    <!-- ── 伤害占比（常驻，条形图）：全队占比 + 每角色直伤类型占比 ── -->
+                    <section
+                        class="rounded-lg border p-3"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                    >
+                        <div class="mb-2 flex items-center gap-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider opacity-50">全队伤害占比</span>
+                            <div
+                                class="ml-auto flex items-center gap-1 rounded-lg border p-0.5 text-[11px]"
+                                style="border-color: var(--theme-divider-border);"
+                            >
+                                <button
+                                    onclick={() => (shareMode = 'total')}
+                                    class="rounded px-2 py-0.5 {shareMode === 'total' ? 'font-medium' : 'opacity-60'}"
+                                    style={shareMode === 'total'
+                                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
+                                        : ''}>看总伤</button
+                                >
+                                <button
+                                    onclick={() => (shareMode = 'pct')}
+                                    class="rounded px-2 py-0.5 {shareMode === 'pct' ? 'font-medium' : 'opacity-60'}"
+                                    style={shareMode === 'pct'
+                                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
+                                        : ''}>看占比</button
+                                >
+                            </div>
+                        </div>
+                        <div style="height: {Math.max(180, barConfigs.length * 44)}px;">
+                            <canvas bind:this={teamShareCanvas}></canvas>
+                        </div>
+                    </section>
+
+                    <section
+                        class="rounded-lg border p-3"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                    >
+                        <div class="mb-2 text-xs font-semibold uppercase tracking-wider opacity-50">
+                            角色直伤类型伤害占比
+                        </div>
+                        <div class="space-y-4">
+                            {#each team as slot, si}
+                                <div>
+                                    <div class="mb-1 text-xs opacity-60">
+                                        {slot.character ?? `槽${si + 1}`}
+                                    </div>
+                                    <div style="height: {Math.max(140, barConfigs.length * 44)}px;">
+                                        <canvas bind:this={charTypeCanvases[String(si)]}></canvas>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    </section>
                 {/if}
             </div>
         </div>
