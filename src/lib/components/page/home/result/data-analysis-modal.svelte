@@ -259,17 +259,51 @@
     /** @desc 展开后的段区间（时间+位置；与 segments 同序压缩，baseSegIdx 对齐 segments 数组索引）；口径与结果页副词条重算共享（$lib/calc/loop-expand） */
     let loopIntervals = $derived(loopActive ? buildLoopIntervals(timings, refLines, loopCounts) : [])
 
-    /** @desc 循环后的分段列表（loopIdx>0 为重复份；未激活时与原 segments 逐项一致） */
+    /** @desc 循环后的分段列表（折叠展示）：同一小节循环 K 次合并为一行，span=单段跨度、count=次数、伤害 ×K；未激活时逐项 count=1 */
     let loopSegments = $derived.by(() => {
-        if (!loopActive) return segments.map((s, i) => ({ ...s, baseSegIdx: i, loopIdx: 0 }))
-        return loopIntervals.map((iv) => {
-            const base = segments[iv.baseSegIdx]!
+        if (!loopActive) {
+            return segments.map((s, i) => ({
+                ...s,
+                span: s.endSeconds - s.startSeconds,
+                count: 1,
+                baseSegIdx: i
+            }))
+        }
+        const collapsed: {
+            startSeconds: number
+            endSeconds: number
+            span: number
+            count: number
+            baseSegIdx: number
+        }[] = []
+        for (const iv of loopIntervals) {
+            const last = collapsed[collapsed.length - 1]
+            if (last && last.baseSegIdx === iv.baseSegIdx) {
+                last.endSeconds = iv.endSeconds
+                last.count++
+            } else {
+                collapsed.push({
+                    startSeconds: iv.startSeconds,
+                    endSeconds: iv.endSeconds,
+                    span: iv.endSeconds - iv.startSeconds,
+                    count: 1,
+                    baseSegIdx: iv.baseSegIdx
+                })
+            }
+        }
+        return collapsed.map((c) => {
+            const base = segments[c.baseSegIdx]!
+            const mul = c.count
             return {
                 ...base,
-                startSeconds: iv.startSeconds,
-                endSeconds: iv.endSeconds,
-                baseSegIdx: iv.baseSegIdx,
-                loopIdx: iv.loopIdx
+                startSeconds: c.startSeconds,
+                endSeconds: c.endSeconds,
+                span: c.span,
+                count: c.count,
+                baseSegIdx: c.baseSegIdx,
+                charDamages: Object.fromEntries(Object.entries(base.charDamages).map(([k, v]) => [k, v * mul])),
+                otherDamage: base.otherDamage * mul,
+                totalDamage: base.totalDamage * mul
             }
         })
     })
@@ -1106,30 +1140,36 @@
                             <tbody>
                                 {#each loopSegments as seg}
                                     {@const span = seg.endSeconds - seg.startSeconds}
-                                    {@const segLoopIdx = seg.loopIdx ?? 0}
                                     <tr
                                         class="border-t"
                                         style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                     >
                                         <td class="py-2 pr-2 text-[10px] tabular-nums" style="opacity: 0.45;">
                                             {seg.startSeconds.toFixed(1)}s — {seg.endSeconds.toFixed(1)}s
-                                            {#if segLoopIdx > 0}
+                                        </td>
+                                        <td
+                                            class="relative px-2 py-2 text-right text-[10px] tabular-nums"
+                                            style="opacity: 0.45;"
+                                        >
+                                            {seg.span.toFixed(1)}s{#if seg.count > 1}
                                                 <span
-                                                    class="ml-1 text-[9px] font-semibold whitespace-nowrap"
+                                                    class="absolute -right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold whitespace-nowrap"
                                                     style="color: var(--theme-accent-text); opacity: 0.7;"
-                                                    >×{segLoopIdx + 1}</span
+                                                    >×{seg.count}</span
                                                 >
                                             {/if}
                                         </td>
-                                        <td
-                                            class="px-2 py-2 text-right text-[10px] tabular-nums"
-                                            style="opacity: 0.45;"
-                                        >
-                                            {span.toFixed(1)}s
+                                        <td class="relative px-2 py-2 text-right tabular-nums">
+                                            {Math.round(
+                                                seg.totalDamage / seg.count
+                                            ).toLocaleString()}{#if seg.count > 1}
+                                                <span
+                                                    class="absolute -right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold whitespace-nowrap"
+                                                    style="color: var(--theme-accent-text); opacity: 0.7;"
+                                                    >×{seg.count}</span
+                                                >
+                                            {/if}
                                         </td>
-                                        <td class="px-2 py-2 text-right tabular-nums"
-                                            >{Math.round(seg.totalDamage).toLocaleString()}</td
-                                        >
                                         <td
                                             class="px-2 py-2 text-right text-sm font-bold tabular-nums"
                                             style="color: var(--theme-accent-text);"
