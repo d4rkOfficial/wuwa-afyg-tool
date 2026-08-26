@@ -9,7 +9,7 @@
     import type { ResultEntry, CharSummary } from '$lib/calc/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
     import { aggregateDirectDamageByType } from '$lib/calc/utils'
-    import type { ComparisonEligibility } from '$lib/calc/comparison'
+    import { COMPARISON_PALETTE, type ComparisonEligibility } from '$lib/calc/comparison'
     import type { ComponentsProps } from '$lib/types'
 
     interface TeamConfig {
@@ -104,7 +104,7 @@
         accent: string
     }
 
-    const PALETTE = ['#6363f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#a855f7', '#ec4899']
+    const PALETTE = COMPARISON_PALETTE
     /** @desc 紧凑配置标签：3 角色 chain+ref 直接拼接，如 6+1/0+1/0+1 → 610101 */
     function compactLabel(chains: number[], refinements: number[]): string {
         return chains.map((c, j) => `${c}${refinements[j]}`).join('')
@@ -329,6 +329,21 @@
         return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
     }
 
+    /** @desc hex → rgba（hex 需为 #rrggbb） */
+    function hexToRgba(hex: string, alpha: number): string {
+        const r = parseInt(hex.slice(1, 3), 16)
+        const g = parseInt(hex.slice(3, 5), 16)
+        const b = parseInt(hex.slice(5, 7), 16)
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    }
+
+    /** @desc 按位置淡化（与数据分析弹窗一致）：0 位全色，后续 alpha = max(0.42, 1 - index*0.18) */
+    function fadedColor(hex: string, index: number): string {
+        if (index === 0) return hex
+        const alpha = Math.max(0.42, 1 - index * 0.18)
+        return hexToRgba(hex, alpha)
+    }
+
     /** @desc 角色元素名 → 主题色（getCharElementMap 返回元素名如「冷凝」，需转 --theme-element-* 颜色） */
     function elementColor(character: string | null | undefined): string {
         const el = charElements[character ?? '']
@@ -432,7 +447,7 @@
                     datasets: team.map((slot, si) => ({
                         label: slot.character ?? `槽${si + 1}`,
                         data: data[si],
-                        backgroundColor: elementColor(slot.character),
+                        backgroundColor: fadedColor(elementColor(slot.character), si),
                         stack: 'team'
                     }))
                 },

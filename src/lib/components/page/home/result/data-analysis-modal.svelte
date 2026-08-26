@@ -13,6 +13,7 @@
     import { getActiveProject } from '$lib/data/project.svelte'
     import { openPanel } from '$lib/ai/panels.svelte'
     import { aggregateDirectDamageByType } from '$lib/calc/utils'
+    import { COMPARISON_PALETTE } from '$lib/calc/comparison'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -642,7 +643,8 @@
 
             const labels = agg.slices.map((s) => s.label)
             const data = agg.slices.map((s) => s.value)
-            const colors = agg.slices.map((s) => s.color)
+            // 与链阶对比弹窗共用色板：按类型索引取 COMPARISON_PALETTE（保证两弹窗配色一致）
+            const colors = agg.slices.map((_, ti) => COMPARISON_PALETTE[ti % COMPARISON_PALETTE.length])
 
             const chart = new Chart(canvas, {
                 type: 'doughnut',
@@ -1231,14 +1233,16 @@
                                         <canvas use:registerTypeChartCanvas={agg.character} class="size-full"></canvas>
                                     </div>
                                     <div class="space-y-1">
-                                        {#each agg.slices as s}
+                                        {#each agg.slices as s, ti}
                                             <div
                                                 class="flex items-center gap-1.5 text-[10px]"
                                                 style="color: var(--theme-modal-text);"
                                             >
                                                 <span
                                                     class="size-2 rounded-full shrink-0"
-                                                    style="background: {s.color};"
+                                                    style="background: {COMPARISON_PALETTE[
+                                                        ti % COMPARISON_PALETTE.length
+                                                    ]};"
                                                 ></span>
                                                 <span class="truncate" title={s.label}>{s.label}</span>
                                                 <span class="ml-auto shrink-0 tabular-nums" style="opacity: 0.6;">

@@ -3,6 +3,9 @@
 // 队友的条件 buff 即便 refIdx 指向他人，也可能通过 scope 影响本角色，故可设值取全队并集。
 import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
 
+/** @desc 链/阶对比与数据分析弹窗共用的直伤类型色板（7 色循环，保证同组内不重复） */
+export const COMPARISON_PALETTE = ['#6363f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#a855f7', '#ec4899']
+
 export interface ComparisonEligibility {
     /** 可设共鸣链值（0-6，去重升序） */
     chains: number[]
