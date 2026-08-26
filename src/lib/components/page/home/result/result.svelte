@@ -642,6 +642,7 @@
         open={showComparison}
         {team}
         timings={resultAnalysis?.timings ?? []}
+        loopCounts={resultAnalysis?.loopCounts ?? {}}
         eligibility={comparisonEligibility}
         recompute={recomputeComparison}
         initialPoints={comparisonPoints}
