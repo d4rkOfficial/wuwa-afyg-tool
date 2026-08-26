@@ -128,7 +128,7 @@
     onclickcapture={toolbarClickCapture}
     class={`${
         simplifyToolbar
-            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-[9999] flex cursor-grab touch-none select-none items-center gap-1.5 rounded-xl border p-2 shadow-2xl active:cursor-grabbing'
+            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-xl border p-2 shadow-2xl active:cursor-grabbing'
             : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'
     } ${className || ''}`}
     style={simplifyToolbar
