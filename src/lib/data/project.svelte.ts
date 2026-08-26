@@ -56,6 +56,7 @@ function normalizeProject(p: Partial<Project>): Project {
     return {
         id: p.id ?? crypto.randomUUID(),
         name: p.name ?? '未命名项目',
+        comparisonPoints: p.comparisonPoints,
         createdAt: p.createdAt ?? Date.now(),
         team: p.team ?? [emptyCharSlot(), emptyCharSlot(), emptyCharSlot()],
         customSkillHits: p.customSkillHits ?? {},
@@ -258,6 +259,14 @@ export async function updateResultAnalysis(data: ResultAnalysisData) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
     project.resultAnalysis = data
+    await persist()
+}
+
+/** @desc 持久化链/阶对比弹窗选定的队伍对比配置 */
+export async function updateComparisonPoints(points: { chains: number[]; refinements: number[] }[]) {
+    const project = projects.find((p) => p.id === activeId)
+    if (!project) return
+    project.comparisonPoints = points.length > 0 ? points : undefined
     await persist()
 }
 

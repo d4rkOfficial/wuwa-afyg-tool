@@ -5,11 +5,16 @@
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
     import { getCharElementMap } from '$lib/calc/timeline.store.svelte'
-    import { getActiveProject, updateResultAnalysis } from '$lib/data/project.svelte'
+    import { getActiveProject, updateResultAnalysis, updateComparisonPoints } from '$lib/data/project.svelte'
     import { computeAll as computeAllDamage } from '$lib/calc/compute'
-    import { getAllDamageEntries, getCalcState, getConditionProfile } from '$lib/calc/calculation.store.svelte'
+    import {
+        getAllDamageEntries,
+        getCalcState,
+        getConditionProfile,
+        getGlobalBuffSetIds
+    } from '$lib/calc/calculation.store.svelte'
     import { getConfig } from '$lib/calc/config.store.svelte'
-    import type { ResultEntry, CharSubstatAnalysis } from '$lib/calc/result.types'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
     import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { getAlgorithm, ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
@@ -18,7 +23,9 @@
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
+    import { getComparisonEligibility } from '$lib/calc/comparison'
     import DataAnalysisModal from './data-analysis-modal.svelte'
+    import ComparisonModal from './comparison-modal.svelte'
     import DamageTraceView from './damage-trace-view.svelte'
     import type { DamageTraceCtx } from '$lib/calc/damage-trace'
 
@@ -194,6 +201,70 @@
     })
 
     let totalDamage = $derived(charSummaries.reduce((s, c) => s + c.totalDamage, 0))
+
+    // ── 链/阶对比：资格判定 + 复算（取期望 totalDamageRaw，不套凹暴/不暴/未命中模式）──
+    let showComparison = $state(false)
+    let comparisonPoints = $state<{ chains: number[]; refinements: number[] }[]>(
+        getActiveProject()?.comparisonPoints ?? []
+    )
+    let comparisonEligibility = $derived(
+        getComparisonEligibility(
+            getCalcState().buffSets,
+            getGlobalBuffSetIds(),
+            getAllDamageEntries(),
+            getCalcState().damageEntryBuffSetIds
+        )
+    )
+
+    /** @desc 按期望（totalDamageRaw）聚合原始（未套模式）条目为对比口径 */
+    function aggregateExpectation(raw: ResultEntry[]): {
+        entries: ResultEntry[]
+        charSummaries: CharSummary[]
+        totalDamage: number
+    } {
+        const map = new Map<string, { total: number; count: number }>()
+        let total = 0
+        for (const e of raw) {
+            const d = e.totalDamageRaw
+            total += d
+            const cur = map.get(e.character) ?? { total: 0, count: 0 }
+            cur.total += d
+            cur.count++
+            map.set(e.character, cur)
+        }
+        return {
+            entries: raw,
+            charSummaries: [...map.entries()].map(([character, d]) => ({
+                character,
+                totalDamage: d.total,
+                entryCount: d.count
+            })),
+            totalDamage: total
+        }
+    }
+
+    /** @desc 对比复算：给定完整队伍链/阶 profile，复算原始期望（不套凹暴/不暴/未命中） */
+    function recomputeComparison(chains: number[], refinements: number[]) {
+        const calc = getCalcState()
+        const config = getConfig()
+        const dmgEntries = getAllDamageEntries()
+        const modified = {
+            chains: [chains[0] ?? 0, chains[1] ?? 0, chains[2] ?? 0],
+            refinements: [refinements[0] ?? 0, refinements[1] ?? 0, refinements[2] ?? 0]
+        }
+        const raw = computeAllDamage(
+            dmgEntries,
+            calc.buffSets,
+            calc.damageEntryBuffSetIds,
+            calc.damageEntryDamageTypes,
+            config,
+            team,
+            charInfoMap,
+            weaponInfoMap,
+            modified
+        )
+        return aggregateExpectation(raw)
+    }
 
     let selectedAlgorithm = $state<AlgorithmId>('single-loss')
     let substatAnalysis = $state<CharSubstatAnalysis[]>([])
@@ -539,8 +610,33 @@
         {selectedAlgorithm}
         {rigCritEntryIds}
         {noCritEntryIds}
+        comparisonEligible={comparisonEligibility.eligible}
+        comparisonReason={comparisonEligibility.reason}
+        onCompare={() => {
+            // 兄弟弹窗互斥：从数据分析进入对比时关闭数据分析
+            showDataAnalysis = false
+            showComparison = true
+        }}
         onSelectAlgorithm={(id: AlgorithmId) => (selectedAlgorithm = id)}
         onUpdateResultAnalysis={(data) => updateResultAnalysis(data)}
         onclose={() => (showDataAnalysis = false)}
+    />
+{/if}
+
+{#if showComparison && entries.length}
+    <ComparisonModal
+        open={showComparison}
+        {team}
+        timings={resultAnalysis?.timings ?? []}
+        eligibility={comparisonEligibility}
+        recompute={recomputeComparison}
+        initialPoints={comparisonPoints}
+        onBack={(points) => {
+            // 返回数据分析弹窗（兄弟互斥）+ 持久化对比配置
+            comparisonPoints = points
+            void updateComparisonPoints(points)
+            showComparison = false
+            showDataAnalysis = true
+        }}
     />
 {/if}

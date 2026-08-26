@@ -27,6 +27,9 @@
         selectedAlgorithm: AlgorithmId
         rigCritEntryIds: string[]
         noCritEntryIds: string[]
+        comparisonEligible?: boolean
+        comparisonReason?: string | null
+        onCompare?: () => void
         onSelectAlgorithm: (id: AlgorithmId) => void
         onUpdateResultAnalysis: (data: ResultAnalysisData) => void
         onclose: () => void
@@ -44,6 +47,9 @@
         selectedAlgorithm,
         rigCritEntryIds,
         noCritEntryIds,
+        comparisonEligible = false,
+        comparisonReason = null,
+        onCompare,
         onSelectAlgorithm,
         onUpdateResultAnalysis,
         onclose,
@@ -741,6 +747,17 @@
                     <span style="opacity: 0.6;">配置时间记点后显示 DPS</span>
                 {/if}
             </div>
+            <button
+                onclick={() => onCompare?.()}
+                disabled={!comparisonEligible}
+                class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:opacity-70"
+                style="color: var(--theme-accent-text);"
+                title={comparisonEligible ? '共鸣链/武器精炼对比' : (comparisonReason ?? '本工程不支持对比')}
+                aria-label="链/阶对比"
+            >
+                <Icon icon="mdi:compare-horizontal" class="size-4" />
+                <span class="hidden md:inline">对比</span>
+            </button>
             <button
                 onclick={() => openPanel('character-detail', true)}
                 class="rounded p-1 transition-colors hover:opacity-70"

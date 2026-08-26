@@ -33,6 +33,8 @@ export interface Project {
     id: string
     name: string
     createdAt: number
+    /** 链/阶对比弹窗中用户选定的队伍对比配置（chains/refinements 各 3 项） */
+    comparisonPoints?: { chains: number[]; refinements: number[] }[]
     team: [CharSlot, CharSlot, CharSlot]
     customSkillHits: Record<string, CustomHit[]>
     resultAnalysis?: ResultAnalysisData
