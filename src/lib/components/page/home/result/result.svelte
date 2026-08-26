@@ -1,10 +1,11 @@
 <script lang="ts">
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
-    import type { CalcState } from '$lib/calc/calculation.types'
+    import type { CalcState, DamageEntry } from '$lib/calc/calculation.types'
     import type { ConfigState } from '$lib/calc/config.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
-    import { getCharElementMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharElementMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
+    import { buildLoopIntervals, expandDamageEntries } from '$lib/calc/loop-expand'
     import { getActiveProject, updateResultAnalysis, updateComparisonPoints } from '$lib/data/project.svelte'
     import { computeAll as computeAllDamage } from '$lib/calc/compute'
     import {
@@ -284,7 +285,7 @@
             }
             const algo = getAlgorithm(selectedAlgorithm)
             substatAnalysis = algo(
-                dmgEntries,
+                expandDamageEntriesForLoop(dmgEntries),
                 calc.buffSets,
                 calc.damageEntryBuffSetIds,
                 calc.damageEntryDamageTypes,
@@ -301,6 +302,18 @@
         }, 0)
     }
 
+    /** @desc 按轴循环配置展开伤害条目（循环段条目复制 K 份，与数据分析弹窗同口径；无循环时原样返回） */
+    function expandDamageEntriesForLoop(entries: DamageEntry[]): DamageEntry[] {
+        const loopCounts = resultAnalysis?.loopCounts ?? {}
+        if (!Object.values(loopCounts).some((k) => (k ?? 1) >= 2)) return entries
+        const refLines = getRefLines().filter((rl) => rl.id !== 'left')
+        const intervals = buildLoopIntervals(resultAnalysis?.timings ?? [], refLines, loopCounts)
+        const posMap = new Map<string, number>()
+        for (const b of getOpBlocks()) posMap.set(b.id, b.pos)
+        for (const rl of refLines) posMap.set(rl.id, rl.pos)
+        return expandDamageEntries(entries, posMap, intervals)
+    }
+
     function handleOpenAnalysis() {
         scheduleAnalysis()
         showDataAnalysis = true
@@ -308,6 +321,7 @@
 
     $effect(() => {
         const _ = selectedAlgorithm
+        resultAnalysis?.loopCounts
         if (showDataAnalysis) untrack(() => scheduleAnalysis())
     })
 
