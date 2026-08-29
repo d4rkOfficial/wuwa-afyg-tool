@@ -109,11 +109,15 @@
     // 本地编辑以 $state 即时驱动派生计算（表格/曲线），写回工程走尾随防抖（250ms）：
     // 记点时长/循环次数是高频输入，逐键写回会触发结果页副词条贡献重算（CPU 密集）+ 全量持久化，必须合并为一次
     let persistTimer: ReturnType<typeof setTimeout> | null = null
+    // 本地是否有未落盘的编辑：为 true 时不同步 store（防止「新击键 → 防抖写回前的旧 store 值回灌」把输入覆盖掉）
+    let localDirty = false
 
     function queuePersist() {
+        localDirty = true
         if (persistTimer) clearTimeout(persistTimer)
         persistTimer = setTimeout(() => {
             persistTimer = null
+            localDirty = false
             onUpdateResultAnalysis({ timings, loopCounts })
         }, 250)
     }
@@ -124,6 +128,7 @@
             clearTimeout(persistTimer)
             persistTimer = null
         }
+        localDirty = false
         onUpdateResultAnalysis({ timings, loopCounts, ...extra })
     }
 
@@ -146,14 +151,20 @@
         return true
     }
 
-    // 从工程同步本地状态；值一致时跳过赋值，避免「本地输入 → 写回 → 回灌同一份数据」的对象身份 churn
-    // （否则每次击键都会让所有循环派生 + 图表全量重算）
+    // 从工程同步本地状态（初始加载 / 外部工具变更 / 防抖写回回灌）。
+    // 关键：读取本地 timings/loopCounts 必须 untrack——否则本地 state 本身成为 effect 依赖，
+    // 每次击键本地一变 effect 立即跑，拿防抖前的 store 旧值把输入回滚（表现为「无法输入」）。
+    // 本地有未落盘编辑时（localDirty）也不回灌，避免写回瞬间的新击键被旧 store 值覆盖。
     $effect(() => {
         const nextTimings = resultAnalysis?.timings ?? []
         const nextCounts = resultAnalysis?.loopCounts ?? {}
-        if (timingsEqual(timings, nextTimings) && loopCountsEqual(loopCounts, nextCounts)) return
-        timings = nextTimings.map((t) => ({ ...t }))
-        loopCounts = { ...nextCounts }
+        if (localDirty) return
+        if (untrack(() => timingsEqual(timings, nextTimings)) && untrack(() => loopCountsEqual(loopCounts, nextCounts)))
+            return
+        untrack(() => {
+            timings = nextTimings.map((t) => ({ ...t }))
+            loopCounts = { ...nextCounts }
+        })
     })
 
     function handleClose() {
