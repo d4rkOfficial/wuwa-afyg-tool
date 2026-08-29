@@ -255,10 +255,18 @@ export async function updateConfig(data: ConfigState) {
     await persist()
 }
 
-export async function updateResultAnalysis(data: ResultAnalysisData) {
+/** @desc 合并写回结果分析数据（调用方只传变更字段；缺失字段保留现值，避免互删 loopCounts / rig / noCrit / miss 等） */
+export async function updateResultAnalysis(data: Partial<ResultAnalysisData>) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
-    project.resultAnalysis = data
+    const prev = project.resultAnalysis
+    project.resultAnalysis = {
+        timings: data.timings ?? prev?.timings ?? [],
+        loopCounts: data.loopCounts ?? prev?.loopCounts,
+        rigCritEntryIds: data.rigCritEntryIds ?? prev?.rigCritEntryIds,
+        noCritEntryIds: data.noCritEntryIds ?? prev?.noCritEntryIds,
+        missEntryIds: data.missEntryIds ?? prev?.missEntryIds
+    }
     await persist()
 }
 

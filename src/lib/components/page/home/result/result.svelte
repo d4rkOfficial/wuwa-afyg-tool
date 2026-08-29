@@ -270,12 +270,17 @@
     let selectedAlgorithm = $state<AlgorithmId>('single-loss')
     let substatAnalysis = $state<CharSubstatAnalysis[]>([])
     let analysisComputing = $state(false)
-    let analysisTimeoutId: ReturnType<typeof setTimeout> | null = null
+    // 副词条贡献重算为 CPU 密集计算：任意触发源（算法切换/链阶变化/循环次数输入等）都汇入同一尾随防抖，
+    // 高频输入（记点时长/循环次数逐键）只保留最后一次计算，避免拖垮主线程
+    let analysisDebounceId: ReturnType<typeof setTimeout> | null = null
+    let analysisBatch = 0
 
     function scheduleAnalysis() {
-        if (analysisTimeoutId) clearTimeout(analysisTimeoutId)
+        if (analysisDebounceId) clearTimeout(analysisDebounceId)
         analysisComputing = true
-        analysisTimeoutId = setTimeout(() => {
+        analysisDebounceId = setTimeout(() => {
+            analysisDebounceId = null
+            const batch = ++analysisBatch
             const calc = getCalcState()
             const config = getConfig()
             const dmgEntries = getAllDamageEntries()
@@ -298,8 +303,8 @@
                 new Set(missEntryIds),
                 getConditionProfile()
             )
-            analysisComputing = false
-        }, 0)
+            if (batch === analysisBatch) analysisComputing = false
+        }, 250)
     }
 
     /** @desc 按轴循环配置展开伤害条目（循环段条目复制 K 份，与数据分析弹窗同口径；无循环时原样返回） */
@@ -315,7 +320,7 @@
     }
 
     function handleOpenAnalysis() {
-        scheduleAnalysis()
+        // 打开弹窗即触发下方 $effect（showDataAnalysis 为响应式依赖）→ 走统一防抖后重算，避免双路触发
         showDataAnalysis = true
     }
 

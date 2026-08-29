@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, untrack } from 'svelte'
+    import { onDestroy, onMount, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Chart from 'chart.js/auto'
     import { getCharElementMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
@@ -106,15 +106,65 @@
     /** @desc 分段 DPS 轴循环：key = 记点 refLineId，value = 该记点之后的时段重复次数（≥2 才循环；缺失/1 = 不循环） */
     let loopCounts = $state<Record<string, number>>({})
 
+    // 本地编辑以 $state 即时驱动派生计算（表格/曲线），写回工程走尾随防抖（250ms）：
+    // 记点时长/循环次数是高频输入，逐键写回会触发结果页副词条贡献重算（CPU 密集）+ 全量持久化，必须合并为一次
+    let persistTimer: ReturnType<typeof setTimeout> | null = null
+
+    function queuePersist() {
+        if (persistTimer) clearTimeout(persistTimer)
+        persistTimer = setTimeout(() => {
+            persistTimer = null
+            onUpdateResultAnalysis({ timings, loopCounts })
+        }, 250)
+    }
+
+    /** @desc 立即落盘（关闭/切换场景）：取消未决防抖并写回当前局部状态；extra 可携带其他变更字段一并合并 */
+    function flushPersist(extra?: Partial<ResultAnalysisData>) {
+        if (persistTimer) {
+            clearTimeout(persistTimer)
+            persistTimer = null
+        }
+        onUpdateResultAnalysis({ timings, loopCounts, ...extra })
+    }
+
+    function timingsEqual(
+        a: { refLineId: string; seconds: number | null }[],
+        b: { refLineId: string; seconds: number | null }[]
+    ): boolean {
+        if (a.length !== b.length) return false
+        for (let i = 0; i < a.length; i++) {
+            if (a[i]!.refLineId !== b[i]!.refLineId || a[i]!.seconds !== b[i]!.seconds) return false
+        }
+        return true
+    }
+
+    function loopCountsEqual(a: Record<string, number>, b: Record<string, number>): boolean {
+        const ka = Object.keys(a)
+        const kb = Object.keys(b)
+        if (ka.length !== kb.length) return false
+        for (const k of ka) if (a[k] !== b[k]) return false
+        return true
+    }
+
+    // 从工程同步本地状态；值一致时跳过赋值，避免「本地输入 → 写回 → 回灌同一份数据」的对象身份 churn
+    // （否则每次击键都会让所有循环派生 + 图表全量重算）
     $effect(() => {
-        timings = resultAnalysis?.timings ?? []
-        loopCounts = { ...(resultAnalysis?.loopCounts ?? {}) }
+        const nextTimings = resultAnalysis?.timings ?? []
+        const nextCounts = resultAnalysis?.loopCounts ?? {}
+        if (timingsEqual(timings, nextTimings) && loopCountsEqual(loopCounts, nextCounts)) return
+        timings = nextTimings.map((t) => ({ ...t }))
+        loopCounts = { ...nextCounts }
     })
 
     function handleClose() {
-        onUpdateResultAnalysis({ timings, loopCounts })
+        flushPersist()
         onclose()
     }
+
+    onDestroy(() => {
+        // 面板/其它路径关闭弹窗（不经 handleClose）时，把未落盘的本地编辑一次性写回
+        flushPersist()
+    })
 
     // ref lines from timeline (exclude 'left')
     let refLines = $derived(getRefLines().filter((rl) => rl.id !== 'left'))
@@ -141,6 +191,7 @@
         } else {
             timings = [...timings, { refLineId: id, seconds: resolveRefLineSeconds(id, refLines, timings) }]
         }
+        queuePersist()
     }
 
     /** @desc 手动填小节时长（该记点相对上一有效记点的长度）：空/非法/负数 → 未解析(null)；合法则换算为绝对秒存入内部 */
@@ -150,16 +201,17 @@
         const prev = prevValidSeconds(idx)
         const sec = raw.trim() !== '' && !isNaN(val) && val >= 0 ? prev + val : null
         timings = timings.map((t) => (t.refLineId === id ? { ...t, seconds: sec } : t))
+        queuePersist()
     }
 
-    /** @desc 设置该记点之后的时段循环次数：≥2 生效，其余（1/空/非法）视为不循环；变更即写回工程（触发结果页按循环口径重跑副词条贡献） */
+    /** @desc 设置该记点之后的时段循环次数：≥2 生效，其余（1/空/非法）视为不循环；防抖写回（触发结果页按循环口径重跑副词条贡献） */
     function updateLoopCount(id: string, raw: string) {
         const val = parseInt(raw, 10)
         const next = { ...loopCounts }
         if (Number.isInteger(val) && val >= 2) next[id] = val
         else delete next[id]
         loopCounts = next
-        onUpdateResultAnalysis({ timings, loopCounts: next })
+        queuePersist()
     }
 
     // sorted timings by ref line pos (timeline order)
@@ -176,7 +228,7 @@
     // 已填写秒数的记点（「未填写」记点不参与 DPS 分段/曲线）
     let validTimings = $derived(sortedTimings.filter((t) => t.seconds !== null))
 
-    /** @desc 该记点之前的最近一个已填写秒数（供输入 min / 提示） */
+    /** @desc 该记点之前的最近一个已填写秒数（原始绝对时间，供时长输入换算绝对秒） */
     function prevValidSeconds(selIdx: number): number {
         if (selIdx <= 0) return 0
         for (let i = selIdx - 1; i >= 0; i--) {
@@ -184,6 +236,21 @@
             if (s !== null) return s
         }
         return 0
+    }
+
+    /** @desc 该记点之前已选有效记点在循环展开后的累计时长（cursor 语义，与 buildLoopIntervals 同口径）：
+     * 中间小节重复 K 次时，其后记点的时间最小值 = 前序各段跨度 × 各自循环次数之和（如 20, 25×3 → ≥95s）。供「(≥ Xs)」提示 */
+    function prevEffectiveSeconds(selIdx: number): number {
+        let cursor = 0
+        let lastSec = 0
+        for (let i = 0; i < selIdx; i++) {
+            const t = sortedTimings[i]
+            if (t.seconds === null) continue
+            const span = t.seconds - lastSec
+            if (span > 0) cursor += span * (loopCounts[t.refLineId] ?? 1)
+            lastSec = t.seconds
+        }
+        return cursor
     }
 
     // 总时长与总 DPS（强调 DPS）
@@ -291,21 +358,25 @@
                 })
             }
         }
-        return collapsed.map((c) => {
-            const base = segments[c.baseSegIdx]!
-            const mul = c.count
-            return {
-                ...base,
-                startSeconds: c.startSeconds,
-                endSeconds: c.endSeconds,
-                span: c.span,
-                count: c.count,
-                baseSegIdx: c.baseSegIdx,
-                charDamages: Object.fromEntries(Object.entries(base.charDamages).map(([k, v]) => [k, v * mul])),
-                otherDamage: base.otherDamage * mul,
-                totalDamage: base.totalDamage * mul
-            }
-        })
+        return collapsed
+            .map((c) => {
+                const base = segments[c.baseSegIdx]
+                // 旧数据/跨度≤0 被跳过时 baseSegIdx 可能越界，防御性跳过
+                if (!base) return null
+                const mul = c.count
+                return {
+                    ...base,
+                    startSeconds: c.startSeconds,
+                    endSeconds: c.endSeconds,
+                    span: c.span,
+                    count: c.count,
+                    baseSegIdx: c.baseSegIdx,
+                    charDamages: Object.fromEntries(Object.entries(base.charDamages).map(([k, v]) => [k, v * mul])),
+                    otherDamage: base.otherDamage * mul,
+                    totalDamage: base.totalDamage * mul
+                }
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null)
     })
 
     /** @desc 循环后总时长 / 总伤 / 总 DPS（未激活时等于原值） */
@@ -898,14 +969,9 @@
             </div>
             <button
                 onclick={() => {
-                    // 切换前先把局部 timings（含模式）写回，保证对比弹窗读到最新时间记点
-                    onUpdateResultAnalysis({
-                        timings,
-                        loopCounts,
-                        rigCritEntryIds,
-                        noCritEntryIds,
-                        missEntryIds: resultAnalysis?.missEntryIds ?? []
-                    })
+                    // 切换前先把局部 timings/loopCounts 立即写回（含未决防抖），保证对比弹窗读到最新时间记点；
+                    // 合并写回不会覆盖既有的 rig/noCrit/miss 模式
+                    flushPersist()
                     onCompare?.()
                 }}
                 disabled={!comparisonEligible}
@@ -1053,6 +1119,7 @@
                                         {@const selIdx = sortedTimings.findIndex((t) => t.refLineId === rl.id)}
                                         {@const timing = timings.find((t) => t.refLineId === rl.id)}
                                         {@const prevV = prevValidSeconds(selIdx)}
+                                        {@const prevEff = prevEffectiveSeconds(selIdx)}
                                         {@const vIdx = validTimings.findIndex((t) => t.refLineId === rl.id)}
                                         {@const loopable = vIdx >= 0}
                                         <div
@@ -1078,7 +1145,11 @@
                                                         updateSeconds(rl.id, (e.target as HTMLInputElement).value)}
                                                     min={0}
                                                     step="0.1"
-                                                    title="该小节时长（相对上一记点）"
+                                                    title="该小节时长（相对上一记点；循环展开后该小节起点 ≥ {prevEff %
+                                                        1 ===
+                                                    0
+                                                        ? prevEff.toFixed(0)
+                                                        : prevEff.toFixed(1)}s）"
                                                     class="w-16 rounded border px-1.5 py-0.5 text-right text-[11px] tabular-nums outline-none"
                                                     style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                                     onclick={(e) => e.stopPropagation()}
@@ -1105,6 +1176,16 @@
                                                 {#if timing?.seconds === null}
                                                     <span class="text-[10px] whitespace-nowrap" style="color: #f59e0b;"
                                                         >未填写</span
+                                                    >
+                                                {/if}
+                                                {#if loopActive && selIdx > 0 && prevEff > 0}
+                                                    <span
+                                                        class="text-[10px] whitespace-nowrap"
+                                                        style="color: var(--theme-accent-text); opacity: 0.6;"
+                                                        title="循环展开后该小节起点"
+                                                        >(≥ {prevEff % 1 === 0
+                                                            ? prevEff.toFixed(0)
+                                                            : prevEff.toFixed(1)}s)</span
                                                     >
                                                 {/if}
                                             {/if}
