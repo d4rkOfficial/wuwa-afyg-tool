@@ -5,6 +5,7 @@
     import Icon from '@iconify/svelte'
     import { tick, untrack } from 'svelte'
     import { getCharElementMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
+    import { buildLoopIntervals } from '$lib/calc/loop-expand'
     import { getConditionProfile } from '$lib/calc/calculation.store.svelte'
     import type { ResultEntry, CharSummary } from '$lib/calc/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
@@ -21,6 +22,8 @@
         open: boolean
         team: [CharSlot, CharSlot, CharSlot]
         timings: { refLineId: string; seconds: number | null }[]
+        /** 分段 DPS 轴循环配置：key = 记点 refLineId，value = 该小节重复次数（≥2 生效） */
+        loopCounts?: Record<string, number>
         eligibility: ComparisonEligibility
         /** 复算回调：给定完整队伍链/阶 profile，复算原始期望（不套凹暴/不暴/未命中） */
         recompute: (
@@ -41,6 +44,7 @@
         open,
         team,
         timings,
+        loopCounts = {},
         eligibility,
         recompute,
         initialPoints,
@@ -91,7 +95,16 @@
             })
     )
     let validTimings = $derived(sortedTimings.filter((t) => t.seconds !== null))
-    let totalDur = $derived(validTimings.length > 0 ? validTimings[validTimings.length - 1].seconds! : 0)
+    // 轴循环（与数据分析弹窗同口径，$lib/calc/loop-expand）
+    let loopActive = $derived(Object.values(loopCounts).some((k) => (k ?? 1) >= 2))
+    let loopIntervals = $derived(loopActive ? buildLoopIntervals(timings, refLines, loopCounts) : [])
+    let totalDur = $derived(
+        loopActive && loopIntervals.length > 0
+            ? loopIntervals[loopIntervals.length - 1]!.endSeconds
+            : validTimings.length > 0
+              ? validTimings[validTimings.length - 1]!.seconds!
+              : 0
+    )
 
     interface Config {
         key: string
@@ -223,6 +236,15 @@
         const segs: { startPos: number; endPos: number; startSec: number; endSec: number }[] = []
         if (validTimings.length === 0) {
             segs.push({ startPos: -Infinity, endPos: Infinity, startSec: 0, endSec: dur })
+        } else if (loopActive) {
+            for (const iv of loopIntervals) {
+                segs.push({
+                    startPos: iv.startPos,
+                    endPos: iv.endPos,
+                    startSec: iv.startSeconds,
+                    endSec: iv.endSeconds
+                })
+            }
         } else {
             let prevPos = 0
             let prevSec = 0
@@ -236,14 +258,10 @@
             segs.push({ startPos: prevPos, endPos: Infinity, startSec: prevSec, endSec: dur })
         }
         const events: { time: number; dmg: number }[] = []
-        let cursor = 0
         for (const seg of segs) {
             if (seg.endSec <= seg.startSec) continue
-            const segEntries: typeof withPos = []
-            while (cursor < withPos.length && withPos[cursor].pos < seg.endPos) {
-                if (withPos[cursor].pos >= seg.startPos) segEntries.push(withPos[cursor])
-                cursor++
-            }
+            // 按位置区间独立过滤（循环展开后同一区间出现多份，不能用共享游标）
+            const segEntries = withPos.filter((x) => x.pos >= seg.startPos && x.pos < seg.endPos)
             const n = segEntries.length
             if (n === 0) continue
             const d = seg.endSec - seg.startSec
@@ -293,27 +311,55 @@
     function segmentsOf(entries: ResultEntry[]): Segment[] {
         if (validTimings.length === 0) return []
         const result: Segment[] = []
-        let prevRefPos = 0
-        let prevSeconds = 0
-        for (const t of validTimings) {
-            const rl = refLines.find((r) => r.id === t.refLineId)
-            if (!rl) continue
-            const span = t.seconds! - prevSeconds
-            if (span <= 0) continue
-            const currentRefPos = rl.pos
+        const segs = loopActive
+            ? loopIntervals.map((iv) => ({
+                  startPos: iv.startPos,
+                  endPos: iv.endPos,
+                  startSec: iv.startSeconds,
+                  endSec: iv.endSeconds
+              }))
+            : (() => {
+                  const out: { startPos: number; endPos: number; startSec: number; endSec: number }[] = []
+                  let prevRefPos = 0
+                  let prevSeconds = 0
+                  for (const t of validTimings) {
+                      const rl = refLines.find((r) => r.id === t.refLineId)
+                      if (!rl) continue
+                      const span = t.seconds! - prevSeconds
+                      if (span <= 0) {
+                          prevRefPos = rl.pos
+                          prevSeconds = t.seconds!
+                          continue
+                      }
+                      out.push({ startPos: prevRefPos, endPos: rl.pos, startSec: prevSeconds, endSec: t.seconds! })
+                      prevRefPos = rl.pos
+                      prevSeconds = t.seconds!
+                  }
+                  return out
+              })()
+        for (const seg of segs) {
+            if (seg.endSec <= seg.startSec) continue
             const segEntries = entries.filter((e) => {
                 const p = blockPosMap.get(e.sourceTimelineBlockId)
-                return p !== undefined && p >= prevRefPos && p < currentRefPos
+                return p !== undefined && p >= seg.startPos && p < seg.endPos
             })
             result.push({
-                startSeconds: prevSeconds,
-                endSeconds: t.seconds!,
+                startSeconds: seg.startSec,
+                endSeconds: seg.endSec,
                 totalDamage: segEntries.reduce((s, e) => s + e.totalDamageRaw, 0)
             })
-            prevRefPos = currentRefPos
-            prevSeconds = t.seconds!
         }
         return result
+    }
+
+    /** @desc 循环展开后的总伤（分段合计 ×K + 未入段条目一次），供总伤/总 DPS 与分段口径一致 */
+    function expandedTotalDamageOf(entries: ResultEntry[]): number {
+        const segTotal = segmentsOf(entries).reduce((s, seg) => s + seg.totalDamage, 0)
+        const withPos = new Set(
+            entries.filter((e) => blockPosMap.get(e.sourceTimelineBlockId) !== undefined).map((e) => e.id)
+        )
+        const outside = entries.filter((e) => !withPos.has(e.id)).reduce((s, e) => s + e.totalDamageRaw, 0)
+        return segTotal + outside
     }
 
     // ── 图表 ──
@@ -686,13 +732,15 @@
                                             <span class="pb-0.5 text-xs opacity-50">DPS</span><span
                                                 class="text-2xl font-bold leading-none tabular-nums"
                                                 style="color: {c.accent};"
-                                                >{totalDur > 0 ? fmt(c.totalDamage / totalDur) : '—'}</span
+                                                >{totalDur > 0
+                                                    ? fmt(expandedTotalDamageOf(c.entries) / totalDur)
+                                                    : '—'}</span
                                             >
                                         </div>
                                         <div class="flex items-center justify-between text-xs">
                                             <span class="opacity-50">总伤</span><span
                                                 class="tabular-nums font-medium"
-                                                style="color: {c.accent};">{fmt(c.totalDamage)}</span
+                                                style="color: {c.accent};">{fmt(expandedTotalDamageOf(c.entries))}</span
                                             >
                                         </div>
                                     </div>

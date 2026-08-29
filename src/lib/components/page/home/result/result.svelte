@@ -1,10 +1,11 @@
 <script lang="ts">
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
-    import type { CalcState } from '$lib/calc/calculation.types'
+    import type { CalcState, DamageEntry } from '$lib/calc/calculation.types'
     import type { ConfigState } from '$lib/calc/config.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
-    import { getCharElementMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharElementMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
+    import { buildLoopIntervals, expandDamageEntries } from '$lib/calc/loop-expand'
     import { getActiveProject, updateResultAnalysis, updateComparisonPoints } from '$lib/data/project.svelte'
     import { computeAll as computeAllDamage } from '$lib/calc/compute'
     import {
@@ -269,12 +270,17 @@
     let selectedAlgorithm = $state<AlgorithmId>('single-loss')
     let substatAnalysis = $state<CharSubstatAnalysis[]>([])
     let analysisComputing = $state(false)
-    let analysisTimeoutId: ReturnType<typeof setTimeout> | null = null
+    // 副词条贡献重算为 CPU 密集计算：任意触发源（算法切换/链阶变化/循环次数输入等）都汇入同一尾随防抖，
+    // 高频输入（记点时长/循环次数逐键）只保留最后一次计算，避免拖垮主线程
+    let analysisDebounceId: ReturnType<typeof setTimeout> | null = null
+    let analysisBatch = 0
 
     function scheduleAnalysis() {
-        if (analysisTimeoutId) clearTimeout(analysisTimeoutId)
+        if (analysisDebounceId) clearTimeout(analysisDebounceId)
         analysisComputing = true
-        analysisTimeoutId = setTimeout(() => {
+        analysisDebounceId = setTimeout(() => {
+            analysisDebounceId = null
+            const batch = ++analysisBatch
             const calc = getCalcState()
             const config = getConfig()
             const dmgEntries = getAllDamageEntries()
@@ -284,7 +290,7 @@
             }
             const algo = getAlgorithm(selectedAlgorithm)
             substatAnalysis = algo(
-                dmgEntries,
+                expandDamageEntriesForLoop(dmgEntries),
                 calc.buffSets,
                 calc.damageEntryBuffSetIds,
                 calc.damageEntryDamageTypes,
@@ -297,17 +303,30 @@
                 new Set(missEntryIds),
                 getConditionProfile()
             )
-            analysisComputing = false
-        }, 0)
+            if (batch === analysisBatch) analysisComputing = false
+        }, 250)
+    }
+
+    /** @desc 按轴循环配置展开伤害条目（循环段条目复制 K 份，与数据分析弹窗同口径；无循环时原样返回） */
+    function expandDamageEntriesForLoop(entries: DamageEntry[]): DamageEntry[] {
+        const loopCounts = resultAnalysis?.loopCounts ?? {}
+        if (!Object.values(loopCounts).some((k) => (k ?? 1) >= 2)) return entries
+        const refLines = getRefLines().filter((rl) => rl.id !== 'left')
+        const intervals = buildLoopIntervals(resultAnalysis?.timings ?? [], refLines, loopCounts)
+        const posMap = new Map<string, number>()
+        for (const b of getOpBlocks()) posMap.set(b.id, b.pos)
+        for (const rl of refLines) posMap.set(rl.id, rl.pos)
+        return expandDamageEntries(entries, posMap, intervals)
     }
 
     function handleOpenAnalysis() {
-        scheduleAnalysis()
+        // 打开弹窗即触发下方 $effect（showDataAnalysis 为响应式依赖）→ 走统一防抖后重算，避免双路触发
         showDataAnalysis = true
     }
 
     $effect(() => {
         const _ = selectedAlgorithm
+        resultAnalysis?.loopCounts
         if (showDataAnalysis) untrack(() => scheduleAnalysis())
     })
 
@@ -628,6 +647,7 @@
         open={showComparison}
         {team}
         timings={resultAnalysis?.timings ?? []}
+        loopCounts={resultAnalysis?.loopCounts ?? {}}
         eligibility={comparisonEligibility}
         recompute={recomputeComparison}
         initialPoints={comparisonPoints}
