@@ -1,5 +1,5 @@
 // 生成结果清洗：白名单过滤乘区/引用/scope/condition、数值归一化、去重（移植自 wuwa-afyg-share）
-import { ZONE_MAP, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
 import type { BuffCondition } from '$lib/calc/calculation.types'
@@ -45,7 +45,8 @@ export function sanitizeBuffs(buffs: GeneratedBuff[]): GeneratedBuff[] {
                 zoneId: z.zoneId,
                 value: z.value,
                 ...(z.override ? { override: true } : {}),
-                ...(sanitizeRef(z.ref) ? { ref: sanitizeRef(z.ref) } : {})
+                // 层数类乘区（集谐干涉/同奏增益等）只填固定层数，丢弃模型误输出的引用
+                ...(!ZONE_NO_REF_IDS.has(z.zoneId as string) && sanitizeRef(z.ref) ? { ref: sanitizeRef(z.ref) } : {})
             }))
         if (!zones.length) continue
         const scope: BuffScope = b.scope && BUFF_SCOPES.includes(b.scope as BuffScope) ? (b.scope as BuffScope) : 'team'

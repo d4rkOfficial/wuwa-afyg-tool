@@ -2,7 +2,7 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+    import { ZONE_DEFS, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
     import type {
         BuffEntityType,
         BuffLibraryBuff,
@@ -601,7 +601,7 @@
                                     <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
                                         >{zoneLabel(z.zoneId)}</span
                                     >
-                                    {#if z.ref}
+                                    {#if z.ref && !ZONE_NO_REF_IDS.has(z.zoneId)}
                                         {@const refDef =
                                             ZONE_REF_MAP.get(z.ref.targetZoneId) ??
                                             ZONE_MAP.get(z.ref.targetZoneId as never)}
@@ -664,21 +664,23 @@
                                             {z.override ? '覆盖' : '追加'}
                                         </button>
                                     {/if}
-                                    <button
-                                        onclick={() => openRefModal(z.zoneId)}
-                                        class={[
-                                            'shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
-                                            z.ref
-                                                ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
-                                                : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
-                                        ].join(' ')}
-                                        title={z.ref
-                                            ? `引${entityType === 'character' ? '自己' : '主人'} ${ZONE_REF_MAP.get(z.ref.targetZoneId)?.label ?? z.ref.targetZoneId} × ${z.ref.pct}%`
-                                            : '引用某属性（如 当前攻击×N%）'}
-                                    >
-                                        <Icon icon="mdi:link-variant" class="size-3" />
-                                        {z.ref ? '已引用' : '引用'}
-                                    </button>
+                                    {#if !ZONE_NO_REF_IDS.has(z.zoneId)}
+                                        <button
+                                            onclick={() => openRefModal(z.zoneId)}
+                                            class={[
+                                                'shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                                z.ref
+                                                    ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                                                    : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
+                                            ].join(' ')}
+                                            title={z.ref
+                                                ? `引${entityType === 'character' ? '自己' : '主人'} ${ZONE_REF_MAP.get(z.ref.targetZoneId)?.label ?? z.ref.targetZoneId} × ${z.ref.pct}%`
+                                                : '引用某属性（如 当前攻击×N%）'}
+                                        >
+                                            <Icon icon="mdi:link-variant" class="size-3" />
+                                            {z.ref ? '已引用' : '引用'}
+                                        </button>
+                                    {/if}
                                     <button
                                         onclick={() => toggleAddZone(z.zoneId)}
                                         class="shrink-0 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"

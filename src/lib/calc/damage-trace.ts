@@ -4,6 +4,8 @@ import type { ConfigState } from './config.types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import { getBoundBuffSets, type ConditionProfile } from './compute'
+import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
+import type { ZoneRef } from './calculation.types'
 import { WEAPON_SUBSTAT_NAME_MAP } from '$lib/consts/game-terms'
 
 /** @desc 溯源所需上下文（结果页可直接提供的输入，与 computeAll 同源） */
@@ -27,6 +29,8 @@ export interface TracePart {
     unit: '%' | 'flat' | 'mult'
     /** @desc 对当前区数值的折算贡献（可选，%乘区为原值，flat 区为折算值） */
     contribution?: number
+    /** @desc 引用/转模等非纯数值来源的说明文字（如「当前攻击 ×50%」），有值时右侧显示该文字而非数值 */
+    note?: string
 }
 
 /** @desc 一个乘区段：数值 + 组成来源（溯源） */
@@ -50,6 +54,8 @@ export interface DamageSegments {
     extraRatioPct: number
     /** @desc 倍率是否已含额外倍率（系数类 ratioNum 为有效倍率，含额外倍率与段数） */
     ratioIncludesExtra: boolean
+    /** @desc 额外倍率（extraRatio）的拉表Buff 来源（含引用/覆盖说明），供倍率 chip 溯源展示 */
+    extraRatioParts: TracePart[]
     hits: number
     baseValue: number
     baseParts: TracePart[]
@@ -94,21 +100,48 @@ const STAT_LABEL: Record<BaseKind, { white: string; pct: string; flat: string }>
 }
 
 function fmtPercent(v: number): string {
-    return `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
+    return `${v.toFixed(1)}%`
 }
 
 // ── 来源收集 ──
 
-/** @desc 拉表Buff：指定 zoneId 的加值列表（普通值；ref/override 归入「引用/覆盖」由上层说明） */
-function buffZoneParts(buffs: BuffSet[], zoneId: string, label: string): TracePart[] {
-    const out: TracePart[] = []
+/** @desc 引用规则摘要（如「当前攻击 ×50%」「攻击白值 超出2000 每100→5 ≤30」），供溯源卡片右侧展示 */
+function refRuleNote(ref: ZoneRef): string {
+    const target = ZONE_REF_MAP.get(ref.zoneId) ?? ZONE_MAP.get(ref.zoneId as never)
+    const parts: string[] = [target?.label ?? ref.zoneId]
+    if (ref.threshold !== 0) parts.push(`超出${ref.threshold}`)
+    parts.push(ref.discrete ? `每${ref.divisor ?? 1}→${ref.multiplier ?? 0}` : `×${ref.pct}%`)
+    if (ref.lower !== undefined) parts.push(`≥${ref.lower}`)
+    if (ref.upper !== undefined) parts.push(`≤${ref.upper}`)
+    return parts.join(' ')
+}
+
+/** @desc 拉表Buff 指定乘区的来源（普通加值 / 覆盖 / 引用）；存在生效覆盖时只列覆盖来源，加算值不再显示（与引擎一致） */
+function buffZoneParts(buffs: BuffSet[], zoneId: string, label: string, unit: '%' | 'flat'): TracePart[] {
+    const adds: TracePart[] = []
+    const overrides: TracePart[] = []
+    const refs: TracePart[] = []
     for (const bs of buffs) {
         for (const z of bs.zones) {
-            if (z.zoneId !== zoneId || z.value === 0) continue
-            out.push({ sourceType: 'buff', source: bs.name, label, value: z.value, unit: '%' })
+            if (z.zoneId !== zoneId) continue
+            if (z.ref) {
+                refs.push({
+                    sourceType: 'buff',
+                    source: bs.name,
+                    label: `${label}(引用)`,
+                    value: 0,
+                    unit,
+                    note: refRuleNote(z.ref)
+                })
+            } else if (z.override) {
+                if (z.value === 0) continue
+                overrides.push({ sourceType: 'buff', source: bs.name, label: `${label}(覆盖)`, value: z.value, unit })
+            } else if (z.value !== 0) {
+                adds.push({ sourceType: 'buff', source: bs.name, label, value: z.value, unit })
+            }
         }
     }
-    return out
+    return overrides.length > 0 ? overrides : [...adds, ...refs]
 }
 
 /** @desc 某伤害类型的类型/元素加成标签命中（Echo 词条 label） */
@@ -276,15 +309,9 @@ function collectCoeffParts(baseUnit: string, coeff: number, ctx: DamageTraceCtx)
     return []
 }
 
-/** @desc 增伤区：拉表Buff 加成 + 声骸/武器 元素、类型加成 */
+/** @desc 增伤区：拉表Buff 加成（含引用/覆盖）+ 声骸/武器 元素、类型加成 */
 function collectBonusParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffSet[]): TracePart[] {
-    const parts: TracePart[] = []
-    for (const bs of buffs) {
-        for (const z of bs.zones) {
-            if (z.zoneId !== 'bonusDmg' || z.value === 0) continue
-            parts.push({ sourceType: 'buff', source: bs.name, label: '加成', value: z.value, unit: '%' })
-        }
-    }
+    const parts = buffZoneParts(buffs, 'bonusDmg', '加成', '%')
     const charIdx = ctx.team.findIndex((s) => s.character === entry.character)
     const echoes = charIdx >= 0 ? (ctx.configState.characters[charIdx]?.echoes ?? []) : []
     const weaponName = charIdx >= 0 ? (ctx.team[charIdx]?.weapon ?? null) : null
@@ -313,18 +340,10 @@ function collectBonusParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffS
     return parts
 }
 
-/** @desc 抗性/防御/免伤区：敌人面板输入 + 拉表Buff 穿透/降低 */
+/** @desc 抗性/防御/免伤区：敌人面板输入 + 拉表Buff 穿透/降低（含引用/覆盖） */
 function collectEnemyParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffSet[], zone: string): TracePart[] {
     const parts: TracePart[] = []
     const enemy = ctx.configState.enemy
-    const pushBuff = (zoneId: string, label: string) => {
-        for (const bs of buffs) {
-            for (const z of bs.zones) {
-                if (z.zoneId !== zoneId || z.value === 0) continue
-                parts.push({ sourceType: 'buff', source: bs.name, label, value: z.value, unit: '%' })
-            }
-        }
-    }
     if (zone === 'res') {
         const base = (enemy.resistances[entry.element] ?? 0) / 100
         parts.push({
@@ -334,8 +353,8 @@ function collectEnemyParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffS
             value: base * 100,
             unit: '%'
         })
-        pushBuff('resPen', '穿抗')
-        pushBuff('resDown', '减抗')
+        parts.push(...buffZoneParts(buffs, 'resPen', '穿抗', '%'))
+        parts.push(...buffZoneParts(buffs, 'resDown', '减抗', '%'))
     } else if (zone === 'def') {
         parts.push({
             sourceType: 'enemy',
@@ -344,8 +363,8 @@ function collectEnemyParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffS
             value: enemy.defense,
             unit: 'flat'
         })
-        pushBuff('defPen', '穿防')
-        pushBuff('defDown', '减防')
+        parts.push(...buffZoneParts(buffs, 'defPen', '穿防', '%'))
+        parts.push(...buffZoneParts(buffs, 'defDown', '减防', '%'))
     } else {
         parts.push({
             sourceType: 'enemy',
@@ -354,7 +373,7 @@ function collectEnemyParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffS
             value: enemy.dmgReduction,
             unit: '%'
         })
-        pushBuff('dmgRedPen', '穿免')
+        parts.push(...buffZoneParts(buffs, 'dmgRedPen', '穿免', '%'))
     }
     return parts
 }
@@ -386,38 +405,54 @@ function collectCritParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffSe
         if (echo.secondMainStat) push(echo.secondMainStat.type, echo.secondMainStat.value)
         for (const sub of echo.substats) push(sub.type, sub.value)
     })
-    for (const bs of buffs) {
-        for (const z of bs.zones) {
-            if (z.zoneId === 'critRate')
-                parts.push({ sourceType: 'buff', source: bs.name, label: '暴击率', value: z.value, unit: '%' })
-            else if (z.zoneId === 'critDmg')
-                parts.push({ sourceType: 'buff', source: bs.name, label: '暴击伤害', value: z.value, unit: '%' })
-        }
-    }
+    parts.push(...buffZoneParts(buffs, 'critRate', '暴击率', '%'))
+    parts.push(...buffZoneParts(buffs, 'critDmg', '暴击伤害', '%'))
     return parts
 }
 
-/** @desc 特殊区：拉表Buff 特殊终伤（加算）与特殊终伤·乘算（连乘因子） */
+/** @desc 特殊区：拉表Buff 特殊终伤（加算）与特殊终伤·乘算（连乘因子），含引用/覆盖来源 */
 function collectCustomParts(buffs: BuffSet[]): TracePart[] {
-    const parts: TracePart[] = []
+    const adds: TracePart[] = []
+    const overrides: TracePart[] = []
+    const refs: TracePart[] = []
     for (const bs of buffs) {
         for (const z of bs.zones) {
-            if (z.value === 0) continue
-            if (z.zoneId === 'customFinalDmg') {
-                parts.push({ sourceType: 'buff', source: bs.name, label: '特殊终伤(加算)', value: z.value, unit: '%' })
-            } else if (z.zoneId === 'customFinalDmgMul') {
-                parts.push({
+            const isMul = z.zoneId === 'customFinalDmgMul'
+            if (z.zoneId !== 'customFinalDmg' && !isMul) continue
+            const zoneLabel = isMul ? '特殊终伤(乘算)' : '特殊终伤(加算)'
+            const extra = isMul ? { contribution: 1 + z.value / 100 } : {}
+            if (z.ref) {
+                refs.push({
                     sourceType: 'buff',
                     source: bs.name,
-                    label: '特殊终伤(乘算)',
+                    label: `${zoneLabel}(引用)`,
+                    value: 0,
+                    unit: '%',
+                    note: refRuleNote(z.ref)
+                })
+            } else if (z.override) {
+                if (z.value === 0) continue
+                overrides.push({
+                    sourceType: 'buff',
+                    source: bs.name,
+                    label: `${zoneLabel}(覆盖)`,
                     value: z.value,
                     unit: '%',
-                    contribution: 1 + z.value / 100
+                    ...extra
+                })
+            } else if (z.value !== 0) {
+                adds.push({
+                    sourceType: 'buff',
+                    source: bs.name,
+                    label: zoneLabel,
+                    value: z.value,
+                    unit: '%',
+                    ...extra
                 })
             }
         }
     }
-    return parts
+    return overrides.length > 0 ? overrides : [...adds, ...refs]
 }
 
 function seg(id: string, label: string, value: number, detail: string, parts: TracePart[]): DamageSegment {
@@ -486,7 +521,7 @@ export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, mis
             '加深区',
             1 + entry.deepen,
             `(1 + ${fmtPercent(entry.deepen * 100)})`,
-            buffZoneParts(buffs, 'deepenDmg', '加深')
+            buffZoneParts(buffs, 'deepenDmg', '加深', '%')
         )
     )
     // 增伤（面板/元素/类型）
@@ -499,7 +534,7 @@ export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, mis
             '易伤区',
             1 + entry.vulnerability,
             `(1 + ${fmtPercent(entry.vulnerability * 100)})`,
-            buffZoneParts(buffs, 'dmgTakenInc', '易伤')
+            buffZoneParts(buffs, 'dmgTakenInc', '易伤', '%')
         )
     )
     // 抗性（敌人 + 穿/减）
@@ -522,11 +557,20 @@ export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, mis
     )
     // 集谐（集谐直伤 = 1+干涉层数；偏谐系数 = 谐度破坏增幅；效应系数 = 1）
     const tuneDelta = entry.finalTuneStrainMulti + entry.finalTuneBreakZone
-    const tuneParts = buffZoneParts(buffs, 'tuneStrainLayer', '集谐层数').map((p) => ({ ...p, unit: 'flat' as const }))
-    tuneParts.push(
-        ...buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅').map((p) => ({ ...p, unit: 'flat' as const }))
-    )
+    const tuneParts = buffZoneParts(buffs, 'tuneStrainLayer', '集谐层数', 'flat')
+    tuneParts.push(...buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat'))
     segments.push(seg('tune', '集谐区', 1 + tuneDelta, `(1 + ${(tuneDelta * 100).toFixed(2)}%)`, tuneParts))
+    // 同奏（同奏区 = 1 + 3%×同奏增益层数，直伤/效应/处决响应全生效）
+    const unisonParts = buffZoneParts(buffs, 'unisonBoonLayer', '同奏层数', 'flat')
+    segments.push(
+        seg(
+            'unison',
+            '同奏区',
+            1 + entry.finalUnisonMulti,
+            `(1 + ${(entry.finalUnisonMulti * 100).toFixed(1)}%)`,
+            unisonParts
+        )
+    )
     // 终伤
     segments.push(
         seg(
@@ -534,7 +578,7 @@ export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, mis
             '终伤区',
             1 + entry.finalDmg,
             `(1 + ${fmtPercent(entry.finalDmg * 100)})`,
-            buffZoneParts(buffs, 'finalDmg', '终伤')
+            buffZoneParts(buffs, 'finalDmg', '终伤', '%')
         )
     )
     // 特殊区
@@ -561,6 +605,8 @@ export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, mis
     const extraRatioPct = entry.extraRatio
     // 系数类 ratioNum 即有效倍率（已含额外倍率与段数），直伤为纯基础倍率
     const ratioIncludesExtra = isCoeff
+    // 额外倍率 buff 来源（引用型 buff 在此列明引用规则）
+    const extraRatioParts = buffZoneParts(buffs, 'extraRatio', '额外倍率', '%')
     // 面板基类在此收集来源（需 buffs）；系数基类在顶部已填
     if (!isCoeff) baseParts = collectBaseParts(kind, baseWhite, entry, ctx, buffs)
 
@@ -579,6 +625,7 @@ export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, mis
         ratioPct,
         extraRatioPct,
         ratioIncludesExtra,
+        extraRatioParts,
         hits: entry.hits || 1,
         baseValue: entry.baseValue,
         baseParts,

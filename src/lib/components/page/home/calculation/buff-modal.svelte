@@ -24,6 +24,7 @@
     import {
         ZONE_DEFS,
         ZONE_MAP,
+        ZONE_NO_REF_IDS,
         ZONE_REF_DEFS,
         ZONE_REF_MAP,
         groupBuffSets,
@@ -2089,7 +2090,7 @@
                                                 <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
                                                     >{def.label}</span
                                                 >
-                                                {#if zone.ref}
+                                                {#if zone.ref && !ZONE_NO_REF_IDS.has(zone.zoneId)}
                                                     {@const refDef =
                                                         ZONE_REF_MAP.get(zone.ref.zoneId) ??
                                                         ZONE_MAP.get(zone.ref.zoneId as any)}
@@ -2173,14 +2174,16 @@
                                                         {zone.override ? '覆盖' : '追加'}
                                                     </button>
                                                 {/if}
-                                                <button
-                                                    onclick={() => openRefModal(zone.zoneId)}
-                                                    class="shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <Icon icon="mdi:link-variant" class="size-3" />
-                                                    引用
-                                                </button>
+                                                {#if !ZONE_NO_REF_IDS.has(zone.zoneId)}
+                                                    <button
+                                                        onclick={() => openRefModal(zone.zoneId)}
+                                                        class="shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5"
+                                                        style="border-color: var(--theme-divider-border);"
+                                                    >
+                                                        <Icon icon="mdi:link-variant" class="size-3" />
+                                                        引用
+                                                    </button>
+                                                {/if}
                                             </div>
                                         {/if}
                                     {/each}

@@ -42,6 +42,8 @@ export interface ResultEntry {
     finalDmg: number
     finalTuneStrainMulti: number
     finalTuneBreakZone: number
+    /** @desc 同奏区（delta，%）：同奏区乘子 = 1 + 3%×同奏增益层数，这里存 3%×层数 */
+    finalUnisonMulti: number
     customMult: number
     extraRatio: number
     vulnerability: number

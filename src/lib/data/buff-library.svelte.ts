@@ -2,6 +2,7 @@ import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { getShareBase } from './workshop.svelte'
+import { ZONE_NO_REF_IDS } from '$lib/calc/calculation.consts'
 import type { BuffCondition } from '$lib/calc/calculation.types'
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
@@ -282,10 +283,12 @@ function normalizeZones(value: unknown): BuffLibraryZone[] {
         const zoneId = String(zo.zoneId ?? '')
         const num = Number(zo.value)
         if (!zoneId || Number.isNaN(num)) continue
+        // 层数类乘区（集谐干涉/同奏增益等）只能填固定层数，不保留引用
+        const ref = ZONE_NO_REF_IDS.has(zoneId) ? undefined : normalizeRef(zo.ref)
         zones.push({
             zoneId,
             value: num,
-            ...(normalizeRef(zo.ref) ? { ref: normalizeRef(zo.ref) } : {}),
+            ...(ref ? { ref } : {}),
             ...(zo.override ? { override: true } : {})
         })
     }
@@ -326,7 +329,13 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
             scope: b.scope,
             exclusive: b.exclusive,
             ...(b.condition ? { condition: cloneCondition(b.condition) } : {}),
-            zones: b.zones.map((z) => ({ ...z }))
+            zones: b.zones.map((z) => {
+                // 层数类乘区（集谐干涉/同奏增益等）只填固定层数，持久化前清除历史遗留引用
+                if (!ZONE_NO_REF_IDS.has(z.zoneId)) return { ...z }
+                const copy = { ...z }
+                delete copy.ref
+                return copy
+            })
         })
     }
     return out

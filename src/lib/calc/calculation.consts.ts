@@ -1,6 +1,6 @@
 import type { ZoneDef, BuffSet } from './calculation.types'
 
-/** @desc 全部乘区定义（拉表页可配置的 Buff 乘区清单）：攻击/生命/防御/双暴/充能/谐度/增伤/加深/穿透/减抗/终伤/易伤/额外倍率等，unit 区分百分比与固定值 */
+/** @desc 全部乘区定义（拉表页可配置的 Buff 乘区清单）：攻击/生命/防御/双暴/充能/谐度/增伤/加深/穿透/减抗/终伤/易伤/同奏/额外倍率等，unit 区分百分比与固定值 */
 export const ZONE_DEFS = [
     { id: 'atkFlat', label: '攻击固定值', unit: 'flat' },
     { id: 'atkPct', label: '攻击百分比', unit: '%' },
@@ -30,6 +30,7 @@ export const ZONE_DEFS = [
 
     { id: 'resDown', label: '目标抗性降低(减抗)', unit: '%' },
     { id: 'tuneStrainLayer', label: '集谐干涉层数', unit: 'flat' },
+    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' },
 
     { id: 'finalDmg', label: '最终伤害(终伤区)', unit: '%' },
 
@@ -45,6 +46,9 @@ export const ZONE_DEFS = [
 export type ZoneId = (typeof ZONE_DEFS)[number]['id']
 
 export const ZONE_MAP = new Map(ZONE_DEFS.map((z) => [z.id, z]))
+
+/** @desc 层数类乘区（集谐干涉/同奏增益等）：只支持直接填固定层数，不支持 ref 引用/转模（引擎/UI/AI 共用判定） */
+export const ZONE_NO_REF_IDS = new Set<string>(['tuneStrainLayer', 'unisonBoonLayer'])
 
 /** @desc 可被「引用」的属性清单（ZoneRef 的目标）：角色白值/当前面板/充能/谐度/双暴等 */
 export const ZONE_REF_DEFS = [

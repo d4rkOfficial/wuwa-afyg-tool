@@ -186,7 +186,7 @@
         return v
     }
 
-    /** @desc 效应/处决/响应伤害实际读取的乘区（computeEffectEntry / computeTuneEntry）：效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；都不吃攻击/暴击/增伤/面板类 */
+    /** @desc 效应/处决/响应伤害实际读取的乘区（computeEffectEntry / computeTuneEntry）：效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；同奏区全伤害生效；都不吃攻击/暴击/增伤/面板类 */
     const EFFECT_RELEVANT_ZONES = new Set([
         'extraRatio',
         'deepenDmg',
@@ -198,7 +198,8 @@
         'dmgTakenInc',
         'finalDmg',
         'customFinalDmg',
-        'customFinalDmgMul'
+        'customFinalDmgMul',
+        'unisonBoonLayer'
     ])
     const TUNE_RELEVANT_ZONES = new Set([
         'extraRatio',
@@ -211,7 +212,8 @@
         'dmgTakenInc',
         'finalDmg',
         'customFinalDmg',
-        'customFinalDmgMul'
+        'customFinalDmgMul',
+        'unisonBoonLayer'
     ])
 
     /** @desc 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff） */

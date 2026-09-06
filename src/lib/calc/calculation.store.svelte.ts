@@ -7,7 +7,7 @@ import { NON_DIRECT_ELEMENT } from './timeline.consts'
 import { getSkillCache } from './timeline.store.svelte'
 import { getCharElementMap, ensureCharElements } from '$lib/data/char-elements.svelte'
 import { addToast } from '$lib/data/toast.svelte'
-import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
+import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from './calculation.consts'
 import type { ZoneId } from './calculation.consts'
 import type { ConditionProfile } from './compute'
 
@@ -425,7 +425,7 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
             const zoneId = z.zoneId as BuffZoneValue['zoneId']
             if (!ZONE_MAP.has(zoneId)) continue
             const zone: BuffZoneValue = { zoneId, value: z.value }
-            if (z.ref && ZONE_REF_MAP.has(z.ref.targetZoneId as never)) {
+            if (z.ref && ZONE_REF_MAP.has(z.ref.targetZoneId as never) && !ZONE_NO_REF_IDS.has(zoneId)) {
                 zone.ref = {
                     characterIdx: item.ownerIdx ?? ownerIdx,
                     zoneId: z.ref.targetZoneId as never,

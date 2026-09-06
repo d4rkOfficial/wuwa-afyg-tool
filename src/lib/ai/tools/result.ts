@@ -114,7 +114,7 @@ defineTool('get_result_summary', {
 
 defineTool('get_result_entry_breakdown', {
     description:
-        '查询单条伤害结果条目及其全部乘区溯源（每段的数值与来源：基础值/白值/绿值、增伤/加深/易伤/抗性/防御/免伤/集谐/终伤/特殊/暴击等乘区，各乘区的 buff 来源与折算贡献）。entryId 用 get_result_summary 获取。用于回答“这条伤害是怎么算出来的”“哪个 buff 贡献最大”“为什么这条伤害偏低”。',
+        '查询单条伤害结果条目及其全部乘区溯源（每段的数值与来源：基础值/白值/绿值、增伤/加深/易伤/抗性/防御/免伤/集谐/同奏/终伤/特殊/暴击等乘区，各乘区的 buff 来源与折算贡献）。entryId 用 get_result_summary 获取。用于回答“这条伤害是怎么算出来的”“哪个 buff 贡献最大”“为什么这条伤害偏低”。',
     parameters: {
         type: 'object',
         properties: { entryId: { type: 'string', description: '伤害条目 id（get_result_summary 获取）' } },

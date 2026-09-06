@@ -30,7 +30,7 @@ import {
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
-import { ZONE_MAP, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import type { ZoneRef } from '$lib/calc/calculation.types'
 
@@ -348,7 +348,7 @@ defineTool('get_buff_set_detail', {
 
 defineTool('set_buff_zone', {
     description:
-        '设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/finalDmg/dmgTakenInc/customFinalDmg/extraRatio。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）。',
+        '设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/finalDmg/dmgTakenInc/customFinalDmg/customFinalDmgMul/extraRatio。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）。',
     parameters: {
         type: 'object',
         properties: {
@@ -415,6 +415,11 @@ defineTool('set_buff_zone_ref', {
             setBuffSetZoneRef(setId, zoneId, null)
             ctx.notifyCalc?.()
             return { cleared: true }
+        }
+        if (ZONE_NO_REF_IDS.has(zoneId)) {
+            throw new Error(
+                `乘区「${ZONE_MAP.get(zoneId as never)?.label ?? zoneId}」只支持填固定层数，不支持引用/转模`
+            )
         }
         const o = raw as Record<string, unknown>
         const targetZoneId = str(o.targetZoneId)

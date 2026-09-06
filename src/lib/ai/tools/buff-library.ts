@@ -9,6 +9,7 @@ import {
     ENTITY_TYPES,
     type BuffLibraryScope
 } from '$lib/data/buff-library.svelte'
+import { ZONE_NO_REF_IDS } from '$lib/calc/calculation.consts'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 const SCOPES: BuffLibraryScope[] = ['self', 'self_except', 'team', 'effect_only']
@@ -108,7 +109,10 @@ defineTool('update_entity_buffs', {
                     zoneId,
                     value,
                     ...(z.override ? { override: true } : {}),
-                    ...(z.ref && typeof z.ref === 'object' ? { ref: z.ref as never } : {})
+                    // 层数类乘区（集谐干涉/同奏增益等）只填固定层数，丢弃引用
+                    ...(z.ref && typeof z.ref === 'object' && !ZONE_NO_REF_IDS.has(zoneId)
+                        ? { ref: z.ref as never }
+                        : {})
                 }
             })
             return {

@@ -281,7 +281,7 @@ _无参数_
 
 ### `set_buff_zone`
 
-设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/finalDmg/dmgTakenInc/customFinalDmg/extraRatio。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）。
+设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/finalDmg/dmgTakenInc/customFinalDmg/customFinalDmgMul/extraRatio。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）。
 
 | 参数       | 必填   | 类型    | 说明                             |
 | ---------- | ------ | ------- | -------------------------------- |
@@ -559,7 +559,7 @@ _无参数_
 
 ### `get_result_entry_breakdown`
 
-查询单条伤害结果条目及其全部乘区溯源（每段的数值与来源：基础值/白值/绿值、增伤/加深/易伤/抗性/防御/免伤/集谐/终伤/特殊/暴击等乘区，各乘区的 buff 来源与折算贡献）。entryId 用 get_result_summary 获取。用于回答“这条伤害是怎么算出来的”“哪个 buff 贡献最大”“为什么这条伤害偏低”。
+查询单条伤害结果条目及其全部乘区溯源（每段的数值与来源：基础值/白值/绿值、增伤/加深/易伤/抗性/防御/免伤/集谐/同奏/终伤/特殊/暴击等乘区，各乘区的 buff 来源与折算贡献）。entryId 用 get_result_summary 获取。用于回答“这条伤害是怎么算出来的”“哪个 buff 贡献最大”“为什么这条伤害偏低”。
 
 | 参数      | 必填   | 类型   | 说明                                   |
 | --------- | ------ | ------ | -------------------------------------- |

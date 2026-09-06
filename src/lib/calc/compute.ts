@@ -3,6 +3,7 @@ import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone } from './result.types'
 import type { CharSlot } from '$lib/types/project'
+import { ZONE_NO_REF_IDS } from './calculation.consts'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
     NON_DIRECT_ELEMENT,
@@ -270,6 +271,8 @@ interface CharacterComputed {
     defDown: number
     resDown: number
     tuneStrainLayer: number
+    /** @desc 同奏增益层数（flat 层数）：同奏区 = 1 + 3% × 层数 */
+    unisonBoonLayer: number
     finalDmg: number
     dmgTakenInc: number
     customMult: number
@@ -378,7 +381,8 @@ function computeCharacterStats(
         defPen = 0,
         defDown = 0
     let resDown = 0,
-        tuneStrainLayer = 0
+        tuneStrainLayer = 0,
+        unisonBoonLayer = 0
     let finalDmg = 0,
         dmgTakenInc = 0
     let customMult = 0,
@@ -412,6 +416,9 @@ function computeCharacterStats(
                     break
                 case 'tuneStrainLayer':
                     tuneStrainLayer += value
+                    break
+                case 'unisonBoonLayer':
+                    unisonBoonLayer += value
                     break
                 case 'finalDmg':
                     finalDmg += value
@@ -468,6 +475,7 @@ function computeCharacterStats(
         defDown,
         resDown,
         tuneStrainLayer,
+        unisonBoonLayer,
         finalDmg,
         dmgTakenInc,
         customMult,
@@ -552,6 +560,9 @@ function computeResultEntry(
     const customMult = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
     const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * stats.tuneStrainLayer
 
+    /** @desc 同奏区：1 + 3% × 同奏增益层数（直伤/效应/处决响应全生效的独立乘区） */
+    const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
+
     // crit (cap at 100%)
     const critDecimal = Math.min(stats.critRate, 100) / 100
     const critDmgDecimal = stats.critDmg / 100
@@ -574,6 +585,7 @@ function computeResultEntry(
         deepen *
         vulnerability *
         tuneStrainMulti *
+        unisonMulti *
         finalDmg *
         customMult *
         defMulti *
@@ -591,6 +603,7 @@ function computeResultEntry(
         dmgRedMulti *
         defMulti *
         tuneStrainMulti *
+        unisonMulti *
         finalDmg *
         customMult
     const nonCritPerHit = Math.round(nonCritRaw)
@@ -606,6 +619,7 @@ function computeResultEntry(
         dmgRedMulti *
         defMulti *
         tuneStrainMulti *
+        unisonMulti *
         finalDmg *
         customMult
     const expectedPerHit = Math.round(expectedRaw)
@@ -624,6 +638,12 @@ function computeResultEntry(
                 stats.tuneStrainLayer > 0
                     ? `(1 + ${((tuneStrainMulti - 1) * 100).toFixed(1)}%)`
                     : tuneStrainMulti.toFixed(4)
+        },
+        {
+            label: '同奏区',
+            value: unisonMulti,
+            detail:
+                stats.unisonBoonLayer > 0 ? `(1 + ${((unisonMulti - 1) * 100).toFixed(1)}%)` : unisonMulti.toFixed(4)
         },
         { label: '终伤区', value: finalDmg, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
         { label: '特殊区', value: customMult, detail: customMult.toFixed(4) }
@@ -666,10 +686,20 @@ function computeResultEntry(
         finalDmg: stats.finalDmg / 100,
         finalTuneStrainMulti: stats.tuneStrainLayer > 0 ? tuneStrainMulti - 1 : 0,
         finalTuneBreakZone: 0,
+        finalUnisonMulti: stats.unisonBoonLayer > 0 ? unisonMulti - 1 : 0,
         customMult,
         vulnerability: stats.dmgTakenInc / 100,
         rawPerHit: Math.round(
-            baseValue * deepen * bonus * resMulti * dmgRedMulti * defMulti * tuneStrainMulti * finalDmg * customMult
+            baseValue *
+                deepen *
+                bonus *
+                resMulti *
+                dmgRedMulti *
+                defMulti *
+                tuneStrainMulti *
+                unisonMulti *
+                finalDmg *
+                customMult
         ),
         expectedPerHit,
         totalDamage: expectedPerHit,
@@ -722,6 +752,7 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         finalDmg: 0,
         finalTuneStrainMulti: 0,
         finalTuneBreakZone: 0,
+        finalUnisonMulti: 0,
         customMult: 1,
         extraRatio: 0,
         vulnerability: 0,
@@ -771,6 +802,9 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
     const finalDmgDec = stats.finalDmg / 100
     const customMultVal = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
 
+    // 同奏区：1 + 3% × 同奏增益层数（全伤害通用乘区）
+    const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
+
     // vulnerability zone (易伤区)
     const vulnerability = 1 + stats.dmgTakenInc / 100
 
@@ -781,6 +815,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         resMulti *
         dmgRedMulti *
         tuneBreakZone *
+        unisonMulti *
         (1 + finalDmgDec) *
         customMultVal
     const expectedPerHit = Math.round(totalPerHit)
@@ -792,6 +827,12 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         { label: '谐度增幅区', value: tuneBreakZone, detail: `(1 + ${stats.totalTuneBreakBoost.toFixed(1)}%)` },
         { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
         { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
+        {
+            label: '同奏区',
+            value: unisonMulti,
+            detail:
+                stats.unisonBoonLayer > 0 ? `(1 + ${((unisonMulti - 1) * 100).toFixed(1)}%)` : unisonMulti.toFixed(4)
+        },
         { label: '特殊区', value: customMultVal, detail: customMultVal.toFixed(4) }
     ]
 
@@ -814,6 +855,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
             resMulti *
             dmgRedMulti *
             tuneBreakZone *
+            unisonMulti *
             (1 + finalDmgDec) *
             customMultVal,
         baseAtk: tuneCoeff,
@@ -839,6 +881,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         finalDmg: finalDmgDec,
         finalTuneStrainMulti: 0,
         finalTuneBreakZone: tuneBreakZone - 1,
+        finalUnisonMulti: stats.unisonBoonLayer > 0 ? unisonMulti - 1 : 0,
         customMult: customMultVal,
         extraRatio: stats.extraRatio,
         vulnerability: stats.dmgTakenInc / 100,
@@ -881,6 +924,7 @@ function emptyCharacterStats(): CharacterComputed {
         defDown: 0,
         resDown: 0,
         tuneStrainLayer: 0,
+        unisonBoonLayer: 0,
         finalDmg: 0,
         dmgTakenInc: 0,
         customMult: 0,
@@ -935,8 +979,12 @@ function computeEffectEntry(
     const finalDmgDec = stats.finalDmg / 100
     const customMultVal = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
 
+    /** @desc 同奏区：1 + 3% × 同奏增益层数（全伤害通用乘区，效应伤害同样生效） */
+    const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
+
     /** @desc ── 汇总：基础值 × 各乘区乘积 = 单段期望伤害（无易伤区，效应伤害不吃易伤）── */
-    const totalPerHit = baseValue * defMulti * resMulti * dmgRedMulti * deepen * (1 + finalDmgDec) * customMultVal
+    const totalPerHit =
+        baseValue * defMulti * resMulti * dmgRedMulti * deepen * (1 + finalDmgDec) * customMultVal * unisonMulti
     const expectedPerHit = Math.round(totalPerHit)
 
     /** @desc 乘区明细（供结果页展示乘区分解） */
@@ -946,6 +994,12 @@ function computeEffectEntry(
         { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
         { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
         { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
+        {
+            label: '同奏区',
+            value: unisonMulti,
+            detail:
+                stats.unisonBoonLayer > 0 ? `(1 + ${((unisonMulti - 1) * 100).toFixed(1)}%)` : unisonMulti.toFixed(4)
+        },
         { label: '特殊区', value: customMultVal, detail: customMultVal.toFixed(4) }
     ]
 
@@ -966,7 +1020,14 @@ function computeEffectEntry(
         baseValue,
         baseUnit,
         totalMultiplier:
-            effectiveRatio * defMulti * resMulti * dmgRedMulti * deepen * (1 + finalDmgDec) * customMultVal,
+            effectiveRatio *
+            defMulti *
+            resMulti *
+            dmgRedMulti *
+            deepen *
+            (1 + finalDmgDec) *
+            customMultVal *
+            unisonMulti,
         baseAtk: EFFECT_BASE_VALUE,
         totalAtk: 0,
         atkPctSum: 0,
@@ -981,7 +1042,7 @@ function computeEffectEntry(
         defFlatSum: 0,
         totalTuneBreakBoost: stats.totalTuneBreakBoost,
         dmgBonus: 0,
-        deepen: stats.deepenDmg,
+        deepen: stats.deepenDmg / 100,
         critRate: 0,
         critDmg: 0,
         defMulti,
@@ -990,6 +1051,7 @@ function computeEffectEntry(
         finalDmg: finalDmgDec,
         finalTuneStrainMulti: 0,
         finalTuneBreakZone: 0,
+        finalUnisonMulti: stats.unisonBoonLayer > 0 ? unisonMulti - 1 : 0,
         customMult: customMultVal,
         extraRatio: stats.extraRatio,
         vulnerability: 0,
@@ -1029,6 +1091,9 @@ function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number
             break
         case 'tuneStrainLayer':
             stats.tuneStrainLayer += value
+            break
+        case 'unisonBoonLayer':
+            stats.unisonBoonLayer += value
             break
         case 'finalDmg':
             stats.finalDmg += value
@@ -1110,6 +1175,9 @@ function applyOverrideToStats(stats: CharacterComputed, zoneId: string, value: n
         case 'tuneStrainLayer':
             stats.tuneStrainLayer = value
             break
+        case 'unisonBoonLayer':
+            stats.unisonBoonLayer = value
+            break
         case 'finalDmg':
             stats.finalDmg = value
             break
@@ -1165,7 +1233,7 @@ function resolveRefsForEntry(
     if (charIndex >= 0) entryRefStats[charIndex] = partialStats
     for (const bs of boundBuffSets) {
         for (const z of bs.zones) {
-            if (!z.ref) continue
+            if (!z.ref || ZONE_NO_REF_IDS.has(z.zoneId)) continue
             const resolved = resolveRefValue(z.ref, entryRefStats)
             if (resolved === 0) continue
             applyRefToStats(stats, z.zoneId, resolved)
