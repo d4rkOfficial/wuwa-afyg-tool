@@ -1,9 +1,10 @@
 <script lang="ts">
-    import { onMount, untrack } from 'svelte'
+    import { onDestroy, onMount, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Chart from 'chart.js/auto'
     import { getCharElementMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
     import { resolveRefLineSeconds } from '$lib/calc/ref-line-timing'
+    import { buildLoopIntervals } from '$lib/calc/loop-expand'
     import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
@@ -96,21 +97,85 @@
         {
             name: '未填写',
             description: '名称无时间片段 → 不参与分段，可手动填',
-            content: '名称不含时间片段时，记点显示「未填写」、不计入 DPS 分段；可在输入框手动填秒数后参与。'
+            content: '名称不含时间片段时，记点显示「未填写」、不计入 DPS 分段；可在输入框手动填该小节时长后参与。'
         }
     ]
 
     // ── timing state ──
     let timings = $state<{ refLineId: string; seconds: number | null }[]>([])
+    /** @desc 分段 DPS 轴循环：key = 记点 refLineId，value = 该记点之后的时段重复次数（≥2 才循环；缺失/1 = 不循环） */
+    let loopCounts = $state<Record<string, number>>({})
 
+    // 本地编辑以 $state 即时驱动派生计算（表格/曲线），写回工程走尾随防抖（250ms）：
+    // 记点时长/循环次数是高频输入，逐键写回会触发结果页副词条贡献重算（CPU 密集）+ 全量持久化，必须合并为一次
+    let persistTimer: ReturnType<typeof setTimeout> | null = null
+    // 本地是否有未落盘的编辑：为 true 时不同步 store（防止「新击键 → 防抖写回前的旧 store 值回灌」把输入覆盖掉）
+    let localDirty = false
+
+    function queuePersist() {
+        localDirty = true
+        if (persistTimer) clearTimeout(persistTimer)
+        persistTimer = setTimeout(() => {
+            persistTimer = null
+            localDirty = false
+            onUpdateResultAnalysis({ timings, loopCounts })
+        }, 250)
+    }
+
+    /** @desc 立即落盘（关闭/切换场景）：取消未决防抖并写回当前局部状态；extra 可携带其他变更字段一并合并 */
+    function flushPersist(extra?: Partial<ResultAnalysisData>) {
+        if (persistTimer) {
+            clearTimeout(persistTimer)
+            persistTimer = null
+        }
+        localDirty = false
+        onUpdateResultAnalysis({ timings, loopCounts, ...extra })
+    }
+
+    function timingsEqual(
+        a: { refLineId: string; seconds: number | null }[],
+        b: { refLineId: string; seconds: number | null }[]
+    ): boolean {
+        if (a.length !== b.length) return false
+        for (let i = 0; i < a.length; i++) {
+            if (a[i]!.refLineId !== b[i]!.refLineId || a[i]!.seconds !== b[i]!.seconds) return false
+        }
+        return true
+    }
+
+    function loopCountsEqual(a: Record<string, number>, b: Record<string, number>): boolean {
+        const ka = Object.keys(a)
+        const kb = Object.keys(b)
+        if (ka.length !== kb.length) return false
+        for (const k of ka) if (a[k] !== b[k]) return false
+        return true
+    }
+
+    // 从工程同步本地状态（初始加载 / 外部工具变更 / 防抖写回回灌）。
+    // 关键：读取本地 timings/loopCounts 必须 untrack——否则本地 state 本身成为 effect 依赖，
+    // 每次击键本地一变 effect 立即跑，拿防抖前的 store 旧值把输入回滚（表现为「无法输入」）。
+    // 本地有未落盘编辑时（localDirty）也不回灌，避免写回瞬间的新击键被旧 store 值覆盖。
     $effect(() => {
-        timings = resultAnalysis?.timings ?? []
+        const nextTimings = resultAnalysis?.timings ?? []
+        const nextCounts = resultAnalysis?.loopCounts ?? {}
+        if (localDirty) return
+        if (untrack(() => timingsEqual(timings, nextTimings)) && untrack(() => loopCountsEqual(loopCounts, nextCounts)))
+            return
+        untrack(() => {
+            timings = nextTimings.map((t) => ({ ...t }))
+            loopCounts = { ...nextCounts }
+        })
     })
 
     function handleClose() {
-        onUpdateResultAnalysis({ timings })
+        flushPersist()
         onclose()
     }
+
+    onDestroy(() => {
+        // 面板/其它路径关闭弹窗（不经 handleClose）时，把未落盘的本地编辑一次性写回
+        flushPersist()
+    })
 
     // ref lines from timeline (exclude 'left')
     let refLines = $derived(getRefLines().filter((rl) => rl.id !== 'left'))
@@ -129,17 +194,35 @@
     function toggleRefLine(id: string) {
         if (timings.some((t) => t.refLineId === id)) {
             timings = timings.filter((t) => t.refLineId !== id)
+            if (loopCounts[id] !== undefined) {
+                const next = { ...loopCounts }
+                delete next[id]
+                loopCounts = next
+            }
         } else {
             timings = [...timings, { refLineId: id, seconds: resolveRefLineSeconds(id, refLines, timings) }]
         }
+        queuePersist()
     }
 
-    /** @desc 手动填秒数：空/非法/负数 → 未解析(null)；合法则作为覆盖值 */
+    /** @desc 手动填小节时长（该记点相对上一有效记点的长度）：空/非法/负数 → 未解析(null)；合法则换算为绝对秒存入内部 */
     function updateSeconds(id: string, raw: string) {
         const val = parseFloat(raw)
-        timings = timings.map((t) =>
-            t.refLineId === id ? { ...t, seconds: raw.trim() !== '' && !isNaN(val) && val >= 0 ? val : null } : t
-        )
+        const idx = sortedTimings.findIndex((t) => t.refLineId === id)
+        const prev = prevValidSeconds(idx)
+        const sec = raw.trim() !== '' && !isNaN(val) && val >= 0 ? prev + val : null
+        timings = timings.map((t) => (t.refLineId === id ? { ...t, seconds: sec } : t))
+        queuePersist()
+    }
+
+    /** @desc 设置该记点之后的时段循环次数：≥2 生效，其余（1/空/非法）视为不循环；防抖写回（触发结果页按循环口径重跑副词条贡献） */
+    function updateLoopCount(id: string, raw: string) {
+        const val = parseInt(raw, 10)
+        const next = { ...loopCounts }
+        if (Number.isInteger(val) && val >= 2) next[id] = val
+        else delete next[id]
+        loopCounts = next
+        queuePersist()
     }
 
     // sorted timings by ref line pos (timeline order)
@@ -156,7 +239,7 @@
     // 已填写秒数的记点（「未填写」记点不参与 DPS 分段/曲线）
     let validTimings = $derived(sortedTimings.filter((t) => t.seconds !== null))
 
-    /** @desc 该记点之前的最近一个已填写秒数（供输入 min / 提示） */
+    /** @desc 该记点之前的最近一个已填写秒数（原始绝对时间，供时长输入换算绝对秒） */
     function prevValidSeconds(selIdx: number): number {
         if (selIdx <= 0) return 0
         for (let i = selIdx - 1; i >= 0; i--) {
@@ -164,6 +247,21 @@
             if (s !== null) return s
         }
         return 0
+    }
+
+    /** @desc 该记点之前已选有效记点在循环展开后的累计时长（cursor 语义，与 buildLoopIntervals 同口径）：
+     * 中间小节重复 K 次时，其后记点的时间最小值 = 前序各段跨度 × 各自循环次数之和（如 20, 25×3 → ≥95s）。供「(≥ Xs)」提示 */
+    function prevEffectiveSeconds(selIdx: number): number {
+        let cursor = 0
+        let lastSec = 0
+        for (let i = 0; i < selIdx; i++) {
+            const t = sortedTimings[i]
+            if (t.seconds === null) continue
+            const span = t.seconds - lastSec
+            if (span > 0) cursor += span * (loopCounts[t.refLineId] ?? 1)
+            lastSec = t.seconds
+        }
+        return cursor
     }
 
     // 总时长与总 DPS（强调 DPS）
@@ -232,6 +330,109 @@
     })
     let segTotalDps = $derived(totalDur > 0 ? segTotals.total / totalDur : 0)
 
+    // ── 轴循环展开（时段重复）──
+    /** @desc 是否存在 ≥2 次的循环配置 */
+    let loopActive = $derived(Object.values(loopCounts).some((k) => (k ?? 1) >= 2))
+
+    /** @desc 展开后的段区间（时间+位置；与 segments 同序压缩，baseSegIdx 对齐 segments 数组索引）；口径与结果页副词条重算共享（$lib/calc/loop-expand） */
+    let loopIntervals = $derived(loopActive ? buildLoopIntervals(timings, refLines, loopCounts) : [])
+
+    /** @desc 循环后的分段列表（折叠展示）：同一小节循环 K 次合并为一行，span=单段跨度、count=次数、伤害 ×K；未激活时逐项 count=1 */
+    let loopSegments = $derived.by(() => {
+        if (!loopActive) {
+            return segments.map((s, i) => ({
+                ...s,
+                span: s.endSeconds - s.startSeconds,
+                count: 1,
+                baseSegIdx: i
+            }))
+        }
+        const collapsed: {
+            startSeconds: number
+            endSeconds: number
+            span: number
+            count: number
+            baseSegIdx: number
+        }[] = []
+        for (const iv of loopIntervals) {
+            const last = collapsed[collapsed.length - 1]
+            if (last && last.baseSegIdx === iv.baseSegIdx) {
+                last.endSeconds = iv.endSeconds
+                last.count++
+            } else {
+                collapsed.push({
+                    startSeconds: iv.startSeconds,
+                    endSeconds: iv.endSeconds,
+                    span: iv.endSeconds - iv.startSeconds,
+                    count: 1,
+                    baseSegIdx: iv.baseSegIdx
+                })
+            }
+        }
+        return collapsed
+            .map((c) => {
+                const base = segments[c.baseSegIdx]
+                // 旧数据/跨度≤0 被跳过时 baseSegIdx 可能越界，防御性跳过
+                if (!base) return null
+                const mul = c.count
+                return {
+                    ...base,
+                    startSeconds: c.startSeconds,
+                    endSeconds: c.endSeconds,
+                    span: c.span,
+                    count: c.count,
+                    baseSegIdx: c.baseSegIdx,
+                    charDamages: Object.fromEntries(Object.entries(base.charDamages).map(([k, v]) => [k, v * mul])),
+                    otherDamage: base.otherDamage * mul,
+                    totalDamage: base.totalDamage * mul
+                }
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null)
+    })
+
+    /** @desc 循环后总时长 / 总伤 / 总 DPS（未激活时等于原值） */
+    let loopTotalDur = $derived(
+        loopActive && loopIntervals.length > 0 ? loopIntervals[loopIntervals.length - 1]!.endSeconds : totalDur
+    )
+    let loopTotalDamage = $derived.by(() => {
+        if (!loopActive) return totalDamage
+        let sum = 0
+        for (const s of loopSegments) sum += s.totalDamage
+        // 未入段条目（无时间线位置）只计一次
+        return totalDamage - segTotals.total + sum
+    })
+    let loopTotalDps = $derived(loopTotalDur > 0 ? loopTotalDamage / loopTotalDur : 0)
+
+    /** @desc 循环后的分段合计（汇总逻辑同 segTotals，作用域为 loopSegments） */
+    let loopSegTotals = $derived.by(() => {
+        const perChar: Record<string, number> = {}
+        let other = 0
+        let total = 0
+        for (const seg of loopSegments) {
+            total += seg.totalDamage
+            for (const [c, d] of Object.entries(seg.charDamages)) perChar[c] = (perChar[c] ?? 0) + d
+            other += seg.otherDamage
+        }
+        return { perChar, other, total }
+    })
+    let loopSegTotalDps = $derived(loopTotalDur > 0 ? loopSegTotals.total / loopTotalDur : 0)
+
+    // 展示联动：顶部总时长/总伤/总 DPS（循环激活时用循环后值）
+    let displayTotalDur = $derived(loopActive ? loopTotalDur : totalDur)
+    let displayTotalDamage = $derived(loopActive ? loopTotalDamage : totalDamage)
+    let displayOverallDps = $derived(displayTotalDur > 0 ? displayTotalDamage / displayTotalDur : null)
+
+    /** @desc 循环后的角色汇总（totalDamage 含循环段增量；未激活时等于原值；空字符条目 = 其它伤害） */
+    let loopCharSummaries = $derived.by(() => {
+        if (!loopActive) return charSummaries
+        return charSummaries.map((cs) => {
+            let inc = 0
+            if (cs.character) inc = (loopSegTotals.perChar[cs.character] ?? 0) - (segTotals.perChar[cs.character] ?? 0)
+            else inc = loopSegTotals.other - segTotals.other
+            return { ...cs, totalDamage: cs.totalDamage + inc }
+        })
+    })
+
     // ── 时间记点配置折叠 ──
     let timingOpen = $state(true)
 
@@ -252,6 +453,16 @@
         const segs: { startPos: number; endPos: number; startSec: number; endSec: number }[] = []
         if (validTimings.length === 0) {
             segs.push({ startPos: -Infinity, endPos: Infinity, startSec: 0, endSec: totalDur })
+        } else if (loopActive) {
+            // 轴循环：直接使用展开后的段区间（时间已含循环偏移）
+            for (const iv of loopIntervals) {
+                segs.push({
+                    startPos: iv.startPos,
+                    endPos: iv.endPos,
+                    startSec: iv.startSeconds,
+                    endSec: iv.endSeconds
+                })
+            }
         } else {
             let prevPos = 0
             let prevSec = 0
@@ -266,14 +477,10 @@
         }
 
         const events: { time: number; rig: number; norm: number; nocrit: number }[] = []
-        let cursor = 0
         for (const seg of segs) {
             if (seg.endSec <= seg.startSec) continue
-            const segEntries: typeof withPos = []
-            while (cursor < withPos.length && withPos[cursor].pos < seg.endPos) {
-                if (withPos[cursor].pos >= seg.startPos) segEntries.push(withPos[cursor])
-                cursor++
-            }
+            // 按位置区间独立过滤（循环展开后同一区间出现多份，不能用共享游标，否则重复份条目会丢失）
+            const segEntries = withPos.filter((x) => x.pos >= seg.startPos && x.pos < seg.endPos)
             const n = segEntries.length
             if (n === 0) continue
             const dur = seg.endSec - seg.startSec
@@ -295,7 +502,7 @@
         if (!curveCanvas || curveEvents.length === 0) return
         curveChart?.destroy()
         const textColor = cssVar('--theme-modal-text', '#e2e8f0')
-        const totalDur = validTimings.length > 0 ? validTimings[validTimings.length - 1].seconds! : 150
+        const totalDur = displayTotalDur
         const hasTicks = validTimings.length > 0
 
         const rigData: { x: number; y: number }[] = []
@@ -470,7 +677,7 @@
 
     const OTHER_PIE_COLOR = 'rgba(210, 214, 220, 0.5)'
 
-    let sortedSummaries = $derived([...charSummaries].sort((a, b) => b.totalDamage - a.totalDamage))
+    let sortedSummaries = $derived([...loopCharSummaries].sort((a, b) => b.totalDamage - a.totalDamage))
     let sortedPieColors = $derived.by(() => {
         let rank = 0
         return sortedSummaries.map((cs) => {
@@ -616,7 +823,29 @@
     })
 
     // ── 角色直伤类型占比：环形饼图，三角色并排；多类型伤害独立成「a&b」组合类别 ──
-    let directDamageByType = $derived(aggregateDirectDamageByType(entries))
+
+    /** @desc 每个条目在循环展开下的伤害放大倍数（循环段条目按展开份数累加；未激活返回空 map） */
+    let loopEntryScale = $derived.by(() => {
+        const scale = new Map<string, number>()
+        if (!loopActive) return scale
+        for (const iv of loopIntervals) {
+            for (const e of entries) {
+                const pos = blockPosMap.get(e.sourceTimelineBlockId)
+                if (pos !== undefined && pos >= iv.startPos && pos < iv.endPos) {
+                    scale.set(e.id, (scale.get(e.id) ?? 0) + 1)
+                }
+            }
+        }
+        return scale
+    })
+
+    let directDamageByType = $derived(
+        loopActive
+            ? aggregateDirectDamageByType(
+                  entries.map((e) => ({ ...e, totalDamage: e.totalDamage * (loopEntryScale.get(e.id) ?? 1) }))
+              )
+            : aggregateDirectDamageByType(entries)
+    )
     let typeCharts: Chart<'doughnut'>[] = []
     const typeChartCanvasMap = new Map<string, HTMLCanvasElement>()
 
@@ -736,13 +965,13 @@
                 class="ml-auto flex items-center gap-2 text-[11px]"
                 style="color: var(--theme-modal-text); opacity: 0.55;"
             >
-                {#if totalDur > 0}
-                    <span class="tabular-nums">总时长 {totalDur.toFixed(1)}s</span>
+                {#if displayTotalDur > 0}
+                    <span class="tabular-nums">总时长 {displayTotalDur.toFixed(1)}s</span>
                     <span class="size-1 rounded-full" style="background: var(--theme-divider-border);"></span>
                     <span class="flex items-center gap-1">
                         总 DPS
                         <span class="text-sm font-bold tabular-nums" style="color: var(--theme-accent-text);"
-                            >{overallDps ? Math.round(overallDps).toLocaleString() : '—'}</span
+                            >{displayOverallDps ? Math.round(displayOverallDps).toLocaleString() : '—'}</span
                         >
                     </span>
                 {:else}
@@ -751,13 +980,9 @@
             </div>
             <button
                 onclick={() => {
-                    // 切换前先把局部 timings（含模式）写回，保证对比弹窗读到最新时间记点
-                    onUpdateResultAnalysis({
-                        timings,
-                        rigCritEntryIds,
-                        noCritEntryIds,
-                        missEntryIds: resultAnalysis?.missEntryIds ?? []
-                    })
+                    // 切换前先把局部 timings/loopCounts 立即写回（含未决防抖），保证对比弹窗读到最新时间记点；
+                    // 合并写回不会覆盖既有的 rig/noCrit/miss 模式
+                    flushPersist()
                     onCompare?.()
                 }}
                 disabled={!comparisonEligible}
@@ -801,11 +1026,11 @@
                         class="mt-1.5 text-2xl font-bold leading-none tabular-nums"
                         style="color: var(--theme-accent-text);"
                     >
-                        {Math.round(totalDamage).toLocaleString()}
+                        {Math.round(displayTotalDamage).toLocaleString()}
                     </div>
                     <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>{entries.length} 条伤害记录</div>
                 </div>
-                {#each charSummaries as cs, i}
+                {#each loopCharSummaries as cs, i}
                     {@const el = charElements[cs.character]}
                     {@const color = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'}
                     <div
@@ -825,7 +1050,7 @@
                             {Math.round(cs.totalDamage).toLocaleString()}
                         </div>
                         <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
-                            占比 {((cs.totalDamage / totalDamage) * 100).toFixed(1)}% · {cs.entryCount} 条
+                            占比 {((cs.totalDamage / displayTotalDamage) * 100).toFixed(1)}% · {cs.entryCount} 条
                         </div>
                     </div>
                 {/each}
@@ -838,7 +1063,7 @@
                         class="mt-1.5 text-2xl font-bold leading-none tabular-nums"
                         style="color: var(--theme-accent-text);"
                     >
-                        {overallDps ? Math.round(overallDps).toLocaleString() : '—'}
+                        {displayOverallDps ? Math.round(displayOverallDps).toLocaleString() : '—'}
                     </div>
                     <div class="mt-1 text-[10px]" style={mutedText}>配置时间记点后计算</div>
                 </div>
@@ -868,12 +1093,12 @@
                         >
                             ?
                         </button>
-                        {#if overallDps}
+                        {#if displayOverallDps}
                             <span
                                 class="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
                                 style="background: color-mix(in srgb, var(--theme-accent-bg) 16%, transparent); color: var(--theme-accent-text);"
                             >
-                                总 DPS {Math.round(overallDps).toLocaleString()}
+                                总 DPS {Math.round(displayOverallDps).toLocaleString()}
                             </span>
                         {/if}
                     </div>
@@ -905,6 +1130,9 @@
                                         {@const selIdx = sortedTimings.findIndex((t) => t.refLineId === rl.id)}
                                         {@const timing = timings.find((t) => t.refLineId === rl.id)}
                                         {@const prevV = prevValidSeconds(selIdx)}
+                                        {@const prevEff = prevEffectiveSeconds(selIdx)}
+                                        {@const vIdx = validTimings.findIndex((t) => t.refLineId === rl.id)}
+                                        {@const loopable = vIdx >= 0}
                                         <div
                                             class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs select-none transition-colors"
                                             style="border-color: {isSelected
@@ -920,27 +1148,55 @@
                                             {#if isSelected}
                                                 <input
                                                     type="number"
-                                                    value={timing?.seconds ?? ''}
+                                                    value={timing?.seconds !== null && timing?.seconds !== undefined
+                                                        ? Math.round((timing.seconds - prevV) * 10) / 10
+                                                        : ''}
                                                     placeholder="未填"
                                                     oninput={(e) =>
                                                         updateSeconds(rl.id, (e.target as HTMLInputElement).value)}
-                                                    min={prevV}
+                                                    min={0}
                                                     step="0.1"
+                                                    title="该小节时长（相对上一记点；循环展开后该小节起点 ≥ {prevEff %
+                                                        1 ===
+                                                    0
+                                                        ? prevEff.toFixed(0)
+                                                        : prevEff.toFixed(1)}s）"
                                                     class="w-16 rounded border px-1.5 py-0.5 text-right text-[11px] tabular-nums outline-none"
                                                     style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                                     onclick={(e) => e.stopPropagation()}
                                                 />
-                                                <span class="text-[10px] opacity-40">秒</span>
+                                                <span class="text-[10px] opacity-40">时长</span>
+                                                {#if loopable}
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        step="1"
+                                                        placeholder="1"
+                                                        value={loopCounts[rl.id] ?? ''}
+                                                        oninput={(e) =>
+                                                            updateLoopCount(
+                                                                rl.id,
+                                                                (e.target as HTMLInputElement).value
+                                                            )}
+                                                        class="w-10 rounded border px-1 py-0.5 text-right text-[11px] tabular-nums outline-none"
+                                                        style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                                                        onclick={(e) => e.stopPropagation()}
+                                                    />
+                                                    <span class="text-[10px] opacity-40">次</span>
+                                                {/if}
                                                 {#if timing?.seconds === null}
                                                     <span class="text-[10px] whitespace-nowrap" style="color: #f59e0b;"
                                                         >未填写</span
                                                     >
                                                 {/if}
-                                                {#if selIdx > 0 && prevV > 0}
+                                                {#if loopActive && selIdx > 0 && prevEff > 0}
                                                     <span
-                                                        class="text-[10px]"
+                                                        class="text-[10px] whitespace-nowrap"
                                                         style="color: var(--theme-accent-text); opacity: 0.6;"
-                                                        >(≥ {prevV.toFixed(1)}s)</span
+                                                        title="循环展开后该小节起点"
+                                                        >(≥ {prevEff % 1 === 0
+                                                            ? prevEff.toFixed(0)
+                                                            : prevEff.toFixed(1)}s)</span
                                                     >
                                                 {/if}
                                             {/if}
@@ -974,7 +1230,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each segments as seg}
+                                {#each loopSegments as seg}
                                     {@const span = seg.endSeconds - seg.startSeconds}
                                     <tr
                                         class="border-t"
@@ -984,14 +1240,28 @@
                                             {seg.startSeconds.toFixed(1)}s — {seg.endSeconds.toFixed(1)}s
                                         </td>
                                         <td
-                                            class="px-2 py-2 text-right text-[10px] tabular-nums"
+                                            class="relative px-2 py-2 text-right text-[10px] tabular-nums"
                                             style="opacity: 0.45;"
                                         >
-                                            {span.toFixed(1)}s
+                                            {seg.span.toFixed(1)}s{#if seg.count > 1}
+                                                <span
+                                                    class="absolute -right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold whitespace-nowrap"
+                                                    style="color: var(--theme-accent-text); opacity: 0.7;"
+                                                    >×{seg.count}</span
+                                                >
+                                            {/if}
                                         </td>
-                                        <td class="px-2 py-2 text-right tabular-nums"
-                                            >{Math.round(seg.totalDamage).toLocaleString()}</td
-                                        >
+                                        <td class="relative px-2 py-2 text-right tabular-nums">
+                                            {Math.round(
+                                                seg.totalDamage / seg.count
+                                            ).toLocaleString()}{#if seg.count > 1}
+                                                <span
+                                                    class="absolute -right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold whitespace-nowrap"
+                                                    style="color: var(--theme-accent-text); opacity: 0.7;"
+                                                    >×{seg.count}</span
+                                                >
+                                            {/if}
+                                        </td>
                                         <td
                                             class="px-2 py-2 text-right text-sm font-bold tabular-nums"
                                             style="color: var(--theme-accent-text);"
@@ -1022,25 +1292,25 @@
                                     <td
                                         class="px-2 py-2 text-right font-semibold tabular-nums"
                                         style="color: var(--theme-modal-text);"
-                                        >{Math.round(segTotals.total).toLocaleString()}</td
+                                        >{Math.round(loopSegTotals.total).toLocaleString()}</td
                                     >
                                     <td
                                         class="px-2 py-2 text-right text-sm font-bold tabular-nums"
                                         style="color: var(--theme-accent-text);"
                                     >
-                                        {Math.round(segTotalDps).toLocaleString()}
+                                        {Math.round(loopSegTotalDps).toLocaleString()}
                                     </td>
                                     {#each team as slot}
                                         {#if slot.character}
-                                            {@const cd = segTotals.perChar[slot.character] ?? 0}
+                                            {@const cd = loopSegTotals.perChar[slot.character] ?? 0}
                                             <td class="py-2 pl-2 text-right font-medium tabular-nums"
-                                                >{cd > 0 ? Math.round(cd / totalDur).toLocaleString() : '—'}</td
+                                                >{cd > 0 ? Math.round(cd / loopTotalDur).toLocaleString() : '—'}</td
                                             >
                                         {/if}
                                     {/each}
                                     <td class="py-2 pl-2 text-right font-medium tabular-nums"
-                                        >{segTotals.other > 0
-                                            ? Math.round(segTotals.other / totalDur).toLocaleString()
+                                        >{loopSegTotals.other > 0
+                                            ? Math.round(loopSegTotals.other / loopTotalDur).toLocaleString()
                                             : '—'}</td
                                     >
                                 </tr>
@@ -1157,14 +1427,14 @@
                         >
                             <span class="font-medium">队伍伤害占比</span>
                             <span class="tabular-nums" style="opacity: 0.5;"
-                                >{Math.round(totalDamage).toLocaleString()}</span
+                                >{Math.round(displayTotalDamage).toLocaleString()}</span
                             >
                         </div>
                         <div
                             class="flex h-3 w-full overflow-hidden rounded-full"
                             style="background: color-mix(in srgb, var(--theme-input-bg) 85%, transparent);"
                         >
-                            {#if totalDamage > 0}
+                            {#if displayTotalDamage > 0}
                                 {#each sortedSummaries as cs, i}
                                     {#if i > 0}
                                         <!-- 段间分割：取弹窗背景色（昼夜主题随 --theme-modal-bg 自动切换），使颜色交界清晰 -->
@@ -1176,9 +1446,10 @@
                                     <div
                                         class="h-full transition-all"
                                         style="flex-grow: {cs.totalDamage}; background: {sortedPieColors[i]};"
-                                        title="{cs.character || '其它'} {((cs.totalDamage / totalDamage) * 100).toFixed(
-                                            1
-                                        )}%"
+                                        title="{cs.character || '其它'} {(
+                                            (cs.totalDamage / displayTotalDamage) *
+                                            100
+                                        ).toFixed(1)}%"
                                     ></div>
                                 {/each}
                             {/if}
@@ -1192,7 +1463,7 @@
                                     <span class="shrink-0 tabular-nums">
                                         {Math.round(cs.totalDamage).toLocaleString()}
                                         <span style="opacity: 0.5;"
-                                            >({((cs.totalDamage / totalDamage) * 100).toFixed(1)}%)</span
+                                            >({((cs.totalDamage / displayTotalDamage) * 100).toFixed(1)}%)</span
                                         >
                                     </span>
                                 </div>

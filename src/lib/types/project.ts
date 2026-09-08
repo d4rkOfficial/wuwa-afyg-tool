@@ -55,6 +55,8 @@ export type { PhaseKey } from '$lib/consts/game-terms'
 export interface ResultAnalysisData {
     /** 时间记点：seconds 为 null 表示「未填写」（名称未解析出时间，不参与分段），可手动填秒数 */
     timings: { refLineId: string; seconds: number | null }[]
+    /** 分段 DPS 轴循环：key = 记点 refLineId，value = 该记点起点的时段重复次数（缺失/1 = 不循环） */
+    loopCounts?: Record<string, number>
     rigCritEntryIds?: string[]
     noCritEntryIds?: string[]
     missEntryIds?: string[]
