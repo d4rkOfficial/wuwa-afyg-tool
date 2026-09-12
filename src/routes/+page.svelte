@@ -274,6 +274,7 @@
         if (isFirstVisit()) {
             setCalcViewMode('spread')
             setMagneticPointer(false)
+            setAiEnabledSession(false)
             void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
             markVisited()
         }
