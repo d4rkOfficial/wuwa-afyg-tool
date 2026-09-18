@@ -3,7 +3,7 @@
     import { slide } from 'svelte/transition'
     import Chart from 'chart.js/auto'
     import { getCharElementMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
-    import { resolveRefLineSeconds } from '$lib/calc/ref-line-timing'
+    import { resolveRefLineSeconds, autoConfigureTimings as autoConfigureTimingsPure } from '$lib/calc/ref-line-timing'
     import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
@@ -97,6 +97,12 @@
             name: '未填写',
             description: '名称无时间片段 → 不参与分段，可手动填',
             content: '名称不含时间片段时，记点显示「未填写」、不计入 DPS 分段；可在输入框手动填秒数后参与。'
+        },
+        {
+            name: '自动配置规则',
+            description: '一键按参考线命名启用记点；解析不出的跳过',
+            content:
+                '点「自动配置」会从左到右启用参考线：名称能解析出时间的直接启用，解析不出的跳过（不打断后续参考线）。末尾的「结束」线按最后一条可解析参考线定：该线之后还有伤害 → 默认 120s，不足则每次 +30s；该线之后已无伤害 → 与它同一时刻（+0 帧），不额外拉长时间。所有参考线都解析不出时，「结束」回退 25s。'
         }
     ]
 
@@ -142,6 +148,20 @@
         )
     }
 
+    // ── 自动配置时间记点 ──
+    /** @desc 该时间轴位置之后是否还有伤害（决定「结束」用尾部 +50 帧还是 120s 起递增） */
+    const hasDamageAfter = (pos: number) =>
+        entries.some((e) => {
+            const entryPos = blockPosMap.get(e.sourceTimelineBlockId)
+            return entryPos !== undefined && entryPos > pos
+        })
+
+    /** @desc 自动配置：从左到右启用可解析出时间的参考线（解析不出的跳过），「结束」按尾部有无伤害两档收尾 */
+    function autoConfigureTimings() {
+        timings = autoConfigureTimingsPure(refLines, hasDamageAfter)
+        timingOpen = true
+    }
+
     // sorted timings by ref line pos (timeline order)
     let sortedTimings = $derived(
         [...timings]
@@ -178,8 +198,11 @@
             startSeconds: number
             endSeconds: number
             totalDamage: number
+            entryCount: number
             charDamages: Record<string, number>
+            charCounts: Record<string, number>
             otherDamage: number
+            otherCount: number
         }[] = []
 
         let prevRefPos = 0
@@ -196,26 +219,89 @@
             })
             const totalDmg = segEntries.reduce((s, e) => s + e.totalDamage, 0)
             const charDmg: Record<string, number> = {}
+            const charCounts: Record<string, number> = {}
             let otherDmg = 0
+            let otherCount = 0
             for (const e of segEntries) {
                 if (team.some((s) => s.character === e.character)) {
                     charDmg[e.character] = (charDmg[e.character] ?? 0) + e.totalDamage
+                    charCounts[e.character] = (charCounts[e.character] ?? 0) + 1
                 } else {
                     otherDmg += e.totalDamage
+                    otherCount += 1
                 }
             }
             result.push({
                 startSeconds: prevSeconds,
                 endSeconds: t.seconds!,
                 totalDamage: totalDmg,
+                entryCount: segEntries.length,
                 charDamages: charDmg,
-                otherDamage: otherDmg
+                charCounts,
+                otherDamage: otherDmg,
+                otherCount
             })
             prevRefPos = currentRefPos
             prevSeconds = t.seconds!
         }
 
         return result
+    })
+
+    // ── 时段选择（含总计）：点行切换，上方 KPI 大卡片按选中范围呈现 ──
+    /** @desc 'total' = 总计；数字 = 时段下标（默认总计） */
+    let selectedRange = $state<'total' | number>('total')
+    /** @desc 时段变化导致下标失效时回落总计 */
+    let activeRange = $derived(
+        typeof selectedRange === 'number' && selectedRange >= segments.length ? 'total' : selectedRange
+    )
+
+    /** @desc 选中范围标签 */
+    let rangeLabel = $derived.by(() => {
+        if (activeRange === 'total') return '总计'
+        const seg = segments[activeRange]
+        return seg ? `${seg.startSeconds.toFixed(1)}s — ${seg.endSeconds.toFixed(1)}s` : '总计'
+    })
+
+    /** @desc 选中范围统计：总计用整段数据，时段用该段数据（KPI 大卡片与合计行共用） */
+    let rangeStats = $derived.by(() => {
+        if (activeRange === 'total') {
+            const perChar: Record<string, { damage: number; count: number }> = {}
+            let otherDamage = 0
+            let otherCount = 0
+            for (const cs of charSummaries) {
+                if (team.some((s) => s.character === cs.character)) {
+                    perChar[cs.character] = { damage: cs.totalDamage, count: cs.entryCount }
+                } else {
+                    otherDamage += cs.totalDamage
+                    otherCount += cs.entryCount
+                }
+            }
+            return {
+                damage: totalDamage,
+                entryCount: entries.length,
+                perChar,
+                otherDamage,
+                otherCount,
+                span: totalDur,
+                dps: overallDps ?? 0
+            }
+        }
+        const seg = segments[activeRange]
+        const perChar: Record<string, { damage: number; count: number }> = {}
+        for (const [character, damage] of Object.entries(seg?.charDamages ?? {})) {
+            perChar[character] = { damage, count: seg?.charCounts[character] ?? 0 }
+        }
+        const span = seg ? seg.endSeconds - seg.startSeconds : 0
+        return {
+            damage: seg?.totalDamage ?? 0,
+            entryCount: seg?.entryCount ?? 0,
+            perChar,
+            otherDamage: seg?.otherDamage ?? 0,
+            otherCount: seg?.otherCount ?? 0,
+            span,
+            dps: seg && span > 0 ? seg.totalDamage / span : 0
+        }
     })
 
     // 分段合计（与表格内部一致）
@@ -767,7 +853,7 @@
                 aria-label="链/阶对比"
             >
                 <Icon icon="mdi:compare-horizontal" class="size-4" />
-                <span class="hidden md:inline">对比</span>
+                <span class="hidden md:inline">{comparisonEligible ? '对比' : '本工程不支持对比'}</span>
             </button>
             <button
                 onclick={() => openPanel('character-detail', true)}
@@ -790,57 +876,72 @@
 
         <!-- Scrollable body -->
         <div class="theme-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-            <!-- ── KPI 总览 ── -->
-            <section class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-                <div
-                    class="relative col-span-2 overflow-hidden rounded-xl border p-4 lg:col-span-1"
-                    style="border-color: var(--theme-divider-border); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, transparent), transparent 65%);"
-                >
-                    <div class="text-[10px] font-semibold uppercase tracking-wider" style={mutedText}>总伤害</div>
-                    <div
-                        class="mt-1.5 text-2xl font-bold leading-none tabular-nums"
-                        style="color: var(--theme-accent-text);"
-                    >
-                        {Math.round(totalDamage).toLocaleString()}
-                    </div>
-                    <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>{entries.length} 条伤害记录</div>
+            <!-- ── KPI 总览（口径随「分段 DPS」里选中的时段切换，默认总计）── -->
+            <section class="space-y-2">
+                <div class="flex flex-wrap items-center gap-2 text-[11px]" style={mutedText}>
+                    <Icon icon="mdi:cursor-default-click-outline" class="size-3.5" />
+                    <span>当前口径：{rangeLabel}</span>
+                    <span class="tabular-nums">（时长 {rangeStats.span.toFixed(1)}s）</span>
+                    <span>· 在「分段 DPS」点时段行可切换</span>
                 </div>
-                {#each charSummaries as cs, i}
-                    {@const el = charElements[cs.character]}
-                    {@const color = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'}
+                <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
                     <div
-                        class="rounded-xl border p-4"
-                        style="border-color: var(--theme-divider-border); background: {cardBg};"
+                        class="relative col-span-2 overflow-hidden rounded-xl border p-4 lg:col-span-1"
+                        style="border-color: var(--theme-divider-border); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, transparent), transparent 65%);"
                     >
-                        <div class="flex items-center gap-1.5">
-                            <span class="size-2 rounded-full shrink-0" style="background: {color};"></span>
-                            <span class="truncate text-[10px] font-semibold" style="color: {color};"
-                                >{cs.character || '其它'}</span
-                            >
-                        </div>
+                        <div class="text-[10px] font-semibold uppercase tracking-wider" style={mutedText}>总伤害</div>
                         <div
-                            class="mt-1.5 text-lg font-bold leading-none tabular-nums"
-                            style="color: var(--theme-modal-text);"
+                            class="mt-1.5 text-2xl font-bold leading-none tabular-nums"
+                            style="color: var(--theme-accent-text);"
                         >
-                            {Math.round(cs.totalDamage).toLocaleString()}
+                            {Math.round(rangeStats.damage).toLocaleString()}
                         </div>
                         <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
-                            占比 {((cs.totalDamage / totalDamage) * 100).toFixed(1)}% · {cs.entryCount} 条
+                            {rangeStats.entryCount} 条伤害记录
                         </div>
                     </div>
-                {/each}
-                <div
-                    class="relative overflow-hidden rounded-xl border p-4"
-                    style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 10%, transparent), transparent 70%);"
-                >
-                    <div class="text-[10px] font-semibold uppercase tracking-wider" style={mutedText}>总 DPS</div>
+                    {#each charSummaries as cs}
+                        {@const el = charElements[cs.character]}
+                        {@const color = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'}
+                        {@const stat = rangeStats.perChar[cs.character] ?? { damage: 0, count: 0 }}
+                        <div
+                            class="rounded-xl border p-4"
+                            style="border-color: var(--theme-divider-border); background: {cardBg};"
+                        >
+                            <div class="flex items-center gap-1.5">
+                                <span class="size-2 rounded-full shrink-0" style="background: {color};"></span>
+                                <span class="truncate text-[10px] font-semibold" style="color: {color};"
+                                    >{cs.character || '其它'}</span
+                                >
+                            </div>
+                            <div
+                                class="mt-1.5 text-lg font-bold leading-none tabular-nums"
+                                style="color: var(--theme-modal-text);"
+                            >
+                                {Math.round(stat.damage).toLocaleString()}
+                            </div>
+                            <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
+                                占比 {rangeStats.damage > 0
+                                    ? ((stat.damage / rangeStats.damage) * 100).toFixed(1)
+                                    : '0.0'}% · {stat.count} 条
+                            </div>
+                        </div>
+                    {/each}
                     <div
-                        class="mt-1.5 text-2xl font-bold leading-none tabular-nums"
-                        style="color: var(--theme-accent-text);"
+                        class="relative overflow-hidden rounded-xl border p-4"
+                        style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 10%, transparent), transparent 70%);"
                     >
-                        {overallDps ? Math.round(overallDps).toLocaleString() : '—'}
+                        <div class="text-[10px] font-semibold uppercase tracking-wider" style={mutedText}>总 DPS</div>
+                        <div
+                            class="mt-1.5 text-2xl font-bold leading-none tabular-nums"
+                            style="color: var(--theme-accent-text);"
+                        >
+                            {rangeStats.dps > 0 ? Math.round(rangeStats.dps).toLocaleString() : '—'}
+                        </div>
+                        <div class="mt-1 text-[10px]" style={mutedText}>
+                            {rangeLabel} · {rangeStats.span.toFixed(1)}s
+                        </div>
                     </div>
-                    <div class="mt-1 text-[10px]" style={mutedText}>配置时间记点后计算</div>
                 </div>
             </section>
 
@@ -877,7 +978,16 @@
                             </span>
                         {/if}
                     </div>
-                    <div class="ml-auto">
+                    <div class="ml-auto flex items-center gap-2">
+                        <button
+                            onclick={autoConfigureTimings}
+                            class="flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors hover:opacity-80"
+                            style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                            title="按参考线命名自动启用时间记点：能解析出时间的全部启用；遇到解析不出的收尾到「结束」（25s）"
+                        >
+                            <Icon icon="mdi:auto-fix" class="size-3.5" />
+                            <span>自动配置</span>
+                        </button>
                         <button
                             onclick={() => (timingOpen = !timingOpen)}
                             class="flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors hover:opacity-80"
@@ -974,11 +1084,19 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each segments as seg}
+                                {#each segments as seg, si}
                                     {@const span = seg.endSeconds - seg.startSeconds}
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <tr
-                                        class="border-t"
-                                        style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                                        class="cursor-pointer border-t transition-colors"
+                                        style="border-color: var(--theme-divider-border); color: var(--theme-modal-text); background: {activeRange ===
+                                        si
+                                            ? 'color-mix(in srgb, var(--theme-accent-bg) 8%, transparent)'
+                                            : 'transparent'};"
+                                        onclick={() => (selectedRange = si)}
+                                        role="button"
+                                        tabindex="0"
+                                        title="点击后上方 KPI 按该时段呈现"
                                     >
                                         <td class="py-2 pr-2 text-[10px] tabular-nums" style="opacity: 0.45;">
                                             {seg.startSeconds.toFixed(1)}s — {seg.endSeconds.toFixed(1)}s
@@ -1013,11 +1131,22 @@
                                         </td>
                                     </tr>
                                 {/each}
-                                <tr class="border-t" style="border-color: var(--theme-divider-border);">
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                <tr
+                                    class="cursor-pointer border-t transition-colors"
+                                    style="border-color: var(--theme-divider-border); background: {activeRange ===
+                                    'total'
+                                        ? 'color-mix(in srgb, var(--theme-accent-bg) 8%, transparent)'
+                                        : 'transparent'};"
+                                    onclick={() => (selectedRange = 'total')}
+                                    role="button"
+                                    tabindex="0"
+                                    title="点击后上方 KPI 按总计呈现"
+                                >
                                     <td
                                         class="py-2 pr-2 text-[10px] font-semibold"
                                         style="color: var(--theme-modal-text); opacity: 0.6;"
-                                        colspan="2">合计</td
+                                        colspan="2">总计</td
                                     >
                                     <td
                                         class="px-2 py-2 text-right font-semibold tabular-nums"
