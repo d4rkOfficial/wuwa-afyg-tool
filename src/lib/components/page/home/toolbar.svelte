@@ -17,13 +17,9 @@
         getHideConditionMismatch,
         toggleHideConditionMismatch
     } from '$lib/calc/calculation.store.svelte'
-    import {
-        getCalcViewMode,
-        getDamageTypeEditMode,
-        setDamageTypeEditMode,
-        getScrollAxisDefault,
-        setScrollAxisDefault
-    } from '$lib/data/calc-view.svelte'
+    import { getCalcViewMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
+    import { openDamageTypeModal } from '$lib/data/damage-type-ui.svelte'
+    import { openSubstatLibrary } from '$lib/data/substat-library-ui.svelte'
     import { addToast } from '$lib/data/toast.svelte'
 
     interface Props extends ComponentsProps {
@@ -205,6 +201,19 @@
                 </button>
             </div>
         {/if}
+        {#if activePhase === 'config'}
+            <button
+                onclick={() => openSubstatLibrary()}
+                disabled={phaseLocked}
+                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
+                    ? 'rounded-full px-3 py-2'
+                    : 'rounded-lg px-3 py-1.5'}"
+                title="打开快速词条方案：一键套用标准14词条，或管理/套用自定义声骸词条方案"
+            >
+                <Icon icon="mdi:clipboard-text-outline" class="size-4 shrink-0" />
+                {#if !simplifyToolbar}<span>快速词条方案</span>{/if}
+            </button>
+        {/if}
         {#if activePhase === 'calculation'}
             <button
                 onclick={() => setShowBuffModal(true)}
@@ -238,22 +247,15 @@
             {/if}
             {#if getCalcViewMode() === 'spread'}
                 <button
-                    onclick={() => {
-                        const next = !getDamageTypeEditMode()
-                        setDamageTypeEditMode(next)
-                        addToast(next ? '已切换为编辑伤害类型' : '已切换为仅查看伤害类型', 'success')
-                    }}
-                    class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                    onclick={() => openDamageTypeModal()}
+                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
-                        : 'rounded-lg px-3 py-1.5'} {getDamageTypeEditMode()
-                        ? 'border-(--theme-accent-bg)'
-                        : 'border-(--theme-sidebar-text)/20'}"
-                    style="color: {getDamageTypeEditMode() ? 'var(--theme-accent-text)' : 'var(--theme-sidebar-text)'}"
-                    title="切换「视为」列伤害类型的编辑 / 只读查看"
+                        : 'rounded-lg px-3 py-1.5'}"
+                    title="逐个倍率确认伤害类型（拉表第一步）"
                 >
-                    <Icon icon={getDamageTypeEditMode() ? 'mdi:pencil' : 'mdi:eye-off'} class="size-4 shrink-0" />
+                    <Icon icon="mdi:playlist-edit" class="size-4 shrink-0" />
                     {#if !simplifyToolbar}
-                        <span>{getDamageTypeEditMode() ? '伤害类型(编辑中)' : '伤害类型(仅查看)'}</span>
+                        <span>编辑伤害类型</span>
                     {/if}
                 </button>
                 <button

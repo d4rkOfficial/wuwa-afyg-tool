@@ -13,7 +13,9 @@ const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 const DEFAULT_OVERRIDES: ThemeOverrides = {
     accentHue: 190,
     backgroundImage: '',
+    backgroundImageLight: '',
     bgOpacity: 85,
+    modalOpacity: 75,
     bgBlur: 4,
     bgDim: 0,
     bgImageBlur: 4,
@@ -195,6 +197,19 @@ function applyAccentOverride(root: HTMLElement) {
 
 function applyBgBlend(root: HTMLElement) {
     root.style.setProperty('--theme-glass-blur', `${overrides.bgBlur}px`)
+    // 弹窗（对话框）表面不透明度：各对话框以 color-mix(... var(--theme-modal-opacity, 75%) ...) 取值
+    root.style.setProperty('--theme-modal-opacity', `${overrides.modalOpacity}%`)
+    // 卡片（含表格粘性表头等跟随卡片的表面）不透明度：供「卡片透明度」设置驱动，始终写入
+    root.style.setProperty('--theme-card-opacity', `${overrides.bgOpacity}%`)
+    // 遮罩同步变透：否则弹窗本身再透明，看到的也只是遮罩的暗底 + 模糊，观感上「透不动」。
+    // 以默认 75 不透明度为 1.0 基准做线性缩放，默认观感保持不变。
+    const activeTheme = themes.find((t) => t.id === activeId)
+    const overlayBase = activeTheme?.components.overlay?.backgroundImage || 'rgba(0,0,0,0.5)'
+    const overlayScale = Math.max(0, Math.min(100, (overrides.modalOpacity / 75) * 100))
+    root.style.setProperty(
+        '--theme-overlay-bg',
+        `color-mix(in srgb, ${overlayBase} ${overlayScale.toFixed(1)}%, transparent)`
+    )
     // 背景图自身的独立控制（遮罩层）：模糊与遮罩强度，与玻璃表面（毛玻璃强度/背景暗度）分开
     root.style.setProperty('--theme-bg-image-blur', `${overrides.bgImageBlur}px`)
     // 背景图遮罩：负值=压暗(黑半透)，正值=明亮(白半透)，0=原图
@@ -206,19 +221,21 @@ function applyBgBlend(root: HTMLElement) {
               ? `rgba(255,255,255,${(v / 100) * 0.35})`
               : 'transparent'
     root.style.setProperty('--theme-bg-mask', maskValue)
+    // 背景图分白天/黑夜两张：按当前主题取生效的那张（白天=backgroundImageLight，黑夜=backgroundImage）
+    const bgImage = activeId === 'light' ? overrides.backgroundImageLight : overrides.backgroundImage
     // 暗度只压暗玻璃表面背后的区域（backdrop brightness），背景图本身保持原亮度形成对比；
     // 无背景图时复位为 1，避免先调暗度再删背景后玻璃表面被残留压暗（暗度滑块仅在有背景图时可见，用户无法自行复位）
-    const glassBrightness = overrides.backgroundImage
-        ? 1 - (Math.max(0, Math.min(100, overrides.bgDim)) / 100) * 0.6
-        : 1
+    const glassBrightness = bgImage ? 1 - (Math.max(0, Math.min(100, overrides.bgDim)) / 100) * 0.6 : 1
     root.style.setProperty('--theme-glass-brightness', String(glassBrightness))
-    if (overrides.backgroundImage) {
-        root.style.setProperty('--theme-bg-image', `url("${overrides.backgroundImage}")`)
+    if (bgImage) {
+        root.style.setProperty('--theme-bg-image', `url("${bgImage}")`)
         const theme = themes.find((t) => t.id === activeId)
         if (theme) {
             for (const key of Object.keys(theme.components)) {
                 const varName = `--theme-${key}-bg`
                 if (key !== 'layout' && !TRANSLUCENT_SURFACES.has(key)) continue
+                // 弹窗表面不吃卡片透明度：--theme-modal-bg 保持主题原值，弹窗只由「弹窗透明度」控制
+                if (key === 'modal') continue
                 if (!bgOriginals.has(varName)) {
                     const val = root.style.getPropertyValue(varName)
                     if (val) bgOriginals.set(varName, val)
@@ -300,12 +317,16 @@ export async function loadThemes() {
     }
     if (ov) {
         overrides = { ...DEFAULT_OVERRIDES, ...ov.data }
-        // 旧版未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃
-        const bg = overrides.backgroundImage
-        if (bg && bg.startsWith('data:') && bg.length > 3_000_000) {
-            overrides.backgroundImage = ''
-            await dbSet(OVERRIDES_KEY, toPlain(overrides))
+        // 旧版未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃（白天/黑夜两张各自校验）
+        let trimmed = false
+        for (const key of ['backgroundImage', 'backgroundImageLight'] as const) {
+            const bg = overrides[key]
+            if (bg && bg.startsWith('data:') && bg.length > 3_000_000) {
+                overrides[key] = ''
+                trimmed = true
+            }
         }
+        if (trimmed) await dbSet(OVERRIDES_KEY, toPlain(overrides))
     }
 
     applyThemeCSS()
@@ -328,9 +349,9 @@ export async function setActiveTheme(id: string) {
         const prevId = activeId
         activeId = id
         await dbSet(ACTIVE_KEY, id)
-        // 白天↔黑夜互切：卡片透明度镜像对调；背景图遮罩正负反转（明亮↔压暗）
+        // 白天↔黑夜互切：仅背景图遮罩正负反转（明亮↔压暗）；卡片/弹窗透明度保持用户设定，不自动取反
         if ((prevId === 'light' && id === 'dark') || (prevId === 'dark' && id === 'light')) {
-            overrides = { ...overrides, bgOpacity: 130 - overrides.bgOpacity, bgImageMask: -overrides.bgImageMask }
+            overrides = { ...overrides, bgImageMask: -overrides.bgImageMask }
             await dbSet(OVERRIDES_KEY, toPlain(overrides))
         }
         applyThemeCSS()
@@ -348,7 +369,9 @@ export async function updateOverride<K extends keyof ThemeOverrides>(key: K, val
     applyAccentOverride(root)
     if (
         key === 'backgroundImage' ||
+        key === 'backgroundImageLight' ||
         key === 'bgOpacity' ||
+        key === 'modalOpacity' ||
         key === 'bgBlur' ||
         key === 'bgDim' ||
         key === 'bgImageBlur' ||

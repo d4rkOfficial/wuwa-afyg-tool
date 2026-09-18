@@ -1,11 +1,11 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
+    import { untrack } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import { fade } from 'svelte/transition'
     import { popOut } from '$lib/utils/motion'
     import { getShareBase } from '$lib/data/workshop.svelte'
-    import { getToyProfile } from '$lib/bilibili-toy/profile.svelte'
-    import { buildWorkshopFrameSrc } from '$lib/bilibili-toy/identity'
+    import { getDayNightScheme } from '$lib/theme/scheme'
     import { setMagneticForcedOff } from '$lib/data/render-prefs.svelte'
 
     interface Props extends ComponentsProps {
@@ -18,8 +18,18 @@
 
     let workshopFrameKey = $state(0)
 
-    /** @desc 工坊 iframe 地址：base + 目标路径（详情页等）+ #toy 身份 hash */
-    let workshopFrameSrc = $derived(buildWorkshopFrameSrc(`${getShareBase()}${path ?? ''}`, getToyProfile().data))
+    /** @desc 打开瞬间把工具箱当前的白天/黑夜透传给工坊（#theme=light|dark）；打开期间切主题不重载 iframe。
+     *  初值在组件挂载时就取一次，避免首次打开先按默认值加载、再重载一次 */
+    let frameTheme = $state<'light' | 'dark'>(getDayNightScheme())
+    let prevOpen = $state(false)
+    $effect(() => {
+        const isOpen = open
+        if (isOpen && !prevOpen) untrack(() => (frameTheme = getDayNightScheme()))
+        prevOpen = isOpen
+    })
+
+    /** @desc 工坊 iframe 地址：base + 目标路径（详情页等）+ 白天/黑夜主题 hash */
+    let workshopFrameSrc = $derived(`${getShareBase()}${path ?? ''}#theme=${frameTheme}`)
 
     // 工坊 iframe 弹窗打开时强制恢复系统光标（磁力光标瞬时抑制）
     $effect(() => {
@@ -43,7 +53,7 @@
     >
         <div
             class="animate-pop-in flex h-[90vh] w-[min(94vw,1100px)] flex-col overflow-hidden rounded-xl border shadow-2xl"
-            style="background: var(--theme-modal-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
             out:popOut
@@ -62,7 +72,7 @@
                         <Icon icon="mdi:refresh" class="size-4.5" />
                     </button>
                     <a
-                        href={`${getShareBase()}${path ?? ''}`}
+                        href={`${getShareBase()}${path ?? ''}#theme=${frameTheme}`}
                         target="_blank"
                         rel="noreferrer"
                         class="rounded p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"

@@ -20,7 +20,8 @@
     import { getCharIconMap, elementColor } from '$lib/calc/timeline.store.svelte'
     import EnemyPanel from './enemy-panel.svelte'
     import RandomEnhanceModal from './random-enhance-modal.svelte'
-    import StandardSubstatModal from './standard-substat-modal.svelte'
+    import EchoSlotCard from '$lib/components/layout/echo-slot-card.svelte'
+    import SubstatPickerModal from '$lib/components/layout/substat-picker-modal.svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
@@ -39,7 +40,6 @@
     let showMainStatMenu = $state<{ ci: number; si: number } | null>(null)
     let showSubstatModal = $state<{ ci: number; si: number } | null>(null)
     let showEnhanceModal = $state<{ ci: number; si: number } | null>(null)
-    let showPlanModal = $state<number | null>(null)
     let dragState = $state<{ ci: number; si: number; idx: number; dropIdx: number; outside: boolean } | null>(null)
     let mainStatMenuPos = $state<{ left: number; top: number; width: number } | null>(null)
     let mainStatMenuEl: HTMLElement | undefined = $state()
@@ -258,7 +258,7 @@
 
 <div
     class="theme-glass-surface flex h-full flex-col p-5 {className}"
-    style="background: var(--theme-modal-bg); color: var(--theme-modal-text); {styleProp || ''}"
+    style="background: transparent; color: var(--theme-modal-text); {styleProp || ''}"
 >
     <!-- Tabs -->
     <div class="flex gap-2 mb-4">
@@ -314,224 +314,35 @@
     {:else}
         {@const ci = parseInt(activeTab.replace('char', ''))}
         <div class="flex flex-col flex-1 min-h-0">
-            <div class="mb-2 flex items-center justify-between">
-                <span class="text-xs text-(--theme-modal-text)/50"
-                    >{charNames[ci] ?? `角色${ci + 1}`} · 声骸词条方案</span
-                >
-                <button
-                    onclick={() => (showPlanModal = ci)}
-                    disabled={locked || !charNames[ci]}
-                    class="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors disabled:opacity-40"
-                    style="border-color: var(--theme-divider-border);"
-                    title="一键套用标准14词条，或保存/套用自定义声骸词条方案"
-                >
-                    <Icon icon="mdi:clipboard-text-outline" class="size-3.5" />
-                    词条方案
-                </button>
-            </div>
             <div class="relative flex-1 min-h-0">
                 <div
                     class="flex flex-wrap content-start gap-4 overflow-y-auto pb-2 hide-scrollbar absolute inset-0"
                     onscroll={closeMainStatMenu}
                 >
                     {#each config.characters[ci].echoes as slot, si}
-                        {@const second = SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT]}
-                        <div
-                            class="relative rounded-xl shrink-0 w-72"
-                            style="background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, var(--theme-modal-text) 6%, transparent) 100%);"
-                        >
-                            <!-- COST overlay -->
-                            <div
-                                class="pointer-events-none absolute inset-0 flex select-none items-center justify-center overflow-hidden"
-                            >
-                                <span
-                                    class="text-[200px] font-black leading-none opacity-[0.06] text-(--theme-accent-text)"
-                                    >{slot.cost}</span
-                                >
-                            </div>
-
-                            <div class="relative z-1 p-4">
-                                <!-- Cost selector -->
-                                <div class="flex items-center justify-between mb-3">
-                                    <button
-                                        onclick={() => handleClearSubstats(ci, si)}
-                                        class="rounded p-0.5 text-(--theme-muted-text) transition-colors hover:text-red-500"
-                                    >
-                                        <Icon icon="mdi:refresh" class="size-3.5" />
-                                    </button>
-                                    <div class="flex gap-1">
-                                        {#each COST_OPTIONS as c}
-                                            <button
-                                                onclick={() => handleSetCost(ci, si, c)}
-                                                disabled={c !== slot.cost &&
-                                                    !(() => {
-                                                        const other = config.characters[ci].echoes.reduce(
-                                                            (s, e, i) => s + (i === si ? 0 : e.cost),
-                                                            0
-                                                        )
-                                                        return other + c <= 12
-                                                    })()}
-                                                class={[
-                                                    'min-w-7 px-2 h-6 rounded text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
-                                                    slot.cost === c
-                                                        ? costBtnCls(slot.cost)
-                                                        : 'bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:bg-(--theme-modal-text)/10'
-                                                ].join(' ')}>{c} COST</button
-                                            >
-                                        {/each}
-                                    </div>
-                                </div>
-
-                                <!-- Main stat + second stat combined -->
-                                <div class="relative z-20 mb-2">
-                                    <button
-                                        data-main-stat-trigger={`${ci}:${si}`}
-                                        onclick={() => toggleMainStatMenu(ci, si)}
-                                        class="w-full rounded border px-3 py-2 transition-colors hover:bg-(--theme-modal-text)/10"
-                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                    >
-                                        <div class="flex items-center justify-between">
-                                            <div class="flex flex-col text-left">
-                                                <span class="text-sm font-medium text-(--theme-modal-text)">
-                                                    {slot.mainStat
-                                                        ? shortLabel(slot.mainStat.type) +
-                                                          ' ' +
-                                                          slot.mainStat.value +
-                                                          slot.mainStat.unit
-                                                        : '未选择'}
-                                                </span>
-                                                {#if second}
-                                                    <span class="text-xs text-(--theme-modal-text)/60"
-                                                        >{second.label} +{second.value}</span
-                                                    >
-                                                {/if}
-                                            </div>
-                                            <Icon
-                                                icon="mdi:chevron-down"
-                                                class="size-3.5 text-(--theme-modal-text)/40 shrink-0"
-                                            />
-                                        </div>
-                                    </button>
-                                </div>
-
-                                <!-- Substats -->
-                                <div>
-                                    <span class="text-[10px] text-(--theme-modal-text)/40 block mb-1"
-                                        >副词条 ({slot.substats.length}/5)</span
-                                    >
-                                    <div class="space-y-1">
-                                        {#each slot.substats as sub, idx (sub.type)}
-                                            {@const opt = SUBSTAT_OPTIONS.find((o) => o.label === sub.type)}
-                                            {#if opt}
-                                                {@const tierIdx = getTierIndex(opt, sub.value)}
-                                                {@const maxTier = opt.tiers.length - 1}
-                                                {@const pct = tierIdx > 0 ? (tierIdx / maxTier) * 100 : 0}
-                                                {@const isDragged =
-                                                    dragState?.ci === ci &&
-                                                    dragState?.si === si &&
-                                                    dragState?.idx === idx}
-                                                {#if dragState?.ci === ci && dragState?.si === si && !dragState?.outside && dragState?.dropIdx === idx}
-                                                    <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-                                                {/if}
-                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                <div
-                                                    data-substat
-                                                    role="listitem"
-                                                    transition:slide={{ duration: 200 }}
-                                                    class={[
-                                                        'flex items-center gap-2 rounded px-2 py-1.5 transition-all touch-none',
-                                                        'cursor-grab active:cursor-grabbing',
-                                                        isDragged &&
-                                                            !dragState?.outside &&
-                                                            'ring-2 ring-(--theme-accent-bg)',
-                                                        isDragged &&
-                                                            dragState?.outside &&
-                                                            'ring-2 ring-red-500 opacity-50'
-                                                    ].join(' ')}
-                                                    style="background: var(--theme-input-bg);"
-                                                    onpointerdown={(e) => startDrag(e, ci, si, idx)}
-                                                    onpointermove={onDragMove}
-                                                    onpointerup={(e) => onDragEnd(e, ci, si, idx)}
-                                                >
-                                                    <span
-                                                        class="text-xs text-(--theme-modal-text)/70 w-20 shrink-0 mr-2"
-                                                        >{shortLabel(sub.type)}</span
-                                                    >
-                                                    <div class="relative flex-1 h-5">
-                                                        <div
-                                                            class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-(--theme-modal-text)/10"
-                                                        >
-                                                            <div
-                                                                class="h-full rounded-full"
-                                                                style="width: {pct}%; background: var(--theme-accent-bg)"
-                                                            ></div>
-                                                        </div>
-                                                        <div
-                                                            class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap pointer-events-none z-10"
-                                                            style="left: {pct}%; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
-                                                        >
-                                                            {sub.value}{opt.unit}
-                                                        </div>
-                                                        <input
-                                                            type="range"
-                                                            min="0"
-                                                            max={maxTier}
-                                                            value={tierIdx > 0 ? tierIdx : 0}
-                                                            oninput={(e) => {
-                                                                const idx2 = parseInt(
-                                                                    (e.target as HTMLInputElement).value
-                                                                )
-                                                                handleUpdateSubstatValue(ci, si, idx, opt.tiers[idx2])
-                                                            }}
-                                                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-0"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            {/if}
-                                        {/each}
-                                        {#if dragState?.ci === ci && dragState?.si === si && !dragState?.outside && dragState?.dropIdx === slot.substats.length}
-                                            <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-                                        {/if}
-                                    </div>
-                                    {#if slot.substats.length === 0}
-                                        <div class="mt-1 flex gap-2">
-                                            <button
-                                                onclick={() =>
-                                                    (showSubstatModal =
-                                                        showSubstatModal?.ci === ci && showSubstatModal?.si === si
-                                                            ? null
-                                                            : { ci, si })}
-                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
-                                            >
-                                                <Icon icon="mdi:plus" class="size-3" />
-                                                选择副词条
-                                            </button>
-                                            <button
-                                                onclick={() => (showEnhanceModal = { ci, si })}
-                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
-                                            >
-                                                <Icon icon="mdi:dice-5" class="size-3" />
-                                                随机强化
-                                            </button>
-                                        </div>
-                                    {:else if slot.substats.length < 5}
-                                        <div class="mt-1">
-                                            <button
-                                                onclick={() =>
-                                                    (showSubstatModal =
-                                                        showSubstatModal?.ci === ci && showSubstatModal?.si === si
-                                                            ? null
-                                                            : { ci, si })}
-                                                class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
-                                            >
-                                                <Icon icon="mdi:plus" class="size-3" />
-                                                选择副词条
-                                            </button>
-                                        </div>
-                                    {/if}
-                                </div>
-                            </div>
-                        </div>
+                        <EchoSlotCard
+                            class="w-72 shrink-0"
+                            {slot}
+                            otherCost={config.characters[ci].echoes.reduce(
+                                (sum, e, i) => sum + (i === si ? 0 : e.cost),
+                                0
+                            )}
+                            mainStatTriggerKey={`${ci}:${si}`}
+                            oncost={(c) => handleSetCost(ci, si, c)}
+                            onmainstat={() => toggleMainStatMenu(ci, si)}
+                            onclearsubstats={() => handleClearSubstats(ci, si)}
+                            onaddsubstat={() =>
+                                (showSubstatModal =
+                                    showSubstatModal?.ci === ci && showSubstatModal?.si === si ? null : { ci, si })}
+                            onsubstatvalue={(idx, value) => handleUpdateSubstatValue(ci, si, idx, value)}
+                            onenhance={() => (showEnhanceModal = { ci, si })}
+                            dragIndex={dragState?.ci === ci && dragState?.si === si ? dragState.idx : null}
+                            dropIndex={dragState?.ci === ci && dragState?.si === si ? dragState.dropIdx : null}
+                            dragOutside={dragState?.outside ?? false}
+                            ondragstart={(e, idx) => startDrag(e, ci, si, idx)}
+                            ondragmove={onDragMove}
+                            ondragend={(e, idx) => onDragEnd(e, ci, si, idx)}
+                        />
                     {/each}
                 </div>
             </div>
@@ -587,58 +398,17 @@
     {/if}
 
     <!-- Substat selector modal -->
-    {#if showSubstatModal}
-        {@const ms = showSubstatModal}
-        {@const mSlot = config.characters[ms.ci].echoes[ms.si]}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-            style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-            class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
-            onclick={() => (showSubstatModal = null)}
-        >
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-                class="animate-pop-in w-72 max-h-80 rounded-xl border p-4 shadow-2xl backdrop-blur-lg"
-                style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
-                onclick={(e) => e.stopPropagation()}
-            >
-                <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm font-medium text-(--theme-modal-text)">选择副词条</span>
-                    <button
-                        onclick={() => (showSubstatModal = null)}
-                        class="rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
-                    >
-                        <Icon icon="mdi:close" class="size-4" />
-                    </button>
-                </div>
-                <div class="theme-scrollbar space-y-0.5 max-h-56 overflow-y-auto">
-                    {#each SUBSTAT_OPTIONS as opt}
-                        {@const exists = mSlot.substats.some((s) => s.type === opt.label)}
-                        <button
-                            onclick={() => {
-                                if (!exists) handleAddSubstat(ms.ci, ms.si, opt.label)
-                            }}
-                            disabled={exists}
-                            class={[
-                                'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
-                                exists
-                                    ? 'text-(--theme-modal-text)/20 cursor-not-allowed'
-                                    : 'text-(--theme-modal-text) hover:bg-(--theme-input-bg)'
-                            ].join(' ')}
-                        >
-                            <span class="flex-1">{opt.label}</span>
-                            <span class="text-[10px] text-(--theme-modal-text)/40">{opt.unit}</span>
-                            {#if exists}
-                                <Icon icon="mdi:check" class="size-3 shrink-0 text-(--theme-accent-text)" />
-                            {/if}
-                        </button>
-                    {/each}
-                </div>
-            </div>
-        </div>
-    {/if}
+    <SubstatPickerModal
+        open={showSubstatModal !== null}
+        existingTypes={showSubstatModal
+            ? config.characters[showSubstatModal.ci].echoes[showSubstatModal.si].substats.map((s) => s.type)
+            : []}
+        onpick={(label) => {
+            if (showSubstatModal) handleAddSubstat(showSubstatModal.ci, showSubstatModal.si, label)
+            showSubstatModal = null
+        }}
+        onclose={() => (showSubstatModal = null)}
+    />
 
     <!-- Random enhance modal -->
     {#if showEnhanceModal}
@@ -648,17 +418,6 @@
             existingTypes={emSlot.substats.map((s) => s.type)}
             onclose={() => (showEnhanceModal = null)}
             onresult={handleEnhanceResult(em.ci, em.si)}
-        />
-    {/if}
-
-    <!-- 声骸词条方案（标准14词条 / 自定义方案） -->
-    {#if showPlanModal !== null && charNames[showPlanModal]}
-        <StandardSubstatModal
-            charIndex={showPlanModal}
-            character={charNames[showPlanModal]!}
-            {locked}
-            onclose={() => (showPlanModal = null)}
-            onapplied={() => onupdate(getCalcState())}
         />
     {/if}
 </div>

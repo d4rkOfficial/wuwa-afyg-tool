@@ -47,7 +47,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         class="animate-pop-in w-72 rounded-xl border p-4 shadow-2xl backdrop-blur-lg"
-        style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+        style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
         <div class="flex items-center justify-between mb-3">

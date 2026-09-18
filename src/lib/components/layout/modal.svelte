@@ -9,6 +9,8 @@
         open: boolean
         onclose?: () => void
         backdropClose?: boolean
+        /** @desc 弹窗整体不滚动，由内容自行管理内部滚动（内部列表滚动） */
+        noScroll?: boolean
         children?: Snippet
         title?: Snippet
         footer?: Snippet
@@ -18,6 +20,7 @@
         open,
         onclose,
         backdropClose = false,
+        noScroll = false,
         backgroundImage,
         textColor,
         class: className,
@@ -59,13 +62,13 @@
         <div
             class={[
                 'animate-pop-in theme-glass-surface theme-scrollbar relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
-                footer ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
+                footer || noScroll ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
                 'text-(--theme-modal-text)',
                 className || ''
             ]
                 .filter(Boolean)
                 .join(' ')}
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); max-width: calc(100vw - 40px); {mergedStyle}"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); max-width: calc(100vw - 40px); {mergedStyle}"
             role="dialog"
             aria-modal="true"
             out:popOut
@@ -88,6 +91,10 @@
                 </div>
                 <div class="shrink-0">
                     {@render footer()}
+                </div>
+            {:else if noScroll}
+                <div class="flex min-h-0 flex-1 flex-col">
+                    {@render children?.()}
                 </div>
             {:else}
                 <div>

@@ -739,6 +739,41 @@ export function setDamageTypesForEntry(entryId: string, types: string[]) {
     _damageEntryDamageTypes = { ..._damageEntryDamageTypes, [entryId]: types }
 }
 
+/** @desc 同名伤害的范围：同一角色 + 同一技能类型 + 同名（避免不同技能类型下重名条目互相覆盖） */
+function sameNameEntryIds(entry: DamageEntry): string[] {
+    return _entries
+        .filter(
+            (e) =>
+                e.character === entry.character &&
+                (e.skillType ?? '') === (entry.skillType ?? '') &&
+                e.displayName === entry.displayName
+        )
+        .map((e) => e.id)
+}
+
+/**
+ * @desc 把某条目的伤害类型同步到所有同名伤害（同角色 + 同技能类型 + 同名）
+ * @returns 实际写入的条目数（含自身；少于 2 表示没有同名同伴）
+ */
+export function syncDamageTypesToSameName(entryId: string): number {
+    const entry = _entries.find((e) => e.id === entryId)
+    if (!entry) return 0
+    if (!assertUnlocked()) return 0
+    const types = _damageEntryDamageTypes[entryId] ?? []
+    const targets = sameNameEntryIds(entry)
+    if (targets.length <= 1) return targets.length
+    const next = { ..._damageEntryDamageTypes }
+    for (const id of targets) next[id] = [...types]
+    _damageEntryDamageTypes = next
+    return targets.length
+}
+
+/** @desc 与某条目同名的伤害条目数（含自身），用于界面提示可用性 */
+export function countSameNameEntries(entryId: string): number {
+    const entry = _entries.find((e) => e.id === entryId)
+    return entry ? sameNameEntryIds(entry).length : 0
+}
+
 /** @desc ── Buff 弹窗开关 ── */
 
 export function getShowBuffModal(): boolean {

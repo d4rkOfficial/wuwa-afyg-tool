@@ -15,7 +15,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             class="animate-pop-in w-full max-h-[70vh] max-w-2xl rounded-lg border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >

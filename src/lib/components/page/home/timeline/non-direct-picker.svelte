@@ -38,7 +38,7 @@
             use:focusTrap
             tabindex="-1"
             class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
                 // 放行 ESC/Enter 到 window 层统一处理（保存/关闭），其余按键阻止冒泡

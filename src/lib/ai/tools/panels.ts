@@ -14,7 +14,7 @@ defineTool('get_panels_state', {
 
 defineTool('open_panel', {
     description:
-        '打开或关闭指定弹窗面板。panel 取 get_panels_state 返回的 name（如 buff-config/quick-lookup/buff-library/settings/workshop/character-detail/buff-import/damage-list 等）；open 默认 true。',
+        '打开或关闭指定弹窗面板。panel 取 get_panels_state 返回的 name（如 buff-config/quick-lookup/buff-library/substat-library（快速词条方案）/settings/workshop/character-detail/buff-import/damage-list 等）；open 默认 true。',
     parameters: {
         type: 'object',
         properties: {

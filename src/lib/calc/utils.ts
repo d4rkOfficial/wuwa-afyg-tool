@@ -7,8 +7,10 @@ import { inferFromSkillText, matchHitNamePrefix } from './skill-infer'
  * @desc 自动推导伤害类型（优先级从高到低）：
  * 1. 效应条目（isEffect）→「效应伤害」；
  * 2. 规则2：技能富文本「视为/为 XX 伤害」→ 直接顶替其它推导（角色技能文案取 charInfo，
- *    声骸技能文案由调用方通过 echoDesc 传入）；
- * 3. 规则1：倍率名含「普攻·/重击·/共鸣技能·/共鸣解放·/变奏技能·/延奏技能·」→ 对应类型；
+ *    声骸技能文案由调用方通过 echoDesc 传入）；同一份文案里并列多个技能/多段时按技能名、段号锚定，
+ *    只有确属本次命中小节的结论才会被采用，有歧义时放弃；
+ * 3. 规则1：倍率名含「普攻·/重击·/空中攻击/闪避反击/共鸣技能·/共鸣解放·/变奏技能·/延奏技能·」→ 对应类型
+ *    （空中攻击、闪避反击默认按普攻伤害结算，文案写明重击的由上一步覆盖）；
  * 4. 按技能类型推断，常态攻击再按招式名分普攻/重击；无法推导归「其它类型伤害」。
  */
 export function inferDamageTypes(entry: DamageEntry, charInfo?: CharacterInfo | null, echoDesc?: string): string[] {

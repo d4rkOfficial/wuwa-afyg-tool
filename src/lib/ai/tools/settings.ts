@@ -109,11 +109,22 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
     theme_background_image: {
         label: '背景图',
         apply: async (v) => {
-            const url = str(v)
+            // 两种写法：直接给图片地址（写入当前主题那张），或 { mode: 'light'|'dark', url } 指定昼夜
+            const obj = v && typeof v === 'object' ? (v as Record<string, unknown>) : null
+            const url = str(obj ? obj.url : v)
             if (url && !/^(https?:\/\/|data:image\/)/i.test(url))
-                throw new Error('theme_background_image 须为 http(s):// 图片地址、data:image 数据或空字符串（清除）')
-            await updateOverride('backgroundImage', url)
-            return url ? '已设置' : '已清除'
+                throw new Error('主题背景图须为 http(s):// 图片地址、data:image 数据，或空字符串（清除）')
+            const MODES: Record<string, 'light' | 'dark'> = {
+                light: 'light',
+                dark: 'dark',
+                白天: 'light',
+                黑夜: 'dark'
+            }
+            const modeRaw = str(obj?.mode).toLowerCase()
+            if (modeRaw && !MODES[modeRaw]) throw new Error('背景图的 mode 只能是 light/dark（白天/黑夜）')
+            const mode: 'light' | 'dark' = modeRaw ? MODES[modeRaw]! : getActiveId() === 'light' ? 'light' : 'dark'
+            await updateOverride(mode === 'light' ? 'backgroundImageLight' : 'backgroundImage', url)
+            return { mode: mode === 'light' ? '白天' : '黑夜', value: url ? '已设置' : '已清除' }
         }
     },
     theme_bg_opacity: {
@@ -153,6 +164,14 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
         apply: async (v) => {
             const n = clampNum(v, 'theme_bg_image_mask', -100, 100)
             await updateOverride('bgImageMask', n)
+            return n
+        }
+    },
+    theme_modal_opacity: {
+        label: '弹窗透明度',
+        apply: async (v) => {
+            const n = clampNum(v, 'theme_modal_opacity', 8, 100)
+            await updateOverride('modalOpacity', n)
             return n
         }
     },
@@ -326,6 +345,7 @@ defineTool('get_settings_state', {
                 mode: getActiveId(),
                 accentHue: overrides.accentHue,
                 backgroundImage: overrides.backgroundImage ? '已设置' : '未设置',
+                backgroundImageLight: overrides.backgroundImageLight ? '已设置' : '未设置',
                 bgOpacity: overrides.bgOpacity,
                 bgBlur: overrides.bgBlur,
                 bgDim: overrides.bgDim,
@@ -375,7 +395,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、theme_modal_opacity(30-100 弹窗透明度)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。',
     parameters: {
         type: 'object',
         properties: {

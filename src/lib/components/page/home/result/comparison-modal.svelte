@@ -567,14 +567,14 @@
     >
         <div
             class="animate-pop-in theme-glass-surface theme-scrollbar flex max-h-[92vh] w-[min(96vw,1400px)] flex-col overflow-hidden rounded-xl border shadow-2xl"
-            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent); color: var(--theme-modal-text);"
+            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text);"
             role="dialog"
             aria-modal="true"
         >
             <!-- Header -->
             <div
                 class="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-3 border-b px-6 py-4"
-                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent); backdrop-filter: blur(12px);"
+                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); backdrop-filter: blur(12px);"
             >
                 <Icon icon="mdi:compare-horizontal" class="size-5" style="color: var(--theme-accent-text);" />
                 <span class="text-base font-semibold">链/阶对比</span>

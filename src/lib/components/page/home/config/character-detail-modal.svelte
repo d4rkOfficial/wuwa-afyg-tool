@@ -97,6 +97,22 @@
 
     const conditionProfile = $derived(getConditionProfile())
 
+    /** @desc 链/阶档位：点选即写入并触发重载；点当前档位不重复写入（避免无谓重载） */
+    const savedChain = $derived(conditionProfile.chains[activeTab] ?? 0)
+    const savedRefine = $derived(conditionProfile.refinements[activeTab] ?? 1)
+
+    function pickChain(n: number) {
+        if (n === savedChain) return
+        setConditionProfileChains(activeTab, n)
+        onProfileReload?.()
+    }
+
+    function pickRefine(n: number) {
+        if (n === savedRefine) return
+        setConditionProfileRefinements(activeTab, n)
+        onProfileReload?.()
+    }
+
     /** @desc 链/阶生效条件帮助文案（武器行问号按钮调起全局帮助面板） */
     let refineHelpItems = [
         {
@@ -278,55 +294,55 @@
             </div>
         </div>
 
-        <!-- 链/阶配置 -->
+        <!-- 链/阶配置：小按钮分组框（样式参考 设置-配色），框宽适应按钮；点选即写入档位并触发重载，点当前档位不重复写入 -->
         <div class="mt-3 rounded-lg border p-3" style="border-color: var(--theme-divider-border);">
             <div class="flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">角色</span>
-                <div class="flex overflow-hidden rounded border" style="border-color: var(--theme-divider-border);">
+                <div
+                    class="flex w-fit gap-1 rounded-lg border p-1"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                >
                     {#each [0, 1, 2, 3, 4, 5, 6] as n}
+                        {@const active = savedChain === n}
                         <button
-                            onclick={() => {
-                                setConditionProfileChains(activeTab, n)
-                                onProfileReload?.()
-                            }}
-                            class={[
-                                'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                (conditionProfile.chains[activeTab] ?? 0) === n
-                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                            ].join(' ')}
+                            onclick={() => pickChain(n)}
+                            class="rounded-md px-2 py-1 text-[11px] font-medium transition-colors {active
+                                ? ''
+                                : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
+                            style={active
+                                ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
+                                : ''}
                         >
-                            {n}
+                            {n}链
                         </button>
                     {/each}
                 </div>
-                <span class="flex h-6 w-4 items-center text-[11px] font-medium text-(--theme-accent-text)">链</span>
             </div>
-            <div class="mt-1.5 flex items-center gap-2">
+            <div class="mt-2 flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">武器</span>
-                <div class="flex overflow-hidden rounded border" style="border-color: var(--theme-divider-border);">
+                <div
+                    class="flex w-fit gap-1 rounded-lg border p-1"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                >
                     {#each [0, 1, 2, 3, 4, 5] as n}
+                        {@const active = savedRefine === n}
                         <button
-                            title={n === 0 ? '未精炼（不触发专武精炼 buff）' : undefined}
-                            onclick={() => {
-                                setConditionProfileRefinements(activeTab, n)
-                                onProfileReload?.()
-                            }}
-                            class={[
-                                'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                (conditionProfile.refinements[activeTab] ?? 1) === n
-                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                            ].join(' ')}
+                            onclick={() => pickRefine(n)}
+                            class="rounded-md px-2 py-1 text-[11px] font-medium transition-colors {active
+                                ? ''
+                                : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
+                            style={active
+                                ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
+                                : ''}
+                            title={n === 0 ? '无专武精炼（不触发专武精炼 buff）' : undefined}
                         >
-                            {n}
+                            {n === 0 ? '无专' : `${n}阶`}
                         </button>
                     {/each}
                 </div>
-                <span class="flex h-6 w-4 items-center text-[11px] font-medium text-(--theme-accent-text)">阶</span>
                 <button
                     onclick={() => openHelp('链/阶生效条件说明', refineHelpItems)}
-                    class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="flex size-6 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--theme-modal-text)/10"
                     style="color: var(--theme-accent-text);"
                     title="链/阶生效条件说明"
                 >

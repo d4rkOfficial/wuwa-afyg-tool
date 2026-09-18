@@ -160,12 +160,13 @@ function normalizeSlot(value: unknown): EchoSlotConfig | null {
 /**
  * @desc 宽松归一化：任意 5 槽位方案（cost 组合不限，只要合计 ≤12），每槽副词条 ≤5 且类型在白名单内；
  * 主词条数值固定为满级、副主词条按 cost 自动推导、副词条数值吸附到合法档位；不满足返回 null。
+ * 入参兼容两种写法：直接的槽位数组，或带 slots 字段的对象（存储/接口层的原始结构）。
  */
 export function normalizeAnyPlanSlots(value: unknown): EchoSlotConfig[] | null {
-    const raw = (value ?? {}) as { slots?: unknown }
-    if (!Array.isArray(raw.slots) || raw.slots.length !== 5) return null
+    const raw = Array.isArray(value) ? value : ((value ?? {}) as { slots?: unknown }).slots
+    if (!Array.isArray(raw) || raw.length !== 5) return null
     const slots: EchoSlotConfig[] = []
-    for (const item of raw.slots) {
+    for (const item of raw) {
         const slot = normalizeSlot(item)
         if (!slot) return null
         slots.push(slot)
@@ -185,12 +186,47 @@ export function normalizePlanSlots(value: unknown): EchoSlotConfig[] | null {
     return slots
 }
 
-/** @desc 深拷贝方案（写入工程前隔离引用，避免本地库与工程互相串改） */
-export function cloneSlots(slots: EchoSlotConfig[]): EchoSlotConfig[] {
+/** @desc 深拷贝方案（写入工程前隔离引用，避免本地库与工程互相串改） */ export function cloneSlots(
+    slots: EchoSlotConfig[]
+): EchoSlotConfig[] {
     return slots.map((slot) => ({
         cost: slot.cost,
         mainStat: slot.mainStat ? { ...slot.mainStat } : null,
         secondMainStat: slot.secondMainStat ? { ...slot.secondMainStat } : null,
         substats: slot.substats.map((s) => ({ ...s }))
     }))
+}
+
+const statKey = (stat: { type: string; value: number; unit: string } | null | undefined) =>
+    stat ? `${stat.type}|${stat.value}|${stat.unit}` : ''
+
+/** @desc 空白方案骨架：标准 cost 布局（43311）+ 自动第二主词条，主词条与副词条都留空 */
+export function buildBlankSlots(): EchoSlotConfig[] {
+    return STANDARD_COST_LAYOUT.map((cost) => {
+        const second = SECOND_MAIN_STAT[cost as keyof typeof SECOND_MAIN_STAT]
+        return {
+            cost,
+            mainStat: null,
+            secondMainStat: second ? { type: second.label, value: second.value, unit: second.unit } : null,
+            substats: []
+        }
+    })
+}
+
+const slotKey = (slot: EchoSlotConfig) =>
+    [
+        slot.cost,
+        statKey(slot.mainStat),
+        statKey(slot.secondMainStat),
+        // 副词条按内容排序比较：顺序不同但词条相同的两套方案视为同一套
+        slot.substats
+            .map((s) => `${s.type}|${s.value}|${s.unit}`)
+            .sort()
+            .join(',')
+    ].join('::')
+
+/** @desc 两套方案是否完全相同（用于判断「已是当前方案」） */
+export function samePlanSlots(a: EchoSlotConfig[], b: EchoSlotConfig[]): boolean {
+    if (a.length !== b.length || a.length === 0) return false
+    return a.every((slot, i) => slotKey(slot) === slotKey(b[i]))
 }

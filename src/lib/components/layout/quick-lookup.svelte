@@ -48,7 +48,7 @@
             use:focusTrap
             tabindex="-1"
             class="animate-pop-in mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-(--theme-modal-text) shadow-2xl"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <!-- @desc 标题栏：标题 + 关闭按钮 -->

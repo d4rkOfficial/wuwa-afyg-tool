@@ -6,14 +6,9 @@
     import type { ConditionProfile } from '$lib/calc/compute'
     import { conditionMet } from '$lib/calc/compute'
     import { inferDamageTypes } from '$lib/calc/utils'
-    import {
-        DAMAGE_TYPES,
-        DAMAGE_TYPE_SHORT,
-        LAYERED_BUFF_PATTERN,
-        LAYERED_BUFF_VAR
-    } from '$lib/calc/calculation.consts'
+    import { DAMAGE_TYPE_SHORT, LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$lib/calc/calculation.consts'
     import { getCalcElementMap, compareNatural } from '$lib/calc/calculation.store.svelte'
-    import { getDamageTypeEditMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
+    import { getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
@@ -33,7 +28,6 @@
         conditionProfile: ConditionProfile
         hideConditionMismatch: boolean
         onToggle: (entryId: string, buffId: string) => void
-        onToggleDamageType: (entryId: string, damageType: string) => void
         onSetEntryBuffSetIds: (entryId: string, ids: string[]) => void
         onSetEntriesBuffSetIds?: (map: Record<string, string[]>) => void
     }
@@ -48,7 +42,6 @@
         conditionProfile,
         hideConditionMismatch,
         onToggle,
-        onToggleDamageType,
         onSetEntryBuffSetIds,
         onSetEntriesBuffSetIds,
         class: className,
@@ -747,11 +740,11 @@
         {@const hasFolder = group.visibleColIdx.some((ci) => folderGroupOf.has(columns[ci].id))}
         <div class="snap-group mb-6">
             <div>
-                <!-- 表格主体底色不透明（单元格区域保持透明）；上/右/下 = 昼夜色双实线（随明暗主题），右上/右下圆角；左 = 常规分隔线 -->
+                <!-- 表格主体底色跟随「卡片透明度」（单元格区域保持透明）；上/右/下 = 昼夜色双实线（随明暗主题），右上/右下圆角；左 = 常规分隔线 -->
                 <table
                     class="min-w-full text-xs"
                     data-group-table={gi}
-                    style="background: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-top: 3px double var(--theme-divider-border); border-right: 3px double var(--theme-divider-border); border-bottom: 3px double var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); border-bottom-right-radius: 0.5rem; {maxTableWidth
+                    style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-collapse: separate; border-spacing: 0; border-top: 3px double var(--theme-divider-border); border-right: 3px double var(--theme-divider-border); border-bottom: 3px double var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); border-bottom-right-radius: 0.5rem; {maxTableWidth
                         ? `width: ${maxTableWidth}px;`
                         : ''}"
                 >
@@ -759,7 +752,7 @@
                     <caption class="text-left">
                         <div
                             class="-mr-px flex items-center gap-2 border-b px-2 py-1.5"
-                            style="background: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
+                            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-color: var(--theme-divider-border);"
                         >
                             <span class="text-sm font-bold" style="color: var(--theme-element-{charElement}, #888);"
                                 >{group.charName || '无角色'}</span
@@ -772,7 +765,7 @@
                         {#if group.visibleGlobalBuffs.length > 0}
                             <div
                                 class="flex items-center gap-1 overflow-hidden whitespace-nowrap border-b px-2 py-1"
-                                style="background: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
+                                style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-color: var(--theme-divider-border);"
                             >
                                 {#each group.visibleGlobalBuffs as gb}
                                     <span
@@ -792,7 +785,7 @@
                             <tr>
                                 <th
                                     class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-medium text-(--theme-modal-text)/50"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
                                     rowspan="2"
                                 >
                                     条目
@@ -836,7 +829,7 @@
                                             <th
                                                 colspan={runLen.len}
                                                 class="sticky top-0 z-30 h-6 p-0 text-center"
-                                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
                                                     columns[group.visibleColIdx[tailPos]].id,
                                                     nextId
                                                 )}"
@@ -854,7 +847,7 @@
                                                 : undefined}
                                         <th
                                             class="sticky top-0 z-30 h-6 p-0"
-                                            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
                                                 bs.id,
                                                 nextId
                                             )}"
@@ -865,7 +858,7 @@
                                     <th
                                         data-fill-th
                                         class="sticky top-0 z-30 h-6 p-0"
-                                        style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
+                                        style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
                                     ></th>
                                 {/if}
                             </tr>
@@ -875,7 +868,7 @@
                                 <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
                                 <th
                                     class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-medium text-(--theme-modal-text)/50"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
                                 >
                                     条目
                                 </th>
@@ -896,7 +889,7 @@
                                         : ''}"
                                     style="border-color: var(--theme-divider-border); background: {colHighlighted
                                         ? HIGHLIGHT_BG
-                                        : 'color-mix(in srgb, var(--theme-modal-bg) 92%, transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                        : 'color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
                                         bs.id,
                                         colPos + 1 < group.visibleColIdx.length
                                             ? columns[group.visibleColIdx[colPos + 1]]?.id
@@ -932,7 +925,7 @@
                                 <th
                                     data-fill-th
                                     class="sticky {hasFolder ? 'top-6' : 'top-0'} z-30 p-0 border-b"
-                                    style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
+                                    style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
                                 ></th>
                             {/if}
                         </tr>
@@ -959,7 +952,7 @@
                                         class="sticky left-0 z-20 cursor-pointer select-none px-2 py-1 border-r transition-colors"
                                         style="border-color: var(--theme-divider-border); background: {rowHighlighted
                                             ? HIGHLIGHT_BG
-                                            : 'color-mix(in srgb, var(--theme-modal-bg) 92%, transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;{rowHighlighted
+                                            : 'color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;{rowHighlighted
                                             ? ' box-shadow: inset 3px 0 0 var(--theme-accent-bg);'
                                             : ''}"
                                         title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${row.selectedCount}/${row.enabledBuffIds.length}）`}
@@ -975,42 +968,24 @@
                                                 >{row.entry.displayName}</span
                                             >
                                         </div>
-                                        <!-- 视为：伤害类型（可切换 编辑 / 仅查看）；stopPropagation 避免触发行高亮 -->
+                                        <!-- 视为：伤害类型（只读展示，编辑统一在底部工具栏的「编辑伤害类型」弹窗）；stopPropagation 避免触发行高亮 -->
                                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                                         <div
-                                            class="flex flex-wrap gap-0.5 px-0.5 pb-0.5"
+                                            class="flex flex-wrap items-center gap-0.5 px-0.5 pb-0.5"
                                             onclick={(e) => e.stopPropagation()}
                                         >
-                                            {#if getDamageTypeEditMode()}
-                                                {#each DAMAGE_TYPES as dt}
-                                                    {@const selected = (
-                                                        entryDamageTypeMap[row.entry.id] ?? []
-                                                    ).includes(dt)}
-                                                    <button
-                                                        onclick={() => onToggleDamageType(row.entry.id, dt)}
-                                                        title={dt}
-                                                        class="rounded px-1 text-[10px] leading-tight transition-colors"
-                                                        style={selected
-                                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 25%, transparent); color: var(--theme-accent-text);'
-                                                            : 'background: var(--theme-input-bg); color: var(--theme-modal-text)/50; hover: background: var(--theme-modal-text)/10;'}
-                                                        >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
-                                                            dt}</button
-                                                    >
-                                                {/each}
-                                            {:else}
+                                            <span
+                                                class="text-[10px] font-bold leading-tight text-(--theme-modal-text)/70"
+                                                >伤害类型：</span
+                                            >
+                                            {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
                                                 <span
-                                                    class="text-[10px] font-bold leading-tight text-(--theme-modal-text)/70"
-                                                    >伤害类型：</span
+                                                    class="rounded px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
+                                                    style="background: var(--theme-input-bg);"
+                                                    >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
+                                                        dt}</span
                                                 >
-                                                {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
-                                                    <span
-                                                        class="rounded px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
-                                                        style="background: var(--theme-input-bg);"
-                                                        >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
-                                                            dt}</span
-                                                    >
-                                                {/each}
-                                            {/if}
+                                            {/each}
                                             {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
                                                 {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
                                                 {#if inferred.length > 0}

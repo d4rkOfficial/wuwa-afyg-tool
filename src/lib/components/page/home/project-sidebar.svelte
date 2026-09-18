@@ -74,6 +74,8 @@
     let actionsCollapsed = $state(false)
 
     let compact = $derived(width <= 144)
+    /** @desc 侧栏偏窄时隐藏顶部「椰果工具箱」标题文本（仅留图标），避免与右侧按钮挤在一起 */
+    let showTitle = $derived(width >= 233)
     /** @desc 速查页占满主体（非紧凑 + 速查开启）；紧凑模式速查开启时仅隐藏工程列表、保留底部按钮 */
     let lookupPage = $derived(sidebarLookupOpen && !compact)
     let lookupCompactHidden = $derived(sidebarLookupOpen && compact)
@@ -224,7 +226,7 @@
         onclick={onhome}
     >
         <img src={favicon} alt="椰果工具箱" class="size-5 shrink-0" />
-        {#if !compact}<span class="text-sm font-semibold tracking-tight">椰果工具箱</span>{/if}
+        {#if showTitle}<span class="text-sm font-semibold tracking-tight">椰果工具箱</span>{/if}
         <div class="flex-1"></div>
         {#if !compact}
             {#if activeId}

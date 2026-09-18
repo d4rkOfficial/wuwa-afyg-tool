@@ -715,13 +715,13 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         class="animate-pop-in theme-scrollbar flex max-h-[94vh] w-[min(1500px,96vw)] flex-col overflow-hidden rounded-2xl border shadow-2xl"
-        style="background: color-mix(in srgb, var(--theme-modal-bg) 80%, transparent); border-color: var(--theme-divider-border);"
+        style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
         <!-- Header -->
         <div
             class="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b px-6 py-4"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-color: var(--theme-divider-border);"
         >
             <div class="flex items-center gap-2.5">
                 <Icon icon="mdi:chart-box-outline" class="size-5" style="color: var(--theme-accent-text);" />

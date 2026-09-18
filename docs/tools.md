@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **101** 个工具。
+> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **109** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
@@ -18,6 +18,10 @@ AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注
 - `remove_substat`
 - `archive_project`
 - `delete_project`
+- `save_substat_plan`
+- `delete_substat_plan`
+- `reset_standard_substat_plan`
+- `sync_substat_plans_from_share`
 - `remove_op_block`
 - `format_timeline`
 - `remove_ref_line`
@@ -420,7 +424,7 @@ _无参数_
 
 ### `open_panel`
 
-打开或关闭指定弹窗面板。panel 取 get_panels_state 返回的 name（如 buff-config/quick-lookup/buff-library/settings/workshop/character-detail/buff-import/damage-list 等）；open 默认 true。
+打开或关闭指定弹窗面板。panel 取 get_panels_state 返回的 name（如 buff-config/quick-lookup/buff-library/substat-library（快速词条方案）/settings/workshop/character-detail/buff-import/damage-list 等）；open 默认 true。
 
 | 参数    | 必填   | 类型    | 说明                              |
 | ------- | ------ | ------- | --------------------------------- |
@@ -581,7 +585,7 @@ _无参数_
 
 ### `set_setting`
 
-修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。
+修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、theme_modal_opacity(30-100 弹窗透明度)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。
 
 | 参数    | 必填   | 类型     | 说明                           |
 | ------- | ------ | -------- | ------------------------------ |
@@ -652,6 +656,88 @@ _无参数_
 ### `get_cache_counts`
 
 读取各类缓存条目数（列表/详情/图像）。可用 set_setting key=clear_cache 清理（值 list/info/image/all）。
+
+_无参数_
+
+## substat-library
+
+### `list_substat_plans`
+
+列出词条集（快速词条方案）里的声骸词条方案。传 character 时列出该角色全部方案（第一项固定为「标准14词条」，其余为自定义）；不传时列出本地库里有方案的角色及数量。
+
+| 参数        | 必填 | 类型   | 说明                       |
+| ----------- | ---- | ------ | -------------------------- |
+| `character` | 否   | string | 可选：角色名（如「绯雪」） |
+
+### `get_substat_plan`
+
+查看某个声骸词条方案的完整 5 槽位明细（cost、主词条、第二主词条、副词条）。不传 name 时返回该角色的标准14词条（自动生成/工坊/本地修改都算）。
+
+| 参数        | 必填   | 类型    | 说明                          |
+| ----------- | ------ | ------- | ----------------------------- |
+| `character` | **是** | string  | 角色名                        |
+| `name`      | 否     | string  | 方案名；省略则取标准14词条    |
+| `standard`  | 否     | boolean | true 表示取该角色的标准14词条 |
+
+### `save_substat_plan`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+新建或覆盖一条声骸词条方案（覆盖会先弹确认框）。standard=true 时写的是该角色的标准14词条，要求副词条恰好 14 条；自定义方案要求 5 个槽位、cost 取值 1/3/4 且合计 ≤12、每槽副词条 ≤5 且不重复。slots 里主词条可写字符串（如 "暴击率"，数值自动取满级），副词条可写 "暴击率" 或 {type:"暴击率",value:7.5}（数值自动吸附到合法档位）。
+
+| 参数        | 必填 | 类型    | 说明                                                 |
+| ----------- | ---- | ------- | ---------------------------------------------------- |
+| `character` | 否   | string  | 角色名                                               |
+| `name`      | 否   | string  | 方案名（standard=true 时忽略，固定为「标准14词条」） |
+| `standard`  | 否   | boolean | 可选：true 表示写标准14词条                          |
+| `slots`     | 否   | array   | 5 个声骸槽位                                         |
+
+### `rename_substat_plan`
+
+重命名一条自定义方案（标准14词条不能改名）。
+
+| 参数        | 必填   | 类型   | 说明       |
+| ----------- | ------ | ------ | ---------- |
+| `character` | **是** | string | 角色名     |
+| `name`      | **是** | string | 当前方案名 |
+| `newName`   | **是** | string | 新方案名   |
+
+### `delete_substat_plan`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+删除一条自定义声骸词条方案（不可恢复；标准14词条不能删除，需要清掉改动请用 reset_standard_substat_plan）。
+
+| 参数        | 必填   | 类型   | 说明   |
+| ----------- | ------ | ------ | ------ |
+| `character` | **是** | string | 角色名 |
+| `name`      | **是** | string | 方案名 |
+
+### `apply_substat_plan`
+
+把某条声骸词条方案套用到当前配队里的该角色（替换其 5 个声骸词条）。不传 name 时套用标准14词条；该角色不在配队中会报错。
+
+| 参数        | 必填   | 类型    | 说明                          |
+| ----------- | ------ | ------- | ----------------------------- |
+| `character` | **是** | string  | 角色名                        |
+| `name`      | 否     | string  | 方案名；省略则套用标准14词条  |
+| `standard`  | 否     | boolean | 可选：true 表示套用标准14词条 |
+
+### `reset_standard_substat_plan`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+重置某角色的标准14词条：清掉本地修改/工坊同步的版本，回落到「工坊同步」或按角色数据自动生成。
+
+| 参数        | 必填   | 类型   | 说明   |
+| ----------- | ------ | ------ | ------ |
+| `character` | **是** | string | 角色名 |
+
+### `sync_substat_plans_from_share`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+从工坊同步全部角色的标准14词条集（只覆盖工坊来源的方案，本地修改与自定义方案不受影响；工坊已下线的会移除）。
 
 _无参数_
 

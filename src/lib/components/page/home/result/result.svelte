@@ -345,7 +345,7 @@
 
 <div
     class="flex h-full flex-col {className}"
-    style="background: var(--theme-modal-bg); color: var(--theme-modal-text); {styleProp || ''}"
+    style="background: transparent; color: var(--theme-modal-text); {styleProp || ''}"
 >
     {#if loading}
         <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">计算中…</div>
@@ -395,7 +395,7 @@
                 <thead>
                     <tr
                         class="text-(--theme-modal-text)/50 sticky top-0"
-                        style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-bottom: 1px solid var(--theme-divider-border);"
+                        style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-bottom: 1px solid var(--theme-divider-border);"
                     >
                         <th class="text-left font-medium py-2 px-3">来源</th>
                         <th class="text-left font-medium py-2 px-3">条目</th>

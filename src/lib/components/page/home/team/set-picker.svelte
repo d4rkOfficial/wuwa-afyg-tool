@@ -117,7 +117,7 @@
     >
         <div
             class="animate-pop-in relative flex max-h-[85vh] w-150 max-w-[90vw] flex-col rounded-xl p-4 shadow-2xl text-(--theme-modal-text)"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent);"
             role="dialog"
             aria-modal="true"
         >

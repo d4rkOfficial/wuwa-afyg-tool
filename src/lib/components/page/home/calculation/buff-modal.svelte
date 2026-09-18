@@ -1045,7 +1045,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             class="animate-pop-in w-full max-h-[95vh] h-full max-w-6xl rounded-xl border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
@@ -2269,7 +2269,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
             class="animate-pop-in rounded-xl border p-5 shadow-xl w-md"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <div class="flex items-center justify-between mb-5">
@@ -2606,7 +2606,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
             class="animate-pop-in rounded-xl border p-5 shadow-xl w-80"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-2">确认删除文件夹</h3>
@@ -2641,7 +2641,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
             class="animate-pop-in rounded-xl border p-5 shadow-xl w-96"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-2">批量重命名文件夹</h3>
@@ -2708,7 +2708,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
             class="animate-pop-in rounded-xl border p-5 shadow-xl w-80"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-2">确认批量删除</h3>
@@ -2743,7 +2743,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
             class="animate-pop-in rounded-xl border p-5 shadow-xl w-96"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-sm font-semibold mb-2">复制 BUFF</h3>

@@ -36,7 +36,7 @@
             ]
                 .filter(Boolean)
                 .join(' ')}
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); {styleProp}"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); {styleProp}"
             role="dialog"
             aria-modal="true"
         >

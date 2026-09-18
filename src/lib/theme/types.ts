@@ -16,8 +16,13 @@ export interface Theme {
 
 export interface ThemeOverrides {
     accentHue: number | 'mono' | null
+    /** @desc 黑夜（dark 主题）背景图 */
     backgroundImage: string
+    /** @desc 白天（light 主题）背景图；留空则白天不显示背景图 */
+    backgroundImageLight: string
     bgOpacity: number
+    /** @desc 弹窗（对话框）表面不透明度；与卡片透明度各自独立，明暗切换时不自动取反 */
+    modalOpacity: number
     bgBlur: number
     bgDim: number
     // 背景图自身的独立控制（与玻璃表面分开）：背景图模糊、背景图遮罩强度

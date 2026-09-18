@@ -50,7 +50,14 @@
         setMagneticPointer
     } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
-    import { getConfirmDeletes, setConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
+    import {
+        getConfirmDeletes,
+        getToastPosition,
+        setConfirmDeletes,
+        setToastPosition,
+        TOAST_POSITIONS,
+        type ToastPosition
+    } from '$lib/data/interaction-prefs.svelte'
     import { getSimplifyContextMenu, setSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
@@ -110,6 +117,27 @@
         { key: 'ai', label: '助手设置', icon: 'mdi:robot-outline' }
     ] as const
 
+    /** @desc Toast 位置按钮文案与说明（顺序取自 TOAST_POSITIONS） */
+    const TOAST_POSITION_LABELS: Record<ToastPosition, string> = {
+        'top-right': '右上角（默认）',
+        none: '不弹出',
+        'top-left': '左上角',
+        'top-center': '正上方',
+        'bottom-center': '正下方',
+        'bottom-left': '左下角',
+        'bottom-right': '右下角'
+    }
+
+    const TOAST_POSITION_HINTS: Record<ToastPosition, string> = {
+        'top-right': '默认位置：屏幕右上角向下堆叠',
+        none: '不显示任何操作反馈提示',
+        'top-left': '屏幕左上角向下堆叠',
+        'top-center': '屏幕正上方居中',
+        'bottom-center': '屏幕正下方居中',
+        'bottom-left': '屏幕左下角向上堆叠',
+        'bottom-right': '屏幕右下角向上堆叠'
+    }
+
     const COLOR_PRESETS = [
         { name: '默认', hue: 190 as number | 'mono' | null },
         { name: '靛蓝', hue: null as number | 'mono' | null },
@@ -122,6 +150,8 @@
 
     let fileInput: HTMLInputElement | undefined = $state()
     let bgUrl = $state('')
+    /** @desc 背景图分白天/黑夜两张：当前正在编辑哪一张（打开设置时默认跟随当前主题） */
+    let bgEditingLight = $state(false)
 
     let overrides = $derived(getOverrides())
     let isDark = $derived(getActiveId() !== 'light')
@@ -187,12 +217,19 @@
 
     $effect(() => {
         if (open) {
-            bgUrl = overrides.backgroundImage.startsWith('http') ? overrides.backgroundImage : ''
+            bgEditingLight = currentTheme === 'light'
+            bgUrl = editingBg.startsWith('http') ? editingBg : ''
             void refreshCacheCounts()
             loadAiConfig()
             loadGenPrefs()
         }
     })
+
+    /** @desc 正在编辑的那张背景图（黑夜=backgroundImage / 白天=backgroundImageLight） */
+    let editingBgKey = $derived(bgEditingLight ? ('backgroundImageLight' as const) : ('backgroundImage' as const))
+    let editingBg = $derived(overrides[editingBgKey])
+    /** @desc 当前主题实际生效的背景图（下方模糊/遮罩/暗度为两种主题共用，提示按它判断） */
+    let activeThemeBg = $derived(currentTheme === 'light' ? overrides.backgroundImageLight : overrides.backgroundImage)
 
     function getPresetStyle(hue: number | 'mono' | null): { bg: string; text: string } {
         if (hue === 'mono') {
@@ -244,16 +281,17 @@
     function handleFileSelect(e: Event) {
         const file = (e.target as HTMLInputElement).files?.[0]
         if (!file) return
+        const key = editingBgKey
         compressImage(file)
             .then((dataUrl) => {
-                updateOverride('backgroundImage', dataUrl)
+                updateOverride(key, dataUrl)
                 bgUrl = ''
             })
             .catch((err) => {
                 console.error('[bg] 压缩失败，改用原图', err)
                 const reader = new FileReader()
                 reader.onload = () => {
-                    updateOverride('backgroundImage', reader.result as string)
+                    updateOverride(key, reader.result as string)
                     bgUrl = ''
                 }
                 reader.readAsDataURL(file)
@@ -263,12 +301,12 @@
     function handleUrlApply() {
         const url = bgUrl.trim()
         if (url) {
-            updateOverride('backgroundImage', url)
+            updateOverride(editingBgKey, url)
         }
     }
 
     function clearBackground() {
-        updateOverride('backgroundImage', '')
+        updateOverride(editingBgKey, '')
         if (fileInput) fileInput.value = ''
         bgUrl = ''
     }
@@ -509,7 +547,7 @@
     >
         <div
             class="animate-pop-in theme-glass-surface relative flex h-140 max-h-[90vh] w-160 max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) 75%, transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
             out:popOut
@@ -638,21 +676,46 @@
                                 <div>
                                     <span class="block text-xs font-medium text-(--theme-modal-text)/70">背景图</span>
                                     <span class="block text-[10px] text-(--theme-modal-text)/35"
-                                        >为工作区添加专属氛围</span
+                                        >白天与黑夜可各设一张；模糊/遮罩/暗度为两者共用</span
                                     >
                                 </div>
                             </div>
 
-                            {#if overrides.backgroundImage}
+                            <!-- 白天 / 黑夜 切换：切换正在编辑的那张背景图 -->
+                            <div
+                                class="mb-3 flex gap-1 rounded-lg border p-1"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                {#each [{ light: false, label: '黑夜' }, { light: true, label: '白天' }] as mode (mode.label)}
+                                    {@const active = bgEditingLight === mode.light}
+                                    {@const isCurrent = (currentTheme === 'light') === mode.light}
+                                    <button
+                                        onclick={() => {
+                                            bgEditingLight = mode.light
+                                            if (fileInput) fileInput.value = ''
+                                            const next = mode.light
+                                                ? overrides.backgroundImageLight
+                                                : overrides.backgroundImage
+                                            bgUrl = next.startsWith('http') ? next : ''
+                                        }}
+                                        class="flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors {active
+                                            ? ''
+                                            : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
+                                        style={active
+                                            ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
+                                            : ''}
+                                    >
+                                        {mode.label}{#if isCurrent}<span class="ml-1 opacity-60">当前</span>{/if}
+                                    </button>
+                                {/each}
+                            </div>
+
+                            {#if editingBg}
                                 <div
                                     class="mb-3 overflow-hidden rounded-lg border"
                                     style="border-color: var(--theme-divider-border);"
                                 >
-                                    <img
-                                        src={overrides.backgroundImage}
-                                        alt="背景预览"
-                                        class="h-28 w-full object-cover"
-                                    />
+                                    <img src={editingBg} alt="背景预览" class="h-28 w-full object-cover" />
                                     <div
                                         class="flex items-center justify-end gap-2 px-3 py-2 bg-(--theme-modal-text)/5"
                                     >
@@ -722,11 +785,11 @@
                                     class="relative h-40 overflow-hidden border-b"
                                     style="border-color: var(--theme-divider-border);"
                                 >
-                                    {#if overrides.backgroundImage}
+                                    {#if editingBg}
                                         <!-- 背景图独立层（自身模糊，不影响上层的预览卡片） -->
                                         <div
                                             class="absolute inset-0"
-                                            style="background-image: url('{overrides.backgroundImage}'); background-position: center; background-size: cover; filter: blur({overrides.bgImageBlur}px);"
+                                            style="background-image: url('{editingBg}'); background-position: center; background-size: cover; filter: blur({overrides.bgImageBlur}px);"
                                         ></div>
                                         <!-- 背景图遮罩层（与工作区一致，由背景图遮罩控制） -->
                                         <div
@@ -827,6 +890,40 @@
                                                 class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
                                             >
                                                 <span class="flex items-center gap-1.5"
+                                                    ><Icon
+                                                        icon="mdi:application-outline"
+                                                        class="size-3.5"
+                                                    />弹窗透明度</span
+                                                >
+                                                <span class="font-mono text-(--theme-accent-text)"
+                                                    >{100 - overrides.modalOpacity}%</span
+                                                >
+                                            </span>
+                                            <input
+                                                aria-label="弹窗透明度"
+                                                type="range"
+                                                min="0"
+                                                max="98"
+                                                value={100 - overrides.modalOpacity}
+                                                oninput={(e) =>
+                                                    updateOverride(
+                                                        'modalOpacity',
+                                                        100 - Number((e.target as HTMLInputElement).value)
+                                                    )}
+                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                            />
+                                            <div
+                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                            >
+                                                <span>清晰</span><span>通透</span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <span
+                                                class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                            >
+                                                <span class="flex items-center gap-1.5"
                                                     ><Icon icon="mdi:blur" class="size-3.5" />毛玻璃强度</span
                                                 >
                                                 <span class="font-mono text-(--theme-accent-text)"
@@ -884,14 +981,14 @@
                                             >
                                                 <span>原图</span><span>沉浸</span>
                                             </div>
-                                            {#if !overrides.backgroundImage}
+                                            {#if !activeThemeBg}
                                                 <p class="mt-1.5 text-[9px] text-(--theme-modal-text)/30">
-                                                    设置背景图后生效（当前未设置背景图）
+                                                    设置背景图后生效（当前主题未设置背景图）
                                                 </p>
                                             {/if}
                                         </div>
 
-                                        {#if overrides.backgroundImage}
+                                        {#if activeThemeBg}
                                             <div
                                                 class="border-t pt-4"
                                                 style="border-color: var(--theme-divider-border);"
@@ -1318,6 +1415,35 @@
                                         ></span>
                                     </button>
                                 </div>
+                            </div>
+
+                            <div class="mt-5">
+                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60"
+                                    >消息提示位置</span
+                                >
+                                <div
+                                    class="flex gap-1 rounded-lg border p-1"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    {#each TOAST_POSITIONS as p (p)}
+                                        {@const active = getToastPosition() === p}
+                                        <button
+                                            onclick={() => setToastPosition(p)}
+                                            class="flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors {active
+                                                ? ''
+                                                : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
+                                            style={active
+                                                ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
+                                                : ''}
+                                            title={TOAST_POSITION_HINTS[p as ToastPosition]}
+                                        >
+                                            {TOAST_POSITION_LABELS[p as ToastPosition]}
+                                        </button>
+                                    {/each}
+                                </div>
+                                <span class="mt-1.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                    操作反馈（Toast）的弹出位置，默认右上角；选「不弹出」后所有操作反馈都不再显示
+                                </span>
                             </div>
 
                             <div class="mt-5">
@@ -2018,7 +2144,7 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
                 class="theme-scrollbar animate-pop-in max-h-[75vh] w-[92vw] max-w-lg overflow-y-auto rounded-xl border p-4"
-                style="background: var(--theme-modal-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 onclick={(e) => e.stopPropagation()}
             >
                 <div class="mb-3 flex items-center justify-between">

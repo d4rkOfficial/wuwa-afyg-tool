@@ -10,7 +10,9 @@
         getCalcElementMap,
         getDamageTypesForEntry,
         toggleDamageTypeForEntry,
-        setDamageTypesForEntry
+        setDamageTypesForEntry,
+        syncDamageTypesToSameName,
+        countSameNameEntries
     } from '$lib/calc/calculation.store.svelte'
     import { inferDamageTypes } from '$lib/calc/utils'
     import { conditionMet } from '$lib/calc/compute'
@@ -279,6 +281,24 @@
         addToast('已经是本角色最后一段直伤', 'info')
     }
 
+    /** @desc 把本条伤害类型同步到所有同名伤害（同一角色 + 同一技能类型 + 同名） */
+    function handleSyncDamageTypeToSameName(entryId: string) {
+        const entry = damageEntries.find((e) => e.id === entryId)
+        const types = getDamageTypesForEntry(entryId)
+        const count = syncDamageTypesToSameName(entryId)
+        if (count <= 1) {
+            addToast('没有其它同名伤害（同名范围：同一角色 + 同一技能类型）', 'info')
+            return
+        }
+        onupdate(getCalcState())
+        addToast(
+            types.length === 0
+                ? `已清空 ${count} 条同名伤害的手动设置（回到自动推导）`
+                : `已把「${entry?.displayName ?? '本条'}」的伤害类型同步到 ${count} 条同名伤害`,
+            'success'
+        )
+    }
+
     /** @desc 是否为直伤条目（非效应/非处决/非响应） */
     function isDirectDamage(e: { isEffect: boolean; isTuneBreak: boolean; isTuneResponse: boolean }): boolean {
         return !e.isEffect && !e.isTuneBreak && !e.isTuneResponse
@@ -421,11 +441,12 @@
     }}
 />
 
-<!-- @desc 表格容器：Ctrl+滚轮横向滚动，背景为弹窗底色 -->
+<!-- @desc 表格容器：Ctrl+滚轮横向滚动，底色跟随「卡片透明度」 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="theme-scrollbar snap-scroll-y h-full overflow-auto pb-48 {className}"
-    style="background: var(--theme-modal-bg); {styleProp || ''}"
+    style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); {styleProp ||
+        ''}"
     bind:this={calcContainer}
     onwheel={(e) => {
         if (e.ctrlKey) {
@@ -439,7 +460,7 @@
         <thead>
             <tr
                 class="text-(--theme-modal-text)/50 sticky top-0 opacity-100!"
-                style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-bottom: 1px solid var(--theme-divider-border);"
+                style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-bottom: 1px solid var(--theme-divider-border);"
             >
                 <th
                     class="text-left font-medium py-2 px-3 w-20 shrink-0 border-r border-dashed"
@@ -583,7 +604,7 @@
                                     <div>
                                         <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">伤害类型</div>
                                         {#if isDirectDamage(damageEntry) && damageEntry.character}
-                                            <div class="mb-1.5">
+                                            <div class="mb-1.5 flex flex-wrap gap-1.5">
                                                 <button
                                                     onclick={(e) => {
                                                         e.stopPropagation()
@@ -594,6 +615,20 @@
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段直伤
+                                                </button>
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleSyncDamageTypeToSameName(damageEntry.id)
+                                                    }}
+                                                    disabled={countSameNameEntries(damageEntry.id) <= 1}
+                                                    title="把本条的伤害类型同步到所有同名伤害（同一角色 + 同一技能类型）"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40"
+                                                >
+                                                    <Icon icon="mdi:sync" class="size-3 shrink-0" />
+                                                    同步伤害类型到所有同名伤害{countSameNameEntries(damageEntry.id) > 1
+                                                        ? `（${countSameNameEntries(damageEntry.id)}）`
+                                                        : ''}
                                                 </button>
                                             </div>
                                         {/if}

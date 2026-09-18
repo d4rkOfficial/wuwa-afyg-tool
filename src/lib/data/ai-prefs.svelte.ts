@@ -3,7 +3,6 @@ import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { DEFAULT_SYSTEM_PROMPT } from '$lib/ai/persona'
 import { DEFAULT_SLANG_DICT } from '$lib/ai/generate/prompts.config'
-import { isFirstVisit } from '$lib/data/toy-prefs.svelte'
 
 export type DangerMode = 'ask' | 'ask_once' | 'trust'
 
@@ -59,14 +58,15 @@ const PREFS_KEY = 'ai-gen-prefs'
 const LEGACY_PREFS_KEY = 'ai-naming-prefs'
 
 const DEFAULT_PREFS: AiGenPrefs = {
-    enabled: true,
+    // 默认关闭：首次进入隐藏 AI 助手，用户可在设置里开启（开启状态持久化保存）
+    enabled: false,
     namingRule: SHARE_NAMING_RULES,
     slangDict: DEFAULT_SLANG_DICT,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     dangerMode: 'ask'
 }
 
-let _prefs: AiGenPrefs = $state({ ...DEFAULT_PREFS, enabled: !isFirstVisit() })
+let _prefs: AiGenPrefs = $state({ ...DEFAULT_PREFS })
 let _loaded = false
 
 export function getGenPrefs(): AiGenPrefs {
@@ -136,9 +136,4 @@ export async function loadGenPrefs(): Promise<void> {
 export async function updateGenPrefs(patch: Partial<AiGenPrefs>): Promise<void> {
     _prefs = { ..._prefs, ...patch }
     if (browser) await dbSet(PREFS_KEY, _prefs)
-}
-
-/** 会话级启用开关（仅内存，不持久化；Toy 环境进入时关闭 AI 助手用） */
-export function setAiEnabledSession(v: boolean): void {
-    _prefs.enabled = v
 }

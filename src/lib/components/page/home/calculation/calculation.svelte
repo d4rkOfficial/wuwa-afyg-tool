@@ -12,7 +12,6 @@
         setShowBuffModal,
         getCalcState,
         getDamageTypesForEntry,
-        toggleDamageTypeForEntry,
         init,
         getGlobalBuffSetIds,
         getBuffDiffMode,
@@ -23,9 +22,11 @@
     import type { TimelineData } from '$lib/calc/timeline.types'
     import type { CalcState } from '$lib/calc/calculation.types'
     import BuffModal from './buff-modal.svelte'
+    import DamageTypeModal from './damage-type-modal.svelte'
     import SpreadTable from './spread-table.svelte'
     import DropdownTable from './dropdown-table.svelte'
     import { getCalcViewMode } from '$lib/data/calc-view.svelte'
+    import { closeDamageTypeModal, getDamageTypeModalOpen } from '$lib/data/damage-type-ui.svelte'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -70,6 +71,8 @@
 
     /** @desc 当前拉表视图：铺开（spread）/ 下拉（dropdown） */
     let calcViewMode = $derived(getCalcViewMode())
+    /** @desc 「编辑伤害类型」弹窗开关（底部工具栏按钮 / AI 面板工具都可打开） */
+    let damageTypeModalOpen = $derived(getDamageTypeModalOpen())
 
     /** @desc 关闭 Buff 弹窗并持久化最新状态 */
     function handleCloseBuffModal() {
@@ -77,15 +80,20 @@
         onupdate(getCalcState())
     }
 
-    /** @desc 铺开表：切换某条目↔某 Buff 的绑定后持久化 */
-    function handleSpreadToggle(entryId: string, buffId: string) {
-        toggleBuffSetForEntry(entryId, buffId)
+    /** @desc 关闭「编辑伤害类型」弹窗并持久化最新状态 */
+    function handleCloseDamageTypeModal() {
+        closeDamageTypeModal()
         onupdate(getCalcState())
     }
 
-    /** @desc 铺开表：切换某条目的伤害类型后持久化 */
-    function handleSpreadToggleDamageType(entryId: string, damageType: string) {
-        toggleDamageTypeForEntry(entryId, damageType)
+    /** @desc 伤害类型改动后回写工程（弹窗内每次点选/同步都调用） */
+    function handlePersistDamageTypes() {
+        onupdate(getCalcState())
+    }
+
+    /** @desc 铺开表：切换某条目↔某 Buff 的绑定后持久化 */
+    function handleSpreadToggle(entryId: string, buffId: string) {
+        toggleBuffSetForEntry(entryId, buffId)
         onupdate(getCalcState())
     }
 
@@ -106,6 +114,17 @@
     <!-- @desc Buff 配置弹窗（挂载于页面顶层，open 由 store 控制） -->
     <BuffModal open={showBuffModal} {team} onclose={handleCloseBuffModal} />
 
+    <!-- @desc 编辑伤害类型弹窗：逐条确认倍率的伤害类型（底部工具栏按钮打开） -->
+    <DamageTypeModal
+        open={damageTypeModalOpen}
+        {damageEntries}
+        {team}
+        {entryDamageTypeMap}
+        {locked}
+        onclose={handleCloseDamageTypeModal}
+        onpersist={handlePersistDamageTypes}
+    />
+
     <!-- @desc 视图切换：spread → 铺开表（传绑定映射/条件配置/回调用）；否则 → 下拉表（多传 buffDiffMode 差异模式） -->
     {#if calcViewMode === 'spread'}
         <SpreadTable
@@ -118,7 +137,6 @@
             conditionProfile={getConditionProfile()}
             hideConditionMismatch={getHideConditionMismatch()}
             onToggle={handleSpreadToggle}
-            onToggleDamageType={handleSpreadToggleDamageType}
             onSetEntryBuffSetIds={handleSpreadSetEntryBuffSetIds}
             onSetEntriesBuffSetIds={handleSpreadSetEntriesBuffSetIds}
         />

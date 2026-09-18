@@ -7,11 +7,11 @@ export interface RatioHit {
     kind: '%' | 'fixed'
 }
 
-const TOKEN_RE = /^\s*(\d+(?:\.\d+)?)\s*(%?)\s*(生命|防御|攻击)?\s*(?:\*\s*(\d+))?\s*$/
+const TOKEN_RE = /^\s*(\d+(?:\.\d+)?)\s*(%?)\s*(生命|防御|攻击|偏谐系数)?\s*(?:\*\s*(\d+))?\s*$/
 
 /**
  * @desc 解析技能倍率串为逐段命中列表（每段一行，`*N` 按 N 次展开）：
- * - 支持 `60.00%*2+40.00%*3`、`809.48%`、`100`（固定值）、`8%生命`、`12%防御` 等写法；
+ * - 支持 `60.00%*2+40.00%*3`、`809.48%`、`100`（固定值）、`8%生命`、`12%防御`、`60%偏谐系数` 等写法；
  * - 无法识别的片段直接跳过（忽略而不是整串失败）。
  */
 export function parseRatioHits(ratio: string): RatioHit[] {
@@ -23,7 +23,8 @@ export function parseRatioHits(ratio: string): RatioHit[] {
         if (!Number.isFinite(value) || value <= 0) continue
         const count = m[4] ? Math.max(1, parseInt(m[4], 10)) : 1
         const kind: RatioHit['kind'] = m[2] === '%' ? '%' : 'fixed'
-        const unit = kind === '%' ? `${m[3] ?? '攻击'}%` : ''
+        const suffix = m[3] ?? '攻击'
+        const unit = kind === '%' ? (suffix === '偏谐系数' ? '偏谐系数' : `${suffix}%`) : ''
         for (let i = 0; i < count; i++) hits.push({ value, unit, kind })
     }
     return hits

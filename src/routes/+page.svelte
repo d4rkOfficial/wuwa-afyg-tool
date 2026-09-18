@@ -59,7 +59,7 @@
         getReloadOnProfileChange,
         setMagneticPointer
     } from '$lib/data/render-prefs.svelte'
-    import { loadGenPrefs, setAiEnabledSession, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
+    import { loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
     import { initToyEnvironmentBridge, onToyEnter, isToyMobile } from '$lib/bilibili-toy/environment.svelte'
     import { isFirstVisit, markVisited, isMagneticToySet, markMagneticToySet } from '$lib/data/toy-prefs.svelte'
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
@@ -69,6 +69,12 @@
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
     import FirstSyncModal from '$lib/components/layout/first-sync-modal.svelte'
+    import SubstatLibraryModal from '$lib/components/layout/substat-library-modal.svelte'
+    import {
+        getSubstatLibraryOpen,
+        openSubstatLibrary,
+        setSubstatLibraryOpen
+    } from '$lib/data/substat-library-ui.svelte'
     import { shouldAskFirstSync } from '$lib/data/first-sync.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
@@ -244,6 +250,7 @@
         const panels: Array<[string, string, () => boolean, (v: boolean) => void]> = [
             ['quick-lookup', '速查', () => sidebarLookupOpen, (v) => (sidebarLookupOpen = v)],
             ['buff-library', 'Buff 集', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
+            ['substat-library', '快速词条方案', () => getSubstatLibraryOpen(), (v) => setSubstatLibraryOpen(v)],
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
             ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
             [
@@ -276,7 +283,7 @@
         if (isFirstVisit()) {
             setCalcViewMode('spread')
             setMagneticPointer(false)
-            setAiEnabledSession(false)
+            // AI 助手默认隐藏（**持久化**保存：用户可在设置里重新开启）
             void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
             markVisited()
         }
@@ -284,7 +291,7 @@
         // - 关闭 AI 助手（会话级，不持久化）
         // - 首次在 Toy 手机环境进入 → 关闭磁力光标（一次性持久设定）
         onToyEnter(() => {
-            void loadGenPrefs().then(() => setAiEnabledSession(false))
+            void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
             if (isToyMobile() && !isMagneticToySet()) {
                 setMagneticPointer(false)
                 markMagneticToySet()
@@ -825,6 +832,7 @@
                     showWorkshopFrame = true
                 }}
                 onBuffLibrary={() => (showBuffLibrary = true)}
+                onSubstatLibrary={() => openSubstatLibrary(null, 'home')}
                 onSettings={() => (showSettings = true)}
             />
         {:else if activeProject}
@@ -962,6 +970,8 @@
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
 
 <FirstSyncModal open={showFirstSync} onclose={() => (showFirstSync = false)} />
+
+<SubstatLibraryModal />
 
 {#if activeProject}
     <CharacterDetailModal
