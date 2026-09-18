@@ -165,3 +165,124 @@ test('否定写法不作为依据（回退到技能类型推导）', () => {
     ]
     assert.equal(typeOf('共鸣技能', '共鸣技能·测试伤害', skills), '共鸣技能伤害')
 })
+
+// ── 长离（1301）：倍率来自哪个技能，就只在该技能的文案里找结论 ──
+const CHANGLI_NA = `<size=40><color=Title>普攻</color></size>进行最多4段的连续攻击，造成热熔伤害。<size=40><color=Title>重击</color></size>消耗耐力，长按普攻施放重击，造成热熔伤害。<size=40><color=Title>空中攻击</color></size>消耗耐力进行空中下落攻击，造成热熔伤害。<size=40><color=Title>闪避反击</color></size>成功闪避后一定时间内短按普攻，将会攻击目标，造成热熔伤害。`
+const CHANGLI_HA = `<size=40><color=Title>重击·焚身以火</color></size>施放重击时，若处于【离火】状态，重击替换为重击·焚身以火，造成热熔伤害，此次伤害为共鸣技能伤害。`
+const CHANGLI_LIB = `<size=40><color=Title>离火照丹心</color></size>攻击目标，造成热熔伤害，并使队伍中所有角色攻击提升。`
+const CHANGLI_VARIATION = `攻击目标，造成热熔伤害，并为自身附加【离火】。`
+const CHANGLI_SKILL = `<size=40><color=Title>共鸣技能·热熔</color></size>攻击目标，造成热熔伤害，此次伤害为共鸣技能伤害。`
+
+const CHANGLI: RawSkill[] = [
+    {
+        type: '常态攻击',
+        desc: CHANGLI_NA,
+        rows: ['普攻第一段伤害', '普攻第二段伤害', '普攻第三段伤害', '普攻第四段伤害', '重击']
+    },
+    { type: '共鸣回路', desc: CHANGLI_HA, rows: ['重击·焚身以火伤害'] },
+    { type: '共鸣解放', desc: CHANGLI_LIB, rows: ['技能伤害'] },
+    { type: '变奏技能', desc: CHANGLI_VARIATION, rows: ['技能伤害'] },
+    { type: '共鸣技能', desc: CHANGLI_SKILL, rows: ['共鸣技能·热熔伤害'] }
+]
+
+test('长离：常态攻击的「重击」不借用共鸣回路「施放重击时…为共鸣技能伤害」的结论', () => {
+    assert.equal(typeOf('常态攻击', '重击', CHANGLI), '重击伤害')
+    assert.equal(typeOf('共鸣回路', '重击·焚身以火伤害', CHANGLI), '共鸣技能伤害')
+})
+
+test('长离：共鸣解放/变奏技能的「技能伤害」不被子串「共鸣技能伤害」抢走', () => {
+    assert.equal(typeOf('共鸣解放', '技能伤害', CHANGLI), '共鸣解放伤害')
+    assert.equal(typeOf('变奏技能', '技能伤害', CHANGLI), '变奏技能伤害')
+    assert.equal(typeOf('共鸣技能', '共鸣技能·热熔伤害', CHANGLI), '共鸣技能伤害')
+})
+
+// ── 大标题小节定位：同一份 desc 里结论只对本小节生效 ──
+const SECTION_NA = `<size=40><color=Title>普攻·苍剑式</color></size>连续短按或按住普攻，进行最多4段的连续攻击，造成湮灭伤害。<size=40><color=Title>闪避反击·苍剑式</color></size>成功闪避后一定时间内短按普攻，攻击目标造成湮灭伤害。施放闪避反击·苍剑式时，视为普攻·苍剑式第2段连段。`
+
+test('倍率定位到所属大标题小节：别的小节的「视为…连段」不改变本段类型', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '常态攻击',
+            desc: SECTION_NA,
+            rows: ['普攻·苍剑式第一段伤害', '普攻·苍剑式第二段伤害', '闪避反击·苍剑式伤害']
+        }
+    ]
+    assert.equal(typeOf('常态攻击', '普攻·苍剑式第一段伤害', skills), '普攻伤害')
+    assert.equal(typeOf('常态攻击', '闪避反击·苍剑式伤害', skills), '普攻伤害')
+})
+
+test('倍率所在小节没写结论时，改用「正文提到该倍率」的小节（炽霞·热压弹）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣回路',
+            desc: `<size=40><color=Title>共鸣技能·咔咔压制</color></size>长按共鸣技能进入咔咔压制状态，在该状态下：·持续消耗【热压弹】攻击目标，造成热熔伤害，此次伤害为共鸣技能伤害；·短按普攻，将会施放第4段普攻攻击目标，造成热熔伤害，此次伤害为普攻伤害。<size=40><color=Title>热压弹获取规则</color></size>【热压弹】容量上限{1}发。常态攻击命中目标时，可积攒【热压弹】。`,
+            rows: ['热压弹伤害', '共鸣技能·咔咔压制伤害']
+        }
+    ]
+    assert.equal(typeOf('共鸣回路', '热压弹伤害', skills), '共鸣技能伤害')
+})
+
+test('同一倍率的多个候选小节里，明写结论优先于名称徽标（今汐·凌霄·普攻）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣回路',
+            desc: `<size=40><color=Title>乘岁凌霄</color></size>·普攻替换为普攻凌霄·普攻，进行最多连续4段攻击，造成衍射伤害，此次伤害为共鸣技能伤害，此外，该连击段数不会被重置。<size=40><color=Title>共鸣技能·惊龙破空</color></size>施放普攻凌霄·普攻第4段后，将立刻结束乘岁凌霄状态，并获得效果游龙廻光。`,
+            rows: ['凌霄·普攻第一段伤害', '凌霄·普攻第四段伤害', '凌霄·重击伤害']
+        }
+    ]
+    assert.equal(typeOf('共鸣回路', '凌霄·普攻第四段伤害', skills), '共鸣技能伤害')
+})
+
+test('名称徽标：倍率名紧跟在「XX 技能【」之后时按该类型结算（秋水·雾化子弹）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣回路',
+            desc: `当秋水穿过【雾气】时，会进入迷雾潜行状态。<size=40><color=Title>迷雾潜行</color></size>·期间可持续消耗【雾滴】，每消耗{0}点【雾滴】，生成{1}颗共鸣技能【雾化子弹】。`,
+            rows: ['雾化子弹伤害']
+        },
+        {
+            type: '共鸣回路',
+            desc: `当秋水穿过【雾气】时，会进入迷雾潜行状态。<size=40><color=Title>迷雾潜行</color></size>·移动速度提升；期间可持续消耗【雾滴】。`,
+            rows: ['雾化子弹伤害']
+        }
+    ]
+    assert.equal(typeOf('共鸣回路', '雾化子弹伤害', skills), '共鸣技能伤害')
+    assert.equal(typeOf('共鸣回路', '雾化子弹伤害', [skills[1]!]), '其它类型伤害')
+})
+
+test('标题名与正文粘连时，标题里的类型词不算本行的徽标（琳奈·绮彩巡游）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '常态攻击',
+            desc: `<size=40><color=Title>绮彩巡游·地面重击</color></size>绮彩巡游状态期间，且处于地面时，按住普攻持续施放。琳奈持续消耗耐力攻击目标，造成衍射伤害，此次伤害为普攻伤害；松开普攻时，琳奈施放绮彩巡游·跃动集束，造成衍射伤害，此次伤害为普攻伤害。<size=40><color=Title>绮彩巡游·普攻</color></size>绮彩巡游状态期间，普攻替换为绮彩巡游·普攻。`,
+            rows: ['绮彩巡游·普攻第一段伤害', '绮彩巡游·地面重击伤害', '绮彩巡游·闪避反击', '绮彩巡游·跃动集束伤害']
+        }
+    ]
+    assert.equal(typeOf('常态攻击', '绮彩巡游·普攻第一段伤害', skills), '普攻伤害')
+    assert.equal(typeOf('常态攻击', '绮彩巡游·闪避反击', skills), '普攻伤害')
+    assert.equal(typeOf('常态攻击', '绮彩巡游·地面重击伤害', skills), '普攻伤害')
+})
+
+test('更短的同族行名套在本行名字里时，不抢走本行的结论（灯灯·强光穿射）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣回路',
+            desc: `<size=40><color=Title>强光穿射</color></size>灯灯施放延奏技能时，消耗当前模式的全部【光能】。消耗的【光能】大于等于{0}点时，可施放强光穿射，造成导电伤害，此次伤害为普攻伤害。每{0}点【光能】可使强光穿射的伤害段数加{1}，最多{2}段。`,
+            rows: ['强光伤害', '强光穿射每段伤害']
+        }
+    ]
+    assert.equal(typeOf('共鸣回路', '强光穿射每段伤害', skills), '普攻伤害')
+})
+
+test('小节标题本身就是倍率行名时，整节共用的一句结论归属本行（绯雪·普攻·预求身）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '常态攻击',
+            desc: `<size=40><color=Title>普攻·常世身</color></size>连续短按或按住普攻，进行最多3段的连续攻击，造成冷凝伤害。<size=40><color=Title>普攻·预求身</color></size>进行最多5段的连续攻击，造成冷凝伤害，此次伤害为共鸣解放伤害。`,
+            rows: ['普攻·常世身第一段伤害', '普攻·预求身第一段伤害', '普攻·预求身第五段伤害']
+        }
+    ]
+    assert.equal(typeOf('常态攻击', '普攻·预求身第一段伤害', skills), '共鸣解放伤害')
+    assert.equal(typeOf('常态攻击', '普攻·预求身第五段伤害', skills), '共鸣解放伤害')
+    assert.equal(typeOf('常态攻击', '普攻·常世身第一段伤害', skills), '普攻伤害')
+})
