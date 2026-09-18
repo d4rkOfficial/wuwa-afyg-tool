@@ -6,7 +6,7 @@
 
 import { registerHooks } from 'node:module'
 import path from 'node:path'
-import { existsSync } from 'node:fs'
+import { statSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -21,6 +21,15 @@ const aliasMap = [
 ]
 
 const EXTENSIONS = ['.ts', '.tsx', '.js', '.mjs', '.json', '/index.ts']
+
+/** 目录不能当模块读（$lib/api/provider 这类目录别名要走下面的 index.ts 兜底） */
+function isFile(p) {
+    try {
+        return statSync(p).isFile()
+    } catch {
+        return false
+    }
+}
 
 function stripQuery(spec) {
     return spec.includes('?') ? spec.slice(0, spec.indexOf('?')) : spec
@@ -48,9 +57,9 @@ registerHooks({
         // 1) 别名（$lib / $app）
         const alias = bare.startsWith('$') ? resolveAlias(bare) : null
         if (alias) {
-            if (existsSync(alias.abs)) return { url: urlFromAbs(alias.abs), shortCircuit: true }
+            if (isFile(alias.abs)) return { url: urlFromAbs(alias.abs), shortCircuit: true }
             for (const ext of EXTENSIONS) {
-                if (existsSync(alias.abs + ext)) return { url: urlFromAbs(alias.abs + ext), shortCircuit: true }
+                if (isFile(alias.abs + ext)) return { url: urlFromAbs(alias.abs + ext), shortCircuit: true }
             }
             return nextResolve(specifier, context)
         }
@@ -61,8 +70,7 @@ registerHooks({
             const base = parentDir ? path.resolve(parentDir, bare) : bare
             if (!path.extname(base)) {
                 for (const ext of EXTENSIONS) {
-                    if (path.extname(base) && existsSync(base)) return { url: urlFromAbs(base), shortCircuit: true }
-                    if (existsSync(base + ext)) return { url: urlFromAbs(base + ext), shortCircuit: true }
+                    if (isFile(base + ext)) return { url: urlFromAbs(base + ext), shortCircuit: true }
                 }
             }
         }

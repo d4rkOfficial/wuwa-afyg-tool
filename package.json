@@ -15,6 +15,7 @@
         "format": "prettier --write .",
         "test": "node --import ./scripts/test/preload.mjs scripts/test/run-provider-tests.ts",
         "test:watch": "node --import ./scripts/test/preload.mjs --watch scripts/test/run-provider-tests.ts",
+        "test:infer": "node --import ./scripts/test/preload.mjs scripts/test/damage-type-infer.example.ts",
         "download-icons": "node scripts/download-static-icons.mjs",
         "generate-icons": "node scripts/generate-icons.mjs",
         "collect-icons": "node scripts/collect-mdi-icons.mjs"
