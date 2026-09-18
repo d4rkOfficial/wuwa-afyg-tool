@@ -9,9 +9,9 @@
     import Modal from '$lib/components/layout/modal.svelte'
     import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import {
-        countSameNameEntries,
         getAllDamageEntries,
         getDamageTypesForEntry,
+        getSameNameEntryIds,
         setDamageTypesForEntry,
         syncDamageTypesToSameName
     } from '$lib/calc/calculation.store.svelte'
@@ -20,6 +20,8 @@
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { addToast } from '$lib/data/toast.svelte'
+    import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
     import type { DamageEntry } from '$lib/calc/calculation.types'
     import type { CharSlot } from '$lib/types/project'
 
@@ -33,8 +35,11 @@
 
     let { open, locked = false, onclose, onpersist, class: className, style: styleProp }: Props = $props()
 
+    /** @desc 条目类型：本弹窗只列有角色归属的倍率，未指定角色的（效应结算等）由结算方式决定类型，不在此展示 */
+    type ListedEntry = DamageEntry & { character: string }
+
     /** @desc 数据自取（与词条集弹窗一样挂在页面顶层，不依赖拉表页子树）：条目、伤害类型映射、配队 */
-    const damageEntries = $derived(getAllDamageEntries())
+    const damageEntries = $derived(getAllDamageEntries().filter((entry): entry is ListedEntry => !!entry.character))
     const entryDamageTypeMap = $derived<Record<string, string[]>>(
         Object.fromEntries(damageEntries.map((e) => [e.id, getDamageTypesForEntry(e.id)]))
     )
@@ -64,24 +69,62 @@
         )
     )
 
-    /** @desc 按角色分段（保持时间线顺序），段内逐条列出倍率 */
+    /**
+     * @desc 按角色分段（保持时间线顺序），段内逐条列出倍率。
+     * 同一角色可能因切人而在时间线上出现多段，所以段 key 必须带上序号，不能只用角色名。
+     */
     let charGroups = $derived.by(() => {
-        const groups: Array<{ character: string; entries: DamageEntry[] }> = []
+        const groups: Array<{ key: string; character: string; entries: ListedEntry[] }> = []
         for (const entry of damageEntries) {
-            const key = entry.character ?? '未指定角色'
             const last = groups[groups.length - 1]
-            if (last && last.character === key) last.entries.push(entry)
-            else groups.push({ character: key, entries: [entry] })
+            if (last && last.character === entry.character) last.entries.push(entry)
+            else
+                groups.push({
+                    key: `${entry.character}#${groups.length}`,
+                    character: entry.character,
+                    entries: [entry]
+                })
         }
         return groups
     })
 
+    /** @desc 行 key：条目 id 已含伤害块 id，再叠加段内序号，保证一定不撞 key */
+    const entryKey = (entry: DamageEntry, index: number) => `${entry.id}#${index}`
+
+    /** @desc 角色真实头像（与排轴/速览同一份图标表） */
+    let charIconMap = $derived(getCharIconMap())
+
+    /** @desc 列表项倍率名：末尾的「(技能类型)」不显示（技能类型已在副标题里） */
+    const ratioNameOf = (entry: DamageEntry) => {
+        const suffix = `(${entry.skillType ?? ''})`
+        if (suffix.length > 2 && entry.displayName.endsWith(suffix)) return entry.displayName.slice(0, -suffix.length)
+        return entry.displayName.endsWith('()') ? entry.displayName.slice(0, -2) : entry.displayName
+    }
+
     /** @desc 效应 / 谐度类条目伤害类型由结算方式决定，不参与编辑 */
     const isEditable = (entry: DamageEntry) => !entry.isEffect && !entry.isTuneBreak && !entry.isTuneResponse
 
-    let editableCount = $derived(damageEntries.filter((e) => isEditable(e)).length)
-
     const shortTypes = (types: string[]) => types.map((t) => DAMAGE_TYPE_SHORT[t] ?? t).join('/')
+
+    /** @desc 有效伤害类型：手填优先，未填用自动推导（与表格展示同一口径） */
+    const effectiveTypesOf = (entryId: string) => {
+        const explicit = entryDamageTypeMap[entryId] ?? []
+        return explicit.length > 0 ? explicit : (inferredTypeMap[entryId] ?? [])
+    }
+
+    /** @desc 两组伤害类型是否等价（忽略顺序：多类型条目顺序不固定） */
+    const isSameTypeSet = (a: string[], b: string[]) =>
+        a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|')
+
+    /** @desc 同步按钮文案：没有其它同名倍率 / 已全部一致 / 同名×N（N 含自身） */
+    const syncLabel = (peerCount: number, aligned: boolean) =>
+        peerCount === 0 ? '无同名倍率' : aligned ? '已全部一致' : `同名×${peerCount + 1}`
+
+    const syncTitle = (peerCount: number, aligned: boolean) => {
+        if (peerCount === 0) return '没有其它同名倍率（同名范围：同一角色 + 同一技能类型）'
+        if (aligned) return '同名倍率的伤害类型已全部一致（含自动推导），无需同步'
+        return `把当前伤害类型同步到 ${peerCount + 1} 条同名倍率（同一角色 + 同一技能类型）`
+    }
 
     /** @desc 第一列副标题里的倍率摘要：百分比 / 固定值 / 效应层数 */
     const ratioLabel = (entry: DamageEntry) => {
@@ -167,33 +210,45 @@
         >
             <span class="min-w-0 flex-1">倍率名</span>
             <span class="w-[34rem] shrink-0">伤害类型</span>
-            <span class="w-24 shrink-0 text-center">同步</span>
+            <span class="w-24 shrink-0 text-center">同步到同名倍率</span>
         </div>
 
         <div class="theme-scrollbar {helpOpen ? 'h-[42vh]' : 'h-[58vh]'} space-y-3 overflow-y-auto pr-1">
-            {#each charGroups as group (group.character)}
+            {#each charGroups as group (group.key)}
                 <div class="space-y-1">
                     <div class="flex items-center gap-2 px-1 text-xs font-semibold text-(--theme-modal-text)">
-                        <Icon icon="mdi:account-outline" class="size-3.5 shrink-0 text-(--theme-modal-text)/50" />
+                        {#if charIconMap[group.character]}
+                            <img
+                                src={charIconMap[group.character]}
+                                alt={group.character}
+                                draggable="false"
+                                use:fallbackIcon={'/icons/placeholder-character.svg'}
+                                class="size-4 shrink-0 rounded-full object-cover ring-1 ring-(--theme-divider-border)"
+                            />
+                        {/if}
                         <span>{group.character}</span>
-                        <span class="text-[10px] font-normal text-(--theme-modal-text)/40"
-                            >{group.entries.length} 条倍率</span
-                        >
                     </div>
-                    {#each group.entries as entry (entry.id)}
+                    {#each group.entries as entry, entryIndex (entryKey(entry, entryIndex))}
                         {@const explicit = entryDamageTypeMap[entry.id] ?? []}
                         {@const inferred = inferredTypeMap[entry.id] ?? []}
-                        {@const sameNameCount = countSameNameEntries(entry.id)}
+                        {@const sameNameIds = getSameNameEntryIds(entry.id)}
+                        {@const aligned =
+                            sameNameIds.length > 0 &&
+                            sameNameIds.every((id) => isSameTypeSet(effectiveTypesOf(entry.id), effectiveTypesOf(id)))}
                         {@const editable = isEditable(entry)}
                         <div
                             in:fade={{ duration: 100 }}
                             class="flex items-center gap-3 rounded-lg border px-2 py-1.5"
                             style="border-color: var(--theme-card-border); background: var(--theme-card-bg);"
                         >
-                            <!-- 第一列：倍率名 -->
+                            <!-- 第一列：倍率名（按属性伤害着色，与拉表表格同一口径） -->
                             <div class="min-w-0 flex-1">
-                                <div class="truncate text-xs text-(--theme-modal-text)" title={entry.displayName}>
-                                    {entry.displayName}
+                                <div
+                                    class="truncate text-xs"
+                                    style="color: var(--theme-element-{entry.damageElement}, #888);"
+                                    title={ratioNameOf(entry)}
+                                >
+                                    {ratioNameOf(entry)}
                                 </div>
                                 <div class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/40">
                                     <span>{entry.skillType || '未分类'}</span>
@@ -240,20 +295,18 @@
                                 {/if}
                             </div>
 
-                            <!-- 第三列：同步到所有同名伤害 -->
+                            <!-- 第三列：同步到同名倍率（同角色 + 同技能类型 + 同名） -->
                             <div class="flex w-24 shrink-0 justify-center">
                                 {#if editable}
                                     <button
                                         onclick={() => syncToSameName(entry)}
-                                        disabled={locked || sameNameCount <= 1}
+                                        disabled={locked || sameNameIds.length === 0 || aligned}
                                         class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] transition-colors disabled:opacity-30"
                                         style="border-color: var(--theme-divider-border); color: var(--theme-modal-text)/70;"
-                                        title={sameNameCount > 1
-                                            ? `把当前伤害类型同步到 ${sameNameCount} 条同名伤害（同一角色 + 同一技能类型）`
-                                            : '没有其它同名伤害'}
+                                        title={syncTitle(sameNameIds.length, aligned)}
                                     >
                                         <Icon icon="mdi:sync" class="size-3.5 shrink-0" />
-                                        同名{sameNameCount > 1 ? `×${sameNameCount}` : ''}
+                                        {syncLabel(sameNameIds.length, aligned)}
                                     </button>
                                 {:else}
                                     <span class="text-[10px] text-(--theme-modal-text)/25">—</span>
@@ -267,16 +320,9 @@
             {#if damageEntries.length === 0}
                 <div class="flex h-40 flex-col items-center justify-center gap-2 text-sm text-(--theme-muted-text)">
                     <Icon icon="mdi:table-question" class="size-9" />
-                    当前时间线还没有伤害倍率：先在排轴页放置伤害块
+                    当前没有可编辑的伤害倍率：先在排轴页给角色放置伤害块
                 </div>
             {/if}
-        </div>
-
-        <div
-            class="shrink-0 border-t pt-2 text-[11px] text-(--theme-modal-text)/45"
-            style="border-color: var(--theme-divider-border);"
-        >
-            共 {damageEntries.length} 条倍率（{editableCount} 条可编辑）。未手动设置的条目按技能文案自动推导；留空即回到自动推导。
         </div>
     </div>
 </Modal>

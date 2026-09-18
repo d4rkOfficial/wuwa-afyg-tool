@@ -769,6 +769,13 @@ export function syncDamageTypesToSameName(entryId: string): number {
     return targets.length
 }
 
+/** @desc 与某条目同名的其它倍率条目 id（不含自身）：界面用它判断「是否已全部一致」 */
+export function getSameNameEntryIds(entryId: string): string[] {
+    const entry = _entries.find((e) => e.id === entryId)
+    if (!entry) return []
+    return sameNameEntryIds(entry).filter((id) => id !== entryId)
+}
+
 /** @desc 与某条目同名的伤害条目数（含自身），用于界面提示可用性 */
 export function countSameNameEntries(entryId: string): number {
     const entry = _entries.find((e) => e.id === entryId)
