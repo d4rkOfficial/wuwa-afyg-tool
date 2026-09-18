@@ -12,28 +12,54 @@
 </p>
 
 <p style="width:100%;text-align:center;">
-  <img src="src\lib\assets\favicon.svg" alt="SvelteKit">
+  <img src="src/lib/assets/favicon.svg" alt="椰果工具箱">
 </p>
 
 主站：[凹分椰果](https://wuwa-afyg-tool.200503.xyz/) | 副站：[滑坡椰果](https://wuwa-hpyg-tool.200503.xyz/)
 
+**业务一句话**：把一名角色的整场战斗拆成「队伍 → 排轴 → 拉表 → 词条/环境 → 结果」五步，逐段配置伤害与 Buff，算清楚每一段伤害是怎么来的、DPS 是多少、哪个词条更值，并把整套配置保存为可分享、可对比的工程。
+
+## 文档
+
+| 文档                                                         | 内容                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [docs/deployment.md](docs/deployment.md)                     | 本地开发、构建预览、Vercel / Cloudflare Pages 部署、完成检查 |
+| [docs/upstream-integration.md](docs/upstream-integration.md) | 接入新数据上游（`DataProvider` 适配器、数据质量验收）        |
+| [docs/tools.md](docs/tools.md)                               | AI 助手与 WS 远程接管共用的工具清单（按源码自动生成）        |
+| [docs/ws-remote.md](docs/ws-remote.md)                       | WS 远程接管：工具分类表与接入方式                            |
+
 ### 另见：椰果工坊
 
-基于Supabase：[d4rkOfficial/wuwa-afyg-share](https://github.com/d4rkOfficial/wuwa-afyg-share)
+工程分享与共享数据（Buff 集 / 标准词条集）的配套服务：
 
-基于Github-Issues：[CoconutToolBox/wuwa-afyg-share-github](https://github.com/CoconutToolBox/wuwa-afyg-share-github)（推荐）
+- 基于 Supabase：[d4rkOfficial/wuwa-afyg-share](https://github.com/d4rkOfficial/wuwa-afyg-share)
+- 基于 GitHub Issues：[CoconutToolBox/wuwa-afyg-share-github](https://github.com/CoconutToolBox/wuwa-afyg-share-github)
 
-配合 椰果工具箱 使用的《鸣潮》工程分享平台。
+工坊对外接口（含「接入工具箱必须实现的最小集」）见 [工坊 API 文档](https://github.com/d4rkOfficial/wuwa-afyg-share/blob/master/docs/api.md)。
 
-用户可以上传椰果工具箱导出的工程 JSON，生成带有效期的分享链接；访客可浏览、克隆（下载）他人的拉表排轴工程。
+## 业务功能
 
-## 功能
+### 工作流五阶段
 
-- **队伍配置** — 选择角色、武器、首位声骸、套装
-- **排轴** — 序列编排操作块和时间参考线，准确的二合一排轴
-- **拉表** — 支持 Buff-全览、Buff-差异 模式，给每一段伤害配置 Buff；Buff 可设生效条件（角色共鸣链 / 武器精炼阶数）并指定参考角色；速查弹窗展示倍率条目的共鸣能量与偏谐值
-- **词条/环境配置** — 声骸主副词条配置、敌怪环境设置
-- **结果：数据分析** — 具体、分段、清晰的伤害计算过程及DPS、伤害占比；可调整各角色共鸣链/精炼档位对比结果
+- **队伍配置** — 选择角色、武器、首位声骸、触发套装
+- **排轴** — 三轨操作块 + 时间参考线；支持变奏入场/切回标记、自动格式化、快速排轴（纯键盘）、复制粘贴、撤销重做
+- **拉表** — 给每一段伤害绑定倍率与 Buff；Buff 支持追加/覆盖、固定值/引用转模、生效条件（共鸣链 / 精炼阶数 / 属性 / 伤害类型）；Buff 全览与 Buff 差异两种视图；速查弹窗展示倍率的共鸣能量与偏谐值
+- **词条/环境配置** — 声骸主副词条（含随机强化与词条方案）、敌人属性与环境
+- **结果** — 逐段伤害、乘区溯源（每段展开可见完整计算链与来源）、DPS 与伤害占比、副词条贡献分析（三种算法）、凹暴击/未命中模式、链阶对比
+
+### 计算引擎
+
+- 完整伤害公式：攻击 × 增伤 × 加深 × 同奏 × 暴击 × 防御 × 抗性 × 免伤 等乘区
+- 支持直伤、**效应伤害**、**谐度破坏 / 偏谐响应**三类输出；同名机制与 buff 按条目独立配置
+- 伤害类型自动推导：按技能倍率名（「普攻·」「重击·」等前缀）与技能文案（「视为 XX 伤害」，含角色技能与声骸技能）自动判定，用户手动设置优先
+
+### 数据与共享
+
+- **Buff 集（本地库 + 工坊同步）** — 按实体（角色/武器/声骸/套装）组织，可编辑、导出、一键导入工程；可从工坊同步，本地自定义不受覆盖
+- **标准词条集** — 一键把角色 5 个声骸套成「标准 14 词条」（主词条 43311：4cost 按固有属性取暴击率/暴击伤害、3cost 取属性伤害加成、1cost 取攻击%/生命%/防御%；副词条 5 暴击 + 5 暴伤 + 2 百分比 + 2 固定值，取中位档）；特殊角色方案由工坊记录并同步；用户可另存多套方案在工程间快速覆盖
+- **工程** — 保存/克隆/归档/导出导入；经工坊生成分享链接，他人可一键导入
+- **AI 助手** — 站内对话式操作：生成 Buff 集、查询计算结果与乘区溯源、数据分析、批量排轴/拉表配置；可接任意 OpenAI 兼容服务
+- **WS 远程接管** — 通过 WebSocket 让外部程序/脚本调用同一套工具能力（见 [docs/ws-remote.md](docs/ws-remote.md)）
 
 ## 技术栈
 
@@ -43,49 +69,15 @@
 | 构建 | [Vite](https://vitejs.dev/)                                                       |
 | 部署 | [Vercel](https://vercel.com/) · [Cloudflare Pages](https://pages.cloudflare.com/) |
 | 语言 | TypeScript                                                                        |
-| 样式 | TailwindCSS                                                                       |
+| 样式 | [TailwindCSS](https://tailwindcss.com)                                            |
 | 图标 | [Iconify](https://iconify.design/) (`@iconify/svelte` + Material Design Icons)    |
+| 数据 | 本地 IndexedDB + 上游数据缓存（[nanoka](https://ww.nanoka.cc) 等）                |
 
-## 本地
-
-### 开发
-
-```bash
-pnpm install
-pnpm run dev
-```
-
-### 构建 & 预览
-
-```bash
-pnpm run build
-pnpm run preview
-```
-
-## 部署
-
-项目直接支持 **Vercel** 与 **Cloudflare Pages** 双平台部署。构建时通过 `DEPLOY_TARGET` 环境变量切换适配器。
-
-### Vercel
-
-默认适配器，push 到 `main` 分支后 Vercel 自动部署（无需额外配置）。
-
-### Cloudflare Pages
-
-在 CF Pages 控制台新建项目，连接同一仓库，配置如下：
-
-| 设置         | 值                                        |
-| ------------ | ----------------------------------------- |
-| 框架预设     | SvelteKit                                 |
-| 构建命令     | `DEPLOY_TARGET=cloudflare pnpm run build` |
-| 构建输出目录 | `.svelte-kit/cloudflare`                  |
-| 环境变量     | `DEPLOY_TARGET` = `cloudflare`            |
+部署与构建见 [docs/deployment.md](docs/deployment.md)；上游数据接入见 [docs/upstream-integration.md](docs/upstream-integration.md)。
 
 ## API
 
-API 基于 [nanoka](https://ww.nanoka.cc) 精简提纯，随版本自动更新。上游以
-`DataProvider` 适配器模式接入（`src/lib/api/provider/`），接入新上游的流程与
-数据质量验收标准见 [docs/upstream-integration.md](docs/upstream-integration.md)。
+工具箱自身提供只读数据接口（供 AI 助手、外部脚本与自建站点使用），基于上游数据精简提纯并随游戏版本自动更新；上游以 `DataProvider` 适配器模式接入（`src/lib/api/provider/`），新增上游的流程与验收标准见 [docs/upstream-integration.md](docs/upstream-integration.md)。
 
 ## 声明
 
