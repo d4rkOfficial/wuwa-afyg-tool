@@ -1,5 +1,6 @@
-import type { ConfigState } from './config.types'
-import { defaultConfig } from './config.consts'
+import type { ConfigState, EchoSlotConfig } from './config.types'
+import { defaultConfig, totalCost } from './config.consts'
+import { cloneSlots, normalizeAnyPlanSlots } from './standard-substats'
 import { SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 import { addToast } from '$lib/data/toast.svelte'
 
@@ -99,4 +100,14 @@ export function moveSubstat(charIndex: number, slotIndex: number, fromIdx: numbe
 
 export function getCalcState(): ConfigState {
     return JSON.parse(JSON.stringify(_config))
+}
+
+/** @desc 整份覆盖某角色的 5 个声骸槽位（词条方案一键套用用）：结构合法且总 cost ≤12 才写入 */
+export function setEchoSlots(charIndex: number, slots: EchoSlotConfig[]): boolean {
+    if (!assertUnlocked()) return false
+    const normalized = normalizeAnyPlanSlots({ slots })
+    if (!normalized || totalCost(normalized) > 12) return false
+    const [s0, s1, s2, s3, s4] = cloneSlots(normalized)
+    _config.characters[charIndex].echoes = [s0, s1, s2, s3, s4]
+    return true
 }

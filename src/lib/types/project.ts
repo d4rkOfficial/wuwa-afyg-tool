@@ -27,6 +27,8 @@ export interface CustomHit {
     pctValue: number
     pctUnit: string
     element: string
+    /** @desc 段数（从多段倍率取段时写入；绑定到操作块时作为默认 ×N） */
+    hits?: number
 }
 
 export interface Project {

@@ -44,11 +44,15 @@
         setBlockKeyPickerId
     } from '$lib/calc/timeline.store.svelte'
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
+    import { getSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import { remapDuplicatedDamageBuffs } from '$lib/calc/calculation.store.svelte'
     import { ORIGINAL_BUTTON_KEYS, GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
     import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 
     let confirmMultiAction = $state<'delete' | 'reset' | null>(null)
+
+    // 简化右键菜单（仅作用于操作块菜单与参考线菜单；多选/空白轨道菜单不受影响）
+    const simplifyContextMenu = $derived(getSimplifyContextMenu())
 
     // 手柄图标（blockKey 为手柄 id 时使用）
     const gamepadIconMap = new Map(GAMEPAD_BUTTONS.filter((b) => b.icon).map((b) => [b.id, b.icon as string]))
@@ -145,7 +149,7 @@
             绑定效应/处决
         </button>
     {/if}
-    {#if getDamageBlocks().some((d) => d.sourceId === id && d.trackIndex === 3)}
+    {#if !simplifyContextMenu && getDamageBlocks().some((d) => d.sourceId === id && d.trackIndex === 3)}
         <div class="border-t mt-1 mb-0" style="border-color: var(--theme-divider-border);"></div>
         <button
             onclick={() => removeDamageBySource(id, 'all')}
@@ -172,7 +176,7 @@
         <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
             参考线
         </div>
-        {#if canAddBefore(cm.id)}
+        {#if !simplifyContextMenu && canAddBefore(cm.id)}
             <button
                 onclick={() => {
                     addBefore(cm.id)
@@ -183,7 +187,7 @@
                 左侧添加参考线
             </button>
         {/if}
-        {#if canAddAfter(cm.id)}
+        {#if !simplifyContextMenu && canAddAfter(cm.id)}
             <button
                 onclick={() => {
                     addAfter(cm.id)
@@ -215,14 +219,16 @@
                 删除参考线
                 {@render shortcut('Del')}
             </button>
-            <button
-                onclick={copyToClipboard}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-            >
-                <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
-                复制
-                {@render shortcut('Ctrl+C')}
-            </button>
+            {#if !simplifyContextMenu}
+                <button
+                    onclick={copyToClipboard}
+                    class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                >
+                    <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
+                    复制
+                    {@render shortcut('Ctrl+C')}
+                </button>
+            {/if}
         {/if}
         {@render damageBinding(cm.id, 'ref')}
     </div>
@@ -257,13 +263,15 @@
             <Icon icon="mdi:comment-edit" class="size-4 shrink-0" />
             修改备注
         </button>
-        <button
-            onclick={() => setBlockKeyPickerId(bm.blockId)}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-        >
-            <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" />
-            更换按键
-        </button>
+        {#if !simplifyContextMenu}
+            <button
+                onclick={() => setBlockKeyPickerId(bm.blockId)}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" />
+                更换按键
+            </button>
+        {/if}
         <button
             onclick={() => {
                 removeBlock(bm.blockId)
@@ -274,14 +282,16 @@
             删除操作块
             {@render shortcut('Del')}
         </button>
-        <button
-            onclick={copyToClipboard}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
-        >
-            <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
-            复制
-            {@render shortcut('Ctrl+C')}
-        </button>
+        {#if !simplifyContextMenu}
+            <button
+                onclick={copyToClipboard}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            >
+                <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
+                复制
+                {@render shortcut('Ctrl+C')}
+            </button>
+        {/if}
         <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
         <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
             特殊切人

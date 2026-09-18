@@ -11,6 +11,7 @@ import type { ResultEntry, CharSubstatAnalysis } from '$lib/calc/result.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { getCharacterInfo, getWeaponInfo } from '$lib/api/data-cache'
+import { ensureEchoSkillText } from '$lib/data/char-info.svelte'
 import { getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
@@ -28,9 +29,12 @@ async function buildComputeContext(): Promise<{
 
     const charNames = p.team.map((s) => s.character).filter((c): c is string => !!c)
     const weaponNames = p.team.map((s) => s.weapon).filter((w): w is string => !!w)
+    const echoNames = p.team.map((s) => s.echoes?.[0]?.name).filter((n): n is string => !!n)
     const [charInfos, weaponInfos] = await Promise.all([
         Promise.all(charNames.map((n) => getCharacterInfo(n).catch(() => null))),
-        Promise.all(weaponNames.map((n) => getWeaponInfo(n).catch(() => null)))
+        Promise.all(weaponNames.map((n) => getWeaponInfo(n).catch(() => null))),
+        // 声骸技能文案（伤害类型规则2）：与结果页同口径，先补齐再计算
+        Promise.all(echoNames.map((n) => ensureEchoSkillText(n)))
     ])
     const charInfoMap: Record<string, CharacterInfo> = {}
     charNames.forEach((n, i) => {

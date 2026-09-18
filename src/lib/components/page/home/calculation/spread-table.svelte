@@ -14,6 +14,8 @@
     } from '$lib/calc/calculation.consts'
     import { getCalcElementMap, compareNatural } from '$lib/calc/calculation.store.svelte'
     import { getDamageTypeEditMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
+    import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
+    import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
@@ -132,15 +134,32 @@
             : 'border-right: 1px dashed var(--theme-divider-border);'
     }
 
-    /** @desc 自动推导伤害类型映射（未手填伤害类型时展示推导结果） */
+    /** @desc 自动推导伤害类型映射（未手填伤害类型时展示推导结果；规则2需要角色/声骸技能文案，故补齐数据） */
     const inferredDamageTypeMap = $derived<Record<string, string[]>>(
-        Object.fromEntries(damageEntries.map((e) => [e.id, inferDamageTypes(e)]))
+        Object.fromEntries(
+            damageEntries.map((e) => [
+                e.id,
+                inferDamageTypes(e, e.character ? charInfoMap[e.character] : undefined, echoDescByEntry[e.id])
+            ])
+        )
     )
 
     /** @desc 角色名→槽位索引（用于 scope 判定） */
     const charToIdx = $derived<Record<string, number>>(
         Object.fromEntries(team.map((s, i) => [s.character ?? '', i]).filter(([name]) => name !== ''))
     )
+
+    /** @desc 角色/声骸技能文案缓存（伤害类型规则2需要）：补齐后映射变化会让推导与可用性缓存自动重算 */
+    const charInfoMap = $derived(getCharInfoMap())
+    const echoSkillText = $derived(getEchoSkillText())
+    const echoDescByEntry = $derived(buildEchoDescByEntry(damageEntries, team, echoSkillText))
+    $effect(() => {
+        for (const slot of team) {
+            if (slot.character) void ensureCharInfo(slot.character)
+            const echoName = slot.echoes?.[0]?.name
+            if (echoName) void ensureEchoSkillText(echoName)
+        }
+    })
 
     /** @desc 非直伤条目对 buff 的可用性判定：scope 匹配 +（隐藏条件不匹配时）条件满足 */
     const buffEnabledForEntry = (bs: BuffSet, entry: DamageEntry, charIdx: number): boolean => {
@@ -149,7 +168,7 @@
             : charIdx >= 0 && (bs.scope === 'all' || (bs.scope as number[]).includes(charIdx))
         if (!scopeOk) return false
         if (!hideConditionMismatch) return true
-        return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap)
+        return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap, charInfoMap, echoDescByEntry)
     }
 
     /** @desc 可用性结果缓存：(entryId, buffId) → enabled；条件配置/隐藏开关/类型映射/角色索引引用未变时复用，避免每次重建全量重跑 conditionMet */
@@ -159,20 +178,26 @@
         profile: ConditionProfile | null
         types: Record<string, string[]> | null
         chars: Record<string, number> | null
-    } = { hide: false, profile: null, types: null, chars: null }
+        infos: Record<string, unknown> | null
+        echoes: Record<string, string> | null
+    } = { hide: false, profile: null, types: null, chars: null, infos: null, echoes: null }
 
     function buffEnabledForEntryCached(bs: BuffSet, entry: DamageEntry, charIdx: number): boolean {
         const ctx = {
             hide: hideConditionMismatch,
             profile: conditionProfile,
             types: entryDamageTypeMap,
-            chars: charToIdx
+            chars: charToIdx,
+            infos: charInfoMap,
+            echoes: echoDescByEntry
         }
         if (
             ctx.hide !== _enabledCacheCtx.hide ||
             ctx.profile !== _enabledCacheCtx.profile ||
             ctx.types !== _enabledCacheCtx.types ||
-            ctx.chars !== _enabledCacheCtx.chars
+            ctx.chars !== _enabledCacheCtx.chars ||
+            ctx.infos !== _enabledCacheCtx.infos ||
+            ctx.echoes !== _enabledCacheCtx.echoes
         ) {
             _enabledCacheCtx = ctx
             _enabledCache.clear()

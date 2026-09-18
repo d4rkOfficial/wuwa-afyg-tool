@@ -68,6 +68,8 @@
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
+    import FirstSyncModal from '$lib/components/layout/first-sync-modal.svelte'
+    import { shouldAskFirstSync } from '$lib/data/first-sync.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
     import CharacterDetailModal from '$lib/components/page/home/config/character-detail-modal.svelte'
@@ -324,6 +326,12 @@
     let projects = $derived(getProjects())
     let activeId = $derived(getActiveId())
     let activeProject = $derived(getActiveProject())
+
+    /** @desc 首次进入（已有工程时）询问是否从工坊同步 Buff 集与标准词条集；跳过/同步后不再提示 */
+    let showFirstSync = $state(false)
+    $effect(() => {
+        if (activeProject && shouldAskFirstSync()) showFirstSync = true
+    })
 
     $effect(() => {
         if (activeProject) loadCustomHits(activeProject.customSkillHits ?? {})
@@ -952,6 +960,8 @@
 />
 
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
+
+<FirstSyncModal open={showFirstSync} onclose={() => (showFirstSync = false)} />
 
 {#if activeProject}
     <CharacterDetailModal

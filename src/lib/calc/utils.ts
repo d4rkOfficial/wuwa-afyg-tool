@@ -1,10 +1,25 @@
 import type { ResultEntry } from './result.types'
 import type { DamageEntry } from './calculation.types'
+import type { CharacterInfo } from '$lib/api/types'
+import { inferFromSkillText, matchHitNamePrefix } from './skill-infer'
 
-/** @desc 自动推导伤害类型：效应条目（isEffect）→「效应伤害」；其余按技能类型推断，常态攻击再按招式名分普攻/重击 */
-export function inferDamageTypes(entry: DamageEntry): string[] {
+/**
+ * @desc 自动推导伤害类型（优先级从高到低）：
+ * 1. 效应条目（isEffect）→「效应伤害」；
+ * 2. 规则2：技能富文本「视为/为 XX 伤害」→ 直接顶替其它推导（角色技能文案取 charInfo，
+ *    声骸技能文案由调用方通过 echoDesc 传入）；
+ * 3. 规则1：倍率名含「普攻·/重击·/共鸣技能·/共鸣解放·/变奏技能·/延奏技能·」→ 对应类型；
+ * 4. 按技能类型推断，常态攻击再按招式名分普攻/重击；无法推导归「其它类型伤害」。
+ */
+export function inferDamageTypes(entry: DamageEntry, charInfo?: CharacterInfo | null, echoDesc?: string): string[] {
     // 效应结算条目自动推导为「效应伤害」
     if (entry.isEffect) return ['效应伤害']
+    // 规则2：技能文案「视为/为 XX 伤害」（富文本先剥标签再匹配）
+    const fromText = inferFromSkillText(charInfo, entry, echoDesc ? [echoDesc] : [])
+    if (fromText) return [fromText]
+    // 规则1：倍率名里的类型前缀
+    const fromName = matchHitNamePrefix(entry.hitName)
+    if (fromName) return [fromName]
     switch (entry.skillType) {
         case '常态攻击':
             return entry.hitName.includes('重击') ? ['重击伤害'] : ['普攻伤害']

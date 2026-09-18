@@ -4,6 +4,7 @@
     import type { ConfigState } from '$lib/calc/config.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
+    import { ensureEchoSkillText } from '$lib/data/char-info.svelte'
     import { getCharElementMap } from '$lib/calc/timeline.store.svelte'
     import { getActiveProject, updateResultAnalysis, updateComparisonPoints } from '$lib/data/project.svelte'
     import { computeAll as computeAllDamage } from '$lib/calc/compute'
@@ -118,6 +119,10 @@
                 if (wpInfos[i]) wmap[weaponNames[i]] = wpInfos[i]!
             }
             weaponInfoMap = wmap
+
+            // 声骸技能文案（伤害类型规则2）：先补齐再计算，避免首次结果缺「视为/为 XX 伤害」推导
+            const echoNames = team.map((s) => s.echoes?.[0]?.name).filter((n): n is string => !!n)
+            await Promise.all(echoNames.map((n) => ensureEchoSkillText(n)))
         } catch {
             /* ignore */
         }

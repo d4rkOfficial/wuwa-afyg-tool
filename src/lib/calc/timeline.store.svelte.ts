@@ -791,6 +791,21 @@ export function removeCustomHit(charName: string, hitId: string) {
     refreshSkillPickerGroups()
 }
 
+/** @desc 复制一条自定义直伤（同名不同 Buff 的倍率可直接复用）：名称自动加序号保证命中名唯一 */
+export function duplicateCustomHit(charName: string, hitId: string): string | null {
+    const list = _customSkillHits[charName] ?? []
+    const source = list.find((h) => h.id === hitId)
+    if (!source) return null
+    const taken = new Set(list.map((h) => h.name))
+    let name = `${source.name} 2`
+    for (let n = 3; taken.has(name); n++) name = `${source.name} ${n}`
+    const copy: CustomHit = { ...source, id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name }
+    _customSkillHits = { ..._customSkillHits, [charName]: [...list, copy] }
+    updateCustomSkillHits(_customSkillHits)
+    refreshSkillPickerGroups()
+    return copy.id
+}
+
 export function getSkillCache() {
     return _skillCache
 }

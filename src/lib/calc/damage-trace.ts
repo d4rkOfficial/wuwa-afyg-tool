@@ -4,6 +4,8 @@ import type { ConfigState } from './config.types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import { getBoundBuffSets, type ConditionProfile } from './compute'
+import { buildEchoDescByEntry } from './skill-infer'
+import { getEchoSkillText } from '$lib/data/char-info.svelte'
 import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
 import type { ZoneRef } from './calculation.types'
 import { WEAPON_SUBSTAT_NAME_MAP } from '$lib/consts/game-terms'
@@ -503,13 +505,16 @@ export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, mis
     }
 
     const charIdx = ctx.team.findIndex((s) => s.character === entry.character)
+    const entryLike = toDamageEntryLike(entry)
     const buffs = getBoundBuffSets(
-        toDamageEntryLike(entry),
+        entryLike,
         charIdx,
         ctx.buffSets,
         ctx.damageEntryBuffSetIds,
         ctx.damageEntryDamageTypes,
-        ctx.conditionProfile
+        ctx.conditionProfile,
+        ctx.charInfoMap,
+        buildEchoDescByEntry([entryLike], ctx.team, getEchoSkillText())
     )
 
     const segments: DamageSegment[] = []

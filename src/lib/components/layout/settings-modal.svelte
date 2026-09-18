@@ -51,6 +51,7 @@
     } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import { getConfirmDeletes, setConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
+    import { getSimplifyContextMenu, setSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
         applyLockedMods,
@@ -1279,6 +1280,39 @@
                                         <span
                                             class="absolute top-0.5 size-4 rounded-full transition-all"
                                             style="left: {getConfirmDeletes()
+                                                ? '18px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mt-5">
+                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">右键菜单</span
+                                >
+                                <div
+                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >简化右键菜单</span
+                                        >
+                                        <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                            开启后排轴页的操作块/参考线右键菜单仅保留重命名、伤害绑定与删除；多选菜单不受影响。默认开启
+                                        </span>
+                                    </div>
+                                    <button
+                                        onclick={() => setSimplifyContextMenu(!getSimplifyContextMenu())}
+                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                        style="background: {getSimplifyContextMenu()
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 size-4 rounded-full transition-all"
+                                            style="left: {getSimplifyContextMenu()
                                                 ? '18px'
                                                 : '2px'}; background: var(--theme-modal-bg);"
                                         ></span>

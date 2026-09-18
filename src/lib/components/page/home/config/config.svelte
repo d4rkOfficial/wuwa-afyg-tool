@@ -20,6 +20,7 @@
     import { getCharIconMap, elementColor } from '$lib/calc/timeline.store.svelte'
     import EnemyPanel from './enemy-panel.svelte'
     import RandomEnhanceModal from './random-enhance-modal.svelte'
+    import StandardSubstatModal from './standard-substat-modal.svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
@@ -38,6 +39,7 @@
     let showMainStatMenu = $state<{ ci: number; si: number } | null>(null)
     let showSubstatModal = $state<{ ci: number; si: number } | null>(null)
     let showEnhanceModal = $state<{ ci: number; si: number } | null>(null)
+    let showPlanModal = $state<number | null>(null)
     let dragState = $state<{ ci: number; si: number; idx: number; dropIdx: number; outside: boolean } | null>(null)
     let mainStatMenuPos = $state<{ left: number; top: number; width: number } | null>(null)
     let mainStatMenuEl: HTMLElement | undefined = $state()
@@ -312,6 +314,21 @@
     {:else}
         {@const ci = parseInt(activeTab.replace('char', ''))}
         <div class="flex flex-col flex-1 min-h-0">
+            <div class="mb-2 flex items-center justify-between">
+                <span class="text-xs text-(--theme-modal-text)/50"
+                    >{charNames[ci] ?? `角色${ci + 1}`} · 声骸词条方案</span
+                >
+                <button
+                    onclick={() => (showPlanModal = ci)}
+                    disabled={locked || !charNames[ci]}
+                    class="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors disabled:opacity-40"
+                    style="border-color: var(--theme-divider-border);"
+                    title="一键套用标准14词条，或保存/套用自定义声骸词条方案"
+                >
+                    <Icon icon="mdi:clipboard-text-outline" class="size-3.5" />
+                    词条方案
+                </button>
+            </div>
             <div class="relative flex-1 min-h-0">
                 <div
                     class="flex flex-wrap content-start gap-4 overflow-y-auto pb-2 hide-scrollbar absolute inset-0"
@@ -631,6 +648,17 @@
             existingTypes={emSlot.substats.map((s) => s.type)}
             onclose={() => (showEnhanceModal = null)}
             onresult={handleEnhanceResult(em.ci, em.si)}
+        />
+    {/if}
+
+    <!-- 声骸词条方案（标准14词条 / 自定义方案） -->
+    {#if showPlanModal !== null && charNames[showPlanModal]}
+        <StandardSubstatModal
+            charIndex={showPlanModal}
+            character={charNames[showPlanModal]!}
+            {locked}
+            onclose={() => (showPlanModal = null)}
+            onapplied={() => onupdate(getCalcState())}
         />
     {/if}
 </div>

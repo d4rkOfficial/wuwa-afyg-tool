@@ -9,7 +9,8 @@ export interface WorkshopInstance {
 
 const KEY = 'workshop'
 
-const DEFAULT_URLS = [SHARE_BASE, 
+const DEFAULT_URLS = [
+    SHARE_BASE
     // 'https://wuwa-standard.200503.xyz'
 ]
 

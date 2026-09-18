@@ -20,10 +20,22 @@ import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
 import type { EnemyConfig } from './config.types'
 
 import { inferDamageTypes } from './utils'
+import { buildEchoDescByEntry } from './skill-infer'
+import { getEchoSkillText } from '$lib/data/char-info.svelte'
 
-function resolveDamageTypes(entry: DamageEntry, damageEntryDamageTypes: Record<string, string[]>): string[] {
+function resolveDamageTypes(
+    entry: DamageEntry,
+    damageEntryDamageTypes: Record<string, string[]>,
+    charInfoMap?: Record<string, CharacterInfo>,
+    echoDescByEntry?: Record<string, string>
+): string[] {
     const explicit = damageEntryDamageTypes[entry.id] ?? []
-    return explicit.length > 0 ? explicit : inferDamageTypes(entry)
+    if (explicit.length > 0) return explicit
+    return inferDamageTypes(
+        entry,
+        entry.character ? charInfoMap?.[entry.character] : undefined,
+        echoDescByEntry?.[entry.id]
+    )
 }
 
 /**
@@ -300,7 +312,9 @@ export function conditionMet(
     profile: ConditionProfile,
     charIndex: number,
     entry?: DamageEntry,
-    damageEntryDamageTypes?: Record<string, string[]>
+    damageEntryDamageTypes?: Record<string, string[]>,
+    charInfoMap?: Record<string, CharacterInfo>,
+    echoDescByEntry?: Record<string, string>
 ): boolean {
     const cond = bs.condition
     if (!cond) return true
@@ -319,7 +333,7 @@ export function conditionMet(
     }
     if (cond.damageTypes?.length) {
         if (!entry) return false
-        const types = resolveDamageTypes(entry, damageEntryDamageTypes ?? {})
+        const types = resolveDamageTypes(entry, damageEntryDamageTypes ?? {}, charInfoMap, echoDescByEntry)
         if (!cond.damageTypes.some((dt) => types.includes(dt))) return false
     }
     return true
@@ -332,17 +346,23 @@ export function getBoundBuffSets(
     buffSets: BuffSet[],
     damageEntryBuffSetIds: Record<string, string[]>,
     damageEntryDamageTypes: Record<string, string[]>,
-    profile: ConditionProfile = DEFAULT_CONDITION_PROFILE
+    profile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
+    charInfoMap?: Record<string, CharacterInfo>,
+    echoDescByEntry?: Record<string, string>
 ): BuffSet[] {
     const boundIds = damageEntryBuffSetIds[entry.id] ?? []
     return buffSets.filter((bs) => {
         if (!boundIds.includes(bs.id)) return false
-        if (bs.scope === 'all') return conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes)
+        if (bs.scope === 'all')
+            return conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
         if (Array.isArray(bs.scope) && bs.scope.length === 0)
-            return charIndex < 0 && conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes)
+            return (
+                charIndex < 0 &&
+                conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
+            )
         return (
             (bs.scope as number[]).includes(charIndex) &&
-            conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes)
+            conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
         )
     })
 }
@@ -1284,6 +1304,8 @@ export function computeAll(
     })
 
     // Phase 2: per-entry computation with ref resolution as final step
+    /** @desc 声骸技能文案索引（伤害类型规则2：声骸技能条目的「视为/为 XX 伤害」） */
+    const echoDescByEntry = buildEchoDescByEntry(damageEntries, team, getEchoSkillText())
     return damageEntries.map((entry) => {
         const charName = entry.character
         const charIndex = team.findIndex((s) => s.character === charName)
@@ -1296,7 +1318,9 @@ export function computeAll(
             buffSets,
             damageEntryBuffSetIds,
             damageEntryDamageTypes,
-            conditionProfile
+            conditionProfile,
+            charInfoMap,
+            echoDescByEntry
         )
         const charInfo = charName ? charInfoMap[charName] : undefined
 
@@ -1327,7 +1351,7 @@ export function computeAll(
         }
 
         // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
-        const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
+        const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
 
         // effect damage
         if (entry.isEffect) {
@@ -1400,13 +1424,17 @@ export function computeOneEntry(
     const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
     const wInfo = weaponInfoMap[weaponName ?? ''] ?? null
     const charInfo = charName ? charInfoMap[charName] : undefined
+    /** @desc 声骸技能文案索引（伤害类型规则2） */
+    const echoDescByEntry = buildEchoDescByEntry([entry], team, getEchoSkillText())
     const boundBuffSets = getBoundBuffSets(
         entry,
         charIndex,
         buffSets,
         damageEntryBuffSetIds,
         damageEntryDamageTypes,
-        conditionProfile
+        conditionProfile,
+        charInfoMap,
+        echoDescByEntry
     )
 
     // partial stats (echo+weapon + non-ref buffs)
@@ -1419,7 +1447,7 @@ export function computeOneEntry(
     resolveRefsForEntry(stats, partialStats, fullStats, charIndex, boundBuffSets)
 
     // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
-    const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes)
+    const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
 
     if (entry.isEffect) {
         return computeEffectEntry(entry, stats, enemy, damageTypes)

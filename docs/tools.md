@@ -581,7 +581,7 @@ _无参数_
 
 ### `set_setting`
 
-修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、calc_view(dropdown/spread)、simplify_toolbar、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。
+修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。
 
 | 参数    | 必填   | 类型     | 说明                           |
 | ------- | ------ | -------- | ------------------------------ |

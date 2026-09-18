@@ -14,6 +14,8 @@
     } from '$lib/calc/calculation.store.svelte'
     import { inferDamageTypes } from '$lib/calc/utils'
     import { conditionMet } from '$lib/calc/compute'
+    import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
+    import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { addToast } from '$lib/data/toast.svelte'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, groupBuffSets, LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
@@ -56,10 +58,25 @@
     let expandedEntryId = $state<string | null>(null)
     let calcContainer = $state<HTMLDivElement | undefined>()
 
-    /** @desc 角色元素映射与自动推导伤害类型（未手填时按条目特征推断） */
+    /** @desc 角色元素映射与自动推导伤害类型（未手填时按条目特征推断；规则2需要角色/声骸技能文案，故先补齐数据） */
     let calcElementMap = $derived(getCalcElementMap())
+    let charInfoMap = $derived(getCharInfoMap())
+    let echoSkillText = $derived(getEchoSkillText())
+    let echoDescByEntry = $derived(buildEchoDescByEntry(damageEntries, team, echoSkillText))
+    $effect(() => {
+        for (const slot of team) {
+            if (slot.character) void ensureCharInfo(slot.character)
+            const echoName = slot.echoes?.[0]?.name
+            if (echoName) void ensureEchoSkillText(echoName)
+        }
+    })
     let inferredDamageTypeMap = $derived<Record<string, string[]>>(
-        Object.fromEntries(damageEntries.map((e) => [e.id, inferDamageTypes(e)]))
+        Object.fromEntries(
+            damageEntries.map((e) => [
+                e.id,
+                inferDamageTypes(e, e.character ? charInfoMap[e.character] : undefined, echoDescByEntry[e.id])
+            ])
+        )
     )
 
     /** @desc 当前展开条目及它的 Buff/伤害类型绑定、角色槽位索引 */
@@ -77,7 +94,7 @@
         if (!bs) return false
         if (!hideConditionMismatch) return true
         const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
-        return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap)
+        return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap, charInfoMap, echoDescByEntry)
     }
 
     /** @desc 对当前展开条目可见（非全局、作用域匹配、条件满足）的 Buff，并按叠层规则分组 */

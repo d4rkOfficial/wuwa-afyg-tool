@@ -18,9 +18,11 @@
         getCustomSkillHits,
         addCustomHit,
         removeCustomHit,
+        duplicateCustomHit,
         applySkillHits,
         switchSkillPickerTab
     } from '$lib/calc/timeline.store.svelte'
+    import { parseRatioHits, summarizeSelectedHits } from '$lib/calc/skill-segments'
     import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
     import type { CustomHit } from '$lib/calc/timeline.types'
     import { addToast } from '$lib/data/toast.svelte'
@@ -39,6 +41,87 @@
     let showUnitMenu = $state(false)
     let hasFlat = $state(false)
     let hasPct = $state(false)
+    let customHitsCount = $state(1)
+    let showSegmentPicker = $state(false)
+    /** @desc 取段来源：当前角色技能命中名（来自数据表的多段倍率） */
+    let segmentSourceName = $state('')
+    /** @desc 展开后的逐段选中集合（索引对应 segmentHits） */
+    let segmentSelected = $state<Set<number>>(new Set())
+    let copySourceId = $state('')
+
+    /** @desc 可取的技能命中（排除自定义/谐度破坏/响应，这些不走直伤） */
+    let segmentOptions = $derived.by(() => {
+        const out: { name: string; ratio: string; element: string }[] = []
+        for (const group of getSkillPickerGroups()) {
+            if (group.type === '自定义' || group.type === '谐度破坏') continue
+            for (const hit of group.hits) {
+                if (hit.name.includes('响应')) continue
+                out.push({ name: hit.name, ratio: hit.ratio, element: hit.element })
+            }
+        }
+        return out
+    })
+    let segmentSourceRatio = $derived(segmentOptions.find((o) => o.name === segmentSourceName)?.ratio ?? '')
+    let segmentHits = $derived(segmentSourceName ? parseRatioHits(segmentSourceRatio) : [])
+    let selectedSegmentHits = $derived(segmentHits.filter((_, i) => segmentSelected.has(i)))
+    let segmentSummary = $derived(selectedSegmentHits.length > 0 ? summarizeSelectedHits(selectedSegmentHits) : null)
+    let existingCustomHits = $derived(getCustomSkillHits()[getSkillPickerCharacter()] ?? [])
+
+    function toggleSegment(index: number) {
+        const next = new Set(segmentSelected)
+        if (next.has(index)) next.delete(index)
+        else next.add(index)
+        segmentSelected = next
+    }
+
+    function selectAllSegments() {
+        segmentSelected = new Set(segmentHits.map((_, i) => i))
+    }
+
+    function clearSegments() {
+        segmentSelected = new Set()
+    }
+
+    /** @desc 取用所选段：写入名称/倍率/段数（同倍率选择 → 倍率×段数；混合选择 → 合计倍率×1，保证总倍率精确） */
+    function applySegments() {
+        const summary = segmentSummary
+        if (!summary) {
+            addToast('请先勾选要取用的段', 'info')
+            return
+        }
+        const option = segmentOptions.find((o) => o.name === segmentSourceName)
+        if (option) {
+            customName = option.name
+            if (option.element) customElement = option.element
+        }
+        if (summary.kind === '%') {
+            hasPct = true
+            customPct = String(summary.ratio)
+            customPctUnit = summary.unit
+        } else {
+            hasFlat = true
+            customFlat = String(summary.ratio)
+        }
+        customHitsCount = summary.hits
+        addToast(
+            `已取用 ${selectedSegmentHits.length} 段：倍率 ${summary.ratio}${summary.kind === '%' ? '%' : ''} × ${summary.hits} 段`,
+            'success'
+        )
+    }
+
+    /** @desc 直接复制一条已有自定义直伤到表单（同名不同 Buff 的倍率可改个后缀名再存一条） */
+    function fillFromExisting() {
+        const source = existingCustomHits.find((h) => h.id === copySourceId)
+        if (!source) return
+        customName = source.name
+        hasFlat = source.flatValue > 0
+        customFlat = source.flatValue > 0 ? String(source.flatValue) : ''
+        hasPct = source.pctValue > 0
+        customPct = source.pctValue > 0 ? String(source.pctValue) : ''
+        customPctUnit = source.pctUnit
+        customElement = source.element
+        customHitsCount = source.hits ?? 1
+    }
 
     function openAddCustom(charName: string) {
         customName = ''
@@ -48,6 +131,11 @@
         customElement = '物理'
         hasFlat = false
         hasPct = false
+        customHitsCount = 1
+        showSegmentPicker = false
+        segmentSourceName = ''
+        segmentSelected = new Set()
+        copySourceId = ''
         showCustomModal = true
     }
 
@@ -68,21 +156,22 @@
             flatValue: isNaN(flat) || flat <= 0 ? 0 : flat,
             pctValue: isNaN(pct) || pct <= 0 ? 0 : pct,
             pctUnit: customPctUnit,
-            element: customElement
+            element: customElement,
+            hits: Math.max(1, Math.floor(customHitsCount) || 1)
         }
         addCustomHit(charName, hit)
+        // 新建后自动勾选并带上段数，省一次手动 ×N 输入
+        const key = `${charName}|自定义|${hit.id}`
+        const nextSelected = new Set(getSkillPickerSelected())
+        nextSelected.add(key)
+        setSkillPickerSelected(nextSelected)
+        setSkillPickerHitHits({ ...getSkillPickerHitHits(), [key]: hit.hits ?? 1 })
         showCustomModal = false
     }
 
     function openAddCustomWithName(name: string, charName: string) {
+        openAddCustom(charName)
         customName = name
-        customFlat = ''
-        customPct = ''
-        customPctUnit = '攻击%'
-        customElement = '物理'
-        hasFlat = false
-        hasPct = false
-        showCustomModal = true
     }
 
     function toggleSkillSelection(key: string) {
@@ -203,6 +292,12 @@
                                                 (c) => c.id === hit.name
                                             )?.name ?? hit.name)
                                           : hit.name}
+                                {@const customHit =
+                                    group.type === '自定义'
+                                        ? (getCustomSkillHits()[getSkillPickerCharacter()] ?? []).find(
+                                              (c) => c.id === hit.name
+                                          )
+                                        : undefined}
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -268,7 +363,7 @@
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={getSkillPickerHitHits()[key] ?? 1}
+                                                value={getSkillPickerHitHits()[key] ?? customHit?.hits ?? 1}
                                                 oninput={(e) => {
                                                     const v = parseInt((e.target as HTMLInputElement).value)
                                                     setSkillPickerHitHits({
@@ -282,6 +377,16 @@
                                         </span>
                                     {/if}
                                     {#if group.type === '自定义'}
+                                        <button
+                                            onclick={(e) => {
+                                                e.stopPropagation()
+                                                const id = duplicateCustomHit(getSkillPickerCharacter(), hit.name)
+                                                if (id) addToast('已复制该自定义直伤', 'success')
+                                            }}
+                                            class="shrink-0 rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-accent-text)"
+                                            title="复制这条倍率（同名不同 Buff 的倍率可直接复用）"
+                                            ><Icon icon="mdi:content-copy" class="size-3.5" /></button
+                                        >
                                         <button
                                             onclick={(e) => {
                                                 e.stopPropagation()
@@ -374,6 +479,135 @@
                         class="w-full rounded-lg border px-3 py-2 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     />
+                </div>
+
+                <div class="flex items-end gap-3">
+                    <div class="flex-1">
+                        <label for="custom-hits" class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5"
+                            >段数</label
+                        >
+                        <input
+                            id="custom-hits"
+                            type="number"
+                            min="1"
+                            bind:value={customHitsCount}
+                            class="w-full rounded-lg border px-3 py-2 text-xs tabular-nums outline-none text-(--theme-modal-text)"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                        />
+                    </div>
+                    {#if existingCustomHits.length > 0}
+                        <div class="flex-1">
+                            <label for="custom-copy" class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5"
+                                >复制已有</label
+                            >
+                            <select
+                                id="custom-copy"
+                                bind:value={copySourceId}
+                                onchange={fillFromExisting}
+                                class="w-full rounded-lg border px-2 py-2 text-xs outline-none text-(--theme-modal-text)"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <option value="">选择一条…</option>
+                                {#each existingCustomHits as ch}
+                                    <option value={ch.id}>{ch.name}</option>
+                                {/each}
+                            </select>
+                        </div>
+                    {/if}
+                </div>
+
+                <!-- 从技能倍率取段：多段倍率（如 60%*2+40%*3）可只取其中几段 -->
+                <div class="rounded-lg border" style="border-color: var(--theme-divider-border);">
+                    <button
+                        class="flex w-full items-center justify-between px-3 py-2 text-[11px] text-(--theme-modal-text)"
+                        onclick={() => (showSegmentPicker = !showSegmentPicker)}
+                    >
+                        <span class="flex items-center gap-1.5">
+                            <Icon icon="mdi:format-list-numbered" class="size-3.5" />
+                            从技能倍率取段（多段倍率只取其中几段）
+                        </span>
+                        <Icon icon={showSegmentPicker ? 'mdi:chevron-up' : 'mdi:chevron-down'} class="size-3.5" />
+                    </button>
+                    {#if showSegmentPicker}
+                        <div class="space-y-2 border-t px-3 py-2" style="border-color: var(--theme-divider-border);">
+                            <div class="theme-scrollbar max-h-36 space-y-0.5 overflow-y-auto">
+                                {#each segmentOptions as option}
+                                    <button
+                                        onclick={() => {
+                                            segmentSourceName = option.name
+                                            segmentSelected = new Set()
+                                        }}
+                                        class={[
+                                            'flex w-full items-center gap-2 rounded px-2 py-1 text-[11px] transition-colors',
+                                            segmentSourceName === option.name
+                                                ? 'bg-(--theme-input-bg) text-(--theme-modal-text)'
+                                                : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5'
+                                        ].join(' ')}
+                                    >
+                                        <span class="min-w-0 flex-1 truncate text-left" title={option.name}
+                                            >{option.name}</span
+                                        >
+                                        <span class="shrink-0 text-(--theme-modal-text)/50">{option.ratio}</span>
+                                    </button>
+                                {/each}
+                                {#if segmentOptions.length === 0}
+                                    <div class="py-2 text-[11px] text-(--theme-modal-text)/50">
+                                        当前角色暂无可用的技能倍率数据
+                                    </div>
+                                {/if}
+                            </div>
+                            {#if segmentSourceName && segmentHits.length > 0}
+                                <div class="flex items-center gap-2 text-[11px] text-(--theme-modal-text)/70">
+                                    <span class="min-w-0 flex-1 truncate" title={segmentSourceName}
+                                        >{segmentSourceName}：共 {segmentHits.length} 段</span
+                                    >
+                                    <button
+                                        onclick={selectAllSegments}
+                                        class="shrink-0 transition-colors hover:text-(--theme-accent-text)">全选</button
+                                    >
+                                    <button
+                                        onclick={clearSegments}
+                                        class="shrink-0 transition-colors hover:text-(--theme-accent-text)">清空</button
+                                    >
+                                </div>
+                                <div class="flex flex-wrap gap-1">
+                                    {#each segmentHits as segment, i}
+                                        <button
+                                            onclick={() => toggleSegment(i)}
+                                            class={[
+                                                'rounded border px-1.5 py-0.5 text-[11px] tabular-nums transition-colors',
+                                                segmentSelected.has(i)
+                                                    ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                                                    : 'border-(--theme-divider-border) text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)'
+                                            ].join(' ')}
+                                        >
+                                            {segment.value}{segment.kind === '%' ? '%' : ''}
+                                            <span class="ml-0.5 opacity-50">#{i + 1}</span>
+                                        </button>
+                                    {/each}
+                                </div>
+                                {#if segmentSummary}
+                                    <div class="text-[11px] text-(--theme-modal-text)/70">
+                                        合计 {segmentSummary.total}{segmentSummary.kind === '%' ? '%' : ''} → 写入
+                                        <b>{segmentSummary.ratio}{segmentSummary.kind === '%' ? '%' : ''}</b>
+                                        × <b>{segmentSummary.hits}</b> 段
+                                        {#if !segmentSummary.uniform}
+                                            <span class="opacity-50"
+                                                >（所选段倍率不一致：按「合计倍率 × 1 段」写入，保证总倍率精确）</span
+                                            >
+                                        {/if}
+                                    </div>
+                                    <button
+                                        onclick={applySegments}
+                                        class="rounded-lg border px-2.5 py-1 text-[11px] transition-colors"
+                                        style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
+                                    >
+                                        取用所选段（{selectedSegmentHits.length}）
+                                    </button>
+                                {/if}
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
 
                 <div ondblclick={() => (hasFlat = true)}>
