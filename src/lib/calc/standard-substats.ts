@@ -1,6 +1,6 @@
 import type { EchoSlotConfig } from './config.types'
 import { ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
-import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_LABELS, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
+import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 import type { SubstatLabel } from '$lib/consts/stat-data'
 
 /** @desc 标准词条集：5 个声骸合计 14 条副词条（5 暴击 + 5 暴伤 + 2 百分比 + 2 固定值） */
@@ -9,22 +9,13 @@ export const STANDARD_SUBSTAT_TOTAL = 14
 /** @desc 标准词条集方案名（工坊同步的唯一一种方案，也是本地不可删除的方案） */
 export const STANDARD_PLAN_NAME = '标准14词条'
 
-/** @desc 标准 43311 的声骸 cost 排列（槽位 1=4cost，2/3=3cost，4/5=1cost） */
+/** @desc 标准方案的默认 cost 排列（槽位 1=4cost，2/3=3cost，4/5=1cost）；
+ *  仅用于「自动生成标准词条」与新建方案的初始值——编辑与校验都**不强制**该组合，只要求合计 ≤12 */
 export const STANDARD_COST_LAYOUT = [4, 3, 3, 1, 1] as const
 
 export type StatFamily = '攻击' | '生命' | '防御'
 
 const STAT_FAMILIES: StatFamily[] = ['攻击', '生命', '防御']
-
-const SUBSTAT_LABEL_SET = new Set<string>(SUBSTAT_LABELS)
-
-/** @desc 各 cost 允许的主词条（主词条与 cost 绑定，避免套用出「1cost 暴击率」这类非法组合） */
-function mainStatLabelsFor(cost: number): Set<string> {
-    return new Set<string>((MAIN_STAT_POOL[cost] ?? []).map((o) => o.label))
-}
-
-/** @desc 副主词条只有攻击/生命两种（引擎只对这两个 label 生效） */
-const SECOND_MAIN_STAT_LABELS = new Set<string>(['攻击', '生命'])
 
 /** @desc 中位档（偏低）：8 档取第 4 档、4 档取第 2 档（与「添加副词条」默认值同口径） */
 export function midTierValue(label: SubstatLabel): number {
@@ -113,14 +104,37 @@ export function planSubstatTotal(slots: EchoSlotConfig[]): number {
     return slots.reduce((sum, slot) => sum + slot.substats.length, 0)
 }
 
-function normalizeStat(value: unknown, allowed: Set<string>): { type: string; value: number; unit: string } | null {
+/** @desc 把数值吸附到最近的合法档位（脏数据 / 手写 JSON 容错；UI 只能从档位里选） */
+function snapToTiers(tiers: number[], value: number): number {
+    const fallback = tiers[Math.floor((tiers.length - 1) / 2)] ?? 0
+    if (!Number.isFinite(value)) return fallback
+    return tiers.reduce((best, t) => (Math.abs(t - value) < Math.abs(best - value) ? t : best), tiers[0] ?? 0)
+}
+
+/** @desc 副词条：type 必须在白名单内，数值吸附到合法档位、单位按词条类型固定（不接受自由数值） */
+function normalizeSubstat(value: unknown): { type: string; value: number; unit: string } | null {
     if (!value || typeof value !== 'object') return null
     const raw = value as Record<string, unknown>
     const type = typeof raw.type === 'string' ? raw.type : ''
-    const num = Number(raw.value)
-    const unit = raw.unit === '%' ? '%' : ''
-    if (!allowed.has(type) || !Number.isFinite(num)) return null
-    return { type, value: num, unit }
+    const opt = SUBSTAT_OPTIONS.find((o) => o.label === type)
+    if (!opt) return null
+    return { type, value: snapToTiers(opt.tiers, Number(raw.value)), unit: opt.unit }
+}
+
+/** @desc 主词条：type 必须属于该 cost 的池子，数值固定取满级上限（不接受自定义数值） */
+function normalizeMainStat(value: unknown, cost: number): { type: string; value: number; unit: string } | null {
+    if (!value || typeof value !== 'object') return null
+    const raw = value as Record<string, unknown>
+    const type = typeof raw.type === 'string' ? raw.type : ''
+    const opt = (MAIN_STAT_POOL[cost] ?? []).find((o) => o.label === type)
+    if (!opt) return null
+    return { type: opt.label, value: opt.maxValue, unit: opt.unit }
+}
+
+/** @desc 副主词条：完全由槽位 cost 自动推导（4→攻击150 / 3→攻击100 / 1→生命2280） */
+function normalizeSecondMainStat(cost: number): { type: string; value: number; unit: string } | null {
+    const sec = SECOND_MAIN_STAT[cost as keyof typeof SECOND_MAIN_STAT]
+    return sec ? { type: sec.label, value: sec.value, unit: sec.unit } : null
 }
 
 function normalizeSlot(value: unknown): EchoSlotConfig | null {
@@ -130,22 +144,22 @@ function normalizeSlot(value: unknown): EchoSlotConfig | null {
     if (![1, 3, 4].includes(cost)) return null
     const substats: { type: string; value: number; unit: string }[] = []
     for (const item of Array.isArray(raw.substats) ? raw.substats : []) {
-        const stat = normalizeStat(item, SUBSTAT_LABEL_SET)
+        const stat = normalizeSubstat(item)
         if (!stat || substats.length >= 5) continue
         if (substats.some((s) => s.type === stat.type)) continue
         substats.push(stat)
     }
     return {
         cost,
-        mainStat: normalizeStat(raw.mainStat, mainStatLabelsFor(cost)),
-        secondMainStat: normalizeStat(raw.secondMainStat, SECOND_MAIN_STAT_LABELS),
+        mainStat: normalizeMainStat(raw.mainStat, cost),
+        secondMainStat: normalizeSecondMainStat(cost),
         substats
     }
 }
 
 /**
- * @desc 宽松归一化：任意 5 槽位方案（用户自建方案允许不同 cost 组合），
- * 要求 5 个槽位、总 cost ≤12、每槽副词条 ≤5 且类型在白名单内；不满足返回 null。
+ * @desc 宽松归一化：任意 5 槽位方案（cost 组合不限，只要合计 ≤12），每槽副词条 ≤5 且类型在白名单内；
+ * 主词条数值固定为满级、副主词条按 cost 自动推导、副词条数值吸附到合法档位；不满足返回 null。
  */
 export function normalizeAnyPlanSlots(value: unknown): EchoSlotConfig[] | null {
     const raw = (value ?? {}) as { slots?: unknown }
@@ -162,13 +176,11 @@ export function normalizeAnyPlanSlots(value: unknown): EchoSlotConfig[] | null {
 
 /**
  * @desc 归一化「标准14词条」方案（工坊同步 / 本地存储 / 导入的 JSON）：
- * 在宽松归一化基础上额外要求 cost 多重集合恰为 {4,3,3,1,1}、副词条合计恰为 14 条；不满足返回 null（脏数据丢弃）。
+ * 在宽松归一化基础上额外要求副词条合计恰为 14 条（**cost 组合不限**，只要合计 ≤12）；不满足返回 null（脏数据丢弃）。
  */
 export function normalizePlanSlots(value: unknown): EchoSlotConfig[] | null {
     const slots = normalizeAnyPlanSlots(value)
     if (!slots) return null
-    const expected = [...STANDARD_COST_LAYOUT]
-    if ([...slots.map((s) => s.cost)].sort().join(',') !== [...expected].sort().join(',')) return null
     if (planSubstatTotal(slots) !== STANDARD_SUBSTAT_TOTAL) return null
     return slots
 }
