@@ -161,6 +161,18 @@
     // ── 配置选择：矩阵多选弹窗，3 角色各自勾选多个 (链,阶)，笛卡尔积组合成团队配置 ──
     let pickerOpen = $state(false)
     let perCharSel = $state<{ chain: number; refinement: number }[][]>([[], [], []])
+    /** @desc 一次可确认的团队配置数上限（超过后禁止确认，避免一次复算过多配置） */
+    const MAX_PICKER_CONFIGS = 16
+    /** @desc 该链档位是否有生效的条件 buff：挂载 buff 的链门槛正好落在 n（门槛语义是「≥n」，故只有门槛值那一档才是新增档） */
+    const chainHasOwnBuff = (chain: number) => eligibility.chains.includes(chain)
+    /** @desc 该阶档位是否有专属 buff（0=无专武，为基线） */
+    const refinementHasOwnBuff = (refinement: number) => eligibility.refinements.includes(refinement)
+    /** @desc 表头档位标签透明度：无专属 buff 的档位压暗，提示「加到这一档不会带来新 buff」；0 链/无专是基线，始终正常显示 */
+    const labelOpacity = (level: number, hasOwnBuff: boolean) => (level === 0 || hasOwnBuff ? 0.5 : 0.22)
+    const cellStyle = (checked: boolean) =>
+        checked
+            ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg); border-color: var(--theme-accent-bg);'
+            : 'border-color: var(--theme-divider-border); color: var(--theme-modal-text);'
 
     function openPicker() {
         // 从当前 points 反推每角色已选 (链,阶)，保留上次选择
@@ -289,6 +301,8 @@
         startSeconds: number
         endSeconds: number
         totalDamage: number
+        charDamages: Record<string, number>
+        otherDamage: number
     }
     function segmentsOf(entries: ResultEntry[]): Segment[] {
         if (validTimings.length === 0) return []
@@ -305,16 +319,97 @@
                 const p = blockPosMap.get(e.sourceTimelineBlockId)
                 return p !== undefined && p >= prevRefPos && p < currentRefPos
             })
+            const charDamages: Record<string, number> = {}
+            let otherDamage = 0
+            for (const e of segEntries) {
+                const character = e.character
+                if (character && team.some((s) => s.character === character)) {
+                    charDamages[character] = (charDamages[character] ?? 0) + e.totalDamageRaw
+                } else {
+                    otherDamage += e.totalDamageRaw
+                }
+            }
             result.push({
                 startSeconds: prevSeconds,
                 endSeconds: t.seconds!,
-                totalDamage: segEntries.reduce((s, e) => s + e.totalDamageRaw, 0)
+                totalDamage: segEntries.reduce((s, e) => s + e.totalDamageRaw, 0),
+                charDamages,
+                otherDamage
             })
             prevRefPos = currentRefPos
             prevSeconds = t.seconds!
         }
         return result
     }
+
+    // ── 时段选择（含总计）：单选一行，下方明细呈现该范围的段总伤 / 段角色总伤 / 段其它总伤 / DPS ──
+    /** @desc 'total' = 总计；数字 = 时段下标（默认总计） */
+    let selectedRange = $state<'total' | number>('total')
+    /** @desc 每配置的分段（记点相同，段数一致） */
+    let configSegments = $derived(configs.map((c) => segmentsOf(c.entries)))
+    /** @desc 时段列表（以首个配置为准：渲染行与范围标签） */
+    let rangeSegments = $derived(configSegments[0] ?? [])
+    /** @desc 记点变化导致段数减少时，失效的下标回落到总计 */
+    let activeRange = $derived(
+        typeof selectedRange === 'number' && selectedRange >= rangeSegments.length ? 'total' : selectedRange
+    )
+
+    interface RangeStat {
+        config: Config
+        damage: number
+        charDamages: Record<string, number>
+        otherDamage: number
+        span: number
+        dps: number
+    }
+
+    /** @desc 选中范围的每配置统计：总计用整段数据，时段用该段数据（大卡片与明细表共用） */
+    let rangeStats = $derived.by<RangeStat[]>(() =>
+        configs.map((c, ci) => {
+            if (activeRange === 'total') {
+                const charDamages: Record<string, number> = {}
+                let otherDamage = 0
+                for (const cs of c.charSummaries) {
+                    if (team.some((s) => s.character === cs.character)) {
+                        charDamages[cs.character] = (charDamages[cs.character] ?? 0) + cs.totalDamage
+                    } else {
+                        otherDamage += cs.totalDamage
+                    }
+                }
+                return {
+                    config: c,
+                    damage: c.totalDamage,
+                    charDamages,
+                    otherDamage,
+                    span: totalDur,
+                    dps: totalDur > 0 ? c.totalDamage / totalDur : 0
+                }
+            }
+            const seg = (configSegments[ci] ?? [])[activeRange]
+            const span = seg ? seg.endSeconds - seg.startSeconds : 0
+            return {
+                config: c,
+                damage: seg?.totalDamage ?? 0,
+                charDamages: seg?.charDamages ?? {},
+                otherDamage: seg?.otherDamage ?? 0,
+                span,
+                dps: seg && span > 0 ? seg.totalDamage / span : 0
+            }
+        })
+    )
+    /** @desc 选中范围标签（明细表标题用） */
+    let rangeLabel = $derived.by(() => {
+        if (activeRange === 'total') return '总计'
+        const seg = rangeSegments[activeRange]
+        return seg ? `${seg.startSeconds.toFixed(1)}s — ${seg.endSeconds.toFixed(1)}s` : '总计'
+    })
+
+    /** @desc 选中范围时长（秒）：总计 = 总时长，否则 = 该段跨度 */
+    let rangeSpan = $derived.by(() => {
+        if (activeRange === 'total') return totalDur
+        const seg = rangeSegments[activeRange]
+        return seg ? seg.endSeconds - seg.startSeconds : 0
+    })
 
     // ── 图表 ──
     let curveCanvas = $state<HTMLCanvasElement | null>(null)
@@ -606,10 +701,10 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <button
                             onclick={openPicker}
-                            class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors hover:border-(--theme-accent-bg)"
-                            style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                            class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors hover:opacity-80"
+                            style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
                         >
-                            <Icon icon="mdi:sitemap" class="size-4" style="color: var(--theme-accent-text);" />
+                            <Icon icon="mdi:sitemap" class="size-4" />
                             选择对比配置
                         </button>
                         {#if points.length > 0}
@@ -667,80 +762,244 @@
                     </section>
 
                     {#if points.length > 0}
-                        <!-- ── 配置 + DPS + 总伤 卡片组（并排）── -->
-                        <section class="theme-scrollbar flex gap-3 overflow-x-auto">
-                            {#each configs as c}
-                                <div
-                                    class="min-w-44 flex-1 shrink-0 rounded-lg border p-3"
-                                    style="border-color: {c.accent}; background: var(--theme-card-bg);"
-                                >
+                        <!-- ── 配置 + DPS + 总伤 卡片组（并排；数值随下方选中的时段切换）── -->
+                        <section class="space-y-2">
+                            <div class="flex items-center gap-2 text-[11px]" style="opacity: 0.6;">
+                                <Icon icon="mdi:cursor-default-click-outline" class="size-3.5" />
+                                <span>当前口径：{rangeLabel}（时长 {rangeSpan.toFixed(1)}s）· 点下方分段行可切换</span>
+                            </div>
+                            <div class="theme-scrollbar flex gap-3 overflow-x-auto">
+                                {#each rangeStats as stat}
+                                    {@const c = stat.config}
                                     <div
-                                        class="flex items-center gap-1.5 text-sm font-semibold"
-                                        style="color: {c.accent};"
+                                        class="min-w-44 flex-1 shrink-0 rounded-lg border p-3"
+                                        style="border-color: {c.accent}; background: var(--theme-card-bg);"
                                     >
-                                        <span class="size-2.5 rounded-full" style="background: {c.accent};"
-                                        ></span>{c.label}
-                                    </div>
-                                    <div class="mt-2 space-y-1.5">
-                                        <div class="flex items-end justify-between gap-2">
-                                            <span class="pb-0.5 text-xs opacity-50">DPS</span><span
-                                                class="text-2xl font-bold leading-none tabular-nums"
-                                                style="color: {c.accent};"
-                                                >{totalDur > 0 ? fmt(c.totalDamage / totalDur) : '—'}</span
-                                            >
+                                        <div
+                                            class="flex items-center gap-1.5 text-sm font-semibold"
+                                            style="color: {c.accent};"
+                                        >
+                                            <span class="size-2.5 rounded-full" style="background: {c.accent};"
+                                            ></span>{c.label}
                                         </div>
-                                        <div class="flex items-center justify-between text-xs">
-                                            <span class="opacity-50">总伤</span><span
-                                                class="tabular-nums font-medium"
-                                                style="color: {c.accent};">{fmt(c.totalDamage)}</span
-                                            >
+                                        <div class="mt-2 space-y-1.5">
+                                            <div class="flex items-end justify-between gap-2">
+                                                <span class="pb-0.5 text-xs opacity-50">DPS</span><span
+                                                    class="text-2xl font-bold leading-none tabular-nums"
+                                                    style="color: {c.accent};"
+                                                    >{stat.dps > 0 ? fmt(stat.dps) : '—'}</span
+                                                >
+                                            </div>
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="opacity-50">总伤</span><span
+                                                    class="tabular-nums font-medium"
+                                                    style="color: {c.accent};">{fmt(stat.damage)}</span
+                                                >
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            {/each}
+                                {/each}
+                            </div>
                         </section>
 
-                        <!-- ── 分段 DPS（并排：每配置一列）── -->
+                        <!-- ── 分段 DPS（版式对齐数据分析页：区块头 + 时段单选 + 选中范围明细）── -->
                         <section
-                            class="rounded-lg border p-3"
-                            style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                            class="rounded-xl border"
+                            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
                         >
-                            <div class="mb-2 text-xs font-semibold uppercase tracking-wider opacity-50">分段 DPS</div>
-                            {#if validTimings.length === 0}
-                                <p class="text-xs opacity-40">配置时间记点后显示分段 DPS</p>
-                            {:else}
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-xs tabular-nums">
-                                        <thead>
-                                            <tr class="text-left opacity-50">
-                                                <th class="py-1 pr-3 font-medium">区间</th>
-                                                {#each configs as c}<th
-                                                        class="px-2 py-1 font-medium"
-                                                        style="color: {c.accent};">{c.label}</th
-                                                    >{/each}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {#each segmentsOf(configs[0].entries) as seg, si}
-                                                <tr class="border-t" style="border-color: var(--theme-divider-border);">
-                                                    <td class="py-1 pr-3 opacity-60"
-                                                        >{seg.startSeconds.toFixed(1)}–{seg.endSeconds.toFixed(1)}s</td
-                                                    >
+                            <div
+                                class="flex flex-wrap items-center gap-2 border-b px-4 py-3"
+                                style="border-color: var(--theme-divider-border);"
+                            >
+                                <Icon
+                                    icon="mdi:chart-timeline-variant"
+                                    class="size-4"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <span class="text-sm font-semibold" style="color: var(--theme-modal-text);"
+                                    >分段 DPS</span
+                                >
+                                <span class="text-[11px] opacity-50"
+                                    >点击时段行切换上方卡片与明细的口径（默认总计）</span
+                                >
+                            </div>
+                            <div class="px-4 py-3">
+                                {#if validTimings.length === 0}
+                                    <p class="text-xs opacity-40">配置时间记点后显示分段 DPS</p>
+                                {:else}
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-xs">
+                                            <thead>
+                                                <tr style="color: var(--theme-modal-text); opacity: 0.5;">
+                                                    <th class="py-1.5 pr-2 text-left font-medium">时段</th>
+                                                    <th class="px-2 py-1.5 text-right font-medium">跨度</th>
                                                     {#each configs as c}
-                                                        {@const segs = segmentsOf(c.entries)}
-                                                        <td class="px-2 py-1"
-                                                            >{(
-                                                                (segs[si]?.totalDamage ?? 0) /
-                                                                (seg.endSeconds - seg.startSeconds)
-                                                            ).toFixed(0)}</td
+                                                        <th
+                                                            class="px-2 py-1.5 text-right font-medium"
+                                                            style="color: {c.accent};">{c.label}</th
                                                         >
                                                     {/each}
                                                 </tr>
-                                            {/each}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            {/if}
+                                            </thead>
+                                            <tbody>
+                                                {#each rangeSegments as seg, si}
+                                                    {@const span = seg.endSeconds - seg.startSeconds}
+                                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                                    <tr
+                                                        class="cursor-pointer border-t transition-colors"
+                                                        style="border-color: var(--theme-divider-border); color: var(--theme-modal-text); background: {activeRange ===
+                                                        si
+                                                            ? 'color-mix(in srgb, var(--theme-accent-bg) 8%, transparent)'
+                                                            : 'transparent'};"
+                                                        onclick={() => (selectedRange = si)}
+                                                        role="button"
+                                                        tabindex="0"
+                                                        title="点击查看该时段数据"
+                                                    >
+                                                        <td
+                                                            class="py-2 pr-2 text-[10px] tabular-nums"
+                                                            style="opacity: 0.45;"
+                                                        >
+                                                            {seg.startSeconds.toFixed(1)}s — {seg.endSeconds.toFixed(
+                                                                1
+                                                            )}s
+                                                        </td>
+                                                        <td
+                                                            class="px-2 py-2 text-right text-[10px] tabular-nums"
+                                                            style="opacity: 0.45;"
+                                                        >
+                                                            {span.toFixed(1)}s
+                                                        </td>
+                                                        {#each rangeStats as stat, ci}
+                                                            {@const segDamage =
+                                                                (configSegments[ci] ?? [])[si]?.totalDamage ?? 0}
+                                                            <td class="px-2 py-2 text-right">
+                                                                <div
+                                                                    class="text-sm font-bold tabular-nums"
+                                                                    style="color: {stat.config.accent};"
+                                                                >
+                                                                    {segDamage > 0
+                                                                        ? Math.round(segDamage / span).toLocaleString()
+                                                                        : '—'}
+                                                                </div>
+                                                                <div
+                                                                    class="text-[10px] tabular-nums"
+                                                                    style="opacity: 0.45;"
+                                                                >
+                                                                    {Math.round(segDamage).toLocaleString()}
+                                                                </div>
+                                                            </td>
+                                                        {/each}
+                                                    </tr>
+                                                {/each}
+                                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                                <tr
+                                                    class="cursor-pointer border-t transition-colors"
+                                                    style="border-color: var(--theme-divider-border); color: var(--theme-modal-text); background: {activeRange ===
+                                                    'total'
+                                                        ? 'color-mix(in srgb, var(--theme-accent-bg) 8%, transparent)'
+                                                        : 'transparent'};"
+                                                    onclick={() => (selectedRange = 'total')}
+                                                    role="button"
+                                                    tabindex="0"
+                                                    title="点击查看总计数据"
+                                                >
+                                                    <td
+                                                        class="py-2 pr-2 text-[10px] font-semibold"
+                                                        style="opacity: 0.6;"
+                                                    >
+                                                        总计
+                                                    </td>
+                                                    <td
+                                                        class="px-2 py-2 text-right text-[10px] tabular-nums"
+                                                        style="opacity: 0.45;"
+                                                    >
+                                                        {totalDur.toFixed(1)}s
+                                                    </td>
+                                                    {#each rangeStats as stat}
+                                                        <td
+                                                            class="px-2 py-2 text-right text-sm font-bold tabular-nums"
+                                                            style="color: {stat.config.accent};"
+                                                        >
+                                                            {Math.round(stat.dps).toLocaleString()}
+                                                        </td>
+                                                    {/each}
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- 选中范围明细：段总伤 / 段角色总伤 / 段其它总伤 / DPS -->
+                                    <div class="mt-4">
+                                        <div class="mb-1.5 flex items-center gap-2">
+                                            <span class="text-xs font-semibold" style="color: var(--theme-modal-text);"
+                                                >{rangeLabel} 明细</span
+                                            >
+                                            <span class="text-[11px] opacity-50">时长 {rangeSpan.toFixed(1)}s</span>
+                                        </div>
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full text-xs">
+                                                <thead>
+                                                    <tr style="color: var(--theme-modal-text); opacity: 0.5;">
+                                                        <th class="py-1.5 pr-2 text-left font-medium">配置</th>
+                                                        <th class="px-2 py-1.5 text-right font-medium">段总伤</th>
+                                                        {#each team as slot}
+                                                            {#if slot.character}
+                                                                <th class="px-2 py-1.5 text-right font-medium"
+                                                                    >{slot.character}</th
+                                                                >
+                                                            {/if}
+                                                        {/each}
+                                                        <th class="px-2 py-1.5 text-right font-medium">其他</th>
+                                                        <th class="px-2 py-1.5 text-right font-medium">DPS</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {#each rangeStats as stat}
+                                                        <tr
+                                                            class="border-t"
+                                                            style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                                                        >
+                                                            <td
+                                                                class="py-2 pr-2 font-medium"
+                                                                style="color: {stat.config.accent};"
+                                                            >
+                                                                {stat.config.label}
+                                                            </td>
+                                                            <td class="px-2 py-2 text-right tabular-nums"
+                                                                >{Math.round(stat.damage).toLocaleString()}</td
+                                                            >
+                                                            {#each team as slot}
+                                                                {#if slot.character}
+                                                                    {@const cd = stat.charDamages[slot.character] ?? 0}
+                                                                    <td class="px-2 py-2 text-right tabular-nums"
+                                                                        >{cd > 0
+                                                                            ? Math.round(cd).toLocaleString()
+                                                                            : '—'}</td
+                                                                    >
+                                                                {/if}
+                                                            {/each}
+                                                            <td class="px-2 py-2 text-right tabular-nums"
+                                                                >{stat.otherDamage > 0
+                                                                    ? Math.round(stat.otherDamage).toLocaleString()
+                                                                    : '—'}</td
+                                                            >
+                                                            <td
+                                                                class="px-2 py-2 text-right text-sm font-bold tabular-nums"
+                                                                style="color: var(--theme-accent-text);"
+                                                            >
+                                                                {stat.dps > 0
+                                                                    ? Math.round(stat.dps).toLocaleString()
+                                                                    : '—'}
+                                                            </td>
+                                                        </tr>
+                                                    {/each}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                {/if}
+                            </div>
                         </section>
                     {:else}
                         <div class="flex flex-col items-center gap-2 py-12 text-center text-sm opacity-50">
@@ -848,27 +1107,31 @@
                                     <tr>
                                         <th class="w-9"></th>
                                         {#each REFINEMENT_RANGE as rf}
-                                            <th class="py-0.5 font-medium opacity-50">阶{rf}</th>
+                                            <th
+                                                class="py-0.5 font-medium"
+                                                style="opacity: {labelOpacity(rf, refinementHasOwnBuff(rf))};"
+                                                >{rf === 0 ? '无专' : `${rf}阶`}</th
+                                            >
                                         {/each}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {#each CHAIN_RANGE as ch}
                                         <tr>
-                                            <td class="pr-1 text-right font-medium opacity-50">链{ch}</td>
+                                            <td
+                                                class="pr-1 text-right font-medium"
+                                                style="opacity: {labelOpacity(ch, chainHasOwnBuff(ch))};">{ch}链</td
+                                            >
                                             {#each REFINEMENT_RANGE as rf}
                                                 {@const checked = isSel(si, ch, rf)}
                                                 <td>
                                                     <button
                                                         onclick={() => toggleSel(si, ch, rf)}
-                                                        class="flex h-7 w-full items-center justify-center rounded-md border text-[10px] transition-colors"
-                                                        style={checked
-                                                            ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg); border-color: var(--theme-accent-bg);'
-                                                            : 'border-color: var(--theme-divider-border); color: var(--theme-modal-text);'}
+                                                        class="flex h-7 w-full items-center justify-center border border-dashed text-[10px] transition-colors"
+                                                        style={cellStyle(checked)}
                                                         title="{ch}+{rf}"
                                                     >
-                                                        {#if checked}<Icon icon="mdi:check" class="size-3.5" />{:else}
-                                                            {ch}+{rf}{/if}
+                                                        {ch}+{rf}
                                                     </button>
                                                 </td>
                                             {/each}
@@ -878,8 +1141,13 @@
                             </table>
                         </div>
                     {/each}
-                    <p class="text-center text-[11px] opacity-50">
-                        将按三个角色的选择组合成 {matrixCount} 个团队配置（笛卡尔积）
+                    <p
+                        class="text-center text-[11px]"
+                        style={matrixCount > MAX_PICKER_CONFIGS ? 'color: #ef4444;' : 'opacity: 0.5;'}
+                    >
+                        {matrixCount > MAX_PICKER_CONFIGS
+                            ? '配置太多，超过限制，为避免卡顿，无法确认。'
+                            : `将按三个角色的选择组合成 ${matrixCount} 个团队配置（笛卡尔积）`}
                     </p>
                 </div>
                 <div
@@ -902,7 +1170,7 @@
                     >
                     <button
                         onclick={confirmMatrix}
-                        disabled={perCharSel.some((s) => s.length === 0)}
+                        disabled={perCharSel.some((s) => s.length === 0) || matrixCount > MAX_PICKER_CONFIGS}
                         class="rounded-lg px-4 py-1.5 text-sm font-medium transition-all enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-40"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                     >
