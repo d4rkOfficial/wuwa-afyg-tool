@@ -44,6 +44,8 @@
     import { initToyProfileBridge } from '$lib/bilibili-toy/profile.svelte'
     import {
         setShowBuffModal,
+        setShowDamageTypeModal,
+        getShowDamageTypeModal,
         setConditionProfile,
         setProfileChangeListener,
         syncGlobalBuffs,
@@ -70,6 +72,7 @@
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
     import FirstSyncModal from '$lib/components/layout/first-sync-modal.svelte'
     import SubstatLibraryModal from '$lib/components/layout/substat-library-modal.svelte'
+    import DamageTypeModal from '$lib/components/page/home/calculation/damage-type-modal.svelte'
     import {
         getSubstatLibraryOpen,
         openSubstatLibrary,
@@ -98,6 +101,8 @@
     let showResult = $state(false)
     let showBuffLibrary = $state(false)
     let showSettings = $state(false)
+    /** @desc 「编辑伤害类型」弹窗开关（底部工具栏按钮 / AI、WS 面板工具共用，状态在 calculation store 里） */
+    let showDamageTypeModal = $derived(getShowDamageTypeModal())
     let showWorkshopFrame = $state(false)
     /** @desc 工坊 iframe 弹窗的目标路径（空 = 工坊首页；如 /share/xxx = 详情页） */
     let workshopFramePath = $state('')
@@ -251,6 +256,7 @@
             ['quick-lookup', '速查', () => sidebarLookupOpen, (v) => (sidebarLookupOpen = v)],
             ['buff-library', 'Buff 集', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
             ['substat-library', '快速词条方案', () => getSubstatLibraryOpen(), (v) => setSubstatLibraryOpen(v)],
+            ['damage-type', '编辑伤害类型', () => getShowDamageTypeModal(), (v) => setShowDamageTypeModal(v)],
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
             ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
             [
@@ -539,6 +545,17 @@
             initForActiveProject()
         }
         addToast(`工程「${p.name}」已归档`, 'success')
+    }
+
+    /** @desc 关闭「编辑伤害类型」弹窗并回写工程 */
+    function handleCloseDamageTypeModal() {
+        setShowDamageTypeModal(false)
+        void updateCalculation(getCalcState())
+    }
+
+    /** @desc 伤害类型改动后回写工程（弹窗内每次点选/同步都调用） */
+    function handlePersistDamageTypes() {
+        void updateCalculation(getCalcState())
     }
 
     /** @desc 重载当前工程全部阶段数据（不改变视图状态）；initForActiveProject 与「链/阶变动重载数据」共用 */
@@ -972,6 +989,14 @@
 <FirstSyncModal open={showFirstSync} onclose={() => (showFirstSync = false)} />
 
 <SubstatLibraryModal />
+
+<!-- @desc 编辑伤害类型弹窗：与词条集一样挂在页面顶层（底部工具栏按钮打开） -->
+<DamageTypeModal
+    open={showDamageTypeModal}
+    locked={phaseLocked}
+    onclose={handleCloseDamageTypeModal}
+    onpersist={handlePersistDamageTypes}
+/>
 
 {#if activeProject}
     <CharacterDetailModal

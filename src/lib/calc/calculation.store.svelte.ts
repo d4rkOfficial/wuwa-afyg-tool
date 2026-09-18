@@ -16,6 +16,7 @@ let _buffSets = $state<BuffSet[]>([])
 let _damageEntryBuffSetIds = $state<Record<string, string[]>>({})
 let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
 let _showBuffModal = $state(false)
+let _showDamageTypeModal = $state(false)
 let _buffDiffMode = $state(false)
 let _locked = $state(false)
 /** @desc 全局生效配置：各角色共鸣链 / 武器精炼阶数（结果计算与条件过滤共用） */
@@ -781,6 +782,15 @@ export function getShowBuffModal(): boolean {
 }
 export function setShowBuffModal(v: boolean) {
     _showBuffModal = v
+}
+
+/** @desc ── 「编辑伤害类型」弹窗开关（底部工具栏按钮打开，与 BUFF 配置同一条路径）── */
+
+export function getShowDamageTypeModal(): boolean {
+    return _showDamageTypeModal
+}
+export function setShowDamageTypeModal(v: boolean) {
+    _showDamageTypeModal = v
 }
 
 /** @desc ── Buff 差异模式（拉表页按段展示 新增/移除/不变/全局 的 buff 变化）── */

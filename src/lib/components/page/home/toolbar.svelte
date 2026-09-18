@@ -12,13 +12,13 @@
     } from '$lib/calc/timeline.store.svelte'
     import {
         setShowBuffModal,
+        setShowDamageTypeModal,
         getBuffDiffMode,
         toggleBuffDiffMode,
         getHideConditionMismatch,
         toggleHideConditionMismatch
     } from '$lib/calc/calculation.store.svelte'
     import { getCalcViewMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
-    import { openDamageTypeModal } from '$lib/data/damage-type-ui.svelte'
     import { openSubstatLibrary } from '$lib/data/substat-library-ui.svelte'
     import { addToast } from '$lib/data/toast.svelte'
 
@@ -247,7 +247,7 @@
             {/if}
             {#if getCalcViewMode() === 'spread'}
                 <button
-                    onclick={() => openDamageTypeModal()}
+                    onclick={() => setShowDamageTypeModal(true)}
                     class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
                         : 'rounded-lg px-3 py-1.5'}"

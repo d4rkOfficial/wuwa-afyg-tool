@@ -10,9 +10,12 @@
     import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import {
         countSameNameEntries,
+        getAllDamageEntries,
+        getDamageTypesForEntry,
         setDamageTypesForEntry,
         syncDamageTypesToSameName
     } from '$lib/calc/calculation.store.svelte'
+    import { getActiveProject } from '$lib/data/project.svelte'
     import { inferDamageTypes } from '$lib/calc/utils'
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
@@ -22,26 +25,20 @@
 
     interface Props extends ComponentsProps {
         open: boolean
-        damageEntries: DamageEntry[]
-        team: [CharSlot, CharSlot, CharSlot]
-        entryDamageTypeMap: Record<string, string[]>
         locked?: boolean
         onclose: () => void
         /** @desc 每次改动后回写工程（与表格内的切换保持一致） */
         onpersist: () => void
     }
 
-    let {
-        open,
-        damageEntries,
-        team,
-        entryDamageTypeMap,
-        locked = false,
-        onclose,
-        onpersist,
-        class: className,
-        style: styleProp
-    }: Props = $props()
+    let { open, locked = false, onclose, onpersist, class: className, style: styleProp }: Props = $props()
+
+    /** @desc 数据自取（与词条集弹窗一样挂在页面顶层，不依赖拉表页子树）：条目、伤害类型映射、配队 */
+    const damageEntries = $derived(getAllDamageEntries())
+    const entryDamageTypeMap = $derived<Record<string, string[]>>(
+        Object.fromEntries(damageEntries.map((e) => [e.id, getDamageTypesForEntry(e.id)]))
+    )
+    const team = $derived((getActiveProject()?.team ?? []) as unknown as [CharSlot, CharSlot, CharSlot])
 
     let helpOpen = $state(false)
 
