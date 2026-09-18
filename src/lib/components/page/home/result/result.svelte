@@ -379,8 +379,8 @@
                 <div class="ml-auto flex items-center gap-2">
                     <button
                         onclick={handleOpenAnalysis}
-                        class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
-                        style="background: var(--theme-input-bg); color: var(--theme-accent-text);"
+                        class="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
+                        style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
                     >
                         <Icon icon="mdi:chart-box-outline" class="size-3.5" />
                         数据分析
