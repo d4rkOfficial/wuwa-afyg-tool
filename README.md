@@ -21,12 +21,13 @@
 
 ## 文档
 
-| 文档                                                         | 内容                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| [docs/deployment.md](docs/deployment.md)                     | 本地开发、构建预览、Vercel / Cloudflare Pages 部署、完成检查 |
-| [docs/upstream-integration.md](docs/upstream-integration.md) | 接入新数据上游（`DataProvider` 适配器、数据质量验收）        |
-| [docs/tools.md](docs/tools.md)                               | AI 助手与 WS 远程接管共用的工具清单（按源码自动生成）        |
-| [docs/ws-remote.md](docs/ws-remote.md)                       | WS 远程接管：工具分类表与接入方式                            |
+| 文档                                                           | 内容                                                         |
+| -------------------------------------------------------------- | ------------------------------------------------------------ |
+| [docs/deployment.md](docs/deployment.md)                       | 本地开发、构建预览、Vercel / Cloudflare Pages 部署、完成检查 |
+| [docs/upstream-integration.md](docs/upstream-integration.md)   | 接入新数据上游（`DataProvider` 适配器、数据质量验收）        |
+| [docs/damage-type-inference.md](docs/damage-type-inference.md) | 伤害类型推导算法（判定链与护栏）与 TDD 用例流程              |
+| [docs/tools.md](docs/tools.md)                                 | AI 助手与 WS 远程接管共用的工具清单（按源码自动生成）        |
+| [docs/ws-remote.md](docs/ws-remote.md)                         | WS 远程接管：工具分类表与接入方式                            |
 
 ### 另见：椰果工坊
 
@@ -51,7 +52,7 @@
 
 - 完整伤害公式：攻击 × 增伤 × 加深 × 同奏 × 暴击 × 防御 × 抗性 × 免伤 等乘区
 - 支持直伤、**效应伤害**、**谐度破坏 / 偏谐响应**三类输出；同名机制与 buff 按条目独立配置
-- 伤害类型自动推导：按技能倍率名（「普攻·」「重击·」等前缀）与技能文案（「视为 XX 伤害」，含角色技能与声骸技能）自动判定，用户手动设置优先
+- 伤害类型自动推导：按技能倍率名（「普攻·」「重击·」等前缀）与技能文案（「视为 XX 伤害」，含角色技能与声骸技能）自动判定，用户手动设置优先；算法判定链、护栏与 TDD 用例流程见 [docs/damage-type-inference.md](docs/damage-type-inference.md)
 
 ### 数据与共享
 
