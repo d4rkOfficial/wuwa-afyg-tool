@@ -5,13 +5,14 @@ import { getAllDamageEntries, getCalcState, getConditionProfile } from '$lib/cal
 import { getConfig } from '$lib/calc/config.store.svelte'
 import { buildDamageSegments, type DamageTraceCtx } from '$lib/calc/damage-trace'
 import { aggregateDirectDamageByType } from '$lib/calc/utils'
-import { algorithms, ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
+import { ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
 import type { AlgorithmId } from '$lib/calc/substat-algorithms/types'
+import { createSubstatAnalysisRunner } from '$lib/calc/substat-algorithms/analysis-runner.svelte'
 import type { ResultEntry, CharSubstatAnalysis } from '$lib/calc/result.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { getCharacterInfo, getWeaponInfo } from '$lib/api/data-cache'
-import { ensureEchoSkillText } from '$lib/data/char-info.svelte'
+import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
 import { getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
@@ -286,21 +287,29 @@ defineTool('get_data_analysis', {
         const config = getConfig()
         const dmgEntries = getAllDamageEntries()
         const allAlgoResults: Record<string, CharSubstatAnalysis[]> = {}
-        for (const info of ALGORITHMS_INFO) {
-            const fn = algorithms[info.id as AlgorithmId]
-            allAlgoResults[info.id] = fn(
-                dmgEntries,
-                calc.buffSets,
-                calc.damageEntryBuffSetIds,
-                calc.damageEntryDamageTypes,
-                config,
-                project.team,
-                ctx.charInfoMap,
-                ctx.weaponInfoMap,
-                rigIds,
-                noCritIds,
-                missIds
-            )
+        // 三种算法都可能很重：交给 worker 执行（开不了 worker 由 runner 内部回退主线程）
+        const runner = createSubstatAnalysisRunner()
+        try {
+            for (const info of ALGORITHMS_INFO) {
+                allAlgoResults[info.id] = await runner.run({
+                    algorithm: info.id as AlgorithmId,
+                    damageEntries: dmgEntries,
+                    buffSets: calc.buffSets,
+                    damageEntryBuffSetIds: calc.damageEntryBuffSetIds,
+                    damageEntryDamageTypes: calc.damageEntryDamageTypes,
+                    configState: config,
+                    team: project.team,
+                    charInfoMap: ctx.charInfoMap,
+                    weaponInfoMap: ctx.weaponInfoMap,
+                    rigCritEntryIds: [...rigIds],
+                    noCritEntryIds: [...noCritIds],
+                    missEntryIds: [...missIds],
+                    conditionProfile: getConditionProfile(),
+                    echoSkillText: getEchoSkillText()
+                })
+            }
+        } finally {
+            runner.dispose()
         }
 
         return {

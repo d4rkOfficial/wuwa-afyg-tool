@@ -45,3 +45,9 @@ export async function ensureEchoSkillText(name: string): Promise<void> {
 export function getEchoSkillText(): Record<string, string> {
     return _echoSkillText
 }
+
+/** @desc 直接注入声骸技能文案映射：Worker 线程里用主线程已解析好的映射初始化它（compute 内部读这个 store
+ *  做伤害类型推导），避免 worker 内重复请求上游、也保证两条执行路径结果一致 */
+export function setEchoSkillText(map: Record<string, string>): void {
+    _echoSkillText = map
+}

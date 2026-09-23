@@ -4,7 +4,7 @@
     import type { ConfigState } from '$lib/calc/config.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
-    import { ensureEchoSkillText } from '$lib/data/char-info.svelte'
+    import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { getCharElementMap } from '$lib/calc/timeline.store.svelte'
     import { getActiveProject, updateResultAnalysis, updateComparisonPoints } from '$lib/data/project.svelte'
     import { computeAll as computeAllDamage } from '$lib/calc/compute'
@@ -17,9 +17,11 @@
     import { getConfig } from '$lib/calc/config.store.svelte'
     import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
     import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
-    import { getAlgorithm, ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
+    import { ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
-    import { tick, untrack, onMount } from 'svelte'
+    import { createSubstatAnalysisRunner } from '$lib/calc/substat-algorithms/analysis-runner.svelte'
+    import type { SubstatAnalysisRequest } from '$lib/calc/substat-algorithms/analysis'
+    import { tick, untrack, onMount, onDestroy } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { slide } from 'svelte/transition'
@@ -276,6 +278,15 @@
     let analysisComputing = $state(false)
     let analysisTimeoutId: ReturnType<typeof setTimeout> | null = null
 
+    /** @desc 词条贡献分析执行器：优先 Worker 线程（Shapley/偏导这类重算不阻塞界面），开不了 Worker 时由它回退主线程 */
+    const analysisRunner = createSubstatAnalysisRunner()
+    /** @desc 请求序号：只接受最新一次的结果，避免快速切换算法时旧结果覆盖新结果 */
+    let analysisSeq = 0
+    onDestroy(() => {
+        analysisRunner.dispose()
+        if (analysisTimeoutId) clearTimeout(analysisTimeoutId)
+    })
+
     function scheduleAnalysis() {
         if (analysisTimeoutId) clearTimeout(analysisTimeoutId)
         analysisComputing = true
@@ -287,22 +298,36 @@
                 analysisComputing = false
                 return
             }
-            const algo = getAlgorithm(selectedAlgorithm)
-            substatAnalysis = algo(
-                dmgEntries,
-                calc.buffSets,
-                calc.damageEntryBuffSetIds,
-                calc.damageEntryDamageTypes,
-                config,
+            const seq = ++analysisSeq
+            // 入参直接用 store 里的对象；runner 发往 Worker 前会自己 $state.snapshot 成纯数据
+            const req: SubstatAnalysisRequest = {
+                algorithm: selectedAlgorithm,
+                damageEntries: dmgEntries,
+                buffSets: calc.buffSets,
+                damageEntryBuffSetIds: calc.damageEntryBuffSetIds,
+                damageEntryDamageTypes: calc.damageEntryDamageTypes,
+                configState: config,
                 team,
                 charInfoMap,
                 weaponInfoMap,
-                new Set(rigCritEntryIds),
-                new Set(noCritEntryIds),
-                new Set(missEntryIds),
-                getConditionProfile()
+                rigCritEntryIds,
+                noCritEntryIds,
+                missEntryIds,
+                conditionProfile: getConditionProfile(),
+                echoSkillText: getEchoSkillText()
+            }
+            analysisRunner.run(req).then(
+                (res) => {
+                    if (seq !== analysisSeq) return
+                    substatAnalysis = res
+                    analysisComputing = false
+                },
+                (err) => {
+                    if (seq !== analysisSeq) return
+                    analysisComputing = false
+                    console.warn('[substat-analysis] 词条贡献分析失败', err)
+                }
             )
-            analysisComputing = false
         }, 0)
     }
 
