@@ -61,15 +61,18 @@
 
 ## 3. 主题 token（只用这些，不要硬编码颜色）
 
-| 用途          | token                                                                                  |
-| ------------- | -------------------------------------------------------------------------------------- |
-| 弹窗文字      | `text-(--theme-modal-text)`，次级用 `/70`、`/40`、`/35`                                |
-| 分割线/边框   | `var(--theme-divider-border)`                                                          |
-| 卡片/输入底色 | `var(--theme-input-bg)`                                                                |
-| 强调色        | `var(--theme-accent-bg)`、`var(--theme-accent-text)`、`var(--theme-accent-text-on-bg)` |
-| 光晕          | `var(--theme-halo-color)`                                                              |
-| 元素色        | `var(--theme-element-{物理/冷凝/热熔/导电/气动/衍射/湮灭})`                            |
-| 危险          | Tailwind `red-500`（`hover:border-red-500/50 hover:text-red-500`）                     |
+| 用途          | token                                                                                                           |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| 弹窗文字      | `text-(--theme-modal-text)`，次级用 `/70`、`/40`、`/35`                                                         |
+| 分割线/边框   | `var(--theme-divider-border)`                                                                                   |
+| 卡片/输入底色 | `var(--theme-input-bg)`                                                                                         |
+| 强调色        | `var(--theme-accent-bg)`、`var(--theme-accent-text)`、`var(--theme-accent-text-on-bg)`                          |
+| 光晕          | `var(--theme-halo-color)`                                                                                       |
+| 元素色        | `var(--theme-element-{物理/冷凝/热熔/导电/气动/衍射/湮灭})`                                                     |
+| 危险          | Tailwind `red-500`（`hover:border-red-500/50 hover:text-red-500`）                                              |
+| 页面级卡片    | `var(--theme-card-bg)` / `var(--theme-card-bg-focused)` / `var(--theme-card-border)` / `var(--theme-card-text)` |
+
+> 弹窗内部一律用 `--theme-modal-*` / `--theme-input-bg` / `--theme-divider-border`；`--theme-card-*` 只给主界面（欢迎页、侧边栏等）的卡片用，两边不要混。
 
 ## 4. 动效
 
