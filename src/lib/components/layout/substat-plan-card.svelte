@@ -4,6 +4,7 @@
      * 底部操作按钮由父组件通过 actions snippet 注入（套用/覆盖/重置/同步/重命名/删除随入口不同）。
      */
     import Icon from '@iconify/svelte'
+    import { slide } from 'svelte/transition'
     import type { Snippet } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import type { EchoSlotConfig } from '$lib/calc/config.types'
@@ -88,7 +89,11 @@
     </button>
 
     {#if expanded}
-        <div class="space-y-1.5 border-t px-3 py-2.5 text-[10px]" style="border-color: var(--theme-divider-border);">
+        <div
+            transition:slide|local={{ duration: 200 }}
+            class="space-y-1.5 border-t px-3 py-2.5 text-[10px]"
+            style="border-color: var(--theme-divider-border);"
+        >
             {#each slots as slot}
                 <div class="flex items-baseline gap-3">
                     <span class="w-16 shrink-0 truncate font-black text-(--theme-accent-text)" title={mainSummary(slot)}

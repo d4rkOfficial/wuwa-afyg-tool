@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { fade } from 'svelte/transition'
     import { onMount } from 'svelte'
     import {
         buildDamageSegments,
@@ -334,11 +333,10 @@
         <div
             bind:this={tipEl}
             use:portal
-            in:fade={{ duration: 100 }}
             role="tooltip"
             onpointerenter={clearClose}
             onpointerleave={scheduleClose}
-            class="fixed z-100 w-[36rem] max-w-[85vw] overflow-hidden rounded-none border backdrop-blur-xl"
+            class="animate-pop-in fixed z-100 w-[36rem] max-w-[85vw] overflow-hidden rounded-none border backdrop-blur-xl"
             style="left: {tipPos.left}px; top: {tipPos.top}px; background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
         >
             <div
