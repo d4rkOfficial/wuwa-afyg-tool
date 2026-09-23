@@ -3,7 +3,6 @@
     import { slide } from 'svelte/transition'
     import Chart from 'chart.js/auto'
     import { getCharElementMap, getCharIconMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
-    import { getElementIcons } from '$lib/api/data-cache'
     import { resolveRefLineSeconds, autoConfigureTimings as autoConfigureTimingsPure } from '$lib/calc/ref-line-timing'
     import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
@@ -61,15 +60,6 @@
 
     let charElements = $derived(getCharElementMap())
     let charIcons = $derived(getCharIconMap())
-
-    // ── 元素图标（静态表，弹窗内加载一次）──
-    let elementIcons = $state<Record<string, string>>({})
-    let elementIconsLoaded = false
-    $effect(() => {
-        if (elementIconsLoaded) return
-        elementIconsLoaded = true
-        void getElementIcons().then((icons) => (elementIcons = icons))
-    })
 
     let helpItems = $derived(
         algorithmsInfo.map((algo) => ({
@@ -631,19 +621,15 @@
             .sort((a, b) => b.damage - a.damage)
     )
 
-    /** @desc 效应伤害卡片：非配队条目按来源效应分流，按当前口径伤害降序（元素图标叠底） */
+    /** @desc 效应伤害卡片：非配队条目按来源效应分流，按当前口径伤害降序（元素色上色，无叠底图） */
     let effectCards = $derived.by(() =>
         Object.entries(rangeStats.effectDamages)
-            .map(([label, damage]) => {
-                const element = rangeStats.effectElements[label] ?? ''
-                return {
-                    label,
-                    damage,
-                    count: rangeStats.effectCounts[label] ?? 0,
-                    element,
-                    icon: elementIcons[element] ?? ''
-                }
-            })
+            .map(([label, damage]) => ({
+                label,
+                damage,
+                count: rangeStats.effectCounts[label] ?? 0,
+                element: rangeStats.effectElements[label] ?? ''
+            }))
             .sort((a, b) => b.damage - a.damage)
     )
 
@@ -1072,14 +1058,6 @@
                             class="relative overflow-hidden rounded-none border p-4"
                             style="border-color: var(--theme-divider-border); background: {cardBg};"
                         >
-                            {#if card.icon}
-                                <div
-                                    class="pointer-events-none absolute -bottom-2 -right-2 z-0 size-24 opacity-40"
-                                    style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
-                                >
-                                    <img src={card.icon} alt="" class="size-full object-cover" />
-                                </div>
-                            {/if}
                             <div class="relative z-10">
                                 <div class="flex items-center gap-1.5">
                                     <span class="size-2 rounded-full shrink-0" style="background: {color};"></span>

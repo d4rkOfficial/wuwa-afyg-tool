@@ -36,7 +36,7 @@ export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
         bgImageMask: 200,
         surfaces: {
             card: { opacity: 20, blur: 5, depth: 5 },
-            modal: { opacity: 0, blur: 32, depth: 0 },
+            modal: { opacity: 40, blur: 32, depth: 0 },
             sidebar: { opacity: 60, blur: 0, depth: 0 },
             content: { opacity: 0, blur: 0, depth: 0 },
             toolbar: { opacity: 0, blur: 0, depth: 0 }
