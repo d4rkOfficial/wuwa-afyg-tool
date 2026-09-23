@@ -780,7 +780,9 @@
             {#if showCustomHitOption}
                 <button
                     onclick={handleCreateCustomHit}
-                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-buff-yellow-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                    disabled={locked}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-buff-yellow-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    title={locked ? '已锁定，无法创建自定义直伤' : undefined}
                     ><Icon icon="mdi:plus-circle-outline" class="size-3.5 shrink-0" /> 创建自定义直伤</button
                 >
             {/if}
