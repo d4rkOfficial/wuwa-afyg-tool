@@ -674,24 +674,41 @@
         })
     }
 
-    /** @desc mouseup：拖动结束应用框选结果（下一次 click 会被拦截） */
+    /** @desc mouseup：先把框选矩形隐藏（并让浏览器先画一帧），再延后一帧应用批量勾选——
+     *  这样「框先消失、勾选随后落地」，不会出现框停在屏幕上干等整表重渲染的卡顿感 */
+    let applyRaf = 0
     function handleMouseUp() {
         if (moveRaf) {
             cancelAnimationFrame(moveRaf)
             moveRaf = 0
             updateDragSelection()
         }
-        if (selStart && dragging) {
-            justDragged = true
-            applySelection()
-            setTimeout(() => {
-                justDragged = false
-            }, 0)
+        if (!selStart || !dragging) {
+            cancelSelection()
+            return
         }
+        // 快照选区范围（随后 cancelSelection 会清空交互状态）
+        const g = selStart.g
+        const r0 = Math.min(selStart.r, selCurrent?.r ?? selStart.r)
+        const r1 = Math.max(selStart.r, selCurrent?.r ?? selStart.r)
+        const c0 = Math.min(selStart.c, selCurrent?.c ?? selStart.c)
+        const c1 = Math.max(selStart.c, selCurrent?.c ?? selStart.c)
         cancelSelection()
+        justDragged = true
+        applyRaf = requestAnimationFrame(() => {
+            // 第二个 rAF：第一个 rAF 只负责让「框已隐藏」这一帧先画出来
+            applyRaf = requestAnimationFrame(() => {
+                applyRaf = 0
+                applySelection(g, r0, r1, c0, c1)
+                setTimeout(() => {
+                    justDragged = false
+                }, 0)
+            })
+        })
     }
     onDestroy(() => {
         if (moveRaf) cancelAnimationFrame(moveRaf)
+        if (applyRaf) cancelAnimationFrame(applyRaf)
     })
 
     /** @desc 框选结束后拦截单元格 click，避免误触发单选 */
@@ -735,15 +752,11 @@
         rootEl.scrollBy({ left: dx, top: dy })
     }
 
-    /** @desc 应用框选：范围内单元格有已勾选 → 全部取消，否则全部勾选（仅可启用单元格） */
-    function applySelection() {
-        if (!selStart || !selCurrent) return
-        const group = tableData[selStart.g]
+    /** @desc 应用框选：范围内单元格有已勾选 → 全部取消，否则全部勾选（仅可启用单元格）；
+     *  范围由调用方（mouseup）快照传入，不再读交互状态，便于「先隐藏框、延后应用」 */
+    function applySelection(gi: number, r0: number, r1: number, c0: number, c1: number) {
+        const group = tableData[gi]
         if (!group) return
-        const r0 = Math.min(selStart.r, selCurrent.r)
-        const r1 = Math.max(selStart.r, selCurrent.r)
-        const c0 = Math.min(selStart.c, selCurrent.c)
-        const c1 = Math.max(selStart.c, selCurrent.c)
         const byRow = new Map<RowData, string[]>()
         let anySelected = false
         for (let ri = r0; ri <= r1; ri++) {
