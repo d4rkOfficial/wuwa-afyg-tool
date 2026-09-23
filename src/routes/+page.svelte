@@ -309,6 +309,12 @@
                 markMagneticToySet()
             }
         })
+        // 本地数据不等待上游版本检查：版本端点是网络请求（实测可能十几秒），
+        // 一旦放在 await 之后，刷新后会先长时间空列表 —— 工程/按键/快捷键/工坊都先在本地恢复
+        loadProjects()
+        loadKeyMap()
+        loadShortcuts()
+        loadWorkshop()
         await ensureVersion()
         if (browser) {
             const prev = localStorage.getItem('wuwa-afyg:version')
@@ -317,11 +323,7 @@
             }
             localStorage.setItem('wuwa-afyg:version', getWWVersion())
         }
-        loadProjects()
         loadIcons()
-        loadKeyMap()
-        loadShortcuts()
-        loadWorkshop()
         checkShare()
         // 分享导入：#import_project=<url>（一次性，执行后清 hash）
         registerHashAction({
