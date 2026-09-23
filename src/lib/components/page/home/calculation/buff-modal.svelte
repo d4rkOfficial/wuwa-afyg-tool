@@ -3,6 +3,7 @@
     import {
         getAllBuffSets,
         createBuffSet,
+        takePendingFocusBuffSetId,
         deleteBuffSet,
         deleteBuffSets,
         duplicateBuffSet,
@@ -167,6 +168,22 @@
     }
 
     let selectedBuffSetId = $state<string | null>(null)
+
+    /**
+     * @desc 从速查右键菜单「以此为名创建BUFF」进来时：自动选中并滚动到刚新建的那条
+     * （id 由 createBuffSet 返回后写入 pending，这里消费一次）
+     */
+    $effect(() => {
+        if (!open) return
+        const id = takePendingFocusBuffSetId()
+        if (!id) return
+        selectedBuffSetId = id
+        requestAnimationFrame(() => {
+            document
+                .querySelector<HTMLElement>(`[data-buffset-id="${id}"]`)
+                ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        })
+    })
     let renameValue = $state('')
     /** @desc 名称编辑输入框引用（新建/右键重命名后自动聚焦） */
     let renameInputEl = $state<HTMLInputElement | null>(null)

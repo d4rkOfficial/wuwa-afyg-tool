@@ -353,6 +353,20 @@ export function getAllBuffSets(): BuffSet[] {
     return _buffSets
 }
 
+/** @desc 待定位的 BUFF 集 id（由「以此为名创建BUFF」写入；buff-modal 打开后消费一次并滚动到它） */
+let _pendingFocusBuffSetId = $state<string | null>(null)
+
+export function setPendingFocusBuffSetId(id: string | null) {
+    _pendingFocusBuffSetId = id
+}
+
+/** @desc 取出并清空待定位 id（只消费一次） */
+export function takePendingFocusBuffSetId(): string | null {
+    const id = _pendingFocusBuffSetId
+    _pendingFocusBuffSetId = null
+    return id
+}
+
 /** @desc 新建空 Buff 块（随机 id，默认全队作用域），返回新块 id */
 export function createBuffSet(name: string): string | undefined {
     if (!assertUnlocked()) return undefined

@@ -51,6 +51,7 @@
         syncGlobalBuffs,
         getCalcState,
         createBuffSet,
+        setPendingFocusBuffSetId,
         init as initCalculation
     } from '$lib/calc/calculation.store.svelte'
     import { setCalcViewMode } from '$lib/data/calc-view.svelte'
@@ -802,7 +803,9 @@
         onToggleSidebarWidth={toggleSidebarWidth}
         team={activeProject?.team}
         onCreateBuff={(name) => {
-            createBuffSet(name)
+            // 新建后记下 id，buff 弹窗打开时自动滚动定位到这条
+            const id = createBuffSet(name)
+            if (id) setPendingFocusBuffSetId(id)
             sidebarLookupOpen = false
             setShowBuffModal(true)
         }}
