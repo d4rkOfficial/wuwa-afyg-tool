@@ -261,7 +261,7 @@
     style="background: transparent; color: var(--theme-modal-text); {styleProp || ''}"
 >
     <!-- Tabs -->
-    <div class="flex gap-2 mb-4">
+    <div class="mb-4 flex gap-2 border-b pb-2.5" style="border-color: var(--theme-divider-border);">
         {#each TAB_LABELS as label, i}
             {@const isActive = i < 3 ? activeTab === `char${i}` : activeTab === 'enemy'}
             <button
@@ -271,9 +271,13 @@
                     showSubstatModal = null
                 }}
                 class={[
-                    'rounded-none px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-2',
-                    isActive && i >= 3 && 'bg-(--theme-modal-text)/10 text-(--theme-modal-text)',
-                    !isActive && 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                    'rounded-none border px-3 py-1.5 text-xs font-black tracking-tight transition-colors flex items-center gap-2',
+                    isActive && i < 3 && 'border-current',
+                    isActive &&
+                        i >= 3 &&
+                        'border-(--theme-divider-border) bg-(--theme-modal-text)/10 text-(--theme-modal-text)',
+                    !isActive &&
+                        'border-transparent text-(--theme-modal-text)/40 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/70'
                 ].join(' ')}
                 style={isActive && i < 3
                     ? `background: color-mix(in srgb, ${elementColor(charNames[i] ?? '')} 18%, transparent); color: ${elementColor(charNames[i] ?? '')};`
@@ -364,7 +368,7 @@
         >
             <div
                 bind:this={mainStatMenuEl}
-                class="animate-pop-in theme-scrollbar absolute max-h-48 overflow-y-auto rounded-none border py-1 shadow-xl backdrop-blur-xl"
+                class="animate-pop-in theme-scrollbar absolute max-h-48 overflow-y-auto rounded-none border py-1 backdrop-blur-xl"
                 style="left: {mainStatMenuPos?.left ?? 0}px; top: {mainStatMenuPos?.top ??
                     0}px; width: {mainStatMenuPos?.width ??
                     0}px; background: color-mix(in srgb, var(--theme-modal-bg) 82%, transparent); border-color: var(--theme-divider-border);"
@@ -372,7 +376,7 @@
             >
                 <button
                     onclick={() => handleSetMainStat(menu.ci, menu.si, null)}
-                    class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-input-bg)"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-input-bg)"
                     >未选择</button
                 >
                 {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt}
@@ -383,10 +387,10 @@
                                 value: opt.maxValue,
                                 unit: opt.unit
                             })}
-                        class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-input-bg)"
+                        class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-(--theme-modal-text) transition-colors hover:bg-(--theme-input-bg)"
                     >
-                        <span class="flex-1">{opt.label}</span>
-                        <span class="text-(--theme-modal-text)/40">{opt.maxValue}{opt.unit}</span>
+                        <span class="flex-1 font-black">{opt.label}</span>
+                        <span class="font-black text-(--theme-modal-text)/40">{opt.maxValue}{opt.unit}</span>
                         {#if slot.mainStat?.type === opt.label}<Icon
                                 icon="mdi:check"
                                 class="size-3 text-(--theme-accent-text)"

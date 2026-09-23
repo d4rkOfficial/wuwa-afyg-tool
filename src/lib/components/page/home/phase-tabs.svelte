@@ -145,12 +145,12 @@
             disabled={tab.disabled}
             title={tab.disabled ? tab.disabledReason : ''}
             class={[
-                'relative flex items-center gap-1.5 rounded-none px-3.5 py-2.5 text-sm transition-all',
+                'relative flex items-center gap-1.5 rounded-none border border-transparent px-3.5 py-2.5 text-sm transition-colors',
                 isActive
-                    ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text) font-medium'
+                    ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_10%,transparent)] font-black tracking-tight text-(--theme-accent-text)'
                     : tab.disabled
                       ? 'opacity-30 cursor-not-allowed'
-                      : 'text-(--theme-tabs-text)/60 hover:bg-(--theme-tabs-text)/5 hover:text-(--theme-tabs-text)',
+                      : 'text-(--theme-tabs-text)/60 hover:border-(--theme-divider-border) hover:text-(--theme-tabs-text)',
                 !tab.disabled && 'hover:opacity-100'
             ].join(' ')}
         >
@@ -204,11 +204,11 @@
         onclick={onresult}
         disabled={!resultEnabled}
         class={[
-            'relative flex items-center gap-1.5 rounded-none px-3.5 py-2.5 text-sm transition-all',
+            'relative flex items-center gap-1.5 rounded-none border border-transparent px-3.5 py-2.5 text-sm transition-colors',
             showResult
-                ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text) font-medium'
+                ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_10%,transparent)] font-black tracking-tight text-(--theme-accent-text)'
                 : resultEnabled
-                  ? 'text-(--theme-tabs-text)/60 hover:bg-(--theme-tabs-text)/5 hover:text-(--theme-tabs-text) hover:opacity-100'
+                  ? 'text-(--theme-tabs-text)/60 hover:border-(--theme-divider-border) hover:text-(--theme-tabs-text) hover:opacity-100'
                   : 'opacity-30 cursor-not-allowed'
         ].join(' ')}
         title={resultEnabled ? '' : '请先锁定队伍配置'}
@@ -259,8 +259,8 @@
                 WS 远程接管
             </span>
             <span
-                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-normal"
-                style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: {wsStatus ===
+                class="inline-flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-[10px] font-black"
+                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: {wsStatus ===
                 'connected'
                     ? 'var(--theme-accent-text)'
                     : wsStatus === 'error'
@@ -283,7 +283,7 @@
     <!-- 连接信息 -->
     <div
         class="space-y-2.5 rounded-none border p-3.5 text-xs"
-        style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 3%, transparent);"
+        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
         <div class="flex items-center justify-between gap-3">
             <span class="shrink-0 text-(--theme-modal-text)/50">地址</span>
@@ -294,15 +294,15 @@
             <span class="tabular-nums text-(--theme-modal-text)/80">{wsToolCount} 次</span>
         </div>
         {#if wsLastError && wsStatus !== 'connected'}
-            <div class="wrap-break-word text-red-400">⚠ {wsLastError}</div>
+            <div class="wrap-break-word text-red-500">⚠ {wsLastError}</div>
         {/if}
     </div>
 
     <!-- 最近工具调用 -->
     {#if wsRecentTools.length > 0}
-        <div class="mt-4">
+        <div class="mt-4 border-t pt-4" style="border-color: var(--theme-divider-border);">
             <div class="mb-2 flex items-center justify-between">
-                <span class="text-[10px] font-medium tracking-wider text-(--theme-modal-text)/40">最近工具调用</span>
+                <span class="text-[10px] font-black tracking-[0.18em] text-(--theme-modal-text)/40">最近工具调用</span>
                 <span class="text-[10px] text-(--theme-modal-text)/30"
                     >最近 {Math.min(wsRecentTools.length, 10)} 条</span
                 >
@@ -330,14 +330,14 @@
         <div class="flex gap-2.5 pt-4">
             <button
                 onclick={() => disconnectWs()}
-                class="flex-1 rounded-none border px-3 py-2 text-xs transition-colors hover:brightness-110"
-                style="border-color: var(--theme-divider-border); color: var(--theme-modal-text)/70;"
+                class="flex-1 rounded-none border px-3 py-2 text-xs font-black tracking-tight text-(--theme-modal-text)/70 transition-colors hover:brightness-110"
+                style="border-color: var(--theme-divider-border);"
             >
                 断开连接
             </button>
             <button
                 onclick={() => connectWs(wsTarget)}
-                class="flex-1 rounded-none px-3 py-2 text-xs transition-colors hover:brightness-110"
+                class="flex-1 rounded-none px-3 py-2 text-xs font-black tracking-tight transition-colors hover:brightness-110"
                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
             >
                 重新连接

@@ -121,18 +121,18 @@
             role="dialog"
             aria-modal="true"
         >
-            <div class="mb-3">
-                <h3 class="text-sm font-semibold">触发套装</h3>
+            <div class="mb-3 border-b pb-2.5 pr-6" style="border-color: var(--theme-divider-border);">
+                <h3 class="text-base font-black tracking-tight">触发套装</h3>
             </div>
 
             <div class="theme-scrollbar flex-1 overflow-y-auto">
                 {#if pinnedList.length > 0}
-                    <div class="mb-2 text-xs font-semibold tracking-wider text-(--theme-muted-text)">首位声骸所属</div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="mb-2 text-xs font-black tracking-tight text-(--theme-modal-text)/70">首位声骸所属</div>
+                    <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                         {#each pinnedList as set}
                             <div
-                                class="flex flex-col gap-2 rounded-none p-3"
-                                style="background: var(--theme-input-bg);"
+                                class="flex flex-col gap-2 rounded-none border p-3"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="flex items-center gap-2 min-w-0">
                                     {#if icons[set.name]}
@@ -142,10 +142,10 @@
                                             class="size-8 shrink-0 rounded-none object-contain"
                                         />
                                     {/if}
-                                    <span class="min-w-0 truncate text-sm font-medium">{set.name}</span>
+                                    <span class="min-w-0 truncate text-xs font-black">{set.name}</span>
                                     <span
-                                        class="ml-auto shrink-0 rounded-none px-1.5 py-0.5 text-[10px]"
-                                        style="background: var(--theme-accent-bg)/15; color: var(--theme-accent-text);"
+                                        class="ml-auto shrink-0 rounded-none px-1.5 py-0.5 text-[10px] font-black"
+                                        style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
                                         >首位所属</span
                                     >
                                 </div>
@@ -155,10 +155,10 @@
                                             onclick={() => togglePiece(set.name, piece)}
                                             disabled={!isPieceAvailable(set.name, piece)}
                                             class={[
-                                                'rounded-none px-2.5 py-1 text-xs font-medium transition-colors',
+                                                'rounded-none border px-2.5 py-1 text-xs font-black transition-colors',
                                                 isPieceSelected(set.name, piece)
-                                                    ? 'bg-(--theme-accent-bg)/30 text-(--theme-accent-text)'
-                                                    : 'bg-(--theme-input-bg) text-(--theme-muted-text) hover:bg-(--theme-modal-text)/10',
+                                                    ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_15%,transparent)] text-(--theme-accent-text)'
+                                                    : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)',
                                                 !isPieceAvailable(set.name, piece) && !isSelected(set.name)
                                                     ? 'opacity-30 pointer-events-none'
                                                     : ''
@@ -177,14 +177,14 @@
                 {/if}
 
                 {#if otherList.length === 0}
-                    <div class="py-8 text-center text-sm text-(--theme-muted-text)">无其他套装</div>
+                    <div class="py-8 text-center text-xs text-(--theme-modal-text)/40">无其他套装</div>
                 {:else}
-                    <div class="mb-2 text-xs font-semibold tracking-wider text-(--theme-muted-text)">其它套装</div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="mb-2 text-xs font-black tracking-tight text-(--theme-modal-text)/70">其它套装</div>
+                    <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                         {#each otherList as set}
                             <div
-                                class="flex flex-col gap-2 rounded-none p-3"
-                                style="background: var(--theme-input-bg);"
+                                class="flex flex-col gap-2 rounded-none border p-3"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="flex items-center gap-2 min-w-0">
                                     {#if icons[set.name]}
@@ -195,7 +195,7 @@
                                             class="size-8 shrink-0 rounded-none object-contain"
                                         />
                                     {/if}
-                                    <span class="min-w-0 truncate text-sm font-medium">{set.name}</span>
+                                    <span class="min-w-0 truncate text-xs font-black">{set.name}</span>
                                 </div>
                                 <div class="flex gap-1">
                                     {#each set.pieces as piece}
@@ -203,10 +203,10 @@
                                             onclick={() => togglePiece(set.name, piece)}
                                             disabled={!isPieceAvailable(set.name, piece)}
                                             class={[
-                                                'rounded-none px-2.5 py-1 text-xs font-medium transition-colors',
+                                                'rounded-none border px-2.5 py-1 text-xs font-black transition-colors',
                                                 isPieceSelected(set.name, piece)
-                                                    ? 'bg-(--theme-accent-bg)/30 text-(--theme-accent-text)'
-                                                    : 'bg-(--theme-input-bg) text-(--theme-muted-text) hover:bg-(--theme-modal-text)/10',
+                                                    ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_15%,transparent)] text-(--theme-accent-text)'
+                                                    : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)',
                                                 !isPieceAvailable(set.name, piece) && !isSelected(set.name)
                                                     ? 'opacity-30 pointer-events-none'
                                                     : ''
@@ -230,7 +230,7 @@
             >
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
+                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-xs font-black tracking-tight transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 >
                     <Icon icon="mdi:check" class="size-4" />

@@ -293,17 +293,18 @@
             {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
                 class="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border p-6"
-                style="background: var(--theme-card-bg); border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent)"
+                style="background: var(--theme-card-bg); border-color: var(--theme-divider-border)"
             >
                 <div class="pointer-events-none absolute inset-0 flex select-none items-center justify-center">
-                    <span class="text-[280px] font-black leading-none opacity-[0.08] text-(--theme-accent-text)"
+                    <span class="text-[280px] font-black leading-none opacity-[0.06] text-(--theme-accent-text)"
                         >{i + 1}</span
                     >
                 </div>
 
                 {#if slot.character}
                     <button
-                        class="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-(--theme-input-bg)/50 text-(--theme-muted-text) opacity-0 backdrop-blur-sm transition-all hover:text-(--theme-accent-text) group-hover:opacity-100"
+                        class="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-none border bg-(--theme-input-bg) text-(--theme-modal-text)/40 opacity-0 backdrop-blur-sm transition-colors hover:text-(--theme-accent-text) group-hover:opacity-100"
+                        style="border-color: var(--theme-divider-border);"
                         onclick={(e) => {
                             e.stopPropagation()
                             resetSlot(i)
@@ -322,13 +323,11 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]',
                                     slot.character
-                                        ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
-                                        : 'border-2 border-dashed border-(--theme-card-border)',
-                                    !slot.character && !locked
-                                        ? 'border-2 border-dashed border-(--theme-card-border)'
-                                        : ''
+                                        ? 'border-(--theme-divider-border) bg-(--theme-input-bg)'
+                                        : 'border-dashed border-(--theme-card-border)',
+                                    !slot.character && !locked ? 'border-dashed border-(--theme-card-border)' : ''
                                 ].join(' ')}
                                 onclick={() => openPicker(i, 'character')}
                             >
@@ -344,6 +343,7 @@
                                 {/if}
                                 <div class="flex flex-col min-w-0 flex-1">
                                     <span
+                                        class="truncate text-xs font-black"
                                         class:opacity-40={!slot.character}
                                         class:text-[var(--theme-muted-text)]={!slot.character}
                                         style={slot.character && eColor ? `color: ${eColor}` : ''}
@@ -353,7 +353,9 @@
                                     {#if slot.character}
                                         {@const charData = characterMap.get(slot.character)}
                                         {#if charData}
-                                            <span class="flex items-center gap-1.5 text-sm text-(--theme-muted-text)">
+                                            <span
+                                                class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/40"
+                                            >
                                                 {#if elementIcons[charData.element]}
                                                     <img
                                                         src={elementIcons[charData.element]}
@@ -383,10 +385,10 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]',
                                     slot.weapon
-                                        ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
-                                        : 'border-2 border-dashed border-(--theme-card-border)',
+                                        ? 'border-(--theme-divider-border) bg-(--theme-input-bg)'
+                                        : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                                 ]
                                     .filter(Boolean)
@@ -404,12 +406,12 @@
                                 {/if}
                                 <div class="flex flex-col min-w-0 flex-1">
                                     {#if autoRecommending[i]}
-                                        <span class="text-(--theme-muted-text)">自动推荐中...</span>
+                                        <span class="text-xs text-(--theme-modal-text)/40">自动推荐中...</span>
                                     {:else}
                                         <span
+                                            class="truncate text-xs font-black"
                                             class:opacity-40={!slot.weapon}
                                             class:text-[var(--theme-muted-text)]={!slot.weapon}
-                                            class=""
                                         >
                                             {slot.weapon ||
                                                 (slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色')}
@@ -418,7 +420,7 @@
                                     {#if slot.weapon}
                                         {@const wpData = weaponMap.get(slot.weapon)}
                                         {#if wpData}
-                                            <span class="text-amber-600 text-sm tracking-wider">
+                                            <span class="text-xs font-black tracking-wider text-amber-600">
                                                 {'★'.repeat(wpData.star)}
                                             </span>
                                         {/if}
@@ -433,10 +435,10 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]',
                                     slot.echoes[0].name
-                                        ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
-                                        : 'border-2 border-dashed border-(--theme-card-border)',
+                                        ? 'border-(--theme-divider-border) bg-(--theme-input-bg)'
+                                        : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                                 ]
                                     .filter(Boolean)
@@ -453,7 +455,7 @@
                                     />
                                 {/if}
                                 <span
-                                    class="flex-1 text-base"
+                                    class="min-w-0 flex-1 truncate text-xs font-black"
                                     class:opacity-40={!slot.echoes[0].name}
                                     class:text-[var(--theme-muted-text)]={!slot.echoes[0].name}
                                 >
@@ -474,10 +476,10 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-2 rounded-none px-4 text-sm transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-2 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]',
                                     slot.triggerSets.length > 0
-                                        ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
-                                        : 'border-2 border-dashed border-(--theme-card-border)',
+                                        ? 'border-(--theme-divider-border) bg-(--theme-input-bg)'
+                                        : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                                 ]
                                     .filter(Boolean)
@@ -489,7 +491,8 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         {#each slot.triggerSets as set}
                                             <span
-                                                class="inline-flex items-center gap-1 rounded-none bg-(--theme-input-bg) px-2 py-1 text-sm"
+                                                class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] font-black"
+                                                style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
                                             >
                                                 {#if echoSetIcons[set.name]}
                                                     <img
@@ -506,7 +509,7 @@
                                     </div>
                                 {:else}
                                     <span
-                                        class="flex-1 truncate text-sm"
+                                        class="min-w-0 flex-1 truncate text-xs"
                                         class:opacity-40={slot.triggerSets.length === 0}
                                         class:text-[var(--theme-muted-text)]={slot.triggerSets.length === 0}
                                     >
@@ -570,18 +573,18 @@
     .hide-scrollbar::-webkit-scrollbar {
         display: none;
     }
-    /* 选择框右上角角标：圆角矩形，背景取主题文本色、文字取主题背景色（自然形成 mono 反色：黑夜白底黑字/白天黑底白字） */
+    /* 选择框右上角角标：直角，背景取主题文本色、文字取主题背景色（自然形成 mono 反色：黑夜白底黑字/白天黑底白字） */
     .picker-badge {
         position: absolute;
         right: 0.375rem;
         top: 0.375rem;
         z-index: 5;
         padding: 0.0625rem 0.4375rem;
-        border-radius: 0.3125rem;
+        border-radius: 0;
         font-size: 0.625rem;
         line-height: 1rem;
-        font-weight: 600;
-        letter-spacing: 0.025em;
+        font-weight: 900;
+        letter-spacing: 0.08em;
         background: var(--theme-modal-text);
         color: var(--theme-modal-bg);
         opacity: 0.75;

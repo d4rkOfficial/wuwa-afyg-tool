@@ -168,9 +168,10 @@
             <button
                 onclick={() => (activeTab = i)}
                 class={[
-                    'rounded-none px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-2',
-                    activeTab === i && 'text-(--theme-modal-text)',
-                    activeTab !== i && 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                    'rounded-none border px-3 py-1.5 text-xs font-black tracking-tight transition-colors flex items-center gap-2',
+                    activeTab === i && 'border-current',
+                    activeTab !== i &&
+                        'border-transparent text-(--theme-modal-text)/40 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/70'
                 ].join(' ')}
                 style={activeTab === i
                     ? `background: color-mix(in srgb, ${charElementColorOf(name ?? '', charInfoMap)} 18%, transparent); color: ${charElementColorOf(name ?? '', charInfoMap)};`
@@ -232,7 +233,7 @@
         <!-- 角色头 -->
         <div
             class="mt-4 flex items-center gap-3 rounded-none border p-3"
-            style="border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
         >
             <div class="flex min-w-0 items-center gap-3">
                 {#if charIcons[charName]}
@@ -244,13 +245,13 @@
                     />
                 {:else}
                     <span
-                        class="size-11 shrink-0 rounded-full flex items-center justify-center text-sm font-bold"
-                        style="background: var(--theme-card-bg); color: var(--theme-modal-text)/50;"
+                        class="size-11 shrink-0 rounded-full flex items-center justify-center text-sm font-black"
+                        style="background: var(--theme-card-bg); color: color-mix(in srgb, var(--theme-modal-text) 50%, transparent);"
                     >
                         {charName.charAt(0)}
                     </span>
                 {/if}
-                <span class="block text-sm font-semibold" style="color: {charElementColorOf(charName, charInfoMap)}">
+                <span class="block text-sm font-black" style="color: {charElementColorOf(charName, charInfoMap)}">
                     {charName}
                 </span>
             </div>
@@ -261,7 +262,7 @@
             <div class="flex min-w-0 flex-1 items-center gap-2.5">
                 <div
                     class="flex size-11 shrink-0 items-center justify-center rounded-none border"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
                 >
                     {#if stat.weapon && weaponIcons[stat.weapon]}
                         <img
@@ -277,8 +278,7 @@
                 {#if stat.weapon}
                     {@const wInfo = weaponInfoMap[stat.weapon]}
                     <div class="min-w-0">
-                        <span class="block truncate text-xs font-medium text-(--theme-modal-text)/80"
-                            >{stat.weapon}</span
+                        <span class="block truncate text-xs font-black text-(--theme-modal-text)/80">{stat.weapon}</span
                         >
                         <span class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40">
                             {#if wInfo}
@@ -295,18 +295,21 @@
         </div>
 
         <!-- 链/阶配置：小按钮分组框（样式参考 设置-配色），框宽适应按钮；点选即写入档位并触发重载，点当前档位不重复写入 -->
-        <div class="mt-3 rounded-none border p-3" style="border-color: var(--theme-divider-border);">
+        <div
+            class="mt-3 rounded-none border p-3"
+            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+        >
             <div class="flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">角色</span>
                 <div
                     class="flex w-fit gap-1 rounded-none border p-1"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
                 >
                     {#each [0, 1, 2, 3, 4, 5, 6] as n}
                         {@const active = savedChain === n}
                         <button
                             onclick={() => pickChain(n)}
-                            class="rounded-none px-2 py-1 text-[11px] font-medium transition-colors {active
+                            class="rounded-none px-2 py-1 text-[11px] font-black transition-colors {active
                                 ? ''
                                 : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
                             style={active
@@ -322,13 +325,13 @@
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">武器</span>
                 <div
                     class="flex w-fit gap-1 rounded-none border p-1"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
                 >
                     {#each [0, 1, 2, 3, 4, 5] as n}
                         {@const active = savedRefine === n}
                         <button
                             onclick={() => pickRefine(n)}
-                            class="rounded-none px-2 py-1 text-[11px] font-medium transition-colors {active
+                            class="rounded-none px-2 py-1 text-[11px] font-black transition-colors {active
                                 ? ''
                                 : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
                             style={active
@@ -354,11 +357,11 @@
         <!-- 属性面板 -->
         <div
             class="mt-3 space-y-1.5 rounded-none border p-3 text-xs"
-            style="border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
         >
             <div class="flex items-center justify-between">
                 <span class="text-(--theme-modal-text)/50">攻击</span>
-                <span class="tabular-nums text-(--theme-modal-text)/80">
+                <span class="font-black tabular-nums text-(--theme-modal-text)/80">
                     {stat.atkTotal.toLocaleString()}
                     <span class="text-(--theme-modal-text)/30">
                         ({stat.atkWhite.toLocaleString()} +
@@ -369,7 +372,7 @@
             </div>
             <div class="flex items-center justify-between">
                 <span class="text-(--theme-modal-text)/50">生命</span>
-                <span class="tabular-nums text-(--theme-modal-text)/80">
+                <span class="font-black tabular-nums text-(--theme-modal-text)/80">
                     {stat.hpTotal.toLocaleString()}
                     <span class="text-(--theme-modal-text)/30">
                         ({stat.hpWhite.toLocaleString()} +
@@ -380,7 +383,7 @@
             </div>
             <div class="flex items-center justify-between">
                 <span class="text-(--theme-modal-text)/50">防御</span>
-                <span class="tabular-nums text-(--theme-modal-text)/80">
+                <span class="font-black tabular-nums text-(--theme-modal-text)/80">
                     {stat.defTotal.toLocaleString()}
                     <span class="text-(--theme-modal-text)/30">
                         ({stat.defWhite.toLocaleString()} +
@@ -391,15 +394,15 @@
             </div>
             <div class="flex items-center justify-between">
                 <span class="text-(--theme-modal-text)/50">谐度破坏增幅</span>
-                <span class="tabular-nums text-(--theme-modal-text)/80">{stat.tune}</span>
+                <span class="font-black tabular-nums text-(--theme-modal-text)/80">{stat.tune}</span>
             </div>
             <div class="flex items-center justify-between">
                 <span class="text-(--theme-modal-text)/50">共鸣效率</span>
-                <span class="tabular-nums text-(--theme-modal-text)/80">{stat.recharge.toFixed(1)}%</span>
+                <span class="font-black tabular-nums text-(--theme-modal-text)/80">{stat.recharge.toFixed(1)}%</span>
             </div>
             <div class="flex items-center justify-between">
                 <span class="text-(--theme-modal-text)/50">暴击 / 暴击伤害</span>
-                <span class="tabular-nums text-(--theme-modal-text)/80">
+                <span class="font-black tabular-nums text-(--theme-modal-text)/80">
                     {stat.critRate.toFixed(1)}% / {stat.critDmg.toFixed(1)}%
                 </span>
             </div>
@@ -407,7 +410,7 @@
             {#if stat.healBonus > 0}
                 <div class="flex items-center justify-between">
                     <span class="text-(--theme-modal-text)/50">治疗加成</span>
-                    <span class="tabular-nums text-(--theme-modal-text)/80">+{stat.healBonus}%</span>
+                    <span class="font-black tabular-nums text-(--theme-modal-text)/80">+{stat.healBonus}%</span>
                 </div>
             {/if}
             -->
@@ -419,7 +422,7 @@
                 {#if v && v > 0}
                     <div class="flex items-center justify-between">
                         <span class="text-(--theme-modal-text)/50">{el}伤害加成</span>
-                        <span class="tabular-nums" style="color: var(--theme-element-{el})">+{v}%</span>
+                        <span class="font-black tabular-nums" style="color: var(--theme-element-{el})">+{v}%</span>
                     </div>
                 {/if}
             {/each}
@@ -429,14 +432,14 @@
                 {#if v && v > 0}
                     <div class="flex items-center justify-between">
                         <span class="text-(--theme-modal-text)/50">{type}伤害加成</span>
-                        <span class="tabular-nums text-(--theme-modal-text)/80">+{v}%</span>
+                        <span class="font-black tabular-nums text-(--theme-modal-text)/80">+{v}%</span>
                     </div>
                 {/if}
             {/each}
             {#if stat.bonusDmg > 0}
                 <div class="flex items-center justify-between">
                     <span class="text-(--theme-modal-text)/50">全属性伤害加成</span>
-                    <span class="tabular-nums text-(--theme-accent-text)">+{stat.bonusDmg}%</span>
+                    <span class="font-black tabular-nums text-(--theme-accent-text)">+{stat.bonusDmg}%</span>
                 </div>
             {/if}
         </div>

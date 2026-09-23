@@ -65,7 +65,10 @@
         class="rounded-none border p-3.5"
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
-        <span class="text-xs font-medium text-(--theme-modal-text)/70 block mb-3">怪物属性</span>
+        <span class="mb-3 flex items-center gap-2 text-xs font-black tracking-tight text-(--theme-modal-text)/70">
+            <Icon icon="mdi:skull" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+            怪物属性
+        </span>
 
         <div class="flex items-center gap-1 min-w-0">
             {#each ['BOSS', '精英怪', '小怪'] as t}
@@ -73,10 +76,10 @@
                 <button
                     onclick={() => handleTypeChange(t as 'BOSS' | '精英怪' | '小怪')}
                     class={[
-                        'rounded-none text-[10px] font-medium transition-colors flex flex-col items-center justify-center gap-0.5 w-12 aspect-square',
+                        'rounded-none border text-[10px] font-black transition-colors flex flex-col items-center justify-center gap-0.5 w-12 aspect-square',
                         config.enemy.type === t
-                            ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
-                            : 'bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/10'
+                            ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_12%,transparent)] text-(--theme-accent-text)'
+                            : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
                     ].join(' ')}
                 >
                     <Icon {icon} class="size-4 shrink-0" />
@@ -103,7 +106,7 @@
                             max="150"
                             oninput={(e) => handleLevelChange(parseInt((e.target as HTMLInputElement).value) || 0)}
                             disabled={config.enemy.defenseLocked}
-                            class="w-28 h-6 rounded-none border px-2 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                            class="w-28 h-6 rounded-none border px-2 text-xs font-black text-right tabular-nums text-(--theme-modal-text) outline-none"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             class:opacity-70={config.enemy.defenseLocked}
                         />
@@ -114,10 +117,10 @@
                                 onclick={() => handleLevelChange(lv)}
                                 disabled={config.enemy.defenseLocked}
                                 class={[
-                                    'min-w-7 h-6 rounded-none text-xs font-medium transition-colors',
+                                    'min-w-7 h-6 rounded-none border text-xs font-black transition-colors',
                                     config.enemy.level === lv
-                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
-                                        : 'bg-(--theme-input-bg) text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
+                                        ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_12%,transparent)] text-(--theme-accent-text)'
+                                        : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/50 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
                                 ].join(' ')}>{lv}</button
                             >
                         {/each}
@@ -140,7 +143,7 @@
                             updateEnemy('defenseLocked', true)
                         }}
                         disabled={config.enemy.defenseLocked}
-                        class="w-28 h-6 rounded-none border px-2 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                        class="w-28 h-6 rounded-none border px-2 text-xs font-black text-right tabular-nums text-(--theme-modal-text) outline-none"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         class:opacity-70={config.enemy.defenseLocked}
                     />
@@ -155,7 +158,7 @@
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
         <div class="mb-3 flex items-center justify-between gap-2">
-            <span class="text-xs font-medium text-(--theme-modal-text)/70">抗性</span>
+            <span class="text-xs font-black tracking-tight text-(--theme-modal-text)/70">抗性</span>
             <div
                 class="flex gap-1 rounded-none border p-0.5"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -164,10 +167,10 @@
                     <button
                         onclick={() => applyResistancePreset(p)}
                         class={[
-                            'rounded-none px-2 py-0.5 text-[10px] font-medium transition-colors',
+                            'rounded-none border px-2 py-0.5 text-[10px] font-black transition-colors',
                             activeResistPreset === p
-                                ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
-                                : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
+                                ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_12%,transparent)] text-(--theme-accent-text)'
+                                : 'border-transparent text-(--theme-modal-text)/50 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)'
                         ].join(' ')}
                     >
                         {p}%全抗
@@ -175,10 +178,10 @@
                 {/each}
                 <span
                     class={[
-                        'rounded-none px-2 py-0.5 text-[10px] font-medium',
+                        'rounded-none border px-2 py-0.5 text-[10px] font-black',
                         activeResistPreset === null
-                            ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
-                            : 'text-(--theme-modal-text)/50'
+                            ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_12%,transparent)] text-(--theme-accent-text)'
+                            : 'border-transparent text-(--theme-modal-text)/50'
                     ].join(' ')}>自定义</span
                 >
             </div>
@@ -189,7 +192,7 @@
                 {@const color = elementColor(el)}
                 <div
                     class="relative w-[calc(25%-7.5px)] min-w-28 overflow-hidden rounded-none border p-2.5 transition-all duration-200 hover:-translate-y-px hover:border-(--card-color)"
-                    style="--card-color: {color}; background: linear-gradient(135deg, color-mix(in srgb, {color} 14%, transparent) 0%, transparent 65%), radial-gradient(ellipse at 85% 8%, color-mix(in srgb, {color} 12%, transparent) 0%, transparent 55%); border-color: color-mix(in srgb, {color} 18%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, {color} 8%, transparent), inset 0 1px 0 rgba(255,255,255,0.04);"
+                    style="--card-color: {color}; background: linear-gradient(135deg, color-mix(in srgb, {color} 14%, transparent) 0%, transparent 65%), radial-gradient(ellipse at 85% 8%, color-mix(in srgb, {color} 12%, transparent) 0%, transparent 55%); border-color: color-mix(in srgb, {color} 18%, transparent);"
                 >
                     <!-- 顶部高光线（元素色，弱） -->
                     <div
@@ -206,7 +209,7 @@
                     <!-- 顶行：图标徽章 + 名称 -->
                     <div class="relative flex items-center gap-1.5">
                         <span
-                            class="flex size-7 shrink-0 items-center justify-center rounded-none text-[10px] font-bold"
+                            class="flex size-7 shrink-0 items-center justify-center rounded-none text-[10px] font-black"
                             style="background: color-mix(in srgb, {color} 12%, transparent); color: {color};"
                         >
                             {#if elementIcons[el]}
@@ -220,7 +223,7 @@
                                 <span>{el.charAt(0)}</span>
                             {/if}
                         </span>
-                        <span class="min-w-0 flex-1 truncate text-sm font-bold" style="color: {color};">{el}</span>
+                        <span class="min-w-0 flex-1 truncate text-sm font-black" style="color: {color};">{el}</span>
                     </div>
                     <!-- 底行：输入（左对齐属性色）+ 横排步进 -->
                     <div class="relative mt-2 flex items-stretch gap-1">
@@ -241,7 +244,7 @@
                                             Math.max(-100, parseInt((e.target as HTMLInputElement).value) || 0)
                                         )
                                     )}
-                                class="w-full min-w-0 bg-transparent px-1.5 py-1 text-sm font-semibold text-left tabular-nums outline-none"
+                                class="w-full min-w-0 bg-transparent px-1.5 py-1 text-sm font-black text-left tabular-nums outline-none"
                                 style="color: {color};"
                             />
                             <span class="shrink-0 pr-1 text-[10px] text-(--theme-modal-text)/25">%</span>
@@ -272,7 +275,7 @@
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
         <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-(--theme-modal-text)/70">免伤率</span>
+            <span class="text-xs font-black tracking-tight text-(--theme-modal-text)/70">免伤率</span>
             <div class="flex items-center gap-1 ml-auto">
                 <input
                     type="number"
@@ -284,7 +287,7 @@
                             'dmgReduction',
                             Math.min(100, Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0))
                         )}
-                    class="w-16 rounded-none border px-2 py-1 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                    class="w-16 rounded-none border px-2 py-1 text-xs font-black text-right tabular-nums text-(--theme-modal-text) outline-none"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 />
                 <span class="text-[10px] text-(--theme-modal-text)/30 w-3">%</span>

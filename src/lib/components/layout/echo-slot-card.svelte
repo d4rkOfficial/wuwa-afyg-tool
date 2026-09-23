@@ -68,9 +68,9 @@
     const second = $derived(SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT])
 
     const costBtnCls = (cost: number): string => {
-        if (cost === 4) return 'bg-(--theme-accent-bg)/25 text-(--theme-accent-text)'
-        if (cost === 3) return 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-        return 'bg-(--theme-accent-bg)/8 text-(--theme-accent-text)'
+        if (cost === 4) return 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/25 text-(--theme-accent-text)'
+        if (cost === 3) return 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+        return 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/8 text-(--theme-accent-text)'
     }
 
     const getTierIndex = (tiers: number[], value: number): number => {
@@ -84,16 +84,15 @@
 </script>
 
 <div
-    class="relative min-w-[13rem] rounded-none {className ?? ''}"
-    style="background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, var(--theme-modal-text) 6%, transparent) 100%); {styleProp ||
-        ''}"
+    class="relative min-w-[13rem] rounded-none border p-4 {className ?? ''}"
+    style="background: var(--theme-card-bg); border-color: var(--theme-divider-border); {styleProp || ''}"
 >
     <!-- COST overlay -->
     <div class="pointer-events-none absolute inset-0 flex select-none items-center justify-center overflow-hidden">
         <span class="text-[200px] font-black leading-none opacity-[0.06] text-(--theme-accent-text)">{slot.cost}</span>
     </div>
 
-    <div class="relative z-1 p-4">
+    <div class="relative z-1">
         <!-- Cost selector：按钮平分卡片宽度 -->
         <div class="mb-3 flex items-center gap-1">
             {#each COST_OPTIONS as c}
@@ -101,10 +100,10 @@
                     onclick={() => oncost(c)}
                     disabled={c !== slot.cost && otherCost + c > 12}
                     class={[
-                        'h-6 min-w-0 flex-1 rounded-none px-1 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
+                        'h-6 min-w-0 flex-1 rounded-none border px-1 text-xs font-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
                         slot.cost === c
                             ? costBtnCls(slot.cost)
-                            : 'bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:bg-(--theme-modal-text)/10'
+                            : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
                     ].join(' ')}>{c} COST</button
                 >
             {/each}
@@ -115,18 +114,18 @@
             <button
                 data-main-stat-trigger={mainStatTriggerKey}
                 onclick={onmainstat}
-                class="w-full rounded-none border px-3 py-2 transition-colors hover:bg-(--theme-modal-text)/10"
+                class="w-full rounded-none border px-3 py-2 transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <div class="flex items-center justify-between">
                     <div class="flex flex-col text-left">
-                        <span class="text-sm font-medium text-(--theme-modal-text)">
+                        <span class="text-xs font-black text-(--theme-modal-text)">
                             {slot.mainStat
                                 ? `${shortLabel(slot.mainStat.type)} ${slot.mainStat.value}${slot.mainStat.unit}`
                                 : '未选择'}
                         </span>
                         {#if second}
-                            <span class="text-xs text-(--theme-modal-text)/60">{second.label} +{second.value}</span>
+                            <span class="text-[10px] text-(--theme-modal-text)/40">{second.label} +{second.value}</span>
                         {/if}
                     </div>
                     <Icon icon="mdi:chevron-down" class="size-3.5 text-(--theme-modal-text)/40 shrink-0" />
@@ -136,7 +135,10 @@
 
         <!-- Substats -->
         <div>
-            <span class="text-[10px] text-(--theme-modal-text)/40 block mb-1">副词条 ({slot.substats.length}/5)</span>
+            <span
+                class="mb-1 flex items-center gap-1.5 border-t pt-2 text-[10px] font-black tracking-[0.18em] text-(--theme-modal-text)/40"
+                style="border-color: var(--theme-divider-border);">副词条 ({slot.substats.length}/5)</span
+            >
             <div class="space-y-1">
                 {#each slot.substats as sub, idx (sub.type)}
                     {@const opt = SUBSTAT_OPTIONS.find((o) => o.label === sub.type)}
@@ -154,7 +156,7 @@
                             role="listitem"
                             transition:slide={{ duration: 200 }}
                             class={[
-                                'flex items-center gap-2 rounded-none px-2 py-1.5 transition-all touch-none',
+                                'flex items-center gap-2 rounded-none border border-(--theme-divider-border) px-2 py-1.5 transition-all touch-none',
                                 ondragstart ? 'cursor-grab active:cursor-grabbing' : '',
                                 isDragged && !dragOutside && 'ring-2 ring-(--theme-accent-bg)',
                                 isDragged && dragOutside && 'ring-2 ring-red-500 opacity-50'
@@ -164,7 +166,7 @@
                             onpointermove={ondragmove}
                             onpointerup={(e) => ondragend?.(e, idx)}
                         >
-                            <span class="text-xs text-(--theme-modal-text)/70 w-20 shrink-0 mr-2"
+                            <span class="text-[11px] font-black text-(--theme-modal-text)/80 w-20 shrink-0 mr-2"
                                 >{shortLabel(sub.type)}</span
                             >
                             <div class="relative flex-1 h-5">
@@ -177,7 +179,7 @@
                                     ></div>
                                 </div>
                                 <div
-                                    class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-none text-[10px] font-medium whitespace-nowrap pointer-events-none z-10"
+                                    class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-none text-[10px] font-black whitespace-nowrap pointer-events-none z-10"
                                     style="left: {pct}%; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                                 >
                                     {sub.value}{opt.unit}
@@ -195,7 +197,7 @@
                             {#if onremovesubstat}
                                 <button
                                     onclick={() => onremovesubstat(idx)}
-                                    class="shrink-0 rounded-none p-0.5 text-(--theme-muted-text) transition-colors hover:text-red-500"
+                                    class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
                                     title="移除该副词条"
                                 >
                                     <Icon icon="mdi:close" class="size-3.5" />
@@ -209,11 +211,11 @@
                 {/if}
             </div>
             {#if slot.substats.length > 0}
-                <div class="mt-1 flex flex-wrap items-center gap-2">
+                <div class="mt-2 flex flex-wrap items-center gap-2">
                     {#if slot.substats.length < 5}
                         <button
                             onclick={onaddsubstat}
-                            class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
+                            class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
                         >
                             <Icon icon="mdi:plus" class="size-3" />
                             选择副词条
@@ -221,7 +223,7 @@
                     {/if}
                     <button
                         onclick={onclearsubstats}
-                        class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-input-bg) hover:text-red-500"
+                        class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
                         title="清空该声骸的副词条"
                     >
                         <Icon icon="mdi:refresh" class="size-3" />
@@ -229,10 +231,10 @@
                     </button>
                 </div>
             {:else}
-                <div class="mt-1 flex flex-wrap items-center gap-2">
+                <div class="mt-2 flex flex-wrap items-center gap-2">
                     <button
                         onclick={onaddsubstat}
-                        class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
+                        class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
                     >
                         <Icon icon="mdi:plus" class="size-3" />
                         选择副词条
@@ -240,7 +242,7 @@
                     {#if onenhance}
                         <button
                             onclick={onenhance}
-                            class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
+                            class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
                         >
                             <Icon icon="mdi:dice-5" class="size-3" />
                             随机强化

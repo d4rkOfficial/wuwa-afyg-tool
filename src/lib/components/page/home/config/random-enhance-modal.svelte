@@ -50,28 +50,32 @@
         style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
-        <div class="flex items-center justify-between mb-3">
-            <span class="text-sm font-medium text-(--theme-modal-text)">随机强化目标</span>
+        <div class="mb-3 flex items-center gap-2 border-b pb-2.5" style="border-color: var(--theme-divider-border);">
+            <Icon icon="mdi:dice-5" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+            <span class="text-sm font-black tracking-tight text-(--theme-modal-text)">随机强化目标</span>
             <button
                 onclick={onclose}
                 disabled={running}
-                class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                class="ml-auto rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
             >
                 <Icon icon="mdi:close" class="size-4" />
             </button>
         </div>
-        <div class="text-xs text-(--theme-modal-text)/50 mb-2">选择希望出现的副词条（最多 5 个）</div>
-        <div class="theme-scrollbar space-y-0.5 max-h-56 overflow-y-auto mb-3">
+        <div class="mb-2 text-[10px] text-(--theme-modal-text)/40">选择希望出现的副词条（最多 5 个）</div>
+        <div
+            class="theme-scrollbar mb-3 max-h-56 space-y-0.5 overflow-y-auto border-b pb-3"
+            style="border-color: var(--theme-divider-border);"
+        >
             {#each available as type}
                 {@const isSelected = selected.includes(type)}
                 <button
                     onclick={() => toggleType(type)}
                     disabled={running}
                     class={[
-                        'flex w-full items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-colors',
+                        'flex w-full items-center gap-2 rounded-none border px-3 py-2 text-xs text-left transition-colors',
                         isSelected
-                            ? 'text-(--theme-modal-text)'
-                            : 'text-(--theme-modal-text)/60 hover:bg-(--theme-input-bg)'
+                            ? 'border-(--theme-accent-bg) font-black text-(--theme-modal-text)'
+                            : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
                     ].join(' ')}
                     style={isSelected ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);' : ''}
                 >
@@ -86,7 +90,7 @@
             onclick={handleStart}
             disabled={selected.length === 0 || running}
             class={[
-                'w-full rounded-none px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5',
+                'w-full rounded-none px-3 py-2 text-xs font-black tracking-tight transition-colors flex items-center justify-center gap-1.5',
                 selected.length > 0 && !running
                     ? 'hover:opacity-80'
                     : 'bg-(--theme-input-bg) text-(--theme-modal-text)/30 cursor-not-allowed'

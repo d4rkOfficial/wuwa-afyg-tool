@@ -34,11 +34,14 @@
             style={mergedStyle}
             onclick={(e) => e.stopPropagation()}
         >
-            <div class="flex items-center justify-between mb-3">
-                <span class="text-sm font-medium text-(--theme-modal-text)">选择副词条</span>
+            <div
+                class="mb-3 flex items-center gap-2 border-b pb-2.5"
+                style="border-color: var(--theme-divider-border);"
+            >
+                <span class="text-sm font-black tracking-tight text-(--theme-modal-text)">选择副词条</span>
                 <button
                     onclick={onclose}
-                    class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                    class="ml-auto rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                     aria-label="关闭"
                 >
                     <Icon icon="mdi:close" class="size-4" />
@@ -53,14 +56,14 @@
                         }}
                         disabled={exists}
                         class={[
-                            'flex w-full items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-colors',
+                            'flex w-full items-center gap-2 rounded-none border px-3 py-2 text-xs text-left transition-colors',
                             exists
-                                ? 'text-(--theme-modal-text)/20 cursor-not-allowed'
-                                : 'text-(--theme-modal-text) hover:bg-(--theme-input-bg)'
+                                ? 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/20 cursor-not-allowed'
+                                : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text) hover:border-(--theme-accent-bg)'
                         ].join(' ')}
                     >
-                        <span class="flex-1">{opt.label}</span>
-                        <span class="text-[10px] text-(--theme-modal-text)/40">{opt.unit}</span>
+                        <span class="flex-1 font-black">{opt.label}</span>
+                        <span class="text-[10px] font-black text-(--theme-modal-text)/40">{opt.unit}</span>
                         {#if exists}
                             <Icon icon="mdi:check" class="size-3 shrink-0 text-(--theme-accent-text)" />
                         {/if}
