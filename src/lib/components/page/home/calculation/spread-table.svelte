@@ -1,5 +1,11 @@
 <script lang="ts">
-    /** @desc 铺开表（拉表铺开模式）：按角色×直伤/非直伤分组，Buff 作列、条目作行，支持单元格/行列头三态勾选、框选批量、叠层文件夹列线区分 */
+    /** @desc 铺开表（拉表铺开模式）：按角色×直伤/非直伤分组，Buff 作列、条目作行，支持单元格/行列头三态勾选、框选批量、叠层文件夹列线区分
+     *  性能约定：
+     *  1) 结构化数据（可用性/表头/列分隔）与勾选状态分离——点单元格不再重建整表结构；
+     *  2) 冻结列与吸顶表头使用实底表面（无 backdrop-filter），避免逐元素重算背景模糊；
+     *  3) 行/列高亮：行级 opacity + 列级单层遮罩，替代逐单元格 opacity + 过渡；
+     *  4) 渐进渲染按结构指纹重置，并以切片方式分帧揭示；
+     *  5) 表格宽度由表头内容决定（不再测宽等宽、不再补填充列）。 */
     import { onMount, onDestroy } from 'svelte'
     import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
     import type { CharSlot } from '$lib/types/project'
@@ -87,6 +93,9 @@
     })
     const globalBuffs = $derived(buffSets.filter((b) => globalBuffSetIds.includes(b.id)))
 
+    /** @desc 列 id → 全局列序索引（勾选统计用，避免每格线性查找） */
+    const colIndexById = $derived.by(() => new Map(columns.map((c, i) => [c.id, i] as const)))
+
     /** @desc 叠层分组信息：buffId → 组（同「前缀+后缀」≥2 条成组；仅用于表头分组展示与分隔线，列本身仍每层一列） */
     interface FolderGroup {
         key: string
@@ -115,16 +124,13 @@
         return map
     })
 
-    /** @desc 列间分割线：folder 组与 folder/普通 buff 接壤→主题色半透明实线加粗；其余→常规分隔线（border-right 单侧绘制避免重叠，最后一列不画） */
-    const colBorderStyle = (curId: string | undefined, nextId: string | undefined): string => {
-        if (nextId === undefined) return ''
-        if (curId === undefined) return ''
+    /** @desc 列间分割线样式类：folder 组与 folder/普通 buff 接壤→主题色半透明实线加粗；其余→常规分隔线（border-right 单侧绘制避免重叠，最后一列不画） */
+    const colSepClass = (curId: string | undefined, nextId: string | undefined): string => {
+        if (nextId === undefined || curId === undefined) return ''
         const curGroup = folderGroupOf.get(curId)
         const nextGroup = folderGroupOf.get(nextId)
         const solid = (curGroup !== undefined || nextGroup !== undefined) && curGroup !== nextGroup
-        return solid
-            ? 'border-right: 2px solid color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);'
-            : 'border-right: 1px solid var(--theme-divider-border);'
+        return solid ? 'spread-sep-solid' : 'spread-sep'
     }
 
     /** @desc 自动推导伤害类型映射（未手填伤害类型时展示推导结果；规则2需要角色/声骸技能文案，故补齐数据） */
@@ -240,36 +246,52 @@
         return bs.zones.some((z) => zones.has(z.zoneId))
     }
 
+    /** @desc 单元格结构数据：只含「该格是否可用」——勾选态在模板里直接读 entryBuffSetIdMap，避免勾选触发整表结构重建 */
     interface CellData {
         buffId: string
         enabled: boolean
-        selected: boolean
     }
     interface RowData {
         entry: DamageEntry
         cells: CellData[]
         enabledBuffIds: string[]
-        selectedCount: number
-        allSelected: boolean
-        partial: boolean
         splitBefore: boolean
     }
-    interface ColStat {
+    /** @desc 表头单元格（第二行=列名行）：标签与分隔线在结构派生里一次算好，模板零正则/零线性查找 */
+    interface HeadCell {
+        ci: number
+        label: string
+        title: string
+        isLayer: boolean
         enabled: number
-        selected: number
+        sepClass: string
+    }
+    interface HeadGroupCell {
+        span: number
+        label?: string
+        sepClass: string
     }
     interface GroupData {
+        key: string
         charName: string
         kind: 'direct' | 'nondirect'
         rows: RowData[]
-        colStats: ColStat[]
+        // 与 columns 同索引：该组内每个 buff 列的可用条目数
+        enabledCounts: number[]
         // 该组角色吃不到的 buff 列索引（组内无任何启用行）——表头直接筛掉
         visibleColIdx: number[]
+        // 是否存在叠层列（决定表头是否两级）
+        hasFolder: boolean
+        // 表头（第一行=叠层组名行，仅叠层列；第二行=列名行）
+        headerGroups: HeadGroupCell[]
+        headerCols: HeadCell[]
         // 该组实际能用的全局 buff（scope/条件/乘区判定）——吃不到的全局 buff 不显示
         visibleGlobalBuffs: BuffSet[]
     }
 
-    /** @desc 预计算整表数据：单元格可用性/选中态、行/列统计、不连续分割标记一次算好，模板零逻辑 */
+    const EMPTY_IDS: string[] = []
+
+    /** @desc 预计算整表「结构」数据：单元格可用性、表头标签/分隔线、行统计一次算好；勾选态不参与，故点单元格不重建整表 */
     const tableData = $derived.by(() => {
         const cols = columns
         const groupMap = new Map<
@@ -293,33 +315,27 @@
         }
 
         const result: GroupData[] = []
-        for (const g of groupMap.values()) {
-            const colStats: ColStat[] = columns.map(() => ({ enabled: 0, selected: 0 }))
+        for (const [groupKey, g] of groupMap) {
+            const enabledCounts: number[] = cols.map(() => 0)
             const rows: RowData[] = []
             let prevIdx = -Infinity
             for (const { entry, idx } of g.items) {
                 const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
-                // 绑定 Set 化：替代每 cell 的 includes
-                const boundSet = new Set(entryBuffSetIdMap[entry.id] ?? [])
                 const cells: CellData[] = []
-                for (let ci = 0; ci < columns.length; ci++) {
-                    const bs = columns[ci]
+                const enabledBuffIds: string[] = []
+                for (let ci = 0; ci < cols.length; ci++) {
+                    const bs = cols[ci]
                     const enabled = buffEnabledForEntryCached(bs, entry, charIdx)
-                    // selected 反映真实绑定状态（含条件不匹配但已勾选的 buff，用于降透明度展示）
-                    const selected = boundSet.has(bs.id)
-                    cells.push({ buffId: bs.id, enabled, selected })
-                    if (enabled) colStats[ci].enabled++
-                    if (enabled && selected) colStats[ci].selected++
+                    cells.push({ buffId: bs.id, enabled })
+                    if (enabled) {
+                        enabledCounts[ci]++
+                        enabledBuffIds.push(bs.id)
+                    }
                 }
-                const enabledBuffIds = cells.filter((c) => c.enabled).map((c) => c.buffId)
-                const selectedCount = enabledBuffIds.filter((id) => boundSet.has(id)).length
                 rows.push({
                     entry,
                     cells,
                     enabledBuffIds,
-                    selectedCount,
-                    allSelected: enabledBuffIds.length > 0 && selectedCount === enabledBuffIds.length,
-                    partial: selectedCount > 0 && selectedCount < enabledBuffIds.length,
                     splitBefore: idx - prevIdx > 1
                 })
                 prevIdx = idx
@@ -334,16 +350,91 @@
                     )
                 })
             )
+            const visibleColIdx = cols.map((_, ci) => ci).filter((ci) => enabledCounts[ci] > 0)
+
+            // 表头两行一次算好：第一行仅叠层组（组起点列输出 colspan 组名，普通列输出占位），第二行列名（叠层子列显示层号/层号+后缀）
+            const headerGroups: HeadGroupCell[] = []
+            const headerCols: HeadCell[] = []
+            for (let p = 0; p < visibleColIdx.length; p++) {
+                const ci = visibleColIdx[p]
+                const bs = cols[ci]
+                const nextId = p + 1 < visibleColIdx.length ? cols[visibleColIdx[p + 1]]?.id : undefined
+                const sep = colSepClass(bs.id, nextId)
+                const grp = folderGroupOf.get(bs.id)
+                const layerNum = grp ? (bs.name.match(LAYERED_BUFF_PATTERN)?.[2] ?? '') : ''
+                headerCols.push({
+                    ci,
+                    label: grp ? (grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum) : bs.name,
+                    title: bs.name,
+                    isLayer: grp !== undefined,
+                    enabled: enabledCounts[ci],
+                    sepClass: sep
+                })
+                if (!grp) {
+                    headerGroups.push({ span: 1, sepClass: sep })
+                    continue
+                }
+                const prevId = p > 0 ? cols[visibleColIdx[p - 1]]?.id : undefined
+                if (p > 0 && folderGroupOf.get(prevId ?? '')?.key === grp.key) continue
+                let run = 1
+                for (let k = p + 1; k < visibleColIdx.length; k++) {
+                    if (folderGroupOf.get(cols[visibleColIdx[k]].id)?.key === grp.key) run++
+                    else break
+                }
+                const tailId = cols[visibleColIdx[p + run - 1]].id
+                const afterTailId = p + run < visibleColIdx.length ? cols[visibleColIdx[p + run]]?.id : undefined
+                headerGroups.push({
+                    span: run,
+                    label: grp.suffix.length <= 3 ? grp.prefix : grp.prefix + LAYERED_BUFF_VAR + grp.suffix,
+                    sepClass: colSepClass(tailId, afterTailId)
+                })
+            }
+
             result.push({
+                key: groupKey,
                 charName: g.charName,
                 kind: g.kind,
                 rows,
-                colStats,
-                visibleColIdx: columns.map((_, ci) => ci).filter((ci) => colStats[ci].enabled > 0),
+                enabledCounts,
+                visibleColIdx,
+                hasFolder: headerCols.some((hc) => hc.isLayer),
+                headerGroups,
+                headerCols,
                 visibleGlobalBuffs
             })
         }
         return result
+    })
+
+    /** @desc 勾选统计（已选数）：按「已绑定的 (条目, buff) 对」增量累加——成本 O(已绑定数)，而非 O(行×列)；
+     *  仅供行头/列头 tooltip 展示，勾选变化不触发结构重建，只失效这两个标题表达式 */
+    const selStats = $derived.by(() => {
+        const colCounts = tableData.map(() => new Map<number, number>())
+        const rowCounts = new Map<string, number>()
+        const groupOfEntry = new Map<string, number>()
+        const rowOfEntry = new Map<string, RowData>()
+        for (let gi = 0; gi < tableData.length; gi++) {
+            for (const row of tableData[gi].rows) {
+                groupOfEntry.set(row.entry.id, gi)
+                rowOfEntry.set(row.entry.id, row)
+            }
+        }
+        for (const [entryId, ids] of Object.entries(entryBuffSetIdMap)) {
+            if (ids.length === 0) continue
+            const gi = groupOfEntry.get(entryId)
+            const row = rowOfEntry.get(entryId)
+            if (gi === undefined || !row) continue
+            let n = 0
+            for (const id of ids) {
+                const ci = colIndexById.get(id)
+                if (ci === undefined || !row.cells[ci]?.enabled) continue
+                n++
+                const m = colCounts[gi]
+                m.set(ci, (m.get(ci) ?? 0) + 1)
+            }
+            if (n > 0) rowCounts.set(entryId, n)
+        }
+        return { colCounts, rowCounts }
     })
 
     /** @desc 单击单元格：切换绑定 */
@@ -373,7 +464,8 @@
         }
     }
 
-    /** @desc ── 行/列高亮（左键单击首列/表头触发，行列互斥；再点同目标取消，表格外点击清除）── */
+    /** @desc ── 行/列高亮（左键单击首列/表头触发，行列互斥；再点同目标取消，表格外点击清除）──
+     *  行高亮=行级 opacity 压暗其他行；列高亮=单层遮罩压暗非高亮列（仅 1~2 个矩形，替代逐单元格 opacity） */
     let highlight = $state<{ gi: number; kind: 'row' | 'col'; index: number } | null>(null)
 
     function clickRowHeader(gi: number, ri: number) {
@@ -392,9 +484,6 @@
 
     /** @desc 首列/表头右键菜单（仿 layout/context-menu；items 在触发处构造闭包） */
     let ctxMenu = $state<{ x: number; y: number; items: Array<{ label: string; action: () => void }> } | null>(null)
-
-    /** @desc 高亮行/列的背景色（由原单元格选中背景转移而来） */
-    const HIGHLIGHT_BG = 'color-mix(in srgb, var(--theme-accent-bg) 20%, transparent)'
 
     function onRowHeaderContextMenu(e: MouseEvent, gi: number, ri: number) {
         e.preventDefault()
@@ -424,13 +513,20 @@
         }
     }
 
+    /** @desc 全局 buff 折叠展开（每张子表一个，默认收起；展开后 chips 自动换行） */
+    let expandedGlobal = $state<Record<number, boolean>>({})
+    const toggleGlobal = (gi: number) => {
+        expandedGlobal[gi] = !expandedGlobal[gi]
+    }
+
     /** @desc ── 框选批量生效/失效（拖拽矩形范围：范围内有已勾选 → 全部取消，否则全部勾选）── */
     let rootEl = $state<HTMLDivElement | undefined>()
     let selStart: { g: number; r: number; c: number; x: number; y: number } | null = null
     let selStartTd: HTMLElement | null = null
     let selCurrentTd: HTMLElement | null = null
-    let selCurrent = $state<{ r: number; c: number } | null>(null)
-    let dragging = $state(false)
+    // selCurrent/dragging 不参与模板渲染，用普通局部变量即可（避免无谓的响应式开销）
+    let selCurrent: { r: number; c: number } | null = null
+    let dragging = false
     let justDragged = false
     let selRect = $state<{ left: number; top: number; width: number; height: number } | null>(null)
     let lastMouseX = 0
@@ -458,11 +554,21 @@
     })
 
     /** @desc 渐进渲染：首帧不立刻铺满所有行，逐帧新增 chunk 行，避免打开大表/切换工程时单帧阻塞卡顿。
-     *  box-select/行列高亮均依赖 data-row/data-col，行分批挂载不影响交互。 */
+     *  box-select/行列高亮均依赖 data-row/data-col，行分批挂载不影响交互；切片保留原索引，data-row 语义不变。 */
     const maxGroupRows = $derived(tableData.reduce((m, g) => Math.max(m, g.rows.length), 0))
     const ROW_CHUNK = 24
-    // 首帧即显示一个 chunk（小表一次到位无闪烁），超出后逐帧续播，避免大表单帧阻塞卡顿
     let visibleRows = $state(ROW_CHUNK)
+    /** @desc 结构指纹（条目集合 + 列集合）：切换工程/队伍后重置分帧进度，避免沿用上一个大表的值而失去分帧保护 */
+    const rowFingerprint = $derived(
+        damageEntries.map((e) => e.id).join('|') + '\u0000' + tableData.map((g) => g.visibleColIdx.join(',')).join('|')
+    )
+    let lastFingerprint = ''
+    $effect(() => {
+        const fp = rowFingerprint
+        if (fp === lastFingerprint) return
+        lastFingerprint = fp
+        visibleRows = ROW_CHUNK
+    })
     $effect(() => {
         if (visibleRows >= maxGroupRows) return
         // 每帧最多揭示 ROW_CHUNK 行，逐帧推进直到铺满（小表一次到位；数据切换后自动续播）
@@ -471,6 +577,9 @@
         })
         return () => cancelAnimationFrame(raf)
     })
+    /** @desc 已揭示的行（切片而非逐行 {#if} 判断：每帧只处理新增 chunk，且未揭示时复用原数组引用） */
+    const shownRows = (g: GroupData): RowData[] =>
+        visibleRows >= g.rows.length ? g.rows : g.rows.slice(0, visibleRows)
 
     /** @desc mousedown：记录框选起点单元格（仅左键）；起点为 folder 列时进入层级框选模式 */
     function handleMouseDown(e: MouseEvent) {
@@ -501,15 +610,45 @@
                 selCurrent = { r: Number(td.dataset.row), c: Number(td.dataset.col) }
             }
         }
-        const curTd = selCurrentTd ?? selStartTd
-        const a = selStartTd.getBoundingClientRect()
-        const b = curTd.getBoundingClientRect()
-        selRect = {
-            left: Math.min(a.left, b.left),
-            top: Math.min(a.top, b.top),
-            width: Math.max(a.right, b.right) - Math.min(a.left, b.left),
-            height: Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top)
+        selRect = rectTo(selStartTd, selCurrentTd ?? selStartTd)
+    }
+
+    /** @desc 两个单元格的并集矩形（视口坐标） */
+    const rectTo = (a: HTMLElement, b: HTMLElement) => {
+        const ra = a.getBoundingClientRect()
+        const rb = b.getBoundingClientRect()
+        return {
+            left: Math.min(ra.left, rb.left),
+            top: Math.min(ra.top, rb.top),
+            width: Math.max(ra.right, rb.right) - Math.min(ra.left, rb.left),
+            height: Math.max(ra.bottom, rb.bottom) - Math.min(ra.top, rb.top)
         }
+    }
+
+    /** @desc 滚动事件用 rAF 合并（滚动可每帧多次触发，避免重复强制布局 + 重复写 state） */
+    let scrollRaf = 0
+    const scheduleSyncSelection = () => {
+        if (scrollRaf) return
+        scrollRaf = requestAnimationFrame(() => {
+            scrollRaf = 0
+            syncSelectionRect()
+        })
+    }
+    onDestroy(() => {
+        if (scrollRaf) cancelAnimationFrame(scrollRaf)
+    })
+
+    /** @desc 拖拽中的 mousemove 同样用 rAF 合并：每帧最多一次强制布局（鼠标位置同步记录，不丢帧） */
+    let moveRaf = 0
+    const updateDragSelection = () => {
+        if (!selStart || !selStartTd) return
+        const el = document.elementFromPoint(lastMouseX, lastMouseY)
+        const td = el?.closest?.<HTMLElement>('td[data-row][data-col]')
+        if (td && Number(td.dataset.group) === selStart.g) {
+            selCurrentTd = td
+            selCurrent = { r: Number(td.dataset.row), c: Number(td.dataset.col) }
+        }
+        selRect = rectTo(selStartTd, selCurrentTd ?? selStartTd)
     }
 
     /** @desc mousemove：拖动超过 4px 阈值后进入框选，随鼠标更新当前单元格与选区矩形 */
@@ -519,24 +658,20 @@
         lastMouseY = e.clientY
         if (!dragging && Math.hypot(e.clientX - selStart.x, e.clientY - selStart.y) < 4) return
         dragging = true
-        const el = document.elementFromPoint(e.clientX, e.clientY)
-        const td = el?.closest?.<HTMLElement>('td[data-row][data-col]')
-        if (td && Number(td.dataset.group) === selStart.g) {
-            selCurrentTd = td
-            selCurrent = { r: Number(td.dataset.row), c: Number(td.dataset.col) }
-        }
-        const a = selStartTd.getBoundingClientRect()
-        const b = (selCurrentTd ?? selStartTd).getBoundingClientRect()
-        selRect = {
-            left: Math.min(a.left, b.left),
-            top: Math.min(a.top, b.top),
-            width: Math.max(a.right, b.right) - Math.min(a.left, b.left),
-            height: Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top)
-        }
+        if (moveRaf) return
+        moveRaf = requestAnimationFrame(() => {
+            moveRaf = 0
+            updateDragSelection()
+        })
     }
 
     /** @desc mouseup：拖动结束应用框选结果（下一次 click 会被拦截） */
     function handleMouseUp() {
+        if (moveRaf) {
+            cancelAnimationFrame(moveRaf)
+            moveRaf = 0
+            updateDragSelection()
+        }
         if (selStart && dragging) {
             justDragged = true
             applySelection()
@@ -546,6 +681,9 @@
         }
         cancelSelection()
     }
+    onDestroy(() => {
+        if (moveRaf) cancelAnimationFrame(moveRaf)
+    })
 
     /** @desc 框选结束后拦截单元格 click，避免误触发单选 */
     function handleClickCapture(e: MouseEvent) {
@@ -602,10 +740,11 @@
         for (let ri = r0; ri <= r1; ri++) {
             const row = group.rows[ri]
             if (!row) continue
+            const selIds = new Set(entryBuffSetIdMap[row.entry.id] ?? [])
             for (let ci = c0; ci <= c1; ci++) {
                 const cell = row.cells[ci]
                 if (!cell?.enabled) continue
-                if (cell.selected) anySelected = true
+                if (selIds.has(cell.buffId)) anySelected = true
                 let list = byRow.get(row)
                 if (!list) {
                     list = []
@@ -633,42 +772,56 @@
         }
     }
 
-    /** @desc ── 所有子表等宽：测量各组表头列宽和取最大值，统一表格宽度；窄表格最后一列吸收剩余空间 ── */
-    let groupTableWidths = $state<Record<number, number>>({})
-    let maxTableWidth = $state(0)
+    /** @desc ── 列高亮压暗遮罩：测量「本组表格区域 − 高亮列」的左右两段（组内容器坐标系，滚动无需重算）；
+     *  冻结列（z-20）与吸顶表头（z-30/40）为实底且 z 更高，天然覆盖遮罩，无需额外裁剪 ── */
+    let dimRects = $state<{ left: number; top: number; width: number; height: number }[]>([])
+    let dimGroup = $state<number | null>(null)
+    let layoutTick = $state(0)
+    const bumpLayout = () => layoutTick++
 
-    /** @desc 列结构指纹：仅列结构变化（增删列/组数）时重测等宽，脱离 tableData 全量重建（勾选不再触发测量） */
-    const colStructureKey = $derived(tableData.map((g) => g.visibleColIdx.join(',')).join('|'))
+    const measureColDimRects = (gi: number, ci: number) => {
+        const wrap = rootEl?.querySelector<HTMLElement>(`[data-group-wrap="${gi}"]`)
+        const table = wrap?.querySelector<HTMLElement>('table')
+        const head = wrap?.querySelector<HTMLElement>(`[data-colhead="${ci}"]`)
+        const frozen = wrap?.querySelector<HTMLElement>('[data-rowhead]')
+        if (!wrap || !table || !head) return []
+        const w = wrap.getBoundingClientRect()
+        const t = table.getBoundingClientRect()
+        const h = head.getBoundingClientRect()
+        const top = t.top - w.top
+        const height = t.height
+        const rects: { left: number; top: number; width: number; height: number }[] = []
+        // 左段：从冻结列右侧（冻结列保持原样不压暗）到高亮列左边界
+        const leftFrom = frozen ? Math.max(t.left, frozen.getBoundingClientRect().right) : t.left
+        const leftW = h.left - leftFrom
+        if (leftW > 1) rects.push({ left: leftFrom - w.left, top, width: leftW, height })
+        // 右段：高亮列右边界到表格右边界
+        const rightW = t.right - h.right
+        if (rightW > 1) rects.push({ left: h.right - w.left, top, width: rightW, height })
+        return rects
+    }
 
     $effect(() => {
-        colStructureKey
-        const measure = () => {
-            const tables = Array.from(document.querySelectorAll<HTMLElement>('[data-group-table]'))
-            if (tables.length === 0) return
-            const widths: Record<number, number> = {}
-            let max = 0
-            for (const tbl of tables) {
-                const g = Number(tbl.dataset.groupTable)
-                let w = 0
-                // 排除填充列（data-fill-th）——否则其吸收剩余空间后的宽度计入测量，造成「加填充列→测出等宽→移除填充列」震荡；
-                // 两级表头只测列名行（最后一行），避免组名行 colspan 重复计数
-                tbl.querySelectorAll<HTMLElement>('thead tr:last-child th:not([data-fill-th])').forEach((th) => {
-                    w += th.getBoundingClientRect().width
-                })
-                w += tbl.offsetWidth - tbl.clientWidth
-                widths[g] = Math.round(w)
-                max = Math.max(max, widths[g])
-            }
-            groupTableWidths = widths
-            maxTableWidth = max
+        const h = highlight
+        visibleRows
+        layoutTick
+        if (!h || h.kind !== 'col') {
+            dimGroup = null
+            dimRects = []
+            return
         }
-        const raf = requestAnimationFrame(measure)
-        const obs = new ResizeObserver(measure)
-        for (const tbl of document.querySelectorAll<HTMLElement>('[data-group-table]')) obs.observe(tbl)
-        return () => {
-            cancelAnimationFrame(raf)
-            obs.disconnect()
-        }
+        const rects = measureColDimRects(h.gi, h.index)
+        dimGroup = rects.length > 0 ? h.gi : null
+        dimRects = rects
+    })
+
+    /** @desc 容器尺寸变化时重测遮罩（窗口缩放/面板拖拽）；只需一个观察者，且仅在列高亮时才有实际测量成本 */
+    $effect(() => {
+        const el = rootEl
+        if (!el) return
+        const obs = new ResizeObserver(bumpLayout)
+        obs.observe(el)
+        return () => obs.disconnect()
     })
 </script>
 
@@ -697,13 +850,13 @@
 <!-- @desc 表格根容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+    class="spread-root theme-scrollbar h-full overflow-auto pb-48 {className}"
     data-sf="content"
-    class="theme-scrollbar snap-scroll-y h-full overflow-auto pb-48 {className}"
     style={styleProp}
     bind:this={rootEl}
     onmousedown={handleMouseDown}
     onclickcapture={handleClickCapture}
-    onscroll={syncSelectionRect}
+    onscroll={scheduleSyncSelection}
     onwheel={(e) => {
         const axis = getScrollAxisDefault()
         if (e.ctrlKey) {
@@ -735,353 +888,257 @@
     {#if damageEntries.length === 0}
         <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {/if}
-    <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（组内等宽） -->
-    {#each tableData as group, gi}
+    <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（表宽由表头内容决定） -->
+    {#each tableData as group, gi (group.key)}
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
-        {@const hasFolder = group.visibleColIdx.some((ci) => folderGroupOf.has(columns[ci].id))}
-        <div class="snap-group mb-6">
-            <div>
-                <!-- 表格主体底色跟随「卡片透明度」（单元格区域保持透明）；上/右/下/左 = 常规分隔线（直角，去重装饰） -->
-                <table
-                    data-sf="card"
-                    class="min-w-full text-xs"
-                    data-group-table={gi}
-                    style="--sf-base: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-top: 1px solid var(--theme-divider-border); border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); {maxTableWidth
-                        ? `width: ${maxTableWidth}px;`
-                        : ''}"
-                >
-                    <!-- 标题块与全局 buff 行放入 caption：宽度自动跟随表头（表格宽度） -->
-                    <caption class="text-left">
-                        <div
-                            data-sf="card"
-                            class="-mr-px flex items-center gap-2 border-b px-2 py-1.5"
-                            style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
+        {@const hasFolder = group.hasFolder}
+        <div class="relative mx-3 my-3.5" data-group-wrap={gi}>
+            <!-- 列高亮压暗遮罩：仅高亮组渲染，最多两段（滚动随内容移动，无需跟随） -->
+            {#if dimGroup === gi && dimRects.length > 0}
+                {#each dimRects as r, i (i)}
+                    <div
+                        class="pointer-events-none absolute z-10"
+                        style="left: {r.left}px; top: {r.top}px; width: {r.width}px; height: {r.height}px; background: var(--spread-dim);"
+                    ></div>
+                {/each}
+            {/if}
+            <table
+                class="spread-table w-auto text-xs shadow-(--theme-card-shadow)"
+                data-group-table={gi}
+                style="border-collapse: separate; border-spacing: 0; border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border);"
+            >
+                <!-- 标题块与全局 buff 折叠行放入 caption：宽度自动跟随表头（表格宽度） -->
+                <caption class="spread-caption text-left">
+                    <div
+                        class="flex items-center gap-2 border-b border-(--theme-divider-border) px-3 py-2"
+                        style="background-image: linear-gradient(
+                            color-mix(in srgb, var(--theme-modal-text) 4%, transparent),
+                            color-mix(in srgb, var(--theme-modal-text) 4%, transparent)
+                        );"
+                    >
+                        <span
+                            class="text-sm font-black tracking-tight"
+                            style="color: var(--theme-element-{charElement}, #888);">{group.charName || '无角色'}</span
                         >
-                            <span
-                                class="text-sm font-black tracking-tight"
-                                style="color: var(--theme-element-{charElement}, #888);"
-                                >{group.charName || '无角色'}</span
+                        <span class="text-xs text-(--theme-modal-text)/60"
+                            >· {group.kind === 'direct' ? '直伤' : '非直伤'}</span
+                        >
+                        <span class="ml-auto text-[10px] text-(--theme-modal-text)/40">{group.rows.length} 条</span>
+                    </div>
+                    {#if group.visibleGlobalBuffs.length > 0}
+                        <!-- 下拉浮层：展开内容绝对定位，不参与 caption/表格布局——否则展开会改变 caption 宽度，
+                             触发表格自动布局（table-layout: auto）重新计算所有列宽，造成可感知卡顿 -->
+                        <div class="relative border-b border-(--theme-divider-border)">
+                            <button
+                                class="flex w-full cursor-pointer items-center gap-1 px-3 py-1.5 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/5"
+                                onclick={() => toggleGlobal(gi)}
                             >
-                            <span class="text-xs text-(--theme-modal-text)/60"
-                                >· {group.kind === 'direct' ? '直伤' : '非直伤'}</span
-                            >
-                            <span class="text-[10px] text-(--theme-modal-text)/35">{group.rows.length} 条</span>
-                        </div>
-                        {#if group.visibleGlobalBuffs.length > 0}
-                            <div
-                                data-sf="card"
-                                class="flex items-center gap-1 overflow-hidden whitespace-nowrap border-b px-2 py-1"
-                                style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
-                            >
-                                {#each group.visibleGlobalBuffs as gb}
-                                    <span
-                                        class="inline-flex shrink-0 items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
-                                        style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
-                                    >
-                                        <Icon icon="mdi:crown" class="size-3" />{gb.name}
-                                    </span>
-                                {/each}
-                            </div>
-                        {/if}
-                    </caption>
-                    <!-- 表头（两级，仅含叠层组时）：第一行=叠层组名行（跨列合并，普通列占位）；第二行=列名行（folder 子列显示层数数字，普通列显示略名换行），吸顶 -->
-                    <!-- 分割线规则：每个 th 的右边界按「本列（或本组尾列）vs 右邻可见列」判断，两行同间隙一致 -->
-                    <thead>
-                        {#if hasFolder}
-                            <tr>
-                                <th
-                                    data-sf="card"
-                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-black tracking-[0.12em] text-(--theme-modal-text)/50"
-                                    style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
-                                    rowspan="2"
+                                <Icon
+                                    icon={expandedGlobal[gi] ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                                    class="size-3.5 shrink-0"
+                                />
+                                全局 BUFF
+                                <span class="text-(--theme-modal-text)/35">({group.visibleGlobalBuffs.length})</span>
+                            </button>
+                            {#if expandedGlobal[gi]}
+                                <!-- 展开后换行铺开，不再截断 -->
+                                <div
+                                    class="absolute top-full left-0 z-50 flex w-max max-w-[70vw] flex-wrap items-center gap-1 border border-(--theme-divider-border) p-2 shadow-(--theme-card-shadow)"
+                                    style="background: var(--theme-modal-bg);"
                                 >
-                                    条目
-                                </th>
-                                {#each group.visibleColIdx as ci, colPos}
-                                    {@const bs = columns[ci]}
-                                    {@const grp = folderGroupOf.get(bs.id)}
-                                    {#if grp}
-                                        {@const runLen = (() => {
-                                            // 该组在可见列中的「连续段」长度：左右扩展，遇到不同组/普通列即停
-                                            let right = 1
-                                            for (let k = colPos + 1; k < group.visibleColIdx.length; k++) {
-                                                if (
-                                                    folderGroupOf.get(columns[group.visibleColIdx[k]].id)?.key ===
-                                                    grp.key
-                                                )
-                                                    right++
-                                                else break
-                                            }
-                                            let left = 0
-                                            for (let k = colPos - 1; k >= 0; k--) {
-                                                if (
-                                                    folderGroupOf.get(columns[group.visibleColIdx[k]].id)?.key ===
-                                                    grp.key
-                                                )
-                                                    left++
-                                                else break
-                                            }
-                                            return { len: left + right, isStart: left === 0 }
-                                        })()}
-                                        {#if runLen.isStart}
-                                            {@const tailPos = colPos + runLen.len - 1}
-                                            {@const nextId =
-                                                tailPos + 1 < group.visibleColIdx.length
-                                                    ? columns[group.visibleColIdx[tailPos + 1]]?.id
-                                                    : undefined}
-                                            {@const grpHeader =
-                                                grp.suffix.length <= 3
-                                                    ? grp.prefix
-                                                    : grp.prefix + LAYERED_BUFF_VAR + grp.suffix}
-                                            <th
-                                                data-sf="card"
-                                                colspan={runLen.len}
-                                                class="sticky top-0 z-30 h-6 p-0 text-center"
-                                                style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); {colBorderStyle(
-                                                    columns[group.visibleColIdx[tailPos]].id,
-                                                    nextId
-                                                )}"
-                                            >
-                                                <span
-                                                    class="block truncate px-1 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/70"
-                                                    title={grpHeader}>{grpHeader}</span
-                                                >
-                                            </th>
-                                        {/if}
-                                    {:else}
-                                        {@const nextId =
-                                            colPos + 1 < group.visibleColIdx.length
-                                                ? columns[group.visibleColIdx[colPos + 1]]?.id
-                                                : undefined}
-                                        <th
-                                            data-sf="card"
-                                            class="sticky top-0 z-30 h-6 p-0"
-                                            style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); {colBorderStyle(
-                                                bs.id,
-                                                nextId
-                                            )}"
-                                        ></th>
-                                    {/if}
-                                {/each}
-                                {#if groupTableWidths[gi] < maxTableWidth}
-                                    <th
-                                        data-fill-th
-                                        data-sf="card"
-                                        class="sticky top-0 z-30 h-6 p-0"
-                                        style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); width: 100%;"
-                                    ></th>
-                                {/if}
-                            </tr>
-                        {/if}
-                        <tr>
-                            {#if !hasFolder}
-                                <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
-                                <th
-                                    data-sf="card"
-                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-black tracking-[0.12em] text-(--theme-modal-text)/50"
-                                    style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
-                                >
-                                    条目
-                                </th>
+                                    {#each group.visibleGlobalBuffs as gb (gb.id)}
+                                        <span
+                                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
+                                            style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
+                                        >
+                                            <Icon icon="mdi:crown" class="size-3" />{gb.name}
+                                        </span>
+                                    {/each}
+                                </div>
                             {/if}
-                            {#each group.visibleColIdx as ci, colPos}
-                                {@const bs = columns[ci]}
-                                {@const stat = group.colStats[ci]}
-                                {@const grp = folderGroupOf.get(bs.id)}
-                                {@const layerNum = grp ? (bs.name.match(LAYERED_BUFF_PATTERN)?.[2] ?? '') : ''}
-                                {@const colHighlighted =
-                                    highlight?.gi === gi && highlight.kind === 'col' && highlight.index === ci}
-                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        </div>
+                    {/if}
+                </caption>
+                <!-- 表头（两级，仅含叠层组时）：第一行=叠层组名行（跨列合并，普通列占位）；第二行=列名行（folder 子列显示层数数字，普通列显示略名换行），吸顶 -->
+                <thead>
+                    {#if hasFolder}
+                        <tr>
+                            <th
+                                data-rowhead
+                                class="spread-head sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
+                                rowspan="2"
+                            >
+                                条目
+                            </th>
+                            {#each group.headerGroups as hc, i (i)}
                                 <th
-                                    data-sf="card"
-                                    class="sticky {hasFolder
-                                        ? 'top-6'
-                                        : 'top-0'} z-30 cursor-pointer select-none p-0 align-top border-b {grp
-                                        ? 'w-8 min-w-8'
-                                        : ''}"
-                                    style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); {colHighlighted
-                                        ? `background: ${HIGHLIGHT_BG} !important;`
-                                        : ''}{colBorderStyle(
-                                        bs.id,
-                                        colPos + 1 < group.visibleColIdx.length
-                                            ? columns[group.visibleColIdx[colPos + 1]]?.id
-                                            : undefined
-                                    )}{colHighlighted ? ' box-shadow: inset 0 -2px 0 var(--theme-accent-bg);' : ''}"
-                                    title={`${bs.name}${stat.enabled > 0 ? `（${stat.selected}/${stat.enabled}）` : '（无可应用条目）'}：单击高亮列，右键全选/全不选`}
-                                    onclick={() => clickColHeader(gi, ci)}
-                                    oncontextmenu={(e) => onColHeaderContextMenu(e, gi, ci)}
+                                    class="spread-head sticky top-0 z-30 h-6 p-0 text-center {hc.sepClass}"
+                                    colspan={hc.span}
                                 >
-                                    <span
-                                        class="flex h-full w-full flex-col items-center justify-center gap-1 px-1 pt-1 pb-1.5 transition-colors hover:bg-(--theme-modal-text)/5 {stat.enabled ===
-                                        0
-                                            ? 'opacity-30'
-                                            : ''}"
-                                    >
-                                        {#if grp}
-                                            {@const grpSub = grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum}
-                                            <span
-                                                class="text-[11px] font-black leading-none tabular-nums"
-                                                style="color: var(--theme-modal-text)/70;"
-                                                title={bs.name}>{grpSub}</span
-                                            >
-                                        {:else}
-                                            <span
-                                                class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
-                                                title={bs.name}>{bs.name}</span
-                                            >
-                                        {/if}
-                                    </span>
+                                    {#if hc.label}
+                                        <span
+                                            class="block truncate px-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/70"
+                                            title={hc.label}>{hc.label}</span
+                                        >
+                                    {/if}
                                 </th>
                             {/each}
-                            {#if groupTableWidths[gi] < maxTableWidth}
-                                <th
-                                    data-fill-th
-                                    data-sf="card"
-                                    class="sticky {hasFolder ? 'top-6' : 'top-0'} z-30 p-0 border-b"
-                                    style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); width: 100%;"
-                                ></th>
-                            {/if}
                         </tr>
-                    </thead>
-                    <!-- 表体：每行一个伤害条目（行头单击高亮行/右键全选全不选 + 伤害类型编辑），单元格可勾选 -->
-                    <tbody>
-                        {#each group.rows as row, ri}
-                            {@const rowHighlighted =
-                                highlight?.gi === gi && highlight.kind === 'row' && highlight.index === ri}
-                            {@const rowHighlightActive = highlight?.gi === gi && highlight.kind === 'row'}
-                            {@const colHighlightActive = highlight?.gi === gi && highlight.kind === 'col'}
-                            {#if ri < visibleRows}
-                                <tr
-                                    class:split-row={row.splitBefore}
-                                    class="border-b {rowHighlightActive && !rowHighlighted
-                                        ? 'opacity-40 transition-opacity'
-                                        : ''}"
-                                    style="border-bottom: 1px solid var(--theme-divider-border);{rowHighlightActive &&
-                                    rowHighlighted
-                                        ? ` background: ${HIGHLIGHT_BG};`
+                    {/if}
+                    <tr>
+                        {#if !hasFolder}
+                            <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
+                            <th
+                                data-rowhead
+                                class="spread-head sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
+                            >
+                                条目
+                            </th>
+                        {/if}
+                        {#each group.headerCols as hc (hc.ci)}
+                            {@const colHighlighted =
+                                highlight?.gi === gi && highlight.kind === 'col' && highlight.index === hc.ci}
+                            {@const selCount = selStats.colCounts[gi]?.get(hc.ci) ?? 0}
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <th
+                                data-colhead={hc.ci}
+                                class="spread-head sticky {hasFolder
+                                    ? 'top-6'
+                                    : 'top-0'} z-30 cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-top {hc.isLayer
+                                    ? 'w-[43px] min-w-[43px]'
+                                    : ''} {hc.sepClass}"
+                                class:spread-head-hl={colHighlighted}
+                                title={`${hc.title}（${selCount}/${hc.enabled}）：单击高亮列，右键全选/全不选`}
+                                onclick={() => clickColHeader(gi, hc.ci)}
+                                oncontextmenu={(e) => onColHeaderContextMenu(e, gi, hc.ci)}
+                            >
+                                <span
+                                    class="flex h-full w-full flex-col items-center justify-center gap-1 px-1.5 pt-1 pb-1.5 transition-colors hover:bg-(--theme-modal-text)/5 {hc.enabled ===
+                                    0
+                                        ? 'opacity-30'
                                         : ''}"
                                 >
-                                    <td
-                                        data-sf="card"
-                                        class="sticky left-0 z-20 cursor-pointer select-none px-2 py-1 border-r transition-colors"
-                                        style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); {rowHighlighted
-                                            ? `background: ${HIGHLIGHT_BG} !important;`
-                                            : ''}{rowHighlighted
-                                            ? ' box-shadow: inset 3px 0 0 var(--theme-accent-bg);'
-                                            : ''}"
-                                        title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${row.selectedCount}/${row.enabledBuffIds.length}）`}
-                                        onclick={() => clickRowHeader(gi, ri)}
-                                        oncontextmenu={(e) => onRowHeaderContextMenu(e, gi, ri)}
+                                    {#if hc.isLayer}
+                                        <span
+                                            class="text-[11px] font-black leading-none tabular-nums text-(--theme-modal-text)/70"
+                                            title={hc.title}>{hc.label}</span
+                                        >
+                                    {:else}
+                                        <span
+                                            class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
+                                            title={hc.title}>{hc.label}</span
+                                        >
+                                    {/if}
+                                </span>
+                            </th>
+                        {/each}
+                    </tr>
+                </thead>
+                <!-- 表体：每行一个伤害条目（行头单击高亮行/右键全选全不选 + 伤害类型编辑），单元格可勾选 -->
+                <tbody>
+                    {#each shownRows(group) as row, ri (row.entry.id)}
+                        {@const rowHighlighted =
+                            highlight?.gi === gi && highlight.kind === 'row' && highlight.index === ri}
+                        {@const rowHighlightActive = highlight?.gi === gi && highlight.kind === 'row'}
+                        {@const colHighlightActive = highlight?.gi === gi && highlight.kind === 'col'}
+                        {@const selIds = entryBuffSetIdMap[row.entry.id] ?? EMPTY_IDS}
+                        <tr
+                            class:spread-rowdim={rowHighlightActive && !rowHighlighted}
+                            class:spread-rowhl-on={rowHighlighted}
+                            class:split-row={row.splitBefore}
+                        >
+                            <td
+                                data-rowhead={ri}
+                                class="spread-frozen sticky left-0 z-20 cursor-pointer select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5"
+                                class:spread-frozen-hl={rowHighlighted}
+                                title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${
+                                    selStats.rowCounts.get(row.entry.id) ?? 0
+                                }/${row.enabledBuffIds.length}）`}
+                                onclick={() => clickRowHeader(gi, ri)}
+                                oncontextmenu={(e) => onRowHeaderContextMenu(e, gi, ri)}
+                            >
+                                <div class="flex w-full items-center gap-1.5 py-0.5 text-left">
+                                    <span
+                                        class="truncate text-(--theme-modal-text)"
+                                        style="color: var(--theme-element-{row.entry.damageElement}, #888);"
+                                        >{row.entry.displayName}</span
                                     >
-                                        <div
-                                            class="flex w-full items-center gap-1.5 py-0.5 text-left transition-colors hover:bg-(--theme-modal-text)/5"
+                                </div>
+                                <!-- 视为：伤害类型（只读展示，编辑统一在底部工具栏的「编辑伤害类型」弹窗）；stopPropagation 避免触发行高亮 -->
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                <div
+                                    class="flex flex-wrap items-center gap-0.5 px-0.5 pb-0.5"
+                                    onclick={(e) => e.stopPropagation()}
+                                >
+                                    <span class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
+                                        >伤害类型：</span
+                                    >
+                                    {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
+                                        <span
+                                            class="rounded-none px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
+                                            style="background: var(--theme-input-bg);"
+                                            >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}</span
                                         >
-                                            <span
-                                                class="truncate text-(--theme-modal-text)"
-                                                style="color: var(--theme-element-{row.entry.damageElement}, #888);"
-                                                >{row.entry.displayName}</span
+                                    {/each}
+                                    {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
+                                        {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
+                                        {#if inferred.length > 0}
+                                            <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
+                                                >自动推导：{inferred
+                                                    .map(
+                                                        (t) =>
+                                                            DAMAGE_TYPE_SHORT[t as keyof typeof DAMAGE_TYPE_SHORT] ?? t
+                                                    )
+                                                    .join('/')}</span
                                             >
-                                        </div>
-                                        <!-- 视为：伤害类型（只读展示，编辑统一在底部工具栏的「编辑伤害类型」弹窗）；stopPropagation 避免触发行高亮 -->
-                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                        <div
-                                            class="flex flex-wrap items-center gap-0.5 px-0.5 pb-0.5"
-                                            onclick={(e) => e.stopPropagation()}
+                                        {/if}
+                                    {/if}
+                                </div>
+                            </td>
+                            {#each group.visibleColIdx as ci, colPos (ci)}
+                                {@const cell = row.cells[ci]}
+                                {@const sepClass = group.headerCols[colPos]?.sepClass ?? ''}
+                                {@const colHighlighted = colHighlightActive && highlight?.index === ci}
+                                {@const on = selIds.includes(cell.buffId)}
+                                <td
+                                    class="min-w-9 border-b border-(--theme-divider-border) p-0 text-center {sepClass}"
+                                    class:spread-cell-hl={colHighlighted}
+                                    data-group={gi}
+                                    data-row={ri}
+                                    data-col={ci}
+                                >
+                                    {#if cell.enabled}
+                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                        <button
+                                            onclick={() => toggleCell(row, cell)}
+                                            title={on ? `取消勾选：${columns[ci].name}` : `勾选：${columns[ci].name}`}
+                                            class="flex min-h-6 w-full cursor-pointer items-center justify-center px-1.5 py-1.5 transition-colors hover:bg-(--theme-modal-text)/10"
                                         >
-                                            <span
-                                                class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
-                                                >伤害类型：</span
-                                            >
-                                            {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
-                                                <span
-                                                    class="rounded-none px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
-                                                    style="background: var(--theme-input-bg);"
-                                                    >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
-                                                        dt}</span
-                                                >
-                                            {/each}
-                                            {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
-                                                {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
-                                                {#if inferred.length > 0}
-                                                    <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
-                                                        >自动推导：{inferred
-                                                            .map(
-                                                                (t) =>
-                                                                    DAMAGE_TYPE_SHORT[
-                                                                        t as keyof typeof DAMAGE_TYPE_SHORT
-                                                                    ] ?? t
-                                                            )
-                                                            .join('/')}</span
+                                            {#if on}
+                                                {#if colHighlighted || (rowHighlightActive && rowHighlighted)}
+                                                    <span
+                                                        class="line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
+                                                        >{columns[ci].name}</span
                                                     >
+                                                {:else}
+                                                    <Icon
+                                                        icon="mdi:check"
+                                                        class="size-3.5 shrink-0"
+                                                        style="color: var(--theme-accent-text);"
+                                                    />
                                                 {/if}
                                             {/if}
-                                        </div>
-                                    </td>
-                                    {#each group.visibleColIdx as ci, colPos}
-                                        {@const cell = row.cells[ci]}
-                                        {@const bs = columns[ci]}
-                                        {@const colHighlighted =
-                                            highlight?.gi === gi && highlight.kind === 'col' && highlight.index === ci}
-                                        {@const cellInHighlight =
-                                            (rowHighlightActive && highlight?.index === ri) ||
-                                            (colHighlightActive && highlight?.index === ci)}
-                                        <td
-                                            class="min-w-9 p-0 text-center {colHighlightActive && !colHighlighted
-                                                ? 'opacity-40 transition-opacity'
-                                                : ''}"
-                                            style="{colBorderStyle(
-                                                bs.id,
-                                                colPos + 1 < group.visibleColIdx.length
-                                                    ? columns[group.visibleColIdx[colPos + 1]]?.id
-                                                    : undefined
-                                            )}{colHighlightActive && colHighlighted
-                                                ? ` background: ${HIGHLIGHT_BG};`
-                                                : ''}"
-                                            data-group={gi}
-                                            data-row={ri}
-                                            data-col={ci}
-                                        >
-                                            {#if cell.enabled}
-                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                <button
-                                                    onclick={() => toggleCell(row, cell)}
-                                                    title={cell.selected ? `取消勾选：${bs.name}` : `勾选：${bs.name}`}
-                                                    class="flex min-h-6 w-full items-center justify-center px-1 py-1 transition-colors hover:bg-(--theme-modal-text)/10"
-                                                >
-                                                    {#if cell.selected}
-                                                        {#if cellInHighlight}
-                                                            <span
-                                                                class="line-clamp-2 text-[10px] leading-tight"
-                                                                style="color: var(--theme-accent-text);">{bs.name}</span
-                                                            >
-                                                        {:else}
-                                                            <Icon
-                                                                icon="mdi:check"
-                                                                class="size-3.5 shrink-0"
-                                                                style="color: var(--theme-accent-text);"
-                                                            />
-                                                        {/if}
-                                                    {/if}
-                                                </button>
-                                            {:else}
-                                                <!-- 不可用（作用域/条件不匹配）不显示文字 -->
-                                                <span class="block h-6 w-full"></span>
-                                            {/if}
-                                        </td>
-                                    {/each}
-                                    {#if groupTableWidths[gi] < maxTableWidth}
-                                        <!-- 填充列：吸收剩余空间；无内容无交互，不参与框选（无 data-col） -->
-                                        <td
-                                            class="p-0"
-                                            style="border-left: 1px solid var(--theme-divider-border); width: 100%;"
-                                        ></td>
+                                        </button>
+                                    {:else}
+                                        <!-- 不可用（作用域/条件不匹配）不显示文字 -->
+                                        <span class="block h-6 w-full"></span>
                                     {/if}
-                                </tr>
-                            {/if}
-                        {/each}
-                    </tbody>
-                </table>
-            </div>
+                                </td>
+                            {/each}
+                        </tr>
+                    {/each}
+                </tbody>
+            </table>
         </div>
     {/each}
 </div>
@@ -1091,9 +1148,44 @@
     <ContextMenu open x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onclose={() => (ctxMenu = null)} />
 {/if}
 
-<!-- @desc 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） -->
-
 <style>
+    /* 根容器：高亮/压暗用色（供单元格与遮罩复用，避免逐元素拼内联样式） */
+    .spread-root {
+        --spread-hl: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent);
+        --spread-dim: color-mix(in srgb, var(--theme-modal-bg) 62%, transparent);
+    }
+    /* 表格改为实底表面：冻结列/吸顶表头/标题块不再需要 backdrop-filter（逐元素重算背景模糊是滚动卡顿主因） */
+    .spread-table,
+    .spread-caption,
+    .spread-frozen,
+    .spread-head {
+        background-color: var(--theme-modal-bg);
+    }
+    /* 列间分割线：叠层组与邻接列之间用主题色实线，其余用常规分隔线 */
+    .spread-sep {
+        border-right: 1px solid var(--theme-divider-border);
+    }
+    .spread-sep-solid {
+        border-right: 2px solid color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
+    }
+    /* 高亮：行级 opacity 压暗其他行（O(行数)，无过渡动画）；高亮行/列用主题色浅洗叠在实底之上 */
+    .spread-rowdim {
+        opacity: 0.4;
+    }
+    .spread-rowhl-on {
+        background-color: var(--spread-hl);
+    }
+    .spread-frozen-hl {
+        background-image: linear-gradient(var(--spread-hl), var(--spread-hl));
+        box-shadow: inset 3px 0 0 var(--theme-accent-bg);
+    }
+    .spread-head-hl {
+        background-image: linear-gradient(var(--spread-hl), var(--spread-hl));
+        box-shadow: inset 0 -2px 0 var(--theme-accent-bg);
+    }
+    .spread-cell-hl {
+        background-color: var(--spread-hl);
+    }
     /* 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） */
     .split-row td {
         border-top: 1px dashed color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
