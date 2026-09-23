@@ -328,6 +328,7 @@
                         <EchoSlotCard
                             class="w-72 shrink-0"
                             {slot}
+                            costTabsAside
                             otherCost={config.characters[ci].echoes.reduce(
                                 (sum, e, i) => sum + (i === si ? 0 : e.cost),
                                 0

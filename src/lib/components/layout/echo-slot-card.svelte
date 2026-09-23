@@ -1,8 +1,10 @@
 <script lang="ts">
     /**
-     * @desc 单个声骸词条卡片（工程-词条配置页与词条集的方案编辑器共用，UI 完全一致）：
+     * @desc 单个声骸词条卡片（工程-词条配置页与词条集的方案编辑器共用）：
      * cost 水印 + cost 选择 + 主词条按钮 + 副词条（档位滑块，可选拖动排序 / 逐个移除）。
      * 数据由父组件持有，本组件只渲染与回调，不直接读写 store。
+     * costTabsAside=true 时改为左右结构（cost 页签竖排在卡片左侧、文本 4c/3c/1c），工程-词条配置页使用；
+     * 不传（默认）则维持上下结构 + 「4 COST」文案，词条集方案编辑器样式不变。
      */
     import Icon from '@iconify/svelte'
     import { slide } from 'svelte/transition'
@@ -14,6 +16,8 @@
         slot: EchoSlotConfig
         /** @desc 副词条区域固定预留 5 行高度（词条集编辑器用，使各卡片内容行高一致） */
         reserveSubstatRows?: boolean
+        /** @desc cost 页签放卡片左侧、卡片改左右结构，页签文案用 4c/3c/1c（工程-词条配置页用） */
+        costTabsAside?: boolean
         /** @desc 其余槽位 cost 合计（用于判断能否切换本槽 cost） */
         otherCost: number
         /** @desc 主词条按钮的定位锚点（工程配置页用于弹出菜单） */
@@ -41,6 +45,7 @@
         otherCost,
         mainStatTriggerKey,
         reserveSubstatRows = false,
+        costTabsAside = false,
         oncost,
         onmainstat,
         onclearsubstats,
@@ -91,171 +96,149 @@
     }
 </script>
 
-<div
-    data-sf="card"
-    class="relative min-w-[13rem] rounded-none border p-4 {className ?? ''}"
-    style="border-color: var(--theme-divider-border); {styleProp || ''}"
->
+{#snippet costWatermark()}
     <!-- COST overlay -->
     <div class="pointer-events-none absolute inset-0 flex select-none items-center justify-center overflow-hidden">
         <span class="text-[200px] font-black leading-none opacity-[0.06] text-(--theme-accent-text)">{slot.cost}</span>
     </div>
+{/snippet}
 
-    <div class="relative z-1">
-        <!-- Cost selector：按钮平分卡片宽度 -->
-        <div class="mb-3 flex items-center gap-1">
-            {#each COST_OPTIONS as c}
-                <button
-                    onclick={() => oncost(c)}
-                    disabled={c !== slot.cost && otherCost + c > 12}
-                    class={[
-                        'h-6 min-w-0 flex-1 rounded-none border px-1 text-xs font-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
-                        slot.cost === c
-                            ? costBtnCls(slot.cost)
-                            : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
-                    ].join(' ')}>{c} COST</button
+{#snippet costTabs()}
+    {#each COST_OPTIONS as c}
+        <button
+            onclick={() => oncost(c)}
+            disabled={c !== slot.cost && otherCost + c > 12}
+            class={[
+                'rounded-none border text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-30',
+                costTabsAside ? 'h-7 w-full px-0.5' : 'h-6 min-w-0 flex-1 px-1',
+                slot.cost === c
+                    ? costBtnCls(slot.cost)
+                    : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
+            ].join(' ')}>{costTabsAside ? `${c}c` : `${c} COST`}</button
+        >
+    {/each}
+{/snippet}
+
+{#snippet statAndSubstats()}
+    <!-- Main stat + second stat combined -->
+    <div class="relative z-20 mb-2">
+        <button
+            data-main-stat-trigger={mainStatTriggerKey}
+            onclick={onmainstat}
+            class="w-full rounded-none border px-3 py-2 transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]"
+            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+        >
+            <div class="flex items-center justify-between">
+                <div class="flex flex-col text-left">
+                    <span class="text-xs font-black text-(--theme-modal-text)">
+                        {slot.mainStat
+                            ? `${shortLabel(slot.mainStat.type)} ${slot.mainStat.value}${slot.mainStat.unit}`
+                            : '未选择'}
+                    </span>
+                    {#if second}
+                        <span class="text-[10px] text-(--theme-modal-text)/40">{second.label} +{second.value}</span>
+                    {/if}
+                </div>
+                <Icon icon="mdi:chevron-down" class="size-3.5 text-(--theme-modal-text)/40 shrink-0" />
+            </div>
+        </button>
+    </div>
+
+    <!-- Substats -->
+    <div>
+        <span
+            class="mb-1 flex items-center gap-1.5 border-t pt-2 text-[10px] font-black tracking-[0.18em] text-(--theme-modal-text)/40"
+            style="border-color: var(--theme-divider-border);">副词条 ({slot.substats.length}/5)</span
+        >
+        <div class="space-y-1">
+            {#each slot.substats as sub, idx (sub.type)}
+                {@const opt = SUBSTAT_OPTIONS.find((o) => o.label === sub.type)}
+                {#if opt}
+                    {@const tierIdx = getTierIndex(opt.tiers, sub.value)}
+                    {@const maxTier = opt.tiers.length - 1}
+                    {@const pct = tierIdx > 0 ? (tierIdx / maxTier) * 100 : 0}
+                    {@const isDragged = dragIndex === idx}
+                    {#if dragIndex !== null && !dragOutside && dropIndex === idx}
+                        <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+                    {/if}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div
+                        data-substat
+                        role="listitem"
+                        transition:slide={{ duration: 200 }}
+                        class={[
+                            'flex items-center gap-2 rounded-none border border-(--theme-divider-border) px-2 py-1.5 transition-all touch-none',
+                            ondragstart ? 'cursor-grab active:cursor-grabbing' : '',
+                            isDragged && !dragOutside && 'ring-2 ring-(--theme-accent-bg)',
+                            isDragged && dragOutside && 'ring-2 ring-red-500 opacity-50'
+                        ].join(' ')}
+                        style="background: var(--theme-input-bg);"
+                        onpointerdown={(e) => ondragstart?.(e, idx)}
+                        onpointermove={ondragmove}
+                        onpointerup={(e) => ondragend?.(e, idx)}
+                    >
+                        <span class="text-[11px] font-black text-(--theme-modal-text)/80 w-20 shrink-0 mr-2"
+                            >{shortLabel(sub.type)}</span
+                        >
+                        <div class="relative flex-1 h-5">
+                            <div
+                                class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-(--theme-modal-text)/10"
+                            >
+                                <div
+                                    class="h-full rounded-full"
+                                    style="width: {pct}%; background: var(--theme-accent-bg)"
+                                ></div>
+                            </div>
+                            <div
+                                class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-none text-[10px] font-black whitespace-nowrap pointer-events-none z-10"
+                                style="left: {pct}%; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                            >
+                                {sub.value}{opt.unit}
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max={maxTier}
+                                value={tierIdx > 0 ? tierIdx : 0}
+                                aria-label={`${sub.type} 档位`}
+                                oninput={(e) => onsubstatvalue(idx, opt.tiers[parseInt(e.currentTarget.value)])}
+                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-0"
+                            />
+                        </div>
+                        {#if onremovesubstat}
+                            <button
+                                onclick={() => onremovesubstat(idx)}
+                                class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                                title="移除该副词条"
+                            >
+                                <Icon icon="mdi:close" class="size-3.5" />
+                            </button>
+                        {/if}
+                    </div>
+                {/if}
+            {/each}
+            {#if dragIndex !== null && !dragOutside && dropIndex === slot.substats.length}
+                <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+            {/if}
+            <!-- 占位行：与真实副词条行同结构、不可见，用于把区域撑到 5 行高度 -->
+            {#each placeholderRows as i (i)}
+                <div
+                    aria-hidden="true"
+                    transition:slide={{ duration: 200 }}
+                    class="invisible flex items-center gap-2 rounded-none border px-2 py-1.5"
+                    style="border-color: var(--theme-divider-border);"
                 >
+                    <span class="mr-2 w-20 shrink-0 text-[11px] font-black">占位</span>
+                    <div class="relative h-5 flex-1"></div>
+                    {#if onremovesubstat}
+                        <span class="shrink-0 p-0.5"><Icon icon="mdi:close" class="size-3.5" /></span>
+                    {/if}
+                </div>
             {/each}
         </div>
-
-        <!-- Main stat + second stat combined -->
-        <div class="relative z-20 mb-2">
-            <button
-                data-main-stat-trigger={mainStatTriggerKey}
-                onclick={onmainstat}
-                class="w-full rounded-none border px-3 py-2 transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]"
-                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-            >
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-col text-left">
-                        <span class="text-xs font-black text-(--theme-modal-text)">
-                            {slot.mainStat
-                                ? `${shortLabel(slot.mainStat.type)} ${slot.mainStat.value}${slot.mainStat.unit}`
-                                : '未选择'}
-                        </span>
-                        {#if second}
-                            <span class="text-[10px] text-(--theme-modal-text)/40">{second.label} +{second.value}</span>
-                        {/if}
-                    </div>
-                    <Icon icon="mdi:chevron-down" class="size-3.5 text-(--theme-modal-text)/40 shrink-0" />
-                </div>
-            </button>
-        </div>
-
-        <!-- Substats -->
-        <div>
-            <span
-                class="mb-1 flex items-center gap-1.5 border-t pt-2 text-[10px] font-black tracking-[0.18em] text-(--theme-modal-text)/40"
-                style="border-color: var(--theme-divider-border);">副词条 ({slot.substats.length}/5)</span
-            >
-            <div class="space-y-1">
-                {#each slot.substats as sub, idx (sub.type)}
-                    {@const opt = SUBSTAT_OPTIONS.find((o) => o.label === sub.type)}
-                    {#if opt}
-                        {@const tierIdx = getTierIndex(opt.tiers, sub.value)}
-                        {@const maxTier = opt.tiers.length - 1}
-                        {@const pct = tierIdx > 0 ? (tierIdx / maxTier) * 100 : 0}
-                        {@const isDragged = dragIndex === idx}
-                        {#if dragIndex !== null && !dragOutside && dropIndex === idx}
-                            <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-                        {/if}
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div
-                            data-substat
-                            role="listitem"
-                            transition:slide={{ duration: 200 }}
-                            class={[
-                                'flex items-center gap-2 rounded-none border border-(--theme-divider-border) px-2 py-1.5 transition-all touch-none',
-                                ondragstart ? 'cursor-grab active:cursor-grabbing' : '',
-                                isDragged && !dragOutside && 'ring-2 ring-(--theme-accent-bg)',
-                                isDragged && dragOutside && 'ring-2 ring-red-500 opacity-50'
-                            ].join(' ')}
-                            style="background: var(--theme-input-bg);"
-                            onpointerdown={(e) => ondragstart?.(e, idx)}
-                            onpointermove={ondragmove}
-                            onpointerup={(e) => ondragend?.(e, idx)}
-                        >
-                            <span class="text-[11px] font-black text-(--theme-modal-text)/80 w-20 shrink-0 mr-2"
-                                >{shortLabel(sub.type)}</span
-                            >
-                            <div class="relative flex-1 h-5">
-                                <div
-                                    class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-(--theme-modal-text)/10"
-                                >
-                                    <div
-                                        class="h-full rounded-full"
-                                        style="width: {pct}%; background: var(--theme-accent-bg)"
-                                    ></div>
-                                </div>
-                                <div
-                                    class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-none text-[10px] font-black whitespace-nowrap pointer-events-none z-10"
-                                    style="left: {pct}%; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
-                                >
-                                    {sub.value}{opt.unit}
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max={maxTier}
-                                    value={tierIdx > 0 ? tierIdx : 0}
-                                    aria-label={`${sub.type} 档位`}
-                                    oninput={(e) => onsubstatvalue(idx, opt.tiers[parseInt(e.currentTarget.value)])}
-                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-0"
-                                />
-                            </div>
-                            {#if onremovesubstat}
-                                <button
-                                    onclick={() => onremovesubstat(idx)}
-                                    class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
-                                    title="移除该副词条"
-                                >
-                                    <Icon icon="mdi:close" class="size-3.5" />
-                                </button>
-                            {/if}
-                        </div>
-                    {/if}
-                {/each}
-                {#if dragIndex !== null && !dragOutside && dropIndex === slot.substats.length}
-                    <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-                {/if}
-                <!-- 占位行：与真实副词条行同结构、不可见，用于把区域撑到 5 行高度 -->
-                {#each placeholderRows as i (i)}
-                    <div
-                        aria-hidden="true"
-                        transition:slide={{ duration: 200 }}
-                        class="invisible flex items-center gap-2 rounded-none border px-2 py-1.5"
-                        style="border-color: var(--theme-divider-border);"
-                    >
-                        <span class="mr-2 w-20 shrink-0 text-[11px] font-black">占位</span>
-                        <div class="relative h-5 flex-1"></div>
-                        {#if onremovesubstat}
-                            <span class="shrink-0 p-0.5"><Icon icon="mdi:close" class="size-3.5" /></span>
-                        {/if}
-                    </div>
-                {/each}
-            </div>
-            {#if slot.substats.length > 0}
-                <div class="mt-2 flex flex-wrap items-center gap-2">
-                    {#if slot.substats.length < 5}
-                        <button
-                            onclick={onaddsubstat}
-                            class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
-                        >
-                            <Icon icon="mdi:plus" class="size-3" />
-                            选择副词条
-                        </button>
-                    {/if}
-                    <button
-                        onclick={onclearsubstats}
-                        class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
-                        title="清空该声骸的副词条"
-                    >
-                        <Icon icon="mdi:refresh" class="size-3" />
-                        重置副词条
-                    </button>
-                </div>
-            {:else}
-                <div class="mt-2 flex flex-wrap items-center gap-2">
+        {#if slot.substats.length > 0}
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                {#if slot.substats.length < 5}
                     <button
                         onclick={onaddsubstat}
                         class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
@@ -263,17 +246,59 @@
                         <Icon icon="mdi:plus" class="size-3" />
                         选择副词条
                     </button>
-                    {#if onenhance}
-                        <button
-                            onclick={onenhance}
-                            class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
-                        >
-                            <Icon icon="mdi:dice-5" class="size-3" />
-                            随机强化
-                        </button>
-                    {/if}
-                </div>
-            {/if}
-        </div>
+                {/if}
+                <button
+                    onclick={onclearsubstats}
+                    class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
+                    title="清空该声骸的副词条"
+                >
+                    <Icon icon="mdi:refresh" class="size-3" />
+                    重置副词条
+                </button>
+            </div>
+        {:else}
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                    onclick={onaddsubstat}
+                    class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
+                >
+                    <Icon icon="mdi:plus" class="size-3" />
+                    选择副词条
+                </button>
+                {#if onenhance}
+                    <button
+                        onclick={onenhance}
+                        class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
+                    >
+                        <Icon icon="mdi:dice-5" class="size-3" />
+                        随机强化
+                    </button>
+                {/if}
+            </div>
+        {/if}
     </div>
+{/snippet}
+
+<div
+    data-sf="card"
+    class="relative min-w-[13rem] rounded-none border p-4 {className ?? ''}"
+    style="border-color: var(--theme-divider-border); {styleProp || ''}"
+>
+    {#if costTabsAside}
+        <!-- 左右结构：cost 页签竖排在卡片左侧，右侧为主词条 + 副词条 -->
+        <div class="relative z-1 flex items-stretch gap-3">
+            <div class="flex w-10 shrink-0 flex-col gap-1">{@render costTabs()}</div>
+            <div class="relative min-w-0 flex-1">
+                {@render costWatermark()}
+                <div class="relative z-1">{@render statAndSubstats()}</div>
+            </div>
+        </div>
+    {:else}
+        {@render costWatermark()}
+        <div class="relative z-1">
+            <!-- Cost selector：按钮平分卡片宽度 -->
+            <div class="mb-3 flex items-center gap-1">{@render costTabs()}</div>
+            {@render statAndSubstats()}
+        </div>
+    {/if}
 </div>
