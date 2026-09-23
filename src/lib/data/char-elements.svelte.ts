@@ -1,4 +1,4 @@
-import { getCharacterInfo } from '$lib/api/data-cache'
+import { getCharacterInfo, getCharacterList } from '$lib/api/data-cache'
 
 let _charElementMap = $state<Record<string, string>>(loadCache())
 
@@ -43,6 +43,28 @@ export async function preloadCharElements(names: string[]) {
 
 let _pendingEnsure: Promise<void> | null = null
 
+/**
+ * @desc 用「角色名录」一次性补全缺失角色的元素（名录走 data-cache 长期缓存，整表只需一次请求）。
+ * 用于展示**不在当前工程配队**里的角色（如工坊社区工程预览、导入的外部工程），
+ * 这类角色没被排轴页预热过，逐条查详情既慢又可能失败。
+ */
+export async function fillCharElementsFromList(names: string[]): Promise<void> {
+    const missing = [...new Set(names.filter((n) => n && !_charElementMap[n]))]
+    if (missing.length === 0) return
+    try {
+        const list = await getCharacterList()
+        const byName = new Map(list.map((c) => [c.name, c.element]))
+        const entries: Record<string, string> = {}
+        for (const name of missing) {
+            const element = byName.get(name)
+            if (element) entries[name] = element
+        }
+        if (Object.keys(entries).length > 0) setCharElements(entries)
+    } catch {
+        /* 名录拉取失败：保持灰色兜底，不阻塞渲染 */
+    }
+}
+
 /** @desc 确保指定角色已写入元素图（缺失则经 data-cache 抓取，data-cache 内部按 URL 去重在途请求）；返回时元素图已尽力包含这些角色的元素 */
 export async function ensureCharElements(names: string[]): Promise<void> {
     for (let round = 0; round < 2; round++) {
@@ -69,4 +91,6 @@ export async function ensureCharElements(names: string[]): Promise<void> {
             _pendingEnsure = null
         }
     }
+    // 详情接口拿不到（或角色不在当前工程预热范围内）时，用名录兜底补全，避免角标退化灰色
+    await fillCharElementsFromList(names)
 }

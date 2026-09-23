@@ -14,6 +14,7 @@
         type ShareProject
     } from '$lib/data/share.svelte'
     import { getCharIconMap, getCharElementMap } from '$lib/calc/timeline.store.svelte'
+    import { fillCharElementsFromList } from '$lib/data/char-elements.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { shortName } from '$lib/utils/character'
 
@@ -55,6 +56,12 @@
             refreshProjects()
         }
         prevOpen = open
+    })
+
+    /** @desc 社区工程预览里的角色多半不在当前工程配队里（元素色缓存为空），用角色名录补全后再渲染角标 */
+    $effect(() => {
+        const names = share.projects.flatMap((p) => p.teamPreview?.names ?? [])
+        if (names.length > 0) void fillCharElementsFromList(names)
     })
 
     let debounceTimer: ReturnType<typeof setTimeout> | undefined
@@ -226,25 +233,13 @@
                         {/if}
                     </div>
 
-                    <!-- 作者（超链接：点按即按作者名搜索） -->
-                    <div class="relative z-10 mt-1.5 flex min-w-0 items-center text-[10px]">
-                        <button
-                            onclick={() => searchBy(item.authorName)}
-                            class="inline-flex min-w-0 items-center gap-1 font-black text-(--theme-accent-text) underline decoration-dotted underline-offset-2 transition-colors hover:decoration-solid"
-                            title={`搜索作者「${item.authorName}」`}
-                        >
-                            <span class="min-w-0 truncate">{item.authorName}</span>
-                            <Icon icon="mdi:magnify" class="size-3 shrink-0" />
-                        </button>
-                    </div>
-
                     <!-- 队伍角色（元素色角标；头像已作叠底，这里只留名字；点按即按角色名搜索） -->
                     {#if names.length > 0}
-                        <div class="relative z-10 mt-2.5 flex flex-wrap items-center gap-1.5">
+                        <div class="relative z-10 mt-3 flex flex-wrap items-center gap-2">
                             {#each names as name}
                                 <button
                                     onclick={() => searchBy(name)}
-                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] font-black transition-colors hover:brightness-125"
+                                    class="inline-flex items-center gap-1.5 border px-2 py-1 text-[11px] font-black transition-colors hover:brightness-125"
                                     style="border-color: color-mix(in srgb, {elementColor(
                                         name
                                     )} 45%, transparent); color: {elementColor(
@@ -253,23 +248,33 @@
                                     title={`搜索角色「${name}」`}
                                 >
                                     {shortName(name)}
-                                    <Icon icon="mdi:magnify" class="size-2.5 shrink-0" />
+                                    <Icon icon="mdi:magnify" class="size-3 shrink-0" />
                                 </button>
                             {/each}
                         </div>
                     {/if}
 
-                    <!-- 底部：下载量 + 操作按钮 -->
-                    <div class="relative z-10 mt-auto flex items-end justify-between gap-3 pt-4">
-                        <span
-                            class="flex shrink-0 items-baseline gap-1.5 text-[10px] tracking-[0.18em] text-(--theme-modal-text)/40"
-                        >
+                    <!-- 底部：下载量 + 作者（超链接，点按即按作者名搜索）+ 操作按钮 -->
+                    <div class="relative z-10 mt-auto flex flex-wrap items-end justify-between gap-x-4 gap-y-2 pt-4">
+                        <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                             <span
-                                class="text-lg font-black leading-none tabular-nums text-(--theme-modal-text)"
-                                style="text-shadow: 0 0 3px var(--theme-halo-color);">{item.downloads}</span
+                                class="flex shrink-0 items-baseline gap-1.5 text-[10px] tracking-[0.18em] text-(--theme-modal-text)/40"
                             >
-                            下载
-                        </span>
+                                <span
+                                    class="text-lg font-black leading-none tabular-nums text-(--theme-modal-text)"
+                                    style="text-shadow: 0 0 3px var(--theme-halo-color);">{item.downloads}</span
+                                >
+                                下载
+                            </span>
+                            <button
+                                onclick={() => searchBy(item.authorName)}
+                                class="inline-flex min-w-0 items-center gap-1.5 text-sm font-black tracking-tight text-(--theme-accent-text) underline decoration-dotted underline-offset-4 transition-colors hover:decoration-solid"
+                                title={`搜索作者「${item.authorName}」`}
+                            >
+                                <span class="min-w-0 truncate">{item.authorName}</span>
+                                <Icon icon="mdi:magnify" class="size-3.5 shrink-0" />
+                            </button>
+                        </div>
                         <div class="flex shrink-0 items-center gap-1.5">
                             <button
                                 onclick={() => handleShare(item)}
