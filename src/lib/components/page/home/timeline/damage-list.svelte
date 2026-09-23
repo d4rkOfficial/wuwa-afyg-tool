@@ -1,4 +1,5 @@
 <script lang="ts">
+    import Icon from '@iconify/svelte'
     import { getShowDamageList, setShowDamageList, getDamageList } from '$lib/calc/timeline.store.svelte'
 </script>
 
@@ -23,7 +24,14 @@
                 class="flex items-center justify-between gap-2 border-b px-4 pb-2.5 pt-3"
                 style="border-color: var(--theme-divider-border);"
             >
-                <h2 class="text-base font-black tracking-tight text-(--theme-modal-text)">伤害列表</h2>
+                <span class="flex items-center gap-2">
+                    <Icon
+                        icon="mdi:chart-box-outline"
+                        class="size-4 shrink-0"
+                        style="color: var(--theme-accent-text);"
+                    />
+                    <h2 class="text-base font-black tracking-tight text-(--theme-modal-text)">伤害列表</h2>
+                </span>
                 <span class="text-[10px] tracking-[0.22em] text-(--theme-modal-text)/40"
                     >{getDamageList().length} 条</span
                 >

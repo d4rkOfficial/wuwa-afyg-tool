@@ -121,7 +121,11 @@
             role="dialog"
             aria-modal="true"
         >
-            <div class="mb-3 border-b pb-2.5 pr-6" style="border-color: var(--theme-divider-border);">
+            <div
+                class="mb-3 flex items-center gap-2 border-b pb-2.5 pr-6"
+                style="border-color: var(--theme-divider-border);"
+            >
+                <Icon icon="mdi:layers-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 <h3 class="text-base font-black tracking-tight">触发套装</h3>
             </div>
 

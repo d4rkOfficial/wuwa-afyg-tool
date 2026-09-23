@@ -38,6 +38,7 @@
                 class="mb-3 flex items-center gap-2 border-b pb-2.5"
                 style="border-color: var(--theme-divider-border);"
             >
+                <Icon icon="mdi:tune-variant" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 <span class="text-sm font-black tracking-tight text-(--theme-modal-text)">选择副词条</span>
                 <button
                     onclick={onclose}

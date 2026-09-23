@@ -1,4 +1,5 @@
 <script lang="ts">
+    import Icon from '@iconify/svelte'
     import {
         getNonDirectPickerBlockId,
         setNonDirectPickerBlockId,
@@ -50,7 +51,10 @@
                 class="flex items-center justify-between border-b px-4 pb-2.5 pt-3"
                 style="border-bottom-color: var(--theme-divider-border);"
             >
-                <h2 class="text-base font-black tracking-tight">配置非直伤</h2>
+                <span class="flex items-center gap-2">
+                    <Icon icon="mdi:tune-variant" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                    <h2 class="text-base font-black tracking-tight">配置非直伤</h2>
+                </span>
             </div>
             <div class="theme-scrollbar flex-1 overflow-y-auto p-4 space-y-3">
                 <div class="text-xs font-black tracking-tight text-(--theme-modal-text)">处决/响应</div>

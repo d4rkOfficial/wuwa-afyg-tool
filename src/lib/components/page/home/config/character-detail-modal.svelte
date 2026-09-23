@@ -159,7 +159,10 @@
         : ''}; {styleProp || ''}"
 >
     {#snippet title()}
-        角色详情配置
+        <span class="flex items-center gap-2">
+            <Icon icon="mdi:account-details" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+            角色详情配置
+        </span>
     {/snippet}
 
     <div class="flex gap-2">
