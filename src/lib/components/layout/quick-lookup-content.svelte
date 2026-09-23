@@ -57,8 +57,11 @@
     let weaponTypeIcons = $state<Record<string, string>>({})
     /** @desc 右键菜单（复制/创建BUFF/跳转）状态 */
     let ctxShow = $state(false)
-    let ctxX = $state(0)
-    let ctxY = $state(0)
+    /** @desc 菜单左上角（视口坐标，clamp 后） */
+    let ctxPos = $state({ x: 0, y: 0 })
+    /** @desc 是否已完成尺寸测量（未测量前先隐藏，避免出现"先错位后跳正"的闪烁） */
+    let ctxMeasured = $state(false)
+    let ctxMenuEl = $state<HTMLElement | null>(null)
     let scrollContainer = $state<HTMLDivElement | null>(null)
 
     let charNames = $derived(team.map((s) => s.character).filter((c): c is string => c !== null))
@@ -156,13 +159,38 @@
         loading = false
     }
 
-    /** @desc 记录右键菜单位置并显示 */
+    /** @desc 记录右键菜单位置并显示（clientX/Y = 视口坐标，配合 fixed 定位与 clamp） */
     function handleCtxMenu(e: MouseEvent) {
         e.preventDefault()
-        ctxX = e.clientX
-        ctxY = e.clientY
+        ctxPos = { x: e.clientX, y: e.clientY }
+        ctxMeasured = false
         ctxShow = true
     }
+
+    /**
+     * @desc 右键菜单定位：先把菜单挂到 document.body（portal），避免被祖先的 transform/backdrop-filter
+     * 变成"相对祖先定位"而错位；挂载后再按实际尺寸 clamp 到视口内（左/上/右/下各留 8px）。
+     */
+    const portal = (node: HTMLElement) => {
+        document.body.appendChild(node)
+        return { destroy: () => node.remove() }
+    }
+
+    $effect(() => {
+        if (!ctxShow) {
+            ctxMeasured = false
+            return
+        }
+        const el = ctxMenuEl
+        if (!el) return
+        const rect = el.getBoundingClientRect()
+        const margin = 8
+        ctxPos = {
+            x: Math.max(margin, Math.min(ctxPos.x, window.innerWidth - rect.width - margin)),
+            y: Math.max(margin, Math.min(ctxPos.y, window.innerHeight - rect.height - margin))
+        }
+        ctxMeasured = true
+    })
 
     /** @desc 复制选中文本到剪贴板 */
     function handleCopy() {
@@ -754,10 +782,18 @@
 {#if ctxShow}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="fixed inset-0 z-80" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
+    <div
+        class="fixed inset-0 z-80"
+        use:portal
+        onclick={() => (ctxShow = false)}
+        oncontextmenu={(e) => e.preventDefault()}
+    >
         <div
+            bind:this={ctxMenuEl}
             class="animate-pop-in absolute min-w-36 rounded-none border bg-(--theme-modal-bg) py-1 backdrop-blur-lg"
-            style="border-color: var(--theme-divider-border); left: {ctxX}px; top: {ctxY}px;"
+            style="border-color: var(--theme-divider-border); left: {ctxPos.x}px; top: {ctxPos.y}px; visibility: {ctxMeasured
+                ? 'visible'
+                : 'hidden'};"
         >
             <button
                 onclick={handleCopy}
