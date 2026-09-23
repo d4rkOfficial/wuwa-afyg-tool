@@ -359,11 +359,27 @@ function quickBlockWidth(key: string, desc: string): number {
     return estimateInnerWidth(key, desc)
 }
 
+/** @desc 操作块文本用的字体（与 DOM 的 text-sm + 全局衬线字体一致） */
+const BLOCK_FONT = "14px 'FangXinShu', system-ui, sans-serif"
+/** @desc 备注在 DOM 上是 max-w-24 + truncate，宽度上限 96px */
+const NOTE_MAX_WIDTH = 96
+
+let _measureCtx: CanvasRenderingContext2D | null | undefined
+/** @desc 用 canvas 实测文本宽度（同字体），比「字符数 × 14px」的粗估准确（中英混排/数字尤甚） */
+function measureTextWidth(text: string, font: string): number {
+    if (_measureCtx === undefined) {
+        _measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d')
+    }
+    if (!_measureCtx) return text.length * 14
+    _measureCtx.font = font
+    return _measureCtx.measureText(text).width
+}
+
 function estimateInnerWidth(key: string, desc: string, chips = 0): number {
     const hasIcon =
         _uiBtnIcons.some(([n, url]) => n === key && url) || GAMEPAD_BUTTONS.some((b) => b.id === key && b.icon)
-    let inner = hasIcon ? 40 : key.length * 8
-    if (desc) inner += 4 + Math.min(desc.length * 14, 96)
+    let inner = hasIcon ? 40 : measureTextWidth(key, BLOCK_FONT)
+    if (desc) inner += 4 + Math.min(measureTextWidth(desc, BLOCK_FONT), NOTE_MAX_WIDTH)
     inner += chips * 28
     return Math.max(56, inner + 22)
 }
