@@ -257,16 +257,16 @@
     <div class="flex h-full flex-col">
         <div
             class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b pb-2.5"
-            style="border-color: var(--theme-card-border);"
+            style="border-color: var(--theme-divider-border);"
         >
-            <p class="text-xs leading-relaxed text-(--theme-muted-text)">
+            <p class="text-[10px] leading-relaxed text-(--theme-modal-text)/40">
                 按角色 / 武器 / 声骸 / 套装管理 Buff 预设，点击条目即可编辑
             </p>
             <div class="flex items-center gap-2">
                 <button
                     onclick={handleDownload}
                     disabled={loading}
-                    class="inline-flex items-center gap-1 rounded-none px-3 py-1.5 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
+                    class="inline-flex items-center gap-1 rounded-none px-3 py-1.5 text-[11px] font-medium transition-all hover:brightness-125 disabled:opacity-40"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                 >
                     <Icon
@@ -284,7 +284,8 @@
                                 void handleClear()
                             }
                         }}
-                        class="inline-flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
+                        class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[11px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
+                        style="border-color: var(--theme-divider-border);"
                     >
                         <Icon icon="mdi:delete-sweep-outline" class="size-3.5" />
                         清空
@@ -295,7 +296,8 @@
 
         {#if error}
             <div
-                class="mb-3 flex items-center gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-xs text-red-500"
+                class="mb-3 flex items-center gap-2 rounded-none border px-3 py-2 text-[10px] text-red-500"
+                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <Icon icon="mdi:alert-circle-outline" class="size-4 shrink-0" />
                 <span class="flex-1">从工坊下载失败：{error}</span>
@@ -303,15 +305,18 @@
         {/if}
 
         <!-- Tab bar -->
-        <div class="mb-3 flex shrink-0 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5">
+        <div
+            class="mb-3 flex shrink-0 rounded-none border p-0.5"
+            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+        >
             {#each BUFF_CATEGORY_ORDER as cat}
                 <button
                     onclick={() => (tab = cat)}
                     class={[
-                        'flex flex-1 items-center justify-center gap-1.5 rounded-none px-2 py-1.5 text-xs font-medium transition-colors',
+                        'flex flex-1 items-center justify-center gap-1.5 rounded-none px-2 py-1.5 text-[11px] font-medium transition-colors',
                         tab === cat
                             ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
-                            : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
+                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)'
                     ].join(' ')}
                 >
                     <Icon
@@ -331,9 +336,10 @@
 
         <!-- Search -->
         <div
-            class="mb-3 flex shrink-0 items-center gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
+            class="mb-3 flex shrink-0 items-center gap-2 rounded-none border px-3 py-2"
+            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
         >
-            <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
+            <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-modal-text)/35" />
             <input
                 bind:value={query}
                 placeholder="搜索{BUFF_CATEGORY_LABELS[tab]}…"
@@ -342,13 +348,14 @@
             {#if query}
                 <button
                     onclick={() => (query = '')}
-                    class="rounded-none p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
+                    class="rounded-none p-0.5 text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)"
                 >
                     <Icon icon="mdi:close" class="size-4" />
                 </button>
             {/if}
             <div
-                class="ml-1 flex shrink-0 items-center gap-0.5 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5"
+                class="ml-1 flex shrink-0 items-center gap-0.5 rounded-none border p-0.5"
+                style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
             >
                 {#each FILTERS as f (f.key)}
                     <button
@@ -357,7 +364,7 @@
                             'whitespace-nowrap rounded-none px-2 py-1 text-[11px] font-medium transition-colors',
                             filter === f.key
                                 ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
-                                : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
+                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)'
                         ].join(' ')}
                     >
                         {f.label}
@@ -369,12 +376,14 @@
         <!-- Entity list -->
         <div class="theme-scrollbar min-h-0 flex-1 overflow-y-auto pr-0.5">
             {#if rows.length === 0}
-                <div class="flex h-full flex-col items-center justify-center gap-2 text-sm text-(--theme-muted-text)">
+                <div
+                    class="flex h-full flex-col items-center justify-center gap-2 text-sm text-(--theme-modal-text)/40"
+                >
                     <Icon icon="mdi:magnify-close" class="size-9" />
                     没有匹配的条目
                 </div>
             {:else}
-                <div class="space-y-1">
+                <div class="grid grid-cols-1 gap-1 xl:grid-cols-2 xl:gap-x-3">
                     {#each rows as row (row.entityType + '/' + row.entityName)}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -383,14 +392,15 @@
                             onclick={() => openEdit(row)}
                             role="button"
                             tabindex="0"
-                            class="flex w-full cursor-pointer items-center gap-3 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-left transition-colors hover:bg-(--theme-card-bg-focused)"
+                            class="flex w-full cursor-pointer items-center gap-3 rounded-none border px-3 py-2 text-left transition-colors hover:border-(--theme-accent-bg)"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <div
                                 class={[
                                     'flex size-10 shrink-0 items-center justify-center overflow-hidden',
                                     row.entityType === 'character'
                                         ? 'rounded-full'
-                                        : 'rounded-none bg-(--theme-card-bg-focused)'
+                                        : 'rounded-none bg-(--theme-modal-text)/5'
                                 ].join(' ')}
                             >
                                 {#if row.icon}
@@ -403,18 +413,18 @@
                                             : 'size-full object-contain p-1'}
                                     />
                                 {:else}
-                                    <span class="text-xs text-(--theme-muted-text)">{row.entityName.charAt(0)}</span>
+                                    <span class="text-xs text-(--theme-modal-text)/40">{row.entityName.charAt(0)}</span>
                                 {/if}
                             </div>
 
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
-                                    <span class="truncate text-sm font-medium text-(--theme-layout-text)">
+                                    <span class="truncate text-sm font-medium text-(--theme-modal-text)">
                                         {row.entityName}
                                     </span>
                                     {#if row.pieces}
                                         <span
-                                            class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                            class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] font-medium text-(--theme-accent-text)"
                                         >
                                             {row.pieces}件
                                         </span>
@@ -430,7 +440,7 @@
                                                 'inline-flex shrink-0 items-center gap-1 rounded-none px-1.5 py-0.5 text-[10px] font-medium transition-colors',
                                                 row.source === 'custom'
                                                     ? 'text-(--theme-accent-text)'
-                                                    : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
+                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)'
                                             ].join(' ')}
                                             style={row.source === 'custom'
                                                 ? 'background: color-mix(in srgb, var(--theme-accent-bg) 10%, transparent);'
@@ -455,8 +465,8 @@
                                 class={[
                                     'shrink-0 rounded-none px-1.5 py-0.5',
                                     row.count > 0
-                                        ? 'bg-(--theme-accent-bg)/10 text-sm font-semibold text-(--theme-accent-text)'
-                                        : 'text-[10px] text-(--theme-muted-text)/60'
+                                        ? 'bg-(--theme-accent-bg)/10 text-sm font-black text-(--theme-accent-text)'
+                                        : 'text-[10px] text-(--theme-modal-text)/35'
                                 ].join(' ')}
                             >
                                 {row.count} 条
@@ -469,7 +479,7 @@
                                         const existing = entityKeyMap.get(`${row.entityType}/${row.entityName}`)
                                         if (existing) requestDelete(existing)
                                     }}
-                                    class="shrink-0 rounded-none p-1 text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
+                                    class="shrink-0 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
                                     title="删除"
                                 >
                                     <Icon icon="mdi:trash-can-outline" class="size-4" />
@@ -490,22 +500,31 @@
             style="width: min(92vw, 420px); {mergedStyle}"
         >
             {#snippet title()}
-                确认删除
+                <span class="flex items-center gap-2">
+                    <Icon
+                        icon="mdi:trash-can-outline"
+                        class="size-4 shrink-0"
+                        style="color: var(--theme-accent-text);"
+                    />
+                    <span class="font-black tracking-tight">确认删除</span>
+                </span>
             {/snippet}
-            <p class="text-sm text-(--theme-muted-text)">
+            <p class="text-xs leading-relaxed text-(--theme-modal-text)/60">
                 确定删除「{confirmDelete.entityName}」的全部 Buff 预设？（无法撤销）
             </p>
-            <div class="mt-4 flex items-center justify-end gap-2 border-t border-(--theme-card-border) pt-3">
+            <div
+                class="mt-4 flex items-center justify-end gap-2 border-t pt-3"
+                style="border-color: var(--theme-divider-border);"
+            >
                 <button
                     onclick={() => (confirmDelete = null)}
-                    class="rounded-none px-4 py-1.5 text-sm text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="rounded-none px-4 py-1.5 text-sm text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                 >
                     取消
                 </button>
                 <button
                     onclick={handleDelete}
-                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium text-white transition-all hover:brightness-110"
-                    style="background: var(--theme-danger-bg, tomato);"
+                    class="inline-flex items-center gap-1.5 rounded-none bg-red-500 px-4 py-1.5 text-sm font-medium text-white transition-all hover:brightness-110"
                 >
                     <Icon icon="mdi:trash-can-outline" class="size-4" />
                     确认删除

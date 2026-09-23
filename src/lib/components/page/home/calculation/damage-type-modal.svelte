@@ -171,8 +171,8 @@
 <Modal {open} {onclose} backdropClose class="w-[68rem] max-w-[94vw] {className}" style={mergedStyle}>
     {#snippet title()}
         <span class="flex items-center gap-2 pr-8">
-            <Icon icon="mdi:playlist-edit" class="size-4 shrink-0" />
-            <span>编辑伤害类型</span>
+            <Icon icon="mdi:playlist-edit" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+            <span class="font-black tracking-tight">编辑伤害类型</span>
             <button
                 onclick={() => (helpOpen = !helpOpen)}
                 class="rounded-full p-0.5 transition-colors {helpOpen
@@ -193,8 +193,8 @@
                 class="shrink-0 space-y-1.5 rounded-none border px-3 py-2.5 text-xs leading-relaxed"
                 style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent); color: var(--theme-modal-text)/85;"
             >
-                <div class="flex items-center gap-1.5 font-semibold text-(--theme-accent-text)">
-                    <Icon icon="mdi:lightbulb-on-outline" class="size-3.5 shrink-0" />
+                <div class="flex items-center gap-1.5 text-xs font-black tracking-tight text-(--theme-accent-text)">
+                    <Icon icon="mdi:lightbulb-on-outline" class="size-4 shrink-0" />
                     为什么要先确认伤害类型
                 </div>
                 {#each HELP_PARAGRAPHS as paragraph (paragraph)}
@@ -205,7 +205,7 @@
 
         <!-- 列头 -->
         <div
-            class="flex shrink-0 items-center gap-3 border-b px-1 pb-1.5 text-[11px] font-semibold text-(--theme-modal-text)/50"
+            class="flex shrink-0 items-center gap-3 border-y px-1 py-1.5 text-[11px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
             style="border-color: var(--theme-divider-border);"
         >
             <span class="min-w-0 flex-1">倍率名</span>
@@ -216,7 +216,9 @@
         <div class="theme-scrollbar {helpOpen ? 'h-[42vh]' : 'h-[58vh]'} space-y-3 overflow-y-auto pr-1">
             {#each charGroups as group (group.key)}
                 <div class="space-y-1">
-                    <div class="flex items-center gap-2 px-1 text-xs font-semibold text-(--theme-modal-text)">
+                    <div
+                        class="flex items-center gap-2 px-1 text-xs font-black tracking-tight text-(--theme-modal-text)"
+                    >
                         {#if charIconMap[group.character]}
                             <img
                                 src={charIconMap[group.character]}
@@ -238,8 +240,8 @@
                         {@const editable = isEditable(entry)}
                         <div
                             in:fade={{ duration: 100 }}
-                            class="flex items-center gap-3 rounded-none border px-2 py-1.5"
-                            style="border-color: var(--theme-card-border); background: var(--theme-card-bg);"
+                            class="flex items-center gap-3 rounded-none border px-2 py-1.5 transition-colors hover:border-(--theme-accent-bg)"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <!-- 第一列：倍率名（按属性伤害着色，与拉表表格同一口径） -->
                             <div class="min-w-0 flex-1">
@@ -273,7 +275,7 @@
                                                 : 'text-(--theme-modal-text)/45 hover:bg-(--theme-modal-text)/10'}"
                                             style={selected
                                                 ? 'background: color-mix(in srgb, var(--theme-accent-bg) 22%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);'
-                                                : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                : 'background: var(--theme-card-bg); border-color: var(--theme-divider-border);'}
                                         >
                                             {DAMAGE_TYPE_SHORT[dt] ?? dt}
                                         </button>
@@ -318,7 +320,7 @@
             {/each}
 
             {#if damageEntries.length === 0}
-                <div class="flex h-40 flex-col items-center justify-center gap-2 text-sm text-(--theme-muted-text)">
+                <div class="flex h-40 flex-col items-center justify-center gap-2 text-sm text-(--theme-modal-text)/40">
                     <Icon icon="mdi:table-question" class="size-9" />
                     当前没有可编辑的伤害倍率：先在排轴页给角色放置伤害块
                 </div>

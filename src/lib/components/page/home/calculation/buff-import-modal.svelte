@@ -134,17 +134,21 @@
 
 <Modal {open} {onclose} class={className} style="width: min(92vw, 720px); {mergedStyle}">
     {#snippet title()}
-        导入 Buff 集
+        <span class="flex items-center gap-2">
+            <Icon icon="mdi:import" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+            <span class="font-black tracking-tight">导入 Buff 集</span>
+        </span>
     {/snippet}
 
-    <p class="mb-3 text-xs text-(--theme-muted-text)">
+    <p class="mb-3 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
         勾选对应角色/武器/首位声骸/套装即可全选其全部 Buff。上方为根据当前配装推荐的实体，下方为其它已下载的
     </p>
 
     <div
-        class="mb-3 flex items-center gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
+        class="mb-3 flex items-center gap-2 rounded-none border px-3 py-2"
+        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
-        <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
+        <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-modal-text)/35" />
         <input
             bind:value={query}
             placeholder="搜索实体 / Buff 名…"
@@ -153,22 +157,23 @@
         {#if query}
             <button
                 onclick={() => (query = '')}
-                class="rounded-none p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
+                class="rounded-none p-0.5 text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)"
             >
                 <Icon icon="mdi:close" class="size-4" />
             </button>
         {/if}
     </div>
 
-    <div class="space-y-4">
+    <div class="flex flex-col gap-4">
         <div>
-            <h3 class="mb-1.5 flex items-center gap-1 text-xs font-medium text-(--theme-accent-text)">
-                <Icon icon="mdi:star" class="size-3.5" />
+            <h3 class="mb-2 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)">
+                <Icon icon="mdi:star" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 推荐（匹配当前配装）
             </h3>
             {#if recommendedEntities.length === 0}
                 <div
-                    class="flex items-center gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-3 text-xs text-(--theme-muted-text)"
+                    class="flex items-center gap-2 rounded-none border px-3 py-3 text-[10px] text-(--theme-modal-text)/40"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
                     <Icon icon="mdi:emoticon-happy-outline" class="size-4 shrink-0" />
                     没有匹配到推荐 Buff 集，可先到主页「Buff 集」从工坊下载
@@ -183,15 +188,15 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <button
                 onclick={() => (showOthers = !showOthers)}
-                class="mb-1.5 flex w-full items-center gap-1 text-xs font-medium text-(--theme-muted-text) transition-colors hover:text-(--theme-modal-text)"
+                class="mb-2 flex w-full items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text) transition-colors hover:text-(--theme-accent-text)"
                 title="展开 / 收起非推荐实体"
             >
-                <Icon icon={showOthers || query ? 'mdi:chevron-down' : 'mdi:chevron-right'} class="size-3.5 shrink-0" />
-                <Icon icon="mdi:download" class="size-3.5" />
+                <Icon icon={showOthers || query ? 'mdi:chevron-down' : 'mdi:chevron-right'} class="size-4 shrink-0" />
+                <Icon icon="mdi:download" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 已下载 · 其它（{otherEntities.length}）
                 {#if otherSelectedCount > 0}
                     <span
-                        class="rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                        class="rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] font-medium text-(--theme-accent-text)"
                         >已选 {otherSelectedCount}</span
                     >
                 {/if}
@@ -199,7 +204,8 @@
             {#if showOthers || query}
                 {#if otherEntities.length === 0}
                     <div
-                        class="rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-3 text-xs text-(--theme-muted-text)"
+                        class="rounded-none border px-3 py-3 text-[10px] text-(--theme-modal-text)/40"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
                         暂无其它 Buff 集
                     </div>
@@ -211,10 +217,13 @@
     </div>
 
     {#snippet footer()}
-        <div class="flex items-center justify-end gap-2 border-t border-(--theme-card-border) pt-3">
+        <div
+            class="flex items-center justify-end gap-2 border-t pt-3"
+            style="border-color: var(--theme-divider-border);"
+        >
             <button
                 onclick={onclose}
-                class="rounded-none px-4 py-1.5 text-sm text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                class="rounded-none px-4 py-1.5 text-sm text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
             >
                 取消
             </button>
@@ -238,10 +247,10 @@
             .sort((a, b) => setPiecesOf(a.entityType) - setPiecesOf(b.entityType))}
         {#if group.length > 0}
             <div class="mb-2">
-                <h4 class="mb-1 px-0.5 text-[10px] font-medium text-(--theme-muted-text)">
+                <h4 class="mb-1 px-0.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40">
                     {BUFF_CATEGORY_LABELS[cat]}（{group.length}）
                 </h4>
-                <div class="space-y-1.5">
+                <div class="grid grid-cols-1 gap-1.5 xl:grid-cols-2 xl:gap-x-3">
                     {#each group as entity (entityKey(entity))}
                         {@render EntityRow(entity, isChecked(entity))}
                     {/each}
@@ -259,7 +268,7 @@
             'flex cursor-pointer items-start gap-3 rounded-none border px-3 py-2 transition-colors',
             checked
                 ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
-                : 'border-(--theme-card-border) bg-(--theme-card-bg) hover:bg-(--theme-card-bg-focused)'
+                : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:border-(--theme-accent-bg)'
         ].join(' ')}
         onclick={() => toggle(entity)}
         title="点击选中"
@@ -267,23 +276,23 @@
         <span
             class="mt-0.5 flex size-5 shrink-0 items-center justify-center {checked
                 ? 'text-(--theme-accent-text)'
-                : 'text-(--theme-muted-text)'}"
+                : 'text-(--theme-modal-text)/40'}"
         >
             <Icon icon={TYPE_ICONS[categoryOfType(entity.entityType)]} class="size-5" />
         </span>
         <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-                <span class="truncate text-sm font-medium text-(--theme-layout-text)">{entity.entityName}</span>
+                <span class="truncate text-sm font-medium text-(--theme-modal-text)">{entity.entityName}</span>
                 <span
-                    class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                    class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] font-medium text-(--theme-accent-text)"
                 >
                     {categoryOfType(entity.entityType) === 'set'
                         ? `${setPiecesOf(entity.entityType)}件`
                         : ENTITY_TYPE_LABELS[entity.entityType]}
                 </span>
-                <span class="shrink-0 text-[10px] text-(--theme-muted-text)">{entity.buffs.length} 条</span>
+                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40">{entity.buffs.length} 条</span>
             </div>
-            <div class="mt-0.5 truncate text-xs text-(--theme-muted-text)" title={buffDetail(entity)}>
+            <div class="mt-0.5 truncate text-[10px] text-(--theme-modal-text)/40" title={buffDetail(entity)}>
                 {buffDetail(entity)}
             </div>
         </div>

@@ -115,7 +115,7 @@
         return map
     })
 
-    /** @desc 列间分割线：folder 组与 folder/普通 buff 接壤→主题色半透明实线加粗；其余→虚线（border-right 单侧绘制避免重叠，最后一列不画） */
+    /** @desc 列间分割线：folder 组与 folder/普通 buff 接壤→主题色半透明实线加粗；其余→常规分隔线（border-right 单侧绘制避免重叠，最后一列不画） */
     const colBorderStyle = (curId: string | undefined, nextId: string | undefined): string => {
         if (nextId === undefined) return ''
         if (curId === undefined) return ''
@@ -124,7 +124,7 @@
         const solid = (curGroup !== undefined || nextGroup !== undefined) && curGroup !== nextGroup
         return solid
             ? 'border-right: 2px solid color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);'
-            : 'border-right: 1px dashed var(--theme-divider-border);'
+            : 'border-right: 1px solid var(--theme-divider-border);'
     }
 
     /** @desc 自动推导伤害类型映射（未手填伤害类型时展示推导结果；规则2需要角色/声骸技能文案，故补齐数据） */
@@ -740,11 +740,11 @@
         {@const hasFolder = group.visibleColIdx.some((ci) => folderGroupOf.has(columns[ci].id))}
         <div class="snap-group mb-6">
             <div>
-                <!-- 表格主体底色跟随「卡片透明度」（单元格区域保持透明）；上/右/下 = 昼夜色双实线（随明暗主题），右上/右下圆角；左 = 常规分隔线 -->
+                <!-- 表格主体底色跟随「卡片透明度」（单元格区域保持透明）；上/右/下/左 = 常规分隔线（直角，去重装饰） -->
                 <table
                     class="min-w-full text-xs"
                     data-group-table={gi}
-                    style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-collapse: separate; border-spacing: 0; border-top: 3px double var(--theme-divider-border); border-right: 3px double var(--theme-divider-border); border-bottom: 3px double var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); border-bottom-right-radius: 0.5rem; {maxTableWidth
+                    style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-collapse: separate; border-spacing: 0; border-top: 1px solid var(--theme-divider-border); border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); {maxTableWidth
                         ? `width: ${maxTableWidth}px;`
                         : ''}"
                 >
@@ -754,7 +754,9 @@
                             class="-mr-px flex items-center gap-2 border-b px-2 py-1.5"
                             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-color: var(--theme-divider-border);"
                         >
-                            <span class="text-sm font-bold" style="color: var(--theme-element-{charElement}, #888);"
+                            <span
+                                class="text-sm font-black tracking-tight"
+                                style="color: var(--theme-element-{charElement}, #888);"
                                 >{group.charName || '无角色'}</span
                             >
                             <span class="text-xs text-(--theme-modal-text)/60"
@@ -784,7 +786,7 @@
                         {#if hasFolder}
                             <tr>
                                 <th
-                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-medium text-(--theme-modal-text)/50"
+                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-black tracking-[0.12em] text-(--theme-modal-text)/50"
                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
                                     rowspan="2"
                                 >
@@ -835,7 +837,7 @@
                                                 )}"
                                             >
                                                 <span
-                                                    class="block truncate px-1 text-[10px] font-semibold text-(--theme-modal-text)/70"
+                                                    class="block truncate px-1 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/70"
                                                     title={grpHeader}>{grpHeader}</span
                                                 >
                                             </th>
@@ -858,7 +860,7 @@
                                     <th
                                         data-fill-th
                                         class="sticky top-0 z-30 h-6 p-0"
-                                        style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
+                                        style="border-color: var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
                                     ></th>
                                 {/if}
                             </tr>
@@ -867,7 +869,7 @@
                             {#if !hasFolder}
                                 <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
                                 <th
-                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-medium text-(--theme-modal-text)/50"
+                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-black tracking-[0.12em] text-(--theme-modal-text)/50"
                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
                                 >
                                     条目
@@ -908,13 +910,13 @@
                                         {#if grp}
                                             {@const grpSub = grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum}
                                             <span
-                                                class="text-[11px] font-bold leading-none tabular-nums"
+                                                class="text-[11px] font-black leading-none tabular-nums"
                                                 style="color: var(--theme-modal-text)/70;"
                                                 title={bs.name}>{grpSub}</span
                                             >
                                         {:else}
                                             <span
-                                                class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] leading-3 text-(--theme-modal-text)/60"
+                                                class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
                                                 title={bs.name}>{bs.name}</span
                                             >
                                         {/if}
@@ -925,7 +927,7 @@
                                 <th
                                     data-fill-th
                                     class="sticky {hasFolder ? 'top-6' : 'top-0'} z-30 p-0 border-b"
-                                    style="border-color: var(--theme-divider-border); border-left: 1px dashed var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
+                                    style="border-color: var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
                                 ></th>
                             {/if}
                         </tr>
@@ -943,7 +945,7 @@
                                     class="border-b {rowHighlightActive && !rowHighlighted
                                         ? 'opacity-40 transition-opacity'
                                         : ''}"
-                                    style="border-bottom: 1px dashed var(--theme-divider-border);{rowHighlightActive &&
+                                    style="border-bottom: 1px solid var(--theme-divider-border);{rowHighlightActive &&
                                     rowHighlighted
                                         ? ` background: ${HIGHLIGHT_BG};`
                                         : ''}"
@@ -975,7 +977,7 @@
                                             onclick={(e) => e.stopPropagation()}
                                         >
                                             <span
-                                                class="text-[10px] font-bold leading-tight text-(--theme-modal-text)/70"
+                                                class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
                                                 >伤害类型：</span
                                             >
                                             {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
@@ -1059,7 +1061,7 @@
                                         <!-- 填充列：吸收剩余空间；无内容无交互，不参与框选（无 data-col） -->
                                         <td
                                             class="p-0"
-                                            style="border-left: 1px dashed var(--theme-divider-border); width: 100%;"
+                                            style="border-left: 1px solid var(--theme-divider-border); width: 100%;"
                                         ></td>
                                     {/if}
                                 </tr>
@@ -1082,6 +1084,6 @@
 <style>
     /* 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） */
     .split-row td {
-        border-top: 2px dashed color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
+        border-top: 1px dashed color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
     }
 </style>

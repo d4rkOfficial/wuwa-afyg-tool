@@ -317,7 +317,10 @@
     style="width: min(96vw, 1400px); height: min(90vh, 760px); {mergedStyle}"
 >
     {#snippet title()}
-        编辑 Buff 预设
+        <span class="flex items-center gap-2">
+            <Icon icon="mdi:pencil-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+            <span class="font-black tracking-tight">编辑 Buff 预设</span>
+        </span>
     {/snippet}
 
     {#snippet footer()}
@@ -345,7 +348,7 @@
     {/snippet}
 
     <div class="flex h-full flex-col">
-        <p class="mb-3 text-xs text-(--theme-muted-text)">
+        <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
             {ENTITY_TYPE_LABELS[entityType]} · {entityName}
             {#if entityType !== 'echo'}（编辑后将自动设为不同步工坊）{/if}
         </p>
@@ -358,12 +361,17 @@
 
         <div class="flex min-h-0 flex-1 gap-3">
             <!-- Left: buff list -->
-            <div class="flex w-64 shrink-0 flex-col rounded-none border border-(--theme-card-border)">
+            <div
+                class="flex w-64 shrink-0 flex-col rounded-none border"
+                style="border-color: var(--theme-divider-border);"
+            >
                 <div
                     class="flex shrink-0 items-center justify-between border-b px-3 py-2"
                     style="border-color: var(--theme-divider-border);"
                 >
-                    <span class="text-xs font-medium text-(--theme-muted-text)">Buff 条目（{buffs.length}）</span>
+                    <span class="text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40"
+                        >Buff 条目（{buffs.length}）</span
+                    >
                     <button
                         onclick={addBuff}
                         class="inline-flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium"
@@ -400,7 +408,10 @@
             </div>
 
             <!-- Middle: selected buff editor -->
-            <div class="flex min-w-0 flex-1 flex-col rounded-none border border-(--theme-card-border)">
+            <div
+                class="flex min-w-0 flex-1 flex-col rounded-none border"
+                style="border-color: var(--theme-divider-border);"
+            >
                 {#if activeBuff}
                     <div
                         class="flex shrink-0 flex-col gap-2 border-b px-3 py-2"
@@ -699,12 +710,15 @@
             </div>
 
             <!-- Right: zone picker -->
-            <div class="flex w-52 shrink-0 flex-col rounded-none border border-(--theme-card-border)">
+            <div
+                class="flex w-52 shrink-0 flex-col rounded-none border"
+                style="border-color: var(--theme-divider-border);"
+            >
                 <div
-                    class="shrink-0 border-b px-3 py-2 text-xs font-medium text-(--theme-muted-text)"
+                    class="flex shrink-0 items-center gap-1.5 border-b px-3 py-2"
                     style="border-color: var(--theme-divider-border);"
                 >
-                    乘区
+                    <span class="text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40">乘区</span>
                 </div>
                 <div class="theme-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
                     {#each ZONE_DEFS as def}
@@ -737,11 +751,16 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in theme-scrollbar rounded-none border p-5 shadow-xl w-120 max-h-[88vh] overflow-y-auto"
+            class="animate-pop-in theme-scrollbar w-120 max-h-[88vh] overflow-y-auto rounded-none border p-5 shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <h3 class="text-sm font-semibold mb-5 flex items-baseline gap-1">
+            <h3 class="text-base font-black tracking-tight mb-5 flex items-baseline gap-1.5">
+                <Icon
+                    icon="mdi:link-variant"
+                    class="size-4 shrink-0 self-center"
+                    style="color: var(--theme-accent-text);"
+                />
                 引用
                 <span
                     class="text-lg scale-110 inline-block leading-none text-(--theme-accent-text)"
@@ -767,7 +786,7 @@
                         </button>
                         {#if showRefZoneMenu}
                             <div
-                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 backdrop-blur-lg"
                                 style="border-color: var(--theme-divider-border);"
                                 onclick={(e) => e.stopPropagation()}
                             >
@@ -817,7 +836,7 @@
                                 class={[
                                     'px-3 py-1.5 text-xs font-medium transition-all',
                                     refHasThreshold
-                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                                 ].join(' ')}
                             >
@@ -851,7 +870,7 @@
                                 class={[
                                     'flex-1 px-3 py-1.5 text-xs font-medium transition-all',
                                     !refIsDiscrete
-                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                                 ].join(' ')}
                             >
@@ -865,7 +884,7 @@
                                 class={[
                                     'flex-1 px-3 py-1.5 text-xs font-medium transition-all',
                                     refIsDiscrete
-                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                                 ].join(' ')}
                             >
@@ -931,7 +950,7 @@
                             class={[
                                 'px-3 py-1.5 text-xs font-medium transition-all',
                                 refHasLower
-                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                     : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                             ].join(' ')}
                         >
@@ -962,7 +981,7 @@
                             class={[
                                 'px-3 py-1.5 text-xs font-medium transition-all',
                                 refHasUpper
-                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                     : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                             ].join(' ')}
                         >
@@ -1002,7 +1021,7 @@
                     >
                     <button
                         onclick={handleConfirmRef}
-                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
+                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         >确认</button
                     >

@@ -1044,17 +1044,20 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="animate-pop-in w-full max-h-[95vh] h-full max-w-6xl rounded-none border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
+            class="animate-pop-in w-full max-h-[95vh] h-full max-w-6xl rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col my-4"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
             <!-- @desc 标题栏：BUFF 配置 + 导入Buff集/速查入口 -->
             <div
-                class="flex items-center justify-between px-5 py-3 border-b"
+                class="flex items-center justify-between border-b px-5 pb-2.5 pt-3"
                 style="border-bottom: 1px solid var(--theme-divider-border);"
             >
-                <h2 class="text-sm font-semibold">BUFF 配置</h2>
+                <h2 class="flex items-center gap-2 text-base font-black tracking-tight">
+                    <Icon icon="mdi:widgets" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                    BUFF 配置
+                </h2>
                 <div class="flex items-center gap-1">
                     <button
                         onclick={() => (showImport = true)}
@@ -1101,7 +1104,7 @@
                                         class={[
                                             'flex min-w-0 items-center gap-1',
                                             !collapsedFolders.has(item.prefix!)
-                                                ? 'sticky top-0 z-10 -mx-2 px-2 py-1 bg-(--theme-modal-bg) shadow-[0_1px_0_0_var(--theme-divider-border)]'
+                                                ? 'sticky top-0 z-10 -mx-2 border-b border-(--theme-divider-border) px-2 py-1 bg-(--theme-modal-bg)'
                                                 : ''
                                         ].join(' ')}
                                     >
@@ -1190,7 +1193,7 @@
                                                                 class={[
                                                                     'flex min-w-0 items-center gap-1',
                                                                     !collapsedFolders.has(subKey)
-                                                                        ? 'sticky top-10 z-10 -mx-2 px-2 py-1 bg-(--theme-modal-bg) shadow-[0_1px_0_0_var(--theme-divider-border)]'
+                                                                        ? 'sticky top-10 z-10 -mx-2 border-b border-(--theme-divider-border) px-2 py-1 bg-(--theme-modal-bg)'
                                                                         : ''
                                                                 ].join(' ')}
                                                             >
@@ -1846,7 +1849,7 @@
                                                     />
                                                 {:else}
                                                     <span
-                                                        class="w-full h-full flex items-center justify-center text-[9px] font-bold text-(--theme-modal-text)/50"
+                                                        class="w-full h-full flex items-center justify-center text-[9px] font-medium text-(--theme-modal-text)/50"
                                                         >{slot.character?.charAt(0) ?? '?'}</span
                                                     >
                                                 {/if}
@@ -1908,9 +1911,9 @@
                                     >
                                         <Icon
                                             icon={condPanelOpen ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-                                            class="size-3.5 shrink-0 text-(--theme-modal-text)/40"
+                                            class="size-4 shrink-0 text-(--theme-modal-text)/40"
                                         />
-                                        <span class="shrink-0">生效条件</span>
+                                        <span class="shrink-0 text-xs font-black tracking-tight">生效条件</span>
                                         {#if conditionSummary}
                                             <span class="min-w-0 truncate text-[11px]">：{conditionSummary}</span>
                                         {/if}
@@ -2016,7 +2019,7 @@
                                                                 />
                                                             {:else}
                                                                 <span
-                                                                    class="w-full h-full flex items-center justify-center text-[8px] font-bold text-(--theme-modal-text)/50"
+                                                                    class="w-full h-full flex items-center justify-center text-[8px] font-medium text-(--theme-modal-text)/50"
                                                                     >{slot.character?.charAt(0) ?? '?'}</span
                                                                 >
                                                             {/if}
@@ -2084,8 +2087,8 @@
                                         {@const def = ZONE_MAP.get(zone.zoneId)}
                                         {#if def}
                                             <div
-                                                class="flex items-center gap-1.5 rounded-none px-3 py-2"
-                                                style="background: var(--theme-input-bg);"
+                                                class="flex items-center gap-1.5 rounded-none border px-3 py-2 transition-colors hover:border-(--theme-accent-bg)"
+                                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                             >
                                                 <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
                                                     >{def.label}</span
@@ -2268,12 +2271,18 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-none border p-5 shadow-xl w-md"
+            class="animate-pop-in rounded-none border p-5 shadow-2xl w-md"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <div class="flex items-center justify-between mb-5">
-                <h3 class="text-sm font-semibold">引用配置</h3>
+            <div
+                class="flex items-center justify-between mb-5 border-b pb-2.5"
+                style="border-color: var(--theme-divider-border);"
+            >
+                <h3 class="flex items-center gap-2 text-base font-black tracking-tight">
+                    <Icon icon="mdi:link-variant" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                    引用配置
+                </h3>
                 <button
                     onclick={() => (showRefLookup = true)}
                     class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
@@ -2308,7 +2317,7 @@
                                     />
                                 {:else}
                                     <span
-                                        class="w-full h-full flex items-center justify-center text-xs font-bold text-(--theme-modal-text)/50"
+                                        class="w-full h-full flex items-center justify-center text-xs font-medium text-(--theme-modal-text)/50"
                                         >{slot.character?.charAt(0) ?? '?'}</span
                                     >
                                 {/if}
@@ -2331,7 +2340,7 @@
                         </button>
                         {#if showRefZoneMenu}
                             <div
-                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 backdrop-blur-lg"
                                 style="border-color: var(--theme-divider-border);"
                                 onclick={(e) => e.stopPropagation()}
                             >
@@ -2382,7 +2391,7 @@
                                 class={[
                                     'px-3 py-1.5 text-xs font-medium transition-all',
                                     refHasThreshold
-                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                                 ].join(' ')}
                             >
@@ -2416,7 +2425,7 @@
                                 class={[
                                     'flex-1 px-3 py-1.5 text-xs font-medium transition-all',
                                     !refIsDiscrete
-                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                                 ].join(' ')}
                             >
@@ -2430,7 +2439,7 @@
                                 class={[
                                     'flex-1 px-3 py-1.5 text-xs font-medium transition-all',
                                     refIsDiscrete
-                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                                 ].join(' ')}
                             >
@@ -2496,7 +2505,7 @@
                             class={[
                                 'px-3 py-1.5 text-xs font-medium transition-all',
                                 refHasLower
-                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                     : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                             ].join(' ')}
                         >
@@ -2527,7 +2536,7 @@
                             class={[
                                 'px-3 py-1.5 text-xs font-medium transition-all',
                                 refHasUpper
-                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                     : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                             ].join(' ')}
                         >
@@ -2567,7 +2576,7 @@
                     >
                     <button
                         onclick={handleConfirmRef}
-                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
+                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         >确认</button
                     >
@@ -2605,24 +2614,26 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-none border p-5 shadow-xl w-80"
+            class="animate-pop-in rounded-none border p-5 shadow-2xl w-80"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <h3 class="text-sm font-semibold mb-2">确认删除文件夹</h3>
+            <h3 class="mb-2 flex items-center gap-2 text-base font-black tracking-tight">
+                <Icon icon="mdi:folder" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                确认删除文件夹
+            </h3>
             <p class="text-xs text-(--theme-modal-text)/60 mb-4">
                 将删除该文件夹内的所有 <strong>{deleteFolderCount}</strong> 条 BUFF，确定吗？
             </p>
-            <div class="flex justify-end gap-2">
+            <div class="flex justify-end gap-2 border-t pt-3" style="border-color: var(--theme-divider-border);">
                 <button
                     onclick={() => (showDeleteFolderConfirm = false)}
-                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                     style="background: var(--theme-input-bg);">取消</button
                 >
                 <button
                     onclick={confirmDeleteFolder}
-                    class="h-7 rounded-none px-3 text-xs transition-all hover:brightness-125"
-                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    class="h-7 rounded-none bg-red-500 px-3 text-xs text-white transition-all hover:brightness-110"
                     >确认删除</button
                 >
             </div>
@@ -2640,11 +2651,14 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-none border p-5 shadow-xl w-96"
+            class="animate-pop-in rounded-none border p-5 shadow-2xl w-96"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <h3 class="text-sm font-semibold mb-2">批量重命名文件夹</h3>
+            <h3 class="mb-2 flex items-center gap-2 text-base font-black tracking-tight">
+                <Icon icon="mdi:rename-box" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                批量重命名文件夹
+            </h3>
             <p class="text-xs text-(--theme-modal-text)/60 mb-3">
                 「{folderRenameTarget.name}」内的 <strong>{folderRenameTarget.children!.length}</strong> 条 BUFF 将按 「新前缀
                 + 序号 + 新后缀」重新编号
@@ -2707,24 +2721,26 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-none border p-5 shadow-xl w-80"
+            class="animate-pop-in rounded-none border p-5 shadow-2xl w-80"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <h3 class="text-sm font-semibold mb-2">确认批量删除</h3>
+            <h3 class="mb-2 flex items-center gap-2 text-base font-black tracking-tight">
+                <Icon icon="mdi:delete-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                确认批量删除
+            </h3>
             <p class="text-xs text-(--theme-modal-text)/60 mb-4">
                 将删除选中的 <strong>{multiSelectedIds.size}</strong> 条 BUFF（全局 buff 不受影响），确定吗？
             </p>
-            <div class="flex justify-end gap-2">
+            <div class="flex justify-end gap-2 border-t pt-3" style="border-color: var(--theme-divider-border);">
                 <button
                     onclick={() => (showMultiDeleteConfirm = false)}
-                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                     style="background: var(--theme-input-bg);">取消</button
                 >
                 <button
                     onclick={confirmMultiDelete}
-                    class="h-7 rounded-none px-3 text-xs transition-all hover:brightness-125"
-                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    class="h-7 rounded-none bg-red-500 px-3 text-xs text-white transition-all hover:brightness-110"
                     >确认删除</button
                 >
             </div>
@@ -2742,11 +2758,14 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-none border p-5 shadow-xl w-96"
+            class="animate-pop-in rounded-none border p-5 shadow-2xl w-96"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <h3 class="text-sm font-semibold mb-2">复制 BUFF</h3>
+            <h3 class="mb-2 flex items-center gap-2 text-base font-black tracking-tight">
+                <Icon icon="mdi:content-copy" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                复制 BUFF
+            </h3>
             <p class="text-xs text-(--theme-modal-text)/60 mb-4">检测到您的 buff 名带数字，请问要复制为？</p>
             <div class="flex flex-col gap-1.5">
                 {#each copyOptions as name}

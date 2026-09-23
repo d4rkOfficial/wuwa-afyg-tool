@@ -460,21 +460,21 @@
         <thead>
             <tr
                 class="text-(--theme-modal-text)/50 sticky top-0 opacity-100!"
-                style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-bottom: 1px solid var(--theme-divider-border);"
+                style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-top: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border);"
             >
                 <th
-                    class="text-left font-medium py-2 px-3 w-20 shrink-0 border-r border-dashed"
+                    class="text-left font-black tracking-[0.12em] py-2 px-3 w-20 shrink-0 border-r"
                     style="border-color: var(--theme-divider-border);">来源</th
                 >
                 <th
-                    class="text-left font-medium py-2 px-3 w-56 shrink-0 border-r border-dashed"
+                    class="text-left font-black tracking-[0.12em] py-2 px-3 w-56 shrink-0 border-r"
                     style="border-color: var(--theme-divider-border);">条目</th
                 >
                 <th
-                    class="text-left font-medium py-2 px-3 w-32 shrink-0 border-r border-dashed"
+                    class="text-left font-black tracking-[0.12em] py-2 px-3 w-32 shrink-0 border-r"
                     style="border-color: var(--theme-divider-border);">视为</th
                 >
-                <th class="text-left font-medium py-2 px-3">Buff</th>
+                <th class="text-left font-black tracking-[0.12em] py-2 px-3">Buff</th>
             </tr>
         </thead>
         <!-- 表体：每行一个伤害条目（点击展开编辑）；展开行内嵌增益配置面板 -->
@@ -498,7 +498,7 @@
                 >
                     <!-- 来源列：角色名（按元素着色） -->
                     <td
-                        class="py-1.5 px-3 w-20 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        class="py-1.5 px-3 w-20 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r"
                         style="border-color: var(--theme-divider-border);"
                     >
                         <span style="color: var(--theme-element-{calcElementMap[damageEntry.character ?? '']}, #888)">
@@ -507,7 +507,7 @@
                     </td>
                     <!-- 条目列：伤害名（按伤害元素着色），超宽省略 + title 完整名 -->
                     <td
-                        class="py-1.5 px-3 w-56 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        class="py-1.5 px-3 w-56 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r"
                         style="border-color: var(--theme-divider-border);"
                     >
                         <span
@@ -519,7 +519,7 @@
                     </td>
                     <!-- 视为列：已选伤害类型标签；未选时显示自动推导结果 -->
                     <td
-                        class="py-1.5 px-3 w-32 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r border-dashed"
+                        class="py-1.5 px-3 w-32 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap border-r"
                         style="border-color: var(--theme-divider-border);"
                     >
                         <div class="flex flex-wrap gap-0.5">
@@ -602,7 +602,16 @@
                             >
                                 {#if !damageEntry.isEffect && !damageEntry.isTuneBreak && !damageEntry.isTuneResponse}
                                     <div>
-                                        <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">伤害类型</div>
+                                        <div
+                                            class="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40 mb-1.5"
+                                        >
+                                            <Icon
+                                                icon="mdi:swap-horizontal-bold"
+                                                class="size-4 shrink-0"
+                                                style="color: var(--theme-accent-text);"
+                                            />
+                                            伤害类型
+                                        </div>
                                         {#if isDirectDamage(damageEntry) && damageEntry.character}
                                             <div class="mb-1.5 flex flex-wrap gap-1.5">
                                                 <button
@@ -611,7 +620,8 @@
                                                         handleCopyDamageTypeToNext(damageEntry.id)
                                                     }}
                                                     title="Shift+Enter"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                    style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段直伤
@@ -623,7 +633,8 @@
                                                     }}
                                                     disabled={countSameNameEntries(damageEntry.id) <= 1}
                                                     title="把本条的伤害类型同步到所有同名伤害（同一角色 + 同一技能类型）"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40"
+                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text) disabled:opacity-40"
+                                                    style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <Icon icon="mdi:sync" class="size-3 shrink-0" />
                                                     同步伤害类型到所有同名伤害{countSameNameEntries(damageEntry.id) > 1
@@ -653,7 +664,7 @@
                                                     ].join(' ')}
                                                     style={selected
                                                         ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
-                                                        : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                        : 'background: var(--theme-card-bg); border-color: var(--theme-divider-border);'}
                                                 >
                                                     {DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}
                                                 </button>
@@ -662,7 +673,16 @@
                                     </div>
                                 {/if}
                                 <div>
-                                    <div class="text-xs text-(--theme-modal-text)/50 mb-1.5">增益选择</div>
+                                    <div
+                                        class="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40 mb-1.5"
+                                    >
+                                        <Icon
+                                            icon="mdi:layers-triple-outline"
+                                            class="size-4 shrink-0"
+                                            style="color: var(--theme-accent-text);"
+                                        />
+                                        增益选择
+                                    </div>
                                     {#if visibleBuffSets.length > 0}
                                         <div
                                             class="flex flex-wrap items-center gap-1 pb-2 border-b mb-2"
@@ -675,7 +695,8 @@
                                                         handleCopyFromPrevDirect(damageEntry.id)
                                                     }}
                                                     title="Shift+Z"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                    style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
                                                     复制前段直伤
@@ -686,7 +707,8 @@
                                                         handleCopyToNextDirect(damageEntry.id)
                                                     }}
                                                     title="Shift+X"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                    style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段直伤
@@ -697,7 +719,8 @@
                                                         e.stopPropagation()
                                                         handleCopyFromPrevEffect(damageEntry.id)
                                                     }}
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                    style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
                                                     复制前段效应
@@ -707,7 +730,8 @@
                                                         e.stopPropagation()
                                                         handleCopyToNextEffect(damageEntry.id)
                                                     }}
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                    style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段效应
@@ -720,7 +744,8 @@
                                                     handleClearAllBuffs(damageEntry.id)
                                                 }}
                                                 title="Shift+C"
-                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40 disabled:pointer-events-none"
+                                                class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-red-500/50 hover:text-red-500 disabled:opacity-40 disabled:pointer-events-none"
+                                                style="border-color: var(--theme-divider-border);"
                                             >
                                                 <Icon icon="mdi:close-circle-outline" class="size-3 shrink-0" />
                                                 清除所有增益
@@ -733,7 +758,8 @@
                                                     handleToggleExpand(damageEntries[nextIdx].id, nextIdx)
                                                 }}
                                                 title="Space"
-                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-accent-bg)/20 text-(--theme-accent-text) border border-(--theme-accent-bg)/30 hover:bg-(--theme-accent-bg)/30"
+                                                class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff); border-color: var(--theme-divider-border);"
                                             >
                                                 <Icon icon="mdi:arrow-down" class="size-3 shrink-0" />
                                                 下一条
@@ -749,7 +775,7 @@
                                                         class="flex flex-wrap items-center gap-1 rounded-none border px-2 py-1 text-xs transition-colors"
                                                         style={folderActive
                                                             ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
-                                                            : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                            : 'background: var(--theme-card-bg); border-color: var(--theme-divider-border);'}
                                                     >
                                                         <button
                                                             onclick={(e) => {
@@ -822,7 +848,7 @@
                                                         ].join(' ')}
                                                         style={checked
                                                             ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
-                                                            : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
+                                                            : 'background: var(--theme-card-bg); border-color: var(--theme-divider-border);'}
                                                     >
                                                         <Icon
                                                             icon={checked ? 'mdi:check' : 'mdi:close'}
