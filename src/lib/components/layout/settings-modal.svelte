@@ -648,7 +648,7 @@
                     class="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 scrollbar-none [&::-webkit-scrollbar]:hidden [&>div+div]:border-t [&>div+div]:border-(--theme-divider-border) [&>div+div]:pt-4"
                 >
                     {#if tab === 'theme'}
-                        <div class="grid grid-cols-1 items-start gap-x-8 gap-y-6 xl:grid-cols-2">
+                        <div class="columns-1 gap-x-8 [&>div]:mb-5 [&>div]:break-inside-avoid xl:columns-2">
                             <!-- Accent color -->
                             <div class="mb-5">
                                 <span
@@ -1346,7 +1346,7 @@
                             </div>
                         </div>
                     {:else if tab === 'interaction'}
-                        <div class="grid grid-cols-1 items-start gap-x-8 gap-y-6 xl:grid-cols-2">
+                        <div class="columns-1 gap-x-8 [&>div]:mb-5 [&>div]:break-inside-avoid xl:columns-2">
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
@@ -1590,7 +1590,7 @@
                             </div>
                         </div>
                     {:else if tab === 'shortcuts'}
-                        <div class="grid grid-cols-1 items-start gap-x-8 gap-y-6 xl:grid-cols-2">
+                        <div class="columns-1 gap-x-8 [&>div]:mb-5 [&>div]:break-inside-avoid xl:columns-2">
                             <div class="mt-5">
                                 <span
                                     class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
@@ -1770,7 +1770,7 @@
                         </div>
                     {:else if tab === 'connection'}
                         <!-- Connection settings: 上游数据源 + 工坊/分享源 -->
-                        <div class="grid grid-cols-1 items-start gap-x-8 gap-y-6 xl:grid-cols-2">
+                        <div class="columns-1 gap-x-8 [&>div]:mb-5 [&>div]:break-inside-avoid xl:columns-2">
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
@@ -1937,21 +1937,30 @@
                                 <div class="columns-1 gap-3 md:columns-2 xl:columns-3">
                                     {#each archivedProjects as p (p.id)}
                                         <div
-                                            class="mb-3 break-inside-avoid rounded-none border p-3"
+                                            class="group relative mb-3 break-inside-avoid overflow-hidden border p-3.5 transition-colors hover:bg-(--theme-card-bg-focused)"
                                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                         >
-                                            <div class="flex items-start gap-2">
-                                                <span
-                                                    class="min-w-0 flex-1 truncate text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                                    >{p.name}</span
+                                            <span
+                                                class="pointer-events-none absolute -right-1 -top-3 select-none text-[4.5rem] font-black leading-none text-(--theme-accent-text) opacity-[0.06]"
+                                                >{p.name.slice(0, 1)}</span
+                                            >
+                                            <div class="relative flex items-baseline gap-2">
+                                                <h4
+                                                    class="min-w-0 flex-1 truncate text-lg font-black leading-tight tracking-tight text-(--theme-modal-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
                                                 >
-                                                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40"
+                                                    {p.name}
+                                                </h4>
+                                                <span
+                                                    class="shrink-0 text-[10px] tracking-[0.22em] text-(--theme-muted-text)"
                                                     >{formatArchiveDate(p.createdAt)}</span
                                                 >
                                             </div>
 
                                             <!-- 工程信息：三角色配装（元素色环 / 武器 / 首位声骸 / 套装 图标）-->
-                                            <div class="mt-2.5 space-y-2">
+                                            <div
+                                                class="relative mt-2.5 space-y-2 border-t pt-2.5"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
                                                 {#each p.team as slot}
                                                     {#if slot.character}
                                                         <div class="flex items-center gap-2">
@@ -2030,7 +2039,7 @@
                                             </div>
 
                                             <div
-                                                class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t pt-2.5"
+                                                class="relative mt-3 flex flex-wrap items-center gap-1.5 border-t pt-2.5"
                                                 style="border-color: var(--theme-divider-border);"
                                             >
                                                 <button
