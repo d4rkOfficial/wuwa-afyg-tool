@@ -22,7 +22,7 @@
         type CacheCategory,
         type CacheEntry
     } from '$lib/api/data-cache'
-    import { getCharIconMap, getCharElementMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         getWorkshopInstances,
@@ -477,9 +477,8 @@
     // ── Archive management ──
     let archivedProjects = $derived(getArchivedProjects())
 
-    // ── 归档卡片工程信息（角色/武器/声骸/套装 图标 + 元素色）──
+    // ── 归档卡片工程信息（角色/武器/声骸/套装 图标）──
     const charIconMap = $derived(getCharIconMap())
-    const charElements = $derived(getCharElementMap())
     let weaponIcons = $state<Record<string, string>>({})
     let echoIcons = $state<Record<string, string>>({})
     let setIcons = $state<Record<string, string>>({})
@@ -493,11 +492,6 @@
             setIcons = s
         })
     })
-    /** @desc 角色元素主题色（getCharElementMap 返回元素名，转 --theme-element-*） */
-    const elementColor = (character: string | null | undefined): string => {
-        const el = charElements[character ?? '']
-        return el ? `var(--theme-element-${el}, #888)` : '#888'
-    }
     let confirmDelete = $state<{ id: string; name: string } | null>(null)
 
     async function handleUnarchive(id: string) {
@@ -2030,7 +2024,7 @@
                                                 >
                                             </div>
 
-                                            <!-- 工程信息：三角色配装（元素色条 / 武器 / 首位声骸 / 套装 图标）-->
+                                            <!-- 工程信息：三角色配装（武器 / 首位声骸 / 套装 图标）-->
                                             <div
                                                 class="relative z-10 mt-3 flex flex-col gap-1.5 border-t pt-3"
                                                 style="border-color: var(--theme-divider-border);"
@@ -2038,8 +2032,7 @@
                                                 {#each p.team as slot}
                                                     {#if slot.character}
                                                         <div
-                                                            class="flex flex-wrap items-center gap-1.5 border-l-2 pl-2 text-[10px]"
-                                                            style="border-color: {elementColor(slot.character)};"
+                                                            class="flex flex-wrap items-center gap-1.5 text-[10px]"
                                                             title={slot.character}
                                                         >
                                                             {#if slot.weapon}
