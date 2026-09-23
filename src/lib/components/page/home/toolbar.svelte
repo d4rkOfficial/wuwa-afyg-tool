@@ -156,6 +156,7 @@
     </button>
     {#if !showResult}
         {#if activePhase === 'timeline'}
+            <!-- ⛔ TEMP-HIDDEN（临时隐藏）：「查看所有伤害」入口按钮，恢复时删除本段包裹的注释即可
             <button
                 onclick={() => setShowDamageList(true)}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
@@ -166,6 +167,7 @@
                 <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
                 {#if !simplifyToolbar}<span>查看所有伤害</span>{/if}
             </button>
+            ⛔ TEMP-HIDDEN-END -->
             <button
                 onclick={formatTimeline}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar

@@ -1,4 +1,4 @@
-export {
+﻿export {
     loadThemes,
     getThemes,
     getActiveTheme,
@@ -14,6 +14,7 @@ export {
     getSurfaceStyle,
     setSurfaceStyle,
     setBgImageEffect,
+    resetAppearance,
     DEFAULT_SURFACES,
     DEFAULT_APPEARANCE,
     defaultSurfaceStyle,

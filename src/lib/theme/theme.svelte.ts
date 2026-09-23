@@ -143,6 +143,16 @@ export async function setBgImageEffect(
     applyBgBlend(document.documentElement)
 }
 
+/** @desc 把某一昼夜的外观恢复为默认（区域质感 + 背景图效果；不动背景图与主色调） */
+export async function resetAppearance(mode: ThemeMode = activeMode()) {
+    overrides = {
+        ...overrides,
+        appearance: { ...overrides.appearance, [mode]: structuredClone(DEFAULT_APPEARANCE[mode]) }
+    }
+    await dbSet(OVERRIDES_KEY, toPlain(overrides))
+    applyBgBlend(document.documentElement)
+}
+
 function applyThemeCSS() {
     if (!browser) return
     const root = document.documentElement
