@@ -238,6 +238,19 @@ export const transformEchoList = (data: Record<string, NanokaEcho>, sonata: Nano
         }))
 }
 
+/** @desc 上游占位名：多个新声骸共用此名，需从技能文案解析真实名称，否则会被去重成一条 */
+export const ECHO_PLACEHOLDER_NAMES = new Set(['敬请期待'])
+
+/**
+ * @desc 从声骸技能文案提取真实名称：取「召唤XXX」/「幻形为XXX」中的 XXX（到标点/空白为止）。
+ * 例：「使用声骸技能，召唤奇绽傀，威慑敌人…」→ 奇绽傀；「…幻形为无常凶鹭…」→ 无常凶鹭。
+ */
+export const extractEchoNameFromSkill = (desc: string | null | undefined): string | null => {
+    if (!desc) return null
+    const m = desc.match(/(?:召唤|幻形为)([^，。；、,;.！？\s]{1,12})/)
+    return m ? m[1] : null
+}
+
 export const transformEchoSetList = (sonata: NanokaSonata): EchoSetItem[] =>
     Object.values(sonata)
         .filter((s) => s.name?.zh)

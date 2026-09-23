@@ -27,7 +27,9 @@ import {
     transformEchoSetInfo,
     findEntryByName,
     findSonataSetEntry,
-    ueToCdn
+    ueToCdn,
+    ECHO_PLACEHOLDER_NAMES,
+    extractEchoNameFromSkill
 } from './utils'
 import type {
     NanokaCharacter,
@@ -63,6 +65,31 @@ async function buildIconMap<T extends { zh: string; icon: string }>(
     return map
 }
 
+/**
+ * @desc 解析占位名声骸（如「敬请期待」）：拉取详情，从技能文案「召唤XXX」提取真实名称写回 zh。
+ * 上游多个新声骸共用占位名，若不去重前解析会被 transformEchoList 按名称合并成一条。
+ * 提取不到时回退为「占位名·id」以保证唯一。
+ */
+async function withResolvedEchoNames(data: Record<string, NanokaEcho>): Promise<Record<string, NanokaEcho>> {
+    const placeholders = Object.entries(data).filter(([, e]) => e.zh && ECHO_PLACEHOLDER_NAMES.has(e.zh))
+    if (placeholders.length === 0) return data
+    await ensureVersion()
+    const patched = { ...data }
+    await Promise.all(
+        placeholders.map(async ([id]) => {
+            let name: string | null = null
+            try {
+                const detail = await fetchZhData<ZhEchoDetail>(`/echo/${id}.json`, getWWVersion())
+                name = extractEchoNameFromSkill(detail.skill?.desc)
+            } catch {
+                /* 拉取失败 → 回退为 id 区分 */
+            }
+            patched[id] = { ...patched[id], zh: name ?? `${patched[id].zh}·${id}` }
+        })
+    )
+    return patched
+}
+
 export const nanokaProvider: DataProvider = {
     id: 'nanoka',
     label: 'Nanoka (nanoka.cc)',
@@ -78,14 +105,15 @@ export const nanokaProvider: DataProvider = {
         transformWeaponList(await fetchData<Record<string, NanokaWeapon>>('/weapon.json')),
     getEchoList: async (): Promise<Echo[]> => {
         const [echoData, sonata] = await Promise.all([fetchData<Record<string, NanokaEcho>>('/echo.json'), getSonata()])
-        return transformEchoList(echoData, sonata)
+        return transformEchoList(await withResolvedEchoNames(echoData), sonata)
     },
     getEchoSetList: async (): Promise<EchoSetItem[]> => transformEchoSetList(await getSonata()),
 
     // ── 图标 ──
     getCharacterIcons: async () => buildIconMap(await fetchData<Record<string, NanokaCharacter>>('/character.json')),
     getWeaponIcons: async () => buildIconMap(await fetchData<Record<string, NanokaWeapon>>('/weapon.json')),
-    getEchoIcons: async () => buildIconMap(await fetchData<Record<string, NanokaEcho>>('/echo.json')),
+    getEchoIcons: async () =>
+        buildIconMap(await withResolvedEchoNames(await fetchData<Record<string, NanokaEcho>>('/echo.json'))),
     getEchoSetIcons: async () => {
         const sonata = await getSonata()
         const map: Record<string, string> = {}
@@ -113,7 +141,7 @@ export const nanokaProvider: DataProvider = {
         return transformWeaponInfo(data)
     },
     getEchoInfo: async (name: string): Promise<EchoInfo> => {
-        const list = await fetchData<Record<string, NanokaEcho>>('/echo.json')
+        const list = await withResolvedEchoNames(await fetchData<Record<string, NanokaEcho>>('/echo.json'))
         const found = findEntryByName(list, name)
         if (!found) throw new Error('Echo not found')
         await ensureVersion()
