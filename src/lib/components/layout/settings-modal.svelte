@@ -10,7 +10,16 @@
         physicalLabel,
         type KeyMapEntry
     } from '$lib/data/keymap.svelte'
-    import { getUiBtnIcons, clearCacheCategory, countCacheCategory, type CacheCategory } from '$lib/api/data-cache'
+    import {
+        getUiBtnIcons,
+        clearCacheCategory,
+        countCacheCategory,
+        getWeaponIcons,
+        getEchoIcons,
+        getEchoSetIcons,
+        type CacheCategory
+    } from '$lib/api/data-cache'
+    import { getCharIconMap, getCharElementMap } from '$lib/calc/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         getWorkshopInstances,
@@ -92,9 +101,9 @@
 
     let { open, onclose, class: className, style: styleProp }: Props = $props()
 
-    let tab = $state<'theme' | 'keymap' | 'interaction' | 'performance' | 'connection' | 'archive' | 'cache' | 'ai'>(
-        'theme'
-    )
+    let tab = $state<
+        'theme' | 'interaction' | 'keymap' | 'shortcuts' | 'performance' | 'connection' | 'cache' | 'archive' | 'ai'
+    >('theme')
 
     let currentTheme = $derived(getActiveId())
 
@@ -109,8 +118,9 @@
     /** @desc 设置栏目：按「界面 / 数据 / 助手」三组重新规划归类 */
     const SETTING_TABS = [
         { group: '界面', key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
-        { group: '界面', key: 'interaction', label: '交互相关', icon: 'mdi:tune-variant' },
+        { group: '界面', key: 'interaction', label: '交互相关', icon: 'mdi:gesture-tap' },
         { group: '界面', key: 'keymap', label: '按键图标', icon: 'mdi:keyboard-outline' },
+        { group: '界面', key: 'shortcuts', label: '快捷键', icon: 'mdi:keyboard-settings-outline' },
         { group: '界面', key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
@@ -453,6 +463,28 @@
 
     // ── Archive management ──
     let archivedProjects = $derived(getArchivedProjects())
+
+    // ── 归档卡片工程信息（角色/武器/声骸/套装 图标 + 元素色）──
+    const charIconMap = $derived(getCharIconMap())
+    const charElements = $derived(getCharElementMap())
+    let weaponIcons = $state<Record<string, string>>({})
+    let echoIcons = $state<Record<string, string>>({})
+    let setIcons = $state<Record<string, string>>({})
+    let archiveIconsLoaded = false
+    $effect(() => {
+        if (archiveIconsLoaded) return
+        archiveIconsLoaded = true
+        void Promise.all([getWeaponIcons(), getEchoIcons(), getEchoSetIcons()]).then(([w, e, s]) => {
+            weaponIcons = w
+            echoIcons = e
+            setIcons = s
+        })
+    })
+    /** @desc 角色元素主题色（getCharElementMap 返回元素名，转 --theme-element-*） */
+    const elementColor = (character: string | null | undefined): string => {
+        const el = charElements[character ?? '']
+        return el ? `var(--theme-element-${el}, #888)` : '#888'
+    }
     let confirmDelete = $state<{ id: string; name: string } | null>(null)
 
     async function handleUnarchive(id: string) {
@@ -616,406 +648,599 @@
                     class="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 scrollbar-none [&::-webkit-scrollbar]:hidden [&>div+div]:border-t [&>div+div]:border-(--theme-divider-border) [&>div+div]:pt-4"
                 >
                     {#if tab === 'theme'}
-                        <!-- Accent color -->
-                        <div class="mb-5">
-                            <span
-                                class="mb-3 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
-                            >
-                                <Icon
-                                    icon="mdi:palette-outline"
-                                    class="size-4 shrink-0"
-                                    style="color: var(--theme-accent-text);"
-                                />
-                                主色调
-                            </span>
-                            <div
-                                class="flex gap-1 rounded-none border p-1"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                            >
-                                {#each COLOR_PRESETS.slice(0, -1) as c}
-                                    {@const style = getPresetStyle(c.hue)}
-                                    <button
-                                        onclick={() => updateOverride('accentHue', c.hue)}
-                                        class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors"
-                                        style="background: {overrides.accentHue === c.hue
-                                            ? style.bg
-                                            : 'transparent'}; color: {overrides.accentHue === c.hue
-                                            ? style.text
-                                            : 'var(--theme-modal-text)/60'};"
-                                    >
-                                        {c.name}
-                                    </button>
-                                {/each}
-                                <div
-                                    class="mx-1.5 my-1 w-px shrink-0"
-                                    style="background: var(--theme-divider-border);"
-                                ></div>
-                                {#each COLOR_PRESETS.slice(-1) as c}
-                                    {@const style = getPresetStyle(c.hue)}
-                                    <button
-                                        onclick={() => updateOverride('accentHue', c.hue)}
-                                        class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors"
-                                        style="background: {overrides.accentHue === c.hue
-                                            ? style.bg
-                                            : 'transparent'}; color: {overrides.accentHue === c.hue
-                                            ? style.text
-                                            : 'var(--theme-modal-text)/60'};"
-                                    >
-                                        {c.name}
-                                    </button>
-                                {/each}
-                            </div>
-                        </div>
-
-                        <!-- 昼夜切换 -->
-                        <div class="mb-5">
-                            <span
-                                class="mb-3 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
-                            >
-                                <Icon
-                                    icon="mdi:theme-light-dark"
-                                    class="size-4 shrink-0"
-                                    style="color: var(--theme-accent-text);"
-                                />
-                                昼夜切换
-                            </span>
-                            <div
-                                class="flex items-center justify-between gap-3 rounded-none border px-2.5 py-2"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                            >
-                                <div class="min-w-0">
-                                    <span class="block text-[11px] text-(--theme-modal-text)/60">深色主题</span>
-                                    <span class="block text-[9px] text-(--theme-modal-text)/35"
-                                        >与侧边栏按钮一致，全局明暗切换</span
-                                    >
-                                </div>
-                                <button
-                                    onclick={toggleTheme}
-                                    class="relative h-4.5 w-8 shrink-0 rounded-full transition-colors"
-                                    style="background: {currentTheme === 'dark'
-                                        ? 'var(--theme-accent-bg)'
-                                        : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
-                                    title="点击切换昼夜"
-                                >
-                                    <span
-                                        class="absolute top-0.5 size-3.5 rounded-full transition-all"
-                                        style="left: {currentTheme === 'dark'
-                                            ? '16px'
-                                            : '2px'}; background: var(--theme-modal-bg);"
-                                    ></span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <hr class="mb-5" style="border-color: var(--theme-divider-border);" />
-
-                        <!-- Background image -->
-                        <div>
-                            <div class="mb-3 flex items-center gap-2">
+                        <div class="grid grid-cols-1 items-start gap-x-8 gap-y-6 xl:grid-cols-2">
+                            <!-- Accent color -->
+                            <div class="mb-5">
                                 <span
-                                    class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                    class="mb-3 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
-                                    <Icon icon="mdi:image-outline" class="size-4" />
+                                    <Icon
+                                        icon="mdi:palette-outline"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    主色调
                                 </span>
-                                <div>
-                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70">背景图</span>
-                                    <span class="block text-[10px] text-(--theme-modal-text)/35"
-                                        >白天与黑夜可各设一张；模糊/遮罩/暗度为两者共用</span
-                                    >
+                                <div
+                                    class="flex gap-1 rounded-none border p-1"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    {#each COLOR_PRESETS.slice(0, -1) as c}
+                                        {@const style = getPresetStyle(c.hue)}
+                                        <button
+                                            onclick={() => updateOverride('accentHue', c.hue)}
+                                            class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors"
+                                            style="background: {overrides.accentHue === c.hue
+                                                ? style.bg
+                                                : 'transparent'}; color: {overrides.accentHue === c.hue
+                                                ? style.text
+                                                : 'var(--theme-modal-text)/60'};"
+                                        >
+                                            {c.name}
+                                        </button>
+                                    {/each}
+                                    <div
+                                        class="mx-1.5 my-1 w-px shrink-0"
+                                        style="background: var(--theme-divider-border);"
+                                    ></div>
+                                    {#each COLOR_PRESETS.slice(-1) as c}
+                                        {@const style = getPresetStyle(c.hue)}
+                                        <button
+                                            onclick={() => updateOverride('accentHue', c.hue)}
+                                            class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors"
+                                            style="background: {overrides.accentHue === c.hue
+                                                ? style.bg
+                                                : 'transparent'}; color: {overrides.accentHue === c.hue
+                                                ? style.text
+                                                : 'var(--theme-modal-text)/60'};"
+                                        >
+                                            {c.name}
+                                        </button>
+                                    {/each}
                                 </div>
                             </div>
 
-                            <!-- 白天 / 黑夜 切换：切换正在编辑的那张背景图 -->
-                            <div
-                                class="mb-3 flex gap-1 rounded-none border p-1"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                            >
-                                {#each [{ light: false, label: '黑夜' }, { light: true, label: '白天' }] as mode (mode.label)}
-                                    {@const active = bgEditingLight === mode.light}
-                                    {@const isCurrent = (currentTheme === 'light') === mode.light}
+                            <!-- 昼夜切换 -->
+                            <div class="mb-5">
+                                <span
+                                    class="mb-3 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    <Icon
+                                        icon="mdi:theme-light-dark"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    昼夜切换
+                                </span>
+                                <div
+                                    class="flex items-center justify-between gap-3 rounded-none border px-2.5 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-[11px] text-(--theme-modal-text)/60">深色主题</span>
+                                        <span class="block text-[9px] text-(--theme-modal-text)/35"
+                                            >与侧边栏按钮一致，全局明暗切换</span
+                                        >
+                                    </div>
                                     <button
-                                        onclick={() => {
-                                            bgEditingLight = mode.light
-                                            if (fileInput) fileInput.value = ''
-                                            const next = mode.light
-                                                ? overrides.backgroundImageLight
-                                                : overrides.backgroundImage
-                                            bgUrl = next.startsWith('http') ? next : ''
-                                        }}
-                                        class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors {active
-                                            ? ''
-                                            : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
-                                        style={active
-                                            ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
-                                            : ''}
+                                        onclick={toggleTheme}
+                                        class="relative h-4.5 w-8 shrink-0 rounded-full transition-colors"
+                                        style="background: {currentTheme === 'dark'
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换昼夜"
                                     >
-                                        {mode.label}{#if isCurrent}<span class="ml-1 opacity-60">当前</span>{/if}
-                                    </button>
-                                {/each}
-                            </div>
-
-                            {#if editingBg}
-                                <div
-                                    class="mb-3 overflow-hidden rounded-none border"
-                                    style="border-color: var(--theme-divider-border);"
-                                >
-                                    <img src={editingBg} alt="背景预览" class="h-28 w-full object-cover" />
-                                    <div
-                                        class="flex items-center justify-end gap-2 px-3 py-2 bg-(--theme-modal-text)/5"
-                                    >
-                                        <button
-                                            onclick={() => fileInput?.click()}
-                                            class="flex items-center gap-1 text-xs text-(--theme-accent-text) transition-colors hover:brightness-125"
-                                        >
-                                            <Icon icon="mdi:reload" class="size-3.5" />
-                                            换图
-                                        </button>
-                                        <button
-                                            onclick={clearBackground}
-                                            class="flex items-center gap-1 text-xs text-(--theme-modal-text)/50 transition-colors hover:text-red-500"
-                                        >
-                                            <Icon icon="mdi:delete-outline" class="size-3.5" />
-                                            清除
-                                        </button>
-                                    </div>
-                                </div>
-                            {:else}
-                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                <div
-                                    onclick={() => fileInput?.click()}
-                                    class="mb-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed px-4 py-8 transition-colors hover:bg-(--theme-modal-text)/5"
-                                    style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
-                                >
-                                    <Icon icon="mdi:image-outline" class="size-8 text-(--theme-modal-text)/20" />
-                                    <span class="text-xs text-(--theme-modal-text)/40">点击选择本地图片</span>
-                                </div>
-                            {/if}
-
-                            <input
-                                type="file"
-                                accept="image/*"
-                                bind:this={fileInput}
-                                onchange={handleFileSelect}
-                                class="hidden"
-                            />
-
-                            <div
-                                class="flex items-center gap-2 rounded-none border px-3 py-2"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                            >
-                                <input
-                                    type="text"
-                                    bind:value={bgUrl}
-                                    onkeydown={handleUrlKeydown}
-                                    placeholder="远程图片 URL"
-                                    class="flex-1 min-w-0 text-xs outline-none bg-transparent text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
-                                />
-                                <button
-                                    onclick={handleUrlApply}
-                                    disabled={!bgUrl.trim()}
-                                    class="shrink-0 rounded-none px-2.5 py-1 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
-                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
-                                >
-                                    加载
-                                </button>
-                            </div>
-
-                            <div
-                                class="mt-4 overflow-hidden rounded-none border"
-                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-input-bg) 70%, transparent);"
-                            >
-                                <div
-                                    class="relative h-40 overflow-hidden border-b"
-                                    style="border-color: var(--theme-divider-border);"
-                                >
-                                    {#if editingBg}
-                                        <!-- 背景图独立层（自身模糊，不影响上层的预览卡片） -->
-                                        <div
-                                            class="absolute inset-0"
-                                            style="background-image: url('{editingBg}'); background-position: center; background-size: cover; filter: blur({overrides.bgImageBlur}px);"
-                                        ></div>
-                                        <!-- 背景图遮罩层（与工作区一致，由背景图遮罩控制） -->
-                                        <div
-                                            class="absolute inset-0"
-                                            style="background: {overrides.bgImageMask < 0
-                                                ? `rgba(0,0,0,${(Math.abs(overrides.bgImageMask) / 100) * 0.6})`
-                                                : overrides.bgImageMask > 0
-                                                  ? `rgba(255,255,255,${(overrides.bgImageMask / 100) * 0.35})`
-                                                  : 'transparent'};"
-                                        ></div>
-                                    {:else}
-                                        <!-- 无背景图时的中性预览底：玻璃卡片效果仍可实时预览 -->
-                                        <div
-                                            class="absolute inset-0"
-                                            style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-input-bg) 92%, var(--theme-accent-bg)), color-mix(in srgb, var(--theme-input-bg) 35%, var(--theme-modal-text)));"
-                                        ></div>
-                                    {/if}
-                                    <div
-                                        class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-none border p-3 shadow-xl"
-                                        style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent); background: color-mix(in srgb, var(--theme-modal-bg) {overrides.bgOpacity}%, transparent); backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
-                                            (overrides.bgDim / 100) *
-                                                0.6}); -webkit-backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
-                                            (overrides.bgDim / 100) * 0.6});"
-                                    >
-                                        <div
-                                            class="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/45 to-transparent"
-                                        ></div>
-                                        <div class="flex items-center gap-2">
-                                            <span
-                                                class="flex size-6 items-center justify-center rounded-none bg-(--theme-accent-bg)/20 text-(--theme-accent-text)"
-                                            >
-                                                <Icon icon="mdi:blur" class="size-3.5" />
-                                            </span>
-                                            <span class="text-[11px] font-medium">玻璃质感预览</span>
-                                        </div>
-                                        <div class="space-y-1.5">
-                                            <div class="h-1.5 w-full rounded-full bg-(--theme-modal-text)/15"></div>
-                                            <div class="h-1.5 w-2/3 rounded-full bg-(--theme-modal-text)/10"></div>
-                                        </div>
-                                    </div>
-                                    <span
-                                        class="absolute bottom-3 right-3 rounded-none bg-black/30 px-2 py-1 font-mono text-[9px] tracking-wide text-white/70 backdrop-blur-sm"
-                                        >LIVE</span
-                                    >
-                                </div>
-
-                                <div class="p-4">
-                                    <div class="mb-4 flex items-start gap-2.5">
                                         <span
-                                            class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-none bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
+                                            class="absolute top-0.5 size-3.5 rounded-full transition-all"
+                                            style="left: {currentTheme === 'dark'
+                                                ? '16px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <hr class="mb-5" style="border-color: var(--theme-divider-border);" />
+
+                            <!-- Background image -->
+                            <div>
+                                <div class="mb-3 flex items-center gap-2">
+                                    <span
+                                        class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                    >
+                                        <Icon icon="mdi:image-outline" class="size-4" />
+                                    </span>
+                                    <div>
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >背景图</span
                                         >
-                                            <Icon icon="mdi:layers-triple-outline" class="size-4" />
+                                        <span class="block text-[10px] text-(--theme-modal-text)/35"
+                                            >白天与黑夜可各设一张；模糊/遮罩/暗度为两者共用</span
+                                        >
+                                    </div>
+                                </div>
+
+                                <!-- 白天 / 黑夜 切换：切换正在编辑的那张背景图 -->
+                                <div
+                                    class="mb-3 flex gap-1 rounded-none border p-1"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    {#each [{ light: false, label: '黑夜' }, { light: true, label: '白天' }] as mode (mode.label)}
+                                        {@const active = bgEditingLight === mode.light}
+                                        {@const isCurrent = (currentTheme === 'light') === mode.light}
+                                        <button
+                                            onclick={() => {
+                                                bgEditingLight = mode.light
+                                                if (fileInput) fileInput.value = ''
+                                                const next = mode.light
+                                                    ? overrides.backgroundImageLight
+                                                    : overrides.backgroundImage
+                                                bgUrl = next.startsWith('http') ? next : ''
+                                            }}
+                                            class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors {active
+                                                ? ''
+                                                : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
+                                            style={active
+                                                ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
+                                                : ''}
+                                        >
+                                            {mode.label}{#if isCurrent}<span class="ml-1 opacity-60">当前</span>{/if}
+                                        </button>
+                                    {/each}
+                                </div>
+
+                                {#if editingBg}
+                                    <div
+                                        class="mb-3 overflow-hidden rounded-none border"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <img src={editingBg} alt="背景预览" class="h-28 w-full object-cover" />
+                                        <div
+                                            class="flex items-center justify-end gap-2 px-3 py-2 bg-(--theme-modal-text)/5"
+                                        >
+                                            <button
+                                                onclick={() => fileInput?.click()}
+                                                class="flex items-center gap-1 text-xs text-(--theme-accent-text) transition-colors hover:brightness-125"
+                                            >
+                                                <Icon icon="mdi:reload" class="size-3.5" />
+                                                换图
+                                            </button>
+                                            <button
+                                                onclick={clearBackground}
+                                                class="flex items-center gap-1 text-xs text-(--theme-modal-text)/50 transition-colors hover:text-red-500"
+                                            >
+                                                <Icon icon="mdi:delete-outline" class="size-3.5" />
+                                                清除
+                                            </button>
+                                        </div>
+                                    </div>
+                                {:else}
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                    <div
+                                        onclick={() => fileInput?.click()}
+                                        class="mb-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed px-4 py-8 transition-colors hover:bg-(--theme-modal-text)/5"
+                                        style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                                    >
+                                        <Icon icon="mdi:image-outline" class="size-8 text-(--theme-modal-text)/20" />
+                                        <span class="text-xs text-(--theme-modal-text)/40">点击选择本地图片</span>
+                                    </div>
+                                {/if}
+
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    bind:this={fileInput}
+                                    onchange={handleFileSelect}
+                                    class="hidden"
+                                />
+
+                                <div
+                                    class="flex items-center gap-2 rounded-none border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <input
+                                        type="text"
+                                        bind:value={bgUrl}
+                                        onkeydown={handleUrlKeydown}
+                                        placeholder="远程图片 URL"
+                                        class="flex-1 min-w-0 text-xs outline-none bg-transparent text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
+                                    />
+                                    <button
+                                        onclick={handleUrlApply}
+                                        disabled={!bgUrl.trim()}
+                                        class="shrink-0 rounded-none px-2.5 py-1 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
+                                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
+                                    >
+                                        加载
+                                    </button>
+                                </div>
+
+                                <div
+                                    class="mt-4 overflow-hidden rounded-none border"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-input-bg) 70%, transparent);"
+                                >
+                                    <div
+                                        class="relative h-40 overflow-hidden border-b"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        {#if editingBg}
+                                            <!-- 背景图独立层（自身模糊，不影响上层的预览卡片） -->
+                                            <div
+                                                class="absolute inset-0"
+                                                style="background-image: url('{editingBg}'); background-position: center; background-size: cover; filter: blur({overrides.bgImageBlur}px);"
+                                            ></div>
+                                            <!-- 背景图遮罩层（与工作区一致，由背景图遮罩控制） -->
+                                            <div
+                                                class="absolute inset-0"
+                                                style="background: {overrides.bgImageMask < 0
+                                                    ? `rgba(0,0,0,${(Math.abs(overrides.bgImageMask) / 100) * 0.6})`
+                                                    : overrides.bgImageMask > 0
+                                                      ? `rgba(255,255,255,${(overrides.bgImageMask / 100) * 0.35})`
+                                                      : 'transparent'};"
+                                            ></div>
+                                        {:else}
+                                            <!-- 无背景图时的中性预览底：玻璃卡片效果仍可实时预览 -->
+                                            <div
+                                                class="absolute inset-0"
+                                                style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-input-bg) 92%, var(--theme-accent-bg)), color-mix(in srgb, var(--theme-input-bg) 35%, var(--theme-modal-text)));"
+                                            ></div>
+                                        {/if}
+                                        <div
+                                            class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-none border p-3 shadow-xl"
+                                            style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent); background: color-mix(in srgb, var(--theme-modal-bg) {overrides.bgOpacity}%, transparent); backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
+                                                (overrides.bgDim / 100) *
+                                                    0.6}); -webkit-backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
+                                                (overrides.bgDim / 100) * 0.6});"
+                                        >
+                                            <div
+                                                class="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/45 to-transparent"
+                                            ></div>
+                                            <div class="flex items-center gap-2">
+                                                <span
+                                                    class="flex size-6 items-center justify-center rounded-none bg-(--theme-accent-bg)/20 text-(--theme-accent-text)"
+                                                >
+                                                    <Icon icon="mdi:blur" class="size-3.5" />
+                                                </span>
+                                                <span class="text-[11px] font-medium">玻璃质感预览</span>
+                                            </div>
+                                            <div class="space-y-1.5">
+                                                <div class="h-1.5 w-full rounded-full bg-(--theme-modal-text)/15"></div>
+                                                <div class="h-1.5 w-2/3 rounded-full bg-(--theme-modal-text)/10"></div>
+                                            </div>
+                                        </div>
+                                        <span
+                                            class="absolute bottom-3 right-3 rounded-none bg-black/30 px-2 py-1 font-mono text-[9px] tracking-wide text-white/70 backdrop-blur-sm"
+                                            >LIVE</span
+                                        >
+                                    </div>
+
+                                    <div class="p-4">
+                                        <div class="mb-4 flex items-start gap-2.5">
+                                            <span
+                                                class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-none bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
+                                            >
+                                                <Icon icon="mdi:layers-triple-outline" class="size-4" />
+                                            </span>
+                                            <div>
+                                                <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                    >背景质感</span
+                                                >
+                                                <span class="block text-[10px] leading-4 text-(--theme-modal-text)/35"
+                                                    >预览与工作区同步更新</span
+                                                >
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-4">
+                                            <div>
+                                                <span
+                                                    class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                >
+                                                    <span class="flex items-center gap-1.5"
+                                                        ><Icon
+                                                            icon="mdi:cards-outline"
+                                                            class="size-3.5"
+                                                        />卡片透明度</span
+                                                    >
+                                                    <span class="font-mono text-(--theme-accent-text)"
+                                                        >{100 - overrides.bgOpacity}%</span
+                                                    >
+                                                </span>
+                                                <input
+                                                    aria-label="卡片透明度"
+                                                    type="range"
+                                                    min="0"
+                                                    max="70"
+                                                    value={100 - overrides.bgOpacity}
+                                                    oninput={(e) =>
+                                                        updateOverride(
+                                                            'bgOpacity',
+                                                            100 - Number((e.target as HTMLInputElement).value)
+                                                        )}
+                                                    class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                />
+                                                <div
+                                                    class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                >
+                                                    <span>清晰</span><span>通透</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span
+                                                    class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                >
+                                                    <span class="flex items-center gap-1.5"
+                                                        ><Icon
+                                                            icon="mdi:application-outline"
+                                                            class="size-3.5"
+                                                        />弹窗透明度</span
+                                                    >
+                                                    <span class="font-mono text-(--theme-accent-text)"
+                                                        >{100 - overrides.modalOpacity}%</span
+                                                    >
+                                                </span>
+                                                <input
+                                                    aria-label="弹窗透明度"
+                                                    type="range"
+                                                    min="0"
+                                                    max="98"
+                                                    value={100 - overrides.modalOpacity}
+                                                    oninput={(e) =>
+                                                        updateOverride(
+                                                            'modalOpacity',
+                                                            100 - Number((e.target as HTMLInputElement).value)
+                                                        )}
+                                                    class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                />
+                                                <div
+                                                    class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                >
+                                                    <span>清晰</span><span>通透</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span
+                                                    class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                >
+                                                    <span class="flex items-center gap-1.5"
+                                                        ><Icon icon="mdi:blur" class="size-3.5" />毛玻璃强度</span
+                                                    >
+                                                    <span class="font-mono text-(--theme-accent-text)"
+                                                        >{overrides.bgBlur}px</span
+                                                    >
+                                                </span>
+                                                <input
+                                                    aria-label="毛玻璃强度"
+                                                    type="range"
+                                                    min="0"
+                                                    max="32"
+                                                    step="1"
+                                                    value={overrides.bgBlur}
+                                                    oninput={(e) =>
+                                                        updateOverride(
+                                                            'bgBlur',
+                                                            Number((e.target as HTMLInputElement).value)
+                                                        )}
+                                                    class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                />
+                                                <div
+                                                    class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                >
+                                                    <span>柔和</span><span>朦胧</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span
+                                                    class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                >
+                                                    <span class="flex items-center gap-1.5"
+                                                        ><Icon icon="mdi:brightness-4" class="size-3.5" />背景暗度</span
+                                                    >
+                                                    <span class="font-mono text-(--theme-accent-text)"
+                                                        >{overrides.bgDim}%</span
+                                                    >
+                                                </span>
+                                                <input
+                                                    aria-label="背景暗度"
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    step="1"
+                                                    value={overrides.bgDim}
+                                                    oninput={(e) =>
+                                                        updateOverride(
+                                                            'bgDim',
+                                                            Number((e.target as HTMLInputElement).value)
+                                                        )}
+                                                    class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                />
+                                                <div
+                                                    class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                >
+                                                    <span>原图</span><span>沉浸</span>
+                                                </div>
+                                                {#if !activeThemeBg}
+                                                    <p class="mt-1.5 text-[9px] text-(--theme-modal-text)/30">
+                                                        设置背景图后生效（当前主题未设置背景图）
+                                                    </p>
+                                                {/if}
+                                            </div>
+
+                                            {#if activeThemeBg}
+                                                <div
+                                                    class="border-t pt-4"
+                                                    style="border-color: var(--theme-divider-border);"
+                                                >
+                                                    <div class="mb-3 flex items-start gap-2.5">
+                                                        <span
+                                                            class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-none bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
+                                                        >
+                                                            <Icon icon="mdi:image-outline" class="size-4" />
+                                                        </span>
+                                                        <div>
+                                                            <span
+                                                                class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                                >背景图效果</span
+                                                            >
+                                                            <span
+                                                                class="block text-[10px] leading-4 text-(--theme-modal-text)/35"
+                                                                >仅作用于背景图本身，与玻璃表面互不影响</span
+                                                            >
+                                                        </div>
+                                                    </div>
+                                                    <div class="space-y-4">
+                                                        <div>
+                                                            <span
+                                                                class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                            >
+                                                                <span class="flex items-center gap-1.5"
+                                                                    ><Icon
+                                                                        icon="mdi:blur"
+                                                                        class="size-3.5"
+                                                                    />背景图模糊</span
+                                                                >
+                                                                <span class="font-mono text-(--theme-accent-text)"
+                                                                    >{overrides.bgImageBlur}px</span
+                                                                >
+                                                            </span>
+                                                            <input
+                                                                aria-label="背景图模糊"
+                                                                type="range"
+                                                                min="0"
+                                                                max="32"
+                                                                step="1"
+                                                                value={overrides.bgImageBlur}
+                                                                oninput={(e) =>
+                                                                    updateOverride(
+                                                                        'bgImageBlur',
+                                                                        Number((e.target as HTMLInputElement).value)
+                                                                    )}
+                                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                            />
+                                                            <div
+                                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                            >
+                                                                <span>清晰</span><span>朦胧</span>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <span
+                                                                class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                            >
+                                                                <span class="flex items-center gap-1.5"
+                                                                    ><Icon
+                                                                        icon="mdi:brightness-4"
+                                                                        class="size-3.5"
+                                                                    />背景图遮罩</span
+                                                                >
+                                                                <span class="font-mono text-(--theme-accent-text)"
+                                                                    >{overrides.bgImageMask === 0
+                                                                        ? '原图'
+                                                                        : overrides.bgImageMask > 0
+                                                                          ? `明亮 ${overrides.bgImageMask}%`
+                                                                          : `压暗 ${Math.abs(overrides.bgImageMask)}%`}</span
+                                                                >
+                                                            </span>
+                                                            <input
+                                                                aria-label="背景图遮罩"
+                                                                type="range"
+                                                                min="-100"
+                                                                max="100"
+                                                                step="1"
+                                                                value={overrides.bgImageMask}
+                                                                oninput={(e) =>
+                                                                    updateOverride(
+                                                                        'bgImageMask',
+                                                                        Number((e.target as HTMLInputElement).value)
+                                                                    )}
+                                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                            />
+                                                            <div
+                                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                            >
+                                                                <span>压暗</span><span>原图</span><span>明亮</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4">
+                                    <div class="mb-3 flex items-center gap-2">
+                                        <span
+                                            class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                        >
+                                            <Icon icon="mdi:monitor" class="size-4" />
                                         </span>
                                         <div>
                                             <span class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                                >背景质感</span
+                                                >标题栏颜色</span
                                             >
-                                            <span class="block text-[10px] leading-4 text-(--theme-modal-text)/35"
-                                                >预览与工作区同步更新</span
+                                            <span class="block text-[10px] text-(--theme-modal-text)/35"
+                                                >跟随主题自动适配（昼夜 / 黑白特例），同步 PWA theme-color</span
                                             >
                                         </div>
                                     </div>
+                                    <div
+                                        class="flex items-center gap-2 rounded-none border p-1.5 px-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <span
+                                            class="size-5 shrink-0 rounded-none border"
+                                            style="background: var(--theme-titlebar-bg); border-color: var(--theme-divider-border);"
+                                        ></span>
+                                        <span class="text-[11px] font-medium text-(--theme-modal-text)/60"
+                                            >跟随当前主题（{getActiveId() === 'light' ? '浅色' : '深色'}）</span
+                                        >
+                                    </div>
+                                </div>
 
-                                    <div class="space-y-4">
+                                <div class="mt-4">
+                                    <div class="mb-3 flex items-center gap-2">
+                                        <span
+                                            class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                        >
+                                            <Icon icon="mdi:star" class="size-4" />
+                                        </span>
                                         <div>
-                                            <span
-                                                class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                            <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                >霓虹灯字体</span
                                             >
-                                                <span class="flex items-center gap-1.5"
-                                                    ><Icon icon="mdi:cards-outline" class="size-3.5" />卡片透明度</span
-                                                >
-                                                <span class="font-mono text-(--theme-accent-text)"
-                                                    >{100 - overrides.bgOpacity}%</span
-                                                >
-                                            </span>
-                                            <input
-                                                aria-label="卡片透明度"
-                                                type="range"
-                                                min="0"
-                                                max="70"
-                                                value={100 - overrides.bgOpacity}
-                                                oninput={(e) =>
-                                                    updateOverride(
-                                                        'bgOpacity',
-                                                        100 - Number((e.target as HTMLInputElement).value)
-                                                    )}
-                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                            />
-                                            <div
-                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                            <span class="block text-[10px] text-(--theme-modal-text)/35"
+                                                >所有文本与图标以当前颜色发光</span
                                             >
-                                                <span>清晰</span><span>通透</span>
-                                            </div>
                                         </div>
-
+                                    </div>
+                                    <div
+                                        class="rounded-none border p-3"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
                                         <div>
                                             <span
                                                 class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
                                             >
-                                                <span class="flex items-center gap-1.5"
-                                                    ><Icon
-                                                        icon="mdi:application-outline"
-                                                        class="size-3.5"
-                                                    />弹窗透明度</span
-                                                >
+                                                <span>发光强度</span>
                                                 <span class="font-mono text-(--theme-accent-text)"
-                                                    >{100 - overrides.modalOpacity}%</span
+                                                    >{overrides.neonText}%</span
                                                 >
                                             </span>
                                             <input
-                                                aria-label="弹窗透明度"
-                                                type="range"
-                                                min="0"
-                                                max="98"
-                                                value={100 - overrides.modalOpacity}
-                                                oninput={(e) =>
-                                                    updateOverride(
-                                                        'modalOpacity',
-                                                        100 - Number((e.target as HTMLInputElement).value)
-                                                    )}
-                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                            />
-                                            <div
-                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
-                                            >
-                                                <span>清晰</span><span>通透</span>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <span
-                                                class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
-                                            >
-                                                <span class="flex items-center gap-1.5"
-                                                    ><Icon icon="mdi:blur" class="size-3.5" />毛玻璃强度</span
-                                                >
-                                                <span class="font-mono text-(--theme-accent-text)"
-                                                    >{overrides.bgBlur}px</span
-                                                >
-                                            </span>
-                                            <input
-                                                aria-label="毛玻璃强度"
-                                                type="range"
-                                                min="0"
-                                                max="32"
-                                                step="1"
-                                                value={overrides.bgBlur}
-                                                oninput={(e) =>
-                                                    updateOverride(
-                                                        'bgBlur',
-                                                        Number((e.target as HTMLInputElement).value)
-                                                    )}
-                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                            />
-                                            <div
-                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
-                                            >
-                                                <span>柔和</span><span>朦胧</span>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <span
-                                                class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
-                                            >
-                                                <span class="flex items-center gap-1.5"
-                                                    ><Icon icon="mdi:brightness-4" class="size-3.5" />背景暗度</span
-                                                >
-                                                <span class="font-mono text-(--theme-accent-text)"
-                                                    >{overrides.bgDim}%</span
-                                                >
-                                            </span>
-                                            <input
-                                                aria-label="背景暗度"
+                                                aria-label="霓虹灯强度"
                                                 type="range"
                                                 min="0"
                                                 max="100"
                                                 step="1"
-                                                value={overrides.bgDim}
+                                                value={overrides.neonText}
                                                 oninput={(e) =>
                                                     updateOverride(
-                                                        'bgDim',
+                                                        'neonText',
                                                         Number((e.target as HTMLInputElement).value)
                                                     )}
                                                 class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
@@ -1023,192 +1248,8 @@
                                             <div
                                                 class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
                                             >
-                                                <span>原图</span><span>沉浸</span>
+                                                <span>关</span><span>强烈</span>
                                             </div>
-                                            {#if !activeThemeBg}
-                                                <p class="mt-1.5 text-[9px] text-(--theme-modal-text)/30">
-                                                    设置背景图后生效（当前主题未设置背景图）
-                                                </p>
-                                            {/if}
-                                        </div>
-
-                                        {#if activeThemeBg}
-                                            <div
-                                                class="border-t pt-4"
-                                                style="border-color: var(--theme-divider-border);"
-                                            >
-                                                <div class="mb-3 flex items-start gap-2.5">
-                                                    <span
-                                                        class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-none bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
-                                                    >
-                                                        <Icon icon="mdi:image-outline" class="size-4" />
-                                                    </span>
-                                                    <div>
-                                                        <span
-                                                            class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                                            >背景图效果</span
-                                                        >
-                                                        <span
-                                                            class="block text-[10px] leading-4 text-(--theme-modal-text)/35"
-                                                            >仅作用于背景图本身，与玻璃表面互不影响</span
-                                                        >
-                                                    </div>
-                                                </div>
-                                                <div class="space-y-4">
-                                                    <div>
-                                                        <span
-                                                            class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
-                                                        >
-                                                            <span class="flex items-center gap-1.5"
-                                                                ><Icon
-                                                                    icon="mdi:blur"
-                                                                    class="size-3.5"
-                                                                />背景图模糊</span
-                                                            >
-                                                            <span class="font-mono text-(--theme-accent-text)"
-                                                                >{overrides.bgImageBlur}px</span
-                                                            >
-                                                        </span>
-                                                        <input
-                                                            aria-label="背景图模糊"
-                                                            type="range"
-                                                            min="0"
-                                                            max="32"
-                                                            step="1"
-                                                            value={overrides.bgImageBlur}
-                                                            oninput={(e) =>
-                                                                updateOverride(
-                                                                    'bgImageBlur',
-                                                                    Number((e.target as HTMLInputElement).value)
-                                                                )}
-                                                            class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                                        />
-                                                        <div
-                                                            class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
-                                                        >
-                                                            <span>清晰</span><span>朦胧</span>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <span
-                                                            class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
-                                                        >
-                                                            <span class="flex items-center gap-1.5"
-                                                                ><Icon
-                                                                    icon="mdi:brightness-4"
-                                                                    class="size-3.5"
-                                                                />背景图遮罩</span
-                                                            >
-                                                            <span class="font-mono text-(--theme-accent-text)"
-                                                                >{overrides.bgImageMask === 0
-                                                                    ? '原图'
-                                                                    : overrides.bgImageMask > 0
-                                                                      ? `明亮 ${overrides.bgImageMask}%`
-                                                                      : `压暗 ${Math.abs(overrides.bgImageMask)}%`}</span
-                                                            >
-                                                        </span>
-                                                        <input
-                                                            aria-label="背景图遮罩"
-                                                            type="range"
-                                                            min="-100"
-                                                            max="100"
-                                                            step="1"
-                                                            value={overrides.bgImageMask}
-                                                            oninput={(e) =>
-                                                                updateOverride(
-                                                                    'bgImageMask',
-                                                                    Number((e.target as HTMLInputElement).value)
-                                                                )}
-                                                            class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                                        />
-                                                        <div
-                                                            class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
-                                                        >
-                                                            <span>压暗</span><span>原图</span><span>明亮</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {/if}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mt-4">
-                                <div class="mb-3 flex items-center gap-2">
-                                    <span
-                                        class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
-                                    >
-                                        <Icon icon="mdi:monitor" class="size-4" />
-                                    </span>
-                                    <div>
-                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                            >标题栏颜色</span
-                                        >
-                                        <span class="block text-[10px] text-(--theme-modal-text)/35"
-                                            >跟随主题自动适配（昼夜 / 黑白特例），同步 PWA theme-color</span
-                                        >
-                                    </div>
-                                </div>
-                                <div
-                                    class="flex items-center gap-2 rounded-none border p-1.5 px-2.5"
-                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                >
-                                    <span
-                                        class="size-5 shrink-0 rounded-none border"
-                                        style="background: var(--theme-titlebar-bg); border-color: var(--theme-divider-border);"
-                                    ></span>
-                                    <span class="text-[11px] font-medium text-(--theme-modal-text)/60"
-                                        >跟随当前主题（{getActiveId() === 'light' ? '浅色' : '深色'}）</span
-                                    >
-                                </div>
-                            </div>
-
-                            <div class="mt-4">
-                                <div class="mb-3 flex items-center gap-2">
-                                    <span
-                                        class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
-                                    >
-                                        <Icon icon="mdi:star" class="size-4" />
-                                    </span>
-                                    <div>
-                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                            >霓虹灯字体</span
-                                        >
-                                        <span class="block text-[10px] text-(--theme-modal-text)/35"
-                                            >所有文本与图标以当前颜色发光</span
-                                        >
-                                    </div>
-                                </div>
-                                <div
-                                    class="rounded-none border p-3"
-                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                >
-                                    <div>
-                                        <span
-                                            class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
-                                        >
-                                            <span>发光强度</span>
-                                            <span class="font-mono text-(--theme-accent-text)"
-                                                >{overrides.neonText}%</span
-                                            >
-                                        </span>
-                                        <input
-                                            aria-label="霓虹灯强度"
-                                            type="range"
-                                            min="0"
-                                            max="100"
-                                            step="1"
-                                            value={overrides.neonText}
-                                            oninput={(e) =>
-                                                updateOverride(
-                                                    'neonText',
-                                                    Number((e.target as HTMLInputElement).value)
-                                                )}
-                                            class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                        />
-                                        <div class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25">
-                                            <span>关</span><span>强烈</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1305,7 +1346,7 @@
                             </div>
                         </div>
                     {:else if tab === 'interaction'}
-                        <div>
+                        <div class="grid grid-cols-1 items-start gap-x-8 gap-y-6 xl:grid-cols-2">
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
@@ -1547,7 +1588,9 @@
                                     操作反馈（Toast）的弹出位置，默认右上角；选「不弹出」后所有操作反馈都不再显示
                                 </span>
                             </div>
-
+                        </div>
+                    {:else if tab === 'shortcuts'}
+                        <div class="grid grid-cols-1 items-start gap-x-8 gap-y-6 xl:grid-cols-2">
                             <div class="mt-5">
                                 <span
                                     class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
@@ -1888,22 +1931,105 @@
                                     <span class="text-xs text-(--theme-modal-text)/40">暂无归档的工程</span>
                                 </div>
                             {:else}
-                                <div class="flex flex-col gap-2">
-                                    {#each archivedProjects as p}
+                                <div class="columns-1 gap-3 md:columns-2 xl:columns-3">
+                                    {#each archivedProjects as p (p.id)}
                                         <div
-                                            class="rounded-none border px-2.5 py-2"
+                                            class="mb-3 break-inside-avoid rounded-none border p-3"
                                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                         >
-                                            <div class="flex items-center gap-2">
+                                            <div class="flex items-start gap-2">
                                                 <span
-                                                    class="min-w-0 flex-1 truncate text-xs font-medium text-(--theme-modal-text)"
+                                                    class="min-w-0 flex-1 truncate text-sm font-black tracking-tight text-(--theme-modal-text)"
                                                     >{p.name}</span
                                                 >
                                                 <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40"
                                                     >{formatArchiveDate(p.createdAt)}</span
                                                 >
                                             </div>
-                                            <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+
+                                            <!-- 工程信息：三角色配装（元素色环 / 武器 / 首位声骸 / 套装 图标）-->
+                                            <div class="mt-2.5 space-y-2">
+                                                {#each p.team as slot}
+                                                    {#if slot.character}
+                                                        <div class="flex items-center gap-2">
+                                                            <span
+                                                                class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full"
+                                                                style="box-shadow: 0 0 0 2px {elementColor(
+                                                                    slot.character
+                                                                )};"
+                                                            >
+                                                                {#if charIconMap[slot.character]}
+                                                                    <img
+                                                                        src={charIconMap[slot.character]}
+                                                                        alt={slot.character}
+                                                                        class="size-full object-cover"
+                                                                    />
+                                                                {/if}
+                                                            </span>
+                                                            <span
+                                                                class="truncate text-xs font-bold"
+                                                                style="color: {elementColor(slot.character)};"
+                                                                >{slot.character}</span
+                                                            >
+                                                            {#if slot.weapon}
+                                                                <span
+                                                                    class="ml-auto flex min-w-0 shrink items-center gap-1 text-[10px] text-(--theme-modal-text)/55"
+                                                                >
+                                                                    {#if weaponIcons[slot.weapon]}
+                                                                        <img
+                                                                            src={weaponIcons[slot.weapon]}
+                                                                            alt=""
+                                                                            class="size-4 shrink-0 object-contain"
+                                                                        />
+                                                                    {/if}
+                                                                    <span class="max-w-28 truncate">{slot.weapon}</span>
+                                                                </span>
+                                                            {/if}
+                                                        </div>
+                                                        <div class="flex flex-wrap items-center gap-1.5 pl-9">
+                                                            {#if slot.echoes?.[0]?.name}
+                                                                <span
+                                                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/60"
+                                                                    style="border-color: var(--theme-divider-border);"
+                                                                    title="首位声骸"
+                                                                >
+                                                                    {#if echoIcons[slot.echoes[0].name]}
+                                                                        <img
+                                                                            src={echoIcons[slot.echoes[0].name]}
+                                                                            alt=""
+                                                                            class="size-3.5 shrink-0 rounded-full object-cover"
+                                                                        />
+                                                                    {/if}
+                                                                    <span class="max-w-24 truncate"
+                                                                        >{slot.echoes[0].name}</span
+                                                                    >
+                                                                </span>
+                                                            {/if}
+                                                            {#each slot.triggerSets as ts}
+                                                                <span
+                                                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/60"
+                                                                    style="border-color: var(--theme-divider-border);"
+                                                                >
+                                                                    {#if setIcons[ts.name]}
+                                                                        <img
+                                                                            src={setIcons[ts.name]}
+                                                                            alt=""
+                                                                            class="size-3.5 shrink-0 rounded-full object-cover"
+                                                                        />
+                                                                    {/if}
+                                                                    <span class="truncate">{ts.name} {ts.pieces}件</span
+                                                                    >
+                                                                </span>
+                                                            {/each}
+                                                        </div>
+                                                    {/if}
+                                                {/each}
+                                            </div>
+
+                                            <div
+                                                class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t pt-2.5"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
                                                 <button
                                                     onclick={() => handleUnarchive(p.id)}
                                                     class="flex items-center gap-1 rounded-none px-2 py-0.5 text-[10px] transition-colors text-(--theme-accent-text) hover:brightness-125"
