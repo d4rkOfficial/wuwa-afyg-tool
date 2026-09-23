@@ -1,58 +1,110 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
-import type { Theme, ComponentTheme, ThemeComponentKey, ThemeOverrides } from './types'
+import type {
+    Theme,
+    ComponentTheme,
+    ThemeComponentKey,
+    ThemeOverrides,
+    ThemeAppearance,
+    ThemeMode,
+    SurfaceKey,
+    SurfaceStyle
+} from './types'
+import { SURFACE_KEYS } from './types'
 import darkPreset from './preset/dark.json'
 import lightPreset from './preset/light.json'
 
 const ACTIVE_KEY = 'theme-active'
 const OVERRIDES_KEY = 'theme-overrides'
-const MASK_MIGRATED_KEY = 'theme-bgmask-migrated-v2'
 
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
+
+/** @desc 五类区域默认外观；口径：尽量贴近改造前的整体观感 */
+export const DEFAULT_SURFACES: Record<SurfaceKey, SurfaceStyle> = {
+    card: { opacity: 100, blur: 0, depth: 0 },
+    modal: { opacity: 75, blur: 4, depth: 0 },
+    sidebar: { opacity: 85, blur: 0, depth: 0 },
+    content: { opacity: 0, blur: 0, depth: 0 },
+    toolbar: { opacity: 100, blur: 0, depth: 0 }
+}
+
+/** @desc 默认外观（昼夜各一份） */
+export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
+    dark: { bgImageBlur: 4, bgImageMask: 0, surfaces: structuredClone(DEFAULT_SURFACES) },
+    light: { bgImageBlur: 4, bgImageMask: 0, surfaces: structuredClone(DEFAULT_SURFACES) }
+}
 
 const DEFAULT_OVERRIDES: ThemeOverrides = {
     accentHue: 190,
     backgroundImage: '',
     backgroundImageLight: '',
-    bgOpacity: 85,
-    modalOpacity: 75,
-    bgBlur: 4,
-    bgDim: 0,
-    bgImageBlur: 4,
-    bgImageMask: 0,
+    appearance: structuredClone(DEFAULT_APPEARANCE),
     neonText: 0
 }
 
-const TRANSLUCENT_SURFACES = new Set([
-    'avatar',
-    'tabs',
-    'sidebar',
-    'search-box',
-    'modal',
-    'context-menu',
-    'toast',
-    'toast-top',
-    'timeline',
-    'card',
-    'input',
-    'watermark'
-])
-
 let themes = $state<Theme[]>([])
 let activeId = $state<string>('')
-let overrides = $state<ThemeOverrides>({ ...DEFAULT_OVERRIDES })
-
-const bgOriginals = new Map<string, string>()
+let overrides = $state<ThemeOverrides>(structuredClone(DEFAULT_OVERRIDES))
 
 const toPlain = <T>(value: T): T => JSON.parse(JSON.stringify(value))
+
+/** @desc 当前昼夜主题（非 light 一律按 dark 处理） */
+const activeMode = (): ThemeMode => (activeId === 'light' ? 'light' : 'dark')
+
+/** @desc 归一化外观设置：缺项回落到默认值（旧的持久化数据不做迁移，缺项直接用默认） */
+function normalizeAppearance(raw: unknown): ThemeAppearance {
+    const src = (raw ?? {}) as Partial<ThemeAppearance>
+    const surfaces = { ...structuredClone(DEFAULT_SURFACES) }
+    for (const key of SURFACE_KEYS) {
+        const saved = (src.surfaces ?? {})[key]
+        if (saved) surfaces[key] = { ...DEFAULT_SURFACES[key], ...saved }
+    }
+    return {
+        bgImageBlur: typeof src.bgImageBlur === 'number' ? src.bgImageBlur : DEFAULT_APPEARANCE.dark.bgImageBlur,
+        bgImageMask: typeof src.bgImageMask === 'number' ? src.bgImageMask : DEFAULT_APPEARANCE.dark.bgImageMask,
+        surfaces
+    }
+}
+
+/** @desc 当前昼夜下的外观设置（背景图效果 + 各表面） */
+export function getAppearance(mode: ThemeMode = activeMode()): ThemeAppearance {
+    return overrides.appearance[mode]
+}
+
+/** @desc 读取某个表面的外观设置（默认取当前昼夜） */
+export function getSurfaceStyle(key: SurfaceKey, mode: ThemeMode = activeMode()): SurfaceStyle {
+    return overrides.appearance[mode].surfaces[key] ?? DEFAULT_SURFACES[key]
+}
+
+/** @desc 修改某个表面的透明度/毛玻璃/背景深度（按昼夜分开保存） */
+export async function setSurfaceStyle(key: SurfaceKey, patch: Partial<SurfaceStyle>, mode: ThemeMode = activeMode()) {
+    const current = overrides.appearance[mode]
+    const next: ThemeAppearance = {
+        ...current,
+        surfaces: { ...current.surfaces, [key]: { ...getSurfaceStyle(key, mode), ...patch } }
+    }
+    overrides = { ...overrides, appearance: { ...overrides.appearance, [mode]: next } }
+    await dbSet(OVERRIDES_KEY, toPlain(overrides))
+    applyBgBlend(document.documentElement)
+}
+
+/** @desc 修改背景图效果（模糊/遮罩），按昼夜分开保存 */
+export async function setBgImageEffect(
+    patch: Partial<Pick<ThemeAppearance, 'bgImageBlur' | 'bgImageMask'>>,
+    mode: ThemeMode = activeMode()
+) {
+    const current = overrides.appearance[mode]
+    const next: ThemeAppearance = { ...current, ...patch }
+    overrides = { ...overrides, appearance: { ...overrides.appearance, [mode]: next } }
+    await dbSet(OVERRIDES_KEY, toPlain(overrides))
+    applyBgBlend(document.documentElement)
+}
 
 function applyThemeCSS() {
     if (!browser) return
     const root = document.documentElement
     const theme = themes.find((t) => t.id === activeId)
     if (!theme) return
-
-    bgOriginals.clear()
 
     for (const [key, comp] of Object.entries(theme.components)) {
         setCSSVar(root, key, 'bg', comp.backgroundImage)
@@ -195,83 +247,77 @@ function applyAccentOverride(root: HTMLElement) {
     }
 }
 
+const clamp = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, v))
+
+/**
+ * @desc 计算某类区域的毛玻璃/背景明暗：blur=0 且 depth=0 时返回 none（不产生合成开销）。
+ * 深度同时作用在背面（昼提亮/夜压暗），让「更白/更黑」在毛玻璃上成立。
+ */
+function computeSurfaceBackdrop(style: SurfaceStyle, isLight: boolean): string {
+    const parts: string[] = []
+    if (style.blur > 0) parts.push(`blur(${clamp(style.blur, 0, 32)}px)`, 'saturate(1.08)')
+    const depth = clamp(style.depth, 0, 100)
+    if (depth > 0) {
+        const brightness = isLight ? 1 + (depth / 100) * 0.35 : 1 - (depth / 100) * 0.6
+        parts.push(`brightness(${brightness.toFixed(3)})`)
+    }
+    return parts.length ? parts.join(' ') : 'none'
+}
+
 function applyBgBlend(root: HTMLElement) {
-    root.style.setProperty('--theme-glass-blur', `${overrides.bgBlur}px`)
-    // 弹窗（对话框）表面不透明度：各对话框以 color-mix(... var(--theme-modal-opacity, 75%) ...) 取值
-    root.style.setProperty('--theme-modal-opacity', `${overrides.modalOpacity}%`)
-    // 卡片（含表格粘性表头等跟随卡片的表面）不透明度：供「卡片透明度」设置驱动，始终写入
-    root.style.setProperty('--theme-card-opacity', `${overrides.bgOpacity}%`)
+    const isLight = activeId === 'light'
+    const appearance = getAppearance()
+
+    // ── 背景图效果（按昼夜分别保存）──
+    root.style.setProperty('--theme-bg-image-blur', `${clamp(appearance.bgImageBlur, 0, 32)}px`)
+    // 遮罩：负值压暗（黑），正值偏白；上限 200 让遮罩能进一步压成更白
+    const v = clamp(appearance.bgImageMask, -100, 200)
+    const maskValue =
+        v < 0
+            ? `rgba(0, 0, 0, ${((Math.abs(v) / 100) * 0.6).toFixed(3)})`
+            : v > 0
+              ? `rgba(255, 255, 255, ${Math.min(0.8, (v / 100) * 0.35).toFixed(3)})`
+              : 'transparent'
+    root.style.setProperty('--theme-bg-mask', maskValue)
+
+    // ── 五类区域：透明度 / 毛玻璃强度 / 背景深度（由 layout.css 的 [data-sf] 规则消费）──
+    for (const key of SURFACE_KEYS) {
+        const style = appearance.surfaces[key] ?? DEFAULT_SURFACES[key]
+        const depth = clamp(style.depth, 0, 100)
+        root.style.setProperty(`--sf-${key}-depth`, `${(depth * 0.9).toFixed(1)}%`)
+        root.style.setProperty(`--sf-${key}-target`, isLight ? '#ffffff' : '#000000')
+        root.style.setProperty(`--sf-${key}-opacity`, `${clamp(style.opacity, 0, 100)}%`)
+        root.style.setProperty(`--sf-${key}-backdrop`, computeSurfaceBackdrop(style, isLight))
+    }
+
+    // 旧类名 .theme-glass-surface 兼容：跟随弹窗表面的毛玻璃强度
+    root.style.setProperty('--theme-glass-blur', `${clamp(appearance.surfaces.modal.blur, 0, 32)}px`)
+
     // 遮罩同步变透：否则弹窗本身再透明，看到的也只是遮罩的暗底 + 模糊，观感上「透不动」。
     // 以默认 75 不透明度为 1.0 基准做线性缩放，默认观感保持不变。
     const activeTheme = themes.find((t) => t.id === activeId)
     const overlayBase = activeTheme?.components.overlay?.backgroundImage || 'rgba(0,0,0,0.5)'
-    const overlayScale = Math.max(0, Math.min(100, (overrides.modalOpacity / 75) * 100))
+    const overlayScale = clamp((appearance.surfaces.modal.opacity / 75) * 100, 0, 100)
     root.style.setProperty(
         '--theme-overlay-bg',
         `color-mix(in srgb, ${overlayBase} ${overlayScale.toFixed(1)}%, transparent)`
     )
-    // 背景图自身的独立控制（遮罩层）：模糊与遮罩强度，与玻璃表面（毛玻璃强度/背景暗度）分开
-    root.style.setProperty('--theme-bg-image-blur', `${overrides.bgImageBlur}px`)
-    // 背景图遮罩：负值=压暗(黑半透)，正值=明亮(白半透)，0=原图
-    const v = Math.max(-100, Math.min(100, overrides.bgImageMask))
-    const maskValue =
-        v < 0
-            ? `rgba(0,0,0,${(Math.abs(v) / 100) * 0.6})`
-            : v > 0
-              ? `rgba(255,255,255,${(v / 100) * 0.35})`
-              : 'transparent'
-    root.style.setProperty('--theme-bg-mask', maskValue)
+
     // 背景图分白天/黑夜两张：按当前主题取生效的那张（白天=backgroundImageLight，黑夜=backgroundImage）
-    const bgImage = activeId === 'light' ? overrides.backgroundImageLight : overrides.backgroundImage
-    // 暗度只压暗玻璃表面背后的区域（backdrop brightness），背景图本身保持原亮度形成对比；
-    // 无背景图时复位为 1，避免先调暗度再删背景后玻璃表面被残留压暗（暗度滑块仅在有背景图时可见，用户无法自行复位）
-    const glassBrightness = bgImage ? 1 - (Math.max(0, Math.min(100, overrides.bgDim)) / 100) * 0.6 : 1
-    root.style.setProperty('--theme-glass-brightness', String(glassBrightness))
+    const bgImage = isLight ? overrides.backgroundImageLight : overrides.backgroundImage
     if (bgImage) {
         root.style.setProperty('--theme-bg-image', `url("${bgImage}")`)
-        const theme = themes.find((t) => t.id === activeId)
-        if (theme) {
-            for (const key of Object.keys(theme.components)) {
-                const varName = `--theme-${key}-bg`
-                if (key !== 'layout' && !TRANSLUCENT_SURFACES.has(key)) continue
-                // 弹窗表面不吃卡片透明度：--theme-modal-bg 保持主题原值，弹窗只由「弹窗透明度」控制
-                if (key === 'modal') continue
-                if (!bgOriginals.has(varName)) {
-                    const val = root.style.getPropertyValue(varName)
-                    if (val) bgOriginals.set(varName, val)
-                }
-                const orig = bgOriginals.get(varName)
-                if (key === 'layout') {
-                    root.style.setProperty(varName, 'transparent')
-                    continue
-                }
-                // 排轴（timeline）因子减半：容器更透，角色头像/伤害绑定粘性列能透出背景图（列自身再叠低透明底）
-                const factor = key === 'timeline' ? overrides.bgOpacity * 0.5 : overrides.bgOpacity
-                if (
-                    orig &&
-                    !orig.startsWith('linear-gradient') &&
-                    !orig.startsWith('radial-gradient') &&
-                    !orig.startsWith('repeating-linear-gradient') &&
-                    !orig.startsWith('repeating-radial-gradient')
-                ) {
-                    root.style.setProperty(varName, `color-mix(in srgb, ${orig} ${factor}%, transparent)`)
-                }
-            }
-        }
-    } else if (bgOriginals.size > 0) {
-        for (const [varName, val] of bgOriginals) {
-            root.style.setProperty(varName, val)
-        }
-        root.style.removeProperty('--theme-bg-image')
-        bgOriginals.clear()
+        // 有背景图时主内容区底色让位给背景图（各页主内容区表面默认不额外铺色，用户可自行加透明度/深度）
+        root.style.setProperty('--theme-layout-bg', 'transparent')
     } else {
         root.style.removeProperty('--theme-bg-image')
+        root.style.removeProperty('--theme-layout-bg')
     }
-    // 排轴/拉表/结果表格滚动条：白天白底、夜间黑底，透明度跟随「背景透明度」设置
-    const isLight = activeId === 'light'
+
+    // 排轴/拉表/结果表格滚动条：白天白底、夜间黑底
     root.style.setProperty(
         '--theme-scrollbar-track',
-        `color-mix(in srgb, ${isLight ? '#ffffff' : '#000000'} ${overrides.bgOpacity}%, transparent)`
+        `color-mix(in srgb, ${isLight ? '#ffffff' : '#000000'} 85%, transparent)`
     )
     root.style.setProperty('--theme-scrollbar-thumb', isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)')
 }
@@ -306,18 +352,17 @@ export async function loadThemes() {
     }
 
     const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
-    // 旧版 bgImageMask（0-100 仅压暗滑块）→ 新版 -100~100 双极滑块 的一次性迁移。
-    // 用标记位保证只迁移一次：否则每次加载都会把新版「明亮」(正) 误判为旧版「压暗」取负，导致设置明亮后重进变成压暗
-    const maskMigrated = await dbGet<boolean>(MASK_MIGRATED_KEY)
-    if (!maskMigrated?.data) {
-        if (ov && typeof ov.data.bgImageMask === 'number' && ov.data.bgImageMask > 0) {
-            ov.data.bgImageMask = -ov.data.bgImageMask
-        }
-        await dbSet(MASK_MIGRATED_KEY, true)
-    }
     if (ov) {
-        overrides = { ...DEFAULT_OVERRIDES, ...ov.data }
-        // 旧版未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃（白天/黑夜两张各自校验）
+        // 外观设置按昼夜分别归一化（旧版扁平字段不再读取，缺项一律用默认值）
+        overrides = {
+            ...DEFAULT_OVERRIDES,
+            ...ov.data,
+            appearance: {
+                dark: normalizeAppearance(ov.data.appearance?.dark),
+                light: normalizeAppearance(ov.data.appearance?.light)
+            }
+        }
+        // 未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃（白天/黑夜两张各自校验）
         let trimmed = false
         for (const key of ['backgroundImage', 'backgroundImageLight'] as const) {
             const bg = overrides[key]
@@ -346,14 +391,9 @@ export function getActiveId(): string {
 
 export async function setActiveTheme(id: string) {
     if (themes.find((t) => t.id === id) && id !== activeId) {
-        const prevId = activeId
+        // 背景图效果与背景质感按昼夜分别保存，切主题即切到另一套设置，不再做正负反转
         activeId = id
         await dbSet(ACTIVE_KEY, id)
-        // 白天↔黑夜互切：仅背景图遮罩正负反转（明亮↔压暗）；卡片/弹窗透明度保持用户设定，不自动取反
-        if ((prevId === 'light' && id === 'dark') || (prevId === 'dark' && id === 'light')) {
-            overrides = { ...overrides, bgImageMask: -overrides.bgImageMask }
-            await dbSet(OVERRIDES_KEY, toPlain(overrides))
-        }
         applyThemeCSS()
     }
 }
@@ -367,17 +407,7 @@ export async function updateOverride<K extends keyof ThemeOverrides>(key: K, val
     await dbSet(OVERRIDES_KEY, toPlain(overrides))
     const root = document.documentElement
     applyAccentOverride(root)
-    if (
-        key === 'backgroundImage' ||
-        key === 'backgroundImageLight' ||
-        key === 'bgOpacity' ||
-        key === 'modalOpacity' ||
-        key === 'bgBlur' ||
-        key === 'bgDim' ||
-        key === 'bgImageBlur' ||
-        key === 'bgImageMask'
-    )
-        applyBgBlend(root)
+    if (key === 'backgroundImage' || key === 'backgroundImageLight' || key === 'appearance') applyBgBlend(root)
     if (key === 'neonText') {
         const on = overrides.neonText > 0
         root.classList.toggle('neon-text', on)

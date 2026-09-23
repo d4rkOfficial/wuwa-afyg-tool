@@ -194,6 +194,59 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
         filter: var(--theme-w-icon-filter, none);
         transition: filter 0.2s;
     }
+
+    /* ── 区域质感（surface）：透明度 / 毛玻璃强度 / 背景深度均可在「设置-外观主题-背景质感」独立配置 ──
+       用法：给元素加 data-sf="card|modal|sidebar|content|toolbar"；
+       底色默认取该类的主题底色，元素可用内联 style="--sf-base: var(--theme-xxx-bg)" 覆盖（如操作块用 timeline 底色） */
+    [data-sf] {
+        background: color-mix(
+            in srgb,
+            color-mix(
+                    in srgb,
+                    var(--sf-base, transparent) calc(100% - var(--sf-depth, 0%)),
+                    var(--sf-target, transparent)
+                )
+                var(--sf-opacity, 100%),
+            transparent
+        );
+        backdrop-filter: var(--sf-backdrop, none);
+        -webkit-backdrop-filter: var(--sf-backdrop, none);
+    }
+    [data-sf='card'] {
+        --sf-base: var(--theme-card-bg);
+        --sf-depth: var(--sf-card-depth);
+        --sf-target: var(--sf-card-target);
+        --sf-opacity: var(--sf-card-opacity);
+        --sf-backdrop: var(--sf-card-backdrop);
+    }
+    [data-sf='modal'] {
+        --sf-base: var(--theme-modal-bg);
+        --sf-depth: var(--sf-modal-depth);
+        --sf-target: var(--sf-modal-target);
+        --sf-opacity: var(--sf-modal-opacity);
+        --sf-backdrop: var(--sf-modal-backdrop);
+    }
+    [data-sf='sidebar'] {
+        --sf-base: var(--theme-sidebar-bg);
+        --sf-depth: var(--sf-sidebar-depth);
+        --sf-target: var(--sf-sidebar-target);
+        --sf-opacity: var(--sf-sidebar-opacity);
+        --sf-backdrop: var(--sf-sidebar-backdrop);
+    }
+    [data-sf='content'] {
+        --sf-base: var(--theme-layout-bg);
+        --sf-depth: var(--sf-content-depth);
+        --sf-target: var(--sf-content-target);
+        --sf-opacity: var(--sf-content-opacity);
+        --sf-backdrop: var(--sf-content-backdrop);
+    }
+    [data-sf='toolbar'] {
+        --sf-base: var(--theme-sidebar-bg);
+        --sf-depth: var(--sf-toolbar-depth);
+        --sf-target: var(--sf-toolbar-target);
+        --sf-opacity: var(--sf-toolbar-opacity);
+        --sf-backdrop: var(--sf-toolbar-backdrop);
+    }
     /* 霓虹灯字体：所有文本与图标以 currentColor 发光 */
     .neon-text * {
         text-shadow: 0 0 var(--theme-neon-glow, 6px) currentColor !important;

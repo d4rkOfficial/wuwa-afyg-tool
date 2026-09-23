@@ -2,7 +2,22 @@
 // （外观主题 / 按键图标 / 交互-拉表视图+工具栏简化+右键菜单简化+界面快捷键 / 工坊 / 性能 / 连接配置-数据源 / 缓存清理 / 助手设置）。
 // 仅「自定义主题创建/删除」需用户手动操作。
 import { defineTool } from './registry'
-import { getActiveId, getOverrides, setActiveTheme, updateOverride } from '$lib/theme'
+import {
+    getActiveId,
+    getAppearance,
+    getOverrides,
+    getSurfaceStyle,
+    setActiveTheme,
+    setBgImageEffect,
+    setSurfaceStyle,
+    updateOverride,
+    DEFAULT_SURFACES,
+    SURFACE_KEYS,
+    SURFACE_LABELS,
+    type SurfaceKey,
+    type SurfaceStyle,
+    type ThemeMode
+} from '$lib/theme'
 import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
 import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
 import { getSimplifyContextMenu, setSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
@@ -65,6 +80,14 @@ import {
 } from '$lib/data/interaction-prefs.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
+
+/** @desc 解析目标昼夜：'light'/'dark'（也接受 白天/黑夜），缺省取当前生效主题 */
+function resolveMode(raw: unknown): ThemeMode {
+    const v = str(raw).toLowerCase()
+    if (v === 'light' || v === '白天') return 'light'
+    if (v === 'dark' || v === '黑夜') return 'dark'
+    return getActiveId() === 'light' ? 'light' : 'dark'
+}
 
 function toBool(v: unknown, key: string): boolean {
     if (typeof v === 'boolean') return v
@@ -147,52 +170,46 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
             return { mode: mode === 'light' ? '白天' : '黑夜', value: url ? '已设置' : '已清除' }
         }
     },
-    theme_bg_opacity: {
-        label: '卡片透明度',
+    theme_bg_image_effect: {
+        label: '背景图效果（模糊/遮罩）',
         apply: async (v) => {
-            const n = clampNum(v, 'theme_bg_opacity', 30, 100)
-            await updateOverride('bgOpacity', n)
-            return n
+            const obj = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+            const mode = resolveMode(obj.mode)
+            const patch: { bgImageBlur?: number; bgImageMask?: number } = {}
+            if (obj.blur !== undefined) patch.bgImageBlur = clampNum(obj.blur, 'theme_bg_image_effect.blur', 0, 32)
+            if (obj.mask !== undefined) patch.bgImageMask = clampNum(obj.mask, 'theme_bg_image_effect.mask', -100, 200)
+            if (!Object.keys(patch).length) throw new Error('须提供 blur（0-32）或 mask（-100 压暗 ~ 200 更白）')
+            await setBgImageEffect(patch, mode)
+            const now = getAppearance(mode)
+            return { mode: mode === 'light' ? '白天' : '黑夜', blur: now.bgImageBlur, mask: now.bgImageMask }
         }
     },
-    theme_bg_blur: {
-        label: '毛玻璃强度',
+    surface_style: {
+        label: '区域质感（透明度/毛玻璃/背景深度）',
         apply: async (v) => {
-            const n = clampNum(v, 'theme_bg_blur', 0, 32)
-            await updateOverride('bgBlur', n)
-            return n
-        }
-    },
-    theme_bg_dim: {
-        label: '背景暗度',
-        apply: async (v) => {
-            const n = clampNum(v, 'theme_bg_dim', 0, 100)
-            await updateOverride('bgDim', n)
-            return n
-        }
-    },
-    theme_bg_image_blur: {
-        label: '背景图模糊',
-        apply: async (v) => {
-            const n = clampNum(v, 'theme_bg_image_blur', 0, 32)
-            await updateOverride('bgImageBlur', n)
-            return n
-        }
-    },
-    theme_bg_image_mask: {
-        label: '背景图遮罩',
-        apply: async (v) => {
-            const n = clampNum(v, 'theme_bg_image_mask', -100, 100)
-            await updateOverride('bgImageMask', n)
-            return n
-        }
-    },
-    theme_modal_opacity: {
-        label: '弹窗透明度',
-        apply: async (v) => {
-            const n = clampNum(v, 'theme_modal_opacity', 8, 100)
-            await updateOverride('modalOpacity', n)
-            return n
+            const obj = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+            const key = str(obj.surface) as SurfaceKey
+            if (!SURFACE_KEYS.includes(key))
+                throw new Error(`surface 须为 ${SURFACE_KEYS.map((k) => `${k}（${SURFACE_LABELS[k]}）`).join(' / ')}`)
+            const mode = resolveMode(obj.mode)
+            if (obj.reset === true) {
+                await setSurfaceStyle(key, DEFAULT_SURFACES[key], mode)
+            } else {
+                const patch: Partial<SurfaceStyle> = {}
+                if (obj.opacity !== undefined) patch.opacity = clampNum(obj.opacity, 'surface_style.opacity', 0, 100)
+                if (obj.blur !== undefined) patch.blur = clampNum(obj.blur, 'surface_style.blur', 0, 32)
+                if (obj.depth !== undefined) patch.depth = clampNum(obj.depth, 'surface_style.depth', 0, 100)
+                if (!Object.keys(patch).length)
+                    throw new Error(
+                        '须提供 opacity（0-100）/ blur（0-32）/ depth（0-100），或用 reset=true 恢复该类默认'
+                    )
+                await setSurfaceStyle(key, patch, mode)
+            }
+            return {
+                surface: SURFACE_LABELS[key],
+                mode: mode === 'light' ? '白天' : '黑夜',
+                ...getSurfaceStyle(key, mode)
+            }
         }
     },
     // ── 交互相关 ──
@@ -392,6 +409,7 @@ defineTool('get_settings_state', {
     parameters: { type: 'object', properties: {} },
     handler: async () => {
         const overrides = getOverrides()
+        const appearanceNow = getAppearance()
         const prefs = getGenPrefs()
         return {
             theme: {
@@ -399,12 +417,14 @@ defineTool('get_settings_state', {
                 accentHue: overrides.accentHue,
                 backgroundImage: overrides.backgroundImage ? '已设置' : '未设置',
                 backgroundImageLight: overrides.backgroundImageLight ? '已设置' : '未设置',
-                bgOpacity: overrides.bgOpacity,
-                bgBlur: overrides.bgBlur,
-                bgDim: overrides.bgDim,
-                bgImageBlur: overrides.bgImageBlur,
-                bgImageMask: overrides.bgImageMask,
-                modalOpacity: overrides.modalOpacity
+                hint: '背景图效果与区域质感按昼夜分别保存；下列 appearance 为当前生效主题那一套，另一套用 mode 参数指定后可读改',
+                appearance: {
+                    mode: getActiveId() === 'light' ? '白天' : '黑夜',
+                    bgImageBlur: appearanceNow.bgImageBlur,
+                    bgImageMask: appearanceNow.bgImageMask,
+                    surfaces: Object.fromEntries(SURFACE_KEYS.map((k) => [SURFACE_LABELS[k], getSurfaceStyle(k)])),
+                    surfaceKeys: SURFACE_KEYS.map((k) => `${k}（${SURFACE_LABELS[k]}）`)
+                }
             },
             interaction: {
                 calcView: getCalcViewMode(),
@@ -460,7 +480,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、theme_modal_opacity(30-100 弹窗透明度)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"|"dark"}，按昼夜分别保存)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar", opacity?:0-100, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。',
     parameters: {
         type: 'object',
         properties: {

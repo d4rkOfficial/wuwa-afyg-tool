@@ -1,7 +1,22 @@
 <script lang="ts">
     import { fade } from 'svelte/transition'
     import { popOut } from '$lib/utils/motion'
-    import { getActiveId, getOverrides, setActiveTheme, getThemes, updateOverride } from '$lib/theme'
+    import {
+        getActiveId,
+        getAppearance,
+        getOverrides,
+        getSurfaceStyle,
+        getThemes,
+        setActiveTheme,
+        setBgImageEffect,
+        setSurfaceStyle,
+        updateOverride,
+        DEFAULT_SURFACES,
+        SURFACE_GROUPS,
+        type SurfaceKey,
+        type SurfaceStyle,
+        type ThemeMode
+    } from '$lib/theme'
     import Icon from '@iconify/svelte'
     import {
         getKeyMapEntries,
@@ -269,8 +284,27 @@
     /** @desc 正在编辑的那张背景图（黑夜=backgroundImage / 白天=backgroundImageLight） */
     let editingBgKey = $derived(bgEditingLight ? ('backgroundImageLight' as const) : ('backgroundImage' as const))
     let editingBg = $derived(overrides[editingBgKey])
-    /** @desc 当前主题实际生效的背景图（下方模糊/遮罩/暗度为两种主题共用，提示按它判断） */
+    /** @desc 当前主题实际生效的背景图 */
     let activeThemeBg = $derived(currentTheme === 'light' ? overrides.backgroundImageLight : overrides.backgroundImage)
+
+    // ── 背景图效果 / 背景质感（按昼夜分别保存，编辑的是当前生效的那一套）──
+    const modeKey = $derived<ThemeMode>(currentTheme === 'light' ? 'light' : 'dark')
+    const appearance = $derived(getAppearance(modeKey))
+    let surfaceKey = $state<SurfaceKey>('card')
+    const surfaceStyle = $derived(getSurfaceStyle(surfaceKey, modeKey))
+
+    const updateSurface = (patch: Partial<SurfaceStyle>) => void setSurfaceStyle(surfaceKey, patch, modeKey)
+    const resetSurface = () => void setSurfaceStyle(surfaceKey, DEFAULT_SURFACES[surfaceKey], modeKey)
+    const updateBgEffect = (patch: { bgImageBlur?: number; bgImageMask?: number }) =>
+        void setBgImageEffect(patch, modeKey)
+
+    /** @desc 背景图遮罩预览色（与 :root 上 --theme-bg-mask 同口径） */
+    const maskPreview = (v: number) =>
+        v < 0
+            ? `rgba(0,0,0,${(Math.abs(v) / 100) * 0.6})`
+            : v > 0
+              ? `rgba(255,255,255,${Math.min(0.8, (v / 100) * 0.35)})`
+              : 'transparent'
 
     function getPresetStyle(hue: number | 'mono' | null): { bg: string; text: string } {
         if (hue === 'mono') {
@@ -917,16 +951,12 @@
                                             <!-- 背景图独立层（自身模糊，不影响上层的预览卡片） -->
                                             <div
                                                 class="absolute inset-0"
-                                                style="background-image: url('{editingBg}'); background-position: center; background-size: cover; filter: blur({overrides.bgImageBlur}px);"
+                                                style="background-image: url('{editingBg}'); background-position: center; background-size: cover; filter: blur({appearance.bgImageBlur}px);"
                                             ></div>
-                                            <!-- 背景图遮罩层（与工作区一致，由背景图遮罩控制） -->
+                                            <!-- 背景图遮罩层（与工作区一致，由当前昼夜的背景图遮罩控制） -->
                                             <div
                                                 class="absolute inset-0"
-                                                style="background: {overrides.bgImageMask < 0
-                                                    ? `rgba(0,0,0,${(Math.abs(overrides.bgImageMask) / 100) * 0.6})`
-                                                    : overrides.bgImageMask > 0
-                                                      ? `rgba(255,255,255,${(overrides.bgImageMask / 100) * 0.35})`
-                                                      : 'transparent'};"
+                                                style="background: {maskPreview(appearance.bgImageMask)};"
                                             ></div>
                                         {:else}
                                             <!-- 无背景图时的中性预览底：玻璃卡片效果仍可实时预览 -->
@@ -936,11 +966,9 @@
                                             ></div>
                                         {/if}
                                         <div
+                                            data-sf="modal"
                                             class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-none border p-3 shadow-2xl"
-                                            style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent); background: color-mix(in srgb, var(--theme-modal-bg) {overrides.bgOpacity}%, transparent); backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
-                                                (overrides.bgDim / 100) *
-                                                    0.6}); -webkit-backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
-                                                (overrides.bgDim / 100) * 0.6});"
+                                            style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent);"
                                         >
                                             <div
                                                 class="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/45 to-transparent"
@@ -981,72 +1009,62 @@
                                             </div>
                                         </div>
 
-                                        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-x-6">
-                                            <div>
-                                                <span
-                                                    class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
-                                                >
-                                                    <span class="flex items-center gap-1.5"
-                                                        ><Icon
-                                                            icon="mdi:cards-outline"
-                                                            class="size-3.5"
-                                                        />卡片透明度</span
-                                                    >
-                                                    <span class="font-mono text-(--theme-accent-text)"
-                                                        >{100 - overrides.bgOpacity}%</span
-                                                    >
-                                                </span>
-                                                <input
-                                                    aria-label="卡片透明度"
-                                                    type="range"
-                                                    min="0"
-                                                    max="70"
-                                                    value={100 - overrides.bgOpacity}
-                                                    oninput={(e) =>
-                                                        updateOverride(
-                                                            'bgOpacity',
-                                                            100 - Number((e.target as HTMLInputElement).value)
-                                                        )}
-                                                    class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                                />
-                                                <div
-                                                    class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
-                                                >
-                                                    <span>清晰</span><span>通透</span>
-                                                </div>
-                                            </div>
+                                        <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/35">
+                                            按昼夜分别保存；当前编辑「{modeKey === 'light' ? '白天' : '黑夜'}
+                                            」主题。五类区域可各自设置透明度 / 毛玻璃强度 / 背景深度
+                                        </p>
 
+                                        <!-- 区域选择 -->
+                                        <div class="mb-2 flex flex-wrap gap-1.5">
+                                            {#each SURFACE_GROUPS[0].items as item (item.key)}
+                                                <button
+                                                    onclick={() => (surfaceKey = item.key)}
+                                                    class="rounded-none border px-2.5 py-1 text-[11px] transition-colors {surfaceKey ===
+                                                    item.key
+                                                        ? 'font-black text-(--theme-accent-text)'
+                                                        : 'text-(--theme-modal-text)/55 hover:text-(--theme-modal-text)'}"
+                                                    style="border-color: {surfaceKey === item.key
+                                                        ? 'var(--theme-accent-bg)'
+                                                        : 'var(--theme-divider-border)'};{surfaceKey === item.key
+                                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
+                                                        : ''}"
+                                                    title={item.hint}
+                                                >
+                                                    {item.label}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                        <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/35">
+                                            {SURFACE_GROUPS[0].items.find((i) => i.key === surfaceKey)?.hint}
+                                        </p>
+
+                                        <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-x-6">
                                             <div>
                                                 <span
                                                     class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
                                                 >
-                                                    <span class="flex items-center gap-1.5"
-                                                        ><Icon
-                                                            icon="mdi:application-outline"
-                                                            class="size-3.5"
-                                                        />弹窗透明度</span
-                                                    >
+                                                    <span>透明度</span>
                                                     <span class="font-mono text-(--theme-accent-text)"
-                                                        >{100 - overrides.modalOpacity}%</span
+                                                        >{surfaceStyle.opacity}%</span
                                                     >
                                                 </span>
                                                 <input
-                                                    aria-label="弹窗透明度"
+                                                    aria-label="透明度"
                                                     type="range"
                                                     min="0"
-                                                    max="98"
-                                                    value={100 - overrides.modalOpacity}
+                                                    max="100"
+                                                    step="1"
+                                                    value={surfaceStyle.opacity}
                                                     oninput={(e) =>
-                                                        updateOverride(
-                                                            'modalOpacity',
-                                                            100 - Number((e.target as HTMLInputElement).value)
-                                                        )}
+                                                        updateSurface({
+                                                            opacity: Number((e.target as HTMLInputElement).value)
+                                                        })}
                                                     class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
                                                 />
                                                 <div
                                                     class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
                                                 >
-                                                    <span>清晰</span><span>通透</span>
+                                                    <span>全透</span><span>不透明</span>
                                                 </div>
                                             </div>
 
@@ -1058,7 +1076,7 @@
                                                         ><Icon icon="mdi:blur" class="size-3.5" />毛玻璃强度</span
                                                     >
                                                     <span class="font-mono text-(--theme-accent-text)"
-                                                        >{overrides.bgBlur}px</span
+                                                        >{surfaceStyle.blur}px</span
                                                     >
                                                 </span>
                                                 <input
@@ -1067,18 +1085,17 @@
                                                     min="0"
                                                     max="32"
                                                     step="1"
-                                                    value={overrides.bgBlur}
+                                                    value={surfaceStyle.blur}
                                                     oninput={(e) =>
-                                                        updateOverride(
-                                                            'bgBlur',
-                                                            Number((e.target as HTMLInputElement).value)
-                                                        )}
+                                                        updateSurface({
+                                                            blur: Number((e.target as HTMLInputElement).value)
+                                                        })}
                                                     class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
                                                 />
                                                 <div
                                                     class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
                                                 >
-                                                    <span>柔和</span><span>朦胧</span>
+                                                    <span>无</span><span>朦胧</span>
                                                 </div>
                                             </div>
 
@@ -1087,137 +1104,156 @@
                                                     class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
                                                 >
                                                     <span class="flex items-center gap-1.5"
-                                                        ><Icon icon="mdi:brightness-4" class="size-3.5" />背景暗度</span
+                                                        ><Icon icon="mdi:brightness-4" class="size-3.5" />背景深度</span
                                                     >
                                                     <span class="font-mono text-(--theme-accent-text)"
-                                                        >{overrides.bgDim}%</span
+                                                        >{surfaceStyle.depth}%</span
                                                     >
                                                 </span>
                                                 <input
-                                                    aria-label="背景暗度"
+                                                    aria-label="背景深度"
                                                     type="range"
                                                     min="0"
                                                     max="100"
                                                     step="1"
-                                                    value={overrides.bgDim}
+                                                    value={surfaceStyle.depth}
                                                     oninput={(e) =>
-                                                        updateOverride(
-                                                            'bgDim',
-                                                            Number((e.target as HTMLInputElement).value)
-                                                        )}
+                                                        updateSurface({
+                                                            depth: Number((e.target as HTMLInputElement).value)
+                                                        })}
                                                     class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
                                                 />
                                                 <div
                                                     class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
                                                 >
-                                                    <span>原图</span><span>沉浸</span>
+                                                    <span>原色</span><span>{modeKey === 'light' ? '更白' : '更黑'}</span
+                                                    >
                                                 </div>
-                                                {#if !activeThemeBg}
-                                                    <p class="mt-1.5 text-[9px] text-(--theme-modal-text)/30">
-                                                        设置背景图后生效（当前主题未设置背景图）
-                                                    </p>
-                                                {/if}
                                             </div>
+                                        </div>
 
-                                            {#if activeThemeBg}
-                                                <div
-                                                    class="border-t pt-4"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <div class="mb-3 flex items-start gap-2.5">
+                                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                                            <button
+                                                onclick={resetSurface}
+                                                class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                <Icon icon="mdi:restore" class="size-3" />
+                                                重置「{SURFACE_GROUPS[0].items.find((i) => i.key === surfaceKey)
+                                                    ?.label}」
+                                            </button>
+                                            <span class="text-[10px] leading-4 text-(--theme-modal-text)/35">
+                                                背景深度越大越接近{modeKey === 'light' ? '白' : '黑'}
+                                                ；同时作用于毛玻璃背面明暗
+                                            </span>
+                                        </div>
+
+                                        {#if activeThemeBg}
+                                            <div
+                                                class="border-t pt-4"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                <div class="mb-3 flex items-start gap-2.5">
+                                                    <span
+                                                        class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-none bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
+                                                    >
+                                                        <Icon icon="mdi:image-outline" class="size-4" />
+                                                    </span>
+                                                    <div>
                                                         <span
-                                                            class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-none bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
+                                                            class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                            >背景图效果</span
                                                         >
-                                                            <Icon icon="mdi:image-outline" class="size-4" />
+                                                        <span
+                                                            class="block text-[10px] leading-4 text-(--theme-modal-text)/35"
+                                                            >按昼夜分别保存，仅作用于背景图本身，与区域质感互不影响</span
+                                                        >
+                                                    </div>
+                                                </div>
+                                                <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-x-6">
+                                                    <div>
+                                                        <span
+                                                            class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                        >
+                                                            <span class="flex items-center gap-1.5"
+                                                                ><Icon
+                                                                    icon="mdi:blur"
+                                                                    class="size-3.5"
+                                                                />背景图模糊</span
+                                                            >
+                                                            <span class="font-mono text-(--theme-accent-text)"
+                                                                >{appearance.bgImageBlur}px</span
+                                                            >
                                                         </span>
-                                                        <div>
-                                                            <span
-                                                                class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                                                >背景图效果</span
-                                                            >
-                                                            <span
-                                                                class="block text-[10px] leading-4 text-(--theme-modal-text)/35"
-                                                                >仅作用于背景图本身，与玻璃表面互不影响</span
-                                                            >
+                                                        <input
+                                                            aria-label="背景图模糊"
+                                                            type="range"
+                                                            min="0"
+                                                            max="32"
+                                                            step="1"
+                                                            value={appearance.bgImageBlur}
+                                                            oninput={(e) =>
+                                                                updateBgEffect({
+                                                                    bgImageBlur: Number(
+                                                                        (e.target as HTMLInputElement).value
+                                                                    )
+                                                                })}
+                                                            class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                        />
+                                                        <div
+                                                            class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                        >
+                                                            <span>清晰</span><span>朦胧</span>
                                                         </div>
                                                     </div>
-                                                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-x-6">
-                                                        <div>
-                                                            <span
-                                                                class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                    <div>
+                                                        <span
+                                                            class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                        >
+                                                            <span class="flex items-center gap-1.5"
+                                                                ><Icon
+                                                                    icon="mdi:brightness-4"
+                                                                    class="size-3.5"
+                                                                />背景图遮罩</span
                                                             >
-                                                                <span class="flex items-center gap-1.5"
-                                                                    ><Icon
-                                                                        icon="mdi:blur"
-                                                                        class="size-3.5"
-                                                                    />背景图模糊</span
-                                                                >
-                                                                <span class="font-mono text-(--theme-accent-text)"
-                                                                    >{overrides.bgImageBlur}px</span
-                                                                >
-                                                            </span>
-                                                            <input
-                                                                aria-label="背景图模糊"
-                                                                type="range"
-                                                                min="0"
-                                                                max="32"
-                                                                step="1"
-                                                                value={overrides.bgImageBlur}
-                                                                oninput={(e) =>
-                                                                    updateOverride(
-                                                                        'bgImageBlur',
-                                                                        Number((e.target as HTMLInputElement).value)
-                                                                    )}
-                                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                                            />
-                                                            <div
-                                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                            <span class="font-mono text-(--theme-accent-text)"
+                                                                >{appearance.bgImageMask === 0
+                                                                    ? '原图'
+                                                                    : appearance.bgImageMask > 100
+                                                                      ? `更白 ${appearance.bgImageMask - 100}%`
+                                                                      : appearance.bgImageMask > 0
+                                                                        ? `偏白 ${appearance.bgImageMask}%`
+                                                                        : `压暗 ${Math.abs(
+                                                                              appearance.bgImageMask
+                                                                          )}%`}</span
                                                             >
-                                                                <span>清晰</span><span>朦胧</span>
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <span
-                                                                class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
+                                                        </span>
+                                                        <input
+                                                            aria-label="背景图遮罩"
+                                                            type="range"
+                                                            min="-100"
+                                                            max="200"
+                                                            step="1"
+                                                            value={appearance.bgImageMask}
+                                                            oninput={(e) =>
+                                                                updateBgEffect({
+                                                                    bgImageMask: Number(
+                                                                        (e.target as HTMLInputElement).value
+                                                                    )
+                                                                })}
+                                                            class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
+                                                        />
+                                                        <div
+                                                            class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
+                                                        >
+                                                            <span>压暗</span><span>原图</span><span>偏白</span><span
+                                                                >更白</span
                                                             >
-                                                                <span class="flex items-center gap-1.5"
-                                                                    ><Icon
-                                                                        icon="mdi:brightness-4"
-                                                                        class="size-3.5"
-                                                                    />背景图遮罩</span
-                                                                >
-                                                                <span class="font-mono text-(--theme-accent-text)"
-                                                                    >{overrides.bgImageMask === 0
-                                                                        ? '原图'
-                                                                        : overrides.bgImageMask > 0
-                                                                          ? `明亮 ${overrides.bgImageMask}%`
-                                                                          : `压暗 ${Math.abs(overrides.bgImageMask)}%`}</span
-                                                                >
-                                                            </span>
-                                                            <input
-                                                                aria-label="背景图遮罩"
-                                                                type="range"
-                                                                min="-100"
-                                                                max="100"
-                                                                step="1"
-                                                                value={overrides.bgImageMask}
-                                                                oninput={(e) =>
-                                                                    updateOverride(
-                                                                        'bgImageMask',
-                                                                        Number((e.target as HTMLInputElement).value)
-                                                                    )}
-                                                                class="h-1.5 w-full cursor-pointer touch-none appearance-none rounded-full bg-(--theme-modal-text)/10 accent-(--theme-accent-bg)"
-                                                            />
-                                                            <div
-                                                                class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
-                                                            >
-                                                                <span>压暗</span><span>原图</span><span>明亮</span>
-                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            {/if}
-                                        </div>
+                                            </div>
+                                        {/if}
                                     </div>
                                 </div>
 
