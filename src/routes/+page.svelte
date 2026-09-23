@@ -71,7 +71,8 @@
     import {
         getConfirmDeletes,
         getLockWatermark,
-        getEffectiveLockWatermarkText
+        getEffectiveLockWatermarkText,
+        setModalClosePosition
     } from '$lib/data/interaction-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
@@ -296,6 +297,8 @@
             setMagneticPointer(false)
             // AI 助手默认隐藏（**持久化**保存：用户可在设置里重新开启）
             void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
+            // B 站 Toy 平台首次进入：弹窗关闭按钮默认放左上角（其它平台保持右上角）
+            if (isToyMobile()) setModalClosePosition('top-left')
             void applyFirstRunAppearance()
             markVisited()
         }

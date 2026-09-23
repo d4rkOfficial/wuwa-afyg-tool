@@ -83,11 +83,13 @@
         getConfirmDeletes,
         getLockWatermark,
         getLockWatermarkText,
+        getModalClosePosition,
         getSidebarActions,
         getToastPosition,
         setConfirmDeletes,
         setLockWatermark,
         setLockWatermarkText,
+        setModalClosePosition,
         setSidebarActions,
         setToastPosition,
         TOAST_POSITIONS,
@@ -1544,6 +1546,32 @@
                                                 : '2px'}; background: var(--theme-modal-bg);"
                                         ></span>
                                     </button>
+                                </div>
+                                <div
+                                    class="mt-2 flex items-center justify-between gap-3 rounded-none border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <span class="min-w-0 text-xs font-medium text-(--theme-modal-text)/70"
+                                        >弹窗关闭按钮位置</span
+                                    >
+                                    <div class="flex shrink-0 gap-1">
+                                        {#each [{ v: 'top-left' as const, l: '左上角' }, { v: 'top-right' as const, l: '右上角' }] as opt (opt.v)}
+                                            <button
+                                                onclick={() => setModalClosePosition(opt.v)}
+                                                class="rounded-none border px-2.5 py-1 text-[10px] transition-colors {getModalClosePosition() ===
+                                                opt.v
+                                                    ? 'font-black text-(--theme-accent-text)'
+                                                    : 'text-(--theme-modal-text)/55 hover:text-(--theme-modal-text)'}"
+                                                style="border-color: {getModalClosePosition() === opt.v
+                                                    ? 'var(--theme-accent-bg)'
+                                                    : 'var(--theme-divider-border)'};{getModalClosePosition() === opt.v
+                                                    ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
+                                                    : ''}"
+                                            >
+                                                {opt.l}
+                                            </button>
+                                        {/each}
+                                    </div>
                                 </div>
                             </div>
 

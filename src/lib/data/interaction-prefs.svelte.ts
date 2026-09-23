@@ -6,11 +6,15 @@ const TOAST_POSITION_KEY = 'wuwa-afyg:interaction-prefs:toast-position'
 const LOCK_WATERMARK_KEY = 'wuwa-afyg:interaction-prefs:lock-watermark'
 const LOCK_WATERMARK_TEXT_KEY = 'wuwa-afyg:interaction-prefs:lock-watermark-text'
 const SIDEBAR_ACTIONS_KEY = 'wuwa-afyg:interaction-prefs:sidebar-actions'
+const MODAL_CLOSE_KEY = 'wuwa-afyg:interaction-prefs:modal-close-position'
 
 /** @desc 锁定水印默认文案（文本框留空时回落到它） */
 export const DEFAULT_LOCK_WATERMARK_TEXT = '已锁定'
 /** @desc 锁定水印文案长度上限 */
 export const LOCK_WATERMARK_TEXT_MAX = 24
+
+/** @desc 弹窗关闭按钮位置 */
+export type ModalClosePosition = 'top-left' | 'top-right'
 
 /** @desc Toast 弹出位置；none = 不弹出 */
 export type ToastPosition =
@@ -34,6 +38,8 @@ let _lockWatermark = $state(true)
 let _lockWatermarkText = $state(DEFAULT_LOCK_WATERMARK_TEXT)
 /** @desc 侧边栏底部是否显示「新建 / 从本地导入 / 从工坊下载」操作区（默认开启） */
 let _sidebarActions = $state(true)
+/** @desc 弹窗关闭按钮位置（默认右上角；B 站 Toy 平台首次进入默认左上角） */
+let _modalClosePosition = $state<ModalClosePosition>('top-right')
 
 if (browser) {
     try {
@@ -66,6 +72,16 @@ if (browser) {
     } catch {
         /* ignore */
     }
+}
+
+/** @desc 弹窗关闭按钮位置 */
+export function getModalClosePosition(): ModalClosePosition {
+    return _modalClosePosition
+}
+
+export function setModalClosePosition(v: ModalClosePosition): void {
+    _modalClosePosition = v
+    if (browser) localStorage.setItem(MODAL_CLOSE_KEY, v)
 }
 
 /** @desc 侧边栏底部操作区（新建 / 从本地导入 / 从工坊下载）是否显示 */

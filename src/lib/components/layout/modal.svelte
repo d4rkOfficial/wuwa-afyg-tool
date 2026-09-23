@@ -4,6 +4,7 @@
     import { popOut } from '$lib/utils/motion'
     import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
+    import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -76,7 +77,10 @@
         >
             <button
                 onclick={onclose}
-                class="absolute right-3 top-3 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                class="absolute top-3 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
+                'top-left'
+                    ? 'left-3'
+                    : 'right-3'}"
                 aria-label="Close"
             >
                 <Icon icon="mdi:close" class="size-4.5" />
