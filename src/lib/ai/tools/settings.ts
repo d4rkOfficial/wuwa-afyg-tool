@@ -31,8 +31,14 @@ import {
     setActiveProvider
 } from '$lib/data/provider-prefs.svelte'
 import { clearCache, clearCacheCategory, countCacheCategory, type CacheCategory } from '$lib/api/data-cache'
-import { getKeyMapEntries, updateKeyMapEntry } from '$lib/data/keymap.svelte'
-import { getShortcutDef, getShortcutKey, getShortcuts, updateShortcut } from '$lib/data/shortcuts.svelte'
+import { getKeyMapEntries, resetKeyMap, updateKeyMapEntry } from '$lib/data/keymap.svelte'
+import {
+    getShortcutDef,
+    getShortcutKey,
+    getShortcuts,
+    resetShortcuts,
+    updateShortcut
+} from '$lib/data/shortcuts.svelte'
 import {
     addProfile,
     deleteProfile,
@@ -43,6 +49,20 @@ import {
     type AiProfile
 } from '$lib/ai/config.svelte'
 import { getGenPrefs, updateGenPrefs, type DangerMode } from '$lib/data/ai-prefs.svelte'
+import {
+    DEFAULT_LOCK_WATERMARK_TEXT,
+    LOCK_WATERMARK_TEXT_MAX,
+    TOAST_POSITIONS,
+    getConfirmDeletes,
+    getEffectiveLockWatermarkText,
+    getLockWatermark,
+    getToastPosition,
+    setConfirmDeletes,
+    setLockWatermark,
+    setLockWatermarkText,
+    setToastPosition,
+    type ToastPosition
+} from '$lib/data/interaction-prefs.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -209,6 +229,39 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
             return b
         }
     },
+    confirm_deletes: {
+        label: '删除前二次确认',
+        apply: async (v) => {
+            const b = toBool(v, 'confirm_deletes')
+            setConfirmDeletes(b)
+            return b
+        }
+    },
+    toast_position: {
+        label: '消息提示位置',
+        apply: async (v) => {
+            const pos = str(v) as ToastPosition
+            if (!TOAST_POSITIONS.includes(pos)) throw new Error(`toast_position 须为 ${TOAST_POSITIONS.join('/')}`)
+            setToastPosition(pos)
+            return pos
+        }
+    },
+    lock_watermark: {
+        label: '显示锁定水印',
+        apply: async (v) => {
+            const b = toBool(v, 'lock_watermark')
+            setLockWatermark(b)
+            return b
+        }
+    },
+    lock_watermark_text: {
+        label: '锁定水印文本',
+        apply: async (v) => {
+            const text = str(v).slice(0, LOCK_WATERMARK_TEXT_MAX)
+            setLockWatermarkText(text)
+            return getEffectiveLockWatermarkText()
+        }
+    },
 
     // ── 性能相关 ──
     gpu_accel: {
@@ -335,7 +388,7 @@ const DENIED_HINTS: Record<string, string> = {
 
 defineTool('get_settings_state', {
     description:
-        '读取当前设置状态——覆盖「设置」弹窗全部可配置项：外观主题、按键图标、交互、性能、工坊、连接配置（数据源）、缓存、助手设置。具体子项可用专用工具查询（get_keymap/get_shortcuts/get_ai_profiles/get_cache_counts）。',
+        '读取当前设置状态——覆盖「设置」弹窗全部可配置项：外观主题、按键图标、交互（含锁定水印）、性能、工坊、连接配置（数据源）、缓存、助手设置。具体子项可用专用工具查询（get_keymap/get_shortcuts/get_ai_profiles/get_cache_counts）。',
     parameters: { type: 'object', properties: {} },
     handler: async () => {
         const overrides = getOverrides()
@@ -350,13 +403,19 @@ defineTool('get_settings_state', {
                 bgBlur: overrides.bgBlur,
                 bgDim: overrides.bgDim,
                 bgImageBlur: overrides.bgImageBlur,
-                bgImageMask: overrides.bgImageMask
+                bgImageMask: overrides.bgImageMask,
+                modalOpacity: overrides.modalOpacity
             },
             interaction: {
                 calcView: getCalcViewMode(),
                 simplifyToolbar: getSimplifyToolbar(),
                 simplifyContextMenu: getSimplifyContextMenu(),
-                magneticPointer: getMagneticPointer()
+                magneticPointer: getMagneticPointer(),
+                confirmDeletes: getConfirmDeletes(),
+                toastPosition: getToastPosition(),
+                lockWatermark: getLockWatermark(),
+                lockWatermarkText: getEffectiveLockWatermarkText(),
+                lockWatermarkTextDefault: DEFAULT_LOCK_WATERMARK_TEXT
             },
             performance: {
                 gpuAccel: getGpuAccel(),
@@ -384,8 +443,14 @@ defineTool('get_settings_state', {
                 profileCount: getAiProfiles().length,
                 activeProfileId: getActiveProfileId()
             },
-            keymap: { count: getKeyMapEntries().length, hint: '用 get_keymap 查看详情，set_keymap_entry 修改' },
-            shortcuts: { count: getShortcuts().length, hint: '用 get_shortcuts 查看详情，set_shortcut 修改' },
+            keymap: {
+                count: getKeyMapEntries().length,
+                hint: '用 get_keymap 查看详情，set_keymap_entry 修改或 reset=true 恢复默认'
+            },
+            shortcuts: {
+                count: getShortcuts().length,
+                hint: '用 get_shortcuts 查看详情，set_shortcut 修改或 reset=true 恢复默认'
+            },
             workshop: { activeId: getActiveWorkshopId(), instances: getWorkshopInstances() },
             modifiableKeys: Object.entries(KEY_APPLYERS).map(([key, def]) => `${key}（${def.label}）`),
             hint: '可用 set_setting 修改上述 key；工坊实例操作请用 manage_workshop；AI 配置文件操作请用 manage_ai_profile。'
@@ -395,7 +460,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、theme_modal_opacity(30-100 弹窗透明度)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、theme_modal_opacity(30-100 弹窗透明度)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。',
     parameters: {
         type: 'object',
         properties: {
@@ -488,17 +553,22 @@ defineTool('get_keymap', {
 
 defineTool('set_keymap_entry', {
     description:
-        '修改单个按键图标映射。id 为操作动作 id（如 attack/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseRight/Q/E/R/F/T/SpaceBar）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。',
+        '修改单个按键图标映射。id 为操作动作 id（如 attack/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseRight/Q/E/R/F/T/SpaceBar）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。传 reset=true 可恢复全部按键图标为默认（此时忽略 id 等其它参数）。',
     parameters: {
         type: 'object',
         properties: {
             id: { type: 'string', description: '操作动作 id（见 get_keymap 返回）' },
             blockKey: { type: 'string', description: '图标 key（如 MouseLeft/Q/SpaceBar）' },
-            physical: { type: 'string', description: '物理按键（单个小写字母 a-z 或空格 " "）' }
+            physical: { type: 'string', description: '物理按键（单个小写字母 a-z 或空格 " "）' },
+            reset: { type: 'boolean', description: 'true = 恢复默认按键图标映射' }
         },
-        required: ['id']
+        required: []
     },
     handler: async (args) => {
+        if (args.reset === true) {
+            await resetKeyMap()
+            return { reset: true, count: getKeyMapEntries().length }
+        }
         const id = str(args.id)
         const existing = getKeyMapEntries().find((e) => e.id === id)
         if (!existing) throw new Error(`按键映射 ${id} 不存在，可用 get_keymap 查看可用 id`)
@@ -538,16 +608,21 @@ defineTool('get_shortcuts', {
 
 defineTool('set_shortcut', {
     description:
-        '修改单个界面快捷键绑定。id 为快捷键定义 id（见 get_shortcuts 返回）；key 为新的快捷键组合（如 "ctrl+s"、"shift+enter"、"a"）。修饰键（Ctrl/Shift/Alt）用 + 连接，主键小写。若与同组其他快捷键冲突将报错。',
+        '修改单个界面快捷键绑定。id 为快捷键定义 id（见 get_shortcuts 返回）；key 为新的快捷键组合（如 "ctrl+s"、"shift+enter"、"a"）。修饰键（Ctrl/Shift/Alt）用 + 连接，主键小写。若与同组其他快捷键冲突将报错。传 reset=true 可恢复全部快捷键为默认（此时忽略 id/key）。',
     parameters: {
         type: 'object',
         properties: {
             id: { type: 'string', description: '快捷键定义 id' },
-            key: { type: 'string', description: '新快捷键组合（如 ctrl+s、a、shift+enter）' }
+            key: { type: 'string', description: '新快捷键组合（如 ctrl+s、a、shift+enter）' },
+            reset: { type: 'boolean', description: 'true = 恢复默认快捷键绑定' }
         },
-        required: ['id', 'key']
+        required: []
     },
     handler: async (args) => {
+        if (args.reset === true) {
+            await resetShortcuts()
+            return { reset: true, count: getShortcuts().length }
+        }
         const id = str(args.id)
         const key = str(args.key)
         if (!id) throw new Error('id 不能为空')

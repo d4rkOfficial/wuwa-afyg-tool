@@ -63,9 +63,15 @@
     } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import {
+        DEFAULT_LOCK_WATERMARK_TEXT,
+        LOCK_WATERMARK_TEXT_MAX,
         getConfirmDeletes,
+        getLockWatermark,
+        getLockWatermarkText,
         getToastPosition,
         setConfirmDeletes,
+        setLockWatermark,
+        setLockWatermarkText,
         setToastPosition,
         TOAST_POSITIONS,
         type ToastPosition
@@ -132,7 +138,7 @@
         { group: '界面', key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
         { group: '界面', key: 'interaction', label: '交互相关', icon: 'mdi:gesture-tap' },
         { group: '界面', key: 'keymap', label: '按键图标', icon: 'mdi:keyboard-outline' },
-        { group: '界面', key: 'shortcuts', label: '快捷键', icon: 'mdi:keyboard-settings-outline' },
+        { group: '界面', key: 'shortcuts', label: '快捷键位', icon: 'mdi:keyboard-settings-outline' },
         { group: '界面', key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
@@ -1372,7 +1378,7 @@
                                     onclick={() => (tab = 'shortcuts')}
                                     class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-accent-text) transition-colors hover:brightness-125"
                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);"
-                                    title="跳转到「快捷键」页配置界面快捷键"
+                                    title="跳转到「快捷键位」页配置界面快捷键"
                                 >
                                     <Icon icon="mdi:keyboard-settings-outline" class="size-3.5" />
                                     界面快捷键设置
@@ -1629,6 +1635,64 @@
                                 </div>
                                 <span class="mt-1.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
                                     操作反馈（Toast）的弹出位置，默认右上角；选「不弹出」后所有操作反馈都不再显示
+                                </span>
+                            </div>
+
+                            <div class="mt-5">
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    <Icon
+                                        icon="mdi:watermark"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    锁定水印
+                                </span>
+                                <div
+                                    class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >显示锁定水印</span
+                                        >
+                                        <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                            排轴页阶段锁定时，在画面上平铺显示自定义文字；默认开启
+                                        </span>
+                                    </div>
+                                    <button
+                                        onclick={() => setLockWatermark(!getLockWatermark())}
+                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                        style="background: {getLockWatermark()
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 size-4 rounded-full transition-all"
+                                            style="left: {getLockWatermark()
+                                                ? '18px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+                                <div class="mt-2 flex items-center gap-2">
+                                    <input
+                                        value={getLockWatermarkText()}
+                                        oninput={(e) => setLockWatermarkText(e.currentTarget.value)}
+                                        maxlength={LOCK_WATERMARK_TEXT_MAX}
+                                        placeholder={DEFAULT_LOCK_WATERMARK_TEXT}
+                                        class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none transition-colors placeholder:text-(--theme-modal-text)/35 focus:border-(--theme-accent-bg)/50"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                        title="锁定水印文本"
+                                    />
+                                    <span class="shrink-0 text-[10px] tracking-[0.18em] text-(--theme-modal-text)/40">
+                                        {getLockWatermarkText().length}/{LOCK_WATERMARK_TEXT_MAX}
+                                    </span>
+                                </div>
+                                <span class="mt-1.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                    留空则使用「{DEFAULT_LOCK_WATERMARK_TEXT}」
                                 </span>
                             </div>
                         </div>

@@ -67,7 +67,11 @@
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
     import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
-    import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
+    import {
+        getConfirmDeletes,
+        getLockWatermark,
+        getEffectiveLockWatermarkText
+    } from '$lib/data/interaction-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
     import FirstSyncModal from '$lib/components/layout/first-sync-modal.svelte'
@@ -634,6 +638,8 @@
     }
 
     let phaseLocked = $derived(activeProject?.phases[activePhase]?.locked ?? false)
+    /** @desc 锁定水印文案（设置-交互相关可自定义，留空回落默认「已锁定」） */
+    let lockWatermarkText = $derived(getEffectiveLockWatermarkText())
     let canLock = $derived.by(() => {
         if (phaseLocked) return false
         const idx = getPhaseOrder().indexOf(activePhase)
@@ -926,9 +932,9 @@
                         </div>
                     {/if}
                 {/key}
-                {#if !showResult && phaseLocked}
-                    <!-- 已锁定遮罩：纯透明背景 + SVG pattern 平铺小字「已锁定」。整层 opacity-10 封顶，
-                         文字取 currentColor（主题文本色），保证任何主题/任何变量解析下都只弱显示、不遮挡内容 -->
+                {#if !showResult && phaseLocked && getLockWatermark()}
+                    <!-- 已锁定遮罩：纯透明背景 + SVG pattern 平铺小字（文案可在 设置-交互相关-锁定水印 自定义）。
+                         整层 opacity-10 封顶，文字取 currentColor（主题文本色），保证任何主题/任何变量解析下都只弱显示、不遮挡内容 -->
                     <div class="absolute inset-0 z-40 pointer-events-none select-none opacity-10">
                         <svg
                             class="absolute inset-0 size-full"
@@ -949,7 +955,7 @@
                                         fill="currentColor"
                                         font-size="26"
                                         font-weight="700"
-                                        letter-spacing="4">已锁定</text
+                                        letter-spacing="4">{lockWatermarkText}</text
                                     >
                                 </pattern>
                             </defs>
