@@ -2,10 +2,11 @@
     /** @desc 铺开表（拉表铺开模式）：按角色×直伤/非直伤分组，Buff 作列、条目作行，支持单元格/行列头三态勾选、框选批量、叠层文件夹列线区分
      *  性能约定：
      *  1) 结构化数据（可用性/表头/列分隔）与勾选状态分离——点单元格不再重建整表结构；
-     *  2) 冻结列与吸顶表头使用实底表面（无 backdrop-filter），避免逐元素重算背景模糊；
-     *  3) 行/列高亮：行级 opacity + 列级单层遮罩，替代逐单元格 opacity + 过渡；
+     *  2) 列表底色走区域系统 card（data-sf-flat，无毛玻璃）；吸顶表头为 toolbar 叠 card 底并取卡片毛玻璃（数量只与列数相关）；
+     *  3) 高亮只给目标行/列上主题色，不压暗其它行列（无遮罩测量、无逐行 opacity 合成层）；
      *  4) 渐进渲染按结构指纹重置，并以切片方式分帧揭示；
-     *  5) 表格宽度由表头内容决定（不再测宽等宽、不再补填充列）。 */
+     *  5) 表格宽度由表头内容决定（不再测宽等宽、不再补填充列）；
+     *  6) 顶部「伤害源」切换按角色过滤要渲染的子表，从根上减少一次挂载的行/格数量。 */
     import { onMount, onDestroy } from 'svelte'
     import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
     import type { CharSlot } from '$lib/types/project'
@@ -14,11 +15,13 @@
     import { inferDamageTypes } from '$lib/calc/utils'
     import { DAMAGE_TYPE_SHORT, LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$lib/calc/calculation.consts'
     import { getCalcElementMap, compareNatural } from '$lib/calc/calculation.store.svelte'
+    import { elementColor, getCharIconMap } from '$lib/calc/timeline.store.svelte'
     import { getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
+    import { fallbackIcon } from '$lib/utils/icons'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
@@ -296,6 +299,10 @@
 
     const EMPTY_IDS: string[] = []
 
+    /** @desc 伤害源标识：直伤/处决/响应取引起它的角色；效应类非直伤条目不带 character（视为非角色引起），
+     *  据此判定排轴上「上一个伤害倍率是否由当前伤害源引起」→ 决定是否画不连续分割线 */
+    const entrySourceOf = (e: DamageEntry): string => e.character ?? ''
+
     /** @desc 预计算整表「结构」数据：单元格可用性、表头标签/分隔线、行统计一次算好；勾选态不参与，故点单元格不重建整表 */
     const tableData = $derived.by(() => {
         const cols = columns
@@ -323,7 +330,6 @@
         for (const [groupKey, g] of groupMap) {
             const enabledCounts: number[] = cols.map(() => 0)
             const rows: RowData[] = []
-            let prevIdx = -Infinity
             for (const { entry, idx } of g.items) {
                 const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
                 const cells: CellData[] = []
@@ -341,9 +347,9 @@
                     entry,
                     cells,
                     enabledBuffIds,
-                    splitBefore: idx - prevIdx > 1
+                    // 不连续判定：排轴上紧邻的上一个伤害倍率不是由「当前伤害源」引起 → 视为一次不连续（同角色跨界直伤/非直伤不算断开）
+                    splitBefore: idx > 0 && entrySourceOf(damageEntries[idx - 1]) !== entrySourceOf(entry)
                 })
-                prevIdx = idx
             }
             const visibleGlobalBuffs = globalBuffs.filter((gb) =>
                 g.items.some(({ entry }) => {
@@ -445,6 +451,50 @@
         }
         return { colCounts, rowCounts }
     })
+
+    /** @desc ── 伤害源切换（主内容区顶部）：按角色过滤要渲染的子表，减少一次要挂载的行/格（大表卡顿从根上缓解）；
+     *  UI 对齐「词条/环境配置」的角色页签；只影响显示哪些子表，不改任何勾选数据 ── */
+    const NONE_SOURCE_KEY = '\u0000none'
+    interface SourceTab {
+        key: string
+        label: string
+        element: string
+        count: number
+    }
+    let sourceKey = $state<string | null>(null)
+    const charIconMap = $derived(getCharIconMap())
+
+    /** @desc 按子表出现顺序汇总角色页签（同角色可能既有直伤表又有非直伤表，故统计子表数） */
+    const sourceTabs = $derived.by<SourceTab[]>(() => {
+        const map = new Map<string, SourceTab>()
+        const order: string[] = []
+        for (const g of tableData) {
+            const key = g.charName || NONE_SOURCE_KEY
+            let tab = map.get(key)
+            if (!tab) {
+                tab = { key, label: g.charName || '无角色', element: elementColor(g.charName), count: 0 }
+                map.set(key, tab)
+                order.push(key)
+            }
+            tab.count++
+        }
+        return order.map((k) => map.get(k)!)
+    })
+    /** @desc 生效的过滤键：数据变化导致该角色消失时自动回落到「全部」 */
+    const activeSource = $derived(sourceKey !== null && sourceTabs.some((t) => t.key === sourceKey) ? sourceKey : null)
+    /** @desc 要渲染的子表下标：始终是 tableData 的原始下标——data-group / 框选 / 高亮 / 右键全选语义不变 */
+    const shownGroupIdx = $derived.by(() => {
+        if (activeSource === null) return tableData.map((_, gi) => gi)
+        return tableData
+            .map((g, gi) => ((g.charName || NONE_SOURCE_KEY) === activeSource ? gi : -1))
+            .filter((gi) => gi >= 0)
+    })
+
+    const selectSource = (key: string | null) => {
+        sourceKey = key
+        // 被过滤掉的子表上的高亮随之失效，避免留下看不见的高亮状态
+        highlight = null
+    }
 
     /** @desc 单击单元格：切换绑定 */
     function toggleCell(row: RowData, cell: CellData) {
@@ -820,311 +870,371 @@
     }}
 />
 
-<!-- @desc 表格根容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-    class="spread-root theme-scrollbar h-full overflow-auto pb-48 {className}"
-    data-sf="content"
-    style={styleProp}
-    bind:this={rootEl}
-    onmousedown={handleMouseDown}
-    onclickcapture={handleClickCapture}
-    onscroll={scheduleSyncSelection}
-    onwheel={(e) => {
-        const axis = getScrollAxisDefault()
-        if (e.ctrlKey) {
-            // Ctrl+滚轮 = 次轴（默认纵向时横向滚动；默认横向时纵向滚动）
-            e.preventDefault()
-            if (axis === 'vertical') {
-                ;(e.currentTarget as HTMLElement).scrollLeft += e.deltaY
-            } else {
-                ;(e.currentTarget as HTMLElement).scrollTop += e.deltaY
-            }
-            return
-        }
-        // 默认横向：普通滚轮也横向滚动；默认纵向沿用浏览器默认（纵向）
-        if (axis === 'horizontal') {
-            e.preventDefault()
-            ;(e.currentTarget as HTMLElement).scrollLeft += e.deltaY
-        }
-    }}
->
-    {#if selRect}
-        <!-- 框选范围指示（GPU 模式用 transform 定位走合成层） -->
+<!-- @desc 铺开表根容器：顶部伤害源页签（不滚动）+ 下方表格滚动区 -->
+<div class="flex h-full flex-col {className}" style={styleProp}>
+    <!-- @desc 伤害源切换：只看某个角色的子表（UI 对齐「词条/环境配置」的角色页签）；多角色时才显示 -->
+    {#if sourceTabs.length > 1}
         <div
-            class="pointer-events-none fixed z-50"
-            style="{gpuAccel
-                ? `left:0;top:0;transform: translate(${selRect.left}px, ${selRect.top}px);`
-                : `left: ${selRect.left}px; top: ${selRect.top}px;`} width: {selRect.width}px; height: {selRect.height}px; background: color-mix(in srgb, var(--theme-accent-bg) 25%, transparent); border: 1px solid var(--theme-accent-bg);"
-        ></div>
-    {/if}
-    {#if damageEntries.length === 0}
-        <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
-    {/if}
-    <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（表宽由表头内容决定） -->
-    {#each tableData as group, gi (group.key)}
-        {@const charElement = getCalcElementMap()[group.charName] ?? ''}
-        {@const hasFolder = group.hasFolder}
-        <div class="mx-3 my-3.5" data-group-wrap={gi}>
-            <!-- 列表（表体）底色跟随「卡片」透明度/深度；data-sf-flat 只取底色不用毛玻璃（逐格元素避免逐元素重算模糊） -->
-            <table
-                class="w-auto text-xs shadow-(--theme-card-shadow)"
-                data-sf="card"
-                data-sf-flat
-                data-group-table={gi}
-                style="--sf-base: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border);"
+            class="flex shrink-0 flex-wrap items-center gap-2 border-b border-(--theme-divider-border) px-3 py-2"
+            data-sf="toolbar"
+            data-sf-flat
+        >
+            <button
+                class={[
+                    'flex cursor-pointer items-center gap-1.5 rounded-none border px-2.5 py-1 text-xs font-black tracking-tight transition-colors',
+                    activeSource === null
+                        ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                        : 'border-transparent text-(--theme-modal-text)/40 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/70'
+                ].join(' ')}
+                onclick={() => selectSource(null)}
+                title="显示全部角色子表"
             >
-                <!-- 标题块与全局 buff 折叠行放入 caption：宽度自动跟随表头（表格宽度） -->
-                <caption class="text-left" data-sf="card" data-sf-flat style="--sf-base: var(--theme-modal-bg);">
-                    <div
-                        class="flex items-center gap-2 border-b border-(--theme-divider-border) px-3 py-2"
-                        style="background-image: linear-gradient(
+                全部
+                <span class="text-[10px] opacity-50">({tableData.length})</span>
+            </button>
+            {#each sourceTabs as tab (tab.key)}
+                <button
+                    class={[
+                        'flex cursor-pointer items-center gap-1.5 rounded-none border px-2.5 py-1 text-xs font-black tracking-tight transition-colors',
+                        activeSource === tab.key
+                            ? 'border-current'
+                            : 'border-transparent text-(--theme-modal-text)/40 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/70'
+                    ].join(' ')}
+                    style={activeSource === tab.key
+                        ? `background: color-mix(in srgb, ${tab.element} 18%, transparent); color: ${tab.element};`
+                        : ''}
+                    onclick={() => selectSource(tab.key)}
+                    title={`${tab.label}：${tab.count} 张子表`}
+                >
+                    {#if tab.key !== NONE_SOURCE_KEY && charIconMap[tab.label]}
+                        <img
+                            src={charIconMap[tab.label]}
+                            alt=""
+                            use:fallbackIcon={'/icons/placeholder-character.svg'}
+                            class="size-5 shrink-0 rounded-full"
+                        />
+                    {:else}
+                        <span
+                            class="flex size-5 shrink-0 items-center justify-center rounded-full bg-(--theme-modal-text)/10 text-[10px]"
+                            >{tab.label.charAt(0)}</span
+                        >
+                    {/if}
+                    <span>{tab.label}</span>
+                    <span class="text-[10px] opacity-50">({tab.count})</span>
+                </button>
+            {/each}
+        </div>
+    {/if}
+    <!-- @desc 表格滚动容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="spread-root theme-scrollbar min-h-0 flex-1 overflow-auto pb-48"
+        data-sf="content"
+        bind:this={rootEl}
+        onmousedown={handleMouseDown}
+        onclickcapture={handleClickCapture}
+        onscroll={scheduleSyncSelection}
+        onwheel={(e) => {
+            const axis = getScrollAxisDefault()
+            if (e.ctrlKey) {
+                // Ctrl+滚轮 = 次轴（默认纵向时横向滚动；默认横向时纵向滚动）
+                e.preventDefault()
+                if (axis === 'vertical') {
+                    ;(e.currentTarget as HTMLElement).scrollLeft += e.deltaY
+                } else {
+                    ;(e.currentTarget as HTMLElement).scrollTop += e.deltaY
+                }
+                return
+            }
+            // 默认横向：普通滚轮也横向滚动；默认纵向沿用浏览器默认（纵向）
+            if (axis === 'horizontal') {
+                e.preventDefault()
+                ;(e.currentTarget as HTMLElement).scrollLeft += e.deltaY
+            }
+        }}
+    >
+        {#if selRect}
+            <!-- 框选范围指示（GPU 模式用 transform 定位走合成层） -->
+            <div
+                class="pointer-events-none fixed z-50"
+                style="{gpuAccel
+                    ? `left:0;top:0;transform: translate(${selRect.left}px, ${selRect.top}px);`
+                    : `left: ${selRect.left}px; top: ${selRect.top}px;`} width: {selRect.width}px; height: {selRect.height}px; background: color-mix(in srgb, var(--theme-accent-bg) 25%, transparent); border: 1px solid var(--theme-accent-bg);"
+            ></div>
+        {/if}
+        {#if damageEntries.length === 0}
+            <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
+        {/if}
+        <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（表宽由表头内容决定）；只渲染当前伤害源页签命中的子表 -->
+        {#each shownGroupIdx as gi (tableData[gi].key)}
+            {@const group = tableData[gi]}
+            {@const charElement = getCalcElementMap()[group.charName] ?? ''}
+            {@const hasFolder = group.hasFolder}
+            <div class="mx-3 my-3.5" data-group-wrap={gi}>
+                <!-- 列表（表体）底色跟随「卡片」透明度/深度；data-sf-flat 只取底色不用毛玻璃（逐格元素避免逐元素重算模糊） -->
+                <table
+                    class="w-auto text-xs shadow-(--theme-card-shadow)"
+                    data-sf="card"
+                    data-sf-flat
+                    data-group-table={gi}
+                    style="--sf-base: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border);"
+                >
+                    <!-- 标题块与全局 buff 折叠行放入 caption：宽度自动跟随表头（表格宽度） -->
+                    <caption class="text-left" data-sf="card" data-sf-flat style="--sf-base: var(--theme-modal-bg);">
+                        <div
+                            class="flex items-center gap-2 border-b border-(--theme-divider-border) px-3 py-2"
+                            style="background-image: linear-gradient(
                             color-mix(in srgb, var(--theme-modal-text) 4%, transparent),
                             color-mix(in srgb, var(--theme-modal-text) 4%, transparent)
                         );"
-                    >
-                        <span
-                            class="text-sm font-black tracking-tight"
-                            style="color: var(--theme-element-{charElement}, #888);">{group.charName || '无角色'}</span
                         >
-                        <span class="text-xs text-(--theme-modal-text)/60"
-                            >· {group.kind === 'direct' ? '直伤' : '非直伤'}</span
-                        >
-                        <span class="ml-auto text-[10px] text-(--theme-modal-text)/40">{group.rows.length} 条</span>
-                    </div>
-                    {#if group.visibleGlobalBuffs.length > 0}
-                        <!-- 下拉浮层：展开内容绝对定位，不参与 caption/表格布局——否则展开会改变 caption 宽度，
-                             触发表格自动布局（table-layout: auto）重新计算所有列宽，造成可感知卡顿 -->
-                        <div class="relative border-b border-(--theme-divider-border)">
-                            <button
-                                class="flex w-full cursor-pointer items-center gap-1 px-3 py-1.5 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/5"
-                                onclick={() => toggleGlobal(gi)}
+                            <span
+                                class="text-sm font-black tracking-tight"
+                                style="color: var(--theme-element-{charElement}, #888);"
+                                >{group.charName || '无角色'}</span
                             >
-                                <Icon
-                                    icon={expandedGlobal[gi] ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-                                    class="size-3.5 shrink-0"
-                                />
-                                全局 BUFF
-                                <span class="text-(--theme-modal-text)/35">({group.visibleGlobalBuffs.length})</span>
-                            </button>
-                            {#if expandedGlobal[gi]}
-                                <!-- 展开后换行铺开，不再截断 -->
-                                <div
-                                    class="absolute top-full left-0 z-50 flex w-max max-w-[70vw] flex-wrap items-center gap-1 border border-(--theme-divider-border) p-2 shadow-(--theme-card-shadow)"
-                                    style="background: var(--theme-modal-bg);"
-                                >
-                                    {#each group.visibleGlobalBuffs as gb (gb.id)}
-                                        <span
-                                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
-                                            style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
-                                        >
-                                            <Icon icon="mdi:crown" class="size-3" />{gb.name}
-                                        </span>
-                                    {/each}
-                                </div>
-                            {/if}
+                            <span class="text-xs text-(--theme-modal-text)/60"
+                                >· {group.kind === 'direct' ? '直伤' : '非直伤'}</span
+                            >
+                            <span class="ml-auto text-[10px] text-(--theme-modal-text)/40">{group.rows.length} 条</span>
                         </div>
-                    {/if}
-                </caption>
-                <!-- 表头（两级，仅含叠层组时）：第一行=叠层组名行（跨列合并，普通列占位）；第二行=列名行（folder 子列显示层数数字，普通列显示略名换行），吸顶 -->
-                <thead>
-                    {#if hasFolder}
-                        <tr>
-                            <!-- 表头（含「条目」角格）底色 = 工具栏层叠一层卡片底（并取卡片的毛玻璃，吸顶时挡住滚过的行）；角格只叠这一套，不再额外叠行头卡片底 -->
-                            <th
-                                data-rowhead
-                                data-sf="toolbar"
-                                data-sf-under="card"
-                                class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
-                                style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                                rowspan="2"
-                            >
-                                条目
-                            </th>
-                            {#each group.headerGroups as hc, i (i)}
+                        {#if group.visibleGlobalBuffs.length > 0}
+                            <!-- 下拉浮层：展开内容绝对定位，不参与 caption/表格布局——否则展开会改变 caption 宽度，
+                             触发表格自动布局（table-layout: auto）重新计算所有列宽，造成可感知卡顿 -->
+                            <div class="relative border-b border-(--theme-divider-border)">
+                                <button
+                                    class="flex w-full cursor-pointer items-center gap-1 px-3 py-1.5 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/5"
+                                    onclick={() => toggleGlobal(gi)}
+                                >
+                                    <Icon
+                                        icon={expandedGlobal[gi] ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                                        class="size-3.5 shrink-0"
+                                    />
+                                    全局 BUFF
+                                    <span class="text-(--theme-modal-text)/35">({group.visibleGlobalBuffs.length})</span
+                                    >
+                                </button>
+                                {#if expandedGlobal[gi]}
+                                    <!-- 展开后换行铺开，不再截断 -->
+                                    <div
+                                        class="absolute top-full left-0 z-50 flex w-max max-w-[70vw] flex-wrap items-center gap-1 border border-(--theme-divider-border) p-2 shadow-(--theme-card-shadow)"
+                                        style="background: var(--theme-modal-bg);"
+                                    >
+                                        {#each group.visibleGlobalBuffs as gb (gb.id)}
+                                            <span
+                                                class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
+                                                style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
+                                            >
+                                                <Icon icon="mdi:crown" class="size-3" />{gb.name}
+                                            </span>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </div>
+                        {/if}
+                    </caption>
+                    <!-- 表头（两级，仅含叠层组时）：第一行=叠层组名行（跨列合并，普通列占位）；第二行=列名行（folder 子列显示层数数字，普通列显示略名换行），吸顶 -->
+                    <thead>
+                        {#if hasFolder}
+                            <tr>
+                                <!-- 表头（含「条目」角格）底色 = 工具栏层叠一层卡片底（并取卡片的毛玻璃，吸顶时挡住滚过的行）；角格只叠这一套，不再额外叠行头卡片底 -->
                                 <th
+                                    data-rowhead
                                     data-sf="toolbar"
                                     data-sf-under="card"
-                                    class="sticky top-0 z-30 h-6 p-0 text-center {hc.sepClass}"
+                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
                                     style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                                    colspan={hc.span}
+                                    rowspan="2"
                                 >
-                                    {#if hc.label}
-                                        <span
-                                            class="block truncate px-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/70"
-                                            title={hc.label}>{hc.label}</span
-                                        >
-                                    {/if}
+                                    条目
+                                </th>
+                                {#each group.headerGroups as hc, i (i)}
+                                    <th
+                                        data-sf="toolbar"
+                                        data-sf-under="card"
+                                        class="sticky top-0 z-30 h-6 p-0 text-center {hc.sepClass}"
+                                        style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                                        colspan={hc.span}
+                                    >
+                                        {#if hc.label}
+                                            <span
+                                                class="block truncate px-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/70"
+                                                title={hc.label}>{hc.label}</span
+                                            >
+                                        {/if}
+                                    </th>
+                                {/each}
+                            </tr>
+                        {/if}
+                        <tr>
+                            {#if !hasFolder}
+                                <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
+                                <th
+                                    data-rowhead
+                                    data-sf="toolbar"
+                                    data-sf-under="card"
+                                    class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
+                                    style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                                >
+                                    条目
+                                </th>
+                            {/if}
+                            {#each group.headerCols as hc (hc.ci)}
+                                {@const colHighlighted =
+                                    highlight?.gi === gi && highlight.kind === 'col' && highlight.index === hc.ci}
+                                {@const selCount = selStats.colCounts[gi]?.get(hc.ci) ?? 0}
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <th
+                                    data-colhead={hc.ci}
+                                    data-sf="toolbar"
+                                    data-sf-under="card"
+                                    class="sticky {hasFolder
+                                        ? 'top-6'
+                                        : 'top-0'} z-30 cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-top {hc.isLayer
+                                        ? 'w-[43px] min-w-[43px]'
+                                        : ''} {hc.sepClass}"
+                                    style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                                    class:spread-head-hl={colHighlighted}
+                                    title={`${hc.title}（${selCount}/${hc.enabled}）：单击高亮列，右键全选/全不选`}
+                                    onclick={() => clickColHeader(gi, hc.ci)}
+                                    oncontextmenu={(e) => onColHeaderContextMenu(e, gi, hc.ci)}
+                                >
+                                    <span
+                                        class="flex h-full w-full flex-col items-center justify-center gap-1 px-1.5 pt-1 pb-1.5 transition-colors hover:bg-(--theme-modal-text)/5 {hc.enabled ===
+                                        0
+                                            ? 'opacity-30'
+                                            : ''}"
+                                    >
+                                        {#if hc.isLayer}
+                                            <span
+                                                class="text-[11px] font-black leading-none tabular-nums text-(--theme-modal-text)/70"
+                                                title={hc.title}>{hc.label}</span
+                                            >
+                                        {:else}
+                                            <span
+                                                class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
+                                                title={hc.title}>{hc.label}</span
+                                            >
+                                        {/if}
+                                    </span>
                                 </th>
                             {/each}
                         </tr>
-                    {/if}
-                    <tr>
-                        {#if !hasFolder}
-                            <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
-                            <th
-                                data-rowhead
-                                data-sf="toolbar"
-                                data-sf-under="card"
-                                class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
-                                style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                            >
-                                条目
-                            </th>
-                        {/if}
-                        {#each group.headerCols as hc (hc.ci)}
-                            {@const colHighlighted =
-                                highlight?.gi === gi && highlight.kind === 'col' && highlight.index === hc.ci}
-                            {@const selCount = selStats.colCounts[gi]?.get(hc.ci) ?? 0}
-                            <!-- svelte-ignore a11y_no_static_element_interactions -->
-                            <th
-                                data-colhead={hc.ci}
-                                data-sf="toolbar"
-                                data-sf-under="card"
-                                class="sticky {hasFolder
-                                    ? 'top-6'
-                                    : 'top-0'} z-30 cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-top {hc.isLayer
-                                    ? 'w-[43px] min-w-[43px]'
-                                    : ''} {hc.sepClass}"
-                                style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                                class:spread-head-hl={colHighlighted}
-                                title={`${hc.title}（${selCount}/${hc.enabled}）：单击高亮列，右键全选/全不选`}
-                                onclick={() => clickColHeader(gi, hc.ci)}
-                                oncontextmenu={(e) => onColHeaderContextMenu(e, gi, hc.ci)}
-                            >
-                                <span
-                                    class="flex h-full w-full flex-col items-center justify-center gap-1 px-1.5 pt-1 pb-1.5 transition-colors hover:bg-(--theme-modal-text)/5 {hc.enabled ===
-                                    0
-                                        ? 'opacity-30'
-                                        : ''}"
-                                >
-                                    {#if hc.isLayer}
-                                        <span
-                                            class="text-[11px] font-black leading-none tabular-nums text-(--theme-modal-text)/70"
-                                            title={hc.title}>{hc.label}</span
-                                        >
-                                    {:else}
-                                        <span
-                                            class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
-                                            title={hc.title}>{hc.label}</span
-                                        >
-                                    {/if}
-                                </span>
-                            </th>
-                        {/each}
-                    </tr>
-                </thead>
-                <!-- 表体：每行一个伤害条目（行头单击高亮行/右键全选全不选 + 伤害类型编辑），单元格可勾选 -->
-                <tbody>
-                    {#each shownRows(group) as row, ri (row.entry.id)}
-                        {@const rowHighlighted =
-                            highlight?.gi === gi && highlight.kind === 'row' && highlight.index === ri}
-                        {@const colHighlightActive = highlight?.gi === gi && highlight.kind === 'col'}
-                        {@const selIds = entryBuffSetIdMap[row.entry.id] ?? EMPTY_IDS}
-                        <tr class:spread-rowhl-on={rowHighlighted} class:split-row={row.splitBefore}>
-                            <td
-                                data-rowhead={ri}
-                                data-sf="card"
-                                data-sf-flat
-                                class="sticky left-0 z-20 cursor-pointer select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5"
-                                style="--sf-base: var(--theme-modal-bg);"
-                                class:spread-frozen-hl={rowHighlighted}
-                                title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${
-                                    selStats.rowCounts.get(row.entry.id) ?? 0
-                                }/${row.enabledBuffIds.length}）`}
-                                onclick={() => clickRowHeader(gi, ri)}
-                                oncontextmenu={(e) => onRowHeaderContextMenu(e, gi, ri)}
-                            >
-                                <div class="flex w-full items-center gap-1.5 py-0.5 text-left">
-                                    <span
-                                        class="truncate text-(--theme-modal-text)"
-                                        style="color: var(--theme-element-{row.entry.damageElement}, #888);"
-                                        >{row.entry.displayName}</span
-                                    >
-                                </div>
-                                <!-- 视为：伤害类型（只读展示，编辑统一在底部工具栏的「编辑伤害类型」弹窗）；stopPropagation 避免触发行高亮 -->
-                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                <div
-                                    class="flex flex-wrap items-center gap-0.5 px-0.5 pb-0.5"
-                                    onclick={(e) => e.stopPropagation()}
-                                >
-                                    <span class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
-                                        >伤害类型：</span
-                                    >
-                                    {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
-                                        <span
-                                            class="rounded-none px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
-                                            style="background: var(--theme-input-bg);"
-                                            >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}</span
-                                        >
-                                    {/each}
-                                    {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
-                                        {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
-                                        {#if inferred.length > 0}
-                                            <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
-                                                >自动推导：{inferred
-                                                    .map(
-                                                        (t) =>
-                                                            DAMAGE_TYPE_SHORT[t as keyof typeof DAMAGE_TYPE_SHORT] ?? t
-                                                    )
-                                                    .join('/')}</span
-                                            >
-                                        {/if}
-                                    {/if}
-                                </div>
-                            </td>
-                            {#each group.visibleColIdx as ci, colPos (ci)}
-                                {@const cell = row.cells[ci]}
-                                {@const head = group.headerCols[colPos]}
-                                {@const colHighlighted = colHighlightActive && highlight?.index === ci}
-                                {@const on = selIds.includes(cell.buffId)}
-                                {@const named = on && (colHighlighted || rowHighlighted)}
+                    </thead>
+                    <!-- 表体：每行一个伤害条目（行头单击高亮行/右键全选全不选 + 伤害类型编辑），单元格可勾选 -->
+                    <tbody>
+                        {#each shownRows(group) as row, ri (row.entry.id)}
+                            {@const rowHighlighted =
+                                highlight?.gi === gi && highlight.kind === 'row' && highlight.index === ri}
+                            {@const colHighlightActive = highlight?.gi === gi && highlight.kind === 'col'}
+                            {@const selIds = entryBuffSetIdMap[row.entry.id] ?? EMPTY_IDS}
+                            <tr class:spread-rowhl-on={rowHighlighted} class:split-row={row.splitBefore}>
                                 <td
-                                    class="min-w-9 border-b border-(--theme-divider-border) p-0 text-center {head?.sepClass ??
-                                        ''}"
-                                    class:spread-cell-hl={colHighlighted}
-                                    data-group={gi}
-                                    data-row={ri}
-                                    data-col={ci}
+                                    data-rowhead={ri}
+                                    data-sf="card"
+                                    data-sf-flat
+                                    class="sticky left-0 z-20 cursor-pointer select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5"
+                                    style="--sf-base: var(--theme-modal-bg);"
+                                    class:spread-frozen-hl={rowHighlighted}
+                                    title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${
+                                        selStats.rowCounts.get(row.entry.id) ?? 0
+                                    }/${row.enabledBuffIds.length}）`}
+                                    onclick={() => clickRowHeader(gi, ri)}
+                                    oncontextmenu={(e) => onRowHeaderContextMenu(e, gi, ri)}
                                 >
-                                    {#if cell.enabled}
-                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                        <button
-                                            onclick={() => toggleCell(row, cell)}
-                                            title={on ? head?.titleOn : head?.titleOff}
-                                            class="flex min-h-6 w-full cursor-pointer items-center justify-center px-1.5 py-1.5 transition-colors hover:bg-(--theme-modal-text)/10"
+                                    <div class="flex w-full items-center gap-1.5 py-0.5 text-left">
+                                        <span
+                                            class="truncate text-(--theme-modal-text)"
+                                            style="color: var(--theme-element-{row.entry.damageElement}, #888);"
+                                            >{row.entry.displayName}</span
                                         >
-                                            {#if on}
-                                                <!-- 高亮行/列时改显 buff 名：图标保留挂载仅隐藏，避免切换高亮时反复销毁/创建图标组件；
-                                                     名称宽度上限与表头列宽上限一致，保证出现/消失不改变列 max-content（不触发整表重排） -->
-                                                <Icon
-                                                    icon="mdi:check"
-                                                    class="size-3.5 shrink-0"
-                                                    style="color: var(--theme-accent-text);{named
-                                                        ? ' display:none;'
-                                                        : ''}"
-                                                />
-                                                {#if named}
-                                                    <span
-                                                        class="w-full {head?.nameMaxClass ??
-                                                            'max-w-[106px]'} line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
-                                                        >{columns[ci].name}</span
-                                                    >
-                                                {/if}
+                                    </div>
+                                    <!-- 视为：伤害类型（只读展示，编辑统一在底部工具栏的「编辑伤害类型」弹窗）；stopPropagation 避免触发行高亮 -->
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <div
+                                        class="flex flex-wrap items-center gap-0.5 px-0.5 pb-0.5"
+                                        onclick={(e) => e.stopPropagation()}
+                                    >
+                                        <span class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
+                                            >伤害类型：</span
+                                        >
+                                        {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
+                                            <span
+                                                class="rounded-none px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
+                                                style="background: var(--theme-input-bg);"
+                                                >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}</span
+                                            >
+                                        {/each}
+                                        {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
+                                            {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
+                                            {#if inferred.length > 0}
+                                                <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
+                                                    >自动推导：{inferred
+                                                        .map(
+                                                            (t) =>
+                                                                DAMAGE_TYPE_SHORT[
+                                                                    t as keyof typeof DAMAGE_TYPE_SHORT
+                                                                ] ?? t
+                                                        )
+                                                        .join('/')}</span
+                                                >
                                             {/if}
-                                        </button>
-                                    {:else}
-                                        <!-- 不可用（作用域/条件不匹配）不显示文字 -->
-                                        <span class="block h-6 w-full"></span>
-                                    {/if}
+                                        {/if}
+                                    </div>
                                 </td>
-                            {/each}
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
-        </div>
-    {/each}
+                                {#each group.visibleColIdx as ci, colPos (ci)}
+                                    {@const cell = row.cells[ci]}
+                                    {@const head = group.headerCols[colPos]}
+                                    {@const colHighlighted = colHighlightActive && highlight?.index === ci}
+                                    {@const on = selIds.includes(cell.buffId)}
+                                    {@const named = on && (colHighlighted || rowHighlighted)}
+                                    <td
+                                        class="min-w-9 border-b border-(--theme-divider-border) p-0 text-center {head?.sepClass ??
+                                            ''}"
+                                        class:spread-cell-hl={colHighlighted}
+                                        data-group={gi}
+                                        data-row={ri}
+                                        data-col={ci}
+                                    >
+                                        {#if cell.enabled}
+                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                            <button
+                                                onclick={() => toggleCell(row, cell)}
+                                                title={on ? head?.titleOn : head?.titleOff}
+                                                class="flex min-h-6 w-full cursor-pointer items-center justify-center px-1.5 py-1.5 transition-colors hover:bg-(--theme-modal-text)/10"
+                                            >
+                                                {#if on}
+                                                    <!-- 高亮行/列时改显 buff 名：图标保留挂载仅隐藏，避免切换高亮时反复销毁/创建图标组件；
+                                                     名称宽度上限与表头列宽上限一致，保证出现/消失不改变列 max-content（不触发整表重排） -->
+                                                    <Icon
+                                                        icon="mdi:check"
+                                                        class="size-3.5 shrink-0"
+                                                        style="color: var(--theme-accent-text);{named
+                                                            ? ' display:none;'
+                                                            : ''}"
+                                                    />
+                                                    {#if named}
+                                                        <span
+                                                            class="w-full {head?.nameMaxClass ??
+                                                                'max-w-[106px]'} line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
+                                                            >{columns[ci].name}</span
+                                                        >
+                                                    {/if}
+                                                {/if}
+                                            </button>
+                                        {:else}
+                                            <!-- 不可用（作用域/条件不匹配）不显示文字 -->
+                                            <span class="block h-6 w-full"></span>
+                                        {/if}
+                                    </td>
+                                {/each}
+                            </tr>
+                        {/each}
+                    </tbody>
+                </table>
+            </div>
+        {/each}
+    </div>
 </div>
 
 <!-- @desc 首列/表头右键菜单：全选/全不选（行或列） -->
@@ -1163,8 +1273,11 @@
     .spread-cell-hl {
         background-color: var(--spread-hl);
     }
-    /* 同角色来源、时间线上不连续的伤害之间画主题色点横线（半透明） */
+    /* 排轴上「上一个伤害倍率不是当前伤害源引起的」→ 该行上方画加粗提亮的主题色点横线，行头处实线收口，突出这次不连续 */
     .split-row td {
-        border-top: 1px dashed color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
+        border-top: 2px dashed color-mix(in srgb, var(--theme-accent-bg) 70%, transparent);
+    }
+    .split-row td[data-rowhead] {
+        border-top-style: solid;
     }
 </style>
