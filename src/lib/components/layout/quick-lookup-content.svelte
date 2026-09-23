@@ -765,11 +765,13 @@
             {#if showBuffOption || showCustomHitOption}
                 <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
             {/if}
-            <!-- @desc 排轴锁定时不显示「以此为名创建BUFF」（锁定态不允许改动工程内容） -->
-            {#if showBuffOption && !getLocked()}
+            <!-- @desc 「以此为名创建BUFF」：排轴锁定时禁用（置灰不可点），不隐藏 -->
+            {#if showBuffOption}
                 <button
                     onclick={handleCreateBuffFromSel}
-                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                    disabled={getLocked()}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    title={getLocked() ? '排轴已锁定，无法创建 BUFF' : undefined}
                     ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</button
                 >
             {/if}
