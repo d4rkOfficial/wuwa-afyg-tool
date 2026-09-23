@@ -930,13 +930,13 @@
                 <thead>
                     {#if hasFolder}
                         <tr>
-                            <!-- 表头（含「条目」角格）底色跟随「工具栏」透明度/深度 -->
+                            <!-- 表头（含「条目」角格）底色 = 工具栏层叠一层卡片底（并取卡片的毛玻璃，吸顶时挡住滚过的行）；角格只叠这一套，不再额外叠行头卡片底 -->
                             <th
                                 data-rowhead
                                 data-sf="toolbar"
-                                data-sf-flat
+                                data-sf-under="card"
                                 class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
-                                style="--sf-base: var(--theme-modal-bg);"
+                                style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
                                 rowspan="2"
                             >
                                 条目
@@ -944,9 +944,9 @@
                             {#each group.headerGroups as hc, i (i)}
                                 <th
                                     data-sf="toolbar"
-                                    data-sf-flat
+                                    data-sf-under="card"
                                     class="sticky top-0 z-30 h-6 p-0 text-center {hc.sepClass}"
-                                    style="--sf-base: var(--theme-modal-bg);"
+                                    style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
                                     colspan={hc.span}
                                 >
                                     {#if hc.label}
@@ -965,9 +965,9 @@
                             <th
                                 data-rowhead
                                 data-sf="toolbar"
-                                data-sf-flat
+                                data-sf-under="card"
                                 class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
-                                style="--sf-base: var(--theme-modal-bg);"
+                                style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
                             >
                                 条目
                             </th>
@@ -980,13 +980,13 @@
                             <th
                                 data-colhead={hc.ci}
                                 data-sf="toolbar"
-                                data-sf-flat
+                                data-sf-under="card"
                                 class="sticky {hasFolder
                                     ? 'top-6'
                                     : 'top-0'} z-30 cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-top {hc.isLayer
                                     ? 'w-[43px] min-w-[43px]'
                                     : ''} {hc.sepClass}"
-                                style="--sf-base: var(--theme-modal-bg);"
+                                style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
                                 class:spread-head-hl={colHighlighted}
                                 title={`${hc.title}（${selCount}/${hc.enabled}）：单击高亮列，右键全选/全不选`}
                                 onclick={() => clickColHeader(gi, hc.ci)}
@@ -1137,7 +1137,7 @@
     .spread-root {
         --spread-hl: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent);
     }
-    /* 底色交给区域系统（data-sf）：列表=card、表头=toolbar，均 data-sf-flat 免毛玻璃；此处只放高亮/分隔线等叠加效果 */
+    /* 底色交给区域系统（data-sf）：列表=card；表头=toolbar 叠 card 底（含卡片毛玻璃）；此处只放高亮/分隔线等叠加效果 */
     /* 列间分割线：叠层组与邻接列之间用主题色实线，其余用常规分隔线 */
     .spread-sep {
         border-right: 1px solid var(--theme-divider-border);
@@ -1149,13 +1149,16 @@
     .spread-rowhl-on {
         background-color: var(--spread-hl);
     }
+    /* 行头/表头带 data-sf（表头为 toolbar+card 两层图片背景），浅洗改用 inset box-shadow 叠加，避免覆盖区域系统的 background-image */
     .spread-frozen-hl {
-        background-image: linear-gradient(var(--spread-hl), var(--spread-hl));
-        box-shadow: inset 3px 0 0 var(--theme-accent-bg);
+        box-shadow:
+            inset 3px 0 0 var(--theme-accent-bg),
+            inset 0 0 0 9999px var(--spread-hl);
     }
     .spread-head-hl {
-        background-image: linear-gradient(var(--spread-hl), var(--spread-hl));
-        box-shadow: inset 0 -2px 0 var(--theme-accent-bg);
+        box-shadow:
+            inset 0 -2px 0 var(--theme-accent-bg),
+            inset 0 0 0 9999px var(--spread-hl);
     }
     .spread-cell-hl {
         background-color: var(--spread-hl);

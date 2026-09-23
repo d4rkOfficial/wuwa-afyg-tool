@@ -199,9 +199,12 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
        用法：给元素加 data-sf="card|modal|sidebar|content|toolbar"；
        底色默认取该类的主题底色，元素可用内联 style="--sf-base: var(--theme-xxx-bg)" 覆盖（如操作块用 timeline 底色）；
        再加 data-sf-flat 则只取该类底色（透明度/深度）而不使用毛玻璃——用于大量逐行/逐格元素（如铺开表），
-       避免每个元素都重算一次背景模糊 */
+       避免每个元素都重算一次背景模糊；
+       再加 data-sf-under="<key>" 则在本区域底色之下垫一层其它区域的底色（如铺开表表头 = toolbar 叠 card 底），
+       毛玻璃取「垫层」的强度（可用 --sfu-base 覆盖垫层底色）；显式再加 data-sf-flat 仍然完全禁用毛玻璃 */
     [data-sf] {
-        background: color-mix(
+        /* 本区域底色（单独一层；data-sf-under 组合两层时复用这个变量） */
+        --sf-mix: color-mix(
             in srgb,
             color-mix(
                     in srgb,
@@ -211,8 +214,32 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
                 var(--sf-opacity, 100%),
             transparent
         );
+        background: var(--sf-mix);
         backdrop-filter: var(--sf-backdrop, none);
         -webkit-backdrop-filter: var(--sf-backdrop, none);
+    }
+    [data-sf][data-sf-under] {
+        /* 两层都走 background-image：background 简写的多层里只有最后一层允许写颜色，故用同色 linear-gradient 当纯色层 */
+        --sfu-mix: color-mix(
+            in srgb,
+            color-mix(
+                    in srgb,
+                    var(--sfu-base, transparent) calc(100% - var(--sfu-depth, 0%)),
+                    var(--sfu-target, transparent)
+                )
+                var(--sfu-opacity, 100%),
+            transparent
+        );
+        background: linear-gradient(var(--sf-mix), var(--sf-mix)), linear-gradient(var(--sfu-mix), var(--sfu-mix));
+        backdrop-filter: var(--sfu-backdrop, none);
+        -webkit-backdrop-filter: var(--sfu-backdrop, none);
+    }
+    [data-sf-under='card'] {
+        --sfu-base: var(--theme-card-bg);
+        --sfu-depth: var(--sf-card-depth);
+        --sfu-target: var(--sf-card-target);
+        --sfu-opacity: var(--sf-card-opacity);
+        --sfu-backdrop: var(--sf-card-backdrop);
     }
     [data-sf][data-sf-flat] {
         backdrop-filter: none;
