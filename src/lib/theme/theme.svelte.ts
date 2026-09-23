@@ -11,6 +11,7 @@ import type {
     SurfaceStyle
 } from './types'
 import { SURFACE_KEYS } from './types'
+import { DEFAULT_BACKGROUND_DARK, DEFAULT_BACKGROUND_LIGHT } from './default-backgrounds'
 import darkPreset from './preset/dark.json'
 import lightPreset from './preset/light.json'
 
@@ -19,19 +20,39 @@ const OVERRIDES_KEY = 'theme-overrides'
 
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
-/** @desc 五类区域默认外观；口径：尽量贴近改造前的整体观感 */
+/** @desc 五类区域兜底外观（= 黑夜默认；仅用于缺项回落与旧数据归一化） */
 export const DEFAULT_SURFACES: Record<SurfaceKey, SurfaceStyle> = {
-    card: { opacity: 100, blur: 0, depth: 0 },
-    modal: { opacity: 75, blur: 4, depth: 0 },
-    sidebar: { opacity: 85, blur: 0, depth: 0 },
+    card: { opacity: 20, blur: 5, depth: 5 },
+    modal: { opacity: 40, blur: 32, depth: 100 },
+    sidebar: { opacity: 0, blur: 32, depth: 0 },
     content: { opacity: 0, blur: 0, depth: 0 },
-    toolbar: { opacity: 100, blur: 0, depth: 0 }
+    toolbar: { opacity: 0, blur: 0, depth: 0 }
 }
 
-/** @desc 默认外观（昼夜各一份） */
+/** @desc 首次进入时的默认外观（昼夜各一份）：白天更通透、黑夜更沉浸 */
 export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
-    dark: { bgImageBlur: 4, bgImageMask: 0, surfaces: structuredClone(DEFAULT_SURFACES) },
-    light: { bgImageBlur: 4, bgImageMask: 0, surfaces: structuredClone(DEFAULT_SURFACES) }
+    light: {
+        bgImageBlur: 0,
+        bgImageMask: 200,
+        surfaces: {
+            card: { opacity: 20, blur: 5, depth: 5 },
+            modal: { opacity: 0, blur: 32, depth: 0 },
+            sidebar: { opacity: 60, blur: 0, depth: 0 },
+            content: { opacity: 0, blur: 0, depth: 0 },
+            toolbar: { opacity: 0, blur: 0, depth: 0 }
+        }
+    },
+    dark: {
+        bgImageBlur: 0,
+        bgImageMask: -100,
+        surfaces: {
+            card: { opacity: 20, blur: 5, depth: 5 },
+            modal: { opacity: 40, blur: 32, depth: 100 },
+            sidebar: { opacity: 0, blur: 32, depth: 0 },
+            content: { opacity: 0, blur: 0, depth: 0 },
+            toolbar: { opacity: 0, blur: 0, depth: 0 }
+        }
+    }
 }
 
 const DEFAULT_OVERRIDES: ThemeOverrides = {
@@ -40,6 +61,21 @@ const DEFAULT_OVERRIDES: ThemeOverrides = {
     backgroundImageLight: '',
     appearance: structuredClone(DEFAULT_APPEARANCE),
     neonText: 0
+}
+
+/**
+ * @desc 首次进入：把外观恢复为默认（昼夜两套默认质感 + 内置默认背景图），并落盘。
+ * 默认背景图为 base64 内联，用户可在设置里替换或清空。
+ */
+export async function applyFirstRunAppearance() {
+    overrides = {
+        ...structuredClone(DEFAULT_OVERRIDES),
+        appearance: structuredClone(DEFAULT_APPEARANCE),
+        backgroundImage: DEFAULT_BACKGROUND_DARK,
+        backgroundImageLight: DEFAULT_BACKGROUND_LIGHT
+    }
+    await dbSet(OVERRIDES_KEY, toPlain(overrides))
+    applyThemeCSS()
 }
 
 let themes = $state<Theme[]>([])
@@ -52,18 +88,25 @@ const toPlain = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 const activeMode = (): ThemeMode => (activeId === 'light' ? 'light' : 'dark')
 
 /** @desc 归一化外观设置：缺项回落到默认值（旧的持久化数据不做迁移，缺项直接用默认） */
-function normalizeAppearance(raw: unknown): ThemeAppearance {
+/** @desc 归一化外观设置：缺项按该昼夜的默认值回落 */
+function normalizeAppearance(raw: unknown, mode: ThemeMode): ThemeAppearance {
     const src = (raw ?? {}) as Partial<ThemeAppearance>
-    const surfaces = { ...structuredClone(DEFAULT_SURFACES) }
+    const base = DEFAULT_APPEARANCE[mode]
+    const surfaces = structuredClone(base.surfaces)
     for (const key of SURFACE_KEYS) {
         const saved = (src.surfaces ?? {})[key]
-        if (saved) surfaces[key] = { ...DEFAULT_SURFACES[key], ...saved }
+        if (saved) surfaces[key] = { ...base.surfaces[key], ...saved }
     }
     return {
-        bgImageBlur: typeof src.bgImageBlur === 'number' ? src.bgImageBlur : DEFAULT_APPEARANCE.dark.bgImageBlur,
-        bgImageMask: typeof src.bgImageMask === 'number' ? src.bgImageMask : DEFAULT_APPEARANCE.dark.bgImageMask,
+        bgImageBlur: typeof src.bgImageBlur === 'number' ? src.bgImageBlur : base.bgImageBlur,
+        bgImageMask: typeof src.bgImageMask === 'number' ? src.bgImageMask : base.bgImageMask,
         surfaces
     }
+}
+
+/** @desc 某区域在指定昼夜下的默认外观（「重置该区域」用） */
+export function defaultSurfaceStyle(key: SurfaceKey, mode: ThemeMode = activeMode()): SurfaceStyle {
+    return DEFAULT_APPEARANCE[mode].surfaces[key]
 }
 
 /** @desc 当前昼夜下的外观设置（背景图效果 + 各表面） */
@@ -73,7 +116,7 @@ export function getAppearance(mode: ThemeMode = activeMode()): ThemeAppearance {
 
 /** @desc 读取某个表面的外观设置（默认取当前昼夜） */
 export function getSurfaceStyle(key: SurfaceKey, mode: ThemeMode = activeMode()): SurfaceStyle {
-    return overrides.appearance[mode].surfaces[key] ?? DEFAULT_SURFACES[key]
+    return overrides.appearance[mode].surfaces[key] ?? DEFAULT_APPEARANCE[mode].surfaces[key]
 }
 
 /** @desc 修改某个表面的透明度/毛玻璃/背景深度（按昼夜分开保存） */
@@ -282,7 +325,7 @@ function applyBgBlend(root: HTMLElement) {
 
     // ── 五类区域：透明度 / 毛玻璃强度 / 背景深度（由 layout.css 的 [data-sf] 规则消费）──
     for (const key of SURFACE_KEYS) {
-        const style = appearance.surfaces[key] ?? DEFAULT_SURFACES[key]
+        const style = appearance.surfaces[key] ?? DEFAULT_APPEARANCE[activeMode()].surfaces[key]
         const depth = clamp(style.depth, 0, 100)
         root.style.setProperty(`--sf-${key}-depth`, `${(depth * 0.9).toFixed(1)}%`)
         root.style.setProperty(`--sf-${key}-target`, isLight ? '#ffffff' : '#000000')
@@ -358,8 +401,8 @@ export async function loadThemes() {
             ...DEFAULT_OVERRIDES,
             ...ov.data,
             appearance: {
-                dark: normalizeAppearance(ov.data.appearance?.dark),
-                light: normalizeAppearance(ov.data.appearance?.light)
+                dark: normalizeAppearance(ov.data.appearance?.dark, 'dark'),
+                light: normalizeAppearance(ov.data.appearance?.light, 'light')
             }
         }
         // 未压缩的 data URL 会撑爆 CSS 变量导致背景图失效，直接丢弃（白天/黑夜两张各自校验）

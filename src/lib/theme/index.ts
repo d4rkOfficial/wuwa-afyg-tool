@@ -15,7 +15,9 @@ export {
     setSurfaceStyle,
     setBgImageEffect,
     DEFAULT_SURFACES,
-    DEFAULT_APPEARANCE
+    DEFAULT_APPEARANCE,
+    defaultSurfaceStyle,
+    applyFirstRunAppearance
 } from './theme.svelte.js'
 
 export { SURFACE_KEYS, SURFACE_GROUPS, SURFACE_LABELS } from './types.js'

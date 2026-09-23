@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { fade } from 'svelte/transition'
     import { popOut } from '$lib/utils/motion'
     import {
@@ -11,7 +11,7 @@
         setBgImageEffect,
         setSurfaceStyle,
         updateOverride,
-        DEFAULT_SURFACES,
+        defaultSurfaceStyle,
         SURFACE_GROUPS,
         type SurfaceKey,
         type SurfaceStyle,
@@ -294,7 +294,7 @@
     const surfaceStyle = $derived(getSurfaceStyle(surfaceKey, modeKey))
 
     const updateSurface = (patch: Partial<SurfaceStyle>) => void setSurfaceStyle(surfaceKey, patch, modeKey)
-    const resetSurface = () => void setSurfaceStyle(surfaceKey, DEFAULT_SURFACES[surfaceKey], modeKey)
+    const resetSurface = () => void setSurfaceStyle(surfaceKey, defaultSurfaceStyle(surfaceKey, modeKey), modeKey)
     const updateBgEffect = (patch: { bgImageBlur?: number; bgImageMask?: number }) =>
         void setBgImageEffect(patch, modeKey)
 
@@ -1012,7 +1012,7 @@
 
                                         <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/35">
                                             按昼夜分别保存；当前编辑「{modeKey === 'light' ? '白天' : '黑夜'}
-                                            」主题。五类区域可各自设置透明度 / 毛玻璃强度 / 背景深度
+                                            」主题。五类区域可各自设置不透明度 / 毛玻璃强度 / 背景深度
                                         </p>
 
                                         <!-- 区域选择 -->
@@ -1044,13 +1044,13 @@
                                                 <span
                                                     class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
                                                 >
-                                                    <span>透明度</span>
+                                                    <span>不透明度</span>
                                                     <span class="font-mono text-(--theme-accent-text)"
                                                         >{surfaceStyle.opacity}%</span
                                                     >
                                                 </span>
                                                 <input
-                                                    aria-label="透明度"
+                                                    aria-label="不透明度"
                                                     type="range"
                                                     min="0"
                                                     max="100"

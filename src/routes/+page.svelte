@@ -64,6 +64,7 @@
     import { loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
     import { initToyEnvironmentBridge, onToyEnter, isToyMobile } from '$lib/bilibili-toy/environment.svelte'
     import { isFirstVisit, markVisited, isMagneticToySet, markMagneticToySet } from '$lib/data/toy-prefs.svelte'
+    import { applyFirstRunAppearance } from '$lib/theme'
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
     import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
@@ -289,12 +290,13 @@
         hideSplash()
         initToyProfileBridge()
         initToyEnvironmentBridge()
-        // 首次进入（任意端）：拉表默认平铺模式；禁用磁力光标；禁用 AI 助手（一次性持久设定，用户可在设置中重新开启）
+        // 首次进入（任意端）：拉表默认平铺模式；禁用磁力光标；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）
         if (isFirstVisit()) {
             setCalcViewMode('spread')
             setMagneticPointer(false)
             // AI 助手默认隐藏（**持久化**保存：用户可在设置里重新开启）
             void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
+            void applyFirstRunAppearance()
             markVisited()
         }
         // 进入 Toy 环境（消息异步到达，每会话首次触发）：

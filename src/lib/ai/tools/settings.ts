@@ -11,7 +11,7 @@ import {
     setBgImageEffect,
     setSurfaceStyle,
     updateOverride,
-    DEFAULT_SURFACES,
+    defaultSurfaceStyle,
     SURFACE_KEYS,
     SURFACE_LABELS,
     type SurfaceKey,
@@ -185,7 +185,7 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
         }
     },
     surface_style: {
-        label: '区域质感（透明度/毛玻璃/背景深度）',
+        label: '区域质感（不透明度/毛玻璃/背景深度）',
         apply: async (v) => {
             const obj = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
             const key = str(obj.surface) as SurfaceKey
@@ -193,7 +193,7 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
                 throw new Error(`surface 须为 ${SURFACE_KEYS.map((k) => `${k}（${SURFACE_LABELS[k]}）`).join(' / ')}`)
             const mode = resolveMode(obj.mode)
             if (obj.reset === true) {
-                await setSurfaceStyle(key, DEFAULT_SURFACES[key], mode)
+                await setSurfaceStyle(key, defaultSurfaceStyle(key, mode), mode)
             } else {
                 const patch: Partial<SurfaceStyle> = {}
                 if (obj.opacity !== undefined) patch.opacity = clampNum(obj.opacity, 'surface_style.opacity', 0, 100)
@@ -480,7 +480,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"|"dark"}，按昼夜分别保存)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar", opacity?:0-100, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"|"dark"}，按昼夜分别保存)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。',
     parameters: {
         type: 'object',
         properties: {

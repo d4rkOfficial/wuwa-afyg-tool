@@ -1,7 +1,8 @@
 // Toy 相关持久化偏好：localStorage 一次性标记（首次访问 / 关闭磁力光标设定）。
 import { browser } from '$app/environment'
 
-const VISITED_KEY = 'wuwa-afyg:visited_6AA49600'
+/** @desc 首次访问标记的 key；改版本号即等于「重置首次进入标记」（下次进入按首次处理） */
+const VISITED_KEY = 'wuwa-afyg:visited_6AA49600:v2'
 const MAGNETIC_TOY_KEY = 'wuwa-afyg:magnetic-toy-set_6AA49600'
 
 /** 是否首次访问 tool（无 visited 标记） */
