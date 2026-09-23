@@ -1770,7 +1770,7 @@
                         </div>
                     {:else if tab === 'connection'}
                         <!-- Connection settings: 上游数据源 + 工坊/分享源 -->
-                        <div>
+                        <div class="grid grid-cols-1 items-start gap-x-8 gap-y-6 xl:grid-cols-2">
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
@@ -1825,7 +1825,10 @@
                                 </button>
                             </div>
 
-                            <div class="my-4 border-t" style="border-color: var(--theme-divider-border);"></div>
+                            <div
+                                class="my-4 border-t xl:hidden"
+                                style="border-color: var(--theme-divider-border);"
+                            ></div>
 
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
