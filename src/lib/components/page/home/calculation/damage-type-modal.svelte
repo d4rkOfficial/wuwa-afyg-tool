@@ -175,7 +175,7 @@
             <span class="font-black tracking-tight">编辑伤害类型</span>
             <button
                 onclick={() => (helpOpen = !helpOpen)}
-                class="rounded-full p-0.5 transition-colors {helpOpen
+                class="rounded-none p-0.5 transition-colors {helpOpen
                     ? 'text-(--theme-accent-text)'
                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
                 title="这个弹窗怎么用？"

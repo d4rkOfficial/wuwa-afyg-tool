@@ -967,7 +967,7 @@
                         </h3>
                         <button
                             onclick={() => openHelp('时间记点规则', refLineHelpItems)}
-                            class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold transition-colors hover:bg-(--theme-modal-text)/10"
+                            class="flex h-5 w-5 items-center justify-center rounded-none text-xs font-black transition-colors hover:bg-(--theme-modal-text)/10"
                             style="color: var(--theme-accent-text);"
                             title="时间参考线命名解析与限制规则"
                         >
@@ -1298,7 +1298,7 @@
                             >
                         </div>
                         <div
-                            class="flex h-3 w-full overflow-hidden rounded-full"
+                            class="flex h-3 w-full overflow-hidden rounded-none"
                             style="background: color-mix(in srgb, var(--theme-input-bg) 85%, transparent);"
                         >
                             {#if totalDamage > 0}
@@ -1413,7 +1413,7 @@
                         </h3>
                         <button
                             onclick={() => openHelp('算法说明', helpItems)}
-                            class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold transition-colors hover:bg-(--theme-modal-text)/10"
+                            class="flex h-5 w-5 items-center justify-center rounded-none text-xs font-black transition-colors hover:bg-(--theme-modal-text)/10"
                             style="color: var(--theme-accent-text);"
                             title="算法说明"
                         >
