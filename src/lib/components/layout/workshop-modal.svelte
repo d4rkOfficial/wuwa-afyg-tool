@@ -112,7 +112,7 @@
     {/snippet}
 
     <div class="flex items-center justify-between gap-2">
-        <p class="text-[10px] leading-relaxed text-(--theme-modal-text)/40">无需登录，下载后自动导入本地项目列表</p>
+        <p class="text-[10px] leading-relaxed text-(--theme-modal-text)/40">无需登录，下载后自动导入本地工程列表</p>
         <button
             onclick={() => refreshProjects()}
             disabled={share.loading}

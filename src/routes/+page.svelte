@@ -379,7 +379,7 @@
         showNewModal = false
         newName = ''
         initForActiveProject()
-        addToast(`项目「${name.trim()}」已创建`, 'success')
+        addToast(`工程「${name.trim()}」已创建`, 'success')
     }
 
     function openRename(id: string) {
@@ -394,7 +394,7 @@
         if (!renameValue.trim()) return
         renameProject(renameId, renameValue.trim())
         renameModal = false
-        addToast('项目已重命名', 'success')
+        addToast('工程已重命名', 'success')
     }
 
     function openClone(id: string) {
@@ -449,7 +449,7 @@
     function handleDelete() {
         deleteProject(deleteId)
         deleteModal = false
-        addToast('项目已删除', 'info')
+        addToast('工程已删除', 'info')
     }
 
     function goHome() {
@@ -500,7 +500,7 @@
         a.click()
         URL.revokeObjectURL(url)
         exportModal = false
-        addToast(`项目「${p.name}」已导出`, 'success')
+        addToast(`工程「${p.name}」已导出`, 'success')
     }
 
     function handleImport() {
@@ -511,7 +511,7 @@
             try {
                 const normalized = parseProjectFile(reader.result as string)
                 importProjects(normalized)
-                addToast(`成功导入 ${normalized.length} 个项目`, 'success')
+                addToast(`成功导入 ${normalized.length} 个工程`, 'success')
             } catch (e) {
                 addToast(e instanceof ProjectParseError ? `导入失败：${e.message}` : '导入失败：文件格式错误', 'error')
             }
@@ -1057,15 +1057,15 @@
 {#if showNewModal}
     <Modal open={true} onclose={() => (showNewModal = false)}>
         {#snippet title()}
-            新建项目
+            新建工程
         {/snippet}
         <div class="space-y-4">
             <div>
-                <label for="project-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">项目名称</label>
+                <label for="project-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">工程名称</label>
                 <input
                     id="project-name"
                     bind:value={newName}
-                    placeholder="输入项目名称"
+                    placeholder="输入工程名称"
                     class="w-full rounded-none border border-(--theme-divider-border) px-3 py-2 text-sm outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleCreate(newName)}
@@ -1085,11 +1085,11 @@
 {#if renameModal}
     <Modal open={true} onclose={() => (renameModal = false)}>
         {#snippet title()}
-            重命名项目
+            重命名工程
         {/snippet}
         <div class="space-y-4">
             <div>
-                <label for="rename-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">项目名称</label>
+                <label for="rename-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">工程名称</label>
                 <input
                     id="rename-name"
                     bind:value={renameValue}
@@ -1108,7 +1108,7 @@
 {#if exportModal}
     <Modal open={true} onclose={() => (exportModal = false)}>
         {#snippet title()}
-            导出项目
+            导出工程
         {/snippet}
         <div class="space-y-4">
             <p class="mb-2 text-[10px] text-(--theme-modal-text)/40">选择要导出的部分（前置部分将自动勾选）</p>
@@ -1122,15 +1122,15 @@
 {#if cloneModal}
     <Modal open={true} onclose={() => (cloneModal = false)}>
         {#snippet title()}
-            复制项目
+            复制工程
         {/snippet}
         <div class="space-y-4">
             <div>
-                <label for="clone-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">新项目名称</label>
+                <label for="clone-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">新工程名称</label>
                 <input
                     id="clone-name"
                     bind:value={cloneName}
-                    placeholder="输入新项目名称"
+                    placeholder="输入新工程名称"
                     class="w-full rounded-none border border-(--theme-divider-border) px-3 py-2 text-sm outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleClone()}
@@ -1162,7 +1162,7 @@
 {#if deleteModal}
     <ConfirmDeleteModal
         open
-        title="删除项目"
+        title="删除工程"
         confirmText={`删除${deleteName}`}
         confirmLabel="删除"
         onclose={() => (deleteModal = false)}

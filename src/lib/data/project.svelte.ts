@@ -55,7 +55,7 @@ function normalizeProject(p: Partial<Project>): Project {
     )
     return {
         id: p.id ?? crypto.randomUUID(),
-        name: p.name ?? '未命名项目',
+        name: p.name ?? '未命名工程',
         comparisonPoints: p.comparisonPoints,
         createdAt: p.createdAt ?? Date.now(),
         team: p.team ?? [emptyCharSlot(), emptyCharSlot(), emptyCharSlot()],
@@ -355,7 +355,7 @@ export function safeJsonParse(text: string): unknown {
     }
 }
 
-/** 解析导出的工程文件文本为项目数组（导入/下载共用），结构无法识别时抛 ProjectParseError */
+/** 解析导出的工程文件文本为工程数组（导入/下载共用），结构无法识别时抛 ProjectParseError */
 export function parseProjectFile(text: string): Project[] {
     const raw = safeJsonParse(text)
     const rawProjects: Record<string, unknown>[] = []
@@ -371,7 +371,7 @@ export function parseProjectFile(text: string): Project[] {
     if (!rawProjects.length) throw new ProjectParseError('无法识别的工程文件结构')
     return rawProjects.map((item) => ({
         id: (item.id as string) || crypto.randomUUID(),
-        name: (item.name as string) || '导入的项目',
+        name: (item.name as string) || '导入的工程',
         createdAt: (item.createdAt as number) || Date.now(),
         team: (item.team as never) || [
             {

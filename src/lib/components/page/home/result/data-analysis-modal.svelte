@@ -70,7 +70,7 @@
     )
 
     // ── 当前工程名（标题栏展示）──
-    let projectName = $derived(getActiveProject()?.name ?? '未命名项目')
+    let projectName = $derived(getActiveProject()?.name ?? '未命名工程')
 
     // ── 时间记点规则帮助 ──
     const refLineHelpItems: { name: string; description: string; content: string }[] = [

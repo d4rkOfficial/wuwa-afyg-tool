@@ -1,6 +1,6 @@
 # 部署与构建
 
-本页是椰果工具箱的部署与构建说明。项目介绍与功能见 [README](../README.md)，其它文档：
+本页是椰果工具箱的部署与构建说明。工程介绍与功能见 [README](../README.md)，其它文档：
 
 - [upstream-integration.md](upstream-integration.md) — 接入新数据上游（`DataProvider`）
 - [tools.md](tools.md) — AI 助手 / WS 远程接管共用的工具清单（自动生成）
@@ -26,7 +26,7 @@ pnpm run preview
 
 ## Cloudflare Pages
 
-在 Cloudflare Pages 控制台新建项目并连接同一仓库：
+在 Cloudflare Pages 控制台新建工程并连接同一仓库：
 
 | 设置         | 值                                        |
 | ------------ | ----------------------------------------- |

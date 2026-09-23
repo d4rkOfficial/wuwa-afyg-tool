@@ -190,7 +190,7 @@
         const current = activeGroupKey
         if (current === prevGroupKey) return
         prevGroupKey = current
-        // 手风琴：活动项目的分组 key 变化时（切换活动项目，或锁定 team 后从未分组进入队伍文件夹），
+        // 手风琴：活动工程的分组 key 变化时（切换活动工程，或锁定 team 后从未分组进入队伍文件夹），
         // 展开 / 切换到其所属队伍文件夹
         if (current && !expandedKeys.has(current)) {
             untrack(() => {
