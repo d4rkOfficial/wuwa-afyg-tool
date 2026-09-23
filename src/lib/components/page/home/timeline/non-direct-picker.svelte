@@ -37,7 +37,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-none border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -47,13 +47,13 @@
             }}
         >
             <div
-                class="flex items-center justify-between px-4 py-3 border-b"
+                class="flex items-center justify-between border-b px-4 pb-2.5 pt-3"
                 style="border-bottom-color: var(--theme-divider-border);"
             >
-                <h2 class="text-sm font-semibold">配置非直伤</h2>
+                <h2 class="text-base font-black tracking-tight">配置非直伤</h2>
             </div>
             <div class="theme-scrollbar flex-1 overflow-y-auto p-4 space-y-3">
-                <div class="text-[11px] font-semibold text-(--theme-modal-text)/60 tracking-wider">处决/响应</div>
+                <div class="text-xs font-black tracking-tight text-(--theme-modal-text)">处决/响应</div>
                 {#each NON_DIRECT_CONFIGS.filter((c) => c.name === '谐度破坏' || c.category === '响应') as cfg}
                     {@const isTuneBreak = cfg.name === '谐度破坏'}
                     {@const isResp = cfg.category === '响应'}
@@ -141,10 +141,8 @@
                     </div>
                 {/each}
 
-                <div class="pt-3 border-t" style="border-top-color: var(--theme-divider-border);">
-                    <div class="text-[11px] font-semibold text-(--theme-modal-text)/60 tracking-wider mb-3">
-                        效应结算
-                    </div>
+                <div class="border-t pt-4" style="border-top-color: var(--theme-divider-border);">
+                    <div class="mb-3 text-xs font-black tracking-tight text-(--theme-modal-text)">效应结算</div>
                     <div class="flex flex-col gap-2">
                         {#each NON_DIRECT_CONFIGS.filter((c) => c.category === '效应') as cfg}
                             {@const idx = getNonDirectPickerData().findIndex((d) => d.name === cfg.name)}
@@ -158,10 +156,13 @@
                                 {@const pct = cfg.max > 0 ? (layers / cfg.max) * 100 : 0}
                                 <div
                                     class="flex flex-col gap-2 rounded-none border p-2.5"
-                                    style="border-color: var(--theme-divider-border);"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="flex items-center justify-between gap-2">
-                                        <span class="text-xs text-(--theme-modal-text) truncate">{cfg.name}</span>
+                                        <span
+                                            class="truncate text-xs font-black tracking-tight text-(--theme-modal-text)"
+                                            >{cfg.name}</span
+                                        >
                                         <span class="flex items-center gap-3 shrink-0">
                                             <span class="text-xs text-(--theme-modal-text)/50 tabular-nums"
                                                 >层数 {layers}/{cfg.max}</span
@@ -205,7 +206,7 @@
                                                 )
                                             )
                                         }}
-                                        class="w-full h-2 appearance-none cursor-pointer rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-(--slider-color) [&::-webkit-slider-thumb]:shadow-md"
+                                        class="w-full h-2 appearance-none cursor-pointer rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-(--slider-color)"
                                         style="--slider-color: {effectColor}; background: linear-gradient(to right, var(--slider-color) 0%, var(--slider-color) {pct}%, rgba(255,255,255,0.1) {pct}%, rgba(255,255,255,0.1) 100%);"
                                     />
                                     {#if cfg.name === '电磁效应'}
@@ -216,7 +217,8 @@
                                             style="background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                         >
                                             <div class="flex items-center justify-between gap-2">
-                                                <span class="text-xs text-(--theme-modal-text)/60 truncate"
+                                                <span
+                                                    class="truncate text-xs font-black tracking-tight text-(--theme-modal-text)/60"
                                                     >电磁爆发</span
                                                 >
                                                 <span class="text-[10px] text-(--theme-modal-text)/40 shrink-0"
@@ -233,7 +235,7 @@
                                                     const v = parseInt((e.target as HTMLInputElement).value)
                                                     setNonDirectPickerBurstLayers({ burst: v })
                                                 }}
-                                                class="w-full h-2 appearance-none cursor-pointer rounded-full disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-(--slider-color) [&::-webkit-slider-thumb]:shadow-md"
+                                                class="w-full h-2 appearance-none cursor-pointer rounded-full disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-(--slider-color)"
                                                 style="--slider-color: {effectColor}; background: linear-gradient(to right, var(--slider-color) 0%, var(--slider-color) {burstPct}%, rgba(255,255,255,0.1) {burstPct}%, rgba(255,255,255,0.1) 100%);"
                                             />
                                         </div>

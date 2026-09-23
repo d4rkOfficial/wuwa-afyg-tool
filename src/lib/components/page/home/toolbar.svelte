@@ -124,8 +124,8 @@
     onclickcapture={toolbarClickCapture}
     class={`${
         simplifyToolbar
-            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-none border p-2 shadow-2xl active:cursor-grabbing'
-            : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'
+            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-none border p-2 active:cursor-grabbing'
+            : 'flex shrink-0 items-center gap-2 border-t px-4 py-2.5'
     } ${className || ''}`}
     style={simplifyToolbar
         ? `interpolate-size: allow-keywords; border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);${
@@ -141,11 +141,11 @@
                   ? 'left 150ms ease'
                   : 'transform 150ms ease, box-shadow 150ms ease, left 150ms ease, width 250ms ease'
           };${toolbarDrag ? (gpuAccel ? ' will-change: transform;' : ' will-change: left;') : ''}${styleProp ? '; ' + styleProp : ''}`
-        : `background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text);${styleProp ? ' ' + styleProp : ''}`}
+        : `background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text); border-color: var(--theme-divider-border);${styleProp ? ' ' + styleProp : ''}`}
 >
     <button
         onclick={onCharDetail}
-        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
             ? 'rounded-full px-3 py-2'
             : 'rounded-none px-3 py-1.5'}"
         title="角色详情配置"
@@ -157,7 +157,7 @@
         {#if activePhase === 'timeline'}
             <button
                 onclick={() => setShowDamageList(true)}
-                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                     ? 'rounded-full px-3 py-2'
                     : 'rounded-none px-3 py-1.5'}"
                 title="查看所有伤害"
@@ -167,7 +167,7 @@
             </button>
             <button
                 onclick={formatTimeline}
-                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                     ? 'rounded-full px-3 py-2'
                     : 'rounded-none px-3 py-1.5'}"
                 title="自动格式化：每个操作块右边界对齐下一个块（可跨角色）的左边界，参考线跟随其左右块"
@@ -178,7 +178,7 @@
             <div class="relative group">
                 <button
                     onclick={toggleQuickMode}
-                    class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                    class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
                         : 'rounded-none px-3 py-1.5'} {getQuickMode()
                         ? 'border-(--theme-accent-bg)'
@@ -205,7 +205,7 @@
             <button
                 onclick={() => openSubstatLibrary()}
                 disabled={phaseLocked}
-                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
+                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
                     ? 'rounded-full px-3 py-2'
                     : 'rounded-none px-3 py-1.5'}"
                 title="打开快速词条方案：一键套用标准14词条，或管理/套用自定义声骸词条方案"
@@ -217,7 +217,7 @@
         {#if activePhase === 'calculation'}
             <button
                 onclick={() => setShowBuffModal(true)}
-                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                     ? 'rounded-full px-3 py-2'
                     : 'rounded-none px-3 py-1.5'}"
                 title="BUFF配置"
@@ -228,7 +228,7 @@
             {#if getCalcViewMode() !== 'spread'}
                 <button
                     onclick={toggleBuffDiffMode}
-                    class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                    class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
                         : 'rounded-none px-3 py-1.5'} {getBuffDiffMode()
                         ? 'border-(--theme-accent-bg)'
@@ -248,7 +248,7 @@
             {#if getCalcViewMode() === 'spread'}
                 <button
                     onclick={() => setShowDamageTypeModal(true)}
-                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
                         : 'rounded-none px-3 py-1.5'}"
                     title="逐个倍率确认伤害类型（拉表第一步）"
@@ -269,7 +269,7 @@
                             'success'
                         )
                     }}
-                    class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                    class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
                         : 'rounded-none px-3 py-1.5'} {getScrollAxisDefault() === 'horizontal'
                         ? 'border-(--theme-accent-bg)'
@@ -291,7 +291,7 @@
             {#if getCalcViewMode() !== 'spread'}
                 <button
                     onclick={toggleHideConditionMismatch}
-                    class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
+                    class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
                         : 'rounded-none px-3 py-1.5'} {getHideConditionMismatch()
                         ? 'border-(--theme-accent-bg)'
@@ -323,7 +323,7 @@
     {#if showResult}
         <button
             onclick={onRefresh}
-            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                 ? 'rounded-full px-3 py-2'
                 : 'rounded-none px-3 py-1.5'}"
             title="刷新结果"
@@ -336,7 +336,7 @@
         <button
             onclick={onLockToggle}
             disabled={!phaseLocked && !canLock}
-            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
+            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
                 ? 'rounded-full px-3 py-2'
                 : 'rounded-none px-3 py-1.5'}"
             title={phaseLocked ? '解锁' : '锁定'}

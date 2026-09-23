@@ -605,7 +605,7 @@
                     >
                         {#if getQuickMode() && getQuickSpecial() !== 'none'}
                             <span
-                                class="text-[10px] font-bold {getQuickSpecial() === 'intro'
+                                class="text-[10px] font-black {getQuickSpecial() === 'intro'
                                     ? 'text-yellow-400'
                                     : 'text-cyan-400'}"
                             >
@@ -662,7 +662,7 @@
                                     style="border-right: 3px dashed color-mix(in srgb, var(--theme-timeline-text) 50%, transparent); margin-right: 4px; width: calc(100% - 4px);"
                                 >
                                     <div
-                                        class="[writing-mode:vertical-rl] text-[16px] font-medium text-(--theme-timeline-text)/60"
+                                        class="[writing-mode:vertical-rl] text-sm font-black tracking-tight text-(--theme-timeline-text)/60"
                                     >
                                         伤害绑定
                                     </div>
@@ -718,19 +718,19 @@
                                             class="flex items-center gap-1 h-full rounded-none {getEditingBlockId() ===
                                             block.id
                                                 ? ''
-                                                : 'px-2.5'} text-sm bg-(--theme-timeline-bg)/80 border whitespace-nowrap shadow-sm min-w-14"
+                                                : 'px-2.5'} text-sm bg-(--theme-timeline-bg)/80 border whitespace-nowrap min-w-14"
                                             style="border-color: {isHighlighted || isSelected
                                                 ? 'var(--theme-accent-bg)'
                                                 : 'var(--theme-divider-border)'};{isHighlighted || isSelected
-                                                ? ' box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);'
+                                                ? ' background: color-mix(in srgb, var(--theme-accent-bg) 12%, color-mix(in srgb, var(--theme-timeline-bg) 80%, transparent)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);'
                                                 : ''}"
                                             use:measureWidth={block.id}
                                         >
                                             {#if block.intro}
-                                                <span class="text-xs text-yellow-400 font-semibold shrink-0">变奏</span>
+                                                <span class="text-xs text-yellow-400 font-black shrink-0">变奏</span>
                                             {/if}
                                             {#if block.switchback}
-                                                <span class="text-xs text-cyan-400 font-semibold shrink-0">切回</span>
+                                                <span class="text-xs text-cyan-400 font-black shrink-0">切回</span>
                                             {/if}
                                             {#if blockIcon}
                                                 <img
@@ -741,7 +741,7 @@
                                                     class="size-10 object-contain shrink-0"
                                                 />
                                             {:else}
-                                                <span class="font-bold text-(--theme-timeline-text)">{effKey}</span>
+                                                <span class="font-black text-(--theme-timeline-text)">{effKey}</span>
                                             {/if}
                                             {#if getEditingBlockId() === block.id}
                                                 <input

@@ -226,7 +226,7 @@
         onclick={onhome}
     >
         <img src={favicon} alt="椰果工具箱" class="size-5 shrink-0" />
-        {#if showTitle}<span class="text-sm font-semibold tracking-tight">椰果工具箱</span>{/if}
+        {#if showTitle}<span class="text-sm font-black tracking-tight">椰果工具箱</span>{/if}
         <div class="flex-1"></div>
         {#if !compact}
             {#if activeId}
@@ -235,7 +235,7 @@
                         e.stopPropagation()
                         onToggleSidebarLookup?.()
                     }}
-                    class="rounded-none p-1 transition-colors hover:bg-white/5 {sidebarLookupOpen
+                    class="rounded-none p-1 transition-colors hover:bg-(--theme-sidebar-text)/5 {sidebarLookupOpen
                         ? 'text-(--theme-accent-text)'
                         : 'text-(--theme-sidebar-text)/40 hover:text-(--theme-sidebar-text)/70'}"
                     title="速查"
@@ -248,7 +248,7 @@
                     e.stopPropagation()
                     onToggleSidebarWidth?.()
                 }}
-                class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-white/5"
+                class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-(--theme-sidebar-text)/5"
                 title={sidebarWide ? '收窄侧栏' : '展宽侧栏'}
             >
                 <Icon icon={sidebarWide ? 'mdi:arrow-collapse' : 'mdi:arrow-expand'} class="size-4" />
@@ -262,7 +262,7 @@
                         addToast(`已切换至「${t?.name ?? next}」`, 'success')
                     })
                 }}
-                class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-white/5"
+                class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-(--theme-sidebar-text)/5"
                 title="切换明暗主题"
             >
                 <Icon icon="mdi:theme-light-dark" class="size-4" />
@@ -283,7 +283,7 @@
             />
         </div>
     {:else if !lookupCompactHidden}
-        <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pt-2">
+        <div class="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pt-2">
             {#each grouped.groups as group, i (group.key)}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -295,7 +295,7 @@
                 >
                     <div
                         class={[
-                            'flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-sm transition-colors',
+                            'flex w-full cursor-pointer items-center gap-2 rounded-none px-2 py-1.5 text-xs font-black tracking-tight transition-colors',
                             group.key === activeGroupKey
                                 ? 'text-(--theme-sidebar-text)/90'
                                 : 'text-(--theme-sidebar-text)/60 hover:text-(--theme-sidebar-text)/90'
@@ -321,7 +321,7 @@
                                     />
                                 </linearGradient>
                             </defs>
-                            <rect x="0" y="0" width="16" height="16" rx="3" fill={`url(#teamGrad-${i})`} />
+                            <rect x="0" y="0" width="16" height="16" rx="0" fill={`url(#teamGrad-${i})`} />
                         </svg>
                         {#if !compact}
                             <span class="flex flex-1 items-center gap-0 truncate">
@@ -337,7 +337,7 @@
                         {/if}
                     </div>
                     {#if expandedKeys.has(group.key)}
-                        <div transition:slide|local={{ duration: 200 }} class="space-y-0.5 pb-1">
+                        <div transition:slide|local={{ duration: 200 }} class="space-y-1 pb-1">
                             {#each group.projects as project (project.id)}
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -345,12 +345,15 @@
                                     onclick={() => selectProject(project.id)}
                                     oncontextmenu={(e) => handleContextMenu(e, project.id)}
                                     class={[
-                                        'flex w-full cursor-pointer items-center text-sm transition-colors rounded-none',
+                                        'flex w-full cursor-pointer items-center rounded-none border text-sm transition-colors',
                                         compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
                                         project.id === activeId
-                                            ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
-                                            : 'text-(--theme-sidebar-text)/60 hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90'
+                                            ? 'border-(--theme-accent-bg) border-l-2 text-(--theme-accent-text)'
+                                            : 'border-(--theme-divider-border) text-(--theme-sidebar-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-sidebar-text)/90'
                                     ].join(' ')}
+                                    style={project.id === activeId
+                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
+                                        : 'background: var(--theme-input-bg);'}
                                 >
                                     {#if compact}
                                         <span
@@ -368,12 +371,20 @@
             {/each}
 
             {#if grouped.ungrouped.length > 0}
-                <div class="space-y-0.5">
+                <div class="space-y-1">
                     <div
-                        class="flex w-full cursor-default items-center gap-2 rounded-none px-2 py-1.5 text-sm text-(--theme-sidebar-text)/60"
+                        class="flex w-full cursor-default items-center gap-2 rounded-none border-t px-2 pb-1.5 pt-3 text-xs font-black tracking-tight text-(--theme-sidebar-text)/60"
+                        style="border-color: var(--theme-divider-border);"
                     >
                         <svg viewBox="0 0 16 16" class="size-4.5 shrink-0">
-                            <rect x="0" y="0" width="16" height="16" rx="3" fill="#555" />
+                            <rect
+                                x="0"
+                                y="0"
+                                width="16"
+                                height="16"
+                                rx="0"
+                                fill="color-mix(in srgb, var(--theme-sidebar-text) 45%, transparent)"
+                            />
                         </svg>
                         {#if !compact}
                             <span class="truncate flex-1">未锁定配队</span>
@@ -386,12 +397,15 @@
                             onclick={() => selectProject(project.id)}
                             oncontextmenu={(e) => handleContextMenu(e, project.id)}
                             class={[
-                                'flex w-full cursor-pointer items-center text-sm transition-colors rounded-none',
+                                'flex w-full cursor-pointer items-center rounded-none border text-sm transition-colors',
                                 compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
                                 project.id === activeId
-                                    ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
-                                    : 'text-(--theme-sidebar-text)/60 hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90'
+                                    ? 'border-(--theme-accent-bg) border-l-2 text-(--theme-accent-text)'
+                                    : 'border-(--theme-divider-border) text-(--theme-sidebar-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-sidebar-text)/90'
                             ].join(' ')}
+                            style={project.id === activeId
+                                ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
+                                : 'background: var(--theme-input-bg);'}
                         >
                             {#if compact}
                                 <span
@@ -409,28 +423,25 @@
     {/if}
 
     {#if !lookupPage && !lookupCompactHidden}
-        <div
-            class="shrink-0 border-t px-2 pt-2 pb-3 space-y-0.5"
-            style="box-shadow: 0 -4px 12px -2px color-mix(in srgb, var(--theme-sidebar-bg) 45%, transparent); border-color: var(--theme-divider-border)"
-        >
+        <div class="shrink-0 border-t px-2 pt-2 pb-3 space-y-0.5" style="border-color: var(--theme-divider-border)">
             {#if compact}
                 <button
                     onclick={oncreate}
-                    class="flex w-full items-center justify-center rounded-none py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="新建工程"
                 >
                     <Icon icon="mdi:plus" class="size-4 shrink-0" />
                 </button>
                 <button
                     onclick={onimport}
-                    class="flex w-full items-center justify-center rounded-none py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="从本地导入"
                 >
                     <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
                 </button>
                 <button
                     onclick={onworkshop}
-                    class="flex w-full items-center justify-center rounded-none py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="从工坊导入"
                 >
                     <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
@@ -450,7 +461,7 @@
                     <div transition:slide|local={{ duration: 200 }} class="space-y-0.5">
                         <button
                             onclick={oncreate}
-                            class="flex w-full items-center gap-2 rounded-none px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="新建工程"
                         >
                             <Icon icon="mdi:plus" class="size-4 shrink-0" />
@@ -458,7 +469,7 @@
                         </button>
                         <button
                             onclick={onimport}
-                            class="flex w-full items-center gap-2 rounded-none px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="从本地导入"
                         >
                             <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
@@ -466,7 +477,7 @@
                         </button>
                         <button
                             onclick={onworkshop}
-                            class="flex w-full items-center gap-2 rounded-none px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="从工坊导入"
                         >
                             <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />

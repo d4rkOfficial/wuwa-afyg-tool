@@ -107,14 +107,17 @@
 
 {#snippet damageBinding(id: string, sourceType: 'op' | 'ref')}
     <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
-    <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
+    <div
+        class="flex items-center gap-1.5 px-3 py-1 text-[10px] font-black tracking-tight text-(--theme-context-menu-text)/50"
+    >
+        <Icon icon="mdi:link-variant" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
         伤害绑定
     </div>
-    <div class="px-3 py-0.5 text-[9px] text-(--theme-context-menu-text)/40">直伤</div>
+    <div class="px-3 py-0.5 text-[10px] text-(--theme-context-menu-text)/40">直伤</div>
     {#if getDamageBlocks().some((d) => d.sourceId === id && d.trackIndex === 3 && d.skillHits.length > 0)}
         <button
             onclick={() => (sourceType === 'op' ? openSkillPicker(id) : openRefSkillPicker(id))}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:pencil" class="size-4 shrink-0" />
             编辑直伤
@@ -122,17 +125,17 @@
     {:else}
         <button
             onclick={() => (sourceType === 'op' ? openSkillPicker(id) : openRefSkillPicker(id))}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
             绑定直伤
         </button>
     {/if}
-    <div class="px-3 py-0.5 text-[9px] text-(--theme-context-menu-text)/40">效应/处决</div>
+    <div class="px-3 py-0.5 text-[10px] text-(--theme-context-menu-text)/40">效应/处决</div>
     {#if getDamageBlocks().some((d) => d.sourceId === id && d.trackIndex === 3 && d.nonDirectEntries.length > 0)}
         <button
             onclick={() => openNonDirectPicker(sourceType, id)}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:pencil" class="size-4 shrink-0" />
             编辑效应/处决
@@ -143,7 +146,7 @@
                 addDamageBlock(sourceType, id)
                 openNonDirectPicker(sourceType, id)
             }}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:link-variant" class="size-4 shrink-0" />
             绑定效应/处决
@@ -153,7 +156,7 @@
         <div class="border-t mt-1 mb-0" style="border-color: var(--theme-divider-border);"></div>
         <button
             onclick={() => removeDamageBySource(id, 'all')}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-red-500 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:restore" class="size-4 shrink-0" />
             重置伤害绑定
@@ -167,13 +170,16 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 backdrop-blur-lg"
         style="left: {cm.x}px; top: {cm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: cm.x, y: cm.y }}
         onclick={() => setContextMenu(null)}
     >
-        <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
+        <div
+            class="flex items-center gap-1.5 px-3 py-1 text-[10px] font-black tracking-tight text-(--theme-context-menu-text)/50"
+        >
+            <Icon icon="mdi:timeline-plus-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             参考线
         </div>
         {#if !simplifyContextMenu && canAddBefore(cm.id)}
@@ -181,7 +187,7 @@
                 onclick={() => {
                     addBefore(cm.id)
                 }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
             >
                 <Icon icon="mdi:arrow-left-bold" class="size-4 shrink-0" />
                 左侧添加参考线
@@ -192,7 +198,7 @@
                 onclick={() => {
                     addAfter(cm.id)
                 }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
             >
                 <Icon icon="mdi:arrow-right-bold" class="size-4 shrink-0" />
                 右侧添加参考线
@@ -204,7 +210,7 @@
                     const r = getRefLines().find((rl) => rl.id === cm.id)
                     if (r) startEdit(cm.id, r.time)
                 }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
             >
                 <Icon icon="mdi:clock-edit" class="size-4 shrink-0" />
                 命名参考线
@@ -213,7 +219,7 @@
                 onclick={() => {
                     removeLine(cm.id)
                 }}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-red-500 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
             >
                 <Icon icon="mdi:delete" class="size-4 shrink-0" />
                 删除参考线
@@ -222,7 +228,7 @@
             {#if !simplifyContextMenu}
                 <button
                     onclick={copyToClipboard}
-                    class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                    class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
                 >
                     <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
                     复制
@@ -245,20 +251,23 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 backdrop-blur-lg"
         style="left: {bm.x}px; top: {bm.y}px; border-color: var(--theme-divider-border);"
         data-block-menu="true"
         use:clampMenu={{ x: bm.x, y: bm.y }}
         onclick={() => setBlockMenu(null)}
     >
-        <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
+        <div
+            class="flex items-center gap-1.5 px-3 py-1 text-[10px] font-black tracking-tight text-(--theme-context-menu-text)/50"
+        >
+            <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             操作块
         </div>
         <button
             onclick={() => {
                 handleBlockDblclick(bm.blockId)
             }}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:comment-edit" class="size-4 shrink-0" />
             修改备注
@@ -266,7 +275,7 @@
         {#if !simplifyContextMenu}
             <button
                 onclick={() => setBlockKeyPickerId(bm.blockId)}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
             >
                 <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" />
                 更换按键
@@ -276,7 +285,7 @@
             onclick={() => {
                 removeBlock(bm.blockId)
             }}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-red-500 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:delete" class="size-4 shrink-0" />
             删除操作块
@@ -285,7 +294,7 @@
         {#if !simplifyContextMenu}
             <button
                 onclick={copyToClipboard}
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
             >
                 <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
                 复制
@@ -293,7 +302,9 @@
             </button>
         {/if}
         <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
-        <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
+        <div
+            class="flex items-center gap-1.5 px-3 py-1 text-[10px] font-black tracking-tight text-(--theme-context-menu-text)/50"
+        >
             特殊切人
         </div>
         <div class="flex gap-1 px-3 py-1.5">
@@ -321,20 +332,23 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 backdrop-blur-lg"
         style="left: {mm.x}px; top: {mm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: mm.x, y: mm.y }}
         onclick={() => setMultiBlockMenu(null)}
     >
-        <div class="px-3 py-1 text-xs font-semibold text-(--theme-context-menu-text)/50 uppercase tracking-wider">
+        <div
+            class="flex items-center gap-1.5 px-3 py-1 text-[10px] font-black tracking-tight text-(--theme-context-menu-text)/50"
+        >
+            <Icon icon="mdi:select-all" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             多选 (操作块 {blockCount} · 参考线 {refCount})
         </div>
         <button
             onclick={() => {
                 selectAll()
             }}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:select-all" class="size-4 shrink-0" />
             全选
@@ -342,7 +356,7 @@
         </button>
         <button
             onclick={copyToClipboard}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:clipboard-outline" class="size-4 shrink-0" />
             复制
@@ -356,7 +370,7 @@
                     removeSelection()
                 }
             }}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-red-500 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:delete" class="size-4 shrink-0" />
             删除 ({totalCount} 项)
@@ -364,7 +378,7 @@
         </button>
         <button
             onclick={() => (confirmMultiAction = 'reset')}
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-red-500 hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
         >
             <Icon icon="mdi:restore" class="size-4 shrink-0" />
             重置伤害绑定 ({totalCount} 项)
@@ -378,8 +392,8 @@
     {@const totalCount = blockCount + refCount}
     <Modal open={true} onclose={() => (confirmMultiAction = null)}>
         {#snippet title()}
-            <div class="flex items-center gap-2 text-red-400">
-                <Icon icon="mdi:alert-circle" class="size-5" />
+            <div class="flex items-center gap-2 text-red-500">
+                <Icon icon="mdi:alert-circle" class="size-4" />
                 危险操作
             </div>
         {/snippet}
@@ -400,7 +414,7 @@
                         removeSelection()
                         confirmMultiAction = null
                     }}
-                    class="h-8 rounded-none bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
+                    class="h-8 rounded-none bg-red-500 px-4 text-xs text-white transition-colors hover:bg-red-600"
                 >
                     确认
                 </button>
@@ -415,8 +429,8 @@
     {@const totalCount = blockCount + refCount}
     <Modal open={true} onclose={() => (confirmMultiAction = null)}>
         {#snippet title()}
-            <div class="flex items-center gap-2 text-red-400">
-                <Icon icon="mdi:alert-circle" class="size-5" />
+            <div class="flex items-center gap-2 text-red-500">
+                <Icon icon="mdi:alert-circle" class="size-4" />
                 危险操作
             </div>
         {/snippet}
@@ -437,7 +451,7 @@
                         resetSelectionDamage()
                         confirmMultiAction = null
                     }}
-                    class="h-8 rounded-none bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
+                    class="h-8 rounded-none bg-red-500 px-4 text-xs text-white transition-colors hover:bg-red-600"
                 >
                     确认
                 </button>
@@ -452,7 +466,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in fixed z-50 max-w-[80vw] overflow-x-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in fixed z-50 max-w-[80vw] overflow-x-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 backdrop-blur-lg"
         style="left: {tm.x}px; top: {tm.y}px; border-color: var(--theme-divider-border);"
         data-track-menu="true"
         use:clampMenu={{ x: tm.x, y: tm.y }}
@@ -492,7 +506,7 @@
             <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
             <button
                 onclick={() => addRefLineAt(tm.pos)}
-                class="w-full flex items-center gap-2 px-1 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                class="w-full flex items-center gap-2 px-1 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
             >
                 <Icon icon="mdi:timeline-plus-outline" class="size-4 shrink-0" />
                 创建参考线
@@ -501,7 +515,7 @@
                 <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
                 <button
                     onclick={pasteFromClipboard}
-                    class="w-full flex items-center gap-2 px-1 py-1.5 text-left text-sm text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                    class="w-full flex items-center gap-2 px-1 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
                 >
                     <Icon icon="mdi:clipboard-arrow-left" class="size-4 shrink-0" />
                     粘贴
@@ -517,7 +531,7 @@
     <Modal open={true} onclose={() => setBlockKeyPickerId(null)}>
         {#snippet title()}
             <div class="flex items-center gap-2">
-                <Icon icon="mdi:keyboard-outline" class="size-5" />
+                <Icon icon="mdi:keyboard-outline" class="size-4" />
                 更换按键
             </div>
         {/snippet}

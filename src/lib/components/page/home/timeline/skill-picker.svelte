@@ -221,7 +221,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-none border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -232,10 +232,17 @@
         >
             <!-- Header -->
             <div
-                class="flex items-center justify-between px-4 py-3 border-b"
+                class="flex items-center justify-between gap-2 border-b px-4 pb-2.5 pt-3"
                 style="border-color: var(--theme-divider-border);"
             >
-                <h2 class="text-sm font-semibold">配置直伤倍率</h2>
+                <h2 class="flex items-center gap-2 text-base font-black tracking-tight">
+                    <Icon
+                        icon="mdi:format-list-numbered"
+                        class="size-4 shrink-0"
+                        style="color: var(--theme-accent-text);"
+                    />
+                    配置直伤倍率
+                </h2>
                 <div class="flex items-center gap-2">
                     <div class="flex items-center gap-1.5">
                         {#each getTeamCharNames() as name}
@@ -279,8 +286,13 @@
                     <div class="space-y-1">
                         {#each getSkillPickerGroups() as group}
                             <div
-                                class="text-[10px] font-semibold text-(--theme-modal-text)/50 uppercase tracking-wider px-2 pt-2 pb-1 flex items-center justify-between"
+                                class="flex items-center gap-1.5 px-2 pt-2 pb-1 text-[10px] font-black tracking-tight text-(--theme-modal-text)/50"
                             >
+                                <Icon
+                                    icon="mdi:format-list-bulleted"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
                                 <span>
                                     {group.type} ({group.hits.length})
                                     {#if group.type === '谐度破坏'}
@@ -292,7 +304,7 @@
                                 {#if group.type === '自定义'}
                                     <button
                                         onclick={() => openAddCustom(getSkillPickerCharacter())}
-                                        class="text-(--theme-accent-text) hover:text-(--theme-accent-text) text-[10px] flex items-center gap-0.5"
+                                        class="ml-auto flex items-center gap-0.5 text-[10px] text-(--theme-accent-text) transition-colors hover:brightness-110"
                                     >
                                         <Icon icon="mdi:plus" class="size-3" /> 添加
                                     </button>
@@ -326,12 +338,12 @@
                                 <div
                                     tabindex={group.type === '谐度破坏' || isResponseHit ? -1 : 0}
                                     class={[
-                                        'flex items-center gap-2 px-2 py-1 rounded-none text-xs transition-colors',
+                                        'flex items-center gap-2 rounded-none border px-2 py-1 text-xs transition-colors',
                                         group.type === '谐度破坏' || isResponseHit
-                                            ? 'opacity-40 cursor-not-allowed select-none text-(--theme-modal-text)/60'
+                                            ? 'border-(--theme-divider-border) opacity-40 cursor-not-allowed select-none text-(--theme-modal-text)/60'
                                             : getSkillPickerSelected().has(key)
-                                              ? 'bg-(--theme-input-bg) text-(--theme-modal-text)'
-                                              : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
+                                              ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/12 text-(--theme-modal-text)'
+                                              : 'border-(--theme-divider-border) text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
                                         group.type !== '谐度破坏' && !isResponseHit
                                             ? 'focus-visible:outline-none focus-visible:bg-(--theme-modal-text)/5 focus-visible:ring-1 focus-visible:ring-(--theme-accent-bg)'
                                             : ''
@@ -482,12 +494,16 @@
         <div
             use:focusTrap={{ initial: 'input' }}
             tabindex="-1"
-            class="animate-pop-in rounded-none border p-5 shadow-xl w-[52rem] max-w-[94vw]"
+            class="animate-pop-in w-[52rem] max-w-[94vw] rounded-none border p-6 shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
-            <div class="flex items-center justify-between mb-5">
-                <h3 class="text-sm font-semibold">自定义直伤</h3>
+            <div
+                class="mb-4 flex items-center gap-2 border-b pb-2.5"
+                style="border-color: var(--theme-divider-border);"
+            >
+                <Icon icon="mdi:plus-circle-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                <h3 class="text-base font-black tracking-tight">自定义直伤</h3>
             </div>
 
             <!-- 左半：上区域选现有倍率（含自定义），下区域选伤害段；右半：编辑当前直伤 -->
@@ -498,8 +514,14 @@
                 >
                     <!-- 上区域：现有倍率（角色技能 + 该角色已有自定义直伤），单选 -->
                     <div class="flex shrink-0 items-center justify-between">
-                        <span class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/50">
-                            <Icon icon="mdi:format-list-bulleted" class="size-3.5" />
+                        <span
+                            class="flex items-center gap-1.5 text-[10px] font-black tracking-tight text-(--theme-modal-text)/50"
+                        >
+                            <Icon
+                                icon="mdi:format-list-bulleted"
+                                class="size-4 shrink-0"
+                                style="color: var(--theme-accent-text);"
+                            />
                             从现有倍率选取
                         </span>
                         <span class="text-[10px] text-(--theme-modal-text)/35">{ratioOptions.length} 条</span>
@@ -515,7 +537,7 @@
                                         : 'border-(--theme-divider-border) text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
                                 ].join(' ')}
                                 style={pickedKey === option.key
-                                    ? 'background: color-mix(in srgb, var(--theme-accent-bg) 10%, transparent);'
+                                    ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
                                     : ''}
                                 title={`${option.name}：${option.ratio || '无倍率数据'}`}
                             >
@@ -547,11 +569,17 @@
 
                     <!-- 下区域：伤害段（直接点选，无全选/清空） -->
                     <div
-                        class="flex shrink-0 items-center justify-between border-t pt-2"
+                        class="flex shrink-0 items-center justify-between border-t pt-3"
                         style="border-color: var(--theme-divider-border);"
                     >
-                        <span class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/50">
-                            <Icon icon="mdi:format-list-numbered" class="size-3.5" />
+                        <span
+                            class="flex items-center gap-1.5 text-[10px] font-black tracking-tight text-(--theme-modal-text)/50"
+                        >
+                            <Icon
+                                icon="mdi:format-list-numbered"
+                                class="size-4 shrink-0"
+                                style="color: var(--theme-accent-text);"
+                            />
                             伤害段
                         </span>
                         <span class="text-[10px] text-(--theme-modal-text)/35">
@@ -587,7 +615,7 @@
                     </div>
 
                     <!-- 取用：常态显示，未选中不可点 -->
-                    <div class="shrink-0 space-y-1.5 border-t pt-2" style="border-color: var(--theme-divider-border);">
+                    <div class="shrink-0 space-y-1.5 border-t pt-3" style="border-color: var(--theme-divider-border);">
                         {#if segmentSummary}
                             <div class="text-[11px] text-(--theme-modal-text)/70">
                                 合计 {segmentSummary.total}{segmentSummary.kind === '%' ? '%' : ''} → 写入
@@ -656,7 +684,7 @@
                                 class={[
                                     'rounded-none px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
                                     hasFlat
-                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                                 ].join(' ')}
                             >
@@ -695,7 +723,7 @@
                                 class={[
                                     'rounded-none px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
                                     hasPct
-                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
+                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
                                 ].join(' ')}
                             >
@@ -730,7 +758,7 @@
                                 </button>
                                 {#if showUnitMenu}
                                     <div
-                                        class="theme-scrollbar absolute right-0 top-full z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                        class="theme-scrollbar absolute right-0 top-full z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 backdrop-blur-lg"
                                         style="border-color: var(--theme-divider-border);"
                                         onclick={(e) => e.stopPropagation()}
                                     >
@@ -768,7 +796,7 @@
                                     class={[
                                         'px-3 py-1.5 rounded-none text-xs font-medium transition-all border',
                                         el === customElement
-                                            ? 'shadow-sm'
+                                            ? 'text-(--theme-modal-text)'
                                             : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text) bg-transparent hover:bg-(--theme-modal-text)/5 border-transparent'
                                     ].join(' ')}
                                     style={el === customElement
@@ -796,7 +824,7 @@
                     >
                     <button
                         onclick={() => confirmAddCustom(getSkillPickerCharacter())}
-                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
+                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         >确认</button
                     >

@@ -1051,12 +1051,12 @@
         {/snippet}
         <div class="space-y-4">
             <div>
-                <label for="project-name" class="mb-1 block text-xs text-zinc-500">项目名称</label>
+                <label for="project-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">项目名称</label>
                 <input
                     id="project-name"
                     bind:value={newName}
                     placeholder="输入项目名称"
-                    class="w-full rounded-none border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
+                    class="w-full rounded-none border border-(--theme-divider-border) px-3 py-2 text-sm outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleCreate(newName)}
                 />
@@ -1079,12 +1079,12 @@
         {/snippet}
         <div class="space-y-4">
             <div>
-                <label for="rename-name" class="mb-1 block text-xs text-zinc-500">项目名称</label>
+                <label for="rename-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">项目名称</label>
                 <input
                     id="rename-name"
                     bind:value={renameValue}
                     placeholder="输入新名称"
-                    class="w-full rounded-none border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
+                    class="w-full rounded-none border border-(--theme-divider-border) px-3 py-2 text-sm outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleRename()}
                 />
@@ -1101,7 +1101,7 @@
             导出项目
         {/snippet}
         <div class="space-y-4">
-            <p class="text-xs text-zinc-500 mb-2">选择要导出的部分（前置部分将自动勾选）</p>
+            <p class="mb-2 text-[10px] text-(--theme-modal-text)/40">选择要导出的部分（前置部分将自动勾选）</p>
             {@render phaseChecklist(exportSelections, toggleExportPhase)}
             {@render modalFooter(false, '导出', () => (exportModal = false), handleExport)}
         </div>
@@ -1116,22 +1116,24 @@
         {/snippet}
         <div class="space-y-4">
             <div>
-                <label for="clone-name" class="mb-1 block text-xs text-zinc-500">新项目名称</label>
+                <label for="clone-name" class="mb-1 block text-[10px] text-(--theme-modal-text)/40">新项目名称</label>
                 <input
                     id="clone-name"
                     bind:value={cloneName}
                     placeholder="输入新项目名称"
-                    class="w-full rounded-none border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
+                    class="w-full rounded-none border border-(--theme-divider-border) px-3 py-2 text-sm outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleClone()}
                 />
             </div>
             <div>
-                <p class="mb-2 text-xs text-zinc-500">选择要保留的部分（勾选的部分将被复制并锁定）</p>
+                <p class="mb-2 text-[10px] text-(--theme-modal-text)/40">
+                    选择要保留的部分（勾选的部分将被复制并锁定）
+                </p>
                 {@render phaseChecklist(cloneSelections, toggleClonePhase)}
             </div>
             <label
-                class="flex cursor-pointer items-center gap-2.5 rounded-none px-3 py-2 text-sm transition-colors hover:bg-white/5"
+                class="flex cursor-pointer items-center gap-2.5 rounded-none px-3 py-2 text-sm transition-colors hover:bg-(--theme-modal-text)/5"
             >
                 <input
                     type="checkbox"
@@ -1179,7 +1181,7 @@
     <div class="space-y-1.5">
         {#each getPhaseOrder() as phase}
             <label
-                class="flex cursor-pointer items-center gap-2.5 rounded-none px-3 py-2 text-sm transition-colors hover:bg-white/5"
+                class="flex cursor-pointer items-center gap-2.5 rounded-none px-3 py-2 text-sm transition-colors hover:bg-(--theme-modal-text)/5"
             >
                 <input
                     type="checkbox"
