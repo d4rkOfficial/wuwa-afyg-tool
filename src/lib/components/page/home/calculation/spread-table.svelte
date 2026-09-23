@@ -781,73 +781,8 @@
         }
     }
 
-    /** @desc ── 高亮压暗遮罩：测量「本组表格区域 − 高亮行/列」的带状区域（组内容器坐标系，滚动无需重算）
-     *  行高亮 → 上下两段（跨整表宽，含冻结列，z-25 盖住 z-20 的冻结单元格）；
-     *  列高亮 → 左右两段（冻结列保持原样不压暗）；实体吸顶表头（z-30/40）天然覆盖遮罩上部，无需裁剪 ── */
-    let dimRects = $state<{ left: number; top: number; width: number; height: number }[]>([])
-    let dimGroup = $state<number | null>(null)
-    let layoutTick = $state(0)
-    const bumpLayout = () => layoutTick++
-
-    const measureDimRects = (h: { gi: number; kind: 'row' | 'col'; index: number }) => {
-        const wrap = rootEl?.querySelector<HTMLElement>(`[data-group-wrap="${h.gi}"]`)
-        const table = wrap?.querySelector<HTMLElement>('table')
-        if (!wrap || !table) return []
-        const w = wrap.getBoundingClientRect()
-        const t = table.getBoundingClientRect()
-        const rects: { left: number; top: number; width: number; height: number }[] = []
-        if (h.kind === 'row') {
-            const rowEl = wrap.querySelector<HTMLElement>(`[data-rowhead="${h.index}"]`)
-            if (!rowEl) return []
-            const r = rowEl.getBoundingClientRect()
-            const topH = r.top - t.top
-            if (topH > 1) rects.push({ left: t.left - w.left, top: t.top - w.top, width: t.width, height: topH })
-            const botH = t.bottom - r.bottom
-            if (botH > 1) rects.push({ left: t.left - w.left, top: r.bottom - w.top, width: t.width, height: botH })
-            return rects
-        }
-        const head = wrap.querySelector<HTMLElement>(`[data-colhead="${h.index}"]`)
-        if (!head) return []
-        const frozen = wrap.querySelector<HTMLElement>('[data-rowhead]')
-        const hRect = head.getBoundingClientRect()
-        const top = t.top - w.top
-        // 左段：从冻结列右侧（冻结列保持原样不压暗）到高亮列左边界
-        const leftFrom = frozen ? Math.max(t.left, frozen.getBoundingClientRect().right) : t.left
-        const leftW = hRect.left - leftFrom
-        if (leftW > 1) rects.push({ left: leftFrom - w.left, top, width: leftW, height: t.height })
-        // 右段：高亮列右边界到表格右边界
-        const rightW = t.right - hRect.right
-        if (rightW > 1) rects.push({ left: hRect.right - w.left, top, width: rightW, height: t.height })
-        return rects
-    }
-
-    /** @desc 高亮切换后延迟到下一帧再测量：不在点击任务内对刚变更的表格强制同步布局（卡顿来源之一），
-     *  顺带合并快速连续切换；visibleRows 变化会重测（渐进揭示时表格高度变化） */
-    $effect(() => {
-        const h = highlight
-        visibleRows
-        layoutTick
-        if (!h) {
-            dimGroup = null
-            dimRects = []
-            return
-        }
-        const raf = requestAnimationFrame(() => {
-            const rects = measureDimRects(h)
-            dimGroup = rects.length > 0 ? h.gi : null
-            dimRects = rects
-        })
-        return () => cancelAnimationFrame(raf)
-    })
-
-    /** @desc 容器尺寸变化时重测遮罩（窗口缩放/面板拖拽）；只需一个观察者，且仅在列高亮时才有实际测量成本 */
-    $effect(() => {
-        const el = rootEl
-        if (!el) return
-        const obs = new ResizeObserver(bumpLayout)
-        obs.observe(el)
-        return () => obs.disconnect()
-    })
+    /** @desc 高亮不压暗其它行/列，只给目标行/列上主题色：纯 CSS 类切换，DOM 写入 O(1)（无遮罩测量、无临时层、
+     *  无逐行 opacity 合成层），滚动与切换都不产生额外重排/重绘成本 ── */
 </script>
 
 <!-- @desc 窗口级事件：鼠标移动/松开（框选）、方向键滚动、快捷键切换默认滚动轴（输入框/文本域内不拦截）、表格外点击清除高亮 -->
@@ -917,16 +852,7 @@
     {#each tableData as group, gi (group.key)}
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
         {@const hasFolder = group.hasFolder}
-        <div class="relative mx-3 my-3.5" data-group-wrap={gi}>
-            <!-- 高亮压暗遮罩：仅高亮组渲染，最多两段（滚动随内容移动，无需跟随；z-25 高于冻结列 z-20、低于吸顶表头 z-30/40） -->
-            {#if dimGroup === gi && dimRects.length > 0}
-                {#each dimRects as r, i (i)}
-                    <div
-                        class="pointer-events-none absolute z-[25]"
-                        style="left: {r.left}px; top: {r.top}px; width: {r.width}px; height: {r.height}px; background: var(--spread-dim);"
-                    ></div>
-                {/each}
-            {/if}
+        <div class="mx-3 my-3.5" data-group-wrap={gi}>
             <table
                 class="spread-table w-auto text-xs shadow-(--theme-card-shadow)"
                 data-group-table={gi}
@@ -1175,10 +1101,9 @@
 {/if}
 
 <style>
-    /* 根容器：高亮/压暗用色（供单元格与遮罩复用，避免逐元素拼内联样式） */
+    /* 根容器：高亮用色（供单元格/行头/表头复用，避免逐元素拼内联样式） */
     .spread-root {
         --spread-hl: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent);
-        --spread-dim: color-mix(in srgb, var(--theme-modal-bg) 62%, transparent);
     }
     /* 表格改为实底表面：冻结列/吸顶表头/标题块不再需要 backdrop-filter（逐元素重算背景模糊是滚动卡顿主因） */
     .spread-table,
@@ -1194,7 +1119,7 @@
     .spread-sep-solid {
         border-right: 2px solid color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
     }
-    /* 高亮：压暗统一交给组内遮罩（行→上下两段、列→左右两段，均只 1~2 个矩形），高亮行/列用主题色浅洗叠在实底之上 */
+    /* 高亮：只给目标行/列上主题色浅洗（不压暗其它行列）：行=行级背景、列=列内单元格背景，表头/行头另加主题色标记线 */
     .spread-rowhl-on {
         background-color: var(--spread-hl);
     }
