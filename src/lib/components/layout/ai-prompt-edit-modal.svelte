@@ -101,7 +101,8 @@
 
 <Modal {open} {onclose} backdropClose={false} class={className} style="width: min(92vw, 820px); {mergedStyle}">
     {#snippet title()}
-        {titleText}
+        <Icon icon="mdi:toolbox-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+        <span class="font-black tracking-tight">{titleText}</span>
     {/snippet}
 
     {#snippet footer()}
@@ -112,26 +113,26 @@
             <button
                 onclick={() => (draft = defaultPrefsValue(kind))}
                 title="恢复为默认内容（保存后生效）"
-                class="inline-flex h-7 items-center gap-1.5 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
-                style="background: var(--theme-input-bg);"
+                class="inline-flex h-7 items-center gap-1.5 rounded-none border px-2.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                style="border-color: var(--theme-divider-border);"
             >
-                <Icon icon="mdi:restore" class="size-3.5" />
+                <Icon icon="mdi:restore" class="size-3" />
                 恢复默认
             </button>
             <div class="flex items-center gap-2">
                 <button
                     onclick={onclose}
-                    class="h-7 rounded-none px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
-                    style="background: var(--theme-input-bg);"
+                    class="inline-flex h-7 items-center rounded-none border px-2.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                    style="border-color: var(--theme-divider-border);"
                 >
                     取消
                 </button>
                 <button
                     onclick={handleSave}
-                    class="inline-flex h-7 items-center gap-1.5 rounded-none px-4 text-xs font-medium transition-all hover:brightness-125"
+                    class="inline-flex h-7 items-center gap-1.5 rounded-none px-2.5 text-[10px] font-medium transition-all hover:brightness-110"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                 >
-                    <Icon icon="mdi:content-save-outline" class="size-3.5" />
+                    <Icon icon="mdi:content-save-outline" class="size-3" />
                     保存
                 </button>
             </div>
@@ -154,15 +155,17 @@
 
         <!-- 可调用工具列表 -->
         <div
-            class="theme-scrollbar w-40 shrink-0 overflow-y-auto rounded-none border p-2 max-h-80"
-            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
+            class="theme-scrollbar max-h-80 w-40 shrink-0 overflow-y-auto rounded-none border p-2"
+            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
         >
-            <div class="mb-1.5 flex items-center gap-1 text-[10px] font-medium text-(--theme-modal-text)/50">
-                <Icon icon="mdi:toolbox-outline" class="size-3" />
+            <div
+                class="mb-1.5 flex items-center gap-1.5 text-[10px] font-black tracking-tight text-(--theme-modal-text)/70"
+            >
+                <Icon icon="mdi:toolbox-outline" class="size-3.5 shrink-0" style="color: var(--theme-accent-text);" />
                 可调用工具
             </div>
             {#each toolGroups as group}
-                <div class="mb-1 mt-2 text-[9px] font-semibold uppercase tracking-wider text-(--theme-modal-text)/35">
+                <div class="mb-1 mt-2 text-[10px] font-black tracking-[0.22em] text-(--theme-modal-text)/40">
                     {group.label}
                 </div>
                 <div class="flex flex-col gap-0.5">

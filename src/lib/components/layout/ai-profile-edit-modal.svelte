@@ -95,7 +95,8 @@
 
 <Modal {open} {onclose} backdropClose={false} class={className} style="width: min(92vw, 480px); {mergedStyle}">
     {#snippet title()}
-        编辑配置文件
+        <Icon icon="mdi:view-grid-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+        <span class="font-black tracking-tight">编辑配置文件</span>
     {/snippet}
 
     {#snippet footer()}
@@ -105,18 +106,18 @@
         >
             <button
                 onclick={onclose}
-                class="h-7 rounded-none px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
-                style="background: var(--theme-input-bg);"
+                class="inline-flex h-7 items-center rounded-none border px-2.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                style="border-color: var(--theme-divider-border);"
             >
                 取消
             </button>
             <button
                 onclick={handleSave}
                 disabled={!canSave}
-                class="inline-flex h-7 items-center gap-1.5 rounded-none px-4 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
+                class="inline-flex h-7 items-center gap-1.5 rounded-none px-2.5 text-[10px] font-medium transition-all hover:brightness-110 disabled:pointer-events-none disabled:opacity-40"
                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
             >
-                <Icon icon="mdi:content-save-outline" class="size-3.5" />
+                <Icon icon="mdi:content-save-outline" class="size-3" />
                 保存
             </button>
         </div>
@@ -125,7 +126,7 @@
     {#if draft}
         <div class="flex flex-col gap-3">
             <label class="block">
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/60">配置名</span>
+                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">配置名</span>
                 <input
                     type="text"
                     value={draft.label}
@@ -136,7 +137,7 @@
                 />
             </label>
             <label class="block">
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/60">AI 服务地址</span>
+                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">AI 服务地址</span>
                 <div class="relative flex items-stretch gap-1.5" bind:this={providerPickerAnchor}>
                     <input
                         type="url"
@@ -164,7 +165,7 @@
                     </button>
                     {#if providerPickerOpen}
                         <div
-                            class="animate-pop-in theme-scrollbar absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-none border py-1 shadow-xl"
+                            class="animate-pop-in theme-scrollbar absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-none border py-1"
                             style="background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
                         >
                             <div class="px-2.5 py-1 text-[10px] text-(--theme-modal-text)/40">
@@ -179,7 +180,7 @@
                                         'flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors',
                                         matchedPreset?.id === preset.id
                                             ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
-                                            : 'text-(--theme-modal-text)/80 hover:bg-(--theme-input-bg)'
+                                            : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
                                     ].join(' ')}
                                 >
                                     <span class="min-w-0 flex-1 truncate text-xs">{preset.label}</span>
@@ -198,7 +199,7 @@
                 {/if}
             </label>
             <label class="block">
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/60">模型名</span>
+                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">模型名</span>
                 <input
                     type="text"
                     value={draft.model}
@@ -209,7 +210,7 @@
                 />
             </label>
             <label class="block">
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/60">AI API Key</span>
+                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">AI API Key</span>
                 <input
                     type="password"
                     value={draft.apiKey}
@@ -236,14 +237,14 @@
                 {/if}
             </label>
             <div>
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/60">思考强度</span>
+                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">思考强度</span>
                 <div class="flex flex-wrap gap-1">
                     {#each ['low', 'medium', 'high'] as level}
                         <button
                             onclick={() => setDraft({ reasoningEffort: level as AiProfile['reasoningEffort'] })}
                             class="rounded-none px-2 py-1 text-[10px] transition-colors {draft.reasoningEffort === level
-                                ? 'text-(--theme-accent-text)'
-                                : 'text-(--theme-modal-text)/60'}"
+                                ? 'font-black text-(--theme-accent-text)'
+                                : 'text-(--theme-modal-text)/40'}"
                             style="background: color-mix(in srgb, var(--theme-accent-bg) {draft.reasoningEffort ===
                             level
                                 ? '14%'

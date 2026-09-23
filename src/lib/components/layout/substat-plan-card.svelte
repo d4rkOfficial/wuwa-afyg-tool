@@ -48,7 +48,7 @@
 
 <div
     class="rounded-none border {className ?? ''}"
-    style="border-color: var(--theme-divider-border); background: var(--theme-card-bg); {styleProp || ''}"
+    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg); {styleProp || ''}"
 >
     <button
         onclick={onexpand}
@@ -57,16 +57,16 @@
     >
         <Icon
             icon={standard ? 'mdi:star-four-points-outline' : 'mdi:clipboard-text-outline'}
-            class="size-4 shrink-0 {standard ? 'text-(--theme-accent-text)' : 'text-(--theme-modal-text)/45'}"
+            class="size-4 shrink-0 {standard ? 'text-(--theme-accent-text)' : 'text-(--theme-modal-text)/40'}"
         />
-        <span class="min-w-0 flex-1 truncate text-xs font-medium text-(--theme-modal-text)">{name}</span>
+        <span class="min-w-0 flex-1 truncate text-xs font-black tracking-tight text-(--theme-modal-text)">{name}</span>
         {#if origin}
             <span
-                class="shrink-0 rounded-none px-1.5 py-0.5 text-[10px]"
-                style="background: var(--theme-input-bg); color: var(--theme-muted-text);">{origin}</span
+                class="shrink-0 rounded-none px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/40"
+                style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);">{origin}</span
             >
         {/if}
-        <span class="shrink-0 text-[11px] tabular-nums text-(--theme-modal-text)/40">
+        <span class="shrink-0 text-[10px] font-black tabular-nums tracking-[0.22em] text-(--theme-modal-text)/40">
             {costString()} · {planSubstatTotal(slots)} 条
         </span>
         <Icon
@@ -76,14 +76,16 @@
     </button>
 
     {#if expanded}
-        <div class="space-y-1.5 border-t px-3 py-2.5 text-[11px]" style="border-color: var(--theme-divider-border);">
+        <div class="space-y-1.5 border-t px-3 py-2.5 text-[10px]" style="border-color: var(--theme-divider-border);">
             {#each slots as slot, i}
                 <div class="flex gap-3">
-                    <span class="w-11 shrink-0 text-(--theme-muted-text)">{slot.cost}cost</span>
+                    <span class="w-11 shrink-0 text-(--theme-modal-text)/40"
+                        ><span class="font-black text-(--theme-modal-text)/70">{slot.cost}</span>cost</span
+                    >
                     <span class="w-28 shrink-0 truncate text-(--theme-modal-text)" title={mainSummary(slot)}
                         >{mainSummary(slot)}</span
                     >
-                    <span class="min-w-0 flex-1 truncate text-(--theme-muted-text)" title={slotSummary(slot)}
+                    <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)/40" title={slotSummary(slot)}
                         >{slotSummary(slot)}</span
                     >
                 </div>

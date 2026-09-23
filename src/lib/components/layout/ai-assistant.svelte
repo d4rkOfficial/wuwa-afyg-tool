@@ -448,7 +448,7 @@
             ? ' box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 60%, transparent), 0 0 14px color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);'
             : ''}width:{curW}px;height:{curH}px;border-radius:{size === 'collapsed'
             ? '9999px'
-            : '0.75rem'};transition:width .38s cubic-bezier(.32,.72,.24,1),height .38s cubic-bezier(.32,.72,.24,1),border-radius .38s cubic-bezier(.32,.72,.24,1),background-color .38s cubic-bezier(.32,.72,.24,1){btnDrag ||
+            : '0'};transition:width .38s cubic-bezier(.32,.72,.24,1),height .38s cubic-bezier(.32,.72,.24,1),border-radius .38s cubic-bezier(.32,.72,.24,1),background-color .38s cubic-bezier(.32,.72,.24,1){btnDrag ||
         dragging
             ? ''
             : ',transform 150ms ease,box-shadow 150ms ease'}{collapsing
@@ -507,23 +507,25 @@
                     if (!(e.target as HTMLElement).closest('button')) toggle(e)
                 }}
             >
-                <Icon icon="mdi:robot-outline" class="size-5 shrink-0 text-(--theme-accent-text)" />
+                <Icon icon="mdi:robot-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 <div class="min-w-0 flex-1 leading-tight">
-                    <div class="truncate text-sm font-semibold" title={aiConfig.baseUrl}>{aiConfig.model}</div>
-                    <div class="truncate text-[10px] text-(--theme-modal-text)/50" title={aiConfig.baseUrl}>
+                    <div class="truncate text-sm font-black tracking-tight" title={aiConfig.baseUrl}>
+                        {aiConfig.model}
+                    </div>
+                    <div class="truncate text-[10px] text-(--theme-modal-text)/40" title={aiConfig.baseUrl}>
                         {aiConfig.label}
                     </div>
                 </div>
                 <button
                     onclick={clearConversation}
-                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
+                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
                     title="清空对话"
                 >
                     <Icon icon="mdi:broom" class="size-4" />
                 </button>
                 <button
                     onclick={toggleScale}
-                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
+                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
                     title={size === 'small' ? '放大到全尺寸' : '缩小'}
                 >
                     <Icon icon={size === 'small' ? 'mdi:arrow-expand' : 'mdi:arrow-collapse'} class="size-4" />
@@ -533,7 +535,7 @@
             <!-- 消息区 -->
             <div bind:this={bodyEl} class="theme-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
                 {#if display.length === 0}
-                    <div class="py-10 text-center text-xs text-(--theme-modal-text)/30">
+                    <div class="py-10 text-center text-xs text-(--theme-modal-text)/35">
                         用文字指挥我：创建工程、锁定环节、查队伍、
                         <br />后续还可排轴、拉表、配置 Buff 集
                     </div>
@@ -543,7 +545,7 @@
                         {@const isLastUser = i === lastUserDisplayIdx}
                         <div class="flex justify-end">
                             <div
-                                class="max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-none rounded-none px-3 py-2 text-xs leading-relaxed"
+                                class="max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-none px-3 py-2 text-xs leading-relaxed"
                                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                             >
                                 {m.text}
@@ -566,7 +568,7 @@
                         {@const activeTab = m.tab ?? 'chat'}
                         <div class="flex justify-start">
                             <div
-                                class="ai-md max-w-[92%] wrap-break-word rounded-none rounded-none px-3 py-2 text-xs leading-relaxed"
+                                class="ai-md max-w-[92%] wrap-break-word rounded-none px-3 py-2 text-xs leading-relaxed"
                                 style="background: var(--theme-input-bg);"
                             >
                                 {#if hasReasoning || hasTools}
@@ -578,7 +580,7 @@
                                             onclick={() => setTab(m, 'chat')}
                                             class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                             'chat'
-                                                ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                 : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
                                         >
                                             聊天
@@ -588,7 +590,7 @@
                                                 onclick={() => setTab(m, 'reasoning')}
                                                 class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                                 'reasoning'
-                                                    ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                    ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
                                             >
                                                 思考{busy && !m.text ? '（生成中…）' : ''}
@@ -599,7 +601,7 @@
                                                 onclick={() => setTab(m, 'tools')}
                                                 class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                                 'tools'
-                                                    ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                    ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
                                             >
                                                 工具（{m.tools!.length}）
@@ -616,7 +618,7 @@
                                 {:else if activeTab === 'reasoning'}
                                     {#if m.reasoning}
                                         <div
-                                            class="whitespace-pre-wrap text-[10px] leading-relaxed text-(--theme-modal-text)/50"
+                                            class="whitespace-pre-wrap text-[10px] leading-relaxed text-(--theme-modal-text)/40"
                                         >
                                             {m.reasoning}
                                         </div>
@@ -627,12 +629,12 @@
                                     <div class="flex flex-col gap-1">
                                         {#each m.tools ?? [] as t}
                                             <div
-                                                class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/50"
+                                                class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/40"
                                             >
                                                 <Icon icon="mdi:wrench-outline" class="size-3 shrink-0" />
-                                                <span class="font-medium">{t.name}</span>
+                                                <span class="font-black">{t.name}</span>
                                                 {#if t.resultLen !== undefined}
-                                                    <span class="text-(--theme-modal-text)/30"
+                                                    <span class="text-(--theme-modal-text)/35"
                                                         >→ {t.resultLen} 字符</span
                                                     >
                                                 {:else if typeof t.args.status === 'string' && t.args.status}
@@ -656,13 +658,13 @@
                         class="rounded-none border border-red-500/40 px-3 py-2.5"
                         style="background: color-mix(in srgb, var(--theme-input-bg) 80%, transparent);"
                     >
-                        <div class="flex items-center gap-2 text-xs font-semibold">
-                            <Icon icon="mdi:alert-outline" class="size-4 text-red-500" />
+                        <div class="flex items-center gap-2 text-xs font-black tracking-tight">
+                            <Icon icon="mdi:alert-outline" class="size-4 shrink-0 text-red-500" />
                             确认执行操作
                         </div>
                         <div class="mt-1.5 rounded-none px-2.5 py-2 text-xs" style="background: var(--theme-input-bg);">
-                            <div class="font-medium text-(--theme-accent-text)">{confirmCard.toolName}</div>
-                            <div class="mt-0.5 wrap-break-word text-(--theme-modal-text)/60">{confirmCard.summary}</div>
+                            <div class="font-black text-(--theme-accent-text)">{confirmCard.toolName}</div>
+                            <div class="mt-0.5 wrap-break-word text-(--theme-modal-text)/70">{confirmCard.summary}</div>
                         </div>
                         <div class="mt-2.5 flex justify-end gap-2">
                             <button
@@ -670,7 +672,8 @@
                                     confirmCard?.resolve(false)
                                     confirmCard = null
                                 }}
-                                class="rounded-none px-3 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                class="rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                style="border-color: var(--theme-divider-border);"
                             >
                                 拒绝
                             </button>
@@ -679,8 +682,7 @@
                                     confirmCard?.resolve(true)
                                     confirmCard = null
                                 }}
-                                class="rounded-none px-3.5 py-1.5 text-xs font-medium text-white transition-all hover:brightness-110"
-                                style="background: #ef4444;"
+                                class="rounded-none bg-red-500 px-2.5 py-1 text-[10px] font-medium text-white transition-all hover:brightness-110"
                             >
                                 允许执行
                             </button>
@@ -742,7 +744,7 @@
     :global(.ai-md h3),
     :global(.ai-md h4) {
         margin: 0.5em 0 0.25em;
-        font-weight: 600;
+        font-weight: 900;
         line-height: 1.3;
     }
     :global(.ai-md h1) {
@@ -769,7 +771,7 @@
     }
     :global(.ai-md code) {
         padding: 0.1em 0.35em;
-        border-radius: 4px;
+        border-radius: 0;
         font-size: 0.92em;
         font-family: 'JetBrains Mono', ui-monospace, monospace;
         background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);
@@ -777,7 +779,7 @@
     :global(.ai-md pre) {
         margin: 0.35em 0;
         padding: 0.5em 0.6em;
-        border-radius: 6px;
+        border-radius: 0;
         overflow-x: auto;
         font-family: 'JetBrains Mono', ui-monospace, monospace;
         background: color-mix(in srgb, var(--theme-modal-bg) 80%, #000);

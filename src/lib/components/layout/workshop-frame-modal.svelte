@@ -66,7 +66,7 @@
                 >
                     <button
                         onclick={() => workshopFrameKey++}
-                        class="rounded-none p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                        class="rounded-none p-2 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
                         title="刷新"
                     >
                         <Icon icon="mdi:refresh" class="size-4.5" />
@@ -75,14 +75,14 @@
                         href={`${getShareBase()}${path ?? ''}#theme=${frameTheme}`}
                         target="_blank"
                         rel="noreferrer"
-                        class="rounded-none p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                        class="rounded-none p-2 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
                         title="在新标签页打开"
                     >
                         <Icon icon="mdi:open-in-new" class="size-4.5" />
                     </a>
                     <button
                         onclick={onclose}
-                        class="rounded-none p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-red-500"
+                        class="rounded-none p-2 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-red-500"
                         title="关闭"
                     >
                         <Icon icon="mdi:close" class="size-4.5" />

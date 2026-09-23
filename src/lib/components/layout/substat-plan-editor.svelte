@@ -115,22 +115,24 @@
     </div>
 
     <div class="flex shrink-0 flex-wrap items-center gap-2">
-        <span class="text-[11px] {costOk ? 'text-(--theme-muted-text)' : 'text-red-500'}">cost 合计 {totalCost}/12</span
+        <span class="text-[10px] {costOk ? 'text-(--theme-modal-text)/40' : 'text-red-500'}"
+            >cost 合计 <span class="font-black">{totalCost}</span>/12</span
         >
-        <span class="text-[11px] {standard && !substatOk ? 'text-red-500' : 'text-(--theme-muted-text)'}"
-            >副词条 {totalSubstats} 条{#if standard}（标准14词条需恰好 {STANDARD_SUBSTAT_TOTAL} 条）{/if}</span
+        <span class="text-[10px] {standard && !substatOk ? 'text-red-500' : 'text-(--theme-modal-text)/40'}"
+            >副词条 <span class="font-black">{totalSubstats}</span> 条{#if standard}（标准14词条需恰好 {STANDARD_SUBSTAT_TOTAL}
+                条）{/if}</span
         >
         <span class="flex-1"></span>
         <button
             onclick={oncancel}
-            class="rounded-none border px-3 py-1 text-[11px] transition-colors"
-            style="border-color: var(--theme-divider-border); color: var(--theme-modal-text)/70;">取消</button
+            class="inline-flex shrink-0 items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+            style="border-color: var(--theme-divider-border);">取消</button
         >
         <button
             onclick={() => onsave(cloneSlots(draft))}
             disabled={!costOk || !substatOk || saving}
-            class="rounded-none border px-3.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);">保存</button
+            class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);">保存</button
         >
     </div>
 </div>
