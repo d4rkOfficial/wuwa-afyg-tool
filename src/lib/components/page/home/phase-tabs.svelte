@@ -145,7 +145,7 @@
             disabled={tab.disabled}
             title={tab.disabled ? tab.disabledReason : ''}
             class={[
-                'relative flex items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-sm transition-all',
+                'relative flex items-center gap-1.5 rounded-none px-3.5 py-2.5 text-sm transition-all',
                 isActive
                     ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text) font-medium'
                     : tab.disabled
@@ -204,7 +204,7 @@
         onclick={onresult}
         disabled={!resultEnabled}
         class={[
-            'relative flex items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-sm transition-all',
+            'relative flex items-center gap-1.5 rounded-none px-3.5 py-2.5 text-sm transition-all',
             showResult
                 ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text) font-medium'
                 : resultEnabled
@@ -282,7 +282,7 @@
 
     <!-- 连接信息 -->
     <div
-        class="space-y-2.5 rounded-xl border p-3.5 text-xs"
+        class="space-y-2.5 rounded-none border p-3.5 text-xs"
         style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 3%, transparent);"
     >
         <div class="flex items-center justify-between gap-3">
@@ -307,7 +307,7 @@
                     >最近 {Math.min(wsRecentTools.length, 10)} 条</span
                 >
             </div>
-            <div class="rounded-xl border px-1" style="border-color: var(--theme-divider-border);">
+            <div class="rounded-none border px-1" style="border-color: var(--theme-divider-border);">
                 {#each wsRecentTools.slice(0, 10) as t}
                     <div class="flex items-center justify-between gap-3 px-2.5 py-1.5 text-[11px]">
                         <span
@@ -330,14 +330,14 @@
         <div class="flex gap-2.5 pt-4">
             <button
                 onclick={() => disconnectWs()}
-                class="flex-1 rounded-lg border px-3 py-2 text-xs transition-colors hover:brightness-110"
+                class="flex-1 rounded-none border px-3 py-2 text-xs transition-colors hover:brightness-110"
                 style="border-color: var(--theme-divider-border); color: var(--theme-modal-text)/70;"
             >
                 断开连接
             </button>
             <button
                 onclick={() => connectWs(wsTarget)}
-                class="flex-1 rounded-lg px-3 py-2 text-xs transition-colors hover:brightness-110"
+                class="flex-1 rounded-none px-3 py-2 text-xs transition-colors hover:brightness-110"
                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
             >
                 重新连接

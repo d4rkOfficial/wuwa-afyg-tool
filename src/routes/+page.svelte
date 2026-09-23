@@ -1056,7 +1056,7 @@
                     id="project-name"
                     bind:value={newName}
                     placeholder="输入项目名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
+                    class="w-full rounded-none border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleCreate(newName)}
                 />
@@ -1084,7 +1084,7 @@
                     id="rename-name"
                     bind:value={renameValue}
                     placeholder="输入新名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
+                    class="w-full rounded-none border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleRename()}
                 />
@@ -1121,7 +1121,7 @@
                     id="clone-name"
                     bind:value={cloneName}
                     placeholder="输入新项目名称"
-                    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
+                    class="w-full rounded-none border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-700 focus:border-(--theme-accent-bg)/50 theme-glass-surface"
                     style="background: var(--theme-search-box-bg); color: var(--theme-search-box-text)"
                     onkeydown={(e) => e.key === 'Enter' && handleClone()}
                 />
@@ -1131,7 +1131,7 @@
                 {@render phaseChecklist(cloneSelections, toggleClonePhase)}
             </div>
             <label
-                class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
+                class="flex cursor-pointer items-center gap-2.5 rounded-none px-3 py-2 text-sm transition-colors hover:bg-white/5"
             >
                 <input
                     type="checkbox"
@@ -1162,13 +1162,13 @@
     <div class="flex justify-end gap-2">
         <button
             onclick={onCancel}
-            class="theme-glass-surface h-7 rounded-md bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+            class="theme-glass-surface h-7 rounded-none bg-(--theme-card-bg) px-3 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
             >取消</button
         >
         <button
             {disabled}
             onclick={onConfirm}
-            class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
+            class="h-7 rounded-none px-3 text-xs transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
             style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
             >{confirmLabel}</button
         >
@@ -1179,7 +1179,7 @@
     <div class="space-y-1.5">
         {#each getPhaseOrder() as phase}
             <label
-                class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
+                class="flex cursor-pointer items-center gap-2.5 rounded-none px-3 py-2 text-sm transition-colors hover:bg-white/5"
             >
                 <input
                     type="checkbox"

@@ -58,7 +58,7 @@
     }
 
     function itemClass(e: Echo): string {
-        const base = 'flex w-[110px] flex-col items-center gap-1.5 rounded-lg p-3 transition-colors cursor-pointer'
+        const base = 'flex w-[110px] flex-col items-center gap-1.5 rounded-none p-3 transition-colors cursor-pointer'
         if (isSelected(e)) {
             return base + ' ring-2 ring-[var(--theme-accent-bg)] bg-[var(--theme-accent-bg)]/10'
         }
@@ -76,7 +76,7 @@
         }}
     >
         <div
-            class="animate-pop-in relative flex max-h-[70vh] min-h-[40vh] w-160 max-w-[90vw] flex-col rounded-xl text-(--theme-modal-text) shadow-2xl"
+            class="animate-pop-in relative flex max-h-[70vh] min-h-[40vh] w-160 max-w-[90vw] flex-col rounded-none text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent);"
             role="dialog"
             aria-modal="true"
@@ -91,7 +91,7 @@
                 {#if query}
                     <button
                         onclick={() => (query = '')}
-                        class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
+                        class="rounded-none p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
                         aria-label="Clear search"
                     >
                         <Icon icon="mdi:close" class="size-4" />
@@ -120,7 +120,7 @@
                                     tabindex="0"
                                     class={itemClass(e)}
                                 >
-                                    <div class="size-14 overflow-hidden rounded-lg bg-(--theme-modal-text)/10 p-1">
+                                    <div class="size-14 overflow-hidden rounded-none bg-(--theme-modal-text)/10 p-1">
                                         {#if icons[e.name]}
                                             <img
                                                 src={icons[e.name]}
@@ -164,7 +164,7 @@
                                             class={itemClass(e)}
                                         >
                                             <div
-                                                class="size-14 overflow-hidden rounded-lg bg-(--theme-modal-text)/10 p-1"
+                                                class="size-14 overflow-hidden rounded-none bg-(--theme-modal-text)/10 p-1"
                                             >
                                                 {#if icons[e.name]}
                                                     <img
@@ -196,7 +196,7 @@
             <div class="flex justify-end border-t px-4 py-2.5" style="border-color: var(--theme-divider-border)">
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
+                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 >
                     <Icon icon="mdi:check" class="size-4" />

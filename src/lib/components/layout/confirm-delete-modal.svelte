@@ -78,7 +78,7 @@
             bind:value={input}
             onkeydown={(e) => e.key === 'Enter' && submit()}
             placeholder={confirmText}
-            class="w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors focus:border-(--theme-accent-bg)/50"
+            class="w-full rounded-none border px-3 py-2 text-sm outline-none transition-colors focus:border-(--theme-accent-bg)/50"
             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg); color: var(--theme-modal-text);"
         />
     </div>
@@ -89,7 +89,7 @@
     >
         <button
             onclick={onclose}
-            class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+            class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
             style="background: var(--theme-input-bg);"
         >
             取消
@@ -97,7 +97,7 @@
         <button
             onclick={submit}
             disabled={input.trim() !== confirmText}
-            class="inline-flex h-7 items-center gap-1 rounded-md border border-red-400 px-3 text-xs font-medium text-red-400 transition-all hover:bg-red-400/10 disabled:opacity-40 disabled:pointer-events-none"
+            class="inline-flex h-7 items-center gap-1 rounded-none border border-red-400 px-3 text-xs font-medium text-red-400 transition-all hover:bg-red-400/10 disabled:opacity-40 disabled:pointer-events-none"
         >
             <Icon icon="mdi:delete-outline" class="size-3.5" />
             {confirmLabel}

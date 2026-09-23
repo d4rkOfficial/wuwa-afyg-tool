@@ -292,7 +292,7 @@
             {@const charData = characterMap.get(slot.character ?? '')}
             {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
-                class="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border p-6"
+                class="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border p-6"
                 style="background: var(--theme-card-bg); border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent)"
             >
                 <div class="pointer-events-none absolute inset-0 flex select-none items-center justify-center">
@@ -322,7 +322,7 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
                                     slot.character
                                         ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
                                         : 'border-2 border-dashed border-(--theme-card-border)',
@@ -383,7 +383,7 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
                                     slot.weapon
                                         ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
                                         : 'border-2 border-dashed border-(--theme-card-border)',
@@ -399,7 +399,7 @@
                                         src={weaponIcons[slot.weapon]}
                                         alt={slot.weapon}
                                         use:fallbackIcon={'/icons/placeholder-weapon.svg'}
-                                        class="size-14 shrink-0 rounded-lg object-contain bg-(--theme-card-bg)"
+                                        class="size-14 shrink-0 rounded-none object-contain bg-(--theme-card-bg)"
                                     />
                                 {/if}
                                 <div class="flex flex-col min-w-0 flex-1">
@@ -433,7 +433,7 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-lg px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none px-4 text-base transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
                                     slot.echoes[0].name
                                         ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
                                         : 'border-2 border-dashed border-(--theme-card-border)',
@@ -449,7 +449,7 @@
                                         src={echoIcons[slot.echoes[0].name]}
                                         alt={slot.echoes[0].name}
                                         use:fallbackIcon={'/icons/placeholder-echo.svg'}
-                                        class="size-14 shrink-0 rounded-lg object-contain bg-(--theme-card-bg)"
+                                        class="size-14 shrink-0 rounded-none object-contain bg-(--theme-card-bg)"
                                     />
                                 {/if}
                                 <span
@@ -474,7 +474,7 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
+                                    'relative flex flex-1 cursor-pointer items-center gap-2 rounded-none px-4 text-sm transition-all hover:z-10 hover:scale-[1.05] hover:bg-(--theme-input-bg)/80',
                                     slot.triggerSets.length > 0
                                         ? 'bg-(--theme-input-bg)/60 backdrop-blur-sm'
                                         : 'border-2 border-dashed border-(--theme-card-border)',
@@ -489,14 +489,14 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         {#each slot.triggerSets as set}
                                             <span
-                                                class="inline-flex items-center gap-1 rounded bg-(--theme-input-bg) px-2 py-1 text-sm"
+                                                class="inline-flex items-center gap-1 rounded-none bg-(--theme-input-bg) px-2 py-1 text-sm"
                                             >
                                                 {#if echoSetIcons[set.name]}
                                                     <img
                                                         src={echoSetIcons[set.name]}
                                                         alt={set.name}
                                                         use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
-                                                        class="size-5 shrink-0 rounded"
+                                                        class="size-5 shrink-0 rounded-none"
                                                     />
                                                 {/if}
                                                 <span>{set.name}</span>

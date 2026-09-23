@@ -168,7 +168,7 @@
             <button
                 onclick={() => (activeTab = i)}
                 class={[
-                    'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-2',
+                    'rounded-none px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-2',
                     activeTab === i && 'text-(--theme-modal-text)',
                     activeTab !== i && 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                 ].join(' ')}
@@ -206,7 +206,7 @@
         </div>
     {:else if !charName}
         <div
-            class="mt-4 flex flex-col items-center gap-2 rounded-lg border border-dashed py-10"
+            class="mt-4 flex flex-col items-center gap-2 rounded-none border border-dashed py-10"
             style="border-color: var(--theme-divider-border);"
         >
             <Icon icon="mdi:account-question-outline" class="size-7 text-(--theme-modal-text)/30" />
@@ -214,14 +214,14 @@
         </div>
     {:else if !stat}
         <div
-            class="mt-4 flex flex-col items-center gap-2 rounded-lg border border-dashed py-10"
+            class="mt-4 flex flex-col items-center gap-2 rounded-none border border-dashed py-10"
             style="border-color: var(--theme-divider-border);"
         >
             <Icon icon="mdi:alert-circle-outline" class="size-7 text-(--theme-modal-text)/30" />
             <span class="text-xs text-(--theme-modal-text)/40">角色信息加载失败</span>
             <button
                 onclick={loadInfo}
-                class="mt-1 inline-flex items-center gap-1 rounded-md px-3 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                class="mt-1 inline-flex items-center gap-1 rounded-none px-3 py-1 text-[10px] font-medium transition-all hover:brightness-110"
                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
             >
                 <Icon icon="mdi:refresh" class="size-3" />
@@ -231,7 +231,7 @@
     {:else}
         <!-- 角色头 -->
         <div
-            class="mt-4 flex items-center gap-3 rounded-lg border p-3"
+            class="mt-4 flex items-center gap-3 rounded-none border p-3"
             style="border-color: var(--theme-divider-border);"
         >
             <div class="flex min-w-0 items-center gap-3">
@@ -260,7 +260,7 @@
             <!-- 武器 -->
             <div class="flex min-w-0 flex-1 items-center gap-2.5">
                 <div
-                    class="flex size-11 shrink-0 items-center justify-center rounded-lg border"
+                    class="flex size-11 shrink-0 items-center justify-center rounded-none border"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
                     {#if stat.weapon && weaponIcons[stat.weapon]}
@@ -295,18 +295,18 @@
         </div>
 
         <!-- 链/阶配置：小按钮分组框（样式参考 设置-配色），框宽适应按钮；点选即写入档位并触发重载，点当前档位不重复写入 -->
-        <div class="mt-3 rounded-lg border p-3" style="border-color: var(--theme-divider-border);">
+        <div class="mt-3 rounded-none border p-3" style="border-color: var(--theme-divider-border);">
             <div class="flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">角色</span>
                 <div
-                    class="flex w-fit gap-1 rounded-lg border p-1"
+                    class="flex w-fit gap-1 rounded-none border p-1"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
                     {#each [0, 1, 2, 3, 4, 5, 6] as n}
                         {@const active = savedChain === n}
                         <button
                             onclick={() => pickChain(n)}
-                            class="rounded-md px-2 py-1 text-[11px] font-medium transition-colors {active
+                            class="rounded-none px-2 py-1 text-[11px] font-medium transition-colors {active
                                 ? ''
                                 : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
                             style={active
@@ -321,14 +321,14 @@
             <div class="mt-2 flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">武器</span>
                 <div
-                    class="flex w-fit gap-1 rounded-lg border p-1"
+                    class="flex w-fit gap-1 rounded-none border p-1"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
                     {#each [0, 1, 2, 3, 4, 5] as n}
                         {@const active = savedRefine === n}
                         <button
                             onclick={() => pickRefine(n)}
-                            class="rounded-md px-2 py-1 text-[11px] font-medium transition-colors {active
+                            class="rounded-none px-2 py-1 text-[11px] font-medium transition-colors {active
                                 ? ''
                                 : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
                             style={active
@@ -352,7 +352,10 @@
         </div>
 
         <!-- 属性面板 -->
-        <div class="mt-3 space-y-1.5 rounded-lg border p-3 text-xs" style="border-color: var(--theme-divider-border);">
+        <div
+            class="mt-3 space-y-1.5 rounded-none border p-3 text-xs"
+            style="border-color: var(--theme-divider-border);"
+        >
             <div class="flex items-center justify-between">
                 <span class="text-(--theme-modal-text)/50">攻击</span>
                 <span class="tabular-nums text-(--theme-modal-text)/80">

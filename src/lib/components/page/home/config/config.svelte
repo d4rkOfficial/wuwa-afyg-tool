@@ -219,7 +219,7 @@
     function onDragMove(e: PointerEvent) {
         if (!dragState) return
         const el = e.currentTarget as HTMLElement
-        const card = el.closest('.rounded-xl') as HTMLElement | null
+        const card = el.closest('.rounded-none') as HTMLElement | null
         const container = el.closest('.space-y-1') as HTMLElement | null
         if (!card || !container) return
 
@@ -271,7 +271,7 @@
                     showSubstatModal = null
                 }}
                 class={[
-                    'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-2',
+                    'rounded-none px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-2',
                     isActive && i >= 3 && 'bg-(--theme-modal-text)/10 text-(--theme-modal-text)',
                     !isActive && 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                 ].join(' ')}
@@ -364,7 +364,7 @@
         >
             <div
                 bind:this={mainStatMenuEl}
-                class="animate-pop-in theme-scrollbar absolute max-h-48 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-xl"
+                class="animate-pop-in theme-scrollbar absolute max-h-48 overflow-y-auto rounded-none border py-1 shadow-xl backdrop-blur-xl"
                 style="left: {mainStatMenuPos?.left ?? 0}px; top: {mainStatMenuPos?.top ??
                     0}px; width: {mainStatMenuPos?.width ??
                     0}px; background: color-mix(in srgb, var(--theme-modal-bg) 82%, transparent); border-color: var(--theme-divider-border);"

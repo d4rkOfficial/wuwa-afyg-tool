@@ -14,7 +14,7 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="animate-pop-in w-full max-h-[70vh] max-w-2xl rounded-lg border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-2xl rounded-none border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
@@ -72,7 +72,7 @@
                 style="border-color: var(--theme-divider-border);"
             >
                 <button
-                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);"
                     onclick={() => setShowDamageList(false)}>关闭</button
                 >

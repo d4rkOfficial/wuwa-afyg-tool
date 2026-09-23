@@ -90,7 +90,7 @@
     {disabled}
     type="button"
     class={[
-        'flex w-full items-center justify-between gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-input-bg) px-2 py-1.5 text-sm outline-none transition-colors focus:border-(--theme-accent-bg)',
+        'flex w-full items-center justify-between gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-input-bg) px-2 py-1.5 text-sm outline-none transition-colors focus:border-(--theme-accent-bg)',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         className || ''
     ]
@@ -122,7 +122,7 @@
     >
         <div
             bind:this={menuEl}
-            class="animate-pop-in theme-scrollbar absolute max-h-64 overflow-y-auto rounded-lg border py-1 shadow-xl backdrop-blur-lg"
+            class="animate-pop-in theme-scrollbar absolute max-h-64 overflow-y-auto rounded-none border py-1 shadow-xl backdrop-blur-lg"
             style="left: {pos.left}px; top: {pos.top}px; width: {pos.width}px; background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >

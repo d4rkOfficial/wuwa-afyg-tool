@@ -1044,7 +1044,7 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="animate-pop-in w-full max-h-[95vh] h-full max-w-6xl rounded-xl border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
+            class="animate-pop-in w-full max-h-[95vh] h-full max-w-6xl rounded-none border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col my-4"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
@@ -1058,14 +1058,14 @@
                 <div class="flex items-center gap-1">
                     <button
                         onclick={() => (showImport = true)}
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                        class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                     >
                         <Icon icon="mdi:import" class="size-3.5" />
                         导入Buff集
                     </button>
                     <button
                         onclick={() => (showLookup = true)}
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                        class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                     >
                         <Icon icon="mdi:magnify" class="size-3.5" />
                         速查
@@ -1118,7 +1118,7 @@
                                             onpointermove={isGlobalFolder || multiSelect ? undefined : onDragMove}
                                             onpointerup={isGlobalFolder || multiSelect ? undefined : onDragEnd}
                                             class={[
-                                                'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
+                                                'flex min-w-0 flex-1 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
                                                 multiSelect && !isGlobalFolder && folderAllSelected(item.children ?? [])
                                                     ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
@@ -1164,7 +1164,7 @@
                                         {#if !multiSelect}
                                             <button
                                                 type="button"
-                                                class="shrink-0 rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                                                class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
                                                 title="文件夹操作"
                                                 onclick={(e) => openFolderMenu(e, item)}
                                                 oncontextmenu={(e) => openFolderMenu(e, item)}
@@ -1195,7 +1195,7 @@
                                                                 ].join(' ')}
                                                             >
                                                                 <button
-                                                                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-left transition-all text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5 {multiSelect &&
+                                                                    class="flex min-w-0 flex-1 items-center gap-2 rounded-none px-3 py-1.5 text-xs text-left transition-all text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5 {multiSelect &&
                                                                     folderAllSelected(sub.children ?? [])
                                                                         ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                                         : ''}"
@@ -1227,7 +1227,7 @@
                                                                 {#if !multiSelect}
                                                                     <button
                                                                         type="button"
-                                                                        class="shrink-0 rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                                                                        class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
                                                                         title="文件夹操作"
                                                                         onclick={(e) => openFolderMenu(e, sub)}
                                                                         oncontextmenu={(e) => openFolderMenu(e, sub)}
@@ -1256,7 +1256,7 @@
                                                                             oncontextmenu={(e) =>
                                                                                 openItemMenu(e, subChild.id)}
                                                                             class={[
-                                                                                'flex w-full min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
+                                                                                'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
                                                                                 multiSelect &&
                                                                                 isMultiSelectDisabled(subChild.id)
                                                                                     ? 'text-(--theme-modal-text)/30 opacity-50'
@@ -1330,7 +1330,7 @@
                                                                     : (selectedBuffSetId = sub.buffSet!.id)}
                                                             oncontextmenu={(e) => openItemMenu(e, sub.buffSet!.id)}
                                                             class={[
-                                                                'flex w-full min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
+                                                                'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
                                                                 multiSelect && isMultiSelectDisabled(sub.buffSet!.id)
                                                                     ? 'text-(--theme-modal-text)/30 opacity-50'
                                                                     : multiSelect
@@ -1407,7 +1407,7 @@
                                                             ? undefined
                                                             : onDragEnd}
                                                         class={[
-                                                            'flex w-full min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
+                                                            'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
                                                             multiSelect && !isGlobalFolder
                                                                 ? multiSelectedIds.has(child.id)
                                                                     ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
@@ -1509,7 +1509,7 @@
                                     onpointermove={isGlobal || multiSelect ? undefined : onDragMove}
                                     onpointerup={isGlobal || multiSelect ? undefined : onDragEnd}
                                     class={[
-                                        'mx-2 flex w-full min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-all',
+                                        'mx-2 flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
                                         multiSelect && isMultiSelectDisabled(item.buffSet!.id)
                                             ? 'text-(--theme-modal-text)/30 opacity-50'
                                             : multiSelect
@@ -1597,7 +1597,7 @@
                                 type="button"
                                 onclick={toggleMultiSelect}
                                 class={[
-                                    'flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors',
+                                    'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] font-medium transition-colors',
                                     multiSelect
                                         ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
                                         : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
@@ -1614,7 +1614,7 @@
                                 <button
                                     type="button"
                                     onclick={toggleSelectAll}
-                                    class="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/5"
+                                    class="flex items-center gap-1 rounded-none px-2 py-1 text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/5"
                                     title={isAllMultiSelected() ? '取消全选' : '全选'}
                                 >
                                     <Icon
@@ -1633,7 +1633,7 @@
                                         disabled={!multiSelectionAllNonGlobal()}
                                         onclick={() => multiSetGlobal(true)}
                                         class={[
-                                            'flex items-center gap-1 rounded px-2 py-1 text-[11px] transition-colors',
+                                            'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] transition-colors',
                                             multiSelectionAllNonGlobal()
                                                 ? 'text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
                                                 : 'text-(--theme-modal-text)/25 cursor-not-allowed'
@@ -1648,7 +1648,7 @@
                                         disabled={!multiSelectionAllGlobal()}
                                         onclick={() => multiSetGlobal(false)}
                                         class={[
-                                            'flex items-center gap-1 rounded px-2 py-1 text-[11px] transition-colors',
+                                            'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] transition-colors',
                                             multiSelectionAllGlobal()
                                                 ? 'text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
                                                 : 'text-(--theme-modal-text)/25 cursor-not-allowed'
@@ -1661,7 +1661,7 @@
                                     <button
                                         type="button"
                                         onclick={() => requestMultiDelete()}
-                                        class="ml-auto flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 transition-colors hover:bg-red-500/10"
+                                        class="ml-auto flex items-center gap-1 rounded-none px-2 py-1 text-[11px] text-red-400 transition-colors hover:bg-red-500/10"
                                         title="删除"
                                     >
                                         <Icon icon="mdi:delete-outline" class="size-3.5" />
@@ -1674,7 +1674,7 @@
                             <button
                                 type="button"
                                 onclick={handleCreateBuffSet}
-                                class="flex w-full items-center justify-center gap-1 rounded border px-2 py-1.5 text-xs font-medium transition-all hover:brightness-125"
+                                class="flex w-full items-center justify-center gap-1 rounded-none border px-2 py-1.5 text-xs font-medium transition-all hover:brightness-125"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                                 title="新建 BUFF 块"
                             >
@@ -1719,7 +1719,7 @@
                                     {#if isGlobal}
                                         <button
                                             disabled
-                                            class="shrink-0 rounded p-1 text-amber-400/40 cursor-not-allowed"
+                                            class="shrink-0 rounded-none p-1 text-amber-400/40 cursor-not-allowed"
                                         >
                                             <Icon
                                                 icon={selectedBuffSet.starred ? 'mdi:star' : 'mdi:star-outline'}
@@ -1731,7 +1731,7 @@
                                                 type="text"
                                                 value={selectedBuffSet.name}
                                                 readonly
-                                                class="flex-1 min-w-0 rounded border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text) cursor-default"
+                                                class="flex-1 min-w-0 rounded-none border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text) cursor-default"
                                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                             />
                                         {:else}
@@ -1741,14 +1741,14 @@
                                                 bind:value={renameValue}
                                                 onkeydown={(e) => e.key === 'Enter' && handleRenameInline()}
                                                 onblur={handleRenameInline}
-                                                class="flex-1 min-w-0 rounded border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text)"
+                                                class="flex-1 min-w-0 rounded-none border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text)"
                                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                             />
                                         {/if}
                                         {#if !isDefaultGlobal}
                                             <button
                                                 onclick={handleToggleGlobal}
-                                                class="shrink-0 flex items-center gap-1 rounded border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
+                                                class="shrink-0 flex items-center gap-1 rounded-none border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
                                                 style="border-color: var(--theme-divider-border);"
                                             >
                                                 <Icon icon="mdi:crown" class="size-3.5" />
@@ -1758,7 +1758,7 @@
                                     {:else}
                                         <button
                                             onclick={() => toggleBuffSetStarred(selectedBuffSet.id)}
-                                            class="shrink-0 rounded p-1 transition-colors text-amber-400 hover:text-amber-300"
+                                            class="shrink-0 rounded-none p-1 transition-colors text-amber-400 hover:text-amber-300"
                                         >
                                             <Icon
                                                 icon={selectedBuffSet.starred ? 'mdi:star' : 'mdi:star-outline'}
@@ -1772,12 +1772,12 @@
                                             bind:value={renameValue}
                                             onkeydown={(e) => e.key === 'Enter' && handleRenameInline()}
                                             onblur={handleRenameInline}
-                                            class="flex-1 min-w-0 rounded border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text)"
+                                            class="flex-1 min-w-0 rounded-none border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text)"
                                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                         />
                                         <button
                                             onclick={handleCopyBuffSet}
-                                            class="shrink-0 flex items-center gap-1 rounded border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
+                                            class="shrink-0 flex items-center gap-1 rounded-none border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             <Icon icon="mdi:content-copy" class="size-3.5" />
@@ -1785,7 +1785,7 @@
                                         </button>
                                         <button
                                             onclick={handleToggleGlobal}
-                                            class="shrink-0 flex items-center gap-1 rounded border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
+                                            class="shrink-0 flex items-center gap-1 rounded-none border px-2 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
                                             style="border-color: var(--theme-divider-border);"
                                             title="并入全局（全局 buff 的受益者将被锁定）"
                                         >
@@ -1794,7 +1794,7 @@
                                         </button>
                                         <button
                                             onclick={handleDeleteBuffSet}
-                                            class="shrink-0 flex items-center gap-1 rounded border border-red-500 px-2 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/20"
+                                            class="shrink-0 flex items-center gap-1 rounded-none border border-red-500 px-2 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/20"
                                         >
                                             <Icon icon="mdi:delete-outline" class="size-3.5" />
                                             删除
@@ -1865,7 +1865,7 @@
                                                 handleToggleNonChar()
                                             }}
                                             class={[
-                                                'flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-all whitespace-nowrap',
+                                                'flex items-center gap-1 rounded-none border px-2 py-1 text-[11px] font-medium transition-all whitespace-nowrap',
                                                 isGlobal ? 'cursor-not-allowed opacity-50' : '',
                                                 isNonCharBuff
                                                     ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
@@ -1933,7 +1933,7 @@
                                                     >共鸣链</span
                                                 >
                                                 <div
-                                                    class="flex overflow-hidden rounded border"
+                                                    class="flex overflow-hidden rounded-none border"
                                                     style="border-color: var(--theme-divider-border);"
                                                 >
                                                     {#each Array.from({ length: 7 }, (_, k) => k) as n}
@@ -1964,7 +1964,7 @@
                                                     >精炼</span
                                                 >
                                                 <div
-                                                    class="flex overflow-hidden rounded border"
+                                                    class="flex overflow-hidden rounded-none border"
                                                     style="border-color: var(--theme-divider-border);"
                                                 >
                                                     {#each Array.from({ length: 5 }, (_, k) => k + 1) as n}
@@ -2034,7 +2034,7 @@
                                                     <button
                                                         onclick={() => toggleConditionElement(el)}
                                                         class={[
-                                                            'rounded px-1.5 py-0.5 text-[10px] transition-colors',
+                                                            'rounded-none px-1.5 py-0.5 text-[10px] transition-colors',
                                                             (cond.elements ?? []).includes(el)
                                                                 ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                                                 : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
@@ -2055,7 +2055,7 @@
                                                         onclick={() => toggleConditionDamageType(dt)}
                                                         title={dt}
                                                         class={[
-                                                            'rounded px-1.5 py-0.5 text-[10px] transition-colors',
+                                                            'rounded-none px-1.5 py-0.5 text-[10px] transition-colors',
                                                             (cond.damageTypes ?? []).includes(dt)
                                                                 ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                                                 : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
@@ -2067,7 +2067,7 @@
                                             </div>
                                             <button
                                                 onclick={clearCondition}
-                                                class="flex h-6 items-center gap-1 rounded border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
+                                                class="flex h-6 items-center gap-1 rounded-none border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
                                                 style="border-color: var(--theme-divider-border);"
                                             >
                                                 <Icon icon="mdi:close-circle-outline" class="size-3" />
@@ -2084,7 +2084,7 @@
                                         {@const def = ZONE_MAP.get(zone.zoneId)}
                                         {#if def}
                                             <div
-                                                class="flex items-center gap-1.5 rounded px-3 py-2"
+                                                class="flex items-center gap-1.5 rounded-none px-3 py-2"
                                                 style="background: var(--theme-input-bg);"
                                             >
                                                 <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
@@ -2147,7 +2147,7 @@
                                                                     isNaN(v) ? 0 : v
                                                                 )
                                                             }}
-                                                            class="w-14 h-6 rounded border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                                                            class="w-14 h-6 rounded-none border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                                                             style="border-color: var(--theme-divider-border);"
                                                         />
                                                         <span class="text-[10px] text-(--theme-modal-text)/40 w-3"
@@ -2164,7 +2164,7 @@
                                                                 !zone.override
                                                             )}
                                                         class={[
-                                                            'shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                                            'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
                                                             zone.override
                                                                 ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
                                                                 : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
@@ -2177,7 +2177,7 @@
                                                 {#if !ZONE_NO_REF_IDS.has(zone.zoneId)}
                                                     <button
                                                         onclick={() => openRefModal(zone.zoneId)}
-                                                        class="shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5"
+                                                        class="shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5"
                                                         style="border-color: var(--theme-divider-border);"
                                                     >
                                                         <Icon icon="mdi:link-variant" class="size-3" />
@@ -2220,7 +2220,7 @@
                                                     }
                                                 }}
                                                 class={[
-                                                    'w-full text-left rounded px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5',
+                                                    'w-full text-left rounded-none px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5',
                                                     exists
                                                         ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
                                                         : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
@@ -2245,7 +2245,7 @@
                     >
                         <button
                             onclick={onclose}
-                            class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
+                            class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
                             style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         >
                             <Icon icon="mdi:check" class="size-4" />
@@ -2268,7 +2268,7 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-xl border p-5 shadow-xl w-md"
+            class="animate-pop-in rounded-none border p-5 shadow-xl w-md"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -2276,7 +2276,7 @@
                 <h3 class="text-sm font-semibold">引用配置</h3>
                 <button
                     onclick={() => (showRefLookup = true)}
-                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                    class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                 >
                     <Icon icon="mdi:magnify" class="size-3.5" />
                     速查
@@ -2323,7 +2323,7 @@
                     <div class="relative">
                         <button
                             onclick={() => (showRefZoneMenu = !showRefZoneMenu)}
-                            class="w-full flex items-center justify-between rounded-lg border px-3 py-2 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                            class="w-full flex items-center justify-between rounded-none border px-3 py-2 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <span class="truncate">{refTargetDef?.label ?? refTargetZoneId}</span>
@@ -2331,7 +2331,7 @@
                         </button>
                         {#if showRefZoneMenu}
                             <div
-                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
                                 style="border-color: var(--theme-divider-border);"
                                 onclick={(e) => e.stopPropagation()}
                             >
@@ -2362,7 +2362,7 @@
                 <!-- Conversion rule card -->
                 {#if refTargetDef && currentZoneDef}
                     <div
-                        class="rounded-lg border px-4 py-3.5 space-y-3"
+                        class="rounded-none border px-4 py-3.5 space-y-3"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
                         <!-- Header: refAttr -->
@@ -2372,7 +2372,7 @@
 
                         <!-- Line 1: 超过 [threshold] unit1 的部分 -->
                         <div
-                            class="flex items-center rounded-md border overflow-hidden"
+                            class="flex items-center rounded-none border overflow-hidden"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <button
@@ -2406,7 +2406,7 @@
 
                         <!-- Conversion mode tab -->
                         <div
-                            class="flex rounded-md border overflow-hidden"
+                            class="flex rounded-none border overflow-hidden"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <button
@@ -2440,7 +2440,7 @@
 
                         <!-- Line 2: 每 [divisor] unit1 转换为 [multiplier] unit2 -->
                         <div
-                            class="flex items-center rounded-md border overflow-hidden"
+                            class="flex items-center rounded-none border overflow-hidden"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <span
@@ -2486,7 +2486,7 @@
                 <!-- Lower & Upper -->
                 <div class="flex gap-2">
                     <div
-                        class="flex items-center flex-1 rounded-md border overflow-hidden"
+                        class="flex items-center flex-1 rounded-none border overflow-hidden"
                         style="border-color: var(--theme-divider-border);"
                     >
                         <button
@@ -2517,7 +2517,7 @@
                         <span class="text-xs text-(--theme-modal-text)/40 px-3 py-1.5">{currentZoneUnit}</span>
                     </div>
                     <div
-                        class="flex items-center flex-1 rounded-md border overflow-hidden"
+                        class="flex items-center flex-1 rounded-none border overflow-hidden"
                         style="border-color: var(--theme-divider-border);"
                     >
                         <button
@@ -2556,18 +2556,18 @@
             >
                 <button
                     onclick={handleClearRef}
-                    class="rounded-md px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/15"
+                    class="rounded-none px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/15"
                     >清除引用</button
                 >
                 <div class="flex items-center gap-2">
                     <button
                         onclick={() => (showRefModal = false)}
-                        class="rounded-md px-3 py-1.5 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10"
+                        class="rounded-none px-3 py-1.5 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10"
                         >取消</button
                     >
                     <button
                         onclick={handleConfirmRef}
-                        class="rounded-md px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
+                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         >确认</button
                     >
@@ -2605,7 +2605,7 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-xl border p-5 shadow-xl w-80"
+            class="animate-pop-in rounded-none border p-5 shadow-xl w-80"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -2616,12 +2616,12 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (showDeleteFolderConfirm = false)}
-                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);">取消</button
                 >
                 <button
                     onclick={confirmDeleteFolder}
-                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
+                    class="h-7 rounded-none px-3 text-xs transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                     >确认删除</button
                 >
@@ -2640,7 +2640,7 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-xl border p-5 shadow-xl w-96"
+            class="animate-pop-in rounded-none border p-5 shadow-xl w-96"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -2654,7 +2654,7 @@
                     type="text"
                     bind:value={folderRenamePrefix}
                     placeholder="新前缀"
-                    class="flex-1 min-w-0 rounded-md border px-2 py-1.5 text-xs outline-none text-(--theme-modal-text)"
+                    class="flex-1 min-w-0 rounded-none border px-2 py-1.5 text-xs outline-none text-(--theme-modal-text)"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 />
                 <span class="text-xs text-(--theme-modal-text)/40 shrink-0">{'{'}1..N{'}'}</span>
@@ -2662,12 +2662,12 @@
                     type="text"
                     bind:value={folderRenameSuffix}
                     placeholder="新后缀"
-                    class="flex-1 min-w-0 rounded-md border px-2 py-1.5 text-xs outline-none text-(--theme-modal-text)"
+                    class="flex-1 min-w-0 rounded-none border px-2 py-1.5 text-xs outline-none text-(--theme-modal-text)"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 />
             </div>
             <div
-                class="theme-scrollbar max-h-28 overflow-y-auto mb-3 rounded-md border p-2 text-[11px] text-(--theme-modal-text)/50"
+                class="theme-scrollbar max-h-28 overflow-y-auto mb-3 rounded-none border p-2 text-[11px] text-(--theme-modal-text)/50"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 {#each folderRenameTarget.children! as child, i (child.id)}
@@ -2683,12 +2683,12 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (showFolderRename = false)}
-                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);">取消</button
                 >
                 <button
                     onclick={confirmFolderRename}
-                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
+                    class="h-7 rounded-none px-3 text-xs transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                     >确认重命名</button
                 >
@@ -2707,7 +2707,7 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-xl border p-5 shadow-xl w-80"
+            class="animate-pop-in rounded-none border p-5 shadow-xl w-80"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -2718,12 +2718,12 @@
             <div class="flex justify-end gap-2">
                 <button
                     onclick={() => (showMultiDeleteConfirm = false)}
-                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);">取消</button
                 >
                 <button
                     onclick={confirmMultiDelete}
-                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
+                    class="h-7 rounded-none px-3 text-xs transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                     >确认删除</button
                 >
@@ -2742,7 +2742,7 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in rounded-xl border p-5 shadow-xl w-96"
+            class="animate-pop-in rounded-none border p-5 shadow-xl w-96"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -2752,7 +2752,7 @@
                 {#each copyOptions as name}
                     <button
                         onclick={() => confirmCopyBuff(name)}
-                        class="h-8 rounded-md px-3 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/10"
+                        class="h-8 rounded-none px-3 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/10"
                         style="background: var(--theme-input-bg);"
                     >
                         {name}
@@ -2762,7 +2762,7 @@
             <div class="flex justify-end gap-2 mt-4">
                 <button
                     onclick={() => (showCopyOptions = false)}
-                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);">取消</button
                 >
             </div>

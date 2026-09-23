@@ -190,7 +190,7 @@
         {#if helpOpen}
             <section
                 in:slide={{ duration: 160 }}
-                class="shrink-0 space-y-1.5 rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
+                class="shrink-0 space-y-1.5 rounded-none border px-3 py-2.5 text-xs leading-relaxed"
                 style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent); color: var(--theme-modal-text)/85;"
             >
                 <div class="flex items-center gap-1.5 font-semibold text-(--theme-accent-text)">
@@ -238,7 +238,7 @@
                         {@const editable = isEditable(entry)}
                         <div
                             in:fade={{ duration: 100 }}
-                            class="flex items-center gap-3 rounded-lg border px-2 py-1.5"
+                            class="flex items-center gap-3 rounded-none border px-2 py-1.5"
                             style="border-color: var(--theme-card-border); background: var(--theme-card-bg);"
                         >
                             <!-- 第一列：倍率名（按属性伤害着色，与拉表表格同一口径） -->
@@ -268,7 +268,7 @@
                                             onclick={() => toggleType(entry, dt)}
                                             disabled={locked}
                                             title={dt}
-                                            class="rounded border px-1.5 py-0.5 text-[11px] transition-colors disabled:opacity-40 {selected
+                                            class="rounded-none border px-1.5 py-0.5 text-[11px] transition-colors disabled:opacity-40 {selected
                                                 ? ''
                                                 : 'text-(--theme-modal-text)/45 hover:bg-(--theme-modal-text)/10'}"
                                             style={selected
@@ -301,7 +301,7 @@
                                     <button
                                         onclick={() => syncToSameName(entry)}
                                         disabled={locked || sameNameIds.length === 0 || aligned}
-                                        class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] transition-colors disabled:opacity-30"
+                                        class="inline-flex items-center gap-1 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors disabled:opacity-30"
                                         style="border-color: var(--theme-divider-border); color: var(--theme-modal-text)/70;"
                                         title={syncTitle(sameNameIds.length, aligned)}
                                     >

@@ -112,7 +112,7 @@
             <button
                 onclick={() => (draft = defaultPrefsValue(kind))}
                 title="恢复为默认内容（保存后生效）"
-                class="inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                class="inline-flex h-7 items-center gap-1.5 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                 style="background: var(--theme-input-bg);"
             >
                 <Icon icon="mdi:restore" class="size-3.5" />
@@ -121,14 +121,14 @@
             <div class="flex items-center gap-2">
                 <button
                     onclick={onclose}
-                    class="h-7 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);"
                 >
                     取消
                 </button>
                 <button
                     onclick={handleSave}
-                    class="inline-flex h-7 items-center gap-1.5 rounded-md px-4 text-xs font-medium transition-all hover:brightness-125"
+                    class="inline-flex h-7 items-center gap-1.5 rounded-none px-4 text-xs font-medium transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                 >
                     <Icon icon="mdi:content-save-outline" class="size-3.5" />
@@ -146,7 +146,7 @@
                 oninput={(e) => (draft = (e.currentTarget as HTMLTextAreaElement).value)}
                 rows="14"
                 placeholder={hintText}
-                class="theme-scrollbar w-full flex-1 resize-y rounded-lg border px-2.5 py-1.5 text-xs leading-relaxed outline-none transition-colors"
+                class="theme-scrollbar w-full flex-1 resize-y rounded-none border px-2.5 py-1.5 text-xs leading-relaxed outline-none transition-colors"
                 style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             ></textarea>
             <p class="text-[10px] text-(--theme-modal-text)/40">{hintText}</p>
@@ -154,7 +154,7 @@
 
         <!-- 可调用工具列表 -->
         <div
-            class="theme-scrollbar w-40 shrink-0 overflow-y-auto rounded-lg border p-2 max-h-80"
+            class="theme-scrollbar w-40 shrink-0 overflow-y-auto rounded-none border p-2 max-h-80"
             style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
         >
             <div class="mb-1.5 flex items-center gap-1 text-[10px] font-medium text-(--theme-modal-text)/50">
@@ -170,7 +170,7 @@
                         <button
                             onclick={() => insertTool(tool.name)}
                             title={tool.desc}
-                            class="truncate rounded px-1.5 py-0.5 text-left font-mono text-[10px] text-(--theme-modal-text)/70 transition-colors hover:bg-(--theme-accent-bg)/15 hover:text-(--theme-accent-text)"
+                            class="truncate rounded-none px-1.5 py-0.5 text-left font-mono text-[10px] text-(--theme-modal-text)/70 transition-colors hover:bg-(--theme-accent-bg)/15 hover:text-(--theme-accent-text)"
                         >
                             {tool.name}
                         </button>

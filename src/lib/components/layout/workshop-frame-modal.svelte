@@ -52,7 +52,7 @@
         out:fade={{ duration: 130 }}
     >
         <div
-            class="animate-pop-in flex h-[90vh] w-[min(94vw,1100px)] flex-col overflow-hidden rounded-xl border shadow-2xl"
+            class="animate-pop-in flex h-[90vh] w-[min(94vw,1100px)] flex-col overflow-hidden rounded-none border shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
@@ -66,7 +66,7 @@
                 >
                     <button
                         onclick={() => workshopFrameKey++}
-                        class="rounded p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                        class="rounded-none p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
                         title="刷新"
                     >
                         <Icon icon="mdi:refresh" class="size-4.5" />
@@ -75,14 +75,14 @@
                         href={`${getShareBase()}${path ?? ''}#theme=${frameTheme}`}
                         target="_blank"
                         rel="noreferrer"
-                        class="rounded p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                        class="rounded-none p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
                         title="在新标签页打开"
                     >
                         <Icon icon="mdi:open-in-new" class="size-4.5" />
                     </a>
                     <button
                         onclick={onclose}
-                        class="rounded p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-red-500"
+                        class="rounded-none p-2 text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-red-500"
                         title="关闭"
                     >
                         <Icon icon="mdi:close" class="size-4.5" />

@@ -62,7 +62,7 @@
 <div class="space-y-4">
     <!-- Enemy card (type + level + defense) -->
     <div
-        class="rounded-lg border p-3.5"
+        class="rounded-none border p-3.5"
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
         <span class="text-xs font-medium text-(--theme-modal-text)/70 block mb-3">怪物属性</span>
@@ -73,7 +73,7 @@
                 <button
                     onclick={() => handleTypeChange(t as 'BOSS' | '精英怪' | '小怪')}
                     class={[
-                        'rounded-lg text-[10px] font-medium transition-colors flex flex-col items-center justify-center gap-0.5 w-12 aspect-square',
+                        'rounded-none text-[10px] font-medium transition-colors flex flex-col items-center justify-center gap-0.5 w-12 aspect-square',
                         config.enemy.type === t
                             ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
                             : 'bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/10'
@@ -103,7 +103,7 @@
                             max="150"
                             oninput={(e) => handleLevelChange(parseInt((e.target as HTMLInputElement).value) || 0)}
                             disabled={config.enemy.defenseLocked}
-                            class="w-28 h-6 rounded-md border px-2 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                            class="w-28 h-6 rounded-none border px-2 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             class:opacity-70={config.enemy.defenseLocked}
                         />
@@ -114,7 +114,7 @@
                                 onclick={() => handleLevelChange(lv)}
                                 disabled={config.enemy.defenseLocked}
                                 class={[
-                                    'min-w-7 h-6 rounded-md text-xs font-medium transition-colors',
+                                    'min-w-7 h-6 rounded-none text-xs font-medium transition-colors',
                                     config.enemy.level === lv
                                         ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
                                         : 'bg-(--theme-input-bg) text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
@@ -140,7 +140,7 @@
                             updateEnemy('defenseLocked', true)
                         }}
                         disabled={config.enemy.defenseLocked}
-                        class="w-28 h-6 rounded-md border px-2 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                        class="w-28 h-6 rounded-none border px-2 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         class:opacity-70={config.enemy.defenseLocked}
                     />
@@ -151,20 +151,20 @@
 
     <!-- Resistances card -->
     <div
-        class="rounded-lg border p-3.5"
+        class="rounded-none border p-3.5"
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
         <div class="mb-3 flex items-center justify-between gap-2">
             <span class="text-xs font-medium text-(--theme-modal-text)/70">抗性</span>
             <div
-                class="flex gap-1 rounded-lg border p-0.5"
+                class="flex gap-1 rounded-none border p-0.5"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 {#each RESISTANCE_PRESETS as p}
                     <button
                         onclick={() => applyResistancePreset(p)}
                         class={[
-                            'rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
+                            'rounded-none px-2 py-0.5 text-[10px] font-medium transition-colors',
                             activeResistPreset === p
                                 ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
                                 : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
@@ -175,7 +175,7 @@
                 {/each}
                 <span
                     class={[
-                        'rounded-md px-2 py-0.5 text-[10px] font-medium',
+                        'rounded-none px-2 py-0.5 text-[10px] font-medium',
                         activeResistPreset === null
                             ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text) ring-1 ring-(--theme-accent-bg)/30'
                             : 'text-(--theme-modal-text)/50'
@@ -188,7 +188,7 @@
                 {@const val = config.enemy.resistances[el]}
                 {@const color = elementColor(el)}
                 <div
-                    class="relative w-[calc(25%-7.5px)] min-w-28 overflow-hidden rounded-xl border p-2.5 transition-all duration-200 hover:-translate-y-px hover:border-(--card-color)"
+                    class="relative w-[calc(25%-7.5px)] min-w-28 overflow-hidden rounded-none border p-2.5 transition-all duration-200 hover:-translate-y-px hover:border-(--card-color)"
                     style="--card-color: {color}; background: linear-gradient(135deg, color-mix(in srgb, {color} 14%, transparent) 0%, transparent 65%), radial-gradient(ellipse at 85% 8%, color-mix(in srgb, {color} 12%, transparent) 0%, transparent 55%); border-color: color-mix(in srgb, {color} 18%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, {color} 8%, transparent), inset 0 1px 0 rgba(255,255,255,0.04);"
                 >
                     <!-- 顶部高光线（元素色，弱） -->
@@ -206,7 +206,7 @@
                     <!-- 顶行：图标徽章 + 名称 -->
                     <div class="relative flex items-center gap-1.5">
                         <span
-                            class="flex size-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+                            class="flex size-7 shrink-0 items-center justify-center rounded-none text-[10px] font-bold"
                             style="background: color-mix(in srgb, {color} 12%, transparent); color: {color};"
                         >
                             {#if elementIcons[el]}
@@ -225,7 +225,7 @@
                     <!-- 底行：输入（左对齐属性色）+ 横排步进 -->
                     <div class="relative mt-2 flex items-stretch gap-1">
                         <div
-                            class="flex min-w-0 flex-1 items-center rounded-md border transition-colors focus-within:border-(--card-color)"
+                            class="flex min-w-0 flex-1 items-center rounded-none border transition-colors focus-within:border-(--card-color)"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <input
@@ -246,16 +246,16 @@
                             />
                             <span class="shrink-0 pr-1 text-[10px] text-(--theme-modal-text)/25">%</span>
                         </div>
-                        <div class="flex items-stretch gap-px rounded-md bg-(--theme-input-bg) p-px">
+                        <div class="flex items-stretch gap-px rounded-none bg-(--theme-input-bg) p-px">
                             <button
                                 onclick={() => updateResistance(el, Math.min(100, val + STEP))}
-                                class="rounded px-1.5 text-(--theme-modal-text)/25 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-[color-mix(in_srgb,var(--card-color)_80%,transparent)]"
+                                class="rounded-none px-1.5 text-(--theme-modal-text)/25 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-[color-mix(in_srgb,var(--card-color)_80%,transparent)]"
                             >
                                 <Icon icon="mdi:plus" class="size-3.5" />
                             </button>
                             <button
                                 onclick={() => updateResistance(el, Math.max(-100, val - STEP))}
-                                class="rounded px-1.5 text-(--theme-modal-text)/25 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-[color-mix(in_srgb,var(--card-color)_80%,transparent)]"
+                                class="rounded-none px-1.5 text-(--theme-modal-text)/25 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-[color-mix(in_srgb,var(--card-color)_80%,transparent)]"
                             >
                                 <Icon icon="mdi:minus" class="size-3.5" />
                             </button>
@@ -268,7 +268,7 @@
 
     <!-- Damage reduction card -->
     <div
-        class="rounded-lg border p-3.5"
+        class="rounded-none border p-3.5"
         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
     >
         <div class="flex items-center gap-2">
@@ -284,21 +284,21 @@
                             'dmgReduction',
                             Math.min(100, Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0))
                         )}
-                    class="w-16 rounded-md border px-2 py-1 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                    class="w-16 rounded-none border px-2 py-1 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 />
                 <span class="text-[10px] text-(--theme-modal-text)/30 w-3">%</span>
                 <button
                     onclick={() =>
                         updateEnemy('dmgReduction', Math.min(100, Math.max(0, config.enemy.dmgReduction - STEP)))}
-                    class="rounded p-0.5 text-(--theme-modal-text)/20 transition-colors hover:text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5"
+                    class="rounded-none p-0.5 text-(--theme-modal-text)/20 transition-colors hover:text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5"
                 >
                     <Icon icon="mdi:minus" class="size-3.5" />
                 </button>
                 <button
                     onclick={() =>
                         updateEnemy('dmgReduction', Math.min(100, Math.max(0, config.enemy.dmgReduction + STEP)))}
-                    class="rounded p-0.5 text-(--theme-modal-text)/20 transition-colors hover:text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5"
+                    class="rounded-none p-0.5 text-(--theme-modal-text)/20 transition-colors hover:text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5"
                 >
                     <Icon icon="mdi:plus" class="size-3.5" />
                 </button>

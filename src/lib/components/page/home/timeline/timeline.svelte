@@ -715,7 +715,7 @@
                                     >
                                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                                         <div
-                                            class="flex items-center gap-1 h-full rounded-md {getEditingBlockId() ===
+                                            class="flex items-center gap-1 h-full rounded-none {getEditingBlockId() ===
                                             block.id
                                                 ? ''
                                                 : 'px-2.5'} text-sm bg-(--theme-timeline-bg)/80 border whitespace-nowrap shadow-sm min-w-14"
@@ -755,7 +755,7 @@
                                                         if (e.key === 'Escape') setEditingBlockId(null)
                                                     }}
                                                     size={Math.max(6, (getEditingBlockDesc()?.length || 0) + 3)}
-                                                    class="bg-(--theme-timeline-bg)/60 text-(--theme-timeline-text) text-xs text-left rounded outline-none border px-1"
+                                                    class="bg-(--theme-timeline-bg)/60 text-(--theme-timeline-text) text-xs text-left rounded-none outline-none border px-1"
                                                     style="border-color: color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);"
                                                 />
                                             {:else}
@@ -813,7 +813,7 @@
                                                               ? (team[srcOp.trackIndex]?.character ?? '')
                                                               : ''}
                                                     <span
-                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-px"
+                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded-none px-1.5 py-px"
                                                         style="color: var(--theme-element-{hit.element}, #888); border-color: var(--theme-element-{hit.element}, #888);"
                                                     >
                                                         {(dmg.sourceType === 'ref' && hit.character
@@ -843,7 +843,7 @@
                                                                 ? `var(--theme-element-${(NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]}, #888)`
                                                                 : 'var(--theme-accent-bg)'}
                                                     <span
-                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded px-1.5 py-px"
+                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded-none px-1.5 py-px"
                                                         style="color: {c}; border-color: {c}; opacity: {nd.category ===
                                                         '效应'
                                                             ? 0.75
@@ -905,7 +905,7 @@
                                     if (e.key === 'Escape') setEditingId(null)
                                 }}
                                 size={Math.max(5, (getEditValue()?.length || 0) + 2)}
-                                class="bg-(--theme-timeline-bg)/60 text-[9px] text-(--theme-timeline-text) text-left rounded outline-none border tabular-nums"
+                                class="bg-(--theme-timeline-bg)/60 text-[9px] text-(--theme-timeline-text) text-left rounded-none outline-none border tabular-nums"
                                 style="border-color: color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);"
                             />
                         {:else}

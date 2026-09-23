@@ -84,7 +84,7 @@
 </script>
 
 <div
-    class="relative min-w-[13rem] rounded-xl {className ?? ''}"
+    class="relative min-w-[13rem] rounded-none {className ?? ''}"
     style="background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, var(--theme-modal-text) 6%, transparent) 100%); {styleProp ||
         ''}"
 >
@@ -101,7 +101,7 @@
                     onclick={() => oncost(c)}
                     disabled={c !== slot.cost && otherCost + c > 12}
                     class={[
-                        'h-6 min-w-0 flex-1 rounded px-1 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
+                        'h-6 min-w-0 flex-1 rounded-none px-1 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
                         slot.cost === c
                             ? costBtnCls(slot.cost)
                             : 'bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:bg-(--theme-modal-text)/10'
@@ -115,7 +115,7 @@
             <button
                 data-main-stat-trigger={mainStatTriggerKey}
                 onclick={onmainstat}
-                class="w-full rounded border px-3 py-2 transition-colors hover:bg-(--theme-modal-text)/10"
+                class="w-full rounded-none border px-3 py-2 transition-colors hover:bg-(--theme-modal-text)/10"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <div class="flex items-center justify-between">
@@ -154,7 +154,7 @@
                             role="listitem"
                             transition:slide={{ duration: 200 }}
                             class={[
-                                'flex items-center gap-2 rounded px-2 py-1.5 transition-all touch-none',
+                                'flex items-center gap-2 rounded-none px-2 py-1.5 transition-all touch-none',
                                 ondragstart ? 'cursor-grab active:cursor-grabbing' : '',
                                 isDragged && !dragOutside && 'ring-2 ring-(--theme-accent-bg)',
                                 isDragged && dragOutside && 'ring-2 ring-red-500 opacity-50'
@@ -177,7 +177,7 @@
                                     ></div>
                                 </div>
                                 <div
-                                    class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap pointer-events-none z-10"
+                                    class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-none text-[10px] font-medium whitespace-nowrap pointer-events-none z-10"
                                     style="left: {pct}%; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                                 >
                                     {sub.value}{opt.unit}
@@ -195,7 +195,7 @@
                             {#if onremovesubstat}
                                 <button
                                     onclick={() => onremovesubstat(idx)}
-                                    class="shrink-0 rounded p-0.5 text-(--theme-muted-text) transition-colors hover:text-red-500"
+                                    class="shrink-0 rounded-none p-0.5 text-(--theme-muted-text) transition-colors hover:text-red-500"
                                     title="移除该副词条"
                                 >
                                     <Icon icon="mdi:close" class="size-3.5" />
@@ -213,7 +213,7 @@
                     {#if slot.substats.length < 5}
                         <button
                             onclick={onaddsubstat}
-                            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
+                            class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
                         >
                             <Icon icon="mdi:plus" class="size-3" />
                             选择副词条
@@ -221,7 +221,7 @@
                     {/if}
                     <button
                         onclick={onclearsubstats}
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-input-bg) hover:text-red-500"
+                        class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-input-bg) hover:text-red-500"
                         title="清空该声骸的副词条"
                     >
                         <Icon icon="mdi:refresh" class="size-3" />
@@ -232,7 +232,7 @@
                 <div class="mt-1 flex flex-wrap items-center gap-2">
                     <button
                         onclick={onaddsubstat}
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
+                        class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
                     >
                         <Icon icon="mdi:plus" class="size-3" />
                         选择副词条
@@ -240,7 +240,7 @@
                     {#if onenhance}
                         <button
                             onclick={onenhance}
-                            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
+                            class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-input-bg)"
                         >
                             <Icon icon="mdi:dice-5" class="size-3" />
                             随机强化

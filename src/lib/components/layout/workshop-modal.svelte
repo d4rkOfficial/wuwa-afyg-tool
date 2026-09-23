@@ -96,7 +96,7 @@
         <button
             onclick={() => refreshProjects()}
             disabled={share.loading}
-            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40"
+            class="inline-flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40"
         >
             <Icon icon="mdi:refresh" class="size-3.5" />
             刷新
@@ -112,17 +112,17 @@
             <input
                 bind:value={keyword}
                 placeholder="搜索标题 / 作者"
-                class="w-full rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) py-1.5 pl-8 pr-3 text-sm text-(--theme-layout-text) outline-none transition-colors placeholder:text-(--theme-muted-text) focus:border-(--theme-accent-bg)/50"
+                class="w-full rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) py-1.5 pl-8 pr-3 text-sm text-(--theme-layout-text) outline-none transition-colors placeholder:text-(--theme-muted-text) focus:border-(--theme-accent-bg)/50"
             />
         </div>
         <div
-            class="flex shrink-0 items-center rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5"
+            class="flex shrink-0 items-center rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5"
         >
             {#each SHARE_SORT_LABELS as opt}
                 <button
                     onclick={() => setSort(opt.value)}
                     class={[
-                        'rounded-md px-2.5 py-1 text-xs transition-colors',
+                        'rounded-none px-2.5 py-1 text-xs transition-colors',
                         share.sort === opt.value
                             ? 'font-medium text-(--theme-accent-text)'
                             : 'text-(--theme-muted-text) hover:text-(--theme-layout-text)'
@@ -146,7 +146,7 @@
                 无法连接椰果工坊
                 <button
                     onclick={() => refreshProjects()}
-                    class="rounded-md px-3 py-1.5 text-xs transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="rounded-none px-3 py-1.5 text-xs transition-colors hover:bg-(--theme-card-bg-focused)"
                 >
                     重试
                 </button>
@@ -159,7 +159,7 @@
         {:else}
             {#each share.projects as item (item.id)}
                 <div
-                    class="flex items-center gap-3 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2.5 transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="flex items-center gap-3 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2.5 transition-colors hover:bg-(--theme-card-bg-focused)"
                 >
                     {#if item.teamPreview?.names?.length}
                         <div class="flex shrink-0 -space-x-1.5">
@@ -180,7 +180,7 @@
                             </span>
                             {#if item.gameVersion}
                                 <span
-                                    class="shrink-0 rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                    class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
                                 >
                                     {item.gameVersion}
                                 </span>
@@ -202,14 +202,14 @@
                     </div>
                     <button
                         onclick={() => handleShare(item)}
-                        class="inline-flex shrink-0 items-center rounded-lg border border-(--theme-card-border) px-2.5 py-1.5 text-(--theme-layout-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                        class="inline-flex shrink-0 items-center rounded-none border border-(--theme-card-border) px-2.5 py-1.5 text-(--theme-layout-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                         title="复制分享链接"
                     >
                         <Icon icon="mdi:share-variant" class="size-4" />
                     </button>
                     <button
                         onclick={() => ondetail?.(item.code)}
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-(--theme-card-border) px-3 py-1.5 text-sm text-(--theme-layout-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-none border border-(--theme-card-border) px-3 py-1.5 text-sm text-(--theme-layout-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                         title="查看详情"
                     >
                         <Icon icon="mdi:information-outline" class="size-4" />
@@ -218,7 +218,7 @@
                     <button
                         onclick={() => handleDownload(item.code, item.title)}
                         disabled={downloading !== null}
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all hover:brightness-125 disabled:opacity-40"
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-none px-3 py-1.5 text-sm font-medium transition-all hover:brightness-125 disabled:opacity-40"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                     >
                         <Icon
@@ -242,7 +242,7 @@
                     <button
                         onclick={() => setPage(share.page - 1)}
                         disabled={share.page <= 1}
-                        class="rounded-md px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
+                        class="rounded-none px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
                     >
                         上一页
                     </button>
@@ -250,7 +250,7 @@
                     <button
                         onclick={() => setPage(share.page + 1)}
                         disabled={share.page >= totalPages}
-                        class="rounded-md px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
+                        class="rounded-none px-2 py-1 transition-colors hover:bg-(--theme-card-bg-focused) hover:text-(--theme-layout-text) disabled:opacity-40 disabled:pointer-events-none"
                     >
                         下一页
                     </button>

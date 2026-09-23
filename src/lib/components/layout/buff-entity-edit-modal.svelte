@@ -327,7 +327,7 @@
         >
             <button
                 onclick={onclose}
-                class="h-7 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                class="h-7 rounded-none px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                 style="background: var(--theme-input-bg);"
             >
                 取消
@@ -335,7 +335,7 @@
             <button
                 onclick={handleSave}
                 disabled={!canSave}
-                class="inline-flex h-7 items-center gap-1.5 rounded-md px-4 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
+                class="inline-flex h-7 items-center gap-1.5 rounded-none px-4 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
             >
                 <Icon icon="mdi:check" class="size-3.5" />
@@ -351,14 +351,14 @@
         </p>
 
         {#if flash}
-            <div class="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
+            <div class="mb-3 rounded-none border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
                 {flash}
             </div>
         {/if}
 
         <div class="flex min-h-0 flex-1 gap-3">
             <!-- Left: buff list -->
-            <div class="flex w-64 shrink-0 flex-col rounded-lg border border-(--theme-card-border)">
+            <div class="flex w-64 shrink-0 flex-col rounded-none border border-(--theme-card-border)">
                 <div
                     class="flex shrink-0 items-center justify-between border-b px-3 py-2"
                     style="border-color: var(--theme-divider-border);"
@@ -366,7 +366,7 @@
                     <span class="text-xs font-medium text-(--theme-muted-text)">Buff 条目（{buffs.length}）</span>
                     <button
                         onclick={addBuff}
-                        class="inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium"
+                        class="inline-flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                     >
                         <Icon icon="mdi:plus" class="size-3.5" />
@@ -381,7 +381,7 @@
                             <button
                                 onclick={() => selectBuff(i)}
                                 class={[
-                                    'w-full rounded-lg px-2 py-1.5 text-left transition-colors',
+                                    'w-full rounded-none px-2 py-1.5 text-left transition-colors',
                                     i === activeBuffIdx
                                         ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                         : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
@@ -400,7 +400,7 @@
             </div>
 
             <!-- Middle: selected buff editor -->
-            <div class="flex min-w-0 flex-1 flex-col rounded-lg border border-(--theme-card-border)">
+            <div class="flex min-w-0 flex-1 flex-col rounded-none border border-(--theme-card-border)">
                 {#if activeBuff}
                     <div
                         class="flex shrink-0 flex-col gap-2 border-b px-3 py-2"
@@ -411,19 +411,19 @@
                                 value={activeBuff.buffName}
                                 oninput={(e) => renameBuff(activeBuffIdx, (e.currentTarget as HTMLInputElement).value)}
                                 placeholder="Buff 名"
-                                class="min-w-0 flex-1 rounded border bg-(--theme-input-bg) px-2 py-1 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)"
+                                class="min-w-0 flex-1 rounded-none border bg-(--theme-input-bg) px-2 py-1 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)"
                                 style="border-color: var(--theme-divider-border);"
                             />
                             <button
                                 onclick={() => removeBuff(activeBuffIdx)}
-                                class="shrink-0 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                                class="shrink-0 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
                                 title="删除该 Buff"
                             >
                                 <Icon icon="mdi:delete-outline" class="size-3.5" />
                             </button>
                         </div>
                         <div
-                            class="flex shrink-0 overflow-hidden rounded border"
+                            class="flex shrink-0 overflow-hidden rounded-none border"
                             style="border-color: var(--theme-divider-border);"
                             title="受益目标：自己=仅自身；队友=自己除外；全队=整个队伍；效应=效应专属（互斥）"
                         >
@@ -467,14 +467,14 @@
                             >
                                 {#if canChain}
                                     <div
-                                        class="flex items-center gap-2 rounded border px-2 py-1"
+                                        class="flex items-center gap-2 rounded-none border px-2 py-1"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
                                         <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
                                             >共鸣链</span
                                         >
                                         <div
-                                            class="flex overflow-hidden rounded border"
+                                            class="flex overflow-hidden rounded-none border"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             {#each Array.from({ length: CHAIN_MAX + 1 }, (_, k) => k) as n}
@@ -501,14 +501,14 @@
                                 {/if}
                                 {#if canRefinement}
                                     <div
-                                        class="flex items-center gap-2 rounded border px-2 py-1"
+                                        class="flex items-center gap-2 rounded-none border px-2 py-1"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
                                         <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
                                             >精炼</span
                                         >
                                         <div
-                                            class="flex overflow-hidden rounded border"
+                                            class="flex overflow-hidden rounded-none border"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             {#each Array.from({ length: REFINE_MAX }, (_, k) => k + 1) as n}
@@ -534,7 +534,7 @@
                                     </div>
                                 {/if}
                                 <div
-                                    class="flex flex-wrap items-center gap-1 rounded border px-2 py-1"
+                                    class="flex flex-wrap items-center gap-1 rounded-none border px-2 py-1"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
@@ -544,7 +544,7 @@
                                         <button
                                             onclick={() => toggleConditionElement(el)}
                                             class={[
-                                                'rounded px-1.5 py-0.5 text-[10px] transition-colors',
+                                                'rounded-none px-1.5 py-0.5 text-[10px] transition-colors',
                                                 (cond.elements ?? []).includes(el)
                                                     ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
@@ -555,7 +555,7 @@
                                     {/each}
                                 </div>
                                 <div
-                                    class="flex flex-wrap items-center gap-1 rounded border px-2 py-1"
+                                    class="flex flex-wrap items-center gap-1 rounded-none border px-2 py-1"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
@@ -566,7 +566,7 @@
                                             onclick={() => toggleConditionDamageType(dt)}
                                             title={dt}
                                             class={[
-                                                'rounded px-1.5 py-0.5 text-[10px] transition-colors',
+                                                'rounded-none px-1.5 py-0.5 text-[10px] transition-colors',
                                                 (cond.damageTypes ?? []).includes(dt)
                                                     ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
@@ -578,7 +578,7 @@
                                 </div>
                                 <button
                                     onclick={clearCondition}
-                                    class="flex h-6 items-center gap-1 rounded border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
+                                    class="flex h-6 items-center gap-1 rounded-none border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     <Icon icon="mdi:close-circle-outline" class="size-3" />
@@ -595,7 +595,7 @@
                         {:else}
                             {#each activeBuff.zones as z}
                                 <div
-                                    class="flex items-center gap-1.5 rounded px-3 py-2"
+                                    class="flex items-center gap-1.5 rounded-none px-3 py-2"
                                     style="background: var(--theme-input-bg);"
                                 >
                                     <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
@@ -642,7 +642,7 @@
                                                         z.zoneId,
                                                         Number((e.currentTarget as HTMLInputElement).value)
                                                     )}
-                                                class="w-14 h-6 rounded border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                                                class="w-14 h-6 rounded-none border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                                                 style="border-color: var(--theme-divider-border);"
                                             />
                                             <span class="w-3 text-[10px] text-(--theme-modal-text)/40">
@@ -654,7 +654,7 @@
                                         <button
                                             onclick={() => setZoneOverride(z.zoneId, !z.override)}
                                             class={[
-                                                'shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                                'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
                                                 z.override
                                                     ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
                                                     : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
@@ -668,7 +668,7 @@
                                         <button
                                             onclick={() => openRefModal(z.zoneId)}
                                             class={[
-                                                'shrink-0 rounded border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                                'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
                                                 z.ref
                                                     ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
                                                     : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
@@ -683,7 +683,7 @@
                                     {/if}
                                     <button
                                         onclick={() => toggleAddZone(z.zoneId)}
-                                        class="shrink-0 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                                        class="shrink-0 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
                                     >
                                         <Icon icon="mdi:close" class="size-3.5" />
                                     </button>
@@ -699,7 +699,7 @@
             </div>
 
             <!-- Right: zone picker -->
-            <div class="flex w-52 shrink-0 flex-col rounded-lg border border-(--theme-card-border)">
+            <div class="flex w-52 shrink-0 flex-col rounded-none border border-(--theme-card-border)">
                 <div
                     class="shrink-0 border-b px-3 py-2 text-xs font-medium text-(--theme-muted-text)"
                     style="border-color: var(--theme-divider-border);"
@@ -712,7 +712,7 @@
                         <button
                             onclick={() => toggleAddZone(def.id)}
                             class={[
-                                'flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs font-medium transition-colors',
+                                'flex w-full items-center gap-1.5 rounded-none px-2 py-1.5 text-left text-xs font-medium transition-colors',
                                 exists
                                     ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
                                     : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
@@ -737,7 +737,7 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
-            class="animate-pop-in theme-scrollbar rounded-xl border p-5 shadow-xl w-120 max-h-[88vh] overflow-y-auto"
+            class="animate-pop-in theme-scrollbar rounded-none border p-5 shadow-xl w-120 max-h-[88vh] overflow-y-auto"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -759,7 +759,7 @@
                     <div class="relative">
                         <button
                             onclick={() => (showRefZoneMenu = !showRefZoneMenu)}
-                            class="w-full flex items-center justify-between rounded-lg border px-3 py-2 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                            class="w-full flex items-center justify-between rounded-none border px-3 py-2 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <span class="truncate">{refTargetDef?.label ?? refTargetZoneId}</span>
@@ -767,7 +767,7 @@
                         </button>
                         {#if showRefZoneMenu}
                             <div
-                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                class="theme-scrollbar absolute left-0 top-full z-10 mt-1.5 w-full max-h-60 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
                                 style="border-color: var(--theme-divider-border);"
                                 onclick={(e) => e.stopPropagation()}
                             >
@@ -798,7 +798,7 @@
                 <!-- Conversion rule card -->
                 {#if refTargetDef && currentZoneDef}
                     <div
-                        class="rounded-lg border px-4 py-3.5 space-y-3"
+                        class="rounded-none border px-4 py-3.5 space-y-3"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
                         <div class="text-xs text-(--theme-modal-text)/60">
@@ -807,7 +807,7 @@
 
                         <!-- Line 1: 超过 [threshold] unit1 的部分 -->
                         <div
-                            class="flex items-center rounded-md border overflow-hidden"
+                            class="flex items-center rounded-none border overflow-hidden"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <button
@@ -841,7 +841,7 @@
 
                         <!-- Conversion mode tab -->
                         <div
-                            class="flex rounded-md border overflow-hidden"
+                            class="flex rounded-none border overflow-hidden"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <button
@@ -875,7 +875,7 @@
 
                         <!-- Line 2: 每 [divisor] unit1 转换为 [multiplier] unit2 -->
                         <div
-                            class="flex items-center rounded-md border overflow-hidden"
+                            class="flex items-center rounded-none border overflow-hidden"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <span
@@ -921,7 +921,7 @@
                 <!-- Lower & Upper -->
                 <div class="flex gap-2">
                     <div
-                        class="flex items-center flex-1 rounded-md border overflow-hidden"
+                        class="flex items-center flex-1 rounded-none border overflow-hidden"
                         style="border-color: var(--theme-divider-border);"
                     >
                         <button
@@ -952,7 +952,7 @@
                         <span class="text-xs text-(--theme-modal-text)/40 px-3 py-1.5">{currentZoneUnit}</span>
                     </div>
                     <div
-                        class="flex items-center flex-1 rounded-md border overflow-hidden"
+                        class="flex items-center flex-1 rounded-none border overflow-hidden"
                         style="border-color: var(--theme-divider-border);"
                     >
                         <button
@@ -991,18 +991,18 @@
             >
                 <button
                     onclick={handleClearRef}
-                    class="rounded-md px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/15"
+                    class="rounded-none px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/15"
                     >清除引用</button
                 >
                 <div class="flex items-center gap-2">
                     <button
                         onclick={() => (showRefModal = false)}
-                        class="rounded-md px-3 py-1.5 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10"
+                        class="rounded-none px-3 py-1.5 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10"
                         >取消</button
                     >
                     <button
                         onclick={handleConfirmRef}
-                        class="rounded-md px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
+                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         >确认</button
                     >

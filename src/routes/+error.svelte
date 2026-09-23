@@ -11,7 +11,7 @@
     </div>
     <button
         onclick={() => goto('/')}
-        class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+        class="inline-flex items-center gap-1.5 rounded-none px-4 py-2 text-sm font-medium transition-colors"
         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff)"
     >
         <Icon icon="mdi:arrow-left" class="size-4" />

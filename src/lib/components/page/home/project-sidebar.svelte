@@ -235,7 +235,7 @@
                         e.stopPropagation()
                         onToggleSidebarLookup?.()
                     }}
-                    class="rounded p-1 transition-colors hover:bg-white/5 {sidebarLookupOpen
+                    class="rounded-none p-1 transition-colors hover:bg-white/5 {sidebarLookupOpen
                         ? 'text-(--theme-accent-text)'
                         : 'text-(--theme-sidebar-text)/40 hover:text-(--theme-sidebar-text)/70'}"
                     title="速查"
@@ -248,7 +248,7 @@
                     e.stopPropagation()
                     onToggleSidebarWidth?.()
                 }}
-                class="rounded p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-white/5"
+                class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-white/5"
                 title={sidebarWide ? '收窄侧栏' : '展宽侧栏'}
             >
                 <Icon icon={sidebarWide ? 'mdi:arrow-collapse' : 'mdi:arrow-expand'} class="size-4" />
@@ -262,7 +262,7 @@
                         addToast(`已切换至「${t?.name ?? next}」`, 'success')
                     })
                 }}
-                class="rounded p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-white/5"
+                class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-white/5"
                 title="切换明暗主题"
             >
                 <Icon icon="mdi:theme-light-dark" class="size-4" />
@@ -289,7 +289,7 @@
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                     class={[
-                        'overflow-hidden rounded-lg transition-colors',
+                        'overflow-hidden rounded-none transition-colors',
                         hoveredHeaderKey === group.key ? 'bg-(--theme-sidebar-text)/5' : ''
                     ].join(' ')}
                 >
@@ -345,7 +345,7 @@
                                     onclick={() => selectProject(project.id)}
                                     oncontextmenu={(e) => handleContextMenu(e, project.id)}
                                     class={[
-                                        'flex w-full cursor-pointer items-center text-sm transition-colors rounded-lg',
+                                        'flex w-full cursor-pointer items-center text-sm transition-colors rounded-none',
                                         compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
                                         project.id === activeId
                                             ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
@@ -354,7 +354,7 @@
                                 >
                                     {#if compact}
                                         <span
-                                            class="flex size-6 items-center justify-center rounded-md bg-(--theme-sidebar-text)/10 text-xs"
+                                            class="flex size-6 items-center justify-center rounded-none bg-(--theme-sidebar-text)/10 text-xs"
                                             >{project.name[0]}</span
                                         >
                                     {:else}
@@ -370,7 +370,7 @@
             {#if grouped.ungrouped.length > 0}
                 <div class="space-y-0.5">
                     <div
-                        class="flex w-full cursor-default items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-(--theme-sidebar-text)/60"
+                        class="flex w-full cursor-default items-center gap-2 rounded-none px-2 py-1.5 text-sm text-(--theme-sidebar-text)/60"
                     >
                         <svg viewBox="0 0 16 16" class="size-4.5 shrink-0">
                             <rect x="0" y="0" width="16" height="16" rx="3" fill="#555" />
@@ -386,7 +386,7 @@
                             onclick={() => selectProject(project.id)}
                             oncontextmenu={(e) => handleContextMenu(e, project.id)}
                             class={[
-                                'flex w-full cursor-pointer items-center text-sm transition-colors rounded-lg',
+                                'flex w-full cursor-pointer items-center text-sm transition-colors rounded-none',
                                 compact ? 'justify-center py-1' : 'gap-2 px-2 py-1.5 pl-6',
                                 project.id === activeId
                                     ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
@@ -395,7 +395,7 @@
                         >
                             {#if compact}
                                 <span
-                                    class="flex size-6 items-center justify-center rounded-md bg-(--theme-sidebar-text)/10 text-xs"
+                                    class="flex size-6 items-center justify-center rounded-none bg-(--theme-sidebar-text)/10 text-xs"
                                     >{project.name[0]}</span
                                 >
                             {:else}
@@ -416,21 +416,21 @@
             {#if compact}
                 <button
                     onclick={oncreate}
-                    class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    class="flex w-full items-center justify-center rounded-none py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="新建工程"
                 >
                     <Icon icon="mdi:plus" class="size-4 shrink-0" />
                 </button>
                 <button
                     onclick={onimport}
-                    class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    class="flex w-full items-center justify-center rounded-none py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="从本地导入"
                 >
                     <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
                 </button>
                 <button
                     onclick={onworkshop}
-                    class="flex w-full items-center justify-center rounded-lg py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    class="flex w-full items-center justify-center rounded-none py-1 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="从工坊导入"
                 >
                     <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
@@ -438,7 +438,7 @@
             {:else}
                 <button
                     onclick={() => (actionsCollapsed = !actionsCollapsed)}
-                    class="flex w-full shrink-0 items-center justify-center rounded-md py-1 text-(--theme-sidebar-text)/40 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/80"
+                    class="flex w-full shrink-0 items-center justify-center rounded-none py-1 text-(--theme-sidebar-text)/40 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/80"
                     title={actionsCollapsed ? '展开操作' : '收起操作'}
                 >
                     <Icon
@@ -450,7 +450,7 @@
                     <div transition:slide|local={{ duration: 200 }} class="space-y-0.5">
                         <button
                             onclick={oncreate}
-                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="新建工程"
                         >
                             <Icon icon="mdi:plus" class="size-4 shrink-0" />
@@ -458,7 +458,7 @@
                         </button>
                         <button
                             onclick={onimport}
-                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="从本地导入"
                         >
                             <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
@@ -466,7 +466,7 @@
                         </button>
                         <button
                             onclick={onworkshop}
-                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-2 text-sm text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="从工坊导入"
                         >
                             <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />

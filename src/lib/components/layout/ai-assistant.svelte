@@ -516,14 +516,14 @@
                 </div>
                 <button
                     onclick={clearConversation}
-                    class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
+                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
                     title="清空对话"
                 >
                     <Icon icon="mdi:broom" class="size-4" />
                 </button>
                 <button
                     onclick={toggleScale}
-                    class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
+                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/80"
                     title={size === 'small' ? '放大到全尺寸' : '缩小'}
                 >
                     <Icon icon={size === 'small' ? 'mdi:arrow-expand' : 'mdi:arrow-collapse'} class="size-4" />
@@ -543,7 +543,7 @@
                         {@const isLastUser = i === lastUserDisplayIdx}
                         <div class="flex justify-end">
                             <div
-                                class="max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-2xl rounded-br-sm px-3 py-2 text-xs leading-relaxed"
+                                class="max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-none rounded-none px-3 py-2 text-xs leading-relaxed"
                                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                             >
                                 {m.text}
@@ -551,7 +551,7 @@
                                     <button
                                         onclick={() => send(m.text)}
                                         disabled={busy}
-                                        class="ml-1 inline-flex items-center rounded px-0.5 py-0.5 align-middle opacity-50 transition-opacity hover:opacity-100 disabled:opacity-30"
+                                        class="ml-1 inline-flex items-center rounded-none px-0.5 py-0.5 align-middle opacity-50 transition-opacity hover:opacity-100 disabled:opacity-30"
                                         style="color: var(--theme-accent-text-on-bg, #fff);"
                                         title="重试这条指令"
                                     >
@@ -566,7 +566,7 @@
                         {@const activeTab = m.tab ?? 'chat'}
                         <div class="flex justify-start">
                             <div
-                                class="ai-md max-w-[92%] wrap-break-word rounded-2xl rounded-bl-sm px-3 py-2 text-xs leading-relaxed"
+                                class="ai-md max-w-[92%] wrap-break-word rounded-none rounded-none px-3 py-2 text-xs leading-relaxed"
                                 style="background: var(--theme-input-bg);"
                             >
                                 {#if hasReasoning || hasTools}
@@ -576,7 +576,7 @@
                                     >
                                         <button
                                             onclick={() => setTab(m, 'chat')}
-                                            class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                            class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                             'chat'
                                                 ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                 : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
@@ -586,7 +586,7 @@
                                         {#if hasReasoning}
                                             <button
                                                 onclick={() => setTab(m, 'reasoning')}
-                                                class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                                class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                                 'reasoning'
                                                     ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
@@ -597,7 +597,7 @@
                                         {#if hasTools}
                                             <button
                                                 onclick={() => setTab(m, 'tools')}
-                                                class="rounded px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                                class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                                 'tools'
                                                     ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
@@ -653,14 +653,14 @@
 
                 {#if confirmCard}
                     <div
-                        class="rounded-2xl border border-red-500/40 px-3 py-2.5"
+                        class="rounded-none border border-red-500/40 px-3 py-2.5"
                         style="background: color-mix(in srgb, var(--theme-input-bg) 80%, transparent);"
                     >
                         <div class="flex items-center gap-2 text-xs font-semibold">
                             <Icon icon="mdi:alert-outline" class="size-4 text-red-500" />
                             确认执行操作
                         </div>
-                        <div class="mt-1.5 rounded-lg px-2.5 py-2 text-xs" style="background: var(--theme-input-bg);">
+                        <div class="mt-1.5 rounded-none px-2.5 py-2 text-xs" style="background: var(--theme-input-bg);">
                             <div class="font-medium text-(--theme-accent-text)">{confirmCard.toolName}</div>
                             <div class="mt-0.5 wrap-break-word text-(--theme-modal-text)/60">{confirmCard.summary}</div>
                         </div>
@@ -670,7 +670,7 @@
                                     confirmCard?.resolve(false)
                                     confirmCard = null
                                 }}
-                                class="rounded-lg px-3 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                class="rounded-none px-3 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                             >
                                 拒绝
                             </button>
@@ -679,7 +679,7 @@
                                     confirmCard?.resolve(true)
                                     confirmCard = null
                                 }}
-                                class="rounded-lg px-3.5 py-1.5 text-xs font-medium text-white transition-all hover:brightness-110"
+                                class="rounded-none px-3.5 py-1.5 text-xs font-medium text-white transition-all hover:brightness-110"
                                 style="background: #ef4444;"
                             >
                                 允许执行
@@ -702,14 +702,14 @@
                                 send()
                             }
                         }}
-                        class="min-h-0 flex-1 resize-none rounded-lg border px-2.5 py-2 text-xs leading-relaxed outline-none transition-colors"
+                        class="min-h-0 flex-1 resize-none rounded-none border px-2.5 py-2 text-xs leading-relaxed outline-none transition-colors"
                         style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                     ></textarea>
                     <div class="flex shrink-0 flex-col items-center gap-1">
                         <button
                             onclick={() => (busy ? stopGenerating() : send())}
                             disabled={!busy && !input.trim()}
-                            class="flex size-9 items-center justify-center rounded-lg transition-all hover:brightness-115 disabled:opacity-40"
+                            class="flex size-9 items-center justify-center rounded-none transition-all hover:brightness-115 disabled:opacity-40"
                             style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                             title={busy ? '停止生成' : '发送'}
                         >

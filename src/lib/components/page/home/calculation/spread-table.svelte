@@ -769,7 +769,7 @@
                             >
                                 {#each group.visibleGlobalBuffs as gb}
                                     <span
-                                        class="inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                        class="inline-flex shrink-0 items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
                                         style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
                                     >
                                         <Icon icon="mdi:crown" class="size-3" />{gb.name}
@@ -980,7 +980,7 @@
                                             >
                                             {#each entryDamageTypeMap[row.entry.id] ?? [] as dt}
                                                 <span
-                                                    class="rounded px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
+                                                    class="rounded-none px-1 text-[10px] leading-tight text-(--theme-modal-text)/70"
                                                     style="background: var(--theme-input-bg);"
                                                     >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ??
                                                         dt}</span

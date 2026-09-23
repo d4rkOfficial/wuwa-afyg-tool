@@ -661,7 +661,7 @@
         }}
     >
         <div
-            class="animate-pop-in theme-glass-surface theme-scrollbar flex max-h-[92vh] w-[min(96vw,1400px)] flex-col overflow-hidden rounded-xl border shadow-2xl"
+            class="animate-pop-in theme-glass-surface theme-scrollbar flex max-h-[92vh] w-[min(96vw,1400px)] flex-col overflow-hidden rounded-none border shadow-2xl"
             style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text);"
             role="dialog"
             aria-modal="true"
@@ -680,7 +680,7 @@
                 </div>
                 <button
                     onclick={() => onBack(points)}
-                    class="inline-flex items-center gap-1 rounded p-1.5 text-xs transition-colors hover:opacity-70"
+                    class="inline-flex items-center gap-1 rounded-none p-1.5 text-xs transition-colors hover:opacity-70"
                     style="color: var(--theme-accent-text);"
                     title="返回数据分析"
                 >
@@ -701,7 +701,7 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <button
                             onclick={openPicker}
-                            class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors hover:opacity-80"
+                            class="inline-flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-sm transition-colors hover:opacity-80"
                             style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
                         >
                             <Icon icon="mdi:sitemap" class="size-4" />
@@ -731,18 +731,18 @@
 
                     <!-- ── 队伍出伤曲线（常驻渲染，同图叠加）── -->
                     <section
-                        class="rounded-lg border p-3"
+                        class="rounded-none border p-3"
                         style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
                     >
                         <div class="mb-2 flex items-center gap-2">
                             <span class="text-xs font-semibold uppercase tracking-wider opacity-50">队伍出伤曲线</span>
                             <div
-                                class="ml-auto flex items-center gap-1 rounded-lg border p-0.5 text-[11px]"
+                                class="ml-auto flex items-center gap-1 rounded-none border p-0.5 text-[11px]"
                                 style="border-color: var(--theme-divider-border);"
                             >
                                 <button
                                     onclick={() => (curveTab = 'cumulative')}
-                                    class="rounded px-2 py-0.5 {curveTab === 'cumulative'
+                                    class="rounded-none px-2 py-0.5 {curveTab === 'cumulative'
                                         ? 'font-medium'
                                         : 'opacity-60'}"
                                     style={curveTab === 'cumulative'
@@ -751,7 +751,9 @@
                                 >
                                 <button
                                     onclick={() => (curveTab = 'window')}
-                                    class="rounded px-2 py-0.5 {curveTab === 'window' ? 'font-medium' : 'opacity-60'}"
+                                    class="rounded-none px-2 py-0.5 {curveTab === 'window'
+                                        ? 'font-medium'
+                                        : 'opacity-60'}"
                                     style={curveTab === 'window'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
                                         : ''}>窗口</button
@@ -772,7 +774,7 @@
                                 {#each rangeStats as stat}
                                     {@const c = stat.config}
                                     <div
-                                        class="min-w-44 flex-1 shrink-0 rounded-lg border p-3"
+                                        class="min-w-44 flex-1 shrink-0 rounded-none border p-3"
                                         style="border-color: {c.accent}; background: var(--theme-card-bg);"
                                     >
                                         <div
@@ -804,7 +806,7 @@
 
                         <!-- ── 分段 DPS（版式对齐数据分析页：区块头 + 时段单选 + 选中范围明细）── -->
                         <section
-                            class="rounded-xl border"
+                            class="rounded-none border"
                             style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
                         >
                             <div
@@ -1010,25 +1012,29 @@
 
                     <!-- ── 伤害占比（常驻，条形图）：全队占比 + 每角色直伤类型占比 ── -->
                     <section
-                        class="rounded-lg border p-3"
+                        class="rounded-none border p-3"
                         style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
                     >
                         <div class="mb-2 flex items-center gap-2">
                             <span class="text-xs font-semibold uppercase tracking-wider opacity-50">全队伤害占比</span>
                             <div
-                                class="ml-auto flex items-center gap-1 rounded-lg border p-0.5 text-[11px]"
+                                class="ml-auto flex items-center gap-1 rounded-none border p-0.5 text-[11px]"
                                 style="border-color: var(--theme-divider-border);"
                             >
                                 <button
                                     onclick={() => (shareMode = 'total')}
-                                    class="rounded px-2 py-0.5 {shareMode === 'total' ? 'font-medium' : 'opacity-60'}"
+                                    class="rounded-none px-2 py-0.5 {shareMode === 'total'
+                                        ? 'font-medium'
+                                        : 'opacity-60'}"
                                     style={shareMode === 'total'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
                                         : ''}>看总伤</button
                                 >
                                 <button
                                     onclick={() => (shareMode = 'pct')}
-                                    class="rounded px-2 py-0.5 {shareMode === 'pct' ? 'font-medium' : 'opacity-60'}"
+                                    class="rounded-none px-2 py-0.5 {shareMode === 'pct'
+                                        ? 'font-medium'
+                                        : 'opacity-60'}"
                                     style={shareMode === 'pct'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
                                         : ''}>看占比</button
@@ -1041,7 +1047,7 @@
                     </section>
 
                     <section
-                        class="rounded-lg border p-3"
+                        class="rounded-none border p-3"
                         style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
                     >
                         <div class="mb-2 text-xs font-semibold uppercase tracking-wider opacity-50">
@@ -1077,7 +1083,7 @@
             }}
         >
             <div
-                class="animate-pop-in theme-glass-surface flex max-h-[88vh] w-[min(94vw,760px)] flex-col overflow-hidden rounded-xl border shadow-2xl"
+                class="animate-pop-in theme-glass-surface flex max-h-[88vh] w-[min(94vw,760px)] flex-col overflow-hidden rounded-none border shadow-2xl"
                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 95%, transparent); color: var(--theme-modal-text);"
                 role="dialog"
                 aria-modal="true"
@@ -1093,7 +1099,7 @@
                 <div class="theme-scrollbar min-h-0 flex-1 space-y-4 overflow-auto p-4">
                     {#each team as slot, si}
                         <div
-                            class="rounded-lg border p-3"
+                            class="rounded-none border p-3"
                             style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
                         >
                             <div class="mb-2 flex items-center gap-2">
@@ -1157,7 +1163,7 @@
                     <button
                         onclick={() => (perCharSel = [[], [], []])}
                         disabled={perCharSel.every((s) => s.length === 0)}
-                        class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm opacity-70 transition-colors enabled:hover:opacity-100 disabled:opacity-30"
+                        class="inline-flex items-center gap-1 rounded-none px-3 py-1.5 text-sm opacity-70 transition-colors enabled:hover:opacity-100 disabled:opacity-30"
                         title="清空全部角色的选择"
                     >
                         <Icon icon="mdi:broom" class="size-4" />清空
@@ -1165,13 +1171,13 @@
                     <div class="flex-1"></div>
                     <button
                         onclick={() => (pickerOpen = false)}
-                        class="rounded-lg px-3 py-1.5 text-sm opacity-70 transition-colors hover:opacity-100"
+                        class="rounded-none px-3 py-1.5 text-sm opacity-70 transition-colors hover:opacity-100"
                         >取消</button
                     >
                     <button
                         onclick={confirmMatrix}
                         disabled={perCharSel.some((s) => s.length === 0) || matrixCount > MAX_PICKER_CONFIGS}
-                        class="rounded-lg px-4 py-1.5 text-sm font-medium transition-all enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-40"
+                        class="rounded-none px-4 py-1.5 text-sm font-medium transition-all enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-40"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                     >
                         确认（{matrixCount} 个）

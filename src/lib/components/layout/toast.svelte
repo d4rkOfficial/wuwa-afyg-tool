@@ -56,7 +56,7 @@
         {#each toasts as toast (toast.id)}
             <div
                 class={[
-                    'pointer-events-auto flex items-center gap-3 rounded-xl px-5 py-3 text-sm shadow-xl',
+                    'pointer-events-auto flex items-center gap-3 rounded-none px-5 py-3 text-sm shadow-xl',
                     'theme-glass-surface bg-(--theme-toast-bg) text-(--theme-toast-text)',
                     typeStyles[toast.type] || typeStyles.info,
                     typeBgStyles[toast.type] || '',
@@ -76,7 +76,7 @@
                 <span class="flex-1">{toast.message}</span>
                 <button
                     onclick={() => removeToast(toast.id)}
-                    class="shrink-0 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
+                    class="shrink-0 rounded-none p-0.5 opacity-50 transition-opacity hover:opacity-100"
                     aria-label="Dismiss"
                 >
                     <Icon icon="mdi:close" class="size-4" />

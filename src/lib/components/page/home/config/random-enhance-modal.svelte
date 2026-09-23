@@ -46,7 +46,7 @@
 >
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in w-72 rounded-xl border p-4 shadow-2xl backdrop-blur-lg"
+        class="animate-pop-in w-72 rounded-none border p-4 shadow-2xl backdrop-blur-lg"
         style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
@@ -55,7 +55,7 @@
             <button
                 onclick={onclose}
                 disabled={running}
-                class="rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
             >
                 <Icon icon="mdi:close" class="size-4" />
             </button>
@@ -68,7 +68,7 @@
                     onclick={() => toggleType(type)}
                     disabled={running}
                     class={[
-                        'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
+                        'flex w-full items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-colors',
                         isSelected
                             ? 'text-(--theme-modal-text)'
                             : 'text-(--theme-modal-text)/60 hover:bg-(--theme-input-bg)'
@@ -86,7 +86,7 @@
             onclick={handleStart}
             disabled={selected.length === 0 || running}
             class={[
-                'w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5',
+                'w-full rounded-none px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5',
                 selected.length > 0 && !running
                     ? 'hover:opacity-80'
                     : 'bg-(--theme-input-bg) text-(--theme-modal-text)/30 cursor-not-allowed'

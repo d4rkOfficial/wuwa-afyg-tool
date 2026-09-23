@@ -47,7 +47,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="animate-pop-in mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border text-(--theme-modal-text) shadow-2xl"
+            class="animate-pop-in mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-none border text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -59,7 +59,7 @@
                 <h2 class="text-base font-semibold">速查</h2>
                 <button
                     onclick={onclose}
-                    class="flex size-7 items-center justify-center rounded-md text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                    class="flex size-7 items-center justify-center rounded-none text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
                     ><Icon icon="mdi:close" class="size-4" /></button
                 >
             </div>

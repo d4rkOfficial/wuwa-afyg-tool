@@ -233,7 +233,7 @@
                         charIndex = i
                     }}
                     class={[
-                        'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                        'rounded-none px-3 py-1 text-sm font-medium transition-colors',
                         i === charIndex
                             ? 'text-(--theme-accent-text)'
                             : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
@@ -270,7 +270,7 @@
                                 src={img(charIcons[currentSlot.character ?? ''])}
                                 alt=""
                                 use:fallbackIcon={'/icons/placeholder-character.svg'}
-                                class="size-10 rounded-md object-contain"
+                                class="size-10 rounded-none object-contain"
                                 style="background: var(--theme-input-bg);"
                             />{/if}
                         <div class="flex flex-wrap items-center gap-2">
@@ -282,8 +282,9 @@
                                     class="size-4"
                                     title={charData.element}
                                 />{:else}
-                                <span class="rounded px-1.5 py-0.5 text-sm" style="background: var(--theme-input-bg);"
-                                    >{charData.element}</span
+                                <span
+                                    class="rounded-none px-1.5 py-0.5 text-sm"
+                                    style="background: var(--theme-input-bg);">{charData.element}</span
                                 >{/if}
                             {#if img(weaponTypeIcons[charData.weaponType])}<img
                                     src={img(weaponTypeIcons[charData.weaponType])}
@@ -291,8 +292,9 @@
                                     class="size-4 w-icon"
                                     title={charData.weaponType}
                                 />{:else}
-                                <span class="rounded px-1.5 py-0.5 text-sm" style="background: var(--theme-input-bg);"
-                                    >{charData.weaponType}</span
+                                <span
+                                    class="rounded-none px-1.5 py-0.5 text-sm"
+                                    style="background: var(--theme-input-bg);">{charData.weaponType}</span
                                 >{/if}
                         </div>
                     </div>
@@ -302,25 +304,25 @@
                             基础属性 (Lv90)
                         </h3>
                         <div class="grid grid-cols-4 gap-2">
-                            <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
+                            <div class="rounded-none p-2.5 text-center" style="background: var(--theme-input-bg);">
                                 <div class="text-sm text-(--theme-modal-text)/50">基础生命</div>
                                 <div class="mt-0.5 text-sm font-semibold tabular-nums">
                                     {charData.lv90BaseStats.hp}
                                 </div>
                             </div>
-                            <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
+                            <div class="rounded-none p-2.5 text-center" style="background: var(--theme-input-bg);">
                                 <div class="text-sm text-(--theme-modal-text)/50">基础攻击</div>
                                 <div class="mt-0.5 text-sm font-semibold tabular-nums">
                                     {charData.lv90BaseStats.atk}
                                 </div>
                             </div>
-                            <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
+                            <div class="rounded-none p-2.5 text-center" style="background: var(--theme-input-bg);">
                                 <div class="text-sm text-(--theme-modal-text)/50">基础防御</div>
                                 <div class="mt-0.5 text-sm font-semibold tabular-nums">
                                     {charData.lv90BaseStats.def}
                                 </div>
                             </div>
-                            <div class="rounded-lg p-2.5 text-center" style="background: var(--theme-input-bg);">
+                            <div class="rounded-none p-2.5 text-center" style="background: var(--theme-input-bg);">
                                 <div class="text-sm text-(--theme-modal-text)/50">谐度破坏增幅</div>
                                 <div class="mt-0.5 text-sm font-semibold tabular-nums">
                                     {charData.lv90BaseStats.tuneBreakBoost}
@@ -332,13 +334,13 @@
                     {#if currentSlot.weapon}
                         <section>
                             <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">武器</h3>
-                            <div class="rounded-lg p-3 space-y-2" style="background: var(--theme-input-bg);">
+                            <div class="rounded-none p-3 space-y-2" style="background: var(--theme-input-bg);">
                                 <div class="flex items-center gap-2">
                                     {#if img(weaponIcons[currentSlot.weapon])}<img
                                             src={img(weaponIcons[currentSlot.weapon])}
                                             alt=""
                                             use:fallbackIcon={'/icons/placeholder-weapon.svg'}
-                                            class="size-8 rounded object-contain"
+                                            class="size-8 rounded-none object-contain"
                                             style="background: var(--theme-input-bg);"
                                         />{/if}
                                     <div>
@@ -378,13 +380,13 @@
                             <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
                                 首位声骸
                             </h3>
-                            <div class="rounded-lg p-3" style="background: var(--theme-input-bg);">
+                            <div class="rounded-none p-3" style="background: var(--theme-input-bg);">
                                 <div class="flex items-center gap-2">
                                     {#if img(echoIcons[currentSlot.echoes[0].name])}<img
                                             src={img(echoIcons[currentSlot.echoes[0].name])}
                                             alt=""
                                             use:fallbackIcon={'/icons/placeholder-echo.svg'}
-                                            class="size-8 rounded object-contain"
+                                            class="size-8 rounded-none object-contain"
                                             style="background: var(--theme-input-bg);"
                                         />{/if}
                                     <div class="text-sm font-medium">
@@ -413,13 +415,13 @@
                             </h3>
                             <div class="space-y-3">
                                 {#each setBonuses as set}
-                                    <div class="rounded-lg p-3" style="background: var(--theme-input-bg);">
+                                    <div class="rounded-none p-3" style="background: var(--theme-input-bg);">
                                         <div class="flex items-center gap-2 mb-2">
                                             {#if img(setIcons[set.name])}<img
                                                     src={img(setIcons[set.name])}
                                                     alt=""
                                                     use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
-                                                    class="size-6 rounded object-contain"
+                                                    class="size-6 rounded-none object-contain"
                                                     style="background: var(--theme-input-bg);"
                                                 />{/if}
                                             <span class="text-sm font-medium">{set.name}</span>
@@ -449,7 +451,7 @@
                         <div class="space-y-3">
                             {#each charData.skills as skill, i}
                                 <div
-                                    class="rounded-lg border"
+                                    class="rounded-none border"
                                     data-skill-index={i}
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
@@ -457,7 +459,7 @@
                                         class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-(--theme-modal-text)"
                                     >
                                         <span
-                                            class="rounded px-1.5 py-0.5 text-sm text-(--theme-modal-text)/50"
+                                            class="rounded-none px-1.5 py-0.5 text-sm text-(--theme-modal-text)/50"
                                             style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);"
                                             >{skill.type}</span
                                         >
@@ -465,7 +467,7 @@
                                         {#if i + 1 < skillCount}
                                             <button
                                                 onclick={() => jumpToSkill(i + 1)}
-                                                class="ml-auto rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)/80"
+                                                class="ml-auto rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)/80"
                                                 title="跳转到下一个技能"
                                             >
                                                 <Icon icon="mdi:chevron-down" class="size-4" />
@@ -506,13 +508,13 @@
                                                         <div class="mt-1 flex items-center justify-end gap-1.5">
                                                             {#if vtune != null}
                                                                 <span
-                                                                    class="rounded border border-(--theme-accent-bg) px-1.5 py-0.5 text-[11px] tabular-nums whitespace-nowrap text-(--theme-accent-text) opacity-75"
+                                                                    class="rounded-none border border-(--theme-accent-bg) px-1.5 py-0.5 text-[11px] tabular-nums whitespace-nowrap text-(--theme-accent-text) opacity-75"
                                                                     >{vtune} 偏谐值</span
                                                                 >
                                                             {/if}
                                                             {#if venergy != null}
                                                                 <span
-                                                                    class="rounded border border-(--theme-accent-bg) px-1.5 py-0.5 text-[11px] tabular-nums whitespace-nowrap text-(--theme-accent-text) opacity-75"
+                                                                    class="rounded-none border border-(--theme-accent-bg) px-1.5 py-0.5 text-[11px] tabular-nums whitespace-nowrap text-(--theme-accent-text) opacity-75"
                                                                     >{venergy} 共鸣能量</span
                                                                 >
                                                             {/if}
@@ -526,7 +528,7 @@
                             {/each}
                             {#each inherentSkills as skill, j}
                                 <div
-                                    class="rounded-lg border"
+                                    class="rounded-none border"
                                     data-skill-index={skillsLen + j}
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
@@ -534,7 +536,7 @@
                                         class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-(--theme-modal-text)"
                                     >
                                         <span
-                                            class="rounded px-1.5 py-0.5 text-sm text-(--theme-modal-text)/50"
+                                            class="rounded-none px-1.5 py-0.5 text-sm text-(--theme-modal-text)/50"
                                             style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);"
                                             >固有技能</span
                                         >
@@ -542,7 +544,7 @@
                                         {#if skillsLen + j + 1 < skillCount}
                                             <button
                                                 onclick={() => jumpToSkill(skillsLen + j + 1)}
-                                                class="ml-auto rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)/80"
+                                                class="ml-auto rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)/80"
                                                 title="跳转到下一个技能"
                                             >
                                                 <Icon icon="mdi:chevron-down" class="size-4" />
@@ -567,7 +569,7 @@
                             </h3>
                             <div class="grid grid-cols-2 gap-2">
                                 {#each sortedStatAttrs as attr}
-                                    <div class="rounded-lg p-2.5" style="background: var(--theme-input-bg);">
+                                    <div class="rounded-none p-2.5" style="background: var(--theme-input-bg);">
                                         <div class="text-sm text-(--theme-modal-text)/50">{attr.name}</div>
                                         {#if attr.desc}
                                             <div class="mt-0.5 text-sm font-semibold tabular-nums leading-relaxed">
@@ -588,7 +590,7 @@
                             <div class="space-y-3">
                                 {#each charData.chains as chain, i}
                                     <div
-                                        class="rounded-lg border px-3 py-2"
+                                        class="rounded-none border px-3 py-2"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
                                         <div class="flex items-center gap-2 text-sm font-medium">
@@ -621,7 +623,7 @@
                         charIndex = i
                     }}
                     class={[
-                        'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                        'rounded-none px-3 py-1 text-sm font-medium transition-colors',
                         i === charIndex
                             ? 'text-(--theme-accent-text)'
                             : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
@@ -648,7 +650,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="fixed inset-0 z-80" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
         <div
-            class="animate-pop-in absolute min-w-36 rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+            class="animate-pop-in absolute min-w-36 rounded-none border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
             style="border-color: var(--theme-divider-border); left: {ctxX}px; top: {ctxY}px;"
         >
             <button

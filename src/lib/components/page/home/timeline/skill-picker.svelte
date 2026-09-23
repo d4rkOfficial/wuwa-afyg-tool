@@ -221,7 +221,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-none border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -326,7 +326,7 @@
                                 <div
                                     tabindex={group.type === '谐度破坏' || isResponseHit ? -1 : 0}
                                     class={[
-                                        'flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors',
+                                        'flex items-center gap-2 px-2 py-1 rounded-none text-xs transition-colors',
                                         group.type === '谐度破坏' || isResponseHit
                                             ? 'opacity-40 cursor-not-allowed select-none text-(--theme-modal-text)/60'
                                             : getSkillPickerSelected().has(key)
@@ -393,7 +393,7 @@
                                                         [key]: Math.max(0, isNaN(v) ? 1 : v)
                                                     })
                                                 }}
-                                                class="w-10 h-6 bg-(--theme-modal-bg)/60 text-xs text-(--theme-modal-text) text-center rounded outline-none border tabular-nums"
+                                                class="w-10 h-6 bg-(--theme-modal-bg)/60 text-xs text-(--theme-modal-text) text-center rounded-none outline-none border tabular-nums"
                                                 style="border-color: var(--theme-divider-border);"
                                             />
                                         </span>
@@ -405,7 +405,7 @@
                                                 const id = duplicateCustomHit(getSkillPickerCharacter(), hit.name)
                                                 if (id) addToast('已复制该自定义直伤', 'success')
                                             }}
-                                            class="shrink-0 rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-accent-text)"
+                                            class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-accent-text)"
                                             title="复制这条倍率（同名不同 Buff 的倍率可直接复用）"
                                             ><Icon icon="mdi:content-copy" class="size-3.5" /></button
                                         >
@@ -414,7 +414,7 @@
                                                 e.stopPropagation()
                                                 removeCustomHit(getSkillPickerCharacter(), hit.name)
                                             }}
-                                            class="shrink-0 rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                                            class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
                                             ><Icon icon="mdi:close" class="size-3.5" /></button
                                         >
                                     {/if}
@@ -432,7 +432,7 @@
             >
                 <div class="flex items-center gap-1">
                     <button
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                        class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                         onclick={() => openAddCustom(getSkillPickerCharacter())}
                     >
                         <Icon icon="mdi:plus-circle-outline" class="size-3.5" />
@@ -440,7 +440,7 @@
                     </button>
                     <button
                         onclick={() => (showLookup = true)}
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                        class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
                     >
                         <Icon icon="mdi:magnify" class="size-3.5" />
                         速查
@@ -448,14 +448,14 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <button
-                        class="h-7 rounded-md bg-(--theme-modal-bg)/60 px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                        class="h-7 rounded-none bg-(--theme-modal-bg)/60 px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                         onclick={() => {
                             setSkillPickerBlockId(null)
                             setSkillPickerIsRef(false)
                         }}>取消</button
                     >
                     <button
-                        class="h-7 rounded-md px-3 text-xs transition-colors"
+                        class="h-7 rounded-none px-3 text-xs transition-colors"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         onclick={applySkillHits}>确认</button
                     >
@@ -482,7 +482,7 @@
         <div
             use:focusTrap={{ initial: 'input' }}
             tabindex="-1"
-            class="animate-pop-in rounded-xl border p-5 shadow-xl w-[52rem] max-w-[94vw]"
+            class="animate-pop-in rounded-none border p-5 shadow-xl w-[52rem] max-w-[94vw]"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
@@ -509,7 +509,7 @@
                             <button
                                 onclick={() => pickRatio(option.key)}
                                 class={[
-                                    'flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[11px] transition-colors',
+                                    'flex w-full items-center gap-2 rounded-none border px-2 py-1.5 text-left text-[11px] transition-colors',
                                     pickedKey === option.key
                                         ? 'border-(--theme-accent-bg) text-(--theme-modal-text)'
                                         : 'border-(--theme-divider-border) text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
@@ -526,7 +526,7 @@
                                 <span class="min-w-0 flex-1 truncate">{option.name}</span>
                                 {#if option.custom}
                                     <span
-                                        class="shrink-0 rounded px-1 text-[10px] text-(--theme-modal-text)/45"
+                                        class="shrink-0 rounded-none px-1 text-[10px] text-(--theme-modal-text)/45"
                                         style="background: var(--theme-input-bg);">自定义</span
                                     >
                                 {/if}
@@ -537,7 +537,7 @@
                         {/each}
                         {#if ratioOptions.length === 0}
                             <div
-                                class="rounded-md border border-dashed px-2 py-3 text-center text-[11px] text-(--theme-modal-text)/40"
+                                class="rounded-none border border-dashed px-2 py-3 text-center text-[11px] text-(--theme-modal-text)/40"
                                 style="border-color: var(--theme-divider-border);"
                             >
                                 暂无可选取的倍率数据：请先在排轴页绑定该角色的技能倍率
@@ -565,7 +565,7 @@
                                     <button
                                         onclick={() => toggleSegment(i)}
                                         class={[
-                                            'rounded border px-1.5 py-0.5 text-[11px] tabular-nums transition-colors',
+                                            'rounded-none border px-1.5 py-0.5 text-[11px] tabular-nums transition-colors',
                                             segmentSelected.has(i)
                                                 ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
                                                 : 'border-(--theme-divider-border) text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)'
@@ -605,7 +605,7 @@
                         <button
                             onclick={applySegments}
                             disabled={selectedSegmentHits.length === 0}
-                            class="w-full rounded-lg border px-2.5 py-1.5 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                            class="w-full rounded-none border px-2.5 py-1.5 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
                         >
                             取用所选段{#if selectedSegmentHits.length > 0}（{selectedSegmentHits.length}）{/if}
@@ -624,7 +624,7 @@
                             type="text"
                             bind:value={customName}
                             placeholder="输入名称"
-                            class="w-full rounded-lg border px-3 py-2 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
+                            class="w-full rounded-none border px-3 py-2 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         />
                     </div>
@@ -638,7 +638,7 @@
                             type="number"
                             min="1"
                             bind:value={customHitsCount}
-                            class="w-full rounded-lg border px-3 py-2 text-xs tabular-nums outline-none text-(--theme-modal-text)"
+                            class="w-full rounded-none border px-3 py-2 text-xs tabular-nums outline-none text-(--theme-modal-text)"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         />
                     </div>
@@ -648,13 +648,13 @@
                             >固定值</label
                         >
                         <div
-                            class="flex items-center rounded-md border"
+                            class="flex items-center rounded-none border"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <button
                                 onclick={() => (hasFlat = !hasFlat)}
                                 class={[
-                                    'rounded-l-md px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
+                                    'rounded-none px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
                                     hasFlat
                                         ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
@@ -687,13 +687,13 @@
                             >百分比值</label
                         >
                         <div
-                            class="flex items-center rounded-md border"
+                            class="flex items-center rounded-none border"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <button
                                 onclick={() => (hasPct = !hasPct)}
                                 class={[
-                                    'rounded-l-md px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
+                                    'rounded-none px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
                                     hasPct
                                         ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12 shadow-sm'
                                         : 'text-(--theme-modal-text)/25 bg-transparent hover:text-(--theme-modal-text)/50'
@@ -720,7 +720,7 @@
                             <div class="relative shrink-0 w-24">
                                 <button
                                     onclick={() => (showUnitMenu = !showUnitMenu)}
-                                    class="flex w-full items-center justify-between rounded-r-md px-3 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                                    class="flex w-full items-center justify-between rounded-none px-3 py-1.5 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                                 >
                                     <span class="text-left">{customPctUnit}</span>
                                     <Icon
@@ -730,7 +730,7 @@
                                 </button>
                                 {#if showUnitMenu}
                                     <div
-                                        class="theme-scrollbar absolute right-0 top-full z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+                                        class="theme-scrollbar absolute right-0 top-full z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-none border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
                                         style="border-color: var(--theme-divider-border);"
                                         onclick={(e) => e.stopPropagation()}
                                     >
@@ -766,7 +766,7 @@
                                 <button
                                     onclick={() => (customElement = el)}
                                     class={[
-                                        'px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
+                                        'px-3 py-1.5 rounded-none text-xs font-medium transition-all border',
                                         el === customElement
                                             ? 'shadow-sm'
                                             : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text) bg-transparent hover:bg-(--theme-modal-text)/5 border-transparent'
@@ -791,12 +791,12 @@
                 <div class="flex items-center gap-2">
                     <button
                         onclick={() => (showCustomModal = false)}
-                        class="rounded-md px-3 py-1.5 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10"
+                        class="rounded-none px-3 py-1.5 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10"
                         >取消</button
                     >
                     <button
                         onclick={() => confirmAddCustom(getSkillPickerCharacter())}
-                        class="rounded-md px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
+                        class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125 shadow-sm"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                         >确认</button
                     >

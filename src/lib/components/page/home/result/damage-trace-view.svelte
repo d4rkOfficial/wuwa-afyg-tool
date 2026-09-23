@@ -199,7 +199,7 @@
                 onblur={() => {
                     if (!pinned) tip = null
                 }}
-                class="inline-flex cursor-help items-baseline gap-1 rounded-md border px-1.5 py-0.5 transition-all hover:opacity-75 hover:shadow-md"
+                class="inline-flex cursor-help items-baseline gap-1 rounded-none border px-1.5 py-0.5 transition-all hover:opacity-75 hover:shadow-md"
                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 30%, transparent);"
             >
                 <span class="text-[10px] font-medium" style="color: var(--theme-modal-text); opacity: 0.55;"
@@ -210,7 +210,7 @@
         {/each}
         <span class="select-none opacity-50">=</span>
         <span
-            class="rounded-md px-1.5 py-0.5 font-mono text-[13px] font-bold tabular-nums"
+            class="rounded-none px-1.5 py-0.5 font-mono text-[13px] font-bold tabular-nums"
             style="color: var(--theme-accent-text);"
         >
             {fmt(seg.expected)}
@@ -246,7 +246,7 @@
             role="tooltip"
             onpointerenter={clearClose}
             onpointerleave={scheduleClose}
-            class="fixed z-100 w-72 max-w-[85vw] overflow-hidden rounded-lg border shadow-2xl backdrop-blur-xl"
+            class="fixed z-100 w-72 max-w-[85vw] overflow-hidden rounded-none border shadow-2xl backdrop-blur-xl"
             style="left: {tip.left}px; top: {tip.top}px; background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
         >
             <div
@@ -262,7 +262,7 @@
                             e.stopPropagation()
                             closeTip()
                         }}
-                        class="shrink-0 rounded text-[11px] leading-none transition-colors hover:opacity-70"
+                        class="shrink-0 rounded-none text-[11px] leading-none transition-colors hover:opacity-70"
                         style="color: var(--theme-modal-text); opacity: 0.5;"
                         aria-label="收起来源"
                     >

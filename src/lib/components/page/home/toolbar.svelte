@@ -124,7 +124,7 @@
     onclickcapture={toolbarClickCapture}
     class={`${
         simplifyToolbar
-            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-xl border p-2 shadow-2xl active:cursor-grabbing'
+            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-none border p-2 shadow-2xl active:cursor-grabbing'
             : 'flex shrink-0 items-center gap-2 border-t border-white/5 px-4 py-2.5'
     } ${className || ''}`}
     style={simplifyToolbar
@@ -147,7 +147,7 @@
         onclick={onCharDetail}
         class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
             ? 'rounded-full px-3 py-2'
-            : 'rounded-lg px-3 py-1.5'}"
+            : 'rounded-none px-3 py-1.5'}"
         title="角色详情配置"
     >
         <Icon icon="mdi:account-details" class="size-4 shrink-0" />
@@ -159,7 +159,7 @@
                 onclick={() => setShowDamageList(true)}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                     ? 'rounded-full px-3 py-2'
-                    : 'rounded-lg px-3 py-1.5'}"
+                    : 'rounded-none px-3 py-1.5'}"
                 title="查看所有伤害"
             >
                 <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" />
@@ -169,7 +169,7 @@
                 onclick={formatTimeline}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                     ? 'rounded-full px-3 py-2'
-                    : 'rounded-lg px-3 py-1.5'}"
+                    : 'rounded-none px-3 py-1.5'}"
                 title="自动格式化：每个操作块右边界对齐下一个块（可跨角色）的左边界，参考线跟随其左右块"
             >
                 <Icon icon="mdi:auto-fix" class="size-4 shrink-0" />
@@ -180,7 +180,7 @@
                     onclick={toggleQuickMode}
                     class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
-                        : 'rounded-lg px-3 py-1.5'} {getQuickMode()
+                        : 'rounded-none px-3 py-1.5'} {getQuickMode()
                         ? 'border-(--theme-accent-bg)'
                         : 'border-(--theme-sidebar-text)/20'}"
                     style="color: {getQuickMode() ? 'var(--theme-accent-text)' : 'var(--theme-sidebar-text)'}"
@@ -207,7 +207,7 @@
                 disabled={phaseLocked}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
                     ? 'rounded-full px-3 py-2'
-                    : 'rounded-lg px-3 py-1.5'}"
+                    : 'rounded-none px-3 py-1.5'}"
                 title="打开快速词条方案：一键套用标准14词条，或管理/套用自定义声骸词条方案"
             >
                 <Icon icon="mdi:clipboard-text-outline" class="size-4 shrink-0" />
@@ -219,7 +219,7 @@
                 onclick={() => setShowBuffModal(true)}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                     ? 'rounded-full px-3 py-2'
-                    : 'rounded-lg px-3 py-1.5'}"
+                    : 'rounded-none px-3 py-1.5'}"
                 title="BUFF配置"
             >
                 <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
@@ -230,7 +230,7 @@
                     onclick={toggleBuffDiffMode}
                     class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
-                        : 'rounded-lg px-3 py-1.5'} {getBuffDiffMode()
+                        : 'rounded-none px-3 py-1.5'} {getBuffDiffMode()
                         ? 'border-(--theme-accent-bg)'
                         : 'border-(--theme-sidebar-text)/20'}"
                     style="color: {getBuffDiffMode() ? 'var(--theme-accent-text)' : 'var(--theme-sidebar-text)'}"
@@ -250,7 +250,7 @@
                     onclick={() => setShowDamageTypeModal(true)}
                     class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
-                        : 'rounded-lg px-3 py-1.5'}"
+                        : 'rounded-none px-3 py-1.5'}"
                     title="逐个倍率确认伤害类型（拉表第一步）"
                 >
                     <Icon icon="mdi:playlist-edit" class="size-4 shrink-0" />
@@ -271,7 +271,7 @@
                     }}
                     class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
-                        : 'rounded-lg px-3 py-1.5'} {getScrollAxisDefault() === 'horizontal'
+                        : 'rounded-none px-3 py-1.5'} {getScrollAxisDefault() === 'horizontal'
                         ? 'border-(--theme-accent-bg)'
                         : 'border-(--theme-sidebar-text)/20'}"
                     style="color: {getScrollAxisDefault() === 'horizontal'
@@ -293,7 +293,7 @@
                     onclick={toggleHideConditionMismatch}
                     class="inline-flex items-center gap-1.5 border text-sm transition-colors {simplifyToolbar
                         ? 'rounded-full px-3 py-2'
-                        : 'rounded-lg px-3 py-1.5'} {getHideConditionMismatch()
+                        : 'rounded-none px-3 py-1.5'} {getHideConditionMismatch()
                         ? 'border-(--theme-accent-bg)'
                         : 'border-(--theme-sidebar-text)/20'}"
                     style="color: {getHideConditionMismatch()
@@ -325,7 +325,7 @@
             onclick={onRefresh}
             class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                 ? 'rounded-full px-3 py-2'
-                : 'rounded-lg px-3 py-1.5'}"
+                : 'rounded-none px-3 py-1.5'}"
             title="刷新结果"
         >
             <Icon icon="mdi:refresh" class="size-4 shrink-0" />
@@ -338,7 +338,7 @@
             disabled={!phaseLocked && !canLock}
             class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-sm text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
                 ? 'rounded-full px-3 py-2'
-                : 'rounded-lg px-3 py-1.5'}"
+                : 'rounded-none px-3 py-1.5'}"
             title={phaseLocked ? '解锁' : '锁定'}
         >
             <Icon icon={phaseLocked ? 'mdi:lock-open-variant-outline' : 'mdi:lock-outline'} class="size-4 shrink-0" />

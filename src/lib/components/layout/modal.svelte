@@ -61,7 +61,7 @@
     >
         <div
             class={[
-                'animate-pop-in theme-glass-surface theme-scrollbar relative max-h-[85vh] min-w-80 rounded-xl p-6 shadow-2xl',
+                'animate-pop-in theme-glass-surface theme-scrollbar relative max-h-[85vh] min-w-80 rounded-none p-6 shadow-2xl',
                 footer || noScroll ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
                 'text-(--theme-modal-text)',
                 className || ''
@@ -75,7 +75,7 @@
         >
             <button
                 onclick={onclose}
-                class="absolute right-3 top-3 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                class="absolute right-3 top-3 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                 aria-label="Close"
             >
                 <Icon icon="mdi:close" class="size-4.5" />

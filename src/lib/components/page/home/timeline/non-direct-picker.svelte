@@ -37,7 +37,7 @@
         <div
             use:focusTrap
             tabindex="-1"
-            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-lg border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-none border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -62,7 +62,7 @@
                         <div class="flex items-center gap-2">
                             <button
                                 class={[
-                                    'h-7 rounded-md px-3 text-xs font-medium transition-colors whitespace-nowrap',
+                                    'h-7 rounded-none px-3 text-xs font-medium transition-colors whitespace-nowrap',
                                     getNonDirectPickerSelected().has(cfg.name)
                                         ? 'text-(--theme-accent-text-on-bg)'
                                         : disabled
@@ -157,7 +157,7 @@
                                 {@const hits = getNonDirectPickerData()[idx].hits}
                                 {@const pct = cfg.max > 0 ? (layers / cfg.max) * 100 : 0}
                                 <div
-                                    class="flex flex-col gap-2 rounded-md border p-2.5"
+                                    class="flex flex-col gap-2 rounded-none border p-2.5"
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     <div class="flex items-center justify-between gap-2">
@@ -186,7 +186,7 @@
                                                             )
                                                         )
                                                     }}
-                                                    class="w-12 h-6 bg-(--theme-modal-bg)/60 text-xs text-(--theme-modal-text) text-center rounded outline-none border tabular-nums disabled:opacity-30"
+                                                    class="w-12 h-6 bg-(--theme-modal-bg)/60 text-xs text-(--theme-modal-text) text-center rounded-none outline-none border tabular-nums disabled:opacity-30"
                                                     style="border-color: var(--theme-divider-border);"
                                                 />
                                             </span>
@@ -212,7 +212,7 @@
                                         {@const burstLayers = getNonDirectPickerBurstLayers()['burst'] ?? 0}
                                         {@const burstPct = cfg.max > 0 ? (burstLayers / cfg.max) * 100 : 0}
                                         <div
-                                            class="flex flex-col gap-1.5 rounded px-2 py-1.5"
+                                            class="flex flex-col gap-1.5 rounded-none px-2 py-1.5"
                                             style="background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                         >
                                             <div class="flex items-center justify-between gap-2">
@@ -249,12 +249,12 @@
                 style="border-top-color: var(--theme-divider-border);"
             >
                 <button
-                    class="h-7 rounded-md px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);"
                     onclick={() => setNonDirectPickerBlockId(null)}>取消</button
                 >
                 <button
-                    class="h-7 rounded-md px-3 text-xs transition-all hover:brightness-125"
+                    class="h-7 rounded-none px-3 text-xs transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                     onclick={applyNonDirectEntries}>确认</button
                 >

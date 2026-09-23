@@ -30,7 +30,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="animate-pop-in w-72 max-h-80 rounded-xl border p-4 shadow-2xl backdrop-blur-lg {className ?? ''}"
+            class="animate-pop-in w-72 max-h-80 rounded-none border p-4 shadow-2xl backdrop-blur-lg {className ?? ''}"
             style={mergedStyle}
             onclick={(e) => e.stopPropagation()}
         >
@@ -38,7 +38,7 @@
                 <span class="text-sm font-medium text-(--theme-modal-text)">选择副词条</span>
                 <button
                     onclick={onclose}
-                    class="rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                    class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                     aria-label="关闭"
                 >
                     <Icon icon="mdi:close" class="size-4" />
@@ -53,7 +53,7 @@
                         }}
                         disabled={exists}
                         class={[
-                            'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left transition-colors',
+                            'flex w-full items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-colors',
                             exists
                                 ? 'text-(--theme-modal-text)/20 cursor-not-allowed'
                                 : 'text-(--theme-modal-text) hover:bg-(--theme-input-bg)'

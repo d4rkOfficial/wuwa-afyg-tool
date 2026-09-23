@@ -2374,9 +2374,9 @@
                                         </div>
                                     {/if}
                                     {#if tab === 'ai-conn'}
-                                        <!-- 配置文件设置 -->
+                                        <!-- AI配置文件设置：独占整行，内部列表双列 -->
                                         <div
-                                            class="rounded-none border px-3 py-2.5"
+                                            class="rounded-none border px-3 py-2.5 xl:col-span-2"
                                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                         >
                                             <div class="mb-2 flex items-center justify-between">
@@ -2395,7 +2395,7 @@
                                             <p class="mb-2 text-[10px] text-(--theme-modal-text)/40">
                                                 点击配置文件即可切换；编辑、删除请使用右侧按钮
                                             </p>
-                                            <div class="mb-1.5 flex flex-col gap-1">
+                                            <div class="mb-1.5 grid grid-cols-1 gap-1 xl:grid-cols-2 xl:gap-x-4">
                                                 {#each aiProfiles as p}
                                                     {@const isActive = p.id === aiActiveId}
                                                     <div

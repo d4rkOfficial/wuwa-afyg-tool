@@ -89,7 +89,7 @@
     }
 
     function itemClass(c: Character): string {
-        const base = 'flex w-[100px] flex-col items-center gap-1.5 rounded-lg p-3 transition-colors cursor-pointer'
+        const base = 'flex w-[100px] flex-col items-center gap-1.5 rounded-none p-3 transition-colors cursor-pointer'
         if (isSelected(c)) {
             return base + ' ring-2 ring-[var(--theme-accent-bg)] bg-[var(--theme-accent-bg)]/10'
         }
@@ -107,7 +107,7 @@
         }}
     >
         <div
-            class="animate-pop-in relative flex max-h-[75vh] min-h-[50vh] w-170 max-w-[90vw] flex-col rounded-xl text-(--theme-modal-text) shadow-2xl"
+            class="animate-pop-in relative flex max-h-[75vh] min-h-[50vh] w-170 max-w-[90vw] flex-col rounded-none text-(--theme-modal-text) shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent);"
             role="dialog"
             aria-modal="true"
@@ -122,7 +122,7 @@
                 {#if query}
                     <button
                         onclick={() => (query = '')}
-                        class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
+                        class="rounded-none p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
                         aria-label="Clear search"
                     >
                         <Icon icon="mdi:close" class="size-4" />
@@ -245,7 +245,7 @@
                         {#each ELEMENT_ORDER as el}
                             <button
                                 onclick={() => scrollToElement(el)}
-                                class="flex size-7 items-center justify-center rounded p-0.5 text-(--theme-muted-text) transition-colors hover:bg-(--theme-modal-text)/5 hover:text-(--theme-modal-text)"
+                                class="flex size-7 items-center justify-center rounded-none p-0.5 text-(--theme-muted-text) transition-colors hover:bg-(--theme-modal-text)/5 hover:text-(--theme-modal-text)"
                                 title={el}
                             >
                                 {#if elementIcons[el]}
@@ -262,7 +262,7 @@
             <div class="flex justify-end border-t px-4 py-2.5" style="border-color: var(--theme-divider-border)">
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
+                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 >
                     <Icon icon="mdi:check" class="size-4" />

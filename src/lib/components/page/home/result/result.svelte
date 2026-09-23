@@ -379,7 +379,7 @@
                 <div class="ml-auto flex items-center gap-2">
                     <button
                         onclick={handleOpenAnalysis}
-                        class="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
+                        class="flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
                         style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
                     >
                         <Icon icon="mdi:chart-box-outline" class="size-3.5" />
@@ -429,7 +429,7 @@
                                 {entry.displayName}
                                 {#each entry.damageTypes as dt}
                                     <span
-                                        class="ml-1 rounded px-1 text-[9px] font-medium align-middle"
+                                        class="ml-1 rounded-none px-1 text-[9px] font-medium align-middle"
                                         style="background: var(--theme-input-bg); color: var(--theme-modal-text)/60;"
                                         >{DAMAGE_TYPE_SHORT[dt] ?? dt}</span
                                     >
@@ -480,7 +480,7 @@
                                                 missed={missEntryIds.includes(entry.id)}
                                             />
                                             <div
-                                                class="shrink-0 self-start inline-flex items-center rounded-lg border overflow-hidden"
+                                                class="shrink-0 self-start inline-flex items-center rounded-none border overflow-hidden"
                                                 style="border-color: var(--theme-divider-border);"
                                             >
                                                 <button
@@ -522,7 +522,7 @@
                                             />
                                             <div class="flex items-start gap-4">
                                                 <div
-                                                    class="shrink-0 self-start inline-flex items-center rounded-lg border overflow-hidden"
+                                                    class="shrink-0 self-start inline-flex items-center rounded-none border overflow-hidden"
                                                     style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <button

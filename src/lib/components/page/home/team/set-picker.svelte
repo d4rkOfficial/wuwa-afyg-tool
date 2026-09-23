@@ -116,7 +116,7 @@
         }}
     >
         <div
-            class="animate-pop-in relative flex max-h-[85vh] w-150 max-w-[90vw] flex-col rounded-xl p-4 shadow-2xl text-(--theme-modal-text)"
+            class="animate-pop-in relative flex max-h-[85vh] w-150 max-w-[90vw] flex-col rounded-none p-4 shadow-2xl text-(--theme-modal-text)"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent);"
             role="dialog"
             aria-modal="true"
@@ -130,18 +130,21 @@
                     <div class="mb-2 text-xs font-semibold tracking-wider text-(--theme-muted-text)">首位声骸所属</div>
                     <div class="grid grid-cols-2 gap-3">
                         {#each pinnedList as set}
-                            <div class="flex flex-col gap-2 rounded-lg p-3" style="background: var(--theme-input-bg);">
+                            <div
+                                class="flex flex-col gap-2 rounded-none p-3"
+                                style="background: var(--theme-input-bg);"
+                            >
                                 <div class="flex items-center gap-2 min-w-0">
                                     {#if icons[set.name]}
                                         <img
                                             src={icons[set.name]}
                                             alt={set.name}
-                                            class="size-8 shrink-0 rounded object-contain"
+                                            class="size-8 shrink-0 rounded-none object-contain"
                                         />
                                     {/if}
                                     <span class="min-w-0 truncate text-sm font-medium">{set.name}</span>
                                     <span
-                                        class="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px]"
+                                        class="ml-auto shrink-0 rounded-none px-1.5 py-0.5 text-[10px]"
                                         style="background: var(--theme-accent-bg)/15; color: var(--theme-accent-text);"
                                         >首位所属</span
                                     >
@@ -152,7 +155,7 @@
                                             onclick={() => togglePiece(set.name, piece)}
                                             disabled={!isPieceAvailable(set.name, piece)}
                                             class={[
-                                                'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                                                'rounded-none px-2.5 py-1 text-xs font-medium transition-colors',
                                                 isPieceSelected(set.name, piece)
                                                     ? 'bg-(--theme-accent-bg)/30 text-(--theme-accent-text)'
                                                     : 'bg-(--theme-input-bg) text-(--theme-muted-text) hover:bg-(--theme-modal-text)/10',
@@ -179,14 +182,17 @@
                     <div class="mb-2 text-xs font-semibold tracking-wider text-(--theme-muted-text)">其它套装</div>
                     <div class="grid grid-cols-2 gap-3">
                         {#each otherList as set}
-                            <div class="flex flex-col gap-2 rounded-lg p-3" style="background: var(--theme-input-bg);">
+                            <div
+                                class="flex flex-col gap-2 rounded-none p-3"
+                                style="background: var(--theme-input-bg);"
+                            >
                                 <div class="flex items-center gap-2 min-w-0">
                                     {#if icons[set.name]}
                                         <img
                                             src={icons[set.name]}
                                             alt={set.name}
                                             use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
-                                            class="size-8 shrink-0 rounded object-contain"
+                                            class="size-8 shrink-0 rounded-none object-contain"
                                         />
                                     {/if}
                                     <span class="min-w-0 truncate text-sm font-medium">{set.name}</span>
@@ -197,7 +203,7 @@
                                             onclick={() => togglePiece(set.name, piece)}
                                             disabled={!isPieceAvailable(set.name, piece)}
                                             class={[
-                                                'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                                                'rounded-none px-2.5 py-1 text-xs font-medium transition-colors',
                                                 isPieceSelected(set.name, piece)
                                                     ? 'bg-(--theme-accent-bg)/30 text-(--theme-accent-text)'
                                                     : 'bg-(--theme-input-bg) text-(--theme-muted-text) hover:bg-(--theme-modal-text)/10',
@@ -224,7 +230,7 @@
             >
                 <button
                     onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
+                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 >
                     <Icon icon="mdi:check" class="size-4" />

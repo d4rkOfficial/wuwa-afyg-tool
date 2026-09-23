@@ -45,7 +45,7 @@
 
 <div
     class={[
-        'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm',
+        'flex items-center gap-2 rounded-none px-3 py-1.5 text-sm',
         'bg-(--theme-search-box-bg) text-(--theme-search-box-text)',
         'focus-within:bg-(--theme-search-box-bg-focused) focus-within:text-(--theme-search-box-text-focused)',
         'ring-1 ring-inset ring-white/5 focus-within:ring-white/10',
@@ -69,7 +69,7 @@
     {#if value}
         <button
             onclick={handleClear}
-            class="shrink-0 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
+            class="shrink-0 rounded-none p-0.5 opacity-50 transition-opacity hover:opacity-100"
             aria-label="Clear"
         >
             <Icon icon="mdi:close" />

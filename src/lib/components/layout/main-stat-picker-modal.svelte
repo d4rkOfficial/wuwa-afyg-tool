@@ -30,7 +30,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="animate-pop-in w-72 max-h-80 rounded-xl border p-4 shadow-2xl backdrop-blur-lg {className ?? ''}"
+            class="animate-pop-in w-72 max-h-80 rounded-none border p-4 shadow-2xl backdrop-blur-lg {className ?? ''}"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border); {styleProp ||
                 ''}"
             onclick={(e) => e.stopPropagation()}
@@ -39,7 +39,7 @@
                 <span class="text-sm font-medium text-(--theme-modal-text)">选择主词条（{cost} COST）</span>
                 <button
                     onclick={onclose}
-                    class="rounded p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                    class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                     aria-label="关闭"
                 >
                     <Icon icon="mdi:close" class="size-4" />
@@ -48,13 +48,13 @@
             <div class="theme-scrollbar space-y-0.5 max-h-56 overflow-y-auto">
                 <button
                     onclick={() => onpick(null)}
-                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-input-bg)"
+                    class="flex w-full items-center gap-2 rounded-none px-3 py-2 text-xs text-left text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-input-bg)"
                     >未选择</button
                 >
                 {#each pool as opt (opt.label)}
                     <button
                         onclick={() => onpick({ type: opt.label, value: opt.maxValue, unit: opt.unit })}
-                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-input-bg)"
+                        class="flex w-full items-center gap-2 rounded-none px-3 py-2 text-xs text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-input-bg)"
                     >
                         <span class="flex-1">{opt.label}</span>
                         <span class="text-[10px] text-(--theme-modal-text)/40">{opt.maxValue}{opt.unit}</span>

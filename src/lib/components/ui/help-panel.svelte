@@ -30,7 +30,7 @@
     >
         <div
             class={[
-                'animate-pop-in theme-scrollbar relative max-h-[85vh] w-[90vw] max-w-4xl overflow-y-auto rounded-xl p-6 shadow-2xl',
+                'animate-pop-in theme-scrollbar relative max-h-[85vh] w-[90vw] max-w-4xl overflow-y-auto rounded-none p-6 shadow-2xl',
                 'text-(--theme-modal-text)',
                 className || ''
             ]
@@ -42,7 +42,7 @@
         >
             <button
                 onclick={closeHelp}
-                class="absolute right-3 top-3 rounded p-1 transition-colors hover:bg-white/10"
+                class="absolute right-3 top-3 rounded-none p-1 transition-colors hover:bg-white/10"
                 style="color: var(--theme-modal-text); opacity: 0.4;"
                 aria-label="关闭"
             >

@@ -800,7 +800,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in theme-scrollbar flex max-h-[94vh] w-[min(1500px,96vw)] flex-col overflow-hidden rounded-2xl border shadow-2xl"
+        class="animate-pop-in theme-scrollbar flex max-h-[94vh] w-[min(1500px,96vw)] flex-col overflow-hidden rounded-none border shadow-2xl"
         style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
@@ -847,7 +847,7 @@
                     onCompare?.()
                 }}
                 disabled={!comparisonEligible}
-                class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:opacity-70"
+                class="inline-flex items-center gap-1 rounded-none px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:opacity-70"
                 style="color: var(--theme-accent-text);"
                 title={comparisonEligible ? '共鸣链/武器精炼对比' : (comparisonReason ?? '本工程不支持对比')}
                 aria-label="链/阶对比"
@@ -857,7 +857,7 @@
             </button>
             <button
                 onclick={() => openPanel('character-detail', true)}
-                class="rounded p-1 transition-colors hover:opacity-70"
+                class="rounded-none p-1 transition-colors hover:opacity-70"
                 style="color: var(--theme-accent-text);"
                 title="打开角色详情配置"
                 aria-label="打开角色详情配置"
@@ -866,7 +866,7 @@
             </button>
             <button
                 onclick={handleClose}
-                class="rounded p-1 transition-colors hover:opacity-70"
+                class="rounded-none p-1 transition-colors hover:opacity-70"
                 style="color: var(--theme-modal-text); opacity: 0.45;"
                 aria-label="关闭"
             >
@@ -886,7 +886,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
                     <div
-                        class="relative col-span-2 overflow-hidden rounded-xl border p-4 lg:col-span-1"
+                        class="relative col-span-2 overflow-hidden rounded-none border p-4 lg:col-span-1"
                         style="border-color: var(--theme-divider-border); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, transparent), transparent 65%);"
                     >
                         <div class="text-[10px] font-semibold uppercase tracking-wider" style={mutedText}>总伤害</div>
@@ -905,7 +905,7 @@
                         {@const color = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'}
                         {@const stat = rangeStats.perChar[cs.character] ?? { damage: 0, count: 0 }}
                         <div
-                            class="rounded-xl border p-4"
+                            class="rounded-none border p-4"
                             style="border-color: var(--theme-divider-border); background: {cardBg};"
                         >
                             <div class="flex items-center gap-1.5">
@@ -928,7 +928,7 @@
                         </div>
                     {/each}
                     <div
-                        class="relative overflow-hidden rounded-xl border p-4"
+                        class="relative overflow-hidden rounded-none border p-4"
                         style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 10%, transparent), transparent 70%);"
                     >
                         <div class="text-[10px] font-semibold uppercase tracking-wider" style={mutedText}>总 DPS</div>
@@ -947,7 +947,7 @@
 
             <!-- ── 时间记点 + 分段 DPS ── -->
             <section
-                class="rounded-xl border"
+                class="rounded-none border"
                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
             >
                 <div
@@ -981,7 +981,7 @@
                     <div class="ml-auto flex items-center gap-2">
                         <button
                             onclick={autoConfigureTimings}
-                            class="flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors hover:opacity-80"
+                            class="flex cursor-pointer items-center gap-1.5 rounded-none border px-2.5 py-1.5 text-[11px] font-medium transition-colors hover:opacity-80"
                             style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                             title="按参考线命名自动启用时间记点：能解析出时间的全部启用；遇到解析不出的收尾到「结束」（25s）"
                         >
@@ -990,7 +990,7 @@
                         </button>
                         <button
                             onclick={() => (timingOpen = !timingOpen)}
-                            class="flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors hover:opacity-80"
+                            class="flex cursor-pointer items-center gap-1.5 rounded-none border px-2.5 py-1.5 text-[11px] font-medium transition-colors hover:opacity-80"
                             style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                         >
                             <Icon icon="mdi:tune-variant" class="size-3.5" />
@@ -1016,7 +1016,7 @@
                                         {@const timing = timings.find((t) => t.refLineId === rl.id)}
                                         {@const prevV = prevValidSeconds(selIdx)}
                                         <div
-                                            class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs select-none transition-colors"
+                                            class="flex items-center gap-1.5 rounded-none border px-2.5 py-1.5 text-xs select-none transition-colors"
                                             style="border-color: {isSelected
                                                 ? 'var(--theme-accent-bg)'
                                                 : 'var(--theme-divider-border)'}; background: {isSelected
@@ -1036,7 +1036,7 @@
                                                         updateSeconds(rl.id, (e.target as HTMLInputElement).value)}
                                                     min={prevV}
                                                     step="0.1"
-                                                    class="w-16 rounded border px-1.5 py-0.5 text-right text-[11px] tabular-nums outline-none"
+                                                    class="w-16 rounded-none border px-1.5 py-0.5 text-right text-[11px] tabular-nums outline-none"
                                                     style="background: var(--theme-input-bg); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                                     onclick={(e) => e.stopPropagation()}
                                                 />
@@ -1181,7 +1181,7 @@
 
             <!-- ── 队伍出伤曲线 ── -->
             <section
-                class="rounded-xl border"
+                class="rounded-none border"
                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
             >
                 <div
@@ -1193,12 +1193,12 @@
                         <span class="text-sm font-semibold" style="color: var(--theme-modal-text);">队伍出伤曲线</span>
                     </div>
                     <div
-                        class="ml-auto flex items-center gap-1 rounded-lg border p-0.5"
+                        class="ml-auto flex items-center gap-1 rounded-none border p-0.5"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
                         <button
                             onclick={() => (curveTab = 'cumulative')}
-                            class="rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors"
+                            class="rounded-none px-2 py-0.5 text-[11px] font-medium transition-colors"
                             style="background: {curveTab === 'cumulative'
                                 ? 'var(--theme-accent-bg)'
                                 : 'transparent'}; color: {curveTab === 'cumulative'
@@ -1209,7 +1209,7 @@
                         </button>
                         <button
                             onclick={() => (curveTab = 'window')}
-                            class="rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors"
+                            class="rounded-none px-2 py-0.5 text-[11px] font-medium transition-colors"
                             style="background: {curveTab === 'window'
                                 ? 'var(--theme-accent-bg)'
                                 : 'transparent'}; color: {curveTab === 'window'
@@ -1262,7 +1262,7 @@
 
             <!-- ── 伤害占比：队伍 + 角色直伤类型 ── -->
             <section
-                class="rounded-xl border"
+                class="rounded-none border"
                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
             >
                 <div class="border-b px-4 py-3" style="border-color: var(--theme-divider-border);">
@@ -1277,7 +1277,7 @@
                 <div class="p-4">
                     <!-- 队伍占比：横向比例条 -->
                     <div
-                        class="mb-4 rounded-lg border px-4 py-3"
+                        class="mb-4 rounded-none border px-4 py-3"
                         style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 25%, transparent);"
                     >
                         <div
@@ -1315,7 +1315,9 @@
                         <div class="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
                             {#each sortedSummaries as cs, i}
                                 <div class="flex items-center gap-1.5 text-xs" style="color: var(--theme-modal-text);">
-                                    <span class="size-2.5 rounded-sm shrink-0" style="background: {sortedPieColors[i]};"
+                                    <span
+                                        class="size-2.5 rounded-none shrink-0"
+                                        style="background: {sortedPieColors[i]};"
                                     ></span>
                                     <span class="truncate font-medium">{cs.character || '其它'}</span>
                                     <span class="shrink-0 tabular-nums">
@@ -1340,7 +1342,7 @@
                                 {@const el = charElements[agg.character]}
                                 {@const color = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'}
                                 <div
-                                    class="rounded-xl border p-4"
+                                    class="rounded-none border p-4"
                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 30%, transparent);"
                                 >
                                     <div class="mb-2 flex items-center justify-between gap-2">
@@ -1389,7 +1391,7 @@
 
             <!-- ── 声骸词条贡献分析（三角色并排，不切换视图） ── -->
             <section
-                class="rounded-xl border"
+                class="rounded-none border"
                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
             >
                 <div
@@ -1411,14 +1413,14 @@
                         </button>
                     </div>
                     <div
-                        class="flex items-center gap-1 rounded-lg border px-1 py-1"
+                        class="flex items-center gap-1 rounded-none border px-1 py-1"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
                         {#each algorithmsInfo as algo}
                             <button
                                 onclick={() => onSelectAlgorithm(algo.id)}
                                 class={[
-                                    'rounded-md px-2 py-1 text-[11px] font-medium transition-all',
+                                    'rounded-none px-2 py-1 text-[11px] font-medium transition-all',
                                     selectedAlgorithm === algo.id
                                         ? 'shadow-sm'
                                         : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
@@ -1449,7 +1451,7 @@
                         <div class="grid grid-cols-1 gap-3 xl:grid-cols-3">
                             {#each substatAnalysis as charSA}
                                 <div
-                                    class="rounded-xl border backdrop-blur-lg"
+                                    class="rounded-none border backdrop-blur-lg"
                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
                                 >
                                     <div class="px-4 py-3">
@@ -1543,7 +1545,7 @@
                                         <div class="mt-3 space-y-1.5">
                                             {#each charSA.echoes as echo}
                                                 <div
-                                                    class="rounded-lg border backdrop-blur-md"
+                                                    class="rounded-none border backdrop-blur-md"
                                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 50%, transparent);"
                                                 >
                                                     <div class="px-3 py-2">

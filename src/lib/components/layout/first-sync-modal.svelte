@@ -84,13 +84,13 @@
         <div class="mt-6 flex items-center gap-2">
             <button
                 onclick={handleSkip}
-                class="rounded-lg border px-3 py-1.5 text-xs transition-colors"
+                class="rounded-none border px-3 py-1.5 text-xs transition-colors"
                 style="border-color: var(--theme-divider-border);">暂不同步</button
             >
             <button
                 onclick={handleSync}
                 disabled={syncing}
-                class="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
+                class="flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
                 style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
             >
                 <Icon icon={syncing ? 'mdi:loading' : 'mdi:cloud-download-outline'} class="size-3.5" />

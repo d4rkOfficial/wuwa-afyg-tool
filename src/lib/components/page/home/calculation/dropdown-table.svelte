@@ -525,7 +525,7 @@
                         <div class="flex flex-wrap gap-0.5">
                             {#each entryDamageTypeMap[damageEntry.id] ?? [] as dt}
                                 <span
-                                    class="text-[10px] px-1 rounded text-(--theme-modal-text)/70 leading-tight"
+                                    class="text-[10px] px-1 rounded-none text-(--theme-modal-text)/70 leading-tight"
                                     style="background: var(--theme-input-bg);"
                                     >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}</span
                                 >
@@ -548,27 +548,27 @@
                                 {#each entryBuffDiff[damageEntry.id] ?? [] as diff}
                                     {#if diff.type === 'global'}
                                         <span
-                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
                                             style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
                                         >
                                             <Icon icon="mdi:crown" class="size-3" />{diff.name}
                                         </span>
                                     {:else if diff.type === 'added'}
                                         <span
-                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
                                             style="background: var(--theme-buff-green-bg); color: var(--theme-buff-green-text);"
                                         >
                                             <Icon icon="mdi:plus" class="size-3" />{diff.name}
                                         </span>
                                     {:else if diff.type === 'removed'}
                                         <span
-                                            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-500/15 text-red-500"
+                                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium bg-red-500/15 text-red-500"
                                         >
                                             <Icon icon="mdi:minus" class="size-3" />{diff.name}
                                         </span>
                                     {:else}
                                         <span
-                                            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            class="inline-flex items-center gap-1 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
                                             style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
                                         >
                                             {diff.name}
@@ -580,7 +580,7 @@
                                     {@const buffSet = buffById.get(setId)}
                                     {#if buffSet && !globalBuffSetIds.includes(setId)}
                                         <span
-                                            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                            class="inline-flex items-center gap-1 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
                                             style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
                                         >
                                             {buffSet.name}
@@ -611,7 +611,7 @@
                                                         handleCopyDamageTypeToNext(damageEntry.id)
                                                     }}
                                                     title="Shift+Enter"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段直伤
@@ -623,7 +623,7 @@
                                                     }}
                                                     disabled={countSameNameEntries(damageEntry.id) <= 1}
                                                     title="把本条的伤害类型同步到所有同名伤害（同一角色 + 同一技能类型）"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40"
                                                 >
                                                     <Icon icon="mdi:sync" class="size-3 shrink-0" />
                                                     同步伤害类型到所有同名伤害{countSameNameEntries(damageEntry.id) > 1
@@ -646,7 +646,7 @@
                                                     }}
                                                     title={dt}
                                                     class={[
-                                                        'px-2 py-1 text-xs rounded transition-colors border',
+                                                        'px-2 py-1 text-xs rounded-none transition-colors border',
                                                         selected
                                                             ? ''
                                                             : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
@@ -675,7 +675,7 @@
                                                         handleCopyFromPrevDirect(damageEntry.id)
                                                     }}
                                                     title="Shift+Z"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
                                                     复制前段直伤
@@ -686,7 +686,7 @@
                                                         handleCopyToNextDirect(damageEntry.id)
                                                     }}
                                                     title="Shift+X"
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段直伤
@@ -697,7 +697,7 @@
                                                         e.stopPropagation()
                                                         handleCopyFromPrevEffect(damageEntry.id)
                                                     }}
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
                                                     复制前段效应
@@ -707,7 +707,7 @@
                                                         e.stopPropagation()
                                                         handleCopyToNextEffect(damageEntry.id)
                                                     }}
-                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused)"
                                                 >
                                                     <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
                                                     复制到下段效应
@@ -720,7 +720,7 @@
                                                     handleClearAllBuffs(damageEntry.id)
                                                 }}
                                                 title="Shift+C"
-                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40 disabled:pointer-events-none"
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-input-bg) text-(--theme-input-text) border border-(--theme-input-border) hover:bg-(--theme-input-bg-focused) disabled:opacity-40 disabled:pointer-events-none"
                                             >
                                                 <Icon icon="mdi:close-circle-outline" class="size-3 shrink-0" />
                                                 清除所有增益
@@ -733,7 +733,7 @@
                                                     handleToggleExpand(damageEntries[nextIdx].id, nextIdx)
                                                 }}
                                                 title="Space"
-                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-(--theme-accent-bg)/20 text-(--theme-accent-text) border border-(--theme-accent-bg)/30 hover:bg-(--theme-accent-bg)/30"
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-none transition-colors bg-(--theme-accent-bg)/20 text-(--theme-accent-text) border border-(--theme-accent-bg)/30 hover:bg-(--theme-accent-bg)/30"
                                             >
                                                 <Icon icon="mdi:arrow-down" class="size-3 shrink-0" />
                                                 下一条
@@ -746,7 +746,7 @@
                                                         selectedEntrySetIds.includes(c.id)
                                                     )}
                                                     <div
-                                                        class="flex flex-wrap items-center gap-1 rounded border px-2 py-1 text-xs transition-colors"
+                                                        class="flex flex-wrap items-center gap-1 rounded-none border px-2 py-1 text-xs transition-colors"
                                                         style={folderActive
                                                             ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
                                                             : 'background: var(--theme-input-bg); border-color: var(--theme-divider-border);'}
@@ -788,7 +788,7 @@
                                                                         }
                                                                     }}
                                                                     class={[
-                                                                        'rounded px-2 py-1 text-[10px] font-medium tabular-nums transition-colors min-w-[1.2em] text-center',
+                                                                        'rounded-none px-2 py-1 text-[10px] font-medium tabular-nums transition-colors min-w-[1.2em] text-center',
                                                                         childChecked
                                                                             ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/30'
                                                                             : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-accent-bg)/10'
@@ -815,7 +815,7 @@
                                                             handleToggleBuffSetForEntry(item.buffSet!.id)
                                                         }}
                                                         class={[
-                                                            'px-2 py-1 text-xs rounded transition-colors inline-flex items-center gap-1 border',
+                                                            'px-2 py-1 text-xs rounded-none transition-colors inline-flex items-center gap-1 border',
                                                             checked
                                                                 ? ''
                                                                 : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'

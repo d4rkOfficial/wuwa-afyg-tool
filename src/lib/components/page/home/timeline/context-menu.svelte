@@ -167,7 +167,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {cm.x}px; top: {cm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: cm.x, y: cm.y }}
@@ -245,7 +245,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {bm.x}px; top: {bm.y}px; border-color: var(--theme-divider-border);"
         data-block-menu="true"
         use:clampMenu={{ x: bm.x, y: bm.y }}
@@ -300,7 +300,7 @@
             {#each specialOptions as opt}
                 <button
                     onclick={() => setBlockSpecial(bm.blockId, opt.value)}
-                    class="flex-1 rounded px-2 py-1 text-xs font-medium transition-colors {special === opt.value
+                    class="flex-1 rounded-none px-2 py-1 text-xs font-medium transition-colors {special === opt.value
                         ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
                         : 'text-(--theme-context-menu-text)/70 hover:bg-(--theme-context-menu-bg-focused)'}"
                 >
@@ -321,7 +321,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in theme-scrollbar fixed z-50 min-w-44 max-h-[70vh] overflow-y-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 shadow-xl backdrop-blur-lg"
         style="left: {mm.x}px; top: {mm.y}px; border-color: var(--theme-divider-border);"
         data-context-menu="true"
         use:clampMenu={{ x: mm.x, y: mm.y }}
@@ -390,7 +390,7 @@
             <div class="flex justify-end gap-2 mt-5">
                 <button
                     onclick={() => (confirmMultiAction = null)}
-                    class="h-8 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-8 rounded-none px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);"
                 >
                     取消
@@ -400,7 +400,7 @@
                         removeSelection()
                         confirmMultiAction = null
                     }}
-                    class="h-8 rounded-md bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
+                    class="h-8 rounded-none bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
                 >
                     确认
                 </button>
@@ -427,7 +427,7 @@
             <div class="flex justify-end gap-2 mt-5">
                 <button
                     onclick={() => (confirmMultiAction = null)}
-                    class="h-8 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                    class="h-8 rounded-none px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                     style="background: var(--theme-input-bg);"
                 >
                     取消
@@ -437,7 +437,7 @@
                         resetSelectionDamage()
                         confirmMultiAction = null
                     }}
-                    class="h-8 rounded-md bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
+                    class="h-8 rounded-none bg-red-700 px-4 text-xs text-white transition-colors hover:bg-red-600"
                 >
                     确认
                 </button>
@@ -452,7 +452,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in fixed z-50 max-w-[80vw] overflow-x-auto rounded-lg border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 shadow-xl backdrop-blur-lg"
+        class="animate-pop-in fixed z-50 max-w-[80vw] overflow-x-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 shadow-xl backdrop-blur-lg"
         style="left: {tm.x}px; top: {tm.y}px; border-color: var(--theme-divider-border);"
         data-track-menu="true"
         use:clampMenu={{ x: tm.x, y: tm.y }}
@@ -462,7 +462,7 @@
             <div class="flex items-center gap-1">
                 {#each menuBtnIcons as [name, url]}
                     <button
-                        class="size-7 flex items-center justify-center rounded hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+                        class="size-7 flex items-center justify-center rounded-none hover:bg-(--theme-context-menu-bg-focused) transition-colors"
                         onclick={() => addOpBlock(tm.trackIndex, tm.pos, name)}
                         title={name}
                     >
@@ -529,7 +529,7 @@
                             setBlockKey(pickerBlockId, name)
                             setBlockKeyPickerId(null)
                         }}
-                        class="size-10 flex items-center justify-center rounded-md border transition-colors hover:bg-(--theme-modal-text)/10"
+                        class="size-10 flex items-center justify-center rounded-none border transition-colors hover:bg-(--theme-modal-text)/10"
                         style="border-color: var(--theme-divider-border);"
                         title={name}
                     >
@@ -561,7 +561,7 @@
                             setBlockKey(pickerBlockId, btn.id)
                             setBlockKeyPickerId(null)
                         }}
-                        class="size-10 flex items-center justify-center rounded-md border transition-colors hover:bg-(--theme-modal-text)/10"
+                        class="size-10 flex items-center justify-center rounded-none border transition-colors hover:bg-(--theme-modal-text)/10"
                         style="border-color: var(--theme-divider-border);"
                         title={btn.label}
                     >

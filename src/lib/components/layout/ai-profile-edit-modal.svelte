@@ -105,7 +105,7 @@
         >
             <button
                 onclick={onclose}
-                class="h-7 rounded-md px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
+                class="h-7 rounded-none px-4 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
                 style="background: var(--theme-input-bg);"
             >
                 取消
@@ -113,7 +113,7 @@
             <button
                 onclick={handleSave}
                 disabled={!canSave}
-                class="inline-flex h-7 items-center gap-1.5 rounded-md px-4 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
+                class="inline-flex h-7 items-center gap-1.5 rounded-none px-4 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40 disabled:pointer-events-none"
                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
             >
                 <Icon icon="mdi:content-save-outline" class="size-3.5" />
@@ -131,7 +131,7 @@
                     value={draft.label}
                     oninput={(e) => setDraft({ label: (e.currentTarget as HTMLInputElement).value })}
                     placeholder="如 本地 Ollama"
-                    class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                    class="w-full rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
             </label>
@@ -143,7 +143,7 @@
                         value={draft.baseUrl}
                         oninput={(e) => setDraft({ baseUrl: (e.currentTarget as HTMLInputElement).value })}
                         placeholder="https://api.deepseek.com"
-                        class="min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                        class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors"
                         style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                     />
                     <button
@@ -151,7 +151,7 @@
                         title="选择主流提供商预设"
                         onclick={() => (providerPickerOpen = !providerPickerOpen)}
                         class={[
-                            'flex size-8 shrink-0 items-center justify-center rounded-lg border transition-colors',
+                            'flex size-8 shrink-0 items-center justify-center rounded-none border transition-colors',
                             providerPickerOpen
                                 ? 'text-(--theme-accent-text)'
                                 : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
@@ -164,7 +164,7 @@
                     </button>
                     {#if providerPickerOpen}
                         <div
-                            class="animate-pop-in theme-scrollbar absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border py-1 shadow-xl"
+                            class="animate-pop-in theme-scrollbar absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-none border py-1 shadow-xl"
                             style="background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
                         >
                             <div class="px-2.5 py-1 text-[10px] text-(--theme-modal-text)/40">
@@ -204,7 +204,7 @@
                     value={draft.model}
                     oninput={(e) => setDraft({ model: (e.currentTarget as HTMLInputElement).value })}
                     placeholder={matchedPreset?.modelHint ?? 'deepseek-v4-flash'}
-                    class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                    class="w-full rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
             </label>
@@ -215,7 +215,7 @@
                     value={draft.apiKey}
                     oninput={(e) => setDraft({ apiKey: (e.currentTarget as HTMLInputElement).value })}
                     placeholder="sk-..."
-                    class="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                    class="w-full rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
                 {#if matchedPreset}
@@ -241,7 +241,7 @@
                     {#each ['low', 'medium', 'high'] as level}
                         <button
                             onclick={() => setDraft({ reasoningEffort: level as AiProfile['reasoningEffort'] })}
-                            class="rounded-md px-2 py-1 text-[10px] transition-colors {draft.reasoningEffort === level
+                            class="rounded-none px-2 py-1 text-[10px] transition-colors {draft.reasoningEffort === level
                                 ? 'text-(--theme-accent-text)'
                                 : 'text-(--theme-modal-text)/60'}"
                             style="background: color-mix(in srgb, var(--theme-accent-bg) {draft.reasoningEffort ===

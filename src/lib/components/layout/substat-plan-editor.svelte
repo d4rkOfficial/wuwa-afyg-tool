@@ -123,13 +123,13 @@
         <span class="flex-1"></span>
         <button
             onclick={oncancel}
-            class="rounded-md border px-3 py-1 text-[11px] transition-colors"
+            class="rounded-none border px-3 py-1 text-[11px] transition-colors"
             style="border-color: var(--theme-divider-border); color: var(--theme-modal-text)/70;">取消</button
         >
         <button
             onclick={() => onsave(cloneSlots(draft))}
             disabled={!costOk || !substatOk || saving}
-            class="rounded-md border px-3.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-none border px-3.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);">保存</button
         >
     </div>
