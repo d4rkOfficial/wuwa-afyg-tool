@@ -39,10 +39,14 @@
 <Modal {open} onclose={oncancel} backdropClose class="w-[88rem] max-w-[97vw] {className}" style={styleProp}>
     {#snippet title()}
         <span class="flex items-center gap-2">
-            <Icon icon="mdi:clipboard-text-outline" class="size-4" />
-            <span>{standard ? `修改「${character}」的 ${STANDARD_PLAN_NAME}` : `编辑方案：${name}`}</span>
+            <Icon icon="mdi:clipboard-text-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+            <span class="tracking-tight"
+                >{standard ? `修改「${character}」的 ${STANDARD_PLAN_NAME}` : `编辑方案：${name}`}</span
+            >
             {#if standard}
-                <span class="text-[10px] font-normal text-(--theme-muted-text)">保存时副词条需恰好 14 条</span>
+                <span class="text-[10px] font-normal tracking-normal text-(--theme-muted-text)"
+                    >保存时副词条需恰好 14 条</span
+                >
             {/if}
         </span>
     {/snippet}

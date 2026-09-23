@@ -81,7 +81,12 @@
                 <Icon icon="mdi:close" class="size-4.5" />
             </button>
             {#if title}
-                <div class="mb-4 pr-6 text-base font-semibold {footer ? 'shrink-0' : ''}">
+                <div
+                    class="mb-4 flex items-center gap-2 border-b pb-2.5 pr-6 text-base font-black tracking-tight {footer
+                        ? 'shrink-0'
+                        : ''}"
+                    style="border-color: var(--theme-divider-border);"
+                >
                     {@render title()}
                 </div>
             {/if}

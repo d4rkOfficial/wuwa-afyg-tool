@@ -25,9 +25,7 @@
     const strokeStyle = $derived(`-webkit-text-stroke: 2px ${isDark ? '#000' : '#fff'}; paint-order: stroke fill;`)
 
     interface Entry {
-        /** @desc 英文小标（kicker） */
-        kicker: string
-        /** @desc 卡片背景水印英文词 */
+        /** @desc 卡片背景水印（装饰性超大水印，非小标） */
         watermark: string
         title: string
         desc: string
@@ -39,7 +37,6 @@
 
     const entries = $derived<Entry[]>([
         {
-            kicker: 'COMMUNITY',
             watermark: 'WORKSHOP',
             title: '工坊',
             desc: '浏览社区分享的排轴拉表工程并一键导入；也可上传自己的工程，生成带有效期的分享链接。',
@@ -48,7 +45,6 @@
             wide: true
         },
         {
-            kicker: 'BUFF SET',
             watermark: 'BUFF',
             title: 'Buff 集',
             desc: '按角色 / 武器 / 声骸 / 套装维护增益条目，拉表时勾选导入；可从工坊同步。',
@@ -56,7 +52,6 @@
             action: onBuffLibrary
         },
         {
-            kicker: 'SUBSTATS SET',
             watermark: 'STAT',
             title: '词条集',
             desc: '标准 14 词条与自定义声骸词条方案，一键套用到队伍角色。',
@@ -64,7 +59,6 @@
             action: onSubstatLibrary
         },
         {
-            kicker: 'SETTINGS',
             watermark: 'COCONUT',
             title: '设置',
             desc: '主题外观、交互与快捷键、AI 助手、数据源与工坊实例。',
@@ -81,9 +75,12 @@
         <header class="flex shrink-0 flex-col gap-3">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
                 <span
-                    class="text-[10px] font-medium uppercase tracking-[0.42em] text-(--theme-accent-text)"
-                    style="opacity: 0.85;">Wuthering Waves · Community Toolkit</span
+                    class="flex items-center gap-2 text-[10px] font-medium tracking-[0.42em] text-(--theme-accent-text)"
+                    style="opacity: 0.85;"
                 >
+                    <Icon icon="mdi:star-four-points-outline" class="size-3 shrink-0" />
+                    鸣潮社区工具箱
+                </span>
                 <span class="text-[10px] uppercase tracking-[0.28em] text-(--theme-muted-text)">
                     {isMono ? 'Mono Edition' : 'Vol. 1 — 排轴 / 拉表 / 配装 / 计算'}
                 </span>
@@ -129,10 +126,6 @@
                     >
                     <div class="relative flex items-start justify-between gap-4">
                         <span class="flex flex-col gap-1">
-                            <span
-                                class="text-[10px] font-semibold uppercase tracking-[0.34em] text-(--theme-muted-text)"
-                                >{entry.kicker}</span
-                            >
                             <span
                                 class="text-xl font-black tracking-tight text-(--theme-card-text) [text-shadow:0_0_3px_var(--theme-halo-color)] md:text-2xl"
                                 >{entry.title}</span

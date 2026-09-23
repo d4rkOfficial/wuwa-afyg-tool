@@ -930,7 +930,7 @@
                                             ></div>
                                         {/if}
                                         <div
-                                            class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-none border p-3 shadow-xl"
+                                            class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-none border p-3 shadow-2xl"
                                             style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent); background: color-mix(in srgb, var(--theme-modal-bg) {overrides.bgOpacity}%, transparent); backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
                                                 (overrides.bgDim / 100) *
                                                     0.6}); -webkit-backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
