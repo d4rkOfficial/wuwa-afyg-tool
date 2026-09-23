@@ -199,18 +199,19 @@
                 onblur={() => {
                     if (!pinned) tip = null
                 }}
-                class="inline-flex cursor-help items-baseline gap-1 rounded-none border px-1.5 py-0.5 transition-all hover:opacity-75 hover:shadow-md"
+                class="inline-flex cursor-help items-baseline gap-1 rounded-none border px-1.5 py-0.5 transition-all hover:opacity-75"
                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 30%, transparent);"
             >
-                <span class="text-[10px] font-medium" style="color: var(--theme-modal-text); opacity: 0.55;"
+                <span class="text-[10px] font-medium" style="color: var(--theme-modal-text); opacity: 0.4;"
                     >{c.label}</span
                 >
-                <span class="font-mono tabular-nums" style="color: var(--theme-accent-text);">{c.value}</span>
+                <span class="font-mono font-black tabular-nums" style="color: var(--theme-accent-text);">{c.value}</span
+                >
             </button>
         {/each}
         <span class="select-none opacity-50">=</span>
         <span
-            class="rounded-none px-1.5 py-0.5 font-mono text-[13px] font-bold tabular-nums"
+            class="rounded-none px-1.5 py-0.5 font-mono text-[13px] font-black tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
             style="color: var(--theme-accent-text);"
         >
             {fmt(seg.expected)}
@@ -223,7 +224,7 @@
             <span class="tabular-nums"
                 ><span style="color: var(--theme-rigcrit-from);">未命中</span> 每段期望
                 <span style="text-decoration: line-through; opacity: 0.6;">{fmt(seg.perHit)}</span> →
-                <span style="color: var(--theme-accent-text); font-weight: 600;">0</span></span
+                <span style="color: var(--theme-accent-text); font-weight: 900;">0</span></span
             >
         {:else}
             <span class="tabular-nums"
@@ -246,16 +247,18 @@
             role="tooltip"
             onpointerenter={clearClose}
             onpointerleave={scheduleClose}
-            class="fixed z-100 w-72 max-w-[85vw] overflow-hidden rounded-none border shadow-2xl backdrop-blur-xl"
+            class="fixed z-100 w-72 max-w-[85vw] overflow-hidden rounded-none border backdrop-blur-xl"
             style="left: {tip.left}px; top: {tip.top}px; background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
         >
             <div
                 class="flex items-center justify-between gap-2 border-b px-3 py-1.5"
                 style="border-color: var(--theme-divider-border);"
             >
-                <span class="text-[11px] font-semibold" style="color: var(--theme-modal-text);">{tip.chip.label}</span>
+                <span class="text-[11px] font-black" style="color: var(--theme-modal-text);">{tip.chip.label}</span>
                 <span class="flex items-center gap-2">
-                    <span class="font-mono text-[11px]" style="color: var(--theme-accent-text);">{tip.chip.value}</span>
+                    <span class="font-mono text-[11px] font-black" style="color: var(--theme-accent-text);"
+                        >{tip.chip.value}</span
+                    >
                     <button
                         type="button"
                         onclick={(e) => {

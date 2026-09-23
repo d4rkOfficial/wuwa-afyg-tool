@@ -356,22 +356,24 @@
         <div class="shrink-0 border-b px-5 py-4" style="border-color: var(--theme-divider-border);">
             <div class="flex items-end gap-6">
                 <div>
-                    <div class="text-[10px] text-(--theme-modal-text)/40 mb-1">总伤害</div>
-                    <div class="text-2xl font-bold tabular-nums text-(--theme-accent-text)">
+                    <div class="mb-1 text-[10px] text-(--theme-modal-text)/40">总伤害</div>
+                    <div
+                        class="text-2xl font-black tabular-nums text-(--theme-accent-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
+                    >
                         {Math.round(totalDamage).toLocaleString()}
                     </div>
                 </div>
                 {#each charSummaries as cs}
                     <div>
                         <div
-                            class="text-[10px] text-(--theme-modal-text)/40 mb-1"
+                            class="mb-1 text-[10px]"
                             style="color: {cs.character
                                 ? `var(--theme-element-${charElements[cs.character]}, #888)`
                                 : 'var(--theme-modal-text)'}"
                         >
                             {cs.character || '—'}
                         </div>
-                        <div class="text-sm font-semibold tabular-nums">
+                        <div class="text-sm font-black tabular-nums">
                             {Math.round(cs.totalDamage).toLocaleString()}
                         </div>
                     </div>
@@ -447,7 +449,7 @@
                                 >{entry.canCrit ? entry.nonCritPerHit.toLocaleString() : '—'}</td
                             >
                             <td
-                                class="py-1.5 px-3 text-right tabular-nums font-medium"
+                                class="py-1.5 px-3 text-right tabular-nums font-black"
                                 style={missEntryIds.includes(entry.id)
                                     ? MISS_TEXT
                                     : rigCritEntryIds.includes(entry.id)
@@ -467,10 +469,10 @@
                                         style="border-color: var(--theme-divider-border);"
                                     >
                                         {#if entry.baseUnit === '固定'}
-                                            <div class="font-semibold font-sans text-(--theme-accent-text)">
+                                            <div class="font-black font-sans text-(--theme-accent-text)">
                                                 固定值为 {entry.baseValue.toLocaleString()}
                                             </div>
-                                            <div class="font-bold font-sans text-(--theme-accent-text)">
+                                            <div class="font-black font-sans text-(--theme-accent-text)">
                                                 最终 = {entry.baseValue.toLocaleString()}
                                             </div>
                                         {:else if entry.baseUnit.startsWith('偏谐系数') || entry.baseUnit === '效应系数'}

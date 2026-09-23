@@ -787,7 +787,7 @@
     })
 
     // ── 通用样式常量 ──
-    const cardBg = 'color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 42%, transparent)'
+    const cardBg = 'var(--theme-input-bg)'
     const mutedText = 'color: var(--theme-modal-text); opacity: 0.45;'
 </script>
 
@@ -806,14 +806,14 @@
     >
         <!-- Header -->
         <div
-            class="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b px-6 py-4"
+            class="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b px-6 pb-2.5 pt-4"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-color: var(--theme-divider-border);"
         >
             <div class="flex items-center gap-2.5">
-                <Icon icon="mdi:chart-box-outline" class="size-5" style="color: var(--theme-accent-text);" />
-                <span class="text-base font-semibold" style="color: var(--theme-modal-text);">数据分析</span>
+                <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                <h2 class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);">数据分析</h2>
                 <span
-                    class="hidden max-w-56 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium md:inline-block"
+                    class="hidden max-w-56 truncate rounded-none border px-2 py-0.5 text-[10px] tracking-[0.22em] md:inline-block"
                     style="color: var(--theme-modal-text); opacity: 0.5; border-color: var(--theme-divider-border);"
                     title={projectName}>{projectName}</span
                 >
@@ -823,11 +823,13 @@
                 style="color: var(--theme-modal-text); opacity: 0.55;"
             >
                 {#if totalDur > 0}
-                    <span class="tabular-nums">总时长 {totalDur.toFixed(1)}s</span>
+                    <span class="tabular-nums tracking-[0.22em]">总时长 {totalDur.toFixed(1)}s</span>
                     <span class="size-1 rounded-full" style="background: var(--theme-divider-border);"></span>
                     <span class="flex items-center gap-1">
                         总 DPS
-                        <span class="text-sm font-bold tabular-nums" style="color: var(--theme-accent-text);"
+                        <span
+                            class="text-sm font-black tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
+                            style="color: var(--theme-accent-text);"
                             >{overallDps ? Math.round(overallDps).toLocaleString() : '—'}</span
                         >
                     </span>
@@ -889,9 +891,9 @@
                         class="relative col-span-2 overflow-hidden rounded-none border p-4 lg:col-span-1"
                         style="border-color: var(--theme-divider-border); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, transparent), transparent 65%);"
                     >
-                        <div class="text-[10px] font-semibold uppercase tracking-wider" style={mutedText}>总伤害</div>
+                        <div class="text-[10px] tracking-[0.22em]" style={mutedText}>总伤害</div>
                         <div
-                            class="mt-1.5 text-2xl font-bold leading-none tabular-nums"
+                            class="mt-1.5 text-2xl font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
                             style="color: var(--theme-accent-text);"
                         >
                             {Math.round(rangeStats.damage).toLocaleString()}
@@ -910,12 +912,12 @@
                         >
                             <div class="flex items-center gap-1.5">
                                 <span class="size-2 rounded-full shrink-0" style="background: {color};"></span>
-                                <span class="truncate text-[10px] font-semibold" style="color: {color};"
+                                <span class="truncate text-[10px] font-black" style="color: {color};"
                                     >{cs.character || '其它'}</span
                                 >
                             </div>
                             <div
-                                class="mt-1.5 text-lg font-bold leading-none tabular-nums"
+                                class="mt-1.5 text-lg font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
                                 style="color: var(--theme-modal-text);"
                             >
                                 {Math.round(stat.damage).toLocaleString()}
@@ -931,9 +933,9 @@
                         class="relative overflow-hidden rounded-none border p-4"
                         style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 10%, transparent), transparent 70%);"
                     >
-                        <div class="text-[10px] font-semibold uppercase tracking-wider" style={mutedText}>总 DPS</div>
+                        <div class="text-[10px] tracking-[0.22em]" style={mutedText}>总 DPS</div>
                         <div
-                            class="mt-1.5 text-2xl font-bold leading-none tabular-nums"
+                            class="mt-1.5 text-2xl font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
                             style="color: var(--theme-accent-text);"
                         >
                             {rangeStats.dps > 0 ? Math.round(rangeStats.dps).toLocaleString() : '—'}
@@ -948,7 +950,7 @@
             <!-- ── 时间记点 + 分段 DPS ── -->
             <section
                 class="rounded-none border"
-                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
+                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <div
                     class="flex flex-wrap items-center gap-2 border-b px-4 py-3"
@@ -957,13 +959,15 @@
                     <div class="flex items-center gap-2">
                         <Icon
                             icon="mdi:chart-timeline-variant"
-                            class="size-4"
+                            class="size-4 shrink-0"
                             style="color: var(--theme-accent-text);"
                         />
-                        <span class="text-sm font-semibold" style="color: var(--theme-modal-text);">分段 DPS</span>
+                        <h3 class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);">
+                            分段 DPS
+                        </h3>
                         <button
                             onclick={() => openHelp('时间记点规则', refLineHelpItems)}
-                            class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold transition-colors hover:bg-white/10"
+                            class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold transition-colors hover:bg-(--theme-modal-text)/10"
                             style="color: var(--theme-accent-text);"
                             title="时间参考线命名解析与限制规则"
                         >
@@ -971,8 +975,8 @@
                         </button>
                         {#if overallDps}
                             <span
-                                class="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
-                                style="background: color-mix(in srgb, var(--theme-accent-bg) 16%, transparent); color: var(--theme-accent-text);"
+                                class="rounded-none border px-2 py-0.5 text-[10px] font-black tabular-nums"
+                                style="background: color-mix(in srgb, var(--theme-accent-bg) 16%, transparent); color: var(--theme-accent-text); border-color: var(--theme-divider-border);"
                             >
                                 总 DPS {Math.round(overallDps).toLocaleString()}
                             </span>
@@ -1042,7 +1046,7 @@
                                                 />
                                                 <span class="text-[10px] opacity-40">秒</span>
                                                 {#if timing?.seconds === null}
-                                                    <span class="text-[10px] whitespace-nowrap" style="color: #f59e0b;"
+                                                    <span class="text-[10px] whitespace-nowrap text-red-500"
                                                         >未填写</span
                                                     >
                                                 {/if}
@@ -1111,7 +1115,7 @@
                                             >{Math.round(seg.totalDamage).toLocaleString()}</td
                                         >
                                         <td
-                                            class="px-2 py-2 text-right text-sm font-bold tabular-nums"
+                                            class="px-2 py-2 text-right text-sm font-black tabular-nums"
                                             style="color: var(--theme-accent-text);"
                                         >
                                             {Math.round(seg.totalDamage / span).toLocaleString()}
@@ -1144,17 +1148,17 @@
                                     title="点击后上方 KPI 按总计呈现"
                                 >
                                     <td
-                                        class="py-2 pr-2 text-[10px] font-semibold"
+                                        class="py-2 pr-2 text-[10px] font-black tracking-[0.22em]"
                                         style="color: var(--theme-modal-text); opacity: 0.6;"
                                         colspan="2">总计</td
                                     >
                                     <td
-                                        class="px-2 py-2 text-right font-semibold tabular-nums"
+                                        class="px-2 py-2 text-right font-black tabular-nums"
                                         style="color: var(--theme-modal-text);"
                                         >{Math.round(segTotals.total).toLocaleString()}</td
                                     >
                                     <td
-                                        class="px-2 py-2 text-right text-sm font-bold tabular-nums"
+                                        class="px-2 py-2 text-right text-sm font-black tabular-nums"
                                         style="color: var(--theme-accent-text);"
                                     >
                                         {Math.round(segTotalDps).toLocaleString()}
@@ -1182,15 +1186,17 @@
             <!-- ── 队伍出伤曲线 ── -->
             <section
                 class="rounded-none border"
-                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
+                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <div
                     class="flex flex-wrap items-center gap-2 border-b px-4 py-3"
                     style="border-color: var(--theme-divider-border);"
                 >
                     <div class="flex items-center gap-2">
-                        <Icon icon="mdi:chart-line" class="size-4" style="color: var(--theme-accent-text);" />
-                        <span class="text-sm font-semibold" style="color: var(--theme-modal-text);">队伍出伤曲线</span>
+                        <Icon icon="mdi:chart-line" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                        <h3 class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);">
+                            队伍出伤曲线
+                        </h3>
                     </div>
                     <div
                         class="ml-auto flex items-center gap-1 rounded-none border p-0.5"
@@ -1263,13 +1269,15 @@
             <!-- ── 伤害占比：队伍 + 角色直伤类型 ── -->
             <section
                 class="rounded-none border"
-                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
+                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <div class="border-b px-4 py-3" style="border-color: var(--theme-divider-border);">
                     <div class="flex items-center gap-2">
-                        <Icon icon="mdi:chart-pie" class="size-4" style="color: var(--theme-accent-text);" />
-                        <span class="text-sm font-semibold" style="color: var(--theme-modal-text);">伤害占比</span>
-                        <span class="text-[10px]" style="color: var(--theme-modal-text); opacity: 0.45;"
+                        <Icon icon="mdi:chart-pie" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                        <h3 class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);">
+                            伤害占比
+                        </h3>
+                        <span class="text-[10px]" style="color: var(--theme-modal-text); opacity: 0.4;"
                             >（类型仅直伤，包括视为效应；多类型伤害独立成「a&b」组合类别）</span
                         >
                     </div>
@@ -1284,7 +1292,7 @@
                             class="mb-2 flex items-center justify-between text-[11px]"
                             style="color: var(--theme-modal-text);"
                         >
-                            <span class="font-medium">队伍伤害占比</span>
+                            <span class="font-black tracking-tight">队伍伤害占比</span>
                             <span class="tabular-nums" style="opacity: 0.5;"
                                 >{Math.round(totalDamage).toLocaleString()}</span
                             >
@@ -1347,7 +1355,7 @@
                                 >
                                     <div class="mb-2 flex items-center justify-between gap-2">
                                         <span
-                                            class="flex items-center gap-1.5 text-xs font-semibold"
+                                            class="flex items-center gap-1.5 text-xs font-black"
                                             style="color: {color};"
                                         >
                                             <span class="size-2 rounded-full" style="background: {color};"></span>
@@ -1392,20 +1400,20 @@
             <!-- ── 声骸词条贡献分析（三角色并排，不切换视图） ── -->
             <section
                 class="rounded-none border"
-                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
+                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <div
                     class="flex flex-wrap items-center gap-2 border-b px-4 py-3"
                     style="border-color: var(--theme-divider-border);"
                 >
                     <div class="flex items-center gap-2 shrink-0">
-                        <Icon icon="mdi:chart-bar" class="size-4" style="color: var(--theme-accent-text);" />
-                        <span class="text-sm font-semibold" style="color: var(--theme-modal-text);"
-                            >声骸词条贡献分析</span
-                        >
+                        <Icon icon="mdi:chart-bar" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                        <h3 class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);">
+                            声骸词条贡献分析
+                        </h3>
                         <button
                             onclick={() => openHelp('算法说明', helpItems)}
-                            class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold transition-colors hover:bg-white/10"
+                            class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold transition-colors hover:bg-(--theme-modal-text)/10"
                             style="color: var(--theme-accent-text);"
                             title="算法说明"
                         >
@@ -1420,10 +1428,10 @@
                             <button
                                 onclick={() => onSelectAlgorithm(algo.id)}
                                 class={[
-                                    'rounded-none px-2 py-1 text-[11px] font-medium transition-all',
+                                    'rounded-none px-2 py-1 text-[11px] transition-all',
                                     selectedAlgorithm === algo.id
-                                        ? 'shadow-sm'
-                                        : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
+                                        ? 'font-black'
+                                        : 'font-medium text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/70'
                                 ].join(' ')}
                                 style="background: {selectedAlgorithm === algo.id
                                     ? 'var(--theme-accent-bg)'
@@ -1451,15 +1459,15 @@
                         <div class="grid grid-cols-1 gap-3 xl:grid-cols-3">
                             {#each substatAnalysis as charSA}
                                 <div
-                                    class="rounded-none border backdrop-blur-lg"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
+                                    class="rounded-none border"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="px-4 py-3">
                                         <div class="flex items-center justify-between">
                                             <div class="flex flex-col gap-0.5">
                                                 <div class="flex flex-wrap items-center gap-3">
                                                     <span
-                                                        class="text-xs font-semibold"
+                                                        class="text-xs font-black"
                                                         style="color: var(--theme-modal-text);">{charSA.character}</span
                                                     >
                                                     <span
@@ -1511,7 +1519,7 @@
                                             </div>
                                             <div class="flex shrink-0 flex-col items-end gap-0.5">
                                                 <div
-                                                    class="text-xl font-bold leading-none tabular-nums"
+                                                    class="text-xl font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
                                                     style="color: var(--theme-accent-text);"
                                                 >
                                                     {charSA.substatTotalPctNorm.toFixed(1)}
@@ -1545,8 +1553,8 @@
                                         <div class="mt-3 space-y-1.5">
                                             {#each charSA.echoes as echo}
                                                 <div
-                                                    class="rounded-none border backdrop-blur-md"
-                                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 50%, transparent);"
+                                                    class="rounded-none border"
+                                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                                 >
                                                     <div class="px-3 py-2">
                                                         <div class="mb-1.5 flex items-center justify-between">
@@ -1559,7 +1567,7 @@
                                                                     : ''}
                                                             </span>
                                                             <span
-                                                                class="text-sm font-bold tabular-nums"
+                                                                class="text-sm font-black tabular-nums"
                                                                 style="color: var(--theme-accent-text);"
                                                             >
                                                                 {echo.totalPctNorm.toFixed(1)}<span
@@ -1647,7 +1655,7 @@
                                                                 {/if}
                                                             </span>
                                                             <span
-                                                                class="font-bold tabular-nums"
+                                                                class="font-black tabular-nums"
                                                                 style="color: var(--theme-accent-text);"
                                                             >
                                                                 {echo.totalPctNorm.toFixed(1)}<span

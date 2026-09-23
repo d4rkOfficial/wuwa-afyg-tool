@@ -668,11 +668,11 @@
         >
             <!-- Header -->
             <div
-                class="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-3 border-b px-6 py-4"
+                class="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-3 border-b px-6 pb-2.5 pt-4"
                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); backdrop-filter: blur(12px);"
             >
-                <Icon icon="mdi:compare-horizontal" class="size-5" style="color: var(--theme-accent-text);" />
-                <span class="text-base font-semibold">链/阶对比</span>
+                <Icon icon="mdi:compare-horizontal" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                <h2 class="text-base font-black tracking-tight">链/阶对比</h2>
                 <div class="ml-auto flex items-center gap-2 text-[11px] opacity-55">
                     {#if totalDur > 0}
                         <span class="tabular-nums">总时长 {totalDur.toFixed(1)}s</span>
@@ -711,7 +711,7 @@
                             <span class="text-xs opacity-50">已选 {points.length} 个：</span>
                             {#each points as p, i}
                                 <span
-                                    class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]"
+                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] tabular-nums tracking-[0.22em]"
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     {compactLabel(p.chains, p.refinements)}
@@ -732,10 +732,15 @@
                     <!-- ── 队伍出伤曲线（常驻渲染，同图叠加）── -->
                     <section
                         class="rounded-none border p-3"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
-                        <div class="mb-2 flex items-center gap-2">
-                            <span class="text-xs font-semibold uppercase tracking-wider opacity-50">队伍出伤曲线</span>
+                        <div class="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <Icon
+                                icon="mdi:chart-timeline-variant"
+                                class="size-4 shrink-0"
+                                style="color: var(--theme-accent-text);"
+                            />
+                            <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">队伍出伤曲线</h3>
                             <div
                                 class="ml-auto flex items-center gap-1 rounded-none border p-0.5 text-[11px]"
                                 style="border-color: var(--theme-divider-border);"
@@ -743,7 +748,7 @@
                                 <button
                                     onclick={() => (curveTab = 'cumulative')}
                                     class="rounded-none px-2 py-0.5 {curveTab === 'cumulative'
-                                        ? 'font-medium'
+                                        ? 'font-black'
                                         : 'opacity-60'}"
                                     style={curveTab === 'cumulative'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
@@ -752,7 +757,7 @@
                                 <button
                                     onclick={() => (curveTab = 'window')}
                                     class="rounded-none px-2 py-0.5 {curveTab === 'window'
-                                        ? 'font-medium'
+                                        ? 'font-black'
                                         : 'opacity-60'}"
                                     style={curveTab === 'window'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
@@ -775,10 +780,10 @@
                                     {@const c = stat.config}
                                     <div
                                         class="min-w-44 flex-1 shrink-0 rounded-none border p-3"
-                                        style="border-color: {c.accent}; background: var(--theme-card-bg);"
+                                        style="border-color: {c.accent}; background: var(--theme-input-bg);"
                                     >
                                         <div
-                                            class="flex items-center gap-1.5 text-sm font-semibold"
+                                            class="flex items-center gap-1.5 text-sm font-black"
                                             style="color: {c.accent};"
                                         >
                                             <span class="size-2.5 rounded-full" style="background: {c.accent};"
@@ -786,15 +791,16 @@
                                         </div>
                                         <div class="mt-2 space-y-1.5">
                                             <div class="flex items-end justify-between gap-2">
-                                                <span class="pb-0.5 text-xs opacity-50">DPS</span><span
-                                                    class="text-2xl font-bold leading-none tabular-nums"
+                                                <span class="pb-0.5 text-[10px] text-(--theme-modal-text)/40">DPS</span
+                                                ><span
+                                                    class="text-2xl font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
                                                     style="color: {c.accent};"
                                                     >{stat.dps > 0 ? fmt(stat.dps) : '—'}</span
                                                 >
                                             </div>
                                             <div class="flex items-center justify-between text-xs">
-                                                <span class="opacity-50">总伤</span><span
-                                                    class="tabular-nums font-medium"
+                                                <span class="text-[10px] text-(--theme-modal-text)/40">总伤</span><span
+                                                    class="tabular-nums font-black"
                                                     style="color: {c.accent};">{fmt(stat.damage)}</span
                                                 >
                                             </div>
@@ -807,7 +813,7 @@
                         <!-- ── 分段 DPS（版式对齐数据分析页：区块头 + 时段单选 + 选中范围明细）── -->
                         <section
                             class="rounded-none border"
-                            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-card-bg, var(--theme-modal-bg)) 30%, transparent);"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <div
                                 class="flex flex-wrap items-center gap-2 border-b px-4 py-3"
@@ -815,13 +821,11 @@
                             >
                                 <Icon
                                     icon="mdi:chart-timeline-variant"
-                                    class="size-4"
+                                    class="size-4 shrink-0"
                                     style="color: var(--theme-accent-text);"
                                 />
-                                <span class="text-sm font-semibold" style="color: var(--theme-modal-text);"
-                                    >分段 DPS</span
-                                >
-                                <span class="text-[11px] opacity-50"
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">分段 DPS</h3>
+                                <span class="text-[10px] text-(--theme-modal-text)/40"
                                     >点击时段行切换上方卡片与明细的口径（默认总计）</span
                                 >
                             </div>
@@ -877,7 +881,7 @@
                                                                 (configSegments[ci] ?? [])[si]?.totalDamage ?? 0}
                                                             <td class="px-2 py-2 text-right">
                                                                 <div
-                                                                    class="text-sm font-bold tabular-nums"
+                                                                    class="text-sm font-black tabular-nums"
                                                                     style="color: {stat.config.accent};"
                                                                 >
                                                                     {segDamage > 0
@@ -907,7 +911,7 @@
                                                     title="点击查看总计数据"
                                                 >
                                                     <td
-                                                        class="py-2 pr-2 text-[10px] font-semibold"
+                                                        class="py-2 pr-2 text-[10px] font-black tracking-[0.22em]"
                                                         style="opacity: 0.6;"
                                                     >
                                                         总计
@@ -920,7 +924,7 @@
                                                     </td>
                                                     {#each rangeStats as stat}
                                                         <td
-                                                            class="px-2 py-2 text-right text-sm font-bold tabular-nums"
+                                                            class="px-2 py-2 text-right text-sm font-black tabular-nums"
                                                             style="color: {stat.config.accent};"
                                                         >
                                                             {Math.round(stat.dps).toLocaleString()}
@@ -934,10 +938,13 @@
                                     <!-- 选中范围明细：段总伤 / 段角色总伤 / 段其它总伤 / DPS -->
                                     <div class="mt-4">
                                         <div class="mb-1.5 flex items-center gap-2">
-                                            <span class="text-xs font-semibold" style="color: var(--theme-modal-text);"
-                                                >{rangeLabel} 明细</span
+                                            <span
+                                                class="text-sm font-black tracking-tight"
+                                                style="color: var(--theme-modal-text);">{rangeLabel} 明细</span
                                             >
-                                            <span class="text-[11px] opacity-50">时长 {rangeSpan.toFixed(1)}s</span>
+                                            <span class="text-[10px] text-(--theme-modal-text)/40"
+                                                >时长 {rangeSpan.toFixed(1)}s</span
+                                            >
                                         </div>
                                         <div class="overflow-x-auto">
                                             <table class="w-full text-xs">
@@ -987,7 +994,7 @@
                                                                     : '—'}</td
                                                             >
                                                             <td
-                                                                class="px-2 py-2 text-right text-sm font-bold tabular-nums"
+                                                                class="px-2 py-2 text-right text-sm font-black tabular-nums"
                                                                 style="color: var(--theme-accent-text);"
                                                             >
                                                                 {stat.dps > 0
@@ -1013,10 +1020,15 @@
                     <!-- ── 伤害占比（常驻，条形图）：全队占比 + 每角色直伤类型占比 ── -->
                     <section
                         class="rounded-none border p-3"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
-                        <div class="mb-2 flex items-center gap-2">
-                            <span class="text-xs font-semibold uppercase tracking-wider opacity-50">全队伤害占比</span>
+                        <div class="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <Icon
+                                icon="mdi:compare-horizontal"
+                                class="size-4 shrink-0"
+                                style="color: var(--theme-accent-text);"
+                            />
+                            <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">全队伤害占比</h3>
                             <div
                                 class="ml-auto flex items-center gap-1 rounded-none border p-0.5 text-[11px]"
                                 style="border-color: var(--theme-divider-border);"
@@ -1024,7 +1036,7 @@
                                 <button
                                     onclick={() => (shareMode = 'total')}
                                     class="rounded-none px-2 py-0.5 {shareMode === 'total'
-                                        ? 'font-medium'
+                                        ? 'font-black'
                                         : 'opacity-60'}"
                                     style={shareMode === 'total'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
@@ -1032,9 +1044,7 @@
                                 >
                                 <button
                                     onclick={() => (shareMode = 'pct')}
-                                    class="rounded-none px-2 py-0.5 {shareMode === 'pct'
-                                        ? 'font-medium'
-                                        : 'opacity-60'}"
+                                    class="rounded-none px-2 py-0.5 {shareMode === 'pct' ? 'font-black' : 'opacity-60'}"
                                     style={shareMode === 'pct'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
                                         : ''}>看占比</button
@@ -1048,9 +1058,9 @@
 
                     <section
                         class="rounded-none border p-3"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
-                        <div class="mb-2 text-xs font-semibold uppercase tracking-wider opacity-50">
+                        <div class="mb-2 text-sm font-black tracking-tight text-(--theme-modal-text)">
                             角色直伤类型伤害占比
                         </div>
                         <div class="space-y-4">
@@ -1089,24 +1099,29 @@
                 aria-modal="true"
             >
                 <div
-                    class="flex shrink-0 items-center gap-2 border-b px-5 py-3"
+                    class="flex shrink-0 items-center gap-2.5 border-b px-5 pb-2.5 pt-3"
                     style="border-color: var(--theme-divider-border);"
                 >
-                    <Icon icon="mdi:sitemap" class="size-4" style="color: var(--theme-accent-text);" />
-                    <span class="text-sm font-semibold">选择对比配置</span>
-                    <span class="text-[11px] opacity-50">三个角色各自勾选多个 (链,阶)，自动组合成队伍配置</span>
+                    <Icon icon="mdi:sitemap" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                    <h3 class="text-base font-black tracking-tight">选择对比配置</h3>
+                    <span class="text-[10px] text-(--theme-modal-text)/40"
+                        >三个角色各自勾选多个 (链,阶)，自动组合成队伍配置</span
+                    >
                 </div>
                 <div class="theme-scrollbar min-h-0 flex-1 space-y-4 overflow-auto p-4">
                     {#each team as slot, si}
                         <div
                             class="rounded-none border p-3"
-                            style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >
                             <div class="mb-2 flex items-center gap-2">
-                                <span class="text-sm font-medium" style="color: var(--theme-modal-text);">
+                                <span class="text-sm font-black" style="color: var(--theme-modal-text);">
                                     {slot.character ?? `槽${si + 1}`}
                                 </span>
-                                <span class="ml-auto text-[11px] opacity-50">已选 {perCharSel[si].length} 个</span>
+                                <span
+                                    class="ml-auto text-[10px] tabular-nums tracking-[0.22em] text-(--theme-modal-text)/40"
+                                    >已选 {perCharSel[si].length} 个</span
+                                >
                             </div>
                             <table class="w-full border-separate border-spacing-0.5 text-center text-[11px]">
                                 <thead>
@@ -1148,8 +1163,9 @@
                         </div>
                     {/each}
                     <p
-                        class="text-center text-[11px]"
-                        style={matrixCount > MAX_PICKER_CONFIGS ? 'color: #ef4444;' : 'opacity: 0.5;'}
+                        class="text-center text-[10px] {matrixCount > MAX_PICKER_CONFIGS
+                            ? 'text-red-500'
+                            : 'text-(--theme-modal-text)/40'}"
                     >
                         {matrixCount > MAX_PICKER_CONFIGS
                             ? '配置太多，超过限制，为避免卡顿，无法确认。'
@@ -1157,27 +1173,28 @@
                     </p>
                 </div>
                 <div
-                    class="flex shrink-0 items-center gap-2 border-t px-5 py-3"
+                    class="flex shrink-0 items-center gap-2 border-t px-5 py-2.5"
                     style="border-color: var(--theme-divider-border);"
                 >
                     <button
                         onclick={() => (perCharSel = [[], [], []])}
                         disabled={perCharSel.every((s) => s.length === 0)}
-                        class="inline-flex items-center gap-1 rounded-none px-3 py-1.5 text-sm opacity-70 transition-colors enabled:hover:opacity-100 disabled:opacity-30"
+                        class="inline-flex items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-30"
+                        style="border-color: var(--theme-divider-border);"
                         title="清空全部角色的选择"
                     >
-                        <Icon icon="mdi:broom" class="size-4" />清空
+                        <Icon icon="mdi:broom" class="size-3" />清空
                     </button>
                     <div class="flex-1"></div>
                     <button
                         onclick={() => (pickerOpen = false)}
-                        class="rounded-none px-3 py-1.5 text-sm opacity-70 transition-colors hover:opacity-100"
-                        >取消</button
+                        class="inline-flex items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                        style="border-color: var(--theme-divider-border);">取消</button
                     >
                     <button
                         onclick={confirmMatrix}
                         disabled={perCharSel.some((s) => s.length === 0) || matrixCount > MAX_PICKER_CONFIGS}
-                        class="rounded-none px-4 py-1.5 text-sm font-medium transition-all enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-40"
+                        class="rounded-none px-3 py-1 text-[10px] font-medium transition-all enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-40"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                     >
                         确认（{matrixCount} 个）

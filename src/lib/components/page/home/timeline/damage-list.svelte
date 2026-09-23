@@ -14,21 +14,23 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="animate-pop-in w-full max-h-[70vh] max-w-2xl rounded-none border text-(--theme-modal-text) shadow-xl overflow-hidden flex flex-col"
+            class="animate-pop-in w-full max-h-[70vh] max-w-2xl rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
             <div
-                class="flex items-center justify-between px-4 py-3 border-b"
+                class="flex items-center justify-between gap-2 border-b px-4 pb-2.5 pt-3"
                 style="border-color: var(--theme-divider-border);"
             >
-                <h2 class="text-sm font-semibold">伤害列表</h2>
-                <span class="text-xs text-(--theme-modal-text)/50">{getDamageList().length} 条</span>
+                <h2 class="text-base font-black tracking-tight text-(--theme-modal-text)">伤害列表</h2>
+                <span class="text-[10px] tracking-[0.22em] text-(--theme-modal-text)/40"
+                    >{getDamageList().length} 条</span
+                >
             </div>
             <div class="theme-scrollbar flex-1 overflow-y-auto p-3">
                 {#if getDamageList().length === 0}
-                    <div class="flex items-center justify-center py-8 text-xs text-(--theme-modal-text)/50">
+                    <div class="flex items-center justify-center py-8 text-[10px] text-(--theme-modal-text)/40">
                         暂无伤害数据
                     </div>
                 {:else}
@@ -72,8 +74,8 @@
                 style="border-color: var(--theme-divider-border);"
             >
                 <button
-                    class="h-7 rounded-none px-3 text-xs text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/10"
-                    style="background: var(--theme-input-bg);"
+                    class="inline-flex items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                    style="border-color: var(--theme-divider-border);"
                     onclick={() => setShowDamageList(false)}>关闭</button
                 >
             </div>
