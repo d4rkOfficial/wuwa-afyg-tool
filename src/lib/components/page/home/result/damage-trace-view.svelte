@@ -116,20 +116,61 @@
         return list
     })
 
-    let tip = $state<{ left: number; top: number; chip: Chip } | null>(null)
+    interface TipAnchor {
+        left: number
+        top: number
+        right: number
+        bottom: number
+    }
+    let tip = $state<{ anchor: TipAnchor; chip: Chip } | null>(null)
     let pinned = $state(false)
     let closeTimer: ReturnType<typeof setTimeout> | null = null
     let rootEl = $state<HTMLElement | null>(null)
+    let tipEl = $state<HTMLElement | null>(null)
+    /** @desc 浮窗实测尺寸：高度随来源条数变化，写死会导致翻上/翻下的位置算错 */
+    let tipSize = $state({ w: 0, h: 0 })
+    /** @desc 视口尺寸（resize 时更新），用于把浮窗 clamp 在窗口内 */
+    let viewport = $state({
+        w: typeof window !== 'undefined' ? window.innerWidth : 1400,
+        h: typeof window !== 'undefined' ? window.innerHeight : 900
+    })
 
-    /** @desc 定位浮窗：默认贴在 badge 下方，空间不足则弹到上方，避让视口边缘 */
-    function posAt(e: Event, chip: Chip): { left: number; top: number } {
+    /** @desc 取触发 badge 的视口矩形作为锚点（真实左右/上下都记下来，定位时按浮窗实测尺寸算） */
+    function anchorAt(e: Event): TipAnchor {
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-        const w = typeof window !== 'undefined' ? window.innerWidth : 1400
-        const h = typeof window !== 'undefined' ? window.innerHeight : 900
-        const left = Math.max(8, Math.min(r.left, w - 330))
-        const top = r.bottom + 8 <= h - 80 ? r.bottom + 8 : Math.max(8, r.top - 280)
-        return { left, top }
+        return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
     }
+
+    const TIP_MARGIN = 8
+    const TIP_GAP = 8
+
+    /** @desc 浮窗定位：默认贴 badge 下方，下方放不下则弹到上方，最后整体 clamp 进视口（左右/上下都不越界） */
+    const tipPos = $derived.by(() => {
+        const t = tip
+        if (!t) return { left: TIP_MARGIN, top: TIP_MARGIN }
+        // 未测到尺寸前的兜底（首帧即会被实测值替换：浮窗宽 36rem，高度按常见内容估）
+        const w = tipSize.w || 576
+        const h = tipSize.h || 240
+        const maxLeft = Math.max(TIP_MARGIN, viewport.w - w - TIP_MARGIN)
+        const maxTop = Math.max(TIP_MARGIN, viewport.h - h - TIP_MARGIN)
+        const left = Math.min(Math.max(TIP_MARGIN, t.anchor.left), maxLeft)
+        const below = t.anchor.bottom + TIP_GAP
+        const above = t.anchor.top - h - TIP_GAP
+        const top =
+            below <= maxTop ? below : above >= TIP_MARGIN ? above : Math.min(Math.max(TIP_MARGIN, below), maxTop)
+        return { left, top }
+    })
+
+    /** @desc 浮窗尺寸测量：等 DOM 更新后量真实宽高（内容换了 chip 也会重测），位置由 tipPos 用实测值算 */
+    $effect(() => {
+        const chipId = tip?.chip.id
+        const el = tipEl
+        if (!el || !chipId) {
+            tipSize = { w: 0, h: 0 }
+            return
+        }
+        tipSize = { w: el.offsetWidth, h: el.offsetHeight }
+    })
 
     function clearClose() {
         if (closeTimer) {
@@ -142,7 +183,7 @@
     function openHover(e: Event, chip: Chip) {
         clearClose()
         pinned = false
-        tip = { ...posAt(e, chip), chip }
+        tip = { anchor: anchorAt(e), chip }
     }
 
     function scheduleClose() {
@@ -164,7 +205,7 @@
             return
         }
         pinned = true
-        tip = { ...posAt(e, chip), chip }
+        tip = { anchor: anchorAt(e), chip }
     }
 
     function closeTip() {
@@ -175,6 +216,9 @@
 </script>
 
 <svelte:window
+    onresize={() => {
+        viewport = { w: window.innerWidth, h: window.innerHeight }
+    }}
     onmousedown={(e) => {
         if (tip && rootEl && !rootEl.contains(e.target as Node)) closeTip()
     }}
@@ -243,12 +287,13 @@
     <!-- 来源浮窗 -->
     {#if tip}
         <div
+            bind:this={tipEl}
             in:fade={{ duration: 100 }}
             role="tooltip"
             onpointerenter={clearClose}
             onpointerleave={scheduleClose}
-            class="fixed z-100 w-72 max-w-[85vw] overflow-hidden rounded-none border backdrop-blur-xl"
-            style="left: {tip.left}px; top: {tip.top}px; background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
+            class="fixed z-100 w-[36rem] max-w-[85vw] overflow-hidden rounded-none border backdrop-blur-xl"
+            style="left: {tipPos.left}px; top: {tipPos.top}px; background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
         >
             <div
                 class="flex items-center justify-between gap-2 border-b px-3 py-1.5"
