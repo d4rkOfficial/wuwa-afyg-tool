@@ -21,7 +21,9 @@
 </script>
 
 <div
-    class={['flex rounded-none bg-white/5 p-0.5', className || ''].filter(Boolean).join(' ')}
+    class={['flex rounded-none border border-(--theme-divider-border) bg-(--theme-input-bg) p-0.5', className || '']
+        .filter(Boolean)
+        .join(' ')}
     style={styleProp}
     role="tablist"
 >
@@ -31,8 +33,10 @@
             aria-selected={i === active}
             onclick={() => onchange?.(i)}
             class={[
-                'rounded-none px-3 py-1 text-sm transition-colors duration-150',
-                i === active ? 'bg-(--theme-tabs-bg) text-(--theme-tabs-text)' : 'text-white/50 hover:text-white/80',
+                'rounded-none px-3 py-1 text-sm font-medium transition-colors duration-150',
+                i === active
+                    ? 'bg-(--theme-tabs-bg) text-(--theme-tabs-text)'
+                    : 'text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)/80',
                 className || ''
             ]
                 .filter(Boolean)

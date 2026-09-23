@@ -56,7 +56,10 @@
                 class="flex shrink-0 items-center justify-between border-b px-5 py-3"
                 style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-color: var(--theme-divider-border);"
             >
-                <h2 class="text-base font-semibold">速查</h2>
+                <h2 class="flex items-center gap-2 text-base font-black tracking-tight">
+                    <Icon icon="mdi:magnify" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                    速查
+                </h2>
                 <button
                     onclick={onclose}
                     class="flex size-7 items-center justify-center rounded-none text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"

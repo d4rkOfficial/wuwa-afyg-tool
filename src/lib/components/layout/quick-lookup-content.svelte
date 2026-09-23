@@ -274,8 +274,8 @@
                                 style="background: var(--theme-input-bg);"
                             />{/if}
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="text-base font-semibold">{currentSlot.character}</span>
-                            <span class="text-sm text-yellow-400">{'★'.repeat(charData.rarity)}</span>
+                            <span class="text-base font-black tracking-tight">{currentSlot.character}</span>
+                            <span class="text-sm text-(--theme-buff-yellow-text)">{'★'.repeat(charData.rarity)}</span>
                             {#if img(elementIcons[charData.element])}<img
                                     src={img(elementIcons[charData.element])}
                                     alt={charData.element}
@@ -299,32 +299,45 @@
                         </div>
                     </div>
                     <!-- @desc 基础属性区：Lv90 生命/攻击/防御/谐度破坏增幅 -->
-                    <section>
-                        <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
-                            基础属性 (Lv90)
-                        </h3>
+                    <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                        <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <Icon
+                                icon="mdi:chart-box-outline"
+                                class="size-4 shrink-0"
+                                style="color: var(--theme-accent-text);"
+                            />
+                            <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">
+                                基础属性 (Lv90)
+                            </h3>
+                        </div>
                         <div class="grid grid-cols-4 gap-2">
-                            <div class="rounded-none p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                <div class="text-sm text-(--theme-modal-text)/50">基础生命</div>
-                                <div class="mt-0.5 text-sm font-semibold tabular-nums">
-                                    {charData.lv90BaseStats.hp}
-                                </div>
+                            <div
+                                class="rounded-none border p-2.5 text-center"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="text-[10px] text-(--theme-modal-text)/40">基础生命</div>
+                                <div class="mt-0.5 text-sm font-black tabular-nums">{charData.lv90BaseStats.hp}</div>
                             </div>
-                            <div class="rounded-none p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                <div class="text-sm text-(--theme-modal-text)/50">基础攻击</div>
-                                <div class="mt-0.5 text-sm font-semibold tabular-nums">
-                                    {charData.lv90BaseStats.atk}
-                                </div>
+                            <div
+                                class="rounded-none border p-2.5 text-center"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="text-[10px] text-(--theme-modal-text)/40">基础攻击</div>
+                                <div class="mt-0.5 text-sm font-black tabular-nums">{charData.lv90BaseStats.atk}</div>
                             </div>
-                            <div class="rounded-none p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                <div class="text-sm text-(--theme-modal-text)/50">基础防御</div>
-                                <div class="mt-0.5 text-sm font-semibold tabular-nums">
-                                    {charData.lv90BaseStats.def}
-                                </div>
+                            <div
+                                class="rounded-none border p-2.5 text-center"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="text-[10px] text-(--theme-modal-text)/40">基础防御</div>
+                                <div class="mt-0.5 text-sm font-black tabular-nums">{charData.lv90BaseStats.def}</div>
                             </div>
-                            <div class="rounded-none p-2.5 text-center" style="background: var(--theme-input-bg);">
-                                <div class="text-sm text-(--theme-modal-text)/50">谐度破坏增幅</div>
-                                <div class="mt-0.5 text-sm font-semibold tabular-nums">
+                            <div
+                                class="rounded-none border p-2.5 text-center"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="text-[10px] text-(--theme-modal-text)/40">谐度破坏增幅</div>
+                                <div class="mt-0.5 text-sm font-black tabular-nums">
                                     {charData.lv90BaseStats.tuneBreakBoost}
                                 </div>
                             </div>
@@ -332,9 +345,19 @@
                     </section>
                     <!-- @desc 武器区：图标/名字/星级/基础攻击/副属性 + 武器效果富文本 -->
                     {#if currentSlot.weapon}
-                        <section>
-                            <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">武器</h3>
-                            <div class="rounded-none p-3 space-y-2" style="background: var(--theme-input-bg);">
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:sword"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">武器</h3>
+                            </div>
+                            <div
+                                class="rounded-none border p-3 space-y-2"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
                                 <div class="flex items-center gap-2">
                                     {#if img(weaponIcons[currentSlot.weapon])}<img
                                             src={img(weaponIcons[currentSlot.weapon])}
@@ -344,9 +367,9 @@
                                             style="background: var(--theme-input-bg);"
                                         />{/if}
                                     <div>
-                                        <div class="flex items-center gap-1.5 text-sm font-medium">
+                                        <div class="flex items-center gap-1.5 text-sm font-black tracking-tight">
                                             <span>{currentSlot.weapon}</span>{#if weaponData}<span
-                                                    class="text-yellow-400 text-sm"
+                                                    class="text-(--theme-buff-yellow-text) text-sm"
                                                     >{'★'.repeat(weaponData.rarity)}</span
                                                 >{/if}
                                         </div>
@@ -376,11 +399,19 @@
                     {/if}
                     <!-- @desc 首位声骸区：图标/名字/Cost/套装名 + 声骸技能描述 -->
                     {#if currentSlot.echoes[0]?.name}
-                        <section>
-                            <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                首位声骸
-                            </h3>
-                            <div class="rounded-none p-3" style="background: var(--theme-input-bg);">
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:star-four-points-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">首位声骸</h3>
+                            </div>
+                            <div
+                                class="rounded-none border p-3"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
                                 <div class="flex items-center gap-2">
                                     {#if img(echoIcons[currentSlot.echoes[0].name])}<img
                                             src={img(echoIcons[currentSlot.echoes[0].name])}
@@ -389,7 +420,7 @@
                                             class="size-8 rounded-none object-contain"
                                             style="background: var(--theme-input-bg);"
                                         />{/if}
-                                    <div class="text-sm font-medium">
+                                    <div class="text-sm font-black tracking-tight">
                                         {currentSlot.echoes[0].name}<span class="text-(--theme-modal-text)/50 ml-1"
                                             >(C{currentSlot.echoes[0].cost})</span
                                         >{#if currentSlot.triggerSets.length > 0}<span
@@ -409,13 +440,21 @@
                     {/if}
                     <!-- @desc 套装加成区：逐套装展示已装备件数对应的加成描述 -->
                     {#if setBonuses}
-                        <section>
-                            <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                套装加成
-                            </h3>
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:layers-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">套装加成</h3>
+                            </div>
                             <div class="space-y-3">
                                 {#each setBonuses as set}
-                                    <div class="rounded-none p-3" style="background: var(--theme-input-bg);">
+                                    <div
+                                        class="rounded-none border p-3"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
                                         <div class="flex items-center gap-2 mb-2">
                                             {#if img(setIcons[set.name])}<img
                                                     src={img(setIcons[set.name])}
@@ -424,7 +463,7 @@
                                                     class="size-6 rounded-none object-contain"
                                                     style="background: var(--theme-input-bg);"
                                                 />{/if}
-                                            <span class="text-sm font-medium">{set.name}</span>
+                                            <span class="text-sm font-black tracking-tight">{set.name}</span>
                                             <span class="text-sm text-(--theme-modal-text)/50"
                                                 >({set.pieces.join('件 + ')}件)</span
                                             >
@@ -446,8 +485,15 @@
                         </section>
                     {/if}
                     <!-- @desc 技能区：普通技能（含倍率数值/偏谐值/共鸣能量明细）+ 固有技能 -->
-                    <section class="border-t pt-4 mt-4" style="border-color: var(--theme-divider-border);">
-                        <h3 class="mb-2 text-base font-semibold tracking-wider text-(--theme-modal-text)/50">技能</h3>
+                    <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                        <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <Icon
+                                icon="mdi:gesture-tap"
+                                class="size-4 shrink-0"
+                                style="color: var(--theme-accent-text);"
+                            />
+                            <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">技能</h3>
+                        </div>
                         <div class="space-y-3">
                             {#each charData.skills as skill, i}
                                 <div
@@ -563,16 +609,24 @@
                     </section>
                     <!-- @desc 固有属性区：双列网格展示「XX提升」数值 -->
                     {#if statAttrs.length > 0}
-                        <section>
-                            <h3 class="mb-2 text-sm font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                固有属性
-                            </h3>
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:tune-variant"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">固有属性</h3>
+                            </div>
                             <div class="grid grid-cols-2 gap-2">
                                 {#each sortedStatAttrs as attr}
-                                    <div class="rounded-none p-2.5" style="background: var(--theme-input-bg);">
-                                        <div class="text-sm text-(--theme-modal-text)/50">{attr.name}</div>
+                                    <div
+                                        class="rounded-none border p-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <div class="text-[10px] text-(--theme-modal-text)/40">{attr.name}</div>
                                         {#if attr.desc}
-                                            <div class="mt-0.5 text-sm font-semibold tabular-nums leading-relaxed">
+                                            <div class="mt-0.5 text-sm font-black tabular-nums leading-relaxed">
                                                 {@html rd(attr.desc)}
                                             </div>
                                         {/if}
@@ -583,17 +637,22 @@
                     {/if}
                     <!-- @desc 共鸣链区：C1~C6 描述 -->
                     {#if charData.chains.length > 0}
-                        <section class="border-t pt-4 mt-4" style="border-color: var(--theme-divider-border);">
-                            <h3 class="mb-2 text-base font-semibold tracking-wider text-(--theme-modal-text)/50">
-                                共鸣链
-                            </h3>
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:link-variant"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">共鸣链</h3>
+                            </div>
                             <div class="space-y-3">
                                 {#each charData.chains as chain, i}
                                     <div
                                         class="rounded-none border px-3 py-2"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
-                                        <div class="flex items-center gap-2 text-sm font-medium">
+                                        <div class="flex items-center gap-2 text-sm font-black tracking-tight">
                                             <span class="text-sm text-(--theme-modal-text)/40">C{i + 1}</span><span
                                                 >{chain.name}</span
                                             >
@@ -650,7 +709,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="fixed inset-0 z-80" onclick={() => (ctxShow = false)} oncontextmenu={(e) => e.preventDefault()}>
         <div
-            class="animate-pop-in absolute min-w-36 rounded-none border bg-(--theme-modal-bg) py-1 shadow-xl backdrop-blur-lg"
+            class="animate-pop-in absolute min-w-36 rounded-none border bg-(--theme-modal-bg) py-1 backdrop-blur-lg"
             style="border-color: var(--theme-divider-border); left: {ctxX}px; top: {ctxY}px;"
         >
             <button
@@ -671,7 +730,7 @@
             {#if showCustomHitOption}
                 <button
                     onclick={handleCreateCustomHit}
-                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-amber-400 transition-colors hover:bg-(--theme-modal-text)/5"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-buff-yellow-text) transition-colors hover:bg-(--theme-modal-text)/5"
                     ><Icon icon="mdi:plus-circle-outline" class="size-3.5 shrink-0" /> 创建自定义直伤</button
                 >
             {/if}

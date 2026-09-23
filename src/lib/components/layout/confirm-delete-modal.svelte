@@ -52,8 +52,8 @@
 
 <Modal {open} {onclose} backdropClose={false} class={className} style="width: min(92vw, 420px); {mergedStyle}">
     {#snippet title()}
-        <div class="flex items-center gap-2 text-red-400">
-            <Icon icon="mdi:alert-circle" class="size-5" />
+        <div class="flex items-center gap-2 text-red-500">
+            <Icon icon="mdi:alert-circle" class="size-4 shrink-0" />
             {title}
         </div>
     {/snippet}
@@ -66,7 +66,7 @@
                     await navigator.clipboard.writeText(confirmText).catch(() => {})
                     addToast(`已复制「${confirmText}」`, 'success')
                 }}
-                class="inline-flex items-center gap-0.5 font-semibold text-(--theme-accent-text) transition-colors hover:brightness-125"
+                class="inline-flex items-center gap-0.5 font-medium text-(--theme-accent-text) transition-colors hover:brightness-125"
                 title="点击复制"
             >
                 {confirmText}
@@ -97,7 +97,7 @@
         <button
             onclick={submit}
             disabled={input.trim() !== confirmText}
-            class="inline-flex h-7 items-center gap-1 rounded-none border border-red-400 px-3 text-xs font-medium text-red-400 transition-all hover:bg-red-400/10 disabled:opacity-40 disabled:pointer-events-none"
+            class="inline-flex h-7 items-center gap-1 rounded-none border border-red-500 px-3 text-xs font-medium text-red-500 transition-all hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-40"
         >
             <Icon icon="mdi:delete-outline" class="size-3.5" />
             {confirmLabel}

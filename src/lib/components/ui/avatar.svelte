@@ -26,7 +26,7 @@
 
 <div
     class={[
-        'theme-glass-surface inline-flex shrink-0 items-center justify-center rounded-full bg-cover bg-center',
+        'theme-glass-surface inline-flex shrink-0 items-center justify-center rounded-full bg-cover bg-center font-black tracking-tight',
         'bg-(--theme-avatar-bg) text-(--theme-avatar-text)',
         'focus-visible:bg-(--theme-avatar-bg-focused) focus-visible:text-(--theme-avatar-text-focused)',
         sizeClass,

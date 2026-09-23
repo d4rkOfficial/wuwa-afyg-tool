@@ -45,10 +45,10 @@
 
 <div
     class={[
-        'flex items-center gap-2 rounded-none px-3 py-1.5 text-sm',
+        'flex items-center gap-2 rounded-none border px-3 py-1.5 text-sm',
         'bg-(--theme-search-box-bg) text-(--theme-search-box-text)',
         'focus-within:bg-(--theme-search-box-bg-focused) focus-within:text-(--theme-search-box-text-focused)',
-        'ring-1 ring-inset ring-white/5 focus-within:ring-white/10',
+        'border-(--theme-divider-border) focus-within:border-(--theme-accent-bg)/50',
         'transition-colors duration-150',
         className || ''
     ]
@@ -64,7 +64,7 @@
         {oninput}
         {onfocus}
         {onblur}
-        class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-white/30"
+        class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-(--theme-search-box-text)/40"
     />
     {#if value}
         <button

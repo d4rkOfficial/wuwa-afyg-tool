@@ -38,10 +38,10 @@
     {disabled}
     {onclick}
     class={[
-        'inline-flex items-center justify-center gap-1.5 rounded-none px-3 py-1.5 text-sm',
+        'inline-flex items-center justify-center gap-1.5 rounded-none px-3 py-1.5 text-sm font-medium tracking-tight',
         'text-(--theme-btn-text)',
         'focus-visible:bg-(--theme-btn-bg-focused) focus-visible:text-(--theme-btn-text-focused)',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--theme-btn-text)/30',
+        'focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-(--theme-btn-text)',
         'disabled:opacity-40 disabled:pointer-events-none',
         'transition-colors duration-150',
         variant === 'icon' ? 'p-1.5' : '',

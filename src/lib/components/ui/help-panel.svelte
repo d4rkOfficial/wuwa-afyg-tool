@@ -42,20 +42,32 @@
         >
             <button
                 onclick={closeHelp}
-                class="absolute right-3 top-3 rounded-none p-1 transition-colors hover:bg-white/10"
-                style="color: var(--theme-modal-text); opacity: 0.4;"
+                class="absolute right-3 top-3 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                 aria-label="关闭"
             >
                 <Icon icon="mdi:close" class="size-4.5" />
             </button>
             {#if state.title}
-                <div class="mb-4 pr-6 text-base font-semibold">{state.title}</div>
+                <div
+                    class="mb-4 flex items-center gap-2 border-b pb-2.5 pr-6 text-base font-black tracking-tight"
+                    style="border-color: var(--theme-divider-border);"
+                >
+                    <Icon
+                        icon="mdi:help-circle-outline"
+                        class="size-4 shrink-0"
+                        style="color: var(--theme-accent-text);"
+                    />
+                    <span>{state.title}</span>
+                </div>
             {/if}
             {#each state.items as item}
-                <div class="mb-5 last:mb-0">
-                    <div class="text-sm font-semibold mb-0.5">{item.name}</div>
-                    <div class="text-xs opacity-70 mb-1">{item.description}</div>
-                    <div class="text-xs opacity-50 leading-relaxed">{item.content}</div>
+                <div
+                    class="mb-3 rounded-none border p-3 last:mb-0"
+                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                >
+                    <div class="text-sm font-black tracking-tight text-(--theme-modal-text)">{item.name}</div>
+                    <div class="mt-0.5 mb-1 text-xs text-(--theme-modal-text)/70">{item.description}</div>
+                    <div class="text-xs leading-relaxed text-(--theme-modal-text)/40">{item.content}</div>
                 </div>
             {/each}
         </div>

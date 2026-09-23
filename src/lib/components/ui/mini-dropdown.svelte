@@ -50,7 +50,7 @@
         <!-- 透明遮罩：点击任意处关闭（z 低于菜单，高于周围内容） -->
         <div class="fixed inset-0 z-40" role="presentation" onclick={() => (open = false)}></div>
         <div
-            class="animate-pop-in absolute left-0 top-full z-50 mt-1 max-h-56 w-full min-w-14 overflow-y-auto rounded-none border py-1 shadow-xl backdrop-blur-lg"
+            class="animate-pop-in absolute left-0 top-full z-50 mt-1 max-h-56 w-full min-w-14 overflow-y-auto rounded-none border py-1 backdrop-blur-lg"
             style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent); border-color: var(--theme-divider-border);"
         >
             {#each options as opt}

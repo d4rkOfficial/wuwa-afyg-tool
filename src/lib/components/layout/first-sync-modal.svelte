@@ -52,46 +52,56 @@
 <Modal {open} {onclose} backdropClose class={className} style={mergedStyle}>
     {#snippet title()}
         <span class="flex items-center gap-2">
-            <Icon icon="mdi:cloud-sync-outline" class="size-4" />
+            <Icon icon="mdi:cloud-sync-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             <span>同步工坊数据</span>
         </span>
     {/snippet}
 
     <div class="flex w-[26rem] max-w-[86vw] flex-col gap-3 text-xs">
-        <p style="opacity: 0.8;">
+        <p class="text-(--theme-modal-text)/70">
             这是你第一次进入工具箱。可以从工坊（{getShareBase()}）同步以下数据到本地，之后拉表与配装可以直接使用：
         </p>
         <ul class="space-y-1.5">
             <li class="flex gap-2">
-                <Icon icon="mdi:format-list-bulleted" class="mt-0.5 size-3.5 shrink-0" style="opacity: 0.6;" />
+                <Icon
+                    icon="mdi:format-list-bulleted"
+                    class="mt-0.5 size-3.5 shrink-0"
+                    style="color: var(--theme-accent-text);"
+                />
                 <span
                     ><b>Buff 集</b
                     >：各角色/武器/声骸/套装的增益条目（按实体整份覆盖本地工坊来源数据，本地自定义不受影响）。</span
                 >
             </li>
             <li class="flex gap-2">
-                <Icon icon="mdi:clipboard-text-outline" class="mt-0.5 size-3.5 shrink-0" style="opacity: 0.6;" />
+                <Icon
+                    icon="mdi:clipboard-text-outline"
+                    class="mt-0.5 size-3.5 shrink-0"
+                    style="color: var(--theme-accent-text);"
+                />
                 <span
                     ><b>标准词条集</b>：特殊角色的 14 词条声骸方案；其余角色由工具箱按角色数据自动生成（声骸主词条 43311
                     + 中位档副词条）。</span
                 >
             </li>
         </ul>
-        <p style="opacity: 0.55;">跳过也没关系：设置里的工坊、以及「Buff 集」「词条方案」面板都能随时手动同步。</p>
+        <p class="text-(--theme-modal-text)/40">
+            跳过也没关系：设置里的工坊、以及「Buff 集」「词条方案」面板都能随时手动同步。
+        </p>
     </div>
 
     {#snippet footer()}
         <div class="mt-6 flex items-center gap-2">
             <button
                 onclick={handleSkip}
-                class="rounded-none border px-3 py-1.5 text-xs transition-colors"
+                class="rounded-none border px-3 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                 style="border-color: var(--theme-divider-border);">暂不同步</button
             >
             <button
                 onclick={handleSync}
                 disabled={syncing}
-                class="flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
-                style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
+                class="flex items-center gap-1.5 rounded-none px-3 py-1.5 text-xs transition-all hover:brightness-110 disabled:opacity-50"
+                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
             >
                 <Icon icon={syncing ? 'mdi:loading' : 'mdi:cloud-download-outline'} class="size-3.5" />
                 {syncing ? '同步中…' : '立即同步'}

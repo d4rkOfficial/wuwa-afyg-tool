@@ -21,15 +21,16 @@
     let toasts = $derived(getToasts())
     let position = $derived(getToastPosition())
 
+    /** @desc 左侧状态色条：info 用强调色、success 用主题增益绿、error 用 red-500（危险色） */
     let typeStyles: Record<string, string> = {
-        info: 'border-l-2 border-l-sky-500',
-        success: 'border-l-2 border-l-emerald-500',
+        info: 'border-l-2 border-l-(--theme-accent-bg)',
+        success: 'border-l-2 border-l-(--theme-buff-green-text)',
         error: 'border-l-2 border-l-red-500'
     }
 
     let typeBgStyles: Record<string, string> = {
-        info: 'bg-sky-500/10',
-        success: 'bg-emerald-500/10',
+        info: 'bg-(--theme-accent-bg)/5',
+        success: 'bg-(--theme-buff-green-text)/10',
         error: 'bg-red-500/10'
     }
 
@@ -56,7 +57,7 @@
         {#each toasts as toast (toast.id)}
             <div
                 class={[
-                    'pointer-events-auto flex items-center gap-3 rounded-none px-5 py-3 text-sm shadow-xl',
+                    'pointer-events-auto flex items-center gap-3 rounded-none border border-(--theme-divider-border) px-5 py-3 text-sm',
                     'theme-glass-surface bg-(--theme-toast-bg) text-(--theme-toast-text)',
                     typeStyles[toast.type] || typeStyles.info,
                     typeBgStyles[toast.type] || '',
