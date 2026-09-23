@@ -7,7 +7,8 @@
 
 1. **一律去圆角**：只用 `rounded-none`。
     - 唯一例外：**功能性圆形**保留 `rounded-full`——头像、开关滑块/轨道、状态点、单选圈（`radiobox-*`）、进度环、`size-*` 小圆点。
-    - 不使用任何阴影做层次（`shadow-sm/md/lg` 等一律去掉），弹窗整体 `shadow-2xl` 例外。层次靠 `border` + `bg` 明暗。
+    - **胶囊 chip 与圆形按钮不算功能性圆形**：`rounded-full` 的 pill 徽标（`px-2 py-0.5` 之类）、圆形图标按钮（`size-8 rounded-full`）一律改直角——徽标用 `border` + `px-1.5 py-0.5`，图标按钮用 `size-8 rounded-none border` + `var(--theme-divider-border)`。
+    - 不使用任何阴影做层次（`shadow-sm/md/lg/xl` 等一律去掉），弹窗整体 `shadow-2xl` 例外。层次靠 `border` + `bg` 明暗。
 2. **衬线重音**：全局字体已是衬线（FangXinShu）。标题靠**字重 + 字距 + 描边光晕**体现杂志感，**不换字体**：
     - 大标题/刊头：`font-black tracking-tight`，需要强调时加 `[text-shadow:0_0_3px_var(--theme-halo-color)]`
     - 分区标题：`text-base font-black tracking-tight`（小分区 `text-xs`/`text-sm`）
