@@ -76,6 +76,12 @@
     let skillsLen = $derived(charData?.skills.length ?? 0)
     let skillCount = $derived(skillsLen + inherentSkills.length)
 
+    /** @desc 第 i 张技能卡片的「下一个技能类型名」（普通技能看完后接固有技能） */
+    function nextSkillTypeName(i: number): string {
+        if (i + 1 < skillsLen) return charData?.skills[i + 1]?.type ?? '下一个技能'
+        return inherentSkills[0]?.name ?? '固有技能'
+    }
+
     /** @desc 挂载即预加载全部图标（失败项静默忽略） */
     $effect(() => {
         loadIcons()
@@ -536,10 +542,12 @@
                                         {#if i + 1 < skillCount}
                                             <button
                                                 onclick={() => jumpToSkill(i + 1)}
-                                                class="ml-auto rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)/80"
+                                                class="ml-auto inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/55 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                style="border-color: var(--theme-divider-border);"
                                                 title="跳转到下一个技能"
                                             >
-                                                <Icon icon="mdi:chevron-down" class="size-4" />
+                                                <Icon icon="mdi:arrow-down-bold" class="size-3 shrink-0" />
+                                                跳转到{nextSkillTypeName(i)}
                                             </button>
                                         {/if}
                                     </div>
@@ -613,10 +621,12 @@
                                         {#if skillsLen + j + 1 < skillCount}
                                             <button
                                                 onclick={() => jumpToSkill(skillsLen + j + 1)}
-                                                class="ml-auto rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)/80"
+                                                class="ml-auto inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/55 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                style="border-color: var(--theme-divider-border);"
                                                 title="跳转到下一个技能"
                                             >
-                                                <Icon icon="mdi:chevron-down" class="size-4" />
+                                                <Icon icon="mdi:arrow-down-bold" class="size-3 shrink-0" />
+                                                跳转到{inherentSkills[j + 1]?.name ?? '下一个技能'}
                                             </button>
                                         {/if}
                                     </div>
