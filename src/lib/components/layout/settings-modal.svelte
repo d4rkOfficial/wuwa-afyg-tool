@@ -102,7 +102,16 @@
     let { open, onclose, class: className, style: styleProp }: Props = $props()
 
     let tab = $state<
-        'theme' | 'interaction' | 'keymap' | 'shortcuts' | 'performance' | 'connection' | 'cache' | 'archive' | 'ai'
+        | 'theme'
+        | 'interaction'
+        | 'keymap'
+        | 'shortcuts'
+        | 'performance'
+        | 'connection'
+        | 'cache'
+        | 'archive'
+        | 'ai'
+        | 'ai-conn'
     >('theme')
 
     let currentTheme = $derived(getActiveId())
@@ -115,7 +124,7 @@
         })
     }
 
-    /** @desc 设置栏目：按「界面 / 数据 / 助手」三组重新规划归类 */
+    /** @desc 设置栏目：按「界面 / 数据 / AI助手」三组重新规划归类 */
     const SETTING_TABS = [
         { group: '界面', key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
         { group: '界面', key: 'interaction', label: '交互相关', icon: 'mdi:gesture-tap' },
@@ -125,7 +134,8 @@
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
         { group: '数据', key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
-        { group: '助手', key: 'ai', label: '助手设置', icon: 'mdi:robot-outline' }
+        { group: 'AI助手', key: 'ai', label: '权限 / 提示词', icon: 'mdi:shield-account-outline' },
+        { group: 'AI助手', key: 'ai-conn', label: '接入配置', icon: 'mdi:connection' }
     ] as const
 
     /** @desc 按 group 聚合栏目（保持声明顺序） */
@@ -2143,264 +2153,270 @@
                                 {/each}
                             </div>
                         </div>
-                    {:else if tab === 'ai'}
-                        <!-- 助手设置 -->
+                    {:else if tab === 'ai' || tab === 'ai-conn'}
+                        <!-- AI 助手设置（权限 / 提示词 与 接入配置 分页） -->
                         <div>
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
                                 <Icon
-                                    icon="mdi:robot-outline"
+                                    icon={tab === 'ai-conn' ? 'mdi:connection' : 'mdi:shield-account-outline'}
                                     class="size-4 shrink-0"
                                     style="color: var(--theme-accent-text);"
                                 />
-                                助手设置
+                                {tab === 'ai-conn' ? '接入配置' : '权限 / 提示词'}
                             </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
-                                可配置多组「提供商 / 模型 / API Key」并一键切换，每组独立保存；API Key
-                                仅存本机。点击配置文件即可切换，点「编辑」打开独立弹窗修改
+                                {tab === 'ai-conn'
+                                    ? '可配置多组「提供商 / 模型 / API Key」并一键切换，每组独立保存；API Key 仅存本机。点击配置文件即可切换，点「编辑」打开独立弹窗修改'
+                                    : '控制 AI 助手的启用状态、危险操作权限与角色提示词；提示词为空时使用内置默认人设'}
                             </p>
                             <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
-                                <!-- 启用 AI 助手（独立开关，立即保存） -->
-                                <div
-                                    class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
-                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                >
-                                    <div class="min-w-0">
-                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                            >启用 AI 助手</span
-                                        >
-                                        <span class="mt-0.5 block text-[10px] text-(--theme-modal-text)/40">
-                                            开启后页面右下角显示 AI 助手悬浮窗；关闭后悬浮窗隐藏，所有 AI 功能不可用
-                                        </span>
-                                    </div>
-                                    <button
-                                        onclick={() => toggleAiEnabled()}
-                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
-                                        style="background: {getGenPrefs().enabled
-                                            ? 'var(--theme-accent-bg)'
-                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
-                                        title="点击切换"
+                                {#if tab === 'ai'}
+                                    <!-- 启用 AI 助手（独立开关，立即保存） -->
+                                    <div
+                                        class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
-                                        <span
-                                            class="absolute top-0.5 size-4 rounded-full transition-all"
-                                            style="left: {getGenPrefs().enabled
-                                                ? '18px'
-                                                : '2px'}; background: var(--theme-modal-bg);"
-                                        ></span>
-                                    </button>
-                                </div>
-
-                                <!-- 危险操作权限（独立设置，立即保存） -->
-                                <div
-                                    class="rounded-none border px-3 py-2.5"
-                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                >
-                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                        >危险操作权限</span
-                                    >
-                                    <p class="mt-1 mb-2 text-[10px] text-(--theme-modal-text)/40">
-                                        AI 执行危险操作（删除工程、清空数据等）时的确认策略；「批量」=
-                                        一次指令内的多次调用只询问一次
-                                    </p>
-                                    <div class="flex flex-col gap-1">
-                                        {#each DANGER_MODE_OPTIONS as opt}
-                                            {@const active = getGenPrefs().dangerMode === opt.value}
-                                            <button
-                                                onclick={() => setDangerMode(opt.value)}
-                                                class={[
-                                                    'flex items-center gap-2 rounded-none border px-2.5 py-1.5 text-left transition-colors',
-                                                    active
-                                                        ? 'border-(--theme-accent-bg)'
-                                                        : 'hover:bg-(--theme-modal-text)/5'
-                                                ].join(' ')}
-                                                style={active
-                                                    ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
-                                                    : 'border-color: var(--theme-divider-border);'}
+                                        <div class="min-w-0">
+                                            <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                >启用 AI 助手</span
                                             >
-                                                <Icon
-                                                    icon={active ? 'mdi:radiobox-marked' : 'mdi:radiobox-blank'}
-                                                    class={active
-                                                        ? 'size-3.5 shrink-0 text-(--theme-accent-text)'
-                                                        : 'size-3.5 shrink-0 text-(--theme-modal-text)/30'}
-                                                />
-                                                <span class="min-w-0 flex-1">
-                                                    <span class="block text-xs font-medium text-(--theme-modal-text)/80"
-                                                        >{opt.label}</span
-                                                    >
-                                                    <span class="block text-[10px] text-(--theme-modal-text)/40"
-                                                        >{opt.desc}</span
-                                                    >
-                                                </span>
-                                            </button>
-                                        {/each}
-                                    </div>
-                                </div>
-
-                                <!-- 配置文件设置 -->
-                                <div
-                                    class="rounded-none border px-3 py-2.5"
-                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                >
-                                    <div class="mb-2 flex items-center justify-between">
-                                        <span class="text-xs font-medium text-(--theme-modal-text)/70"
-                                            >配置文件设置</span
-                                        >
+                                            <span class="mt-0.5 block text-[10px] text-(--theme-modal-text)/40">
+                                                开启后页面右下角显示 AI 助手悬浮窗；关闭后悬浮窗隐藏，所有 AI 功能不可用
+                                            </span>
+                                        </div>
                                         <button
-                                            onclick={handleAddAiProfile}
-                                            class="inline-flex items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
-                                            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                            onclick={() => toggleAiEnabled()}
+                                            class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                            style="background: {getGenPrefs().enabled
+                                                ? 'var(--theme-accent-bg)'
+                                                : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                            title="点击切换"
                                         >
-                                            <Icon icon="mdi:plus" class="size-3" />
-                                            新建
+                                            <span
+                                                class="absolute top-0.5 size-4 rounded-full transition-all"
+                                                style="left: {getGenPrefs().enabled
+                                                    ? '18px'
+                                                    : '2px'}; background: var(--theme-modal-bg);"
+                                            ></span>
                                         </button>
                                     </div>
-                                    <p class="mb-2 text-[10px] text-(--theme-modal-text)/40">
-                                        点击配置文件即可切换；编辑、删除请使用右侧按钮
-                                    </p>
-                                    <div class="mb-1.5 flex flex-col gap-1">
-                                        {#each aiProfiles as p}
-                                            {@const isActive = p.id === aiActiveId}
-                                            <div
-                                                class="flex items-center gap-2 rounded-none border px-2.5 py-1.5 transition-colors"
-                                                style="border-color: {isActive
-                                                    ? 'color-mix(in srgb, var(--theme-accent-bg) 45%, transparent)'
-                                                    : 'var(--theme-divider-border)'}; background: color-mix(in srgb, var(--theme-accent-bg) {isActive
-                                                    ? '10%'
-                                                    : '0%'}, transparent);"
-                                            >
+
+                                    <!-- 危险操作权限（独立设置，立即保存） -->
+                                    <div
+                                        class="rounded-none border px-3 py-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >危险操作权限</span
+                                        >
+                                        <p class="mt-1 mb-2 text-[10px] text-(--theme-modal-text)/40">
+                                            AI 执行危险操作（删除工程、清空数据等）时的确认策略；「批量」=
+                                            一次指令内的多次调用只询问一次
+                                        </p>
+                                        <div class="flex flex-col gap-1">
+                                            {#each DANGER_MODE_OPTIONS as opt}
+                                                {@const active = getGenPrefs().dangerMode === opt.value}
                                                 <button
-                                                    onclick={() => handleSelectAiProfile(p.id)}
-                                                    class="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
-                                                    title="切换到该配置"
+                                                    onclick={() => setDangerMode(opt.value)}
+                                                    class={[
+                                                        'flex items-center gap-2 rounded-none border px-2.5 py-1.5 text-left transition-colors',
+                                                        active
+                                                            ? 'border-(--theme-accent-bg)'
+                                                            : 'hover:bg-(--theme-modal-text)/5'
+                                                    ].join(' ')}
+                                                    style={active
+                                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
+                                                        : 'border-color: var(--theme-divider-border);'}
                                                 >
-                                                    <span
-                                                        class="flex w-full items-center gap-1.5 text-xs font-medium text-(--theme-modal-text)"
-                                                    >
-                                                        <Icon
-                                                            icon={isActive
-                                                                ? 'mdi:radiobox-marked'
-                                                                : 'mdi:radiobox-blank'}
-                                                            class={isActive
-                                                                ? 'size-3.5 shrink-0 text-(--theme-accent-text)'
-                                                                : 'size-3.5 shrink-0 text-(--theme-modal-text)/30'}
-                                                        />
-                                                        <span class="truncate">{p.label}</span>
-                                                        {#if isActive}
-                                                            <span
-                                                                class="shrink-0 rounded-none bg-(--theme-accent-bg)/20 px-1 py-px text-[9px] text-(--theme-accent-text)"
-                                                                >当前</span
-                                                            >
-                                                        {/if}
-                                                    </span>
-                                                    <span
-                                                        class="w-full truncate pl-5 text-[10px] text-(--theme-modal-text)/40"
-                                                    >
-                                                        {p.model} · {p.baseUrl}
+                                                    <Icon
+                                                        icon={active ? 'mdi:radiobox-marked' : 'mdi:radiobox-blank'}
+                                                        class={active
+                                                            ? 'size-3.5 shrink-0 text-(--theme-accent-text)'
+                                                            : 'size-3.5 shrink-0 text-(--theme-modal-text)/30'}
+                                                    />
+                                                    <span class="min-w-0 flex-1">
+                                                        <span
+                                                            class="block text-xs font-medium text-(--theme-modal-text)/80"
+                                                            >{opt.label}</span
+                                                        >
+                                                        <span class="block text-[10px] text-(--theme-modal-text)/40"
+                                                            >{opt.desc}</span
+                                                        >
                                                     </span>
                                                 </button>
-                                                <div class="flex shrink-0 items-center gap-0.5">
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
+                                {#if tab === 'ai-conn'}
+                                    <!-- 配置文件设置 -->
+                                    <div
+                                        class="rounded-none border px-3 py-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <div class="mb-2 flex items-center justify-between">
+                                            <span class="text-xs font-medium text-(--theme-modal-text)/70"
+                                                >配置文件设置</span
+                                            >
+                                            <button
+                                                onclick={handleAddAiProfile}
+                                                class="inline-flex items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                            >
+                                                <Icon icon="mdi:plus" class="size-3" />
+                                                新建
+                                            </button>
+                                        </div>
+                                        <p class="mb-2 text-[10px] text-(--theme-modal-text)/40">
+                                            点击配置文件即可切换；编辑、删除请使用右侧按钮
+                                        </p>
+                                        <div class="mb-1.5 flex flex-col gap-1">
+                                            {#each aiProfiles as p}
+                                                {@const isActive = p.id === aiActiveId}
+                                                <div
+                                                    class="flex items-center gap-2 rounded-none border px-2.5 py-1.5 transition-colors"
+                                                    style="border-color: {isActive
+                                                        ? 'color-mix(in srgb, var(--theme-accent-bg) 45%, transparent)'
+                                                        : 'var(--theme-divider-border)'}; background: color-mix(in srgb, var(--theme-accent-bg) {isActive
+                                                        ? '10%'
+                                                        : '0%'}, transparent);"
+                                                >
                                                     <button
-                                                        onclick={() => (aiEditTarget = p)}
-                                                        class="rounded-none p-1 text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-accent-text)"
-                                                        title="编辑此配置"
+                                                        onclick={() => handleSelectAiProfile(p.id)}
+                                                        class="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
+                                                        title="切换到该配置"
                                                     >
-                                                        <Icon icon="mdi:pencil-outline" class="size-3.5" />
+                                                        <span
+                                                            class="flex w-full items-center gap-1.5 text-xs font-medium text-(--theme-modal-text)"
+                                                        >
+                                                            <Icon
+                                                                icon={isActive
+                                                                    ? 'mdi:radiobox-marked'
+                                                                    : 'mdi:radiobox-blank'}
+                                                                class={isActive
+                                                                    ? 'size-3.5 shrink-0 text-(--theme-accent-text)'
+                                                                    : 'size-3.5 shrink-0 text-(--theme-modal-text)/30'}
+                                                            />
+                                                            <span class="truncate">{p.label}</span>
+                                                            {#if isActive}
+                                                                <span
+                                                                    class="shrink-0 rounded-none bg-(--theme-accent-bg)/20 px-1 py-px text-[9px] text-(--theme-accent-text)"
+                                                                    >当前</span
+                                                                >
+                                                            {/if}
+                                                        </span>
+                                                        <span
+                                                            class="w-full truncate pl-5 text-[10px] text-(--theme-modal-text)/40"
+                                                        >
+                                                            {p.model} · {p.baseUrl}
+                                                        </span>
                                                     </button>
-                                                    <button
-                                                        onclick={() => handleDeleteAiProfile(p)}
-                                                        class="rounded-none p-1 text-(--theme-modal-text)/35 transition-colors hover:text-red-400"
-                                                        title="删除此配置"
-                                                    >
-                                                        <Icon icon="mdi:trash-can-outline" class="size-3.5" />
-                                                    </button>
+                                                    <div class="flex shrink-0 items-center gap-0.5">
+                                                        <button
+                                                            onclick={() => (aiEditTarget = p)}
+                                                            class="rounded-none p-1 text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-accent-text)"
+                                                            title="编辑此配置"
+                                                        >
+                                                            <Icon icon="mdi:pencil-outline" class="size-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onclick={() => handleDeleteAiProfile(p)}
+                                                            class="rounded-none p-1 text-(--theme-modal-text)/35 transition-colors hover:text-red-400"
+                                                            title="删除此配置"
+                                                        >
+                                                            <Icon icon="mdi:trash-can-outline" class="size-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        {/each}
-                                    </div>
-                                </div>
-
-                                <!-- 提示词设置 -->
-                                <div
-                                    class="rounded-none border px-3 py-2.5"
-                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                >
-                                    <span class="text-xs font-medium text-(--theme-modal-text)/70">提示词设置</span>
-                                    <p class="mb-2 mt-1 text-[10px] text-(--theme-modal-text)/40">
-                                        命名规则与人设提示词，与模型配置分开保存
-                                    </p>
-                                    <div class="flex flex-col gap-1">
-                                        <div
-                                            class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
-                                            style="border-color: var(--theme-divider-border);"
-                                        >
-                                            <div class="min-w-0 flex-1">
-                                                <span class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                                    >Buff 命名规则</span
-                                                >
-                                                <span
-                                                    class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
-                                                >
-                                                    生成 Buff 时的命名规范；清空则每次由 AI 询问
-                                                </span>
-                                            </div>
-                                            <button
-                                                onclick={() => (promptEditKind = 'naming')}
-                                                class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
-                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                                            >
-                                                <Icon icon="mdi:pencil-outline" class="size-3" />
-                                                编辑
-                                            </button>
-                                        </div>
-                                        <div
-                                            class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
-                                            style="border-color: var(--theme-divider-border);"
-                                        >
-                                            <div class="min-w-0 flex-1">
-                                                <span class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                                    >黑话词典</span
-                                                >
-                                                <span
-                                                    class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
-                                                >
-                                                    官方/生僻叫法 → 玩家黑话；
-                                                </span>
-                                            </div>
-                                            <button
-                                                onclick={() => (promptEditKind = 'slang')}
-                                                class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
-                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                                            >
-                                                <Icon icon="mdi:pencil-outline" class="size-3" />
-                                                编辑
-                                            </button>
-                                        </div>
-                                        <div
-                                            class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
-                                            style="border-color: var(--theme-divider-border);"
-                                        >
-                                            <div class="min-w-0 flex-1">
-                                                <span class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                                    >人设提示词</span
-                                                >
-                                                <span
-                                                    class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
-                                                >
-                                                    AI 助手的角色与行为规则（system prompt）
-                                                </span>
-                                            </div>
-                                            <button
-                                                onclick={() => (promptEditKind = 'persona')}
-                                                class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
-                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                                            >
-                                                <Icon icon="mdi:pencil-outline" class="size-3" />
-                                                编辑
-                                            </button>
+                                            {/each}
                                         </div>
                                     </div>
-                                </div>
+                                {/if}
+                                {#if tab === 'ai'}
+                                    <!-- 提示词设置 -->
+                                    <div
+                                        class="rounded-none border px-3 py-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <span class="text-xs font-medium text-(--theme-modal-text)/70">提示词设置</span>
+                                        <p class="mb-2 mt-1 text-[10px] text-(--theme-modal-text)/40">
+                                            命名规则与人设提示词，与模型配置分开保存
+                                        </p>
+                                        <div class="flex flex-col gap-1">
+                                            <div
+                                                class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                <div class="min-w-0 flex-1">
+                                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                        >Buff 命名规则</span
+                                                    >
+                                                    <span
+                                                        class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
+                                                    >
+                                                        生成 Buff 时的命名规范；清空则每次由 AI 询问
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onclick={() => (promptEditKind = 'naming')}
+                                                    class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                                >
+                                                    <Icon icon="mdi:pencil-outline" class="size-3" />
+                                                    编辑
+                                                </button>
+                                            </div>
+                                            <div
+                                                class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                <div class="min-w-0 flex-1">
+                                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                        >黑话词典</span
+                                                    >
+                                                    <span
+                                                        class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
+                                                    >
+                                                        官方/生僻叫法 → 玩家黑话；
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onclick={() => (promptEditKind = 'slang')}
+                                                    class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                                >
+                                                    <Icon icon="mdi:pencil-outline" class="size-3" />
+                                                    编辑
+                                                </button>
+                                            </div>
+                                            <div
+                                                class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
+                                                style="border-color: var(--theme-divider-border);"
+                                            >
+                                                <div class="min-w-0 flex-1">
+                                                    <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                                        >人设提示词</span
+                                                    >
+                                                    <span
+                                                        class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
+                                                    >
+                                                        AI 助手的角色与行为规则（system prompt）
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onclick={() => (promptEditKind = 'persona')}
+                                                    class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                                >
+                                                    <Icon icon="mdi:pencil-outline" class="size-3" />
+                                                    编辑
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {/if}
                             </div>
                         </div>
                     {/if}
