@@ -79,7 +79,7 @@
                     style="opacity: 0.85;"
                 >
                     <Icon icon="mdi:star-four-points-outline" class="size-3 shrink-0" />
-                    鸣潮社区工具箱
+                    Wuthering Waves Coconut Toolbox
                 </span>
                 <span class="text-[10px] uppercase tracking-[0.28em] text-(--theme-muted-text)">
                     {isMono ? 'Mono Edition' : 'Vol. 1 — 排轴 / 拉表 / 配装 / 计算'}

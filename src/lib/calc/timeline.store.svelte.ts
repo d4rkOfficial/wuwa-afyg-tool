@@ -35,7 +35,7 @@ import {
 import { getEffectMultiplier, getEffectBurstMultiplier } from '$lib/consts/tune-data'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { addToast } from '$lib/data/toast.svelte'
-import { setCharElements } from '$lib/data/char-elements.svelte'
+import { getCharElementMap as getSharedCharElementMap, setCharElements } from '$lib/data/char-elements.svelte'
 import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 import { getInputShortcutId } from '$lib/data/shortcuts.svelte'
 import { registerDragCancel } from '$lib/utils/drag-guard'
@@ -73,7 +73,6 @@ let _team = $state<[CharSlot, CharSlot, CharSlot]>([{}, {}, {}] as unknown as [C
 let _uiBtnIcons = $state<[string, string][]>([])
 let _charIconMap = $state<Record<string, string>>({})
 let _elementIconMap = $state<Record<string, string>>({})
-let _charElementMap = $state<Record<string, string>>({})
 let _charWeaponTypeMap = $state<Record<string, string>>({})
 
 /** @desc 上次 init 的轻量键（数据/队伍/锁定未变时幂等短路，避免 save 回写触发全量重初始化） */
@@ -190,7 +189,6 @@ async function loadCharElements() {
             skillsMap[names[i]] = buildSkillGroups(r.value.skills)
         }
     }
-    _charElementMap = elemMap
     setCharElements(elemMap)
     _charWeaponTypeMap = weapMap
     Object.assign(_skillCache, skillsMap)
@@ -906,11 +904,11 @@ export function elementColor(name: string): string {
 }
 
 function elementNameForChar(slot: CharSlot): string {
-    return _charElementMap[slot.character ?? ''] ?? ''
+    return getSharedCharElementMap()[slot.character ?? ''] ?? ''
 }
 
 export function getCharElementMap(): Record<string, string> {
-    return _charElementMap
+    return getSharedCharElementMap()
 }
 
 export function getCharWeaponTypeMap(): Record<string, string> {
@@ -2578,7 +2576,7 @@ function buildDamageList() {
                                 baseType: respBase,
                                 time,
                                 x,
-                                element: _charElementMap[r] ?? ''
+                                element: getSharedCharElementMap()[r] ?? ''
                             })
                         }
                     } else {

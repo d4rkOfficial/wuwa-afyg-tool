@@ -1,6 +1,12 @@
 import { getCharacterInfo, getCharacterList } from '$lib/api/data-cache'
+import { STATIC_CHAR_ELEMENTS } from '$lib/consts/char-elements-static'
 
-let _charElementMap = $state<Record<string, string>>(loadCache())
+/**
+ * @desc 角色元素图（唯一数据源）。
+ * 首帧 = 静态表 + 本地缓存，保证任何角色（含工坊预览、导入工程里不在配队中的角色）立刻有颜色；
+ * 运行期再用名录/详情接口的结果覆盖更新。
+ */
+let _charElementMap = $state<Record<string, string>>({ ...STATIC_CHAR_ELEMENTS, ...loadCache() })
 
 function loadCache(): Record<string, string> {
     try {
