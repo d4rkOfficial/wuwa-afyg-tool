@@ -371,6 +371,16 @@ function estimateInnerWidth(key: string, desc: string, chips = 0): number {
 /** @desc 块宽估算缓存（key+desc → width；formatTimeline 每块调用，避免 O(N²) 同款查找） */
 const _estOpWidthCache = new Map<string, number>()
 
+/**
+ * @desc 失效块宽缓存（DOM 实测值 + 同款估算值）。
+ * 备注/键名等内容改动后，`_blockWidths[id]` 里存的仍是**旧宽度**（元素宽度由排版反推，形成循环），
+ * 若不失效，格式化会拿旧宽度当输入 → 宽度看起来没变化。清空后按当前内容重新估算，并等 DOM 重新测量回填。
+ */
+export function invalidateBlockWidths() {
+    _blockWidths = {}
+    _estOpWidthCache.clear()
+}
+
 function estimateOpBlockWidth(block: OpBlock): number {
     if (_blockWidths[block.id]) return _blockWidths[block.id]
     const cacheKey = block.key + '\u0000' + block.desc + '\u0000' + block.intro + block.switchback
@@ -1983,6 +1993,8 @@ export function reflowTrack(trackIndex: number) {
 
 export function formatTimeline() {
     if (!assertUnlocked()) return
+    // 先刷新（失效块宽缓存）再排版：否则编辑备注后拿到的是旧实测宽度，格式化会「看起来没生效」
+    invalidateBlockWidths()
     const lastTrackIdx = getTRACKS().length - 1
     const items = _opBlocks
         .filter((b) => b.trackIndex < lastTrackIdx)
