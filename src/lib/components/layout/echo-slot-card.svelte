@@ -3,7 +3,7 @@
      * @desc 单个声骸词条卡片（工程-词条配置页与词条集的方案编辑器共用）：
      * cost 水印 + cost 选择 + 主词条按钮 + 副词条（档位滑块，可选拖动排序 / 逐个移除）。
      * 数据由父组件持有，本组件只渲染与回调，不直接读写 store。
-     * costTabsAside=true 时改为左右结构（cost 页签竖排在卡片左侧、文本 4c/3c/1c），工程-词条配置页使用；
+     * costTabsAside=true 时改为左右结构（cost 页签竖排在卡片左侧、文本 4C/3C/1C，左侧底部是无边框图标式重置），工程-词条配置页使用；
      * 不传（默认）则维持上下结构 + 「4 COST」文案，词条集方案编辑器样式不变。
      */
     import Icon from '@iconify/svelte'
@@ -110,11 +110,11 @@
             disabled={c !== slot.cost && otherCost + c > 12}
             class={[
                 'rounded-none border text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-30',
-                costTabsAside ? 'h-7 w-full px-0.5' : 'h-6 min-w-0 flex-1 px-1',
+                costTabsAside ? 'flex size-8 shrink-0 items-center justify-center' : 'h-6 min-w-0 flex-1 px-1',
                 slot.cost === c
                     ? costBtnCls(slot.cost)
                     : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
-            ].join(' ')}>{costTabsAside ? `${c}c` : `${c} COST`}</button
+            ].join(' ')}>{costTabsAside ? `${c}C` : `${c} COST`}</button
         >
     {/each}
 {/snippet}
@@ -145,11 +145,16 @@
     </div>
 
     <!-- Substats -->
-    <div>
-        <span
-            class="mb-1 flex items-center gap-1.5 border-t pt-2 text-[10px] font-black tracking-[0.18em] text-(--theme-modal-text)/40"
-            style="border-color: var(--theme-divider-border);">副词条 ({slot.substats.length}/5)</span
-        >
+    <div
+        class={costTabsAside ? 'border-t pt-2' : ''}
+        style={costTabsAside ? 'border-color: var(--theme-divider-border);' : ''}
+    >
+        {#if !costTabsAside}
+            <span
+                class="mb-1 flex items-center gap-1.5 border-t pt-2 text-[10px] font-black tracking-[0.18em] text-(--theme-modal-text)/40"
+                style="border-color: var(--theme-divider-border);">副词条 ({slot.substats.length}/5)</span
+            >
+        {/if}
         <div class="space-y-1">
             {#each slot.substats as sub, idx (sub.type)}
                 {@const opt = SUBSTAT_OPTIONS.find((o) => o.label === sub.type)}
@@ -247,14 +252,16 @@
                         选择副词条
                     </button>
                 {/if}
-                <button
-                    onclick={onclearsubstats}
-                    class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
-                    title="清空该声骸的副词条"
-                >
-                    <Icon icon="mdi:refresh" class="size-3" />
-                    重置副词条
-                </button>
+                {#if !costTabsAside}
+                    <button
+                        onclick={onclearsubstats}
+                        class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
+                        title="清空该声骸的副词条"
+                    >
+                        <Icon icon="mdi:refresh" class="size-3" />
+                        重置副词条
+                    </button>
+                {/if}
             </div>
         {:else}
             <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -285,10 +292,23 @@
     style="border-color: var(--theme-divider-border); {styleProp || ''}"
 >
     {#if costTabsAside}
-        <!-- 左右结构：cost 页签竖排在卡片左侧，右侧为主词条 + 副词条 -->
-        <div class="relative z-1 flex items-stretch gap-3">
-            <div class="flex w-10 shrink-0 flex-col gap-1">{@render costTabs()}</div>
-            <div class="relative min-w-0 flex-1">
+        <!-- 左右结构：左侧竖排正方形 cost 页签（4C/3C/1C）+ 左下角无边框重置图标（上方一条分界线）；右侧为主词条 + 副词条；左右之间有分割线 -->
+        <div class="relative z-1 flex items-stretch">
+            <div class="flex shrink-0 flex-col items-center gap-1.5 border-r border-(--theme-divider-border) pr-2.5">
+                {@render costTabs()}
+                {#if slot.substats.length > 0}
+                    <div class="mt-auto flex flex-col items-center border-t border-(--theme-divider-border) pt-1.5">
+                        <button
+                            onclick={onclearsubstats}
+                            class="flex size-8 cursor-pointer items-center justify-center rounded-none text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                            title="清空该声骸的副词条"
+                        >
+                            <Icon icon="mdi:refresh" class="size-4" />
+                        </button>
+                    </div>
+                {/if}
+            </div>
+            <div class="relative min-w-0 flex-1 pl-3">
                 {@render costWatermark()}
                 <div class="relative z-1">{@render statAndSubstats()}</div>
             </div>
