@@ -2,7 +2,6 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import {
         getBuffEntities,
@@ -10,7 +9,6 @@
         getBuffLibraryError,
         fetchBuffSetsFromShare,
         deleteBuffEntity,
-        clearBuffLibrary,
         loadBuffLibrary,
         setEntitySource,
         BUFF_CATEGORY_ORDER,
@@ -230,13 +228,6 @@
         confirmDelete = entity
     }
 
-    function handleClear() {
-        clearBuffLibrary()
-        addToast('已清空本地 buff 预设', 'success')
-    }
-
-    let showClearConfirm = $state(false)
-
     function iconFallback(entityType: BuffEntityType): string {
         if (entityType === 'character') return '/icons/placeholder-character.svg'
         if (entityType === 'weapon') return '/icons/placeholder-weapon.svg'
@@ -275,22 +266,6 @@
                     />
                     从工坊同步
                 </button>
-                {#if entities.length > 0}
-                    <button
-                        onclick={() => {
-                            if (getConfirmDeletes()) {
-                                showClearConfirm = true
-                            } else {
-                                void handleClear()
-                            }
-                        }}
-                        class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[11px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
-                        style="border-color: var(--theme-divider-border);"
-                    >
-                        <Icon icon="mdi:delete-sweep-outline" class="size-3.5" />
-                        清空
-                    </button>
-                {/if}
             </div>
         </div>
 
@@ -532,19 +507,6 @@
             </div>
         </Modal>
     {/if}
-
-    <ConfirmDeleteModal
-        open={showClearConfirm}
-        title="清空 Buff 集"
-        confirmText="我知道这会删除所有Buff集"
-        confirmLabel="确认清空"
-        hintSuffix="以确认清空："
-        onclose={() => (showClearConfirm = false)}
-        onconfirm={() => {
-            showClearConfirm = false
-            handleClear()
-        }}
-    />
 </Modal>
 
 {#if editTarget}

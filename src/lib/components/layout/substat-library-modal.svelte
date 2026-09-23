@@ -299,14 +299,6 @@
             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);">一键套用</button
         >
     {/if}
-    {#if standardOriginFor(character) !== '自动生成'}
-        <button
-            onclick={() => resetStandard(character)}
-            class="rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-            style="border-color: var(--theme-divider-border);"
-            title="清掉本地/工坊保存的方案，回落到工坊同步或自动生成">重置</button
-        >
-    {/if}
 {/snippet}
 
 {#snippet customActions(character: string, plan: SubstatPlan)}
@@ -325,19 +317,6 @@
             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);">套用</button
         >
     {/if}
-    <button
-        onclick={() => {
-            renameId = plan.id
-            renameText = plan.name
-        }}
-        class="rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-        style="border-color: var(--theme-divider-border);">重命名</button
-    >
-    <button
-        onclick={() => removePlan(plan)}
-        class="rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
-        style="border-color: var(--theme-divider-border);">删除</button
-    >
 {/snippet}
 
 <Modal
@@ -440,9 +419,29 @@
     {:else}
         <!-- ── 主页版：全角色管理（查看/维护方案，不套用；编辑在独立弹窗里） ── -->
         <div class="flex h-full min-h-0 flex-col">
-            <p class="mb-3 shrink-0 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
-                管理各角色的标准14词条与自定义声骸方案；进入工程后可一键套用到配队角色
-            </p>
+            <div
+                class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b pb-2.5"
+                style="border-color: var(--theme-divider-border);"
+            >
+                <p class="text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                    管理各角色的标准14词条与自定义声骸方案；进入工程后可一键套用到配队角色
+                </p>
+                <div class="flex items-center gap-2">
+                    <button
+                        onclick={syncFromShare}
+                        disabled={syncing}
+                        class="inline-flex items-center gap-1 rounded-none px-3 py-1.5 text-[11px] font-medium transition-all hover:brightness-125 disabled:opacity-40"
+                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
+                        title="从工坊同步全部角色的标准14词条集"
+                    >
+                        <Icon
+                            icon={syncing ? 'mdi:loading' : 'mdi:download'}
+                            class={syncing ? 'size-3.5 animate-spin' : 'size-3.5'}
+                        />
+                        从工坊同步
+                    </button>
+                </div>
+            </div>
 
             <div class="flex min-h-0 flex-1 gap-4">
                 <div class="flex w-72 shrink-0 flex-col gap-2">
@@ -573,19 +572,6 @@
                                             class="rounded-none border border-(--theme-accent-bg) px-2.5 py-1 text-[10px] text-(--theme-accent-text) transition-colors hover:bg-(--theme-accent-bg)/10"
                                             title="修改该角色的标准14词条（保存时需恰好 14 条副词条）">修改</button
                                         >
-                                        <button
-                                            onclick={syncFromShare}
-                                            disabled={syncing}
-                                            class="inline-flex items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] transition-colors disabled:opacity-40"
-                                            style="border-color: var(--theme-divider-border); color: var(--theme-accent-text);"
-                                            title="从工坊同步全部角色的标准14词条集"
-                                        >
-                                            <Icon
-                                                icon={syncing ? 'mdi:loading' : 'mdi:cloud-download-outline'}
-                                                class={syncing ? 'size-3 animate-spin' : 'size-3'}
-                                            />
-                                            从工坊同步
-                                        </button>
                                         {#if standardOriginFor(selected) !== '自动生成'}
                                             <button
                                                 onclick={() => resetStandard(selected)}
