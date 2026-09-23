@@ -70,6 +70,18 @@
     /** @desc 当前拉表视图：铺开（spread）/ 下拉（dropdown） */
     let calcViewMode = $derived(getCalcViewMode())
 
+    /** @desc 先切进来再加载：进入本页/切换视图后，先让出一帧把页面（页签、容器）画出来，
+     *  再挂载重表——否则点击「拉表」的那一帧会被表格首屏渲染占满，感官上像是点了没反应。 */
+    let viewReady = $state(false)
+    $effect(() => {
+        calcViewMode
+        viewReady = false
+        const raf = requestAnimationFrame(() => {
+            viewReady = true
+        })
+        return () => cancelAnimationFrame(raf)
+    })
+
     /** @desc 关闭 Buff 弹窗并持久化最新状态 */
     function handleCloseBuffModal() {
         setShowBuffModal(false)
@@ -100,7 +112,10 @@
     <BuffModal open={showBuffModal} {team} onclose={handleCloseBuffModal} />
 
     <!-- @desc 视图切换：spread → 铺开表（传绑定映射/条件配置/回调用）；否则 → 下拉表（多传 buffDiffMode 差异模式） -->
-    {#if calcViewMode === 'spread'}
+    {#if !viewReady}
+        <!-- 让出的一帧：页面已可见，重表还在路上（首屏渲染被推迟到下一帧，避免点击后整帧卡住） -->
+        <div class="flex flex-1 items-center justify-center text-xs text-(--theme-modal-text)/40">加载中…</div>
+    {:else if calcViewMode === 'spread'}
         <SpreadTable
             {team}
             {damageEntries}

@@ -10,6 +10,7 @@
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
     import { aggregateDirectDamageByType } from '$lib/calc/utils'
     import { COMPARISON_PALETTE, type ComparisonEligibility } from '$lib/calc/comparison'
+    import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import type { ComponentsProps } from '$lib/types'
 
     interface TeamConfig {
@@ -710,9 +711,12 @@
                         <span class="tabular-nums">总时长 {totalDur.toFixed(1)}s</span>
                     {/if}
                 </div>
+                <!-- 返回入口：关闭按钮设在右上角时靠最右（与其它弹窗右侧控件一致），左上角模式则跟随标题行自然排布 -->
                 <button
                     onclick={() => onBack(points)}
-                    class="inline-flex items-center gap-1 rounded-none p-1.5 text-xs transition-colors hover:opacity-70"
+                    class="{getModalClosePosition() === 'top-left'
+                        ? ''
+                        : 'ml-auto '}inline-flex items-center gap-1 rounded-none p-1.5 text-xs transition-colors hover:opacity-70"
                     style="color: var(--theme-accent-text);"
                     title="返回数据分析"
                 >
