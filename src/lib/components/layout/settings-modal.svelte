@@ -1326,12 +1326,12 @@
                             </div>
                             <div class="mt-3 flex items-center gap-2">
                                 <button
-                                    onclick={() => (tab = 'interaction')}
+                                    onclick={() => (tab = 'shortcuts')}
                                     class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-accent-text) transition-colors hover:brightness-125"
                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);"
-                                    title="跳转到「交互相关」页配置快速排轴输入键与界面快捷键"
+                                    title="跳转到「快捷键」页配置界面快捷键"
                                 >
-                                    <Icon icon="mdi:tune-variant" class="size-3.5" />
+                                    <Icon icon="mdi:keyboard-settings-outline" class="size-3.5" />
                                     界面快捷键设置
                                     <Icon icon="mdi:arrow-right" class="size-3" />
                                 </button>
@@ -1394,7 +1394,7 @@
                                     class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
                                     <Icon
-                                        icon="mdi:toolbar"
+                                        icon="mdi:widgets-outline"
                                         class="size-4 shrink-0"
                                         style="color: var(--theme-accent-text);"
                                     />
@@ -1788,7 +1788,7 @@
                                 {#each providerOptions as opt}
                                     <div
                                         class={[
-                                            'flex cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
+                                            'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
                                             opt.id === activeProviderId
                                                 ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
                                                 : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
@@ -1814,7 +1814,7 @@
                                     </div>
                                 {/each}
                             </div>
-                            <div class="mt-3">
+                            <div class="mt-3 mb-2">
                                 <button
                                     onclick={handleResetProvider}
                                     class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
@@ -1849,7 +1849,7 @@
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
                                         class={[
-                                            'flex cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
+                                            'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
                                             inst.id === workshopActiveId
                                                 ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
                                                 : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
@@ -1934,19 +1934,44 @@
                                     <span class="text-xs text-(--theme-modal-text)/40">暂无归档的工程</span>
                                 </div>
                             {:else}
-                                <div class="columns-1 gap-3 md:columns-2 xl:columns-3">
+                                <div class="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
                                     {#each archivedProjects as p (p.id)}
+                                        {@const avatars = p.team.map((s) =>
+                                            s.character ? charIconMap[s.character] : undefined
+                                        )}
                                         <div
-                                            class="group relative mb-3 break-inside-avoid overflow-hidden border p-3.5 transition-colors hover:bg-(--theme-card-bg-focused)"
-                                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                            class="group relative overflow-hidden border-2 p-4 transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-card-bg-focused)"
+                                            style="border-color: var(--theme-card-border); background: var(--theme-card-bg);"
                                         >
-                                            <span
-                                                class="pointer-events-none absolute -right-1 -top-3 select-none text-[4.5rem] font-black leading-none text-(--theme-accent-text) opacity-[0.06]"
-                                                >{p.name.slice(0, 1)}</span
-                                            >
-                                            <div class="relative flex items-baseline gap-2">
+                                            <!-- 角色头像叠底（右下：1号大→3号小，向右递减；半透明 + 边缘淡出） -->
+                                            {#if avatars[2]}
+                                                <div
+                                                    class="pointer-events-none absolute -bottom-3 right-36 z-0 size-16 opacity-40"
+                                                    style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
+                                                >
+                                                    <img src={avatars[2]} alt="" class="size-full object-cover" />
+                                                </div>
+                                            {/if}
+                                            {#if avatars[1]}
+                                                <div
+                                                    class="pointer-events-none absolute -bottom-3 right-[4.5rem] z-0 size-24 opacity-40"
+                                                    style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
+                                                >
+                                                    <img src={avatars[1]} alt="" class="size-full object-cover" />
+                                                </div>
+                                            {/if}
+                                            {#if avatars[0]}
+                                                <div
+                                                    class="pointer-events-none absolute -bottom-3 right-0 z-0 size-32 opacity-40"
+                                                    style="-webkit-mask-image: linear-gradient(to bottom, transparent, #000 40%); mask-image: linear-gradient(to bottom, transparent, #000 40%);"
+                                                >
+                                                    <img src={avatars[0]} alt="" class="size-full object-cover" />
+                                                </div>
+                                            {/if}
+
+                                            <div class="relative z-10 flex items-baseline gap-2">
                                                 <h4
-                                                    class="min-w-0 flex-1 truncate text-lg font-black leading-tight tracking-tight text-(--theme-modal-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
+                                                    class="min-w-0 flex-1 truncate text-base font-black leading-tight tracking-tight text-(--theme-modal-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
                                                 >
                                                     {p.name}
                                                 </h4>
@@ -1958,79 +1983,75 @@
 
                                             <!-- 工程信息：三角色配装（元素色环 / 武器 / 首位声骸 / 套装 图标）-->
                                             <div
-                                                class="relative mt-2.5 space-y-2 border-t pt-2.5"
+                                                class="relative z-10 mt-3 flex flex-col gap-1.5 border-t pt-3"
                                                 style="border-color: var(--theme-divider-border);"
                                             >
                                                 {#each p.team as slot}
                                                     {#if slot.character}
-                                                        <div class="flex items-center gap-2">
+                                                        <div class="flex flex-wrap items-center gap-1.5 text-[10px]">
                                                             <span
-                                                                class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full"
-                                                                style="box-shadow: 0 0 0 2px {elementColor(
+                                                                class="inline-flex items-center gap-1 border px-1.5 py-0.5 font-bold"
+                                                                style="border-color: color-mix(in srgb, {elementColor(
                                                                     slot.character
-                                                                )};"
+                                                                )} 45%, transparent); color: {elementColor(
+                                                                    slot.character
+                                                                )}; background: color-mix(in srgb, {elementColor(
+                                                                    slot.character
+                                                                )} 12%, transparent);"
                                                             >
                                                                 {#if charIconMap[slot.character]}
                                                                     <img
                                                                         src={charIconMap[slot.character]}
-                                                                        alt={slot.character}
-                                                                        class="size-full object-cover"
+                                                                        alt=""
+                                                                        class="size-3.5 rounded-full object-cover"
                                                                     />
                                                                 {/if}
+                                                                {slot.character}
                                                             </span>
-                                                            <span
-                                                                class="truncate text-xs font-bold"
-                                                                style="color: {elementColor(slot.character)};"
-                                                                >{slot.character}</span
-                                                            >
                                                             {#if slot.weapon}
                                                                 <span
-                                                                    class="ml-auto flex min-w-0 shrink items-center gap-1 text-[10px] text-(--theme-modal-text)/55"
+                                                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
+                                                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                                                 >
                                                                     {#if weaponIcons[slot.weapon]}
                                                                         <img
                                                                             src={weaponIcons[slot.weapon]}
                                                                             alt=""
-                                                                            class="size-4 shrink-0 object-contain"
+                                                                            class="size-3.5 object-contain"
                                                                         />
                                                                     {/if}
-                                                                    <span class="max-w-28 truncate">{slot.weapon}</span>
+                                                                    {slot.weapon}
                                                                 </span>
                                                             {/if}
-                                                        </div>
-                                                        <div class="flex flex-wrap items-center gap-1.5 pl-9">
                                                             {#if slot.echoes?.[0]?.name}
                                                                 <span
-                                                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/60"
-                                                                    style="border-color: var(--theme-divider-border);"
+                                                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
+                                                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                                                     title="首位声骸"
                                                                 >
                                                                     {#if echoIcons[slot.echoes[0].name]}
                                                                         <img
                                                                             src={echoIcons[slot.echoes[0].name]}
                                                                             alt=""
-                                                                            class="size-3.5 shrink-0 rounded-full object-cover"
+                                                                            class="size-3.5 rounded-full object-cover"
                                                                         />
                                                                     {/if}
-                                                                    <span class="max-w-24 truncate"
-                                                                        >{slot.echoes[0].name}</span
-                                                                    >
+                                                                    {slot.echoes[0].name}
                                                                 </span>
                                                             {/if}
                                                             {#each slot.triggerSets as ts}
                                                                 <span
-                                                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/60"
-                                                                    style="border-color: var(--theme-divider-border);"
+                                                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
+                                                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                                                 >
                                                                     {#if setIcons[ts.name]}
                                                                         <img
                                                                             src={setIcons[ts.name]}
                                                                             alt=""
-                                                                            class="size-3.5 shrink-0 rounded-full object-cover"
+                                                                            class="size-3.5 rounded-full object-cover"
                                                                         />
                                                                     {/if}
-                                                                    <span class="truncate">{ts.name} {ts.pieces}件</span
-                                                                    >
+                                                                    {ts.pieces}件
                                                                 </span>
                                                             {/each}
                                                         </div>
@@ -2039,7 +2060,7 @@
                                             </div>
 
                                             <div
-                                                class="relative mt-3 flex flex-wrap items-center gap-1.5 border-t pt-2.5"
+                                                class="relative z-10 mt-3 flex flex-wrap items-center gap-1.5 border-t pt-2.5"
                                                 style="border-color: var(--theme-divider-border);"
                                             >
                                                 <button
