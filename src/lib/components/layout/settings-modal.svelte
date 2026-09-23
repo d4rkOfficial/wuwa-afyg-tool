@@ -1991,33 +1991,18 @@
                                                 >
                                             </div>
 
-                                            <!-- 工程信息：三角色配装（元素色环 / 武器 / 首位声骸 / 套装 图标）-->
+                                            <!-- 工程信息：三角色配装（元素色条 / 武器 / 首位声骸 / 套装 图标）-->
                                             <div
                                                 class="relative z-10 mt-3 flex flex-col gap-1.5 border-t pt-3"
                                                 style="border-color: var(--theme-divider-border);"
                                             >
                                                 {#each p.team as slot}
                                                     {#if slot.character}
-                                                        <div class="flex flex-wrap items-center gap-1.5 text-[10px]">
-                                                            <span
-                                                                class="inline-flex items-center gap-1 border px-1.5 py-0.5 font-bold"
-                                                                style="border-color: color-mix(in srgb, {elementColor(
-                                                                    slot.character
-                                                                )} 45%, transparent); color: {elementColor(
-                                                                    slot.character
-                                                                )}; background: color-mix(in srgb, {elementColor(
-                                                                    slot.character
-                                                                )} 12%, transparent);"
-                                                            >
-                                                                {#if charIconMap[slot.character]}
-                                                                    <img
-                                                                        src={charIconMap[slot.character]}
-                                                                        alt=""
-                                                                        class="size-3.5 rounded-full object-cover"
-                                                                    />
-                                                                {/if}
-                                                                {slot.character}
-                                                            </span>
+                                                        <div
+                                                            class="flex flex-wrap items-center gap-1.5 border-l-2 pl-2 text-[10px]"
+                                                            style="border-color: {elementColor(slot.character)};"
+                                                            title={slot.character}
+                                                        >
                                                             {#if slot.weapon}
                                                                 <span
                                                                     class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
