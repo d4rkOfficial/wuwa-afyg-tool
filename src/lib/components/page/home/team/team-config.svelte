@@ -293,8 +293,9 @@
             {@const charData = characterMap.get(slot.character ?? '')}
             {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
+                data-sf="card"
                 class="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border p-6"
-                style="background: var(--theme-card-bg); border-color: var(--theme-divider-border)"
+                style="border-color: var(--theme-divider-border)"
             >
                 <div class="pointer-events-none absolute inset-0 flex select-none items-center justify-center">
                     <span class="text-[280px] font-black leading-none opacity-[0.06] text-(--theme-accent-text)"

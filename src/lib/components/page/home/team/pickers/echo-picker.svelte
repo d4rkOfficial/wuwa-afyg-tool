@@ -59,7 +59,7 @@
 
     function itemClass(e: Echo): string {
         const base =
-            'flex w-[110px] flex-col items-center gap-1.5 rounded-none border border-(--theme-divider-border) bg-(--theme-input-bg) p-3 transition-colors cursor-pointer'
+            'flex w-[110px] flex-col items-center gap-1.5 rounded-none border border-(--theme-divider-border) p-3 transition-colors cursor-pointer'
         if (isSelected(e)) {
             return (
                 base +
@@ -128,6 +128,8 @@
                                     }}
                                     role="button"
                                     tabindex="0"
+                                    data-sf="card"
+                                    style="--sf-base: var(--theme-input-bg)"
                                     class={itemClass(e)}
                                 >
                                     <div class="size-14 overflow-hidden rounded-none bg-(--theme-modal-text)/10 p-1">
@@ -177,6 +179,8 @@
                                             }}
                                             role="button"
                                             tabindex="0"
+                                            data-sf="card"
+                                            style="--sf-base: var(--theme-input-bg)"
                                             class={itemClass(e)}
                                         >
                                             <div

@@ -235,8 +235,9 @@
     {:else}
         <!-- 角色头 -->
         <div
+            data-sf="card"
             class="mt-4 flex items-center gap-3 rounded-none border p-3"
-            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+            style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
         >
             <div class="flex min-w-0 items-center gap-3">
                 {#if charIcons[charName]}
@@ -299,8 +300,9 @@
 
         <!-- 链/阶配置：小按钮分组框（样式参考 设置-配色），框宽适应按钮；点选即写入档位并触发重载，点当前档位不重复写入 -->
         <div
+            data-sf="card"
             class="mt-3 rounded-none border p-3"
-            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+            style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
         >
             <div class="flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">角色</span>
@@ -359,8 +361,9 @@
 
         <!-- 属性面板 -->
         <div
+            data-sf="card"
             class="mt-3 space-y-1.5 rounded-none border p-3 text-xs"
-            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+            style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
         >
             <div class="flex items-center justify-between">
                 <span class="text-(--theme-modal-text)/50">攻击</span>

@@ -397,8 +397,9 @@
             <table class="w-full text-xs">
                 <thead>
                     <tr
+                        data-sf="card"
                         class="text-(--theme-modal-text)/50 sticky top-0"
-                        style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-bottom: 1px solid var(--theme-divider-border);"
+                        style="--sf-base: var(--theme-modal-bg); border-bottom: 1px solid var(--theme-divider-border);"
                     >
                         <th class="text-left font-medium py-2 px-3">来源</th>
                         <th class="text-left font-medium py-2 px-3">条目</th>
@@ -410,7 +411,7 @@
                         <th class="text-right font-medium py-2 px-3 w-8"></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody data-sf="card" style="--sf-base: var(--theme-modal-bg);">
                     {#each entries as entry, i}
                         <tr
                             onclick={() => toggleExpand(entry.id, i)}

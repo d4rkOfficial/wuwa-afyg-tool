@@ -743,17 +743,19 @@
             <div>
                 <!-- 表格主体底色跟随「卡片透明度」（单元格区域保持透明）；上/右/下/左 = 常规分隔线（直角，去重装饰） -->
                 <table
+                    data-sf="card"
                     class="min-w-full text-xs"
                     data-group-table={gi}
-                    style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-collapse: separate; border-spacing: 0; border-top: 1px solid var(--theme-divider-border); border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); {maxTableWidth
+                    style="--sf-base: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-top: 1px solid var(--theme-divider-border); border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); {maxTableWidth
                         ? `width: ${maxTableWidth}px;`
                         : ''}"
                 >
                     <!-- 标题块与全局 buff 行放入 caption：宽度自动跟随表头（表格宽度） -->
                     <caption class="text-left">
                         <div
+                            data-sf="card"
                             class="-mr-px flex items-center gap-2 border-b px-2 py-1.5"
-                            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-color: var(--theme-divider-border);"
+                            style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
                         >
                             <span
                                 class="text-sm font-black tracking-tight"
@@ -767,8 +769,9 @@
                         </div>
                         {#if group.visibleGlobalBuffs.length > 0}
                             <div
+                                data-sf="card"
                                 class="flex items-center gap-1 overflow-hidden whitespace-nowrap border-b px-2 py-1"
-                                style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); border-color: var(--theme-divider-border);"
+                                style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
                             >
                                 {#each group.visibleGlobalBuffs as gb}
                                     <span
@@ -787,8 +790,9 @@
                         {#if hasFolder}
                             <tr>
                                 <th
+                                    data-sf="card"
                                     class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-black tracking-[0.12em] text-(--theme-modal-text)/50"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
+                                    style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
                                     rowspan="2"
                                 >
                                     条目
@@ -830,9 +834,10 @@
                                                     ? grp.prefix
                                                     : grp.prefix + LAYERED_BUFF_VAR + grp.suffix}
                                             <th
+                                                data-sf="card"
                                                 colspan={runLen.len}
                                                 class="sticky top-0 z-30 h-6 p-0 text-center"
-                                                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                                style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); {colBorderStyle(
                                                     columns[group.visibleColIdx[tailPos]].id,
                                                     nextId
                                                 )}"
@@ -849,8 +854,9 @@
                                                 ? columns[group.visibleColIdx[colPos + 1]]?.id
                                                 : undefined}
                                         <th
+                                            data-sf="card"
                                             class="sticky top-0 z-30 h-6 p-0"
-                                            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                            style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); {colBorderStyle(
                                                 bs.id,
                                                 nextId
                                             )}"
@@ -860,8 +866,9 @@
                                 {#if groupTableWidths[gi] < maxTableWidth}
                                     <th
                                         data-fill-th
+                                        data-sf="card"
                                         class="sticky top-0 z-30 h-6 p-0"
-                                        style="border-color: var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
+                                        style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); width: 100%;"
                                     ></th>
                                 {/if}
                             </tr>
@@ -870,8 +877,9 @@
                             {#if !hasFolder}
                                 <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
                                 <th
+                                    data-sf="card"
                                     class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r px-2 text-left font-black tracking-[0.12em] text-(--theme-modal-text)/50"
-                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;"
+                                    style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
                                 >
                                     条目
                                 </th>
@@ -885,14 +893,15 @@
                                     highlight?.gi === gi && highlight.kind === 'col' && highlight.index === ci}
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <th
+                                    data-sf="card"
                                     class="sticky {hasFolder
                                         ? 'top-6'
                                         : 'top-0'} z-30 cursor-pointer select-none p-0 align-top border-b {grp
                                         ? 'w-8 min-w-8'
                                         : ''}"
-                                    style="border-color: var(--theme-divider-border); background: {colHighlighted
-                                        ? HIGHLIGHT_BG
-                                        : 'color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; {colBorderStyle(
+                                    style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); {colHighlighted
+                                        ? `background: ${HIGHLIGHT_BG} !important;`
+                                        : ''}{colBorderStyle(
                                         bs.id,
                                         colPos + 1 < group.visibleColIdx.length
                                             ? columns[group.visibleColIdx[colPos + 1]]?.id
@@ -927,8 +936,9 @@
                             {#if groupTableWidths[gi] < maxTableWidth}
                                 <th
                                     data-fill-th
+                                    data-sf="card"
                                     class="sticky {hasFolder ? 'top-6' : 'top-0'} z-30 p-0 border-b"
-                                    style="border-color: var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; width: 100%;"
+                                    style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border); width: 100%;"
                                 ></th>
                             {/if}
                         </tr>
@@ -952,10 +962,11 @@
                                         : ''}"
                                 >
                                     <td
+                                        data-sf="card"
                                         class="sticky left-0 z-20 cursor-pointer select-none px-2 py-1 border-r transition-colors"
-                                        style="border-color: var(--theme-divider-border); background: {rowHighlighted
-                                            ? HIGHLIGHT_BG
-                                            : 'color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent)'} !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;{rowHighlighted
+                                        style="--sf-base: var(--theme-modal-bg); border-color: var(--theme-divider-border); {rowHighlighted
+                                            ? `background: ${HIGHLIGHT_BG} !important;`
+                                            : ''}{rowHighlighted
                                             ? ' box-shadow: inset 3px 0 0 var(--theme-accent-bg);'
                                             : ''}"
                                         title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${row.selectedCount}/${row.enabledBuffIds.length}）`}

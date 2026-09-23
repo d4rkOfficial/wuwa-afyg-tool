@@ -135,8 +135,9 @@
                     <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                         {#each pinnedList as set}
                             <div
+                                data-sf="card"
                                 class="flex flex-col gap-2 rounded-none border p-3"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
                             >
                                 <div class="flex items-center gap-2 min-w-0">
                                     {#if icons[set.name]}
@@ -187,8 +188,9 @@
                     <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                         {#each otherList as set}
                             <div
+                                data-sf="card"
                                 class="flex flex-col gap-2 rounded-none border p-3"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
                             >
                                 <div class="flex items-center gap-2 min-w-0">
                                     {#if icons[set.name]}

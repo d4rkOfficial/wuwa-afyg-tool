@@ -716,11 +716,13 @@
                                     >
                                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                                         <div
+                                            data-sf="card"
                                             class="flex items-center gap-1 h-full rounded-none {getEditingBlockId() ===
                                             block.id
                                                 ? ''
-                                                : 'px-2.5'} text-sm bg-(--theme-timeline-bg)/80 border whitespace-nowrap min-w-14"
-                                            style="border-color: {isHighlighted || isSelected
+                                                : 'px-2.5'} text-sm border whitespace-nowrap min-w-14"
+                                            style="--sf-base: var(--theme-timeline-bg); border-color: {isHighlighted ||
+                                            isSelected
                                                 ? 'var(--theme-accent-bg)'
                                                 : 'var(--theme-divider-border)'};{isHighlighted || isSelected
                                                 ? ' background: color-mix(in srgb, var(--theme-accent-bg) 12%, color-mix(in srgb, var(--theme-timeline-bg) 80%, transparent)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);'

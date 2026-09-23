@@ -62,8 +62,9 @@
 <div class="space-y-4">
     <!-- Enemy card (type + level + defense) -->
     <div
+        data-sf="card"
         class="rounded-none border p-3.5"
-        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+        style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
     >
         <span class="mb-3 flex items-center gap-2 text-xs font-black tracking-tight text-(--theme-modal-text)/70">
             <Icon icon="mdi:skull" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
@@ -154,8 +155,9 @@
 
     <!-- Resistances card -->
     <div
+        data-sf="card"
         class="rounded-none border p-3.5"
-        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+        style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
     >
         <div class="mb-3 flex items-center justify-between gap-2">
             <span class="text-xs font-black tracking-tight text-(--theme-modal-text)/70">抗性</span>
@@ -271,8 +273,9 @@
 
     <!-- Damage reduction card -->
     <div
+        data-sf="card"
         class="rounded-none border p-3.5"
-        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+        style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
     >
         <div class="flex items-center gap-2">
             <span class="text-xs font-black tracking-tight text-(--theme-modal-text)/70">免伤率</span>

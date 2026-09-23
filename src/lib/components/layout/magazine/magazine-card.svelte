@@ -20,6 +20,7 @@
 </script>
 
 <div
+    data-sf="card"
     class={[
         'relative overflow-hidden border transition-colors',
         active ? '' : onclick ? 'cursor-pointer hover:bg-(--theme-card-bg-focused)' : '',
@@ -27,9 +28,11 @@
     ]
         .filter(Boolean)
         .join(' ')}
-    style="border-color: {active ? 'var(--theme-accent-bg)' : 'var(--theme-card-border)'}; background: {active
+    style="--sf-base: {active
         ? 'color-mix(in srgb, var(--theme-accent-bg) 8%, var(--theme-card-bg))'
-        : 'var(--theme-card-bg)'}; {styleProp ?? ''}"
+        : 'var(--theme-card-bg)'}; border-color: {active
+        ? 'var(--theme-accent-bg)'
+        : 'var(--theme-card-border)'}; {styleProp ?? ''}"
     role={onclick ? 'button' : undefined}
     tabindex={onclick ? 0 : undefined}
     {onclick}

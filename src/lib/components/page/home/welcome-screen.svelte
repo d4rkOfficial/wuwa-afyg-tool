@@ -114,8 +114,9 @@
             {#each entries as entry (entry.title)}
                 <button
                     onclick={entry.action}
+                    data-sf="card"
                     class={[
-                        'card-pop-in group relative flex flex-col justify-between gap-4 overflow-hidden border border-(--theme-card-border) bg-(--theme-card-bg) p-5 text-left theme-glass-surface shadow-(--theme-card-shadow) transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)',
+                        'card-pop-in group relative flex flex-col justify-between gap-4 overflow-hidden border border-(--theme-card-border) p-5 text-left theme-glass-surface shadow-(--theme-card-shadow) transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)',
                         'min-h-[9.5rem] md:h-full md:min-h-[11rem]',
                         entry.wide ? 'md:col-span-2' : ''
                     ].join(' ')}

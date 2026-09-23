@@ -90,7 +90,7 @@
 
     function itemClass(c: Character): string {
         const base =
-            'flex w-[100px] flex-col items-center gap-1.5 rounded-none border border-(--theme-divider-border) bg-(--theme-input-bg) p-3 transition-colors cursor-pointer'
+            'flex w-[100px] flex-col items-center gap-1.5 rounded-none border border-(--theme-divider-border) p-3 transition-colors cursor-pointer'
         if (isSelected(c)) {
             return (
                 base +
@@ -161,6 +161,8 @@
                                         }}
                                         role="button"
                                         tabindex="0"
+                                        data-sf="card"
+                                        style="--sf-base: var(--theme-input-bg)"
                                         class={itemClass(c)}
                                     >
                                         <div class="size-14 overflow-hidden rounded-full bg-(--theme-modal-text)/10">
@@ -215,6 +217,8 @@
                                                 }}
                                                 role="button"
                                                 tabindex="0"
+                                                data-sf="card"
+                                                style="--sf-base: var(--theme-input-bg)"
                                                 class={itemClass(c)}
                                             >
                                                 <div

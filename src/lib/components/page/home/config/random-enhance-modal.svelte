@@ -47,7 +47,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         data-sf="modal"
-        class="animate-pop-in w-72 rounded-none border p-4 shadow-2xl backdrop-blur-lg"
+        class="animate-pop-in w-72 rounded-none border p-4 shadow-2xl"
         style="border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >

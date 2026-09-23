@@ -363,28 +363,34 @@
         dps: number
     }
 
+    /** @desc 某配置的整段总计（与所选时段无关）：总计行/总计卡片专用 */
+    const totalStatOf = (c: Config): RangeStat => {
+        const charDamages: Record<string, number> = {}
+        let otherDamage = 0
+        for (const cs of c.charSummaries) {
+            if (team.some((s) => s.character === cs.character)) {
+                charDamages[cs.character] = (charDamages[cs.character] ?? 0) + cs.totalDamage
+            } else {
+                otherDamage += cs.totalDamage
+            }
+        }
+        return {
+            config: c,
+            damage: c.totalDamage,
+            charDamages,
+            otherDamage,
+            span: totalDur,
+            dps: totalDur > 0 ? c.totalDamage / totalDur : 0
+        }
+    }
+
+    /** @desc 总计口径的每配置统计：永远取整段，**不受分段行点击影响** */
+    let totalStats = $derived.by<RangeStat[]>(() => configs.map((c) => totalStatOf(c)))
+
     /** @desc 选中范围的每配置统计：总计用整段数据，时段用该段数据（大卡片与明细表共用） */
     let rangeStats = $derived.by<RangeStat[]>(() =>
         configs.map((c, ci) => {
-            if (activeRange === 'total') {
-                const charDamages: Record<string, number> = {}
-                let otherDamage = 0
-                for (const cs of c.charSummaries) {
-                    if (team.some((s) => s.character === cs.character)) {
-                        charDamages[cs.character] = (charDamages[cs.character] ?? 0) + cs.totalDamage
-                    } else {
-                        otherDamage += cs.totalDamage
-                    }
-                }
-                return {
-                    config: c,
-                    damage: c.totalDamage,
-                    charDamages,
-                    otherDamage,
-                    span: totalDur,
-                    dps: totalDur > 0 ? c.totalDamage / totalDur : 0
-                }
-            }
+            if (activeRange === 'total') return totalStatOf(c)
             const seg = (configSegments[ci] ?? [])[activeRange]
             const span = seg ? seg.endSeconds - seg.startSeconds : 0
             return {
@@ -661,15 +667,16 @@
         }}
     >
         <div
+            data-sf="modal"
             class="animate-pop-in theme-glass-surface theme-scrollbar flex max-h-[92vh] w-[min(96vw,1400px)] flex-col overflow-hidden rounded-none border shadow-2xl"
-            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text);"
+            style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
             role="dialog"
             aria-modal="true"
         >
             <!-- Header -->
             <div
                 class="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-3 border-b px-6 pb-2.5 pt-4"
-                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); backdrop-filter: blur(12px);"
+                style="border-color: var(--theme-divider-border); background: var(--theme-modal-bg);"
             >
                 <Icon icon="mdi:compare-horizontal" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 <h2 class="text-base font-black tracking-tight">链/阶对比</h2>
@@ -780,7 +787,7 @@
                                     {@const c = stat.config}
                                     <div
                                         class="min-w-44 flex-1 shrink-0 rounded-none border p-3"
-                                        style="border-color: {c.accent}; background: var(--theme-input-bg);"
+                                        style="border-color: {c.accent}; background: color-mix(in srgb, {c.accent} 16%, transparent);"
                                     >
                                         <div
                                             class="flex items-center gap-1.5 text-sm font-black"
@@ -922,7 +929,7 @@
                                                     >
                                                         {totalDur.toFixed(1)}s
                                                     </td>
-                                                    {#each rangeStats as stat}
+                                                    {#each totalStats as stat}
                                                         <td
                                                             class="px-2 py-2 text-right text-sm font-black tabular-nums"
                                                             style="color: {stat.config.accent};"

@@ -441,7 +441,7 @@
     }}
 />
 
-<!-- @desc 表格容器：Ctrl+滚轮横向滚动，底色跟随「卡片透明度」 -->
+<!-- @desc 表格容器：Ctrl+滚轮横向滚动；外层是「主内容区」表面，行/表头由「卡片」表面提供底色 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     data-sf="content"
@@ -459,8 +459,9 @@
         <!-- 表头：来源 / 条目 / 视为（伤害类型） / Buff 四列，吸顶毛玻璃 -->
         <thead>
             <tr
+                data-sf="card"
                 class="text-(--theme-modal-text)/50 sticky top-0 opacity-100!"
-                style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border-top: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border);"
+                style="--sf-base: var(--theme-modal-bg); border-top: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border);"
             >
                 <th
                     class="text-left font-black tracking-[0.12em] py-2 px-3 w-20 shrink-0 border-r"
@@ -477,8 +478,9 @@
                 <th class="text-left font-black tracking-[0.12em] py-2 px-3">Buff</th>
             </tr>
         </thead>
-        <!-- 表体：每行一个伤害条目（点击展开编辑）；展开行内嵌增益配置面板 -->
-        <tbody>
+        <!-- 表体：每行一个伤害条目（点击展开编辑）；展开行内嵌增益配置面板。
+             行底色由「卡片」表面提供（可与表头分别调透明度/毛玻璃/深度） -->
+        <tbody data-sf="card" style="--sf-base: var(--theme-modal-bg);">
             {#each damageEntries as damageEntry, i}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
