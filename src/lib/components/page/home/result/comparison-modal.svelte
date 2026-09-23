@@ -705,7 +705,7 @@
             >
                 <Icon icon="mdi:compare-horizontal" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 <h2 class="text-base font-black tracking-tight">链/阶对比</h2>
-                <div class="ml-auto flex items-center gap-2 text-[11px] opacity-55">
+                <div class="flex items-center gap-2 text-[11px] opacity-55">
                     {#if totalDur > 0}
                         <span class="tabular-nums">总时长 {totalDur.toFixed(1)}s</span>
                     {/if}
@@ -774,7 +774,7 @@
                             />
                             <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">队伍出伤曲线</h3>
                             <div
-                                class="ml-auto flex items-center gap-1 rounded-none border p-0.5 text-[11px]"
+                                class="flex items-center gap-1 rounded-none border p-0.5 text-[11px]"
                                 style="border-color: var(--theme-divider-border);"
                             >
                                 <button
@@ -1067,7 +1067,7 @@
                             />
                             <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">全队伤害占比</h3>
                             <div
-                                class="ml-auto flex items-center gap-1 rounded-none border p-0.5 text-[11px]"
+                                class="flex items-center gap-1 rounded-none border p-0.5 text-[11px]"
                                 style="border-color: var(--theme-divider-border);"
                             >
                                 <button

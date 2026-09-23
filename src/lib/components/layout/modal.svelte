@@ -75,25 +75,45 @@
             aria-modal="true"
             out:popOut
         >
-            <button
-                onclick={onclose}
-                class="absolute top-3 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
-                'top-left'
-                    ? 'left-3'
-                    : 'right-3'}"
-                aria-label="Close"
-            >
-                <Icon icon="mdi:close" class="size-4.5" />
-            </button>
-            {#if title}
+            {#if getModalClosePosition() === 'top-left' && title}
+                <!-- 左上角模式且带标题：关闭按钮进入标题行，形成「关闭 | 图标 标题」 -->
                 <div
                     class="mb-4 flex items-center gap-2 border-b pb-2.5 pr-6 text-base font-black tracking-tight {footer
                         ? 'shrink-0'
                         : ''}"
                     style="border-color: var(--theme-divider-border);"
                 >
+                    <button
+                        onclick={onclose}
+                        class="shrink-0 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                        aria-label="Close"
+                    >
+                        <Icon icon="mdi:close" class="size-4.5" />
+                    </button>
+                    <span class="h-4 w-px shrink-0" style="background: var(--theme-divider-border);"></span>
                     {@render title()}
                 </div>
+            {:else}
+                <button
+                    onclick={onclose}
+                    class="absolute top-3 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
+                    'top-left'
+                        ? 'left-3'
+                        : 'right-3'}"
+                    aria-label="Close"
+                >
+                    <Icon icon="mdi:close" class="size-4.5" />
+                </button>
+                {#if title}
+                    <div
+                        class="mb-4 flex items-center gap-2 border-b pb-2.5 pr-6 text-base font-black tracking-tight {footer
+                            ? 'shrink-0'
+                            : ''}"
+                        style="border-color: var(--theme-divider-border);"
+                    >
+                        {@render title()}
+                    </div>
+                {/if}
             {/if}
             {#if footer}
                 <div class="theme-scrollbar min-h-0 flex-1 overflow-y-auto">

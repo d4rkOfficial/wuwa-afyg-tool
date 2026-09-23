@@ -1491,7 +1491,7 @@
                                         class="size-4 shrink-0"
                                         style="color: var(--theme-accent-text);"
                                     />
-                                    工具栏
+                                    界面显示
                                 </span>
                                 <div
                                     class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
