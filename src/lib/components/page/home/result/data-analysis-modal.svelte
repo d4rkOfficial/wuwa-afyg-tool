@@ -927,7 +927,10 @@
                     title={projectName}>{projectName}</span
                 >
             </div>
-            <div class="flex items-center gap-2 text-[11px]" style="color: var(--theme-modal-text); opacity: 0.55;">
+            <div
+                class="flex items-center gap-2 text-[11px] {getModalClosePosition() === 'top-left' ? '' : 'ml-auto'}"
+                style="color: var(--theme-modal-text); opacity: 0.55;"
+            >
                 {#if totalDur > 0}
                     <span class="tabular-nums tracking-[0.22em]">总时长 {totalDur.toFixed(1)}s</span>
                     <span class="size-1 rounded-full" style="background: var(--theme-divider-border);"></span>
@@ -1131,7 +1134,7 @@
                             </span>
                         {/if}
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="{getModalClosePosition() === 'top-left' ? '' : 'ml-auto '}flex items-center gap-2">
                         <button
                             onclick={autoConfigureTimings}
                             class="flex cursor-pointer items-center gap-1.5 rounded-none border px-2.5 py-1.5 text-[11px] font-medium transition-colors hover:opacity-80"
@@ -1352,7 +1355,9 @@
                         </h3>
                     </div>
                     <div
-                        class="flex items-center gap-1 rounded-none border p-0.5"
+                        class="{getModalClosePosition() === 'top-left'
+                            ? ''
+                            : 'ml-auto '}flex items-center gap-1 rounded-none border p-0.5"
                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
                         <button
