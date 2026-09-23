@@ -2,7 +2,6 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import Avatar from '$lib/components/ui/avatar.svelte'
     import {
         getShareState,
         refreshProjects,
@@ -14,7 +13,7 @@
         SHARE_SORT_LABELS,
         type ShareProject
     } from '$lib/data/share.svelte'
-    import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharIconMap, getCharElementMap } from '$lib/calc/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { shortName } from '$lib/utils/character'
 
@@ -39,6 +38,13 @@
 
     const share = getShareState()
     let charIconMap = $derived(getCharIconMap())
+    const charElements = $derived(getCharElementMap())
+
+    /** @desc 角色元素主题色（getCharElementMap 返回元素名，转 --theme-element-*） */
+    const elementColor = (character: string | null | undefined): string => {
+        const el = charElements[character ?? '']
+        return el ? `var(--theme-element-${el}, #888)` : '#888'
+    }
 
     let downloading = $state<string | null>(null)
     let prevOpen = $state(open)
@@ -138,7 +144,7 @@
         </div>
     </div>
 
-    <div class="mt-3 grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
+    <div class="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2 xl:gap-x-4">
         {#if share.loading}
             <div
                 class="flex items-center justify-center gap-2 py-10 text-xs text-(--theme-modal-text)/40 xl:col-span-2"
@@ -165,80 +171,124 @@
             </div>
         {:else}
             {#each share.projects as item (item.id)}
+                {@const names = item.teamPreview?.names?.slice(0, 3) ?? []}
+                {@const avatars = names.map((n) => charIconMap[n])}
                 <div
-                    class="flex min-w-0 items-center gap-3 rounded-none border px-3 py-2.5 transition-colors hover:bg-(--theme-modal-text)/5"
+                    class="group relative flex min-h-[11rem] min-w-0 flex-col overflow-hidden rounded-none border p-4 transition-colors hover:border-(--theme-accent-bg)"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
-                    {#if item.teamPreview?.names?.length}
-                        <div class="flex shrink-0 -space-x-1.5">
-                            {#each item.teamPreview.names.slice(0, 3) as name}
-                                <Avatar
-                                    src={charIconMap[name] || undefined}
-                                    alt={name}
-                                    size="sm"
-                                    class="ring-2 ring-(--theme-input-bg)"
-                                />
+                    <!-- 角色头像叠底（右下：1号大→3号小，向左递减；半透明 + 边缘淡出） -->
+                    {#if avatars[2]}
+                        <div
+                            class="pointer-events-none absolute -bottom-3 right-36 z-0 size-16 opacity-40"
+                            style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
+                        >
+                            <img src={avatars[2]} alt="" class="size-full object-cover" />
+                        </div>
+                    {/if}
+                    {#if avatars[1]}
+                        <div
+                            class="pointer-events-none absolute -bottom-3 right-[4.5rem] z-0 size-24 opacity-40"
+                            style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
+                        >
+                            <img src={avatars[1]} alt="" class="size-full object-cover" />
+                        </div>
+                    {/if}
+                    {#if avatars[0]}
+                        <div
+                            class="pointer-events-none absolute -bottom-3 right-0 z-0 size-32 opacity-40"
+                            style="-webkit-mask-image: linear-gradient(to bottom, transparent, #000 40%); mask-image: linear-gradient(to bottom, transparent, #000 40%);"
+                        >
+                            <img src={avatars[0]} alt="" class="size-full object-cover" />
+                        </div>
+                    {/if}
+
+                    <!-- 标题 + 版本号 -->
+                    <div class="relative z-10 flex items-start gap-2">
+                        <h4
+                            class="min-w-0 flex-1 truncate text-base font-black leading-tight tracking-tight text-(--theme-modal-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
+                        >
+                            {item.title}
+                        </h4>
+                        {#if item.gameVersion}
+                            <span
+                                class="shrink-0 border px-1.5 py-0.5 text-[10px] font-black tracking-[0.18em] text-(--theme-accent-text)"
+                                style="border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);"
+                            >
+                                {item.gameVersion}
+                            </span>
+                        {/if}
+                    </div>
+
+                    <!-- 作者 -->
+                    <div
+                        class="relative z-10 mt-1.5 flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/45"
+                    >
+                        <Icon icon="mdi:account-circle-outline" class="size-3.5 shrink-0" />
+                        <span class="min-w-0 truncate">{item.authorName}</span>
+                    </div>
+
+                    <!-- 队伍角色（元素色角标；头像已作叠底，这里只留名字） -->
+                    {#if names.length > 0}
+                        <div class="relative z-10 mt-2.5 flex flex-wrap items-center gap-1.5">
+                            {#each names as name}
+                                <span
+                                    class="inline-flex items-center border px-1.5 py-0.5 text-[10px] font-black"
+                                    style="border-color: color-mix(in srgb, {elementColor(
+                                        name
+                                    )} 45%, transparent); color: {elementColor(
+                                        name
+                                    )}; background: color-mix(in srgb, {elementColor(name)} 12%, transparent);"
+                                >
+                                    {shortName(name)}
+                                </span>
                             {/each}
                         </div>
                     {/if}
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">
-                            <span class="truncate text-sm font-black tracking-tight text-(--theme-modal-text)">
-                                {item.title}
-                            </span>
-                            {#if item.gameVersion}
-                                <span
-                                    class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
-                                >
-                                    {item.gameVersion}
-                                </span>
-                            {/if}
-                        </div>
-                        <div class="mt-0.5 flex items-center gap-2 text-[10px] text-(--theme-modal-text)/40">
-                            {#if item.teamPreview?.names?.length}
-                                <span class="truncate">
-                                    {item.teamPreview.names.map((n) => shortName(n)).join(' / ')}
-                                </span>
-                                <span>·</span>
-                            {/if}
-                            {#if item.downloads > 0}
-                                <span class="shrink-0"
-                                    ><span class="font-black text-(--theme-modal-text)/70">{item.downloads}</span> 下载</span
-                                >
-                                <span>·</span>
-                            {/if}
-                            <span class="shrink-0">{item.authorName}</span>
+
+                    <!-- 底部：下载量 + 操作按钮 -->
+                    <div class="relative z-10 mt-auto flex items-end justify-between gap-3 pt-4">
+                        <span
+                            class="flex shrink-0 items-baseline gap-1.5 text-[10px] tracking-[0.18em] text-(--theme-modal-text)/40"
+                        >
+                            <span
+                                class="text-lg font-black leading-none tabular-nums text-(--theme-modal-text)"
+                                style="text-shadow: 0 0 3px var(--theme-halo-color);">{item.downloads}</span
+                            >
+                            下载
+                        </span>
+                        <div class="flex shrink-0 items-center gap-1.5">
+                            <button
+                                onclick={() => handleShare(item)}
+                                class="inline-flex shrink-0 items-center rounded-none border px-2 py-1 text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                style="border-color: var(--theme-divider-border);"
+                                title="复制分享链接"
+                            >
+                                <Icon icon="mdi:share-variant" class="size-3.5" />
+                            </button>
+                            <button
+                                onclick={() => ondetail?.(item.code)}
+                                class="inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-1 text-[10px] whitespace-nowrap text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                style="border-color: var(--theme-divider-border);"
+                                title="查看详情"
+                            >
+                                <Icon icon="mdi:information-outline" class="size-3" />
+                                详情
+                            </button>
+                            <button
+                                onclick={() => handleDownload(item.code, item.title)}
+                                disabled={downloading !== null}
+                                class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium whitespace-nowrap transition-all hover:brightness-110 disabled:opacity-40"
+                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                            >
+                                <Icon
+                                    icon={downloading === item.code ? 'mdi:loading' : 'mdi:download'}
+                                    class={downloading === item.code ? 'size-3 animate-spin' : 'size-3'}
+                                />
+                                下载
+                            </button>
                         </div>
                     </div>
-                    <button
-                        onclick={() => handleShare(item)}
-                        class="inline-flex shrink-0 items-center rounded-none border px-2 py-1 text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                        style="border-color: var(--theme-divider-border);"
-                        title="复制分享链接"
-                    >
-                        <Icon icon="mdi:share-variant" class="size-3.5" />
-                    </button>
-                    <button
-                        onclick={() => ondetail?.(item.code)}
-                        class="inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-1 text-[10px] whitespace-nowrap text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                        style="border-color: var(--theme-divider-border);"
-                        title="查看详情"
-                    >
-                        <Icon icon="mdi:information-outline" class="size-3" />
-                        详情
-                    </button>
-                    <button
-                        onclick={() => handleDownload(item.code, item.title)}
-                        disabled={downloading !== null}
-                        class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium whitespace-nowrap transition-all hover:brightness-110 disabled:opacity-40"
-                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                    >
-                        <Icon
-                            icon={downloading === item.code ? 'mdi:loading' : 'mdi:download'}
-                            class={downloading === item.code ? 'size-3 animate-spin' : 'size-3'}
-                        />
-                        下载
-                    </button>
                 </div>
             {/each}
         {/if}
