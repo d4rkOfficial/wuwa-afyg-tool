@@ -2381,7 +2381,7 @@
                                         >
                                             <div class="mb-2 flex items-center justify-between">
                                                 <span class="text-xs font-medium text-(--theme-modal-text)/70"
-                                                    >配置文件设置</span
+                                                    >AI配置文件设置</span
                                                 >
                                                 <button
                                                     onclick={handleAddAiProfile}
