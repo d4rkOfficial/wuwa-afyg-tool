@@ -746,7 +746,7 @@
     {/if}
 </div>
 
-<!-- @desc 右键菜单：复制选中文本 / 创建BUFF / 创建自定义直伤 / 跳转顶底（点击遮罩关闭） -->
+<!-- @desc 右键菜单：复制选中文本 / 创建BUFF / 创建自定义直伤 / 快速跳转（武器/首位声骸/技能/固有属性/共鸣链）（点击遮罩关闭） -->
 {#if ctxShow}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -790,7 +790,9 @@
                 ><Icon icon="mdi:arrow-down-bold-outline" class="size-3.5 shrink-0" /> 跳转到底部</button
             >
             ⛔ TEMP-HIDDEN-END -->
+            <!-- ⛔ TEMP-HIDDEN（临时隐藏）：跳转到底部下方那条分割线（上方已有分割线，避免重复）
             <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            ⛔ TEMP-HIDDEN-END -->
             <!-- @desc 快速跳转：武器 / 首位声骸 / 技能 / 固有属性 / 共鸣链 -->
             {#each [{ key: 'weapon', label: '跳转到武器', icon: 'mdi:sword' }, { key: 'echo', label: '跳转到首位声骸', icon: 'mdi:circle-double' }, { key: 'skill', label: '跳转到技能', icon: 'mdi:flash-outline' }, { key: 'innate', label: '跳转到固有属性', icon: 'mdi:star-four-points-outline' }, { key: 'chain', label: '跳转到共鸣链', icon: 'mdi:link-variant' }] as item (item.key)}
                 <button
