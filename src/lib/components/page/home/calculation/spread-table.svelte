@@ -515,6 +515,15 @@
         return tableData.map((g, gi) => (sourceKeyOf(g.charName) === activeSource ? gi : -1)).filter((gi) => gi >= 0)
     })
 
+    /** @desc 顶部「全局 BUFF」条：当前页签涉及的子表里能吃到该全局 buff 的并集（去重，保持出现顺序） */
+    const shownGlobalBuffs = $derived.by(() => {
+        const map = new Map<string, BuffSet>()
+        for (const gi of shownGroupIdx) {
+            for (const gb of tableData[gi].visibleGlobalBuffs) map.set(gb.id, gb)
+        }
+        return [...map.values()]
+    })
+
     const selectSource = (key: string) => {
         sourceKey = key
         // 被过滤掉的子表上的高亮随之失效，避免留下看不见的高亮状态
@@ -595,12 +604,6 @@
                 { label: '全不选本列', action: () => selectColumn(group, ci, false) }
             ]
         }
-    }
-
-    /** @desc 全局 buff 折叠展开（每张子表一个，默认收起；展开后 chips 自动换行） */
-    let expandedGlobal = $state<Record<number, boolean>>({})
-    const toggleGlobal = (gi: number) => {
-        expandedGlobal[gi] = !expandedGlobal[gi]
     }
 
     /** @desc ── 框选批量生效/失效（拖拽矩形范围：范围内有已勾选 → 全部取消，否则全部勾选）── */
@@ -926,6 +929,11 @@
                             use:fallbackIcon={'/icons/placeholder-character.svg'}
                             class="size-5 shrink-0 rounded-full"
                         />
+                    {:else if tab.key === NONE_SOURCE_KEY}
+                        <span
+                            class="flex size-5 shrink-0 items-center justify-center rounded-full bg-(--theme-modal-text)/10"
+                            ><Icon icon="mdi:dots-horizontal" class="size-3.5" /></span
+                        >
                     {:else}
                         <span
                             class="flex size-5 shrink-0 items-center justify-center rounded-full bg-(--theme-modal-text)/10 text-[10px]"
@@ -934,6 +942,24 @@
                     {/if}
                     <span>{tab.label}</span>
                 </button>
+            {/each}
+        </div>
+    {/if}
+    <!-- @desc 全局 BUFF 条：当前伤害源涉及的所有全局 buff 直接列在表上方（不再折叠进各表标题里），chips 自动换行 -->
+    {#if shownGlobalBuffs.length > 0}
+        <div
+            class="theme-scrollbar flex max-h-28 shrink-0 flex-wrap items-center gap-1 overflow-y-auto border-b border-(--theme-divider-border) px-3 py-2"
+            data-sf="toolbar"
+            data-sf-flat
+        >
+            <span class="mr-1 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50">全局 BUFF</span>
+            {#each shownGlobalBuffs as gb (gb.id)}
+                <span
+                    class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
+                    style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
+                >
+                    <Icon icon="mdi:crown" class="size-3" />{gb.name}
+                </span>
             {/each}
         </div>
     {/if}
@@ -1014,40 +1040,6 @@
                             >
                             <span class="ml-auto text-[10px] text-(--theme-modal-text)/40">{group.rows.length} 条</span>
                         </div>
-                        {#if group.visibleGlobalBuffs.length > 0}
-                            <!-- 下拉浮层：展开内容绝对定位，不参与 caption/表格布局——否则展开会改变 caption 宽度，
-                             触发表格自动布局（table-layout: auto）重新计算所有列宽，造成可感知卡顿 -->
-                            <div class="relative border-b border-(--theme-divider-border)">
-                                <button
-                                    class="flex w-full cursor-pointer items-center gap-1 px-3 py-1.5 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/60 transition-colors hover:bg-(--theme-modal-text)/5"
-                                    onclick={() => toggleGlobal(gi)}
-                                >
-                                    <Icon
-                                        icon={expandedGlobal[gi] ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-                                        class="size-3.5 shrink-0"
-                                    />
-                                    全局 BUFF
-                                    <span class="text-(--theme-modal-text)/35">({group.visibleGlobalBuffs.length})</span
-                                    >
-                                </button>
-                                {#if expandedGlobal[gi]}
-                                    <!-- 展开后换行铺开，不再截断 -->
-                                    <div
-                                        class="absolute top-full left-0 z-50 flex w-max max-w-[70vw] flex-wrap items-center gap-1 border border-(--theme-divider-border) p-2 shadow-(--theme-card-shadow)"
-                                        style="background: var(--theme-modal-bg);"
-                                    >
-                                        {#each group.visibleGlobalBuffs as gb (gb.id)}
-                                            <span
-                                                class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
-                                                style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
-                                            >
-                                                <Icon icon="mdi:crown" class="size-3" />{gb.name}
-                                            </span>
-                                        {/each}
-                                    </div>
-                                {/if}
-                            </div>
-                        {/if}
                     </caption>
                     <!-- 表头（两级，仅含叠层组时）：第一行=叠层组名行（跨列合并，普通列占位）；第二行=列名行（folder 子列显示层数数字，普通列显示略名换行），吸顶 -->
                     <thead>
