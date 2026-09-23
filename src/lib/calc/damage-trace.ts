@@ -481,8 +481,18 @@ function toDamageEntryLike(entry: ResultEntry): DamageEntry {
     }
 }
 
-/** @desc 将某伤害条目还原为分段：基础值拆分 + 各乘区段（含来源溯源），并给出 per-hit / 段数 汇总；missed 表示该条目被设为「未命中」（伤害归零） */
-export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, missed = false): DamageSegments {
+/** @desc 暴击展示口径：由调用方按「该条目是否被设为凹暴/不暴」传入（不要用数值反推——
+ *  暴击率≥100% 时期望值天然等于全暴击值，反推会把「必暴」误判成「凹暴」模式） */
+export type CritDisplayMode = 'expected' | 'rig' | 'noCrit'
+
+/** @desc 将某伤害条目还原为分段：基础值拆分 + 各乘区段（含来源溯源），并给出 per-hit / 段数 汇总；
+ *  missed 表示该条目被设为「未命中」（伤害归零）；critMode 表示该条目当前处于期望/凹暴/不暴哪一种口径 */
+export function buildDamageSegments(
+    entry: ResultEntry,
+    ctx: DamageTraceCtx,
+    missed = false,
+    critMode: CritDisplayMode = 'expected'
+): DamageSegments {
     const baseUnit = entry.baseUnit
     const kind = baseKindOf(baseUnit)
     const baseLabel = baseLabelOf(baseUnit)
@@ -595,14 +605,20 @@ export function buildDamageSegments(entry: ResultEntry, ctx: DamageTraceCtx, mis
     if (entry.canCrit) {
         const critAvg = 1 + entry.critRate * (entry.critDmg - 1)
         const preCrit = entry.nonCritPerHit
-        const rigged = !missed && Math.abs(entry.expectedPerHit - entry.critPerHit) < 0.5
-        const noCrit = !missed && Math.abs(entry.expectedPerHit - entry.nonCritPerHit) < 0.5
+        // 模式来自调用方传入的勾选状态；暴击率≥100%（或≤0）时只是「数学上必暴/必不暴」，不等于选了凹暴/不暴模式
+        const rigged = !missed && critMode === 'rig'
+        const noCrit = !missed && critMode === 'noCrit'
+        const critPct = (entry.critRate * 100).toFixed(1)
         const effective = missed || preCrit <= 0 ? critAvg : entry.expectedPerHit / preCrit
         const detail = rigged
             ? '全暴击（凹暴）'
             : noCrit
               ? '不暴击'
-              : `(1 + ${(entry.critRate * 100).toFixed(1)}% × ${((entry.critDmg - 1) * 100).toFixed(1)}%)`
+              : entry.critRate >= 1
+                ? `暴击率 ${critPct}%（必暴）`
+                : entry.critRate <= 0
+                  ? `暴击率 ${critPct}%（必不暴击）`
+                  : `(1 + ${critPct}% × ${((entry.critDmg - 1) * 100).toFixed(1)}%)`
         critSegment = seg('crit', '暴击区', effective, detail, collectCritParts(entry, ctx, buffs))
     }
 

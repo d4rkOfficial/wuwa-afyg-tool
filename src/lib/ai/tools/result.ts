@@ -135,7 +135,13 @@ defineTool('get_result_entry_breakdown', {
         const ra = getActiveProject()?.resultAnalysis
         const missIds = new Set(ra?.missEntryIds ?? [])
         const missed = missIds.has(entry.id)
-        const segments = buildDamageSegments(entry, ctx, missed)
+        // 暴击口径同样按用户勾选判定（暴击率≥100% 时期望值等于全暴击，不能据此反推成凹暴）
+        const critMode = ra?.rigCritEntryIds?.includes(entry.id)
+            ? 'rig'
+            : ra?.noCritEntryIds?.includes(entry.id)
+              ? 'noCrit'
+              : 'expected'
+        const segments = buildDamageSegments(entry, ctx, missed, critMode)
 
         return {
             entry: {

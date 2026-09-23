@@ -30,7 +30,7 @@
     import DataAnalysisModal from './data-analysis-modal.svelte'
     import ComparisonModal from './comparison-modal.svelte'
     import DamageTraceView from './damage-trace-view.svelte'
-    import type { DamageTraceCtx } from '$lib/calc/damage-trace'
+    import type { DamageTraceCtx, CritDisplayMode } from '$lib/calc/damage-trace'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
@@ -71,6 +71,11 @@
         weaponInfoMap,
         conditionProfile: getConditionProfile()
     })
+
+    /** @desc 条目的暴击展示口径：按用户勾选（凹暴/不暴）判定，不看数值——
+     *  暴击率≥100% 时期望值天然等于全暴击值，用数值反推会把「必暴」误显示成「凹暴」 */
+    const critModeOf = (entryId: string): CritDisplayMode =>
+        rigCritEntryIds.includes(entryId) ? 'rig' : noCritEntryIds.includes(entryId) ? 'noCrit' : 'expected'
 
     $effect(() => {
         calcState
@@ -507,6 +512,7 @@
                                                 {entry}
                                                 ctx={traceCtx}
                                                 missed={missEntryIds.includes(entry.id)}
+                                                critMode={critModeOf(entry.id)}
                                             />
                                             <div
                                                 class="shrink-0 self-start inline-flex items-center rounded-none border overflow-hidden"
@@ -548,6 +554,7 @@
                                                 {entry}
                                                 ctx={traceCtx}
                                                 missed={missEntryIds.includes(entry.id)}
+                                                critMode={critModeOf(entry.id)}
                                             />
                                             <div class="flex items-start gap-4">
                                                 <div

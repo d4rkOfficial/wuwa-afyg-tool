@@ -1,7 +1,12 @@
 <script lang="ts">
     import { fade } from 'svelte/transition'
     import { onMount } from 'svelte'
-    import { buildDamageSegments, type DamageTraceCtx, type TracePart } from '$lib/calc/damage-trace'
+    import {
+        buildDamageSegments,
+        type CritDisplayMode,
+        type DamageTraceCtx,
+        type TracePart
+    } from '$lib/calc/damage-trace'
     import type { ResultEntry } from '$lib/calc/result.types'
     import type { ComponentsProps } from '$lib/types'
 
@@ -9,11 +14,13 @@
         entry: ResultEntry
         ctx: DamageTraceCtx
         missed?: boolean
+        /** @desc 该条目当前口径：expected 期望 / rig 凹暴 / noCrit 不暴（决定暴击段文案，不靠数值反推） */
+        critMode?: CritDisplayMode
     }
 
-    let { entry, ctx, missed = false, class: className, style: styleProp }: Props = $props()
+    let { entry, ctx, missed = false, critMode = 'expected', class: className, style: styleProp }: Props = $props()
 
-    let seg = $derived(buildDamageSegments(entry, ctx, missed))
+    let seg = $derived(buildDamageSegments(entry, ctx, missed, critMode))
 
     const fmt = (n: number, d = 1) => n.toLocaleString(undefined, { maximumFractionDigits: d })
     const fmtMult = (n: number) => n.toFixed(4)
