@@ -190,10 +190,10 @@
                     class="group relative flex min-h-[11rem] min-w-0 flex-col overflow-hidden rounded-none border p-4 transition-colors hover:border-(--theme-accent-bg)"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
-                    <!-- 角色头像叠底（右下：1号大→3号小，向左递减；半透明 + 边缘淡出） -->
+                    <!-- 角色头像叠底（右下：1号最大≈卡片高，向左递减；固定 24px 轻微重叠便于分辨，边缘淡出） -->
                     {#if avatars[2]}
                         <div
-                            class="pointer-events-none absolute -bottom-3 right-36 z-0 size-16 opacity-40"
+                            class="pointer-events-none absolute -bottom-2 right-56 z-0 size-20 opacity-40"
                             style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
                         >
                             <img src={avatars[2]} alt="" class="size-full object-cover" />
@@ -201,7 +201,7 @@
                     {/if}
                     {#if avatars[1]}
                         <div
-                            class="pointer-events-none absolute -bottom-3 right-[4.5rem] z-0 size-24 opacity-40"
+                            class="pointer-events-none absolute -bottom-2 right-[8.5rem] z-0 size-28 opacity-40"
                             style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
                         >
                             <img src={avatars[1]} alt="" class="size-full object-cover" />
@@ -209,7 +209,7 @@
                     {/if}
                     {#if avatars[0]}
                         <div
-                            class="pointer-events-none absolute -bottom-3 right-0 z-0 size-32 opacity-40"
+                            class="pointer-events-none absolute -bottom-2 right-0 z-0 size-40 opacity-40"
                             style="-webkit-mask-image: linear-gradient(to bottom, transparent, #000 40%); mask-image: linear-gradient(to bottom, transparent, #000 40%);"
                         >
                             <img src={avatars[0]} alt="" class="size-full object-cover" />
@@ -278,16 +278,16 @@
                         <div class="flex shrink-0 items-center gap-1.5">
                             <button
                                 onclick={() => handleShare(item)}
-                                class="inline-flex shrink-0 items-center rounded-none border px-2 py-1 text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                                style="border-color: var(--theme-divider-border);"
+                                class="inline-flex shrink-0 items-center rounded-none border px-2 py-1 transition-all hover:brightness-110"
+                                style="background: var(--theme-accent-bg); border-color: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                                 title="复制分享链接"
                             >
                                 <Icon icon="mdi:share-variant" class="size-3.5" />
                             </button>
                             <button
                                 onclick={() => ondetail?.(item.code)}
-                                class="inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-1 text-[10px] whitespace-nowrap text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                                style="border-color: var(--theme-divider-border);"
+                                class="inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-1 text-[10px] whitespace-nowrap transition-all hover:brightness-110"
+                                style="background: var(--theme-accent-bg); border-color: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                                 title="查看详情"
                             >
                                 <Icon icon="mdi:information-outline" class="size-3" />
@@ -296,8 +296,8 @@
                             <button
                                 onclick={() => handleDownload(item.code, item.title)}
                                 disabled={downloading !== null}
-                                class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium whitespace-nowrap transition-all hover:brightness-110 disabled:opacity-40"
-                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                class="inline-flex shrink-0 items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] whitespace-nowrap transition-all hover:brightness-110 disabled:opacity-40"
+                                style="background: var(--theme-accent-bg); border-color: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                             >
                                 <Icon
                                     icon={downloading === item.code ? 'mdi:loading' : 'mdi:download'}
