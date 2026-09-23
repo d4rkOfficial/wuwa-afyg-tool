@@ -396,36 +396,102 @@ export function clearCache(category?: string, entity?: string): void {
 
 export type CacheCategory = 'list' | 'info' | 'image'
 
-/** 分类清理接口数据缓存（仅清理 wuwa-afyg:v2: 命名空间，不影响用户工程/预设） */
-export async function clearCacheCategory(kind: CacheCategory): Promise<void> {
-    const lsPrefix =
-        kind === 'list' ? cacheKey('list', '') : kind === 'info' ? cacheKey('info', '') : cacheKey('batch-icons', '')
-    if (kind === 'list') {
-        clearCache('list')
-    } else if (kind === 'info') {
-        clearCache('info')
-    } else {
-        clearCache('batch-icons')
-        if (typeof caches !== 'undefined') {
-            await caches.delete(DATA_CDN_CACHE_NAME).catch(() => {})
-        }
+/** @desc 缓存条目描述（设置面板「逐条清理」用） */
+export interface CacheEntry {
+    /** 完整缓存键，删除时原样回传 */
+    key: string
+    category: CacheCategory
+    /** 上游数据源 id（默认源为 nanoka） */
+    provider: string
+    /** 实体名：列表/图像为 character·weapon·echo…，详情为 character-v2·weapon… */
+    entity: string
+    /** 详情类缓存的条目名（列表/图像类为 null） */
+    name: string | null
+}
+
+const CATEGORY_OF_PREFIX: Record<string, CacheCategory> = {
+    list: 'list',
+    info: 'info',
+    'batch-icons': 'image'
+}
+
+/** @desc 解析缓存键 `wuwa-afyg:v2:[provider/]cat:entity[:name]`，非本命名空间返回 null */
+const parseCacheKey = (key: string): Omit<CacheEntry, 'key'> | null => {
+    if (!key.startsWith(PREFIX)) return null
+    let rest = key.slice(PREFIX.length)
+    let provider = DEFAULT_PROVIDER
+    const slash = rest.indexOf('/')
+    if (slash >= 0) {
+        provider = rest.slice(0, slash)
+        rest = rest.slice(slash + 1)
     }
-    // 等待 IDB 侧清理完成（settings 面板随后刷新计数）
-    const keys = await idbKeys()
-    for (const k of keys) {
-        if (k.startsWith(lsPrefix)) await idbDelete(k)
+    const [cat, entity = '', ...tail] = rest.split(':')
+    const category = CATEGORY_OF_PREFIX[cat]
+    if (!category) return null
+    return { category, provider, entity, name: tail.length ? tail.join(':') : null }
+}
+
+/** @desc 汇总全部缓存键（IDB 持久层 + localStorage 回退层，去重） */
+const collectCacheKeys = async (): Promise<string[]> => {
+    if (!browser) return []
+    const keys = new Set(await idbKeys())
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k) keys.add(k)
+    }
+    return [...keys]
+}
+
+/** @desc 枚举缓存条目（可按分类过滤），供设置面板按类型/条目精确清理 */
+export async function listCacheEntries(kind?: CacheCategory): Promise<CacheEntry[]> {
+    const keys = await collectCacheKeys()
+    const entries: CacheEntry[] = []
+    for (const key of keys) {
+        const parsed = parseCacheKey(key)
+        if (parsed && (!kind || parsed.category === kind)) entries.push({ key, ...parsed })
+    }
+    return entries.sort(
+        (a, b) =>
+            a.entity.localeCompare(b.entity) ||
+            a.provider.localeCompare(b.provider) ||
+            (a.name ?? '').localeCompare(b.name ?? '')
+    )
+}
+
+/** @desc 图像类条目额外清掉其映射到的浏览器图像缓存条目 */
+const purgeEntryImages = async (key: string): Promise<void> => {
+    if (typeof caches === 'undefined') return
+    const map = memoryCache.get(key) ?? (await getLocal<Record<string, string>>(key, ICON_TTL))
+    if (!map) return
+    try {
+        const cache = await caches.open(DATA_CDN_CACHE_NAME)
+        await Promise.all(Object.values(map).map((url) => cache.delete(url)))
+    } catch {}
+}
+
+/** @desc 删除单条缓存（内存 + localStorage + IDB 三层同步，图像类附带清图，下次访问重新拉取） */
+export async function deleteCacheEntry(key: string): Promise<void> {
+    if (!browser) return
+    if (parseCacheKey(key)?.category === 'image') await purgeEntryImages(key)
+    memoryCache.delete(key)
+    inFlight.delete(key)
+    try {
+        localStorage.removeItem(key)
+    } catch {}
+    await idbDelete(key)
+}
+
+/** @desc 分类清理接口数据缓存（含全部上游来源，仅限 wuwa-afyg:v2: 命名空间，不影响用户工程/预设） */
+export async function clearCacheCategory(kind: CacheCategory): Promise<void> {
+    const entries = await listCacheEntries(kind)
+    await Promise.all(entries.map((e) => deleteCacheEntry(e.key)))
+    // 图像类额外清空 Service Worker 图像缓存桶
+    if (kind === 'image' && typeof caches !== 'undefined') {
+        await caches.delete(DATA_CDN_CACHE_NAME).catch(() => {})
     }
 }
 
-/** 统计某类缓存的 IDB + localStorage 条目数 */
+/** @desc 统计某类缓存的条目数（跨全部上游来源） */
 export async function countCacheCategory(kind: CacheCategory): Promise<number> {
-    if (!browser) return 0
-    const prefix =
-        kind === 'list' ? cacheKey('list', '') : kind === 'info' ? cacheKey('info', '') : cacheKey('batch-icons', '')
-    const idbCount = (await idbKeys()).filter((k) => k.startsWith(prefix)).length
-    let lsCount = 0
-    for (let i = 0; i < localStorage.length; i++) {
-        if (localStorage.key(i)?.startsWith(prefix)) lsCount++
-    }
-    return idbCount + lsCount
+    return (await listCacheEntries(kind)).length
 }
