@@ -380,24 +380,7 @@
                                         onexpand={() => toggleExpand(row)}
                                     >
                                         {#snippet actions()}
-                                            {#if renameId === row.key && row.plan}
-                                                <input
-                                                    bind:value={renameText}
-                                                    class="h-7 min-w-0 flex-1 rounded-none border bg-transparent px-2 text-[10px] outline-none"
-                                                    style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
-                                                />
-                                                <button
-                                                    onclick={() => commitRename(row.plan!)}
-                                                    class="rounded-none border px-2.5 py-1 text-[10px]"
-                                                    style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
-                                                    >确定</button
-                                                >
-                                                <button
-                                                    onclick={() => (renameId = null)}
-                                                    class="rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/40"
-                                                    style="border-color: var(--theme-divider-border);">取消</button
-                                                >
-                                            {:else if row.standard}
+                                            {#if row.standard}
                                                 {@render standardActions(character)}
                                             {:else if row.plan}
                                                 {@render customActions(character, row.plan)}
