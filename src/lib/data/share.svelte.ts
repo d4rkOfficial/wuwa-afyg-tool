@@ -60,6 +60,71 @@ export function getShareState() {
 
 let _seq = 0
 
+/** @desc 搜索模式扫描工程的上限（本地按角色过滤需要样本；超出部分用服务端 q 兜底标题/作者） */
+const SEARCH_SCAN_LIMIT = 200
+/** @desc 服务端单页上限（实测 perPage 超过 50 也只返回 50） */
+const SCAN_PER_PAGE = 50
+const SCAN_MAX_PAGES = 8
+
+interface ProjectsPage {
+    projects: ShareProject[]
+    total: number
+}
+
+const fetchProjectsPage = async (params: {
+    page: number
+    perPage: number
+    sort: ShareSort
+    q?: string
+}): Promise<ProjectsPage> => {
+    const search = new URLSearchParams({
+        page: String(params.page),
+        perPage: String(params.perPage),
+        sort: params.sort,
+        excludeAnon: '1'
+    })
+    if (params.q?.trim()) search.set('q', params.q.trim())
+    const res = await fetch(`${getShareBase()}/api/public/projects?${search}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const json = (await res.json()) as { projects?: ShareProject[]; total?: number }
+    return { projects: json.projects ?? [], total: json.total ?? 0 }
+}
+
+/** @desc 逐页扫描工程列表（用于本地检索）；complete=false 表示还有没扫到的老工程 */
+const scanProjects = async (
+    sort: ShareSort,
+    limit: number
+): Promise<{ projects: ShareProject[]; complete: boolean }> => {
+    const collected: ShareProject[] = []
+    let total = 0
+    for (let page = 1; page <= SCAN_MAX_PAGES && collected.length < limit; page++) {
+        const res = await fetchProjectsPage({ page, perPage: SCAN_PER_PAGE, sort })
+        if (res.projects.length === 0) break
+        total = res.total
+        collected.push(...res.projects)
+        if (collected.length >= total) break
+    }
+    return { projects: collected.slice(0, limit), complete: collected.length >= total }
+}
+
+/** @desc 本地匹配：标题 / 作者 / 标签 / 配队角色名（服务端 q 只认标题与作者，角色名需本地兜底） */
+const matchesQuery = (project: ShareProject, query: string): boolean => {
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    const fields = [project.title, project.authorName, ...(project.tags ?? []), ...(project.teamPreview?.names ?? [])]
+    return fields.some((field) => (field ?? '').toLowerCase().includes(q))
+}
+
+/** @desc 合并「本地命中」与「服务端命中」时按 id 去重，保留先出现的顺序 */
+const dedupeById = (list: ShareProject[]): ShareProject[] => {
+    const seen = new Set<string>()
+    return list.filter((project) => {
+        if (seen.has(project.id)) return false
+        seen.add(project.id)
+        return true
+    })
+}
+
 export async function checkShare(force = false) {
     if (!browser) return
     if (shareState.checked && !force) return
@@ -67,19 +132,39 @@ export async function checkShare(force = false) {
     shareState.loading = true
     shareState.error = null
     try {
-        const params = new URLSearchParams({
-            page: String(shareState.page),
-            perPage: String(shareState.perPage),
-            sort: shareState.sort,
-            excludeAnon: '1'
+        const query = shareState.query.trim()
+        if (query) {
+            // 搜索模式：本地按 标题/作者/标签/角色 过滤后分页（服务端 q 搜不到角色名）
+            const scan = await scanProjects(shareState.sort, SEARCH_SCAN_LIMIT)
+            const localHits = scan.projects.filter((project) => matchesQuery(project, query))
+            const remoteHits = scan.complete
+                ? []
+                : (
+                      await fetchProjectsPage({
+                          page: 1,
+                          perPage: SCAN_PER_PAGE,
+                          sort: shareState.sort,
+                          q: query
+                      })
+                  ).projects
+            const merged = dedupeById([...localHits, ...remoteHits])
+            if (seq !== _seq) return
+            shareState.total = merged.length
+            shareState.projects = merged.slice(
+                (shareState.page - 1) * shareState.perPage,
+                shareState.page * shareState.perPage
+            )
+            shareState.available = true
+            return
+        }
+        const page = await fetchProjectsPage({
+            page: shareState.page,
+            perPage: shareState.perPage,
+            sort: shareState.sort
         })
-        if (shareState.query.trim()) params.set('q', shareState.query.trim())
-        const res = await fetch(`${getShareBase()}/api/public/projects?${params}`)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const json = (await res.json()) as { projects: ShareProject[]; total?: number }
         if (seq !== _seq) return
-        shareState.projects = json.projects ?? []
-        shareState.total = json.total ?? 0
+        shareState.projects = page.projects
+        shareState.total = page.total
         shareState.available = true
     } catch (e) {
         if (seq !== _seq) return

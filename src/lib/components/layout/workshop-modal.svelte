@@ -69,6 +69,12 @@
 
     let totalPages = $derived(Math.max(1, Math.ceil(share.total / share.perPage)))
 
+    /** @desc 点作者超链接 / 角色角标 → 回填搜索框并立即检索（角色名由本地检索支持） */
+    const searchBy = (text: string) => {
+        keyword = text
+        void setSearch(text)
+    }
+
     async function handleDownload(code: string, title: string) {
         if (downloading) return
         downloading = code
@@ -92,7 +98,7 @@
     }
 </script>
 
-<Modal {open} {onclose} backdropClose={false} class={className} style="width: min(94vw, 1040px); {mergedStyle}">
+<Modal {open} {onclose} backdropClose={false} class={className} style="width: min(96vw, 1360px); {mergedStyle}">
     {#snippet title()}
         <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
         <span class="font-black tracking-tight">椰果工坊 · 社区工程</span>
@@ -119,7 +125,7 @@
             />
             <input
                 bind:value={keyword}
-                placeholder="搜索标题 / 作者"
+                placeholder="搜索标题 / 作者 / 角色"
                 class="w-full rounded-none border py-1.5 pl-8 pr-3 text-xs text-(--theme-modal-text) outline-none transition-colors placeholder:text-(--theme-modal-text)/35 focus:border-(--theme-accent-bg)/50"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             />
@@ -144,7 +150,7 @@
         </div>
     </div>
 
-    <div class="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2 xl:gap-x-4">
+    <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 xl:gap-x-4">
         {#if share.loading}
             <div
                 class="flex items-center justify-center gap-2 py-10 text-xs text-(--theme-modal-text)/40 xl:col-span-2"
@@ -220,28 +226,35 @@
                         {/if}
                     </div>
 
-                    <!-- 作者 -->
-                    <div
-                        class="relative z-10 mt-1.5 flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/45"
-                    >
-                        <Icon icon="mdi:account-circle-outline" class="size-3.5 shrink-0" />
-                        <span class="min-w-0 truncate">{item.authorName}</span>
+                    <!-- 作者（超链接：点按即按作者名搜索） -->
+                    <div class="relative z-10 mt-1.5 flex min-w-0 items-center text-[10px]">
+                        <button
+                            onclick={() => searchBy(item.authorName)}
+                            class="inline-flex min-w-0 items-center gap-1 font-black text-(--theme-accent-text) underline decoration-dotted underline-offset-2 transition-colors hover:decoration-solid"
+                            title={`搜索作者「${item.authorName}」`}
+                        >
+                            <span class="min-w-0 truncate">{item.authorName}</span>
+                            <Icon icon="mdi:magnify" class="size-3 shrink-0" />
+                        </button>
                     </div>
 
-                    <!-- 队伍角色（元素色角标；头像已作叠底，这里只留名字） -->
+                    <!-- 队伍角色（元素色角标；头像已作叠底，这里只留名字；点按即按角色名搜索） -->
                     {#if names.length > 0}
                         <div class="relative z-10 mt-2.5 flex flex-wrap items-center gap-1.5">
                             {#each names as name}
-                                <span
-                                    class="inline-flex items-center border px-1.5 py-0.5 text-[10px] font-black"
+                                <button
+                                    onclick={() => searchBy(name)}
+                                    class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] font-black transition-colors hover:brightness-125"
                                     style="border-color: color-mix(in srgb, {elementColor(
                                         name
                                     )} 45%, transparent); color: {elementColor(
                                         name
                                     )}; background: color-mix(in srgb, {elementColor(name)} 12%, transparent);"
+                                    title={`搜索角色「${name}」`}
                                 >
                                     {shortName(name)}
-                                </span>
+                                    <Icon icon="mdi:magnify" class="size-2.5 shrink-0" />
+                                </button>
                             {/each}
                         </div>
                     {/if}
