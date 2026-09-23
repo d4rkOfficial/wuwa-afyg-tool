@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import { onMount, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Chart from 'chart.js/auto'
@@ -905,6 +906,18 @@
             class="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b px-6 pb-2.5 pt-4"
             style="background: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
         >
+            {#if getModalClosePosition() === 'top-left'}
+                <!-- 左上角模式：关闭按钮排到最前，用竖线分隔 -->
+                <button
+                    onclick={handleClose}
+                    class="shrink-0 rounded-none p-1 transition-colors hover:opacity-70"
+                    style="color: var(--theme-modal-text); opacity: 0.45;"
+                    aria-label="关闭"
+                >
+                    <Icon icon="mdi:close" class="size-5" />
+                </button>
+                <span class="h-4 w-px shrink-0" style="background: var(--theme-divider-border);"></span>
+            {/if}
             <div class="flex items-center gap-2.5">
                 <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 <h2 class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);">数据分析</h2>
@@ -959,14 +972,16 @@
             >
                 <Icon icon="mdi:account-details-outline" class="size-5" />
             </button>
-            <button
-                onclick={handleClose}
-                class="rounded-none p-1 transition-colors hover:opacity-70"
-                style="color: var(--theme-modal-text); opacity: 0.45;"
-                aria-label="关闭"
-            >
-                <Icon icon="mdi:close" class="size-5" />
-            </button>
+            {#if getModalClosePosition() !== 'top-left'}
+                <button
+                    onclick={handleClose}
+                    class="rounded-none p-1 transition-colors hover:opacity-70"
+                    style="color: var(--theme-modal-text); opacity: 0.45;"
+                    aria-label="关闭"
+                >
+                    <Icon icon="mdi:close" class="size-5" />
+                </button>
+            {/if}
         </div>
 
         <!-- Scrollable body -->
