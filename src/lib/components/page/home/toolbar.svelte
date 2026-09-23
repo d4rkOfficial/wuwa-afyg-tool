@@ -146,7 +146,7 @@
     <button
         onclick={onCharDetail}
         class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-            ? 'rounded-full px-3 py-2'
+            ? 'rounded-none px-3 py-2'
             : 'rounded-none px-3 py-1.5'}"
         title="角色详情配置"
     >
@@ -158,7 +158,7 @@
             <button
                 onclick={() => setShowDamageList(true)}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                    ? 'rounded-full px-3 py-2'
+                    ? 'rounded-none px-3 py-2'
                     : 'rounded-none px-3 py-1.5'}"
                 title="查看所有伤害"
             >
@@ -168,7 +168,7 @@
             <button
                 onclick={formatTimeline}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                    ? 'rounded-full px-3 py-2'
+                    ? 'rounded-none px-3 py-2'
                     : 'rounded-none px-3 py-1.5'}"
                 title="自动格式化：每个操作块右边界对齐下一个块（可跨角色）的左边界，参考线跟随其左右块"
             >
@@ -179,7 +179,7 @@
                 <button
                     onclick={toggleQuickMode}
                     class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
-                        ? 'rounded-full px-3 py-2'
+                        ? 'rounded-none px-3 py-2'
                         : 'rounded-none px-3 py-1.5'} {getQuickMode()
                         ? 'border-(--theme-accent-bg)'
                         : 'border-(--theme-sidebar-text)/20'}"
@@ -206,7 +206,7 @@
                 onclick={() => openSubstatLibrary()}
                 disabled={phaseLocked}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
-                    ? 'rounded-full px-3 py-2'
+                    ? 'rounded-none px-3 py-2'
                     : 'rounded-none px-3 py-1.5'}"
                 title="打开快速词条方案：一键套用标准14词条，或管理/套用自定义声骸词条方案"
             >
@@ -218,7 +218,7 @@
             <button
                 onclick={() => setShowBuffModal(true)}
                 class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                    ? 'rounded-full px-3 py-2'
+                    ? 'rounded-none px-3 py-2'
                     : 'rounded-none px-3 py-1.5'}"
                 title="BUFF配置"
             >
@@ -229,7 +229,7 @@
                 <button
                     onclick={toggleBuffDiffMode}
                     class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
-                        ? 'rounded-full px-3 py-2'
+                        ? 'rounded-none px-3 py-2'
                         : 'rounded-none px-3 py-1.5'} {getBuffDiffMode()
                         ? 'border-(--theme-accent-bg)'
                         : 'border-(--theme-sidebar-text)/20'}"
@@ -249,7 +249,7 @@
                 <button
                     onclick={() => setShowDamageTypeModal(true)}
                     class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                        ? 'rounded-full px-3 py-2'
+                        ? 'rounded-none px-3 py-2'
                         : 'rounded-none px-3 py-1.5'}"
                     title="逐个倍率确认伤害类型（拉表第一步）"
                 >
@@ -270,7 +270,7 @@
                         )
                     }}
                     class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
-                        ? 'rounded-full px-3 py-2'
+                        ? 'rounded-none px-3 py-2'
                         : 'rounded-none px-3 py-1.5'} {getScrollAxisDefault() === 'horizontal'
                         ? 'border-(--theme-accent-bg)'
                         : 'border-(--theme-sidebar-text)/20'}"
@@ -292,7 +292,7 @@
                 <button
                     onclick={toggleHideConditionMismatch}
                     class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
-                        ? 'rounded-full px-3 py-2'
+                        ? 'rounded-none px-3 py-2'
                         : 'rounded-none px-3 py-1.5'} {getHideConditionMismatch()
                         ? 'border-(--theme-accent-bg)'
                         : 'border-(--theme-sidebar-text)/20'}"
@@ -324,7 +324,7 @@
         <button
             onclick={onRefresh}
             class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                ? 'rounded-full px-3 py-2'
+                ? 'rounded-none px-3 py-2'
                 : 'rounded-none px-3 py-1.5'}"
             title="刷新结果"
         >
@@ -337,7 +337,7 @@
             onclick={onLockToggle}
             disabled={!phaseLocked && !canLock}
             class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:opacity-40 disabled:pointer-events-none {simplifyToolbar
-                ? 'rounded-full px-3 py-2'
+                ? 'rounded-none px-3 py-2'
                 : 'rounded-none px-3 py-1.5'}"
             title={phaseLocked ? '解锁' : '锁定'}
         >
