@@ -344,8 +344,9 @@
 </script>
 
 <div
+    data-sf="content"
     class="flex h-full flex-col {className}"
-    style="background: transparent; color: var(--theme-modal-text); {styleProp || ''}"
+    style="color: var(--theme-modal-text); {styleProp || ''}"
 >
     {#if loading}
         <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">计算中…</div>

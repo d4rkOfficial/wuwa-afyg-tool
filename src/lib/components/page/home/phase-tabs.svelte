@@ -134,8 +134,9 @@
 </script>
 
 <div
+    data-sf="toolbar"
     class="theme-glass-surface flex items-center gap-1 border-b px-3 {className}"
-    style="background: var(--theme-tabs-bg); color: var(--theme-tabs-text); border-color: var(--theme-divider-border); {styleProp ||
+    style="--sf-base: var(--theme-tabs-bg); color: var(--theme-tabs-text); border-color: var(--theme-divider-border); {styleProp ||
         ''}"
 >
     {#each tabs as tab}

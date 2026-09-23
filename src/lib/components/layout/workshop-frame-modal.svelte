@@ -52,8 +52,9 @@
         out:fade={{ duration: 130 }}
     >
         <div
+            data-sf="modal"
             class="animate-pop-in flex h-[90vh] w-[min(94vw,1100px)] flex-col overflow-hidden rounded-none border shadow-2xl"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+            style="color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
             out:popOut

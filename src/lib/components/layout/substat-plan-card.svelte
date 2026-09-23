@@ -58,8 +58,9 @@
 </script>
 
 <div
+    data-sf="card"
     class="rounded-none border {className ?? ''}"
-    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg); {styleProp || ''}"
+    style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border); {styleProp || ''}"
 >
     <button
         onclick={onexpand}

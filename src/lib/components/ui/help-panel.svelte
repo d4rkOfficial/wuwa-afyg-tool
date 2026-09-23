@@ -29,6 +29,7 @@
         role="presentation"
     >
         <div
+            data-sf="modal"
             class={[
                 'animate-pop-in theme-scrollbar relative max-h-[85vh] w-[90vw] max-w-4xl overflow-y-auto rounded-none p-6 shadow-2xl',
                 'text-(--theme-modal-text)',
@@ -36,7 +37,7 @@
             ]
                 .filter(Boolean)
                 .join(' ')}
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); {styleProp}"
+            style={styleProp}
             role="dialog"
             aria-modal="true"
         >

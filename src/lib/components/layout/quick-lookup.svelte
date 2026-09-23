@@ -45,10 +45,11 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            data-sf="modal"
             use:focusTrap
             tabindex="-1"
             class="animate-pop-in mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-none border text-(--theme-modal-text) shadow-2xl"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <!-- @desc 标题栏：标题 + 关闭按钮 -->

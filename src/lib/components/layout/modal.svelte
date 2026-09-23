@@ -60,6 +60,7 @@
         out:fade={{ duration: 130 }}
     >
         <div
+            data-sf="modal"
             class={[
                 'animate-pop-in theme-glass-surface theme-scrollbar relative max-h-[85vh] min-w-80 rounded-none p-6 shadow-2xl',
                 footer || noScroll ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
@@ -68,7 +69,7 @@
             ]
                 .filter(Boolean)
                 .join(' ')}
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); max-width: calc(100vw - 40px); {mergedStyle}"
+            style="max-width: calc(100vw - 40px); {mergedStyle}"
             role="dialog"
             aria-modal="true"
             out:popOut

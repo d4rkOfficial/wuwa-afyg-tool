@@ -586,7 +586,8 @@
 />
 
 <div
-    class="theme-glass-surface flex h-full flex-col bg-transparent text-(--theme-timeline-text) {className}"
+    data-sf="content"
+    class="theme-glass-surface flex h-full flex-col text-(--theme-timeline-text) {className}"
     style={styleProp}
 >
     <div

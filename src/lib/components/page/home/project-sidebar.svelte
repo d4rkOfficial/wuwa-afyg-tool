@@ -213,10 +213,11 @@
 </script>
 
 <aside
+    data-sf="sidebar"
     class="theme-glass-surface flex h-full shrink-0 flex-col border-r {className}"
     style="width: {width}px;{dragging
         ? ''
-        : ' transition: width 0.15s ease;'} background: color-mix(in srgb, var(--theme-sidebar-bg) 80%, transparent); color: var(--theme-sidebar-text); border-color: var(--theme-divider-border, rgba(255,255,255,0.1)); {styleProp ||
+        : ' transition: width 0.15s ease;'} color: var(--theme-sidebar-text); border-color: var(--theme-divider-border, rgba(255,255,255,0.1)); {styleProp ||
         ''}"
     oncontextmenu={(e) => e.preventDefault()}
 >

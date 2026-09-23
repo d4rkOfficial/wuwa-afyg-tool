@@ -1044,8 +1044,9 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
+            data-sf="modal"
             class="animate-pop-in w-full max-h-[95vh] h-full max-w-6xl rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col my-4"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
@@ -2271,8 +2272,9 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            data-sf="modal"
             class="animate-pop-in rounded-none border p-5 shadow-2xl w-md"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <div
@@ -2614,8 +2616,9 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            data-sf="modal"
             class="animate-pop-in rounded-none border p-5 shadow-2xl w-80"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="mb-2 flex items-center gap-2 text-base font-black tracking-tight">
@@ -2651,8 +2654,9 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            data-sf="modal"
             class="animate-pop-in rounded-none border p-5 shadow-2xl w-96"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="mb-2 flex items-center gap-2 text-base font-black tracking-tight">
@@ -2721,8 +2725,9 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            data-sf="modal"
             class="animate-pop-in rounded-none border p-5 shadow-2xl w-80"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="mb-2 flex items-center gap-2 text-base font-black tracking-tight">
@@ -2758,8 +2763,9 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            data-sf="modal"
             class="animate-pop-in rounded-none border p-5 shadow-2xl w-96"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="mb-2 flex items-center gap-2 text-base font-black tracking-tight">

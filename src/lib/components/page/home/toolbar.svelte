@@ -113,6 +113,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+    data-sf="toolbar"
     bind:this={toolbarEl}
     role="toolbar"
     onpointerdown={toolbarDown}
@@ -128,7 +129,7 @@
             : 'flex shrink-0 items-center gap-2 border-t px-4 py-2.5'
     } ${className || ''}`}
     style={simplifyToolbar
-        ? `interpolate-size: allow-keywords; border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);${
+        ? `interpolate-size: allow-keywords; border-color: var(--theme-divider-border); --sf-base: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);${
               toolbarX !== null && gpuAccel
                   ? `left: 0; transform: translate(${toolbarX}px, 0) scale(${toolbarScale});`
                   : `transform: scale(${toolbarScale});${toolbarX !== null ? `left: ${toolbarX}px;` : 'right: 20px;'}`
@@ -141,7 +142,7 @@
                   ? 'left 150ms ease'
                   : 'transform 150ms ease, box-shadow 150ms ease, left 150ms ease, width 250ms ease'
           };${toolbarDrag ? (gpuAccel ? ' will-change: transform;' : ' will-change: left;') : ''}${styleProp ? '; ' + styleProp : ''}`
-        : `background: var(--theme-sidebar-bg); color: var(--theme-sidebar-text); border-color: var(--theme-divider-border);${styleProp ? ' ' + styleProp : ''}`}
+        : `color: var(--theme-sidebar-text); border-color: var(--theme-divider-border);${styleProp ? ' ' + styleProp : ''}`}
 >
     <button
         onclick={onCharDetail}

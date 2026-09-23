@@ -46,8 +46,9 @@
 >
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
+        data-sf="modal"
         class="animate-pop-in w-72 rounded-none border p-4 shadow-2xl backdrop-blur-lg"
-        style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+        style="border-color: var(--theme-divider-border);"
         onclick={(e) => e.stopPropagation()}
     >
         <div class="mb-3 flex items-center gap-2 border-b pb-2.5" style="border-color: var(--theme-divider-border);">

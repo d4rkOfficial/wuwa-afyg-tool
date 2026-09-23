@@ -257,8 +257,9 @@
 </script>
 
 <div
+    data-sf="content"
     class="theme-glass-surface flex h-full flex-col p-5 {className}"
-    style="background: transparent; color: var(--theme-modal-text); {styleProp || ''}"
+    style="color: var(--theme-modal-text); {styleProp || ''}"
 >
     <!-- Tabs -->
     <div class="mb-4 flex gap-2 border-b pb-2.5" style="border-color: var(--theme-divider-border);">

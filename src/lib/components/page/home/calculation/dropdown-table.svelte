@@ -444,9 +444,9 @@
 <!-- @desc 表格容器：Ctrl+滚轮横向滚动，底色跟随「卡片透明度」 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+    data-sf="content"
     class="theme-scrollbar snap-scroll-y h-full overflow-auto pb-48 {className}"
-    style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-card-opacity, 92%), transparent); {styleProp ||
-        ''}"
+    style={styleProp}
     bind:this={calcContainer}
     onwheel={(e) => {
         if (e.ctrlKey) {

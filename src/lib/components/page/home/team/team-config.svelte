@@ -284,8 +284,9 @@
 </script>
 
 <div
+    data-sf="content"
     class="theme-glass-surface flex h-full flex-col p-6 {className}"
-    style="background: transparent; color: var(--theme-modal-text); {styleProp || ''}"
+    style="color: var(--theme-modal-text); {styleProp || ''}"
 >
     <div class="flex min-h-0 flex-1 gap-4">
         {#each localTeam as slot, i}

@@ -673,8 +673,9 @@
         out:fade={{ duration: 130 }}
     >
         <div
+            data-sf="modal"
             class="animate-pop-in theme-glass-surface relative flex h-[min(90vh,940px)] w-[min(96vw,1240px)] flex-col overflow-hidden rounded-none shadow-2xl"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+            style="color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
             out:popOut
@@ -2708,8 +2709,9 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
+                data-sf="modal"
                 class="theme-scrollbar animate-pop-in max-h-[75vh] w-[92vw] max-w-lg overflow-y-auto rounded-none border p-4"
-                style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                style="color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 onclick={(e) => e.stopPropagation()}
             >
                 <div class="mb-3 flex items-center justify-between">

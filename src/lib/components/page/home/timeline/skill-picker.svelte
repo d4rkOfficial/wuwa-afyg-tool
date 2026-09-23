@@ -219,10 +219,11 @@
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
+            data-sf="modal"
             use:focusTrap
             tabindex="-1"
             class="animate-pop-in w-full max-h-[70vh] max-w-xl rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
                 // 放行 ESC/Enter 到 window 层统一处理（保存/关闭），其余按键阻止冒泡
@@ -492,10 +493,11 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            data-sf="modal"
             use:focusTrap={{ initial: 'input' }}
             tabindex="-1"
             class="animate-pop-in w-[52rem] max-w-[94vw] rounded-none border p-6 shadow-2xl"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <div

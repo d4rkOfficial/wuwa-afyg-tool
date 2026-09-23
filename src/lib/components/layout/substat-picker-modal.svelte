@@ -15,7 +15,7 @@
     let { open, existingTypes, onpick, onclose, class: className, style: styleProp }: Props = $props()
 
     const mergedStyle = $derived(
-        `background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border); ${styleProp || ''}`
+        `border-color: var(--theme-divider-border); ${styleProp || ''}`
     )
 </script>
 
@@ -30,6 +30,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
+            data-sf="modal"
             class="animate-pop-in w-72 max-h-80 rounded-none border p-4 shadow-2xl backdrop-blur-lg {className ?? ''}"
             style={mergedStyle}
             onclick={(e) => e.stopPropagation()}

@@ -697,6 +697,7 @@
 <!-- @desc 表格根容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+    data-sf="content"
     class="theme-scrollbar snap-scroll-y h-full overflow-auto pb-48 {className}"
     style={styleProp}
     bind:this={rootEl}

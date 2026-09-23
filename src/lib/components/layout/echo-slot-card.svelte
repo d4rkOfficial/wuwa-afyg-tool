@@ -92,8 +92,9 @@
 </script>
 
 <div
+    data-sf="card"
     class="relative min-w-[13rem] rounded-none border p-4 {className ?? ''}"
-    style="background: var(--theme-card-bg); border-color: var(--theme-divider-border); {styleProp || ''}"
+    style="border-color: var(--theme-divider-border); {styleProp || ''}"
 >
     <!-- COST overlay -->
     <div class="pointer-events-none absolute inset-0 flex select-none items-center justify-center overflow-hidden">

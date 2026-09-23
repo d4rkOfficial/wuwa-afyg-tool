@@ -69,7 +69,7 @@
     ])
 </script>
 
-<div class="theme-scrollbar min-h-0 flex-1 overflow-y-auto {className}" style={styleProp}>
+<div data-sf="content" class="theme-scrollbar min-h-0 flex-1 overflow-y-auto {className}" style={styleProp}>
     <div class="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-5 px-6 py-7 md:px-8">
         <!-- 刊头 -->
         <header class="flex shrink-0 flex-col gap-3">

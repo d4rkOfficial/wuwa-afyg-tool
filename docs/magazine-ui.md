@@ -100,3 +100,23 @@
 - `src/lib/components/layout/magazine/magazine-card.svelte` — 直角卡片 + 水印
 - `src/lib/components/layout/settings-modal.svelte` — 侧边栏分区 + 双列列表 + 归档卡片（大胆版）
 - `src/lib/components/page/home/welcome-screen.svelte` — 刊头/水印基调（注意：不要照搬英文 kicker）
+
+## 7. 区域质感（surface）：透明度 / 毛玻璃强度 / 背景深度
+
+外观设置里的「背景质感」按 **5 类区域**独立配置，且**按昼夜主题分别保存**（`ThemeOverrides.appearance.dark|light`）：
+
+| key       | 覆盖范围                                                                     | 默认底色             |
+| --------- | ---------------------------------------------------------------------------- | -------------------- |
+| `card`    | 一般卡片（声骸/套装/方案）、排轴操作块、下拉拉表与结果页的行、平铺拉表单元格 | `--theme-card-bg`    |
+| `modal`   | 所有对话框                                                                   | `--theme-modal-bg`   |
+| `sidebar` | 工程列表侧边栏、顶部标题栏                                                   | `--theme-sidebar-bg` |
+| `content` | 欢迎页 / 队伍配置 / 排轴 / 平铺拉表 / 下拉拉表 / 词条环境配置 / 结果         | `--theme-layout-bg`  |
+| `toolbar` | 顶部工具栏、底部工具栏、底部悬浮工具栏                                       | `--theme-sidebar-bg` |
+
+**接入方式**：给元素加 `data-sf="<key>"`，并**删掉它自己写死的 background 与 backdrop-filter**；底色不是默认值时用内联覆盖 `style="--sf-base: var(--theme-xxx-bg)"`（排轴操作块用 `--theme-timeline-bg`、表格行/单元格用 `--theme-modal-bg`）。
+
+引擎在 `:root` 上写 `--sf-<key>-opacity|depth|target|backdrop`，`src/routes/layout.css` 的 `[data-sf]` 一条通用规则合成 `background`（`color-mix` 嵌套：先按深度向主题极值混色，再乘透明度）与 `backdrop-filter`。`blur=0 且 depth=0` 时 `--sf-*-backdrop` 为 `none`，不产生合成开销，因此可以安全地给大量行/单元格挂 `data-sf`。
+
+**背景图效果**（`bgImageBlur` / `bgImageMask`）同样按昼夜分别保存；遮罩范围 `-100`（压暗）~ `200`（更白）。**背景深度** `0-100`：昼主题向白、夜主题向黑，并同时作用于毛玻璃背面的亮度。
+
+AI / WS 侧：`set_setting key=theme_bg_image_effect({blur,mask,mode})`、`set_setting key=surface_style({surface,opacity,blur,depth,reset,mode})`。

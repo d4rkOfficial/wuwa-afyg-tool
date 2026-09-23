@@ -751,8 +751,9 @@
     >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
+            data-sf="modal"
             class="animate-pop-in theme-scrollbar w-120 max-h-[88vh] overflow-y-auto rounded-none border p-5 shadow-2xl"
-            style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); border-color: var(--theme-divider-border);"
+            style="border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
         >
             <h3 class="text-base font-black tracking-tight mb-5 flex items-baseline gap-1.5">
