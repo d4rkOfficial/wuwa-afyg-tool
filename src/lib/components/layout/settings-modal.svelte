@@ -546,7 +546,7 @@
         out:fade={{ duration: 130 }}
     >
         <div
-            class="animate-pop-in theme-glass-surface relative flex h-140 max-h-[90vh] w-160 max-w-[94vw] flex-col overflow-hidden rounded-xl shadow-2xl"
+            class="animate-pop-in theme-glass-surface relative flex h-140 max-h-[90vh] w-160 max-w-[94vw] flex-col overflow-hidden rounded-none shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
@@ -556,10 +556,16 @@
                 class="flex shrink-0 items-center justify-between border-b px-6 py-4"
                 style="border-color: var(--theme-divider-border);"
             >
-                <h3 class="text-base font-semibold">设置</h3>
+                <div class="flex items-baseline gap-2.5">
+                    <span
+                        class="text-[10px] font-semibold uppercase tracking-[0.34em] text-(--theme-accent-text) opacity-80"
+                        >SETTINGS</span
+                    >
+                    <h3 class="font-black tracking-tight">设置</h3>
+                </div>
                 <button
                     onclick={onclose}
-                    class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                     aria-label="关闭设置"
                 >
                     <Icon icon="mdi:close" class="size-4.5" />
@@ -575,7 +581,7 @@
                     {#each SETTING_TABS as t}
                         <button
                             onclick={() => (tab = t.key)}
-                            class="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors {tab ===
+                            class="flex shrink-0 items-center gap-2 rounded-none px-3 py-2 text-sm font-medium transition-colors {tab ===
                             t.key
                                 ? 'text-(--theme-accent-text-on-bg)'
                                 : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
@@ -592,16 +598,18 @@
                     {#if tab === 'theme'}
                         <!-- Accent color -->
                         <div class="mb-5">
-                            <span class="mb-3 block text-xs font-medium text-(--theme-modal-text)/60">主色调</span>
+                            <span class="mb-3 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >主色调</span
+                            >
                             <div
-                                class="flex gap-1 rounded-lg border p-1"
+                                class="flex gap-1 rounded-none border p-1"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 {#each COLOR_PRESETS.slice(0, -1) as c}
                                     {@const style = getPresetStyle(c.hue)}
                                     <button
                                         onclick={() => updateOverride('accentHue', c.hue)}
-                                        class="flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors"
+                                        class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors"
                                         style="background: {overrides.accentHue === c.hue
                                             ? style.bg
                                             : 'transparent'}; color: {overrides.accentHue === c.hue
@@ -619,7 +627,7 @@
                                     {@const style = getPresetStyle(c.hue)}
                                     <button
                                         onclick={() => updateOverride('accentHue', c.hue)}
-                                        class="flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors"
+                                        class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors"
                                         style="background: {overrides.accentHue === c.hue
                                             ? style.bg
                                             : 'transparent'}; color: {overrides.accentHue === c.hue
@@ -634,9 +642,11 @@
 
                         <!-- 昼夜切换 -->
                         <div class="mb-5">
-                            <span class="mb-3 block text-xs font-medium text-(--theme-modal-text)/60">昼夜切换</span>
+                            <span class="mb-3 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >昼夜切换</span
+                            >
                             <div
-                                class="flex items-center justify-between gap-3 rounded-lg border px-2.5 py-2"
+                                class="flex items-center justify-between gap-3 rounded-none border px-2.5 py-2"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="min-w-0">
@@ -669,7 +679,7 @@
                         <div>
                             <div class="mb-3 flex items-center gap-2">
                                 <span
-                                    class="flex size-7 items-center justify-center rounded-lg bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                    class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
                                 >
                                     <Icon icon="mdi:image-outline" class="size-4" />
                                 </span>
@@ -683,7 +693,7 @@
 
                             <!-- 白天 / 黑夜 切换：切换正在编辑的那张背景图 -->
                             <div
-                                class="mb-3 flex gap-1 rounded-lg border p-1"
+                                class="mb-3 flex gap-1 rounded-none border p-1"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 {#each [{ light: false, label: '黑夜' }, { light: true, label: '白天' }] as mode (mode.label)}
@@ -698,7 +708,7 @@
                                                 : overrides.backgroundImage
                                             bgUrl = next.startsWith('http') ? next : ''
                                         }}
-                                        class="flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors {active
+                                        class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium transition-colors {active
                                             ? ''
                                             : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
                                         style={active
@@ -712,7 +722,7 @@
 
                             {#if editingBg}
                                 <div
-                                    class="mb-3 overflow-hidden rounded-lg border"
+                                    class="mb-3 overflow-hidden rounded-none border"
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     <img src={editingBg} alt="背景预览" class="h-28 w-full object-cover" />
@@ -740,7 +750,7 @@
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <div
                                     onclick={() => fileInput?.click()}
-                                    class="mb-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 transition-colors hover:bg-(--theme-modal-text)/5"
+                                    class="mb-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed px-4 py-8 transition-colors hover:bg-(--theme-modal-text)/5"
                                     style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                 >
                                     <Icon icon="mdi:image-outline" class="size-8 text-(--theme-modal-text)/20" />
@@ -757,7 +767,7 @@
                             />
 
                             <div
-                                class="flex items-center gap-2 rounded-lg border px-3 py-2"
+                                class="flex items-center gap-2 rounded-none border px-3 py-2"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <input
@@ -770,7 +780,7 @@
                                 <button
                                     onclick={handleUrlApply}
                                     disabled={!bgUrl.trim()}
-                                    class="shrink-0 rounded px-2.5 py-1 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
+                                    class="shrink-0 rounded-none px-2.5 py-1 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
                                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                                 >
                                     加载
@@ -778,7 +788,7 @@
                             </div>
 
                             <div
-                                class="mt-4 overflow-hidden rounded-xl border"
+                                class="mt-4 overflow-hidden rounded-none border"
                                 style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-input-bg) 70%, transparent);"
                             >
                                 <div
@@ -808,7 +818,7 @@
                                         ></div>
                                     {/if}
                                     <div
-                                        class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-xl border p-3 shadow-xl"
+                                        class="absolute inset-y-4 left-4 flex w-40 flex-col justify-between overflow-hidden rounded-none border p-3 shadow-xl"
                                         style="border-color: color-mix(in srgb, var(--theme-modal-text) 18%, transparent); background: color-mix(in srgb, var(--theme-modal-bg) {overrides.bgOpacity}%, transparent); backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
                                             (overrides.bgDim / 100) *
                                                 0.6}); -webkit-backdrop-filter: blur({overrides.bgBlur}px) saturate(1.12) brightness({1 -
@@ -819,7 +829,7 @@
                                         ></div>
                                         <div class="flex items-center gap-2">
                                             <span
-                                                class="flex size-6 items-center justify-center rounded-md bg-(--theme-accent-bg)/20 text-(--theme-accent-text)"
+                                                class="flex size-6 items-center justify-center rounded-none bg-(--theme-accent-bg)/20 text-(--theme-accent-text)"
                                             >
                                                 <Icon icon="mdi:blur" class="size-3.5" />
                                             </span>
@@ -831,7 +841,7 @@
                                         </div>
                                     </div>
                                     <span
-                                        class="absolute bottom-3 right-3 rounded-md bg-black/30 px-2 py-1 font-mono text-[9px] tracking-wide text-white/70 backdrop-blur-sm"
+                                        class="absolute bottom-3 right-3 rounded-none bg-black/30 px-2 py-1 font-mono text-[9px] tracking-wide text-white/70 backdrop-blur-sm"
                                         >LIVE</span
                                     >
                                 </div>
@@ -839,7 +849,7 @@
                                 <div class="p-4">
                                     <div class="mb-4 flex items-start gap-2.5">
                                         <span
-                                            class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
+                                            class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-none bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
                                         >
                                             <Icon icon="mdi:layers-triple-outline" class="size-4" />
                                         </span>
@@ -995,7 +1005,7 @@
                                             >
                                                 <div class="mb-3 flex items-start gap-2.5">
                                                     <span
-                                                        class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
+                                                        class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-none bg-(--theme-modal-text)/5 text-(--theme-modal-text)/45"
                                                     >
                                                         <Icon icon="mdi:image-outline" class="size-4" />
                                                     </span>
@@ -1093,7 +1103,7 @@
                             <div class="mt-4">
                                 <div class="mb-3 flex items-center gap-2">
                                     <span
-                                        class="flex size-7 items-center justify-center rounded-lg bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                        class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
                                     >
                                         <Icon icon="mdi:monitor" class="size-4" />
                                     </span>
@@ -1107,11 +1117,11 @@
                                     </div>
                                 </div>
                                 <div
-                                    class="flex items-center gap-2 rounded-lg border p-1.5 px-2.5"
+                                    class="flex items-center gap-2 rounded-none border p-1.5 px-2.5"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <span
-                                        class="size-5 shrink-0 rounded border"
+                                        class="size-5 shrink-0 rounded-none border"
                                         style="background: var(--theme-titlebar-bg); border-color: var(--theme-divider-border);"
                                     ></span>
                                     <span class="text-[11px] font-medium text-(--theme-modal-text)/60"
@@ -1123,7 +1133,7 @@
                             <div class="mt-4">
                                 <div class="mb-3 flex items-center gap-2">
                                     <span
-                                        class="flex size-7 items-center justify-center rounded-lg bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
+                                        class="flex size-7 items-center justify-center rounded-none bg-(--theme-accent-bg)/10 text-(--theme-accent-text)"
                                     >
                                         <Icon icon="mdi:star" class="size-4" />
                                     </span>
@@ -1137,7 +1147,7 @@
                                     </div>
                                 </div>
                                 <div
-                                    class="rounded-lg border p-3"
+                                    class="rounded-none border p-3"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div>
@@ -1173,14 +1183,16 @@
                     {:else if tab === 'keymap'}
                         <!-- Key mapping -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">按键图标</span>
+                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >按键图标</span
+                            >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 每行决定排轴时操作块显示的按键图标（键盘或手柄）；快速排轴输入键与界面快捷键可在「交互相关」中配置
                             </p>
                             <div class="flex flex-col gap-2">
                                 {#each keymapEntries as entry}
                                     <div
-                                        class="flex items-center gap-2 rounded-lg border px-2.5 py-2"
+                                        class="flex items-center gap-2 rounded-none border px-2.5 py-2"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
                                         <span class="flex size-9 shrink-0 items-center justify-center">
@@ -1214,7 +1226,7 @@
                                             class="min-w-0 flex-1 bg-transparent text-xs text-(--theme-modal-text) outline-none placeholder:text-(--theme-modal-text)/30"
                                         />
                                         <span
-                                            class="shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/60"
+                                            class="shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/60"
                                             style="border-color: var(--theme-divider-border);"
                                             title="快捷键"
                                         >
@@ -1222,7 +1234,7 @@
                                         </span>
                                         <button
                                             onclick={() => (keyPickerFor = entry.id)}
-                                            class="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium transition-all hover:brightness-125"
+                                            class="shrink-0 rounded-none px-2 py-0.5 text-[10px] font-medium transition-all hover:brightness-125"
                                             style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                                         >
                                             选择自定义key
@@ -1233,7 +1245,7 @@
                             <div class="mt-3 flex items-center gap-2">
                                 <button
                                     onclick={() => (tab = 'interaction')}
-                                    class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-accent-text) transition-colors hover:brightness-125"
+                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-accent-text) transition-colors hover:brightness-125"
                                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);"
                                     title="跳转到「交互相关」页配置快速排轴输入键与界面快捷键"
                                 >
@@ -1243,7 +1255,7 @@
                                 </button>
                                 <button
                                     onclick={() => resetKeyMap()}
-                                    class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     <Icon icon="mdi:restore" class="size-3.5" />
@@ -1253,12 +1265,14 @@
                         </div>
                     {:else if tab === 'interaction'}
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">拉表视图</span>
+                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >拉表视图</span
+                            >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 选择拉表页面的 Buff 编辑方式；后续拉表/排轴等快捷键设置也将集中在此区域
                             </p>
                             <div
-                                class="flex gap-1 rounded-lg border p-1"
+                                class="flex gap-1 rounded-none border p-1"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 role="tablist"
                             >
@@ -1266,7 +1280,7 @@
                                     role="tab"
                                     aria-selected={getCalcViewMode() === 'dropdown'}
                                     onclick={() => switchCalcViewMode('dropdown')}
-                                    class="flex-1 rounded-md px-1 py-1.5 text-xs font-medium transition-colors"
+                                    class="flex-1 rounded-none px-1 py-1.5 text-xs font-medium transition-colors"
                                     style={getCalcViewMode() === 'dropdown'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
                                         : 'color: var(--theme-modal-text)/60;'}
@@ -1277,7 +1291,7 @@
                                     role="tab"
                                     aria-selected={getCalcViewMode() === 'spread'}
                                     onclick={() => switchCalcViewMode('spread')}
-                                    class="flex-1 rounded-md px-1 py-1.5 text-xs font-medium transition-colors"
+                                    class="flex-1 rounded-none px-1 py-1.5 text-xs font-medium transition-colors"
                                     style={getCalcViewMode() === 'spread'
                                         ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
                                         : 'color: var(--theme-modal-text)/60;'}
@@ -1287,9 +1301,11 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">工具栏</span>
+                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                    >工具栏</span
+                                >
                                 <div
-                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="min-w-0">
@@ -1319,10 +1335,11 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">交互效果</span
+                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                    >交互效果</span
                                 >
                                 <div
-                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="min-w-0">
@@ -1352,10 +1369,11 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">删除行为</span
+                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                    >删除行为</span
                                 >
                                 <div
-                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="min-w-0">
@@ -1385,10 +1403,11 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">右键菜单</span
+                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                    >右键菜单</span
                                 >
                                 <div
-                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="min-w-0">
@@ -1418,18 +1437,18 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60"
+                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
                                     >消息提示位置</span
                                 >
                                 <div
-                                    class="flex gap-1 rounded-lg border p-1"
+                                    class="flex gap-1 rounded-none border p-1"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     {#each TOAST_POSITIONS as p (p)}
                                         {@const active = getToastPosition() === p}
                                         <button
                                             onclick={() => setToastPosition(p)}
-                                            class="flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors {active
+                                            class="flex-1 rounded-none px-1 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors {active
                                                 ? ''
                                                 : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
                                             style={active
@@ -1447,7 +1466,7 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60"
+                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
                                     >界面快捷键</span
                                 >
                                 <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/40">
@@ -1462,7 +1481,7 @@
                                         <div class="mt-1 flex flex-col gap-1.5">
                                             {#each getShortcuts().filter((s) => s.group === g.key) as s}
                                                 <div
-                                                    class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+                                                    class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
                                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                                 >
                                                     <div class="min-w-0 flex-1">
@@ -1475,14 +1494,14 @@
                                                         >
                                                     </div>
                                                     <span
-                                                        class="shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[10px] text-(--theme-modal-text)/70"
+                                                        class="shrink-0 rounded-none border px-1.5 py-0.5 font-mono text-[10px] text-(--theme-modal-text)/70"
                                                         style="border-color: var(--theme-divider-border);"
                                                         >{shortcutLabel(getShortcutKey(s.id))}</span
                                                     >
                                                     <button
                                                         onclick={() =>
                                                             (shortcutCapture = shortcutCapture === s.id ? null : s.id)}
-                                                        class="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium transition-all"
+                                                        class="shrink-0 rounded-none px-2 py-0.5 text-[10px] font-medium transition-all"
                                                         style={shortcutCapture === s.id
                                                             ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);'
                                                             : 'background: var(--theme-modal-text)/8; color: var(--theme-modal-text)/70;'}
@@ -1502,7 +1521,7 @@
                                 <div class="mt-3 flex items-center gap-2">
                                     <button
                                         onclick={() => resetShortcuts()}
-                                        class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                                         style="border-color: var(--theme-divider-border);"
                                     >
                                         <Icon icon="mdi:restore" class="size-3.5" />
@@ -1514,13 +1533,15 @@
                     {:else if tab === 'performance'}
                         <!-- 性能相关 -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">性能设置</span>
+                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >性能设置</span
+                            >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 控制交互渲染方式与刷新结果时的数据加载行为
                             </p>
                             <!-- 渲染加速（GPU）：拖拽/动画走合成层 -->
                             <div
-                                class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="min-w-0">
@@ -1550,7 +1571,7 @@
                             </div>
                             <!-- 刷新结果重载数据：开启后刷新结果时重新加载本工程全部阶段数据 -->
                             <div
-                                class="mt-2 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                class="mt-2 flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="min-w-0">
@@ -1579,7 +1600,7 @@
                             </div>
                             <!-- 链/阶变动重载数据：开启后调整共鸣链/精炼档位时自动重载本工程全部阶段数据 -->
                             <div
-                                class="mt-2 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                class="mt-2 flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                             >
                                 <div class="min-w-0">
@@ -1610,7 +1631,9 @@
                     {:else if tab === 'connection'}
                         <!-- Connection settings: 上游数据源 + 工坊/分享源 -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">上游数据源</span>
+                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >上游数据源</span
+                            >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 选择角色/武器/声骸等数据的来源；切换后列表与详情缓存会按新源重新加载
                             </p>
@@ -1618,7 +1641,7 @@
                                 {#each providerOptions as opt}
                                     <div
                                         class={[
-                                            'flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors',
+                                            'flex cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
                                             opt.id === activeProviderId
                                                 ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
                                                 : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
@@ -1636,7 +1659,7 @@
                                             >{opt.label}</span
                                         >
                                         <span
-                                            class="shrink-0 rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                            class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
                                             title="最新数据版本"
                                         >
                                             {providerVersions[opt.id] || opt.id}
@@ -1647,7 +1670,7 @@
                             <div class="mt-3">
                                 <button
                                     onclick={handleResetProvider}
-                                    class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     <Icon icon="mdi:restore" class="size-3.5" />
@@ -1657,7 +1680,7 @@
 
                             <div class="my-4 border-t" style="border-color: var(--theme-divider-border);"></div>
 
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60"
+                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >工坊 / 分享源</span
                             >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
@@ -1669,7 +1692,7 @@
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
                                         class={[
-                                            'flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors',
+                                            'flex cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
                                             inst.id === workshopActiveId
                                                 ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
                                                 : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
@@ -1692,7 +1715,7 @@
                                                     e.stopPropagation()
                                                     handleRemoveWorkshop(inst.id)
                                                 }}
-                                                class="shrink-0 rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                                                class="shrink-0 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
                                                 title="删除"
                                             >
                                                 <Icon icon="mdi:close" class="size-3.5" />
@@ -1706,12 +1729,12 @@
                                     bind:value={newWorkshopUrl}
                                     onkeydown={(e) => e.key === 'Enter' && handleAddWorkshop()}
                                     placeholder="https://example.com 工坊地址"
-                                    class="min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none placeholder:text-(--theme-modal-text)/30"
+                                    class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none placeholder:text-(--theme-modal-text)/30"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 />
                                 <button
                                     onclick={handleAddWorkshop}
-                                    class="flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all hover:brightness-125"
+                                    class="flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1.5 text-xs font-medium transition-all hover:brightness-125"
                                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                                 >
                                     <Icon icon="mdi:plus" class="size-3.5" />
@@ -1721,7 +1744,7 @@
                             <div class="mt-3">
                                 <button
                                     onclick={handleResetWorkshop}
-                                    class="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     <Icon icon="mdi:restore" class="size-3.5" />
@@ -1732,13 +1755,15 @@
                     {:else if tab === 'archive'}
                         <!-- Archive management -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">归档管理</span>
+                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >归档管理</span
+                            >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 已归档的工程不会出现在侧边栏，可取消归档恢复、全量导出、分享或永久删除
                             </p>
                             {#if archivedProjects.length === 0}
                                 <div
-                                    class="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-10"
+                                    class="flex flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed px-4 py-10"
                                     style="border-color: var(--theme-divider-border);"
                                 >
                                     <Icon icon="mdi:archive-outline" class="size-8 text-(--theme-modal-text)/20" />
@@ -1748,7 +1773,7 @@
                                 <div class="flex flex-col gap-2">
                                     {#each archivedProjects as p}
                                         <div
-                                            class="rounded-lg border px-2.5 py-2"
+                                            class="rounded-none border px-2.5 py-2"
                                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                         >
                                             <div class="flex items-center gap-2">
@@ -1763,7 +1788,7 @@
                                             <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                                                 <button
                                                     onclick={() => handleUnarchive(p.id)}
-                                                    class="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] transition-colors text-(--theme-accent-text) hover:brightness-125"
+                                                    class="flex items-center gap-1 rounded-none px-2 py-0.5 text-[10px] transition-colors text-(--theme-accent-text) hover:brightness-125"
                                                     style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);"
                                                 >
                                                     <Icon icon="mdi:archive-arrow-up-outline" class="size-3" />
@@ -1771,7 +1796,7 @@
                                                 </button>
                                                 <button
                                                     onclick={() => handleArchiveExport(p.id)}
-                                                    class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                                    class="flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                                                     style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <Icon icon="mdi:file-export" class="size-3" />
@@ -1779,7 +1804,7 @@
                                                 </button>
                                                 <button
                                                     onclick={() => handleArchiveShare(p.id)}
-                                                    class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                                    class="flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                                                     style="border-color: var(--theme-divider-border);"
                                                 >
                                                     <Icon icon="mdi:share-variant" class="size-3" />
@@ -1787,7 +1812,7 @@
                                                 </button>
                                                 <button
                                                     onclick={() => openArchiveDelete(p.id)}
-                                                    class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
+                                                    class="flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
                                                     style="border-color: var(--theme-divider-border);"
                                                     title="永久删除，不可恢复"
                                                 >
@@ -1803,14 +1828,16 @@
                     {:else if tab === 'cache'}
                         <!-- Cache management -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">缓存清理</span>
+                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >缓存清理</span
+                            >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 仅清理接口数据缓存（列表 / 详情 / 图像），不影响你的工程与本地数据
                             </p>
                             <div class="flex flex-col gap-2">
                                 {#each CACHE_LABELS as item}
                                     <div
-                                        class="flex items-center gap-2.5 rounded-lg border px-3 py-2.5"
+                                        class="flex items-center gap-2.5 rounded-none border px-3 py-2.5"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                     >
                                         <Icon icon={item.icon} class="size-4 shrink-0 text-(--theme-accent-text)" />
@@ -1822,7 +1849,7 @@
                                         >
                                         <button
                                             onclick={() => handleClearCache(item.key)}
-                                            class="shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-all hover:brightness-125"
+                                            class="shrink-0 inline-flex items-center gap-1 rounded-none px-2 py-1 text-[10px] font-medium transition-all hover:brightness-125"
                                             style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                                         >
                                             <Icon icon="mdi:delete-sweep-outline" class="size-3" />
@@ -1835,7 +1862,9 @@
                     {:else if tab === 'ai'}
                         <!-- 助手设置 -->
                         <div>
-                            <span class="mb-1 block text-xs font-medium text-(--theme-modal-text)/60">助手设置</span>
+                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >助手设置</span
+                            >
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 可配置多组「提供商 / 模型 / API Key」并一键切换，每组独立保存；API Key
                                 仅存本机。点击配置文件即可切换，点「编辑」打开独立弹窗修改
@@ -1843,7 +1872,7 @@
                             <div class="flex flex-col gap-2">
                                 <!-- 启用 AI 助手（独立开关，立即保存） -->
                                 <div
-                                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                    class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="min-w-0">
@@ -1873,7 +1902,7 @@
 
                                 <!-- 危险操作权限（独立设置，立即保存） -->
                                 <div
-                                    class="rounded-lg border px-3 py-2.5"
+                                    class="rounded-none border px-3 py-2.5"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <span class="block text-xs font-medium text-(--theme-modal-text)/70"
@@ -1889,7 +1918,7 @@
                                             <button
                                                 onclick={() => setDangerMode(opt.value)}
                                                 class={[
-                                                    'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
+                                                    'flex items-center gap-2 rounded-none border px-2.5 py-1.5 text-left transition-colors',
                                                     active
                                                         ? 'border-(--theme-accent-bg)'
                                                         : 'hover:bg-(--theme-modal-text)/5'
@@ -1919,7 +1948,7 @@
 
                                 <!-- 配置文件设置 -->
                                 <div
-                                    class="rounded-lg border px-3 py-2.5"
+                                    class="rounded-none border px-3 py-2.5"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <div class="mb-2 flex items-center justify-between">
@@ -1928,7 +1957,7 @@
                                         >
                                         <button
                                             onclick={handleAddAiProfile}
-                                            class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                            class="inline-flex items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
                                             style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                                         >
                                             <Icon icon="mdi:plus" class="size-3" />
@@ -1942,7 +1971,7 @@
                                         {#each aiProfiles as p}
                                             {@const isActive = p.id === aiActiveId}
                                             <div
-                                                class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors"
+                                                class="flex items-center gap-2 rounded-none border px-2.5 py-1.5 transition-colors"
                                                 style="border-color: {isActive
                                                     ? 'color-mix(in srgb, var(--theme-accent-bg) 45%, transparent)'
                                                     : 'var(--theme-divider-border)'}; background: color-mix(in srgb, var(--theme-accent-bg) {isActive
@@ -1968,7 +1997,7 @@
                                                         <span class="truncate">{p.label}</span>
                                                         {#if isActive}
                                                             <span
-                                                                class="shrink-0 rounded bg-(--theme-accent-bg)/20 px-1 py-px text-[9px] text-(--theme-accent-text)"
+                                                                class="shrink-0 rounded-none bg-(--theme-accent-bg)/20 px-1 py-px text-[9px] text-(--theme-accent-text)"
                                                                 >当前</span
                                                             >
                                                         {/if}
@@ -1982,14 +2011,14 @@
                                                 <div class="flex shrink-0 items-center gap-0.5">
                                                     <button
                                                         onclick={() => (aiEditTarget = p)}
-                                                        class="rounded p-1 text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-accent-text)"
+                                                        class="rounded-none p-1 text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-accent-text)"
                                                         title="编辑此配置"
                                                     >
                                                         <Icon icon="mdi:pencil-outline" class="size-3.5" />
                                                     </button>
                                                     <button
                                                         onclick={() => handleDeleteAiProfile(p)}
-                                                        class="rounded p-1 text-(--theme-modal-text)/35 transition-colors hover:text-red-400"
+                                                        class="rounded-none p-1 text-(--theme-modal-text)/35 transition-colors hover:text-red-400"
                                                         title="删除此配置"
                                                     >
                                                         <Icon icon="mdi:trash-can-outline" class="size-3.5" />
@@ -2002,7 +2031,7 @@
 
                                 <!-- 提示词设置 -->
                                 <div
-                                    class="rounded-lg border px-3 py-2.5"
+                                    class="rounded-none border px-3 py-2.5"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                 >
                                     <span class="text-xs font-medium text-(--theme-modal-text)/70">提示词设置</span>
@@ -2011,7 +2040,7 @@
                                     </p>
                                     <div class="flex flex-col gap-1">
                                         <div
-                                            class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+                                            class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             <div class="min-w-0 flex-1">
@@ -2026,7 +2055,7 @@
                                             </div>
                                             <button
                                                 onclick={() => (promptEditKind = 'naming')}
-                                                class="inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
                                                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                                             >
                                                 <Icon icon="mdi:pencil-outline" class="size-3" />
@@ -2034,7 +2063,7 @@
                                             </button>
                                         </div>
                                         <div
-                                            class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+                                            class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             <div class="min-w-0 flex-1">
@@ -2049,7 +2078,7 @@
                                             </div>
                                             <button
                                                 onclick={() => (promptEditKind = 'slang')}
-                                                class="inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
                                                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                                             >
                                                 <Icon icon="mdi:pencil-outline" class="size-3" />
@@ -2057,7 +2086,7 @@
                                             </button>
                                         </div>
                                         <div
-                                            class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+                                            class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             <div class="min-w-0 flex-1">
@@ -2072,7 +2101,7 @@
                                             </div>
                                             <button
                                                 onclick={() => (promptEditKind = 'persona')}
-                                                class="inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
+                                                class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
                                                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                                             >
                                                 <Icon icon="mdi:pencil-outline" class="size-3" />
@@ -2143,7 +2172,7 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-                class="theme-scrollbar animate-pop-in max-h-[75vh] w-[92vw] max-w-lg overflow-y-auto rounded-xl border p-4"
+                class="theme-scrollbar animate-pop-in max-h-[75vh] w-[92vw] max-w-lg overflow-y-auto rounded-none border p-4"
                 style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 onclick={(e) => e.stopPropagation()}
             >
@@ -2151,7 +2180,7 @@
                     <span class="text-sm font-semibold">选择按键与手柄键位</span>
                     <button
                         onclick={() => (keyPickerFor = null)}
-                        class="rounded p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                        class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                     >
                         <Icon icon="mdi:close" class="size-4.5" />
                     </button>
@@ -2167,7 +2196,7 @@
                                 updateEntry(keyPickerFor!, { blockKey: name })
                                 keyPickerFor = null
                             }}
-                            class="flex size-10 items-center justify-center rounded-md border transition-colors {keyPickerFor &&
+                            class="flex size-10 items-center justify-center rounded-none border transition-colors {keyPickerFor &&
                             entryById(keyPickerFor)?.blockKey === name
                                 ? 'border-(--theme-accent-bg)'
                                 : 'hover:bg-(--theme-modal-text)/10'}"
@@ -2197,7 +2226,7 @@
                                 updateEntry(keyPickerFor!, { blockKey: btn.id })
                                 keyPickerFor = null
                             }}
-                            class="flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-md border px-2 transition-colors {keyPickerFor &&
+                            class="flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-none border px-2 transition-colors {keyPickerFor &&
                             entryById(keyPickerFor)?.blockKey === btn.id
                                 ? 'border-(--theme-accent-bg)'
                                 : 'hover:bg-(--theme-modal-text)/10'}"
