@@ -197,7 +197,9 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
 
     /* ── 区域质感（surface）：透明度 / 毛玻璃强度 / 背景深度均可在「设置-外观主题-背景质感」独立配置 ──
        用法：给元素加 data-sf="card|modal|sidebar|content|toolbar"；
-       底色默认取该类的主题底色，元素可用内联 style="--sf-base: var(--theme-xxx-bg)" 覆盖（如操作块用 timeline 底色） */
+       底色默认取该类的主题底色，元素可用内联 style="--sf-base: var(--theme-xxx-bg)" 覆盖（如操作块用 timeline 底色）；
+       再加 data-sf-flat 则只取该类底色（透明度/深度）而不使用毛玻璃——用于大量逐行/逐格元素（如铺开表），
+       避免每个元素都重算一次背景模糊 */
     [data-sf] {
         background: color-mix(
             in srgb,
@@ -211,6 +213,10 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
         );
         backdrop-filter: var(--sf-backdrop, none);
         -webkit-backdrop-filter: var(--sf-backdrop, none);
+    }
+    [data-sf][data-sf-flat] {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
     [data-sf='card'] {
         --sf-base: var(--theme-card-bg);

@@ -853,13 +853,16 @@
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
         {@const hasFolder = group.hasFolder}
         <div class="mx-3 my-3.5" data-group-wrap={gi}>
+            <!-- 列表（表体）底色跟随「卡片」透明度/深度；data-sf-flat 只取底色不用毛玻璃（逐格元素避免逐元素重算模糊） -->
             <table
-                class="spread-table w-auto text-xs shadow-(--theme-card-shadow)"
+                class="w-auto text-xs shadow-(--theme-card-shadow)"
+                data-sf="card"
+                data-sf-flat
                 data-group-table={gi}
-                style="border-collapse: separate; border-spacing: 0; border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border);"
+                style="--sf-base: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border);"
             >
                 <!-- 标题块与全局 buff 折叠行放入 caption：宽度自动跟随表头（表格宽度） -->
-                <caption class="spread-caption text-left">
+                <caption class="text-left" data-sf="card" data-sf-flat style="--sf-base: var(--theme-modal-bg);">
                     <div
                         class="flex items-center gap-2 border-b border-(--theme-divider-border) px-3 py-2"
                         style="background-image: linear-gradient(
@@ -914,16 +917,23 @@
                 <thead>
                     {#if hasFolder}
                         <tr>
+                            <!-- 表头（含「条目」角格）底色跟随「工具栏」透明度/深度 -->
                             <th
                                 data-rowhead
-                                class="spread-head sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
+                                data-sf="toolbar"
+                                data-sf-flat
+                                class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
+                                style="--sf-base: var(--theme-modal-bg);"
                                 rowspan="2"
                             >
                                 条目
                             </th>
                             {#each group.headerGroups as hc, i (i)}
                                 <th
-                                    class="spread-head sticky top-0 z-30 h-6 p-0 text-center {hc.sepClass}"
+                                    data-sf="toolbar"
+                                    data-sf-flat
+                                    class="sticky top-0 z-30 h-6 p-0 text-center {hc.sepClass}"
+                                    style="--sf-base: var(--theme-modal-bg);"
                                     colspan={hc.span}
                                 >
                                     {#if hc.label}
@@ -941,7 +951,10 @@
                             <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
                             <th
                                 data-rowhead
-                                class="spread-head sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
+                                data-sf="toolbar"
+                                data-sf-flat
+                                class="sticky left-0 top-0 z-40 w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
+                                style="--sf-base: var(--theme-modal-bg);"
                             >
                                 条目
                             </th>
@@ -953,11 +966,14 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <th
                                 data-colhead={hc.ci}
-                                class="spread-head sticky {hasFolder
+                                data-sf="toolbar"
+                                data-sf-flat
+                                class="sticky {hasFolder
                                     ? 'top-6'
                                     : 'top-0'} z-30 cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-top {hc.isLayer
                                     ? 'w-[43px] min-w-[43px]'
                                     : ''} {hc.sepClass}"
+                                style="--sf-base: var(--theme-modal-bg);"
                                 class:spread-head-hl={colHighlighted}
                                 title={`${hc.title}（${selCount}/${hc.enabled}）：单击高亮列，右键全选/全不选`}
                                 onclick={() => clickColHeader(gi, hc.ci)}
@@ -995,7 +1011,10 @@
                         <tr class:spread-rowhl-on={rowHighlighted} class:split-row={row.splitBefore}>
                             <td
                                 data-rowhead={ri}
-                                class="spread-frozen sticky left-0 z-20 cursor-pointer select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5"
+                                data-sf="card"
+                                data-sf-flat
+                                class="sticky left-0 z-20 cursor-pointer select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5"
+                                style="--sf-base: var(--theme-modal-bg);"
                                 class:spread-frozen-hl={rowHighlighted}
                                 title={`${row.entry.displayName}：单击高亮行，右键全选/全不选（已选 ${
                                     selStats.rowCounts.get(row.entry.id) ?? 0
@@ -1105,13 +1124,7 @@
     .spread-root {
         --spread-hl: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent);
     }
-    /* 表格改为实底表面：冻结列/吸顶表头/标题块不再需要 backdrop-filter（逐元素重算背景模糊是滚动卡顿主因） */
-    .spread-table,
-    .spread-caption,
-    .spread-frozen,
-    .spread-head {
-        background-color: var(--theme-modal-bg);
-    }
+    /* 底色交给区域系统（data-sf）：列表=card、表头=toolbar，均 data-sf-flat 免毛玻璃；此处只放高亮/分隔线等叠加效果 */
     /* 列间分割线：叠层组与邻接列之间用主题色实线，其余用常规分隔线 */
     .spread-sep {
         border-right: 1px solid var(--theme-divider-border);
