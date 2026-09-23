@@ -57,9 +57,11 @@
     let weaponTypeIcons = $state<Record<string, string>>({})
     /** @desc 右键菜单（复制/创建BUFF/跳转）状态 */
     let ctxShow = $state(false)
-    /** @desc 菜单左上角（视口坐标，clamp 后） */
-    let ctxPos = $state({ x: 0, y: 0 })
-    /** @desc 是否已完成尺寸测量（未测量前先隐藏，避免出现"先错位后跳正"的闪烁） */
+    /** @desc 右键时的原始鼠标位置（视口坐标） */
+    let ctxRaw = $state({ x: 0, y: 0 })
+    /** @desc 菜单实测尺寸（用于 clamp） */
+    let ctxSize = $state({ w: 0, h: 0 })
+    /** @desc 是否已完成尺寸测量（未测量前先隐藏，避免"先错位后跳正"的闪烁） */
     let ctxMeasured = $state(false)
     let ctxMenuEl = $state<HTMLElement | null>(null)
     let scrollContainer = $state<HTMLDivElement | null>(null)
@@ -162,14 +164,15 @@
     /** @desc 记录右键菜单位置并显示（clientX/Y = 视口坐标，配合 fixed 定位与 clamp） */
     function handleCtxMenu(e: MouseEvent) {
         e.preventDefault()
-        ctxPos = { x: e.clientX, y: e.clientY }
+        ctxRaw = { x: e.clientX, y: e.clientY }
         ctxMeasured = false
         ctxShow = true
     }
 
     /**
      * @desc 右键菜单定位：先把菜单挂到 document.body（portal），避免被祖先的 transform/backdrop-filter
-     * 变成"相对祖先定位"而错位；挂载后再按实际尺寸 clamp 到视口内（左/上/右/下各留 8px）。
+     * 变成"相对祖先定位"而错位；再由 $derived 按实测尺寸 clamp 到视口内（四边各留 8px）。
+     * 注意：测量只写 ctxSize（不读它），clamp 在 $derived 里算——避免 effect 自依赖导致死循环卡顿。
      */
     const portal = (node: HTMLElement) => {
         document.body.appendChild(node)
@@ -184,12 +187,19 @@
         const el = ctxMenuEl
         if (!el) return
         const rect = el.getBoundingClientRect()
-        const margin = 8
-        ctxPos = {
-            x: Math.max(margin, Math.min(ctxPos.x, window.innerWidth - rect.width - margin)),
-            y: Math.max(margin, Math.min(ctxPos.y, window.innerHeight - rect.height - margin))
-        }
+        ctxSize = { w: rect.width, h: rect.height }
         ctxMeasured = true
+    })
+
+    /** @desc 最终位置 = 原始鼠标位置按菜单实际尺寸夹进视口 */
+    let ctxPos = $derived.by(() => {
+        const margin = 8
+        const maxX = Math.max(margin, window.innerWidth - ctxSize.w - margin)
+        const maxY = Math.max(margin, window.innerHeight - ctxSize.h - margin)
+        return {
+            x: Math.min(Math.max(margin, ctxRaw.x), maxX),
+            y: Math.min(Math.max(margin, ctxRaw.y), maxY)
+        }
     })
 
     /** @desc 复制选中文本到剪贴板 */
