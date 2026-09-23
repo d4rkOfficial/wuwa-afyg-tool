@@ -302,8 +302,12 @@
         endSeconds: number
         totalDamage: number
         charDamages: Record<string, number>
-        otherDamage: number
+        effectDamages: Record<string, number>
+        effectElements: Record<string, string>
     }
+    /** @desc 非配队条目的展示名：效应结算 →「XX效应伤害」，处决/响应 →「XX伤害」 */
+    const effectLabelOf = (e: ResultEntry) =>
+        e.skillType === '效应结算' ? `${e.hitName}伤害` : `${e.hitName || e.displayName}伤害`
     function segmentsOf(entries: ResultEntry[]): Segment[] {
         if (validTimings.length === 0) return []
         const result: Segment[] = []
@@ -320,13 +324,16 @@
                 return p !== undefined && p >= prevRefPos && p < currentRefPos
             })
             const charDamages: Record<string, number> = {}
-            let otherDamage = 0
+            const effectDamages: Record<string, number> = {}
+            const effectElements: Record<string, string> = {}
             for (const e of segEntries) {
                 const character = e.character
                 if (character && team.some((s) => s.character === character)) {
                     charDamages[character] = (charDamages[character] ?? 0) + e.totalDamageRaw
                 } else {
-                    otherDamage += e.totalDamageRaw
+                    const label = effectLabelOf(e)
+                    effectDamages[label] = (effectDamages[label] ?? 0) + e.totalDamageRaw
+                    if (!effectElements[label]) effectElements[label] = e.element
                 }
             }
             result.push({
@@ -334,7 +341,8 @@
                 endSeconds: t.seconds!,
                 totalDamage: segEntries.reduce((s, e) => s + e.totalDamageRaw, 0),
                 charDamages,
-                otherDamage
+                effectDamages,
+                effectElements
             })
             prevRefPos = currentRefPos
             prevSeconds = t.seconds!
@@ -342,7 +350,7 @@
         return result
     }
 
-    // ── 时段选择（含总计）：单选一行，下方明细呈现该范围的段总伤 / 段角色总伤 / 段其它总伤 / DPS ──
+    // ── 时段选择（含总计）：单选一行，下方明细呈现该范围的段总伤 / 段角色总伤 / 段效应分流总伤 / DPS ──
     /** @desc 'total' = 总计；数字 = 时段下标（默认总计） */
     let selectedRange = $state<'total' | number>('total')
     /** @desc 每配置的分段（记点相同，段数一致） */
@@ -358,7 +366,8 @@
         config: Config
         damage: number
         charDamages: Record<string, number>
-        otherDamage: number
+        effectDamages: Record<string, number>
+        effectElements: Record<string, string>
         span: number
         dps: number
     }
@@ -366,19 +375,25 @@
     /** @desc 某配置的整段总计（与所选时段无关）：总计行/总计卡片专用 */
     const totalStatOf = (c: Config): RangeStat => {
         const charDamages: Record<string, number> = {}
-        let otherDamage = 0
+        const effectDamages: Record<string, number> = {}
+        const effectElements: Record<string, string> = {}
         for (const cs of c.charSummaries) {
             if (team.some((s) => s.character === cs.character)) {
                 charDamages[cs.character] = (charDamages[cs.character] ?? 0) + cs.totalDamage
-            } else {
-                otherDamage += cs.totalDamage
             }
+        }
+        for (const e of c.entries) {
+            if (e.character && team.some((s) => s.character === e.character)) continue
+            const label = effectLabelOf(e)
+            effectDamages[label] = (effectDamages[label] ?? 0) + e.totalDamageRaw
+            if (!effectElements[label]) effectElements[label] = e.element
         }
         return {
             config: c,
             damage: c.totalDamage,
             charDamages,
-            otherDamage,
+            effectDamages,
+            effectElements,
             span: totalDur,
             dps: totalDur > 0 ? c.totalDamage / totalDur : 0
         }
@@ -397,12 +412,22 @@
                 config: c,
                 damage: seg?.totalDamage ?? 0,
                 charDamages: seg?.charDamages ?? {},
-                otherDamage: seg?.otherDamage ?? 0,
+                effectDamages: seg?.effectDamages ?? {},
+                effectElements: seg?.effectElements ?? {},
                 span,
                 dps: seg && span > 0 ? seg.totalDamage / span : 0
             }
         })
     )
+
+    /** @desc 明细表的效应列：当前口径下全部配置的效应分流并集，按合计伤害降序 */
+    let effectColumns = $derived.by(() => {
+        const totals = new Map<string, number>()
+        for (const stat of rangeStats) {
+            for (const [label, d] of Object.entries(stat.effectDamages)) totals.set(label, (totals.get(label) ?? 0) + d)
+        }
+        return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([label]) => label)
+    })
     /** @desc 选中范围标签（明细表标题用） */
     let rangeLabel = $derived.by(() => {
         if (activeRange === 'total') return '总计'
@@ -942,7 +967,7 @@
                                         </table>
                                     </div>
 
-                                    <!-- 选中范围明细：段总伤 / 段角色总伤 / 段其它总伤 / DPS -->
+                                    <!-- 选中范围明细：段总伤 / 段角色总伤 / 段效应分流总伤 / DPS -->
                                     <div class="mt-4">
                                         <div class="mb-1.5 flex items-center gap-2">
                                             <span
@@ -966,7 +991,9 @@
                                                                 >
                                                             {/if}
                                                         {/each}
-                                                        <th class="px-2 py-1.5 text-right font-medium">其他</th>
+                                                        {#each effectColumns as label}
+                                                            <th class="px-2 py-1.5 text-right font-medium">{label}</th>
+                                                        {/each}
                                                         <th class="px-2 py-1.5 text-right font-medium">DPS</th>
                                                     </tr>
                                                 </thead>
@@ -995,11 +1022,14 @@
                                                                     >
                                                                 {/if}
                                                             {/each}
-                                                            <td class="px-2 py-2 text-right tabular-nums"
-                                                                >{stat.otherDamage > 0
-                                                                    ? Math.round(stat.otherDamage).toLocaleString()
-                                                                    : '—'}</td
-                                                            >
+                                                            {#each effectColumns as label}
+                                                                {@const ed = stat.effectDamages[label] ?? 0}
+                                                                <td class="px-2 py-2 text-right tabular-nums"
+                                                                    >{ed > 0
+                                                                        ? Math.round(ed).toLocaleString()
+                                                                        : '—'}</td
+                                                                >
+                                                            {/each}
                                                             <td
                                                                 class="px-2 py-2 text-right text-sm font-black tabular-nums"
                                                                 style="color: var(--theme-accent-text);"

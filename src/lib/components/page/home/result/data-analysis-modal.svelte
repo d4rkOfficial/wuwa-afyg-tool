@@ -2,7 +2,8 @@
     import { onMount, untrack } from 'svelte'
     import { slide } from 'svelte/transition'
     import Chart from 'chart.js/auto'
-    import { getCharElementMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
+    import { getCharElementMap, getCharIconMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
+    import { getElementIcons } from '$lib/api/data-cache'
     import { resolveRefLineSeconds, autoConfigureTimings as autoConfigureTimingsPure } from '$lib/calc/ref-line-timing'
     import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
@@ -59,6 +60,17 @@
     }: Props = $props()
 
     let charElements = $derived(getCharElementMap())
+    let charIcons = $derived(getCharIconMap())
+
+    // ── 元素图标（静态表，弹窗内加载一次）──
+    let elementIcons = $state<Record<string, string>>({})
+    let elementIconsLoaded = false
+    $effect(() => {
+        if (elementIconsLoaded) return
+        elementIconsLoaded = true
+        void getElementIcons().then((icons) => (elementIcons = icons))
+    })
+
     let helpItems = $derived(
         algorithmsInfo.map((algo) => ({
             name: algo.name,
@@ -190,6 +202,36 @@
     let totalDur = $derived(validTimings.length > 0 ? validTimings[validTimings.length - 1].seconds! : 0)
     let overallDps = $derived(totalDur > 0 ? totalDamage / totalDur : null)
 
+    // ── 非配队条目（效应结算 / 处决 / 响应）按来源效应分流 ──
+    interface EffectAgg {
+        damages: Record<string, number>
+        elements: Record<string, string>
+        counts: Record<string, number>
+    }
+
+    /** @desc 非配队条目的展示名：效应结算 →「XX效应伤害」，处决/响应 →「XX伤害」 */
+    const effectLabelOf = (e: ResultEntry) =>
+        e.skillType === '效应结算' ? `${e.hitName}伤害` : `${e.hitName || e.displayName}伤害`
+
+    const emptyEffectAgg = (): EffectAgg => ({ damages: {}, elements: {}, counts: {} })
+
+    /** @desc 把一个非配队条目累加进分流聚合：同 label 合并，元素取首个非空值 */
+    const addEffectEntry = (agg: EffectAgg, e: ResultEntry) => {
+        const label = effectLabelOf(e)
+        agg.damages[label] = (agg.damages[label] ?? 0) + e.totalDamage
+        agg.counts[label] = (agg.counts[label] ?? 0) + 1
+        if (!agg.elements[label]) agg.elements[label] = e.element
+    }
+
+    /** @desc 整段（总计口径）的非配队条目分流聚合 */
+    let effectTotals = $derived.by(() => {
+        const agg = emptyEffectAgg()
+        for (const e of entries) {
+            if (!team.some((s) => s.character === e.character)) addEffectEntry(agg, e)
+        }
+        return agg
+    })
+
     // ── DPS segments ──
     let segments = $derived.by(() => {
         if (validTimings.length === 0) return []
@@ -201,8 +243,9 @@
             entryCount: number
             charDamages: Record<string, number>
             charCounts: Record<string, number>
-            otherDamage: number
-            otherCount: number
+            effectDamages: Record<string, number>
+            effectElements: Record<string, string>
+            effectCounts: Record<string, number>
         }[] = []
 
         let prevRefPos = 0
@@ -220,15 +263,13 @@
             const totalDmg = segEntries.reduce((s, e) => s + e.totalDamage, 0)
             const charDmg: Record<string, number> = {}
             const charCounts: Record<string, number> = {}
-            let otherDmg = 0
-            let otherCount = 0
+            const effects = emptyEffectAgg()
             for (const e of segEntries) {
                 if (team.some((s) => s.character === e.character)) {
                     charDmg[e.character] = (charDmg[e.character] ?? 0) + e.totalDamage
                     charCounts[e.character] = (charCounts[e.character] ?? 0) + 1
                 } else {
-                    otherDmg += e.totalDamage
-                    otherCount += 1
+                    addEffectEntry(effects, e)
                 }
             }
             result.push({
@@ -238,8 +279,9 @@
                 entryCount: segEntries.length,
                 charDamages: charDmg,
                 charCounts,
-                otherDamage: otherDmg,
-                otherCount
+                effectDamages: effects.damages,
+                effectElements: effects.elements,
+                effectCounts: effects.counts
             })
             prevRefPos = currentRefPos
             prevSeconds = t.seconds!
@@ -263,26 +305,34 @@
         return seg ? `${seg.startSeconds.toFixed(1)}s — ${seg.endSeconds.toFixed(1)}s` : '总计'
     })
 
+    /** @desc 选中范围统计口径（总计 = 整段，时段 = 该段）：KPI 大卡片与分段表合计行共用 */
+    interface RangeStats {
+        damage: number
+        entryCount: number
+        perChar: Record<string, { damage: number; count: number }>
+        effectDamages: Record<string, number>
+        effectElements: Record<string, string>
+        effectCounts: Record<string, number>
+        span: number
+        dps: number
+    }
+
     /** @desc 选中范围统计：总计用整段数据，时段用该段数据（KPI 大卡片与合计行共用） */
-    let rangeStats = $derived.by(() => {
+    let rangeStats = $derived.by<RangeStats>(() => {
         if (activeRange === 'total') {
             const perChar: Record<string, { damage: number; count: number }> = {}
-            let otherDamage = 0
-            let otherCount = 0
             for (const cs of charSummaries) {
                 if (team.some((s) => s.character === cs.character)) {
                     perChar[cs.character] = { damage: cs.totalDamage, count: cs.entryCount }
-                } else {
-                    otherDamage += cs.totalDamage
-                    otherCount += cs.entryCount
                 }
             }
             return {
                 damage: totalDamage,
                 entryCount: entries.length,
                 perChar,
-                otherDamage,
-                otherCount,
+                effectDamages: effectTotals.damages,
+                effectElements: effectTotals.elements,
+                effectCounts: effectTotals.counts,
                 span: totalDur,
                 dps: overallDps ?? 0
             }
@@ -297,8 +347,9 @@
             damage: seg?.totalDamage ?? 0,
             entryCount: seg?.entryCount ?? 0,
             perChar,
-            otherDamage: seg?.otherDamage ?? 0,
-            otherCount: seg?.otherCount ?? 0,
+            effectDamages: seg?.effectDamages ?? {},
+            effectElements: seg?.effectElements ?? {},
+            effectCounts: seg?.effectCounts ?? {},
             span,
             dps: seg && span > 0 ? seg.totalDamage / span : 0
         }
@@ -307,16 +358,23 @@
     // 分段合计（与表格内部一致）
     let segTotals = $derived.by(() => {
         const perChar: Record<string, number> = {}
-        let other = 0
+        const effectDamages: Record<string, number> = {}
         let total = 0
         for (const seg of segments) {
             total += seg.totalDamage
             for (const [c, d] of Object.entries(seg.charDamages)) perChar[c] = (perChar[c] ?? 0) + d
-            other += seg.otherDamage
+            for (const [label, d] of Object.entries(seg.effectDamages))
+                effectDamages[label] = (effectDamages[label] ?? 0) + d
         }
-        return { perChar, other, total }
+        return { perChar, effectDamages, total }
     })
     let segTotalDps = $derived(totalDur > 0 ? segTotals.total / totalDur : 0)
+
+    /** @desc 分段表的效应列：整段与分段口径的并集，按整段伤害降序（保证各时段列序一致） */
+    let effectColumns = $derived.by(() => {
+        const labels = new Set([...Object.keys(effectTotals.damages), ...Object.keys(segTotals.effectDamages)])
+        return [...labels].sort((a, b) => (effectTotals.damages[b] ?? 0) - (effectTotals.damages[a] ?? 0))
+    })
 
     // ── 时间记点配置折叠 ──
     let timingOpen = $state(true)
@@ -554,23 +612,74 @@
         return hexToRgba(hex, alpha)
     }
 
-    const OTHER_PIE_COLOR = 'rgba(210, 214, 220, 0.5)'
+    // ── KPI 大卡片：① 总伤害 ② 总 DPS ③ 角色伤害（降序）④ 效应伤害（永远最后，降序）──
+    /** @desc 角色伤害卡片：配队角色按当前口径伤害降序（头像叠底、元素色上色） */
+    let charCards = $derived.by(() =>
+        team
+            .filter((s) => !!s.character)
+            .map((s) => {
+                const character = s.character as string
+                const stat = rangeStats.perChar[character] ?? { damage: 0, count: 0 }
+                return {
+                    character,
+                    damage: stat.damage,
+                    count: stat.count,
+                    element: charElements[character] ?? '',
+                    icon: charIcons[character] ?? ''
+                }
+            })
+            .sort((a, b) => b.damage - a.damage)
+    )
 
-    let sortedSummaries = $derived([...charSummaries].sort((a, b) => b.totalDamage - a.totalDamage))
-    let sortedPieColors = $derived.by(() => {
-        let rank = 0
-        return sortedSummaries.map((cs) => {
-            if (!cs.character) return OTHER_PIE_COLOR
-            const el = charElements[cs.character]
-            const base = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'
-            const color = fadedColor(base, rank)
-            rank++
-            return color
+    /** @desc 效应伤害卡片：非配队条目按来源效应分流，按当前口径伤害降序（元素图标叠底） */
+    let effectCards = $derived.by(() =>
+        Object.entries(rangeStats.effectDamages)
+            .map(([label, damage]) => {
+                const element = rangeStats.effectElements[label] ?? ''
+                return {
+                    label,
+                    damage,
+                    count: rangeStats.effectCounts[label] ?? 0,
+                    element,
+                    icon: elementIcons[element] ?? ''
+                }
+            })
+            .sort((a, b) => b.damage - a.damage)
+    )
+
+    /** @desc 伤害占比：配队角色在前、效应分流在后，各自按伤害降序；颜色为元素色 + 按贡献淡化 */
+    let shareItems = $derived.by(() => {
+        const items: { key: string; label: string; damage: number; color: string }[] = []
+        const charBase = (character: string) => {
+            const el = charElements[character]
+            return el ? cssVar(`--theme-element-${el}`, '#888') : '#888'
+        }
+        const elementBase = (element: string) => (element ? cssVar(`--theme-element-${element}`, '#888') : '#888')
+        const charRows = charSummaries
+            .filter((cs) => team.some((s) => s.character === cs.character))
+            .sort((a, b) => b.totalDamage - a.totalDamage)
+        charRows.forEach((cs, i) => {
+            items.push({
+                key: `char:${cs.character}`,
+                label: cs.character,
+                damage: cs.totalDamage,
+                color: fadedColor(charBase(cs.character), i)
+            })
         })
+        const effectRows = Object.entries(effectTotals.damages).sort((a, b) => b[1] - a[1])
+        effectRows.forEach(([label, damage], i) => {
+            items.push({
+                key: `effect:${label}`,
+                label,
+                damage,
+                color: fadedColor(elementBase(effectTotals.elements[label] ?? ''), charRows.length + i)
+            })
+        })
+        return items
     })
 
     // ── team share：横向比例条（纯 HTML 渲染，无需 chart.js）──
-    // 色板复用 sortedPieColors（按贡献降序 + 淡出），模板中用宽度百分比绘制分段
+    // 色板复用 shareItems（按贡献降序 + 淡出），模板中用宽度百分比绘制分段
 
     // ── bar chart (substat aggregation) ──
     let barCharts: Chart<'bar'>[] = []
@@ -888,6 +997,7 @@
                     <span>· 在「分段 DPS」点时段行可切换</span>
                 </div>
                 <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+                    <!-- ① 总伤害 -->
                     <div
                         class="relative col-span-2 overflow-hidden rounded-none border p-4 lg:col-span-1"
                         style="border-color: var(--theme-divider-border); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, transparent), transparent 65%);"
@@ -903,33 +1013,7 @@
                             {rangeStats.entryCount} 条伤害记录
                         </div>
                     </div>
-                    {#each charSummaries as cs}
-                        {@const el = charElements[cs.character]}
-                        {@const color = el ? cssVar(`--theme-element-${el}`, '#888') : '#888'}
-                        {@const stat = rangeStats.perChar[cs.character] ?? { damage: 0, count: 0 }}
-                        <div
-                            class="rounded-none border p-4"
-                            style="border-color: var(--theme-divider-border); background: {cardBg};"
-                        >
-                            <div class="flex items-center gap-1.5">
-                                <span class="size-2 rounded-full shrink-0" style="background: {color};"></span>
-                                <span class="truncate text-[10px] font-black" style="color: {color};"
-                                    >{cs.character || '其它'}</span
-                                >
-                            </div>
-                            <div
-                                class="mt-1.5 text-lg font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
-                                style="color: var(--theme-modal-text);"
-                            >
-                                {Math.round(stat.damage).toLocaleString()}
-                            </div>
-                            <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
-                                占比 {rangeStats.damage > 0
-                                    ? ((stat.damage / rangeStats.damage) * 100).toFixed(1)
-                                    : '0.0'}% · {stat.count} 条
-                            </div>
-                        </div>
-                    {/each}
+                    <!-- ② 总 DPS -->
                     <div
                         class="relative overflow-hidden rounded-none border p-4"
                         style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 10%, transparent), transparent 70%);"
@@ -945,6 +1029,80 @@
                             {rangeLabel} · {rangeStats.span.toFixed(1)}s
                         </div>
                     </div>
+                    <!-- ③ 角色伤害（按当前口径伤害降序，头像叠底） -->
+                    {#each charCards as card (card.character)}
+                        {@const color = card.element ? cssVar(`--theme-element-${card.element}`, '#888') : '#888'}
+                        <div
+                            class="relative overflow-hidden rounded-none border p-4"
+                            style="border-color: var(--theme-divider-border); background: {cardBg};"
+                        >
+                            {#if card.icon}
+                                <div
+                                    class="pointer-events-none absolute -bottom-2 -right-2 z-0 size-24 opacity-40"
+                                    style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
+                                >
+                                    <img src={card.icon} alt="" class="size-full object-cover" />
+                                </div>
+                            {/if}
+                            <div class="relative z-10">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="size-2 rounded-full shrink-0" style="background: {color};"></span>
+                                    <span class="truncate text-[10px] font-black" style="color: {color};"
+                                        >{card.character}</span
+                                    >
+                                </div>
+                                <div
+                                    class="mt-1.5 text-lg font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
+                                    style="color: var(--theme-modal-text);"
+                                >
+                                    {Math.round(card.damage).toLocaleString()}
+                                </div>
+                                <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
+                                    占比 {rangeStats.damage > 0
+                                        ? ((card.damage / rangeStats.damage) * 100).toFixed(1)
+                                        : '0.0'}% · {card.count} 条
+                                </div>
+                            </div>
+                        </div>
+                    {/each}
+                    <!-- ④ 效应伤害（非配队条目按来源效应分流，永远排在最后，按当前口径伤害降序） -->
+                    {#each effectCards as card (card.label)}
+                        {@const color = card.element ? cssVar(`--theme-element-${card.element}`, '#888') : '#888'}
+                        <div
+                            class="relative overflow-hidden rounded-none border p-4"
+                            style="border-color: var(--theme-divider-border); background: {cardBg};"
+                        >
+                            {#if card.icon}
+                                <div
+                                    class="pointer-events-none absolute -bottom-2 -right-2 z-0 size-24 opacity-40"
+                                    style="-webkit-mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); -webkit-mask-composite: source-in; mask-image: linear-gradient(to left, transparent, #000 40%), linear-gradient(to bottom, transparent, #000 40%); mask-composite: intersect;"
+                                >
+                                    <img src={card.icon} alt="" class="size-full object-cover" />
+                                </div>
+                            {/if}
+                            <div class="relative z-10">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="size-2 rounded-full shrink-0" style="background: {color};"></span>
+                                    <span
+                                        class="truncate text-[10px] font-black"
+                                        style="color: {color};"
+                                        title={card.label}>{card.label}</span
+                                    >
+                                </div>
+                                <div
+                                    class="mt-1.5 text-lg font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
+                                    style="color: {color};"
+                                >
+                                    {Math.round(card.damage).toLocaleString()}
+                                </div>
+                                <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
+                                    占比 {rangeStats.damage > 0
+                                        ? ((card.damage / rangeStats.damage) * 100).toFixed(1)
+                                        : '0.0'}% · {card.count} 条
+                                </div>
+                            </div>
+                        </div>
+                    {/each}
                 </div>
             </section>
 
@@ -1085,7 +1243,9 @@
                                             <th class="py-1.5 pl-2 text-right font-medium">{slot.character}</th>
                                         {/if}
                                     {/each}
-                                    <th class="py-1.5 pl-2 text-right font-medium">其他</th>
+                                    {#each effectColumns as label}
+                                        <th class="py-1.5 pl-2 text-right font-medium">{label}</th>
+                                    {/each}
                                 </tr>
                             </thead>
                             <tbody>
@@ -1129,11 +1289,12 @@
                                                 >
                                             {/if}
                                         {/each}
-                                        <td class="py-2 pl-2 text-right tabular-nums">
-                                            {seg.otherDamage > 0
-                                                ? Math.round(seg.otherDamage / span).toLocaleString()
-                                                : '—'}
-                                        </td>
+                                        {#each effectColumns as label}
+                                            {@const ed = seg.effectDamages[label] ?? 0}
+                                            <td class="py-2 pl-2 text-right tabular-nums"
+                                                >{ed > 0 ? Math.round(ed / span).toLocaleString() : '—'}</td
+                                            >
+                                        {/each}
                                     </tr>
                                 {/each}
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -1172,11 +1333,12 @@
                                             >
                                         {/if}
                                     {/each}
-                                    <td class="py-2 pl-2 text-right font-medium tabular-nums"
-                                        >{segTotals.other > 0
-                                            ? Math.round(segTotals.other / totalDur).toLocaleString()
-                                            : '—'}</td
-                                    >
+                                    {#each effectColumns as label}
+                                        {@const ed = segTotals.effectDamages[label] ?? 0}
+                                        <td class="py-2 pl-2 text-right font-medium tabular-nums"
+                                            >{ed > 0 ? Math.round(ed / totalDur).toLocaleString() : '—'}</td
+                                        >
+                                    {/each}
                                 </tr>
                             </tbody>
                         </table>
@@ -1303,7 +1465,7 @@
                             style="background: color-mix(in srgb, var(--theme-input-bg) 85%, transparent);"
                         >
                             {#if totalDamage > 0}
-                                {#each sortedSummaries as cs, i}
+                                {#each shareItems as item, i (item.key)}
                                     {#if i > 0}
                                         <!-- 段间分割：取弹窗背景色（昼夜主题随 --theme-modal-bg 自动切换），使颜色交界清晰 -->
                                         <div
@@ -1313,26 +1475,22 @@
                                     {/if}
                                     <div
                                         class="h-full transition-all"
-                                        style="flex-grow: {cs.totalDamage}; background: {sortedPieColors[i]};"
-                                        title="{cs.character || '其它'} {((cs.totalDamage / totalDamage) * 100).toFixed(
-                                            1
-                                        )}%"
+                                        style="flex-grow: {item.damage}; background: {item.color};"
+                                        title="{item.label} {((item.damage / totalDamage) * 100).toFixed(1)}%"
                                     ></div>
                                 {/each}
                             {/if}
                         </div>
                         <div class="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
-                            {#each sortedSummaries as cs, i}
+                            {#each shareItems as item (item.key)}
                                 <div class="flex items-center gap-1.5 text-xs" style="color: var(--theme-modal-text);">
-                                    <span
-                                        class="size-2.5 rounded-none shrink-0"
-                                        style="background: {sortedPieColors[i]};"
+                                    <span class="size-2.5 rounded-none shrink-0" style="background: {item.color};"
                                     ></span>
-                                    <span class="truncate font-medium">{cs.character || '其它'}</span>
+                                    <span class="truncate font-medium">{item.label}</span>
                                     <span class="shrink-0 tabular-nums">
-                                        {Math.round(cs.totalDamage).toLocaleString()}
+                                        {Math.round(item.damage).toLocaleString()}
                                         <span style="opacity: 0.5;"
-                                            >({((cs.totalDamage / totalDamage) * 100).toFixed(1)}%)</span
+                                            >({((item.damage / totalDamage) * 100).toFixed(1)}%)</span
                                         >
                                     </span>
                                 </div>
