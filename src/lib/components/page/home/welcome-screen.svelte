@@ -8,12 +8,21 @@
         onBuffLibrary: () => void
         onSubstatLibrary: () => void
         onSettings: () => void
+        /** @desc 新建工程 */
+        oncreate: () => void
+        /** @desc 从本地导入工程文件 */
+        onimport: () => void
+        /** @desc 从工坊下载社区工程 */
+        onworkshop: () => void
     }
     let {
         onWorkshopFrame,
         onBuffLibrary,
         onSubstatLibrary,
         onSettings,
+        oncreate,
+        onimport,
+        onworkshop,
         class: className,
         style: styleProp
     }: Props = $props()
@@ -99,13 +108,36 @@
                         style={strokeStyle}>让排轴与伤害计算更简单</span
                     >
                 </h1>
-                <p
-                    class="max-w-md text-xs leading-relaxed text-(--theme-muted-text) md:ml-auto md:text-right md:text-[13px]"
-                >
-                    三轨排轴、逐段拉表、词条与环境配置、乘区溯源与 DPS 分析——<br
-                        class="hidden md:block"
-                    />从配装到出伤，一份工程讲清整场战斗。
-                </p>
+                <!-- 主要动作：新建 / 本地导入 / 工坊下载（取代原刊头右侧说明文字） -->
+                <div class="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
+                    <button
+                        onclick={oncreate}
+                        class="inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-xs font-black tracking-tight transition-all hover:brightness-110"
+                        style="border-color: var(--theme-accent-bg); background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                        title="新建一个空白工程"
+                    >
+                        <Icon icon="mdi:plus" class="size-4 shrink-0" />
+                        新建工程
+                    </button>
+                    <button
+                        onclick={onimport}
+                        class="inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-xs font-black tracking-tight text-(--theme-card-text) transition-colors hover:border-(--theme-accent-bg)"
+                        style="border-color: var(--theme-card-border); background: color-mix(in srgb, var(--theme-card-bg) 70%, transparent);"
+                        title="从本地选择工程文件导入"
+                    >
+                        <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
+                        从本地导入
+                    </button>
+                    <button
+                        onclick={onworkshop}
+                        class="inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-xs font-black tracking-tight text-(--theme-card-text) transition-colors hover:border-(--theme-accent-bg)"
+                        style="border-color: var(--theme-card-border); background: color-mix(in srgb, var(--theme-card-bg) 70%, transparent);"
+                        title="浏览椰果工坊的社区工程并下载导入"
+                    >
+                        <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+                        从工坊下载
+                    </button>
+                </div>
             </div>
         </header>
 

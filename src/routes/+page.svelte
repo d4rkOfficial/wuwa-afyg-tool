@@ -861,6 +861,12 @@
                 onBuffLibrary={() => (showBuffLibrary = true)}
                 onSubstatLibrary={() => openSubstatLibrary(null, 'home')}
                 onSettings={() => (showSettings = true)}
+                oncreate={() => {
+                    newName = ''
+                    showNewModal = true
+                }}
+                onimport={() => importInput?.click()}
+                onworkshop={() => (showWorkshop = true)}
             />
         {:else if activeProject}
             <PhaseTabs
