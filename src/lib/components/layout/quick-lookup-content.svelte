@@ -182,6 +182,17 @@
         ctxShow = false
     }
 
+    /** @desc 右键菜单快速跳转：滚动到带 data-jump 锚点的分区标题（仅滚动速查内容容器） */
+    function jumpToSection(key: string) {
+        const el = scrollContainer?.querySelector<HTMLElement>(`[data-jump="${key}"]`)
+        if (el && scrollContainer) {
+            const top =
+                el.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop
+            scrollContainer.scrollTo({ top: Math.max(0, top - 8), behavior: 'smooth' })
+        }
+        ctxShow = false
+    }
+
     /** @desc 滚动容器到顶/到底 */
     function handleScrollTop() {
         scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' })
@@ -352,7 +363,12 @@
                                     class="size-4 shrink-0"
                                     style="color: var(--theme-accent-text);"
                                 />
-                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">武器</h3>
+                                <h3
+                                    data-jump="weapon"
+                                    class="text-base font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    武器
+                                </h3>
                             </div>
                             <div
                                 class="rounded-none border p-3 space-y-2"
@@ -406,7 +422,12 @@
                                     class="size-4 shrink-0"
                                     style="color: var(--theme-accent-text);"
                                 />
-                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">首位声骸</h3>
+                                <h3
+                                    data-jump="echo"
+                                    class="text-base font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    首位声骸
+                                </h3>
                             </div>
                             <div
                                 class="rounded-none border p-3"
@@ -492,7 +513,9 @@
                                 class="size-4 shrink-0"
                                 style="color: var(--theme-accent-text);"
                             />
-                            <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">技能</h3>
+                            <h3 data-jump="skill" class="text-base font-black tracking-tight text-(--theme-modal-text)">
+                                技能
+                            </h3>
                         </div>
                         <div class="space-y-3">
                             {#each charData.skills as skill, i}
@@ -616,7 +639,12 @@
                                     class="size-4 shrink-0"
                                     style="color: var(--theme-accent-text);"
                                 />
-                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">固有属性</h3>
+                                <h3
+                                    data-jump="innate"
+                                    class="text-base font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    固有属性
+                                </h3>
                             </div>
                             <div class="grid grid-cols-2 gap-2">
                                 {#each sortedStatAttrs as attr}
@@ -644,7 +672,12 @@
                                     class="size-4 shrink-0"
                                     style="color: var(--theme-accent-text);"
                                 />
-                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">共鸣链</h3>
+                                <h3
+                                    data-jump="chain"
+                                    class="text-base font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    共鸣链
+                                </h3>
                             </div>
                             <div class="space-y-3">
                                 {#each charData.chains as chain, i}
@@ -735,6 +768,7 @@
                 >
             {/if}
             <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            <!-- ⛔ TEMP-HIDDEN（临时隐藏）：跳转到顶部/底部按钮，恢复时删掉本段注释标记即可
             <button
                 onclick={handleScrollTop}
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
@@ -745,6 +779,16 @@
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                 ><Icon icon="mdi:arrow-down-bold-outline" class="size-3.5 shrink-0" /> 跳转到底部</button
             >
+            ⛔ TEMP-HIDDEN-END -->
+            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            <!-- @desc 快速跳转：武器 / 首位声骸 / 技能 / 固有属性 / 共鸣链 -->
+            {#each [{ key: 'weapon', label: '跳转到武器', icon: 'mdi:sword' }, { key: 'echo', label: '跳转到首位声骸', icon: 'mdi:circle-double' }, { key: 'skill', label: '跳转到技能', icon: 'mdi:flash-outline' }, { key: 'innate', label: '跳转到固有属性', icon: 'mdi:star-four-points-outline' }, { key: 'chain', label: '跳转到共鸣链', icon: 'mdi:link-variant' }] as item (item.key)}
+                <button
+                    onclick={() => jumpToSection(item.key)}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                    ><Icon icon={item.icon} class="size-3.5 shrink-0" /> {item.label}</button
+                >
+            {/each}
         </div>
     </div>
 {/if}
