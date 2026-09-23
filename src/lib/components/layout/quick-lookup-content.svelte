@@ -15,6 +15,7 @@
     import type { CharSlot } from '$lib/types/project'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import { getLocked } from '$lib/calc/timeline.store.svelte'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -567,7 +568,8 @@
                                                     class="flex flex-col px-1 py-0.5 text-sm text-(--theme-modal-text)/70 even:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,transparent)]"
                                                 >
                                                     <div class="flex items-center justify-between gap-2">
-                                                        <span class="text-(--theme-modal-text)/50 truncate"
+                                                        <span
+                                                            class="max-w-[50%] break-words text-(--theme-modal-text)/50"
                                                             >{vname}</span
                                                         >
                                                         <span class="flex items-center gap-2 text-[12px] leading-snug">
@@ -763,7 +765,8 @@
             {#if showBuffOption || showCustomHitOption}
                 <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
             {/if}
-            {#if showBuffOption}
+            <!-- @desc 排轴锁定时不显示「以此为名创建BUFF」（锁定态不允许改动工程内容） -->
+            {#if showBuffOption && !getLocked()}
                 <button
                     onclick={handleCreateBuffFromSel}
                     class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
