@@ -349,10 +349,8 @@
     style={mergedStyle}
 >
     {#snippet title()}
-        <span class="flex items-baseline gap-2.5">
-            <span class="text-[10px] font-semibold uppercase tracking-[0.34em] text-(--theme-accent-text) opacity-80"
-                >SUBSTATS</span
-            >
+        <span class="flex items-center gap-2">
+            <Icon icon="mdi:clipboard-text-outline" class="size-4" style="color: var(--theme-accent-text);" />
             <span class="font-black tracking-tight">{isProjectMode ? '快速词条方案' : '词条集'}</span>
             {#if isProjectMode}
                 <span class="text-[10px] font-normal tracking-wide text-(--theme-muted-text)">当前配队</span>

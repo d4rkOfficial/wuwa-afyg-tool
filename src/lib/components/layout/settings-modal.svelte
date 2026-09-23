@@ -106,16 +106,28 @@
         })
     }
 
+    /** @desc 设置栏目：按「界面 / 数据 / 助手」三组重新规划归类 */
     const SETTING_TABS = [
-        { key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
-        { key: 'keymap', label: '按键图标', icon: 'mdi:keyboard-outline' },
-        { key: 'interaction', label: '交互相关', icon: 'mdi:tune-variant' },
-        { key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
-        { key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
-        { key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
-        { key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
-        { key: 'ai', label: '助手设置', icon: 'mdi:robot-outline' }
+        { group: '界面', key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
+        { group: '界面', key: 'interaction', label: '交互相关', icon: 'mdi:tune-variant' },
+        { group: '界面', key: 'keymap', label: '按键图标', icon: 'mdi:keyboard-outline' },
+        { group: '界面', key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
+        { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
+        { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
+        { group: '数据', key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
+        { group: '助手', key: 'ai', label: '助手设置', icon: 'mdi:robot-outline' }
     ] as const
+
+    /** @desc 按 group 聚合栏目（保持声明顺序） */
+    const SETTING_GROUPS = SETTING_TABS.reduce<{ group: string; items: (typeof SETTING_TABS)[number][] }[]>(
+        (acc, t) => {
+            const last = acc[acc.length - 1]
+            if (last && last.group === t.group) last.items.push(t)
+            else acc.push({ group: t.group, items: [t] })
+            return acc
+        },
+        []
+    )
 
     /** @desc Toast 位置按钮文案与说明（顺序取自 TOAST_POSITIONS） */
     const TOAST_POSITION_LABELS: Record<ToastPosition, string> = {
@@ -546,7 +558,7 @@
         out:fade={{ duration: 130 }}
     >
         <div
-            class="animate-pop-in theme-glass-surface relative flex h-140 max-h-[90vh] w-160 max-w-[94vw] flex-col overflow-hidden rounded-none shadow-2xl"
+            class="animate-pop-in theme-glass-surface relative flex h-[min(90vh,940px)] w-[min(96vw,1240px)] flex-col overflow-hidden rounded-none shadow-2xl"
             style="background: color-mix(in srgb, var(--theme-modal-bg) var(--theme-modal-opacity, 75%), transparent); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             role="dialog"
             aria-modal="true"
@@ -556,11 +568,8 @@
                 class="flex shrink-0 items-center justify-between border-b px-6 py-4"
                 style="border-color: var(--theme-divider-border);"
             >
-                <div class="flex items-baseline gap-2.5">
-                    <span
-                        class="text-[10px] font-semibold uppercase tracking-[0.34em] text-(--theme-accent-text) opacity-80"
-                        >SETTINGS</span
-                    >
+                <div class="flex items-center gap-2.5">
+                    <Icon icon="mdi:cog-outline" class="size-4.5" style="color: var(--theme-accent-text);" />
                     <h3 class="font-black tracking-tight">设置</h3>
                 </div>
                 <button
@@ -575,32 +584,50 @@
             <div class="flex min-h-0 flex-1 flex-row">
                 <!-- Sidebar -->
                 <div
-                    class="flex w-40 shrink-0 flex-col gap-1 border-r p-3"
+                    class="theme-scrollbar flex w-52 shrink-0 flex-col gap-4 overflow-y-auto border-r p-3"
                     style="border-color: var(--theme-divider-border);"
                 >
-                    {#each SETTING_TABS as t}
-                        <button
-                            onclick={() => (tab = t.key)}
-                            class="flex shrink-0 items-center gap-2 rounded-none px-3 py-2 text-sm font-medium transition-colors {tab ===
-                            t.key
-                                ? 'text-(--theme-accent-text-on-bg)'
-                                : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
-                            style={tab === t.key ? 'background: var(--theme-accent-bg);' : ''}
-                        >
-                            <Icon icon={t.icon} class="size-4 shrink-0" />
-                            {t.label}
-                        </button>
+                    {#each SETTING_GROUPS as g (g.group)}
+                        <div class="flex flex-col gap-0.5">
+                            <span class="px-3 pb-1 text-[10px] font-black tracking-[0.3em] text-(--theme-muted-text)"
+                                >{g.group}</span
+                            >
+                            {#each g.items as t (t.key)}
+                                <button
+                                    onclick={() => (tab = t.key)}
+                                    class="flex shrink-0 items-center gap-2.5 border-l-2 px-3 py-2 text-sm font-black tracking-tight transition-colors {tab ===
+                                    t.key
+                                        ? 'text-(--theme-accent-text)'
+                                        : 'text-(--theme-modal-text)/55 hover:text-(--theme-modal-text)'}"
+                                    style={tab === t.key
+                                        ? 'border-color: var(--theme-accent-bg); background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent);'
+                                        : 'border-color: transparent;'}
+                                >
+                                    <Icon icon={t.icon} class="size-4 shrink-0" />
+                                    {t.label}
+                                </button>
+                            {/each}
+                        </div>
                     {/each}
                 </div>
 
                 <!-- Content -->
-                <div class="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 scrollbar-none [&::-webkit-scrollbar]:hidden">
+                <div
+                    class="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 scrollbar-none [&::-webkit-scrollbar]:hidden [&>div+div]:border-t [&>div+div]:border-(--theme-divider-border) [&>div+div]:pt-4"
+                >
                     {#if tab === 'theme'}
                         <!-- Accent color -->
                         <div class="mb-5">
-                            <span class="mb-3 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >主色调</span
+                            <span
+                                class="mb-3 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:palette-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                主色调
+                            </span>
                             <div
                                 class="flex gap-1 rounded-none border p-1"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -642,9 +669,16 @@
 
                         <!-- 昼夜切换 -->
                         <div class="mb-5">
-                            <span class="mb-3 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >昼夜切换</span
+                            <span
+                                class="mb-3 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:theme-light-dark"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                昼夜切换
+                            </span>
                             <div
                                 class="flex items-center justify-between gap-3 rounded-none border px-2.5 py-2"
                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -1183,9 +1217,16 @@
                     {:else if tab === 'keymap'}
                         <!-- Key mapping -->
                         <div>
-                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >按键图标</span
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:keyboard-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                按键图标
+                            </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 每行决定排轴时操作块显示的按键图标（键盘或手柄）；快速排轴输入键与界面快捷键可在「交互相关」中配置
                             </p>
@@ -1265,9 +1306,16 @@
                         </div>
                     {:else if tab === 'interaction'}
                         <div>
-                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >拉表视图</span
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:table-large"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                拉表视图
+                            </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 选择拉表页面的 Buff 编辑方式；后续拉表/排轴等快捷键设置也将集中在此区域
                             </p>
@@ -1301,9 +1349,16 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                    >工具栏</span
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
+                                    <Icon
+                                        icon="mdi:toolbar"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    工具栏
+                                </span>
                                 <div
                                     class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -1335,9 +1390,16 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                    >交互效果</span
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
+                                    <Icon
+                                        icon="mdi:gesture-tap"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    交互效果
+                                </span>
                                 <div
                                     class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -1369,9 +1431,16 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                    >删除行为</span
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
+                                    <Icon
+                                        icon="mdi:trash-can-outline"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    删除行为
+                                </span>
                                 <div
                                     class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -1403,9 +1472,16 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                    >右键菜单</span
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
+                                    <Icon
+                                        icon="mdi:cursor-default-click-outline"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    右键菜单
+                                </span>
                                 <div
                                     class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -1437,9 +1513,16 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                    >消息提示位置</span
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
+                                    <Icon
+                                        icon="mdi:bell-outline"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    消息提示位置
+                                </span>
                                 <div
                                     class="flex gap-1 rounded-none border p-1"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -1466,9 +1549,16 @@
                             </div>
 
                             <div class="mt-5">
-                                <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                    >界面快捷键</span
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
+                                    <Icon
+                                        icon="mdi:keyboard-settings-outline"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    界面快捷键
+                                </span>
                                 <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/40">
                                     点击「记录」后按下新键即时绑定（ESC 取消）；同组冲突会被拒绝。弹窗关闭与 Ctrl+A/Z/Y
                                     等固定不可改
@@ -1533,9 +1623,16 @@
                     {:else if tab === 'performance'}
                         <!-- 性能相关 -->
                         <div>
-                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >性能设置</span
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:speedometer"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                性能设置
+                            </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 控制交互渲染方式与刷新结果时的数据加载行为
                             </p>
@@ -1631,9 +1728,16 @@
                     {:else if tab === 'connection'}
                         <!-- Connection settings: 上游数据源 + 工坊/分享源 -->
                         <div>
-                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >上游数据源</span
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:cloud-download-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                上游数据源
+                            </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 选择角色/武器/声骸等数据的来源；切换后列表与详情缓存会按新源重新加载
                             </p>
@@ -1680,9 +1784,16 @@
 
                             <div class="my-4 border-t" style="border-color: var(--theme-divider-border);"></div>
 
-                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >工坊 / 分享源</span
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:storefront-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                工坊 / 分享源
+                            </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 配置椰果工坊实例；单选使用，可删除或新增，分享与工坊列表将使用当前选中实例
                             </p>
@@ -1755,9 +1866,16 @@
                     {:else if tab === 'archive'}
                         <!-- Archive management -->
                         <div>
-                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >归档管理</span
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:archive-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                归档管理
+                            </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 已归档的工程不会出现在侧边栏，可取消归档恢复、全量导出、分享或永久删除
                             </p>
@@ -1828,9 +1946,16 @@
                     {:else if tab === 'cache'}
                         <!-- Cache management -->
                         <div>
-                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >缓存清理</span
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:database-off-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                缓存清理
+                            </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 仅清理接口数据缓存（列表 / 详情 / 图像），不影响你的工程与本地数据
                             </p>
@@ -1862,9 +1987,16 @@
                     {:else if tab === 'ai'}
                         <!-- 助手设置 -->
                         <div>
-                            <span class="mb-1 block text-sm font-black tracking-tight text-(--theme-modal-text)"
-                                >助手设置</span
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
+                                <Icon
+                                    icon="mdi:robot-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                助手设置
+                            </span>
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 可配置多组「提供商 / 模型 / API Key」并一键切换，每组独立保存；API Key
                                 仅存本机。点击配置文件即可切换，点「编辑」打开独立弹窗修改

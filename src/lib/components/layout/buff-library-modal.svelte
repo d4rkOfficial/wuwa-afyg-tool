@@ -247,10 +247,8 @@
 
 <Modal {open} {onclose} class={className} style="width: min(92vw, 820px); height: min(85vh, 760px); {mergedStyle}">
     {#snippet title()}
-        <span class="flex items-baseline gap-2.5">
-            <span class="text-[10px] font-semibold uppercase tracking-[0.34em] text-(--theme-accent-text) opacity-80"
-                >BUFF SET</span
-            >
+        <span class="flex items-center gap-2">
+            <Icon icon="mdi:view-dashboard-outline" class="size-4" style="color: var(--theme-accent-text);" />
             <span class="font-black tracking-tight">Buff 集</span>
         </span>
     {/snippet}
