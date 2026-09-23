@@ -257,7 +257,7 @@
         enabledBuffIds: string[]
         splitBefore: boolean
     }
-    /** @desc 表头单元格（第二行=列名行）：标签与分隔线在结构派生里一次算好，模板零正则/零线性查找 */
+    /** @desc 表头单元格（第二行=列名行）：标签、分隔线、高亮时单元格内名称的宽度上限都在结构派生里一次算好，模板零正则/零线性查找 */
     interface HeadCell {
         ci: number
         label: string
@@ -265,6 +265,11 @@
         isLayer: boolean
         enabled: number
         sepClass: string
+        // 高亮时单元格内显示 buff 名的宽度上限：与表头一致，避免名称出现/消失改变列的 max-content 触发整表重排
+        nameMaxClass: string
+        // 单元格 tooltip 预算好，避免每次渲染为每格拼字符串
+        titleOn: string
+        titleOff: string
     }
     interface HeadGroupCell {
         span: number
@@ -368,7 +373,11 @@
                     title: bs.name,
                     isLayer: grp !== undefined,
                     enabled: enabledCounts[ci],
-                    sepClass: sep
+                    sepClass: sep,
+                    // 与表头列宽上限对齐（叠层子列 43px、普通列 max-w-24 同宽 96px→106px）
+                    nameMaxClass: grp ? 'max-w-[43px]' : 'max-w-[106px]',
+                    titleOn: `取消勾选：${bs.name}`,
+                    titleOff: `勾选：${bs.name}`
                 })
                 if (!grp) {
                     headerGroups.push({ span: 1, sepClass: sep })
@@ -772,47 +781,63 @@
         }
     }
 
-    /** @desc ── 列高亮压暗遮罩：测量「本组表格区域 − 高亮列」的左右两段（组内容器坐标系，滚动无需重算）；
-     *  冻结列（z-20）与吸顶表头（z-30/40）为实底且 z 更高，天然覆盖遮罩，无需额外裁剪 ── */
+    /** @desc ── 高亮压暗遮罩：测量「本组表格区域 − 高亮行/列」的带状区域（组内容器坐标系，滚动无需重算）
+     *  行高亮 → 上下两段（跨整表宽，含冻结列，z-25 盖住 z-20 的冻结单元格）；
+     *  列高亮 → 左右两段（冻结列保持原样不压暗）；实体吸顶表头（z-30/40）天然覆盖遮罩上部，无需裁剪 ── */
     let dimRects = $state<{ left: number; top: number; width: number; height: number }[]>([])
     let dimGroup = $state<number | null>(null)
     let layoutTick = $state(0)
     const bumpLayout = () => layoutTick++
 
-    const measureColDimRects = (gi: number, ci: number) => {
-        const wrap = rootEl?.querySelector<HTMLElement>(`[data-group-wrap="${gi}"]`)
+    const measureDimRects = (h: { gi: number; kind: 'row' | 'col'; index: number }) => {
+        const wrap = rootEl?.querySelector<HTMLElement>(`[data-group-wrap="${h.gi}"]`)
         const table = wrap?.querySelector<HTMLElement>('table')
-        const head = wrap?.querySelector<HTMLElement>(`[data-colhead="${ci}"]`)
-        const frozen = wrap?.querySelector<HTMLElement>('[data-rowhead]')
-        if (!wrap || !table || !head) return []
+        if (!wrap || !table) return []
         const w = wrap.getBoundingClientRect()
         const t = table.getBoundingClientRect()
-        const h = head.getBoundingClientRect()
-        const top = t.top - w.top
-        const height = t.height
         const rects: { left: number; top: number; width: number; height: number }[] = []
+        if (h.kind === 'row') {
+            const rowEl = wrap.querySelector<HTMLElement>(`[data-rowhead="${h.index}"]`)
+            if (!rowEl) return []
+            const r = rowEl.getBoundingClientRect()
+            const topH = r.top - t.top
+            if (topH > 1) rects.push({ left: t.left - w.left, top: t.top - w.top, width: t.width, height: topH })
+            const botH = t.bottom - r.bottom
+            if (botH > 1) rects.push({ left: t.left - w.left, top: r.bottom - w.top, width: t.width, height: botH })
+            return rects
+        }
+        const head = wrap.querySelector<HTMLElement>(`[data-colhead="${h.index}"]`)
+        if (!head) return []
+        const frozen = wrap.querySelector<HTMLElement>('[data-rowhead]')
+        const hRect = head.getBoundingClientRect()
+        const top = t.top - w.top
         // 左段：从冻结列右侧（冻结列保持原样不压暗）到高亮列左边界
         const leftFrom = frozen ? Math.max(t.left, frozen.getBoundingClientRect().right) : t.left
-        const leftW = h.left - leftFrom
-        if (leftW > 1) rects.push({ left: leftFrom - w.left, top, width: leftW, height })
+        const leftW = hRect.left - leftFrom
+        if (leftW > 1) rects.push({ left: leftFrom - w.left, top, width: leftW, height: t.height })
         // 右段：高亮列右边界到表格右边界
-        const rightW = t.right - h.right
-        if (rightW > 1) rects.push({ left: h.right - w.left, top, width: rightW, height })
+        const rightW = t.right - hRect.right
+        if (rightW > 1) rects.push({ left: hRect.right - w.left, top, width: rightW, height: t.height })
         return rects
     }
 
+    /** @desc 高亮切换后延迟到下一帧再测量：不在点击任务内对刚变更的表格强制同步布局（卡顿来源之一），
+     *  顺带合并快速连续切换；visibleRows 变化会重测（渐进揭示时表格高度变化） */
     $effect(() => {
         const h = highlight
         visibleRows
         layoutTick
-        if (!h || h.kind !== 'col') {
+        if (!h) {
             dimGroup = null
             dimRects = []
             return
         }
-        const rects = measureColDimRects(h.gi, h.index)
-        dimGroup = rects.length > 0 ? h.gi : null
-        dimRects = rects
+        const raf = requestAnimationFrame(() => {
+            const rects = measureDimRects(h)
+            dimGroup = rects.length > 0 ? h.gi : null
+            dimRects = rects
+        })
+        return () => cancelAnimationFrame(raf)
     })
 
     /** @desc 容器尺寸变化时重测遮罩（窗口缩放/面板拖拽）；只需一个观察者，且仅在列高亮时才有实际测量成本 */
@@ -893,11 +918,11 @@
         {@const charElement = getCalcElementMap()[group.charName] ?? ''}
         {@const hasFolder = group.hasFolder}
         <div class="relative mx-3 my-3.5" data-group-wrap={gi}>
-            <!-- 列高亮压暗遮罩：仅高亮组渲染，最多两段（滚动随内容移动，无需跟随） -->
+            <!-- 高亮压暗遮罩：仅高亮组渲染，最多两段（滚动随内容移动，无需跟随；z-25 高于冻结列 z-20、低于吸顶表头 z-30/40） -->
             {#if dimGroup === gi && dimRects.length > 0}
                 {#each dimRects as r, i (i)}
                     <div
-                        class="pointer-events-none absolute z-10"
+                        class="pointer-events-none absolute z-[25]"
                         style="left: {r.left}px; top: {r.top}px; width: {r.width}px; height: {r.height}px; background: var(--spread-dim);"
                     ></div>
                 {/each}
@@ -1039,14 +1064,9 @@
                     {#each shownRows(group) as row, ri (row.entry.id)}
                         {@const rowHighlighted =
                             highlight?.gi === gi && highlight.kind === 'row' && highlight.index === ri}
-                        {@const rowHighlightActive = highlight?.gi === gi && highlight.kind === 'row'}
                         {@const colHighlightActive = highlight?.gi === gi && highlight.kind === 'col'}
                         {@const selIds = entryBuffSetIdMap[row.entry.id] ?? EMPTY_IDS}
-                        <tr
-                            class:spread-rowdim={rowHighlightActive && !rowHighlighted}
-                            class:spread-rowhl-on={rowHighlighted}
-                            class:split-row={row.splitBefore}
-                        >
+                        <tr class:spread-rowhl-on={rowHighlighted} class:split-row={row.splitBefore}>
                             <td
                                 data-rowhead={ri}
                                 class="spread-frozen sticky left-0 z-20 cursor-pointer select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5"
@@ -1097,11 +1117,13 @@
                             </td>
                             {#each group.visibleColIdx as ci, colPos (ci)}
                                 {@const cell = row.cells[ci]}
-                                {@const sepClass = group.headerCols[colPos]?.sepClass ?? ''}
+                                {@const head = group.headerCols[colPos]}
                                 {@const colHighlighted = colHighlightActive && highlight?.index === ci}
                                 {@const on = selIds.includes(cell.buffId)}
+                                {@const named = on && (colHighlighted || rowHighlighted)}
                                 <td
-                                    class="min-w-9 border-b border-(--theme-divider-border) p-0 text-center {sepClass}"
+                                    class="min-w-9 border-b border-(--theme-divider-border) p-0 text-center {head?.sepClass ??
+                                        ''}"
                                     class:spread-cell-hl={colHighlighted}
                                     data-group={gi}
                                     data-row={ri}
@@ -1111,21 +1133,25 @@
                                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                                         <button
                                             onclick={() => toggleCell(row, cell)}
-                                            title={on ? `取消勾选：${columns[ci].name}` : `勾选：${columns[ci].name}`}
+                                            title={on ? head?.titleOn : head?.titleOff}
                                             class="flex min-h-6 w-full cursor-pointer items-center justify-center px-1.5 py-1.5 transition-colors hover:bg-(--theme-modal-text)/10"
                                         >
                                             {#if on}
-                                                {#if colHighlighted || (rowHighlightActive && rowHighlighted)}
+                                                <!-- 高亮行/列时改显 buff 名：图标保留挂载仅隐藏，避免切换高亮时反复销毁/创建图标组件；
+                                                     名称宽度上限与表头列宽上限一致，保证出现/消失不改变列 max-content（不触发整表重排） -->
+                                                <Icon
+                                                    icon="mdi:check"
+                                                    class="size-3.5 shrink-0"
+                                                    style="color: var(--theme-accent-text);{named
+                                                        ? ' display:none;'
+                                                        : ''}"
+                                                />
+                                                {#if named}
                                                     <span
-                                                        class="line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
+                                                        class="w-full {head?.nameMaxClass ??
+                                                            'max-w-[106px]'} line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
                                                         >{columns[ci].name}</span
                                                     >
-                                                {:else}
-                                                    <Icon
-                                                        icon="mdi:check"
-                                                        class="size-3.5 shrink-0"
-                                                        style="color: var(--theme-accent-text);"
-                                                    />
                                                 {/if}
                                             {/if}
                                         </button>
@@ -1168,10 +1194,7 @@
     .spread-sep-solid {
         border-right: 2px solid color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
     }
-    /* 高亮：行级 opacity 压暗其他行（O(行数)，无过渡动画）；高亮行/列用主题色浅洗叠在实底之上 */
-    .spread-rowdim {
-        opacity: 0.4;
-    }
+    /* 高亮：压暗统一交给组内遮罩（行→上下两段、列→左右两段，均只 1~2 个矩形），高亮行/列用主题色浅洗叠在实底之上 */
     .spread-rowhl-on {
         background-color: var(--spread-hl);
     }
