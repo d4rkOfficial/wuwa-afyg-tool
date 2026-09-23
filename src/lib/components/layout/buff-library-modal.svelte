@@ -247,18 +247,28 @@
 
 <Modal {open} {onclose} class={className} style="width: min(92vw, 820px); height: min(85vh, 760px); {mergedStyle}">
     {#snippet title()}
-        Buff 集
+        <span class="flex items-baseline gap-2.5">
+            <span class="text-[10px] font-semibold uppercase tracking-[0.34em] text-(--theme-accent-text) opacity-80"
+                >BUFF SET</span
+            >
+            <span class="font-black tracking-tight">Buff 集</span>
+        </span>
     {/snippet}
     {#snippet footer()}{/snippet}
 
     <div class="flex h-full flex-col">
-        <div class="mb-3 flex shrink-0 items-center justify-between gap-2">
-            <p class="text-xs text-(--theme-muted-text)">按角色/武器/声骸/套装管理 Buff 预设，点击条目即可编辑</p>
+        <div
+            class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b pb-2.5"
+            style="border-color: var(--theme-card-border);"
+        >
+            <p class="text-xs leading-relaxed text-(--theme-muted-text)">
+                按角色 / 武器 / 声骸 / 套装管理 Buff 预设，点击条目即可编辑
+            </p>
             <div class="flex items-center gap-2">
                 <button
                     onclick={handleDownload}
                     disabled={loading}
-                    class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
+                    class="inline-flex items-center gap-1 rounded-none px-3 py-1.5 text-xs font-medium transition-all hover:brightness-125 disabled:opacity-40"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                 >
                     <Icon
@@ -276,7 +286,7 @@
                                 void handleClear()
                             }
                         }}
-                        class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
+                        class="inline-flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
                     >
                         <Icon icon="mdi:delete-sweep-outline" class="size-3.5" />
                         清空
@@ -287,7 +297,7 @@
 
         {#if error}
             <div
-                class="mb-3 flex items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-xs text-red-500"
+                class="mb-3 flex items-center gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-xs text-red-500"
             >
                 <Icon icon="mdi:alert-circle-outline" class="size-4 shrink-0" />
                 <span class="flex-1">从工坊下载失败：{error}</span>
@@ -295,12 +305,12 @@
         {/if}
 
         <!-- Tab bar -->
-        <div class="mb-3 flex shrink-0 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5">
+        <div class="mb-3 flex shrink-0 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5">
             {#each BUFF_CATEGORY_ORDER as cat}
                 <button
                     onclick={() => (tab = cat)}
                     class={[
-                        'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                        'flex flex-1 items-center justify-center gap-1.5 rounded-none px-2 py-1.5 text-xs font-medium transition-colors',
                         tab === cat
                             ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
                             : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
@@ -323,7 +333,7 @@
 
         <!-- Search -->
         <div
-            class="mb-3 flex shrink-0 items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
+            class="mb-3 flex shrink-0 items-center gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
         >
             <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
             <input
@@ -334,19 +344,19 @@
             {#if query}
                 <button
                     onclick={() => (query = '')}
-                    class="rounded p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
+                    class="rounded-none p-0.5 text-(--theme-muted-text) hover:text-(--theme-modal-text)"
                 >
                     <Icon icon="mdi:close" class="size-4" />
                 </button>
             {/if}
             <div
-                class="ml-1 flex shrink-0 items-center gap-0.5 rounded-md border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5"
+                class="ml-1 flex shrink-0 items-center gap-0.5 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) p-0.5"
             >
                 {#each FILTERS as f (f.key)}
                     <button
                         onclick={() => (filter = f.key)}
                         class={[
-                            'whitespace-nowrap rounded px-2 py-1 text-[11px] font-medium transition-colors',
+                            'whitespace-nowrap rounded-none px-2 py-1 text-[11px] font-medium transition-colors',
                             filter === f.key
                                 ? 'bg-(--theme-accent-bg) text-(--theme-accent-text-on-bg)'
                                 : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
@@ -375,14 +385,14 @@
                             onclick={() => openEdit(row)}
                             role="button"
                             tabindex="0"
-                            class="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-left transition-colors hover:bg-(--theme-card-bg-focused)"
+                            class="flex w-full cursor-pointer items-center gap-3 rounded-none border border-(--theme-card-border) bg-(--theme-card-bg) px-3 py-2 text-left transition-colors hover:bg-(--theme-card-bg-focused)"
                         >
                             <div
                                 class={[
                                     'flex size-10 shrink-0 items-center justify-center overflow-hidden',
                                     row.entityType === 'character'
                                         ? 'rounded-full'
-                                        : 'rounded-lg bg-(--theme-card-bg-focused)'
+                                        : 'rounded-none bg-(--theme-card-bg-focused)'
                                 ].join(' ')}
                             >
                                 {#if row.icon}
@@ -406,7 +416,7 @@
                                     </span>
                                     {#if row.pieces}
                                         <span
-                                            class="shrink-0 rounded bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                            class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
                                         >
                                             {row.pieces}件
                                         </span>
@@ -419,7 +429,7 @@
                                                 if (existing) handleExcludeSync(existing)
                                             }}
                                             class={[
-                                                'inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors',
+                                                'inline-flex shrink-0 items-center gap-1 rounded-none px-1.5 py-0.5 text-[10px] font-medium transition-colors',
                                                 row.source === 'custom'
                                                     ? 'text-(--theme-accent-text)'
                                                     : 'text-(--theme-muted-text) hover:text-(--theme-modal-text)'
@@ -445,7 +455,7 @@
 
                             <span
                                 class={[
-                                    'shrink-0 rounded px-1.5 py-0.5',
+                                    'shrink-0 rounded-none px-1.5 py-0.5',
                                     row.count > 0
                                         ? 'bg-(--theme-accent-bg)/10 text-sm font-semibold text-(--theme-accent-text)'
                                         : 'text-[10px] text-(--theme-muted-text)/60'
@@ -461,7 +471,7 @@
                                         const existing = entityKeyMap.get(`${row.entityType}/${row.entityName}`)
                                         if (existing) requestDelete(existing)
                                     }}
-                                    class="shrink-0 rounded p-1 text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
+                                    class="shrink-0 rounded-none p-1 text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused) hover:text-red-500"
                                     title="删除"
                                 >
                                     <Icon icon="mdi:trash-can-outline" class="size-4" />
@@ -490,13 +500,13 @@
             <div class="mt-4 flex items-center justify-end gap-2 border-t border-(--theme-card-border) pt-3">
                 <button
                     onclick={() => (confirmDelete = null)}
-                    class="rounded-lg px-4 py-1.5 text-sm text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
+                    class="rounded-none px-4 py-1.5 text-sm text-(--theme-muted-text) transition-colors hover:bg-(--theme-card-bg-focused)"
                 >
                     取消
                 </button>
                 <button
                     onclick={handleDelete}
-                    class="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium text-white transition-all hover:brightness-110"
+                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium text-white transition-all hover:brightness-110"
                     style="background: var(--theme-danger-bg, tomato);"
                 >
                     <Icon icon="mdi:trash-can-outline" class="size-4" />

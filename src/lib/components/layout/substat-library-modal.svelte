@@ -287,7 +287,7 @@
     {#if isCurrentPlan(character, standardSlotsFor(character) ?? [])}
         <button
             disabled
-            class="rounded-md border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-100"
+            class="rounded-none border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-100"
             style="border-color: var(--theme-divider-border); color: var(--theme-muted-text);"
             title="当前工程该角色的词条已与这套方案一致">已是当前方案</button
         >
@@ -295,14 +295,14 @@
         <button
             onclick={() => applyPlan(character, standardSlotsFor(character) ?? [], STANDARD_PLAN_NAME)}
             disabled={teamIndexOf(character) < 0}
-            class="rounded-md border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-40"
+            class="rounded-none border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-40"
             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);">一键套用</button
         >
     {/if}
     {#if standardOriginFor(character) !== '自动生成'}
         <button
             onclick={() => resetStandard(character)}
-            class="rounded-md border px-2.5 py-1 text-[11px] transition-colors"
+            class="rounded-none border px-2.5 py-1 text-[11px] transition-colors"
             style="border-color: var(--theme-divider-border);"
             title="清掉本地/工坊保存的方案，回落到工坊同步或自动生成">重置</button
         >
@@ -313,7 +313,7 @@
     {#if isCurrentPlan(character, plan.slots)}
         <button
             disabled
-            class="rounded-md border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-100"
+            class="rounded-none border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-100"
             style="border-color: var(--theme-divider-border); color: var(--theme-muted-text);"
             title="当前工程该角色的词条已与这套方案一致">已是当前方案</button
         >
@@ -321,7 +321,7 @@
         <button
             onclick={() => applyPlan(character, plan.slots, plan.name)}
             disabled={teamIndexOf(character) < 0}
-            class="rounded-md border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-40"
+            class="rounded-none border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-40"
             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);">套用</button
         >
     {/if}
@@ -330,12 +330,12 @@
             renameId = plan.id
             renameText = plan.name
         }}
-        class="rounded-md border px-2.5 py-1 text-[11px] transition-colors"
+        class="rounded-none border px-2.5 py-1 text-[11px] transition-colors"
         style="border-color: var(--theme-divider-border);">重命名</button
     >
     <button
         onclick={() => removePlan(plan)}
-        class="rounded-md border px-2.5 py-1 text-[11px] text-red-500 transition-colors"
+        class="rounded-none border px-2.5 py-1 text-[11px] text-red-500 transition-colors"
         style="border-color: var(--theme-divider-border);">删除</button
     >
 {/snippet}
@@ -349,11 +349,13 @@
     style={mergedStyle}
 >
     {#snippet title()}
-        <span class="flex items-center gap-2">
-            <Icon icon="mdi:clipboard-text-outline" class="size-4" />
-            <span>{isProjectMode ? '快速词条方案' : '词条集'}</span>
+        <span class="flex items-baseline gap-2.5">
+            <span class="text-[10px] font-semibold uppercase tracking-[0.34em] text-(--theme-accent-text) opacity-80"
+                >SUBSTATS</span
+            >
+            <span class="font-black tracking-tight">{isProjectMode ? '快速词条方案' : '词条集'}</span>
             {#if isProjectMode}
-                <span class="text-[10px] font-normal text-(--theme-muted-text)">当前配队</span>
+                <span class="text-[10px] font-normal tracking-wide text-(--theme-muted-text)">当前配队</span>
             {/if}
         </span>
     {/snippet}
@@ -364,7 +366,7 @@
             {#each project!.team as slot, ci (ci)}
                 {@const character = slot.character}
                 <div
-                    class="flex min-h-0 flex-col gap-3 rounded-xl border p-3.5"
+                    class="flex min-h-0 flex-col gap-3 rounded-none border p-3.5"
                     style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-bg) 40%, transparent);"
                 >
                     <!-- 栏头：角色 + 位次 -->
@@ -404,18 +406,18 @@
                                             {#if renameId === row.key && row.plan}
                                                 <input
                                                     bind:value={renameText}
-                                                    class="h-7 min-w-0 flex-1 rounded border bg-transparent px-2 text-[11px] outline-none"
+                                                    class="h-7 min-w-0 flex-1 rounded-none border bg-transparent px-2 text-[11px] outline-none"
                                                     style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                                 />
                                                 <button
                                                     onclick={() => commitRename(row.plan!)}
-                                                    class="rounded-md border px-2.5 py-1 text-[11px]"
+                                                    class="rounded-none border px-2.5 py-1 text-[11px]"
                                                     style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
                                                     >确定</button
                                                 >
                                                 <button
                                                     onclick={() => (renameId = null)}
-                                                    class="rounded-md border px-2.5 py-1 text-[11px] text-(--theme-muted-text)"
+                                                    class="rounded-none border px-2.5 py-1 text-[11px] text-(--theme-muted-text)"
                                                     style="border-color: var(--theme-divider-border);">取消</button
                                                 >
                                             {:else if row.standard}
@@ -445,7 +447,7 @@
             <div class="flex min-h-0 flex-1 gap-4">
                 <div class="flex w-72 shrink-0 flex-col gap-2">
                     <div
-                        class="flex items-center gap-2 rounded-lg border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
+                        class="flex items-center gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-input-bg) px-3 py-2"
                     >
                         <Icon icon="mdi:magnify" class="size-4 shrink-0 text-(--theme-muted-text)" />
                         <input
@@ -463,7 +465,7 @@
                                 }}
                                 in:fade={{ duration: 100 }}
                                 class={[
-                                    'flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition-colors',
+                                    'flex w-full items-center gap-2 rounded-none border px-2.5 py-2 text-left text-xs transition-colors',
                                     selected === row.name
                                         ? 'border-(--theme-accent-bg)'
                                         : 'border-(--theme-card-border) bg-(--theme-card-bg) hover:bg-(--theme-card-bg-focused)'
@@ -488,14 +490,14 @@
                                 <span class="flex shrink-0 items-center gap-1">
                                     {#if row.hasCustom}
                                         <span
-                                            class="rounded px-1 py-0.5 text-[9px] whitespace-nowrap"
+                                            class="rounded-none px-1 py-0.5 text-[9px] whitespace-nowrap"
                                             style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text);"
                                             >有自定义</span
                                         >
                                     {/if}
                                     {#if row.standardChanged}
                                         <span
-                                            class="rounded px-1 py-0.5 text-[9px] whitespace-nowrap"
+                                            class="rounded-none px-1 py-0.5 text-[9px] whitespace-nowrap"
                                             style="background: var(--theme-input-bg); color: var(--theme-muted-text);"
                                             >14词条·改</span
                                         >
@@ -523,13 +525,13 @@
                             <span class="flex-1"></span>
                             <button
                                 onclick={() => startNewPlan(selected, true)}
-                                class="rounded-md border px-2.5 py-1 text-[11px] transition-colors"
+                                class="rounded-none border px-2.5 py-1 text-[11px] transition-colors"
                                 style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
                                 title="以该角色的标准14词条为起点新建一条自定义方案">从14词条新建</button
                             >
                             <button
                                 onclick={() => startNewPlan(selected, false)}
-                                class="rounded-md border px-2.5 py-1 text-[11px] transition-colors"
+                                class="rounded-none border px-2.5 py-1 text-[11px] transition-colors"
                                 style="border-color: var(--theme-divider-border);"
                                 title="从空白骨架（43311 cost、无主词条与副词条）新建自定义方案">从空白新建</button
                             >
@@ -547,31 +549,31 @@
                                     {#if renameId === row.key && row.plan}
                                         <input
                                             bind:value={renameText}
-                                            class="h-7 min-w-0 flex-1 rounded border bg-transparent px-2 text-[11px] outline-none"
+                                            class="h-7 min-w-0 flex-1 rounded-none border bg-transparent px-2 text-[11px] outline-none"
                                             style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
                                         />
                                         <button
                                             onclick={() => commitRename(row.plan!)}
-                                            class="rounded-md border px-2.5 py-1 text-[11px]"
+                                            class="rounded-none border px-2.5 py-1 text-[11px]"
                                             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
                                             >确定</button
                                         >
                                         <button
                                             onclick={() => (renameId = null)}
-                                            class="rounded-md border px-2.5 py-1 text-[11px] text-(--theme-muted-text)"
+                                            class="rounded-none border px-2.5 py-1 text-[11px] text-(--theme-muted-text)"
                                             style="border-color: var(--theme-divider-border);">取消</button
                                         >
                                     {:else if row.standard}
                                         <button
                                             onclick={() => startEdit(row.key, row.name, true, row.slots)}
-                                            class="rounded-md border px-2.5 py-1 text-[11px] transition-colors"
+                                            class="rounded-none border px-2.5 py-1 text-[11px] transition-colors"
                                             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
                                             title="修改该角色的标准14词条（保存时需恰好 14 条副词条）">修改</button
                                         >
                                         <button
                                             onclick={syncFromShare}
                                             disabled={syncing}
-                                            class="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-40"
+                                            class="inline-flex items-center gap-1 rounded-none border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-40"
                                             style="border-color: var(--theme-divider-border); color: var(--theme-accent-text);"
                                             title="从工坊同步全部角色的标准14词条集"
                                         >
@@ -584,7 +586,7 @@
                                         {#if standardOriginFor(selected) !== '自动生成'}
                                             <button
                                                 onclick={() => resetStandard(selected)}
-                                                class="rounded-md border px-2.5 py-1 text-[11px] transition-colors"
+                                                class="rounded-none border px-2.5 py-1 text-[11px] transition-colors"
                                                 style="border-color: var(--theme-divider-border);"
                                                 title="清掉本地/工坊保存的方案，回落到工坊同步或自动生成">重置</button
                                             >
@@ -593,7 +595,7 @@
                                         <button
                                             onclick={() =>
                                                 startEdit(row.plan!.id, row.plan!.name, false, row.plan!.slots)}
-                                            class="rounded-md border px-2.5 py-1 text-[11px] transition-colors"
+                                            class="rounded-none border px-2.5 py-1 text-[11px] transition-colors"
                                             style="border-color: var(--theme-accent-bg); color: var(--theme-accent-text);"
                                             >修改</button
                                         >
@@ -602,12 +604,12 @@
                                                 renameId = row.plan!.id
                                                 renameText = row.plan!.name
                                             }}
-                                            class="rounded-md border px-2.5 py-1 text-[11px] transition-colors"
+                                            class="rounded-none border px-2.5 py-1 text-[11px] transition-colors"
                                             style="border-color: var(--theme-divider-border);">重命名</button
                                         >
                                         <button
                                             onclick={() => removePlan(row.plan!)}
-                                            class="rounded-md border px-2.5 py-1 text-[11px] text-red-500 transition-colors"
+                                            class="rounded-none border px-2.5 py-1 text-[11px] text-red-500 transition-colors"
                                             style="border-color: var(--theme-divider-border);">删除</button
                                         >
                                     {/if}

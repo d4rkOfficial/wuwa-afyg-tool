@@ -47,7 +47,7 @@
 </script>
 
 <div
-    class="rounded-lg border {className ?? ''}"
+    class="rounded-none border {className ?? ''}"
     style="border-color: var(--theme-divider-border); background: var(--theme-card-bg); {styleProp || ''}"
 >
     <button
@@ -62,7 +62,7 @@
         <span class="min-w-0 flex-1 truncate text-xs font-medium text-(--theme-modal-text)">{name}</span>
         {#if origin}
             <span
-                class="shrink-0 rounded px-1.5 py-0.5 text-[10px]"
+                class="shrink-0 rounded-none px-1.5 py-0.5 text-[10px]"
                 style="background: var(--theme-input-bg); color: var(--theme-muted-text);">{origin}</span
             >
         {/if}
