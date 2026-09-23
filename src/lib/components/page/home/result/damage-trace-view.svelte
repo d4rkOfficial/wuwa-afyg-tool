@@ -1,5 +1,6 @@
 <script lang="ts">
     import { fade } from 'svelte/transition'
+    import { onMount } from 'svelte'
     import { buildDamageSegments, type DamageTraceCtx, type TracePart } from '$lib/calc/damage-trace'
     import type { ResultEntry } from '$lib/calc/result.types'
     import type { ComponentsProps } from '$lib/types'
@@ -127,6 +128,8 @@
     let closeTimer: ReturnType<typeof setTimeout> | null = null
     let rootEl = $state<HTMLElement | null>(null)
     let tipEl = $state<HTMLElement | null>(null)
+    /** @desc 触发浮窗的 badge 元素：滚动时按它最新矩形重定位（fixed + 视口坐标，滚动后原锚点会失效） */
+    let tipTrigger: HTMLElement | null = null
     /** @desc 浮窗实测尺寸：高度随来源条数变化，写死会导致翻上/翻下的位置算错 */
     let tipSize = $state({ w: 0, h: 0 })
     /** @desc 视口尺寸（resize 时更新），用于把浮窗 clamp 在窗口内 */
@@ -136,13 +139,27 @@
     })
 
     /** @desc 取触发 badge 的视口矩形作为锚点（真实左右/上下都记下来，定位时按浮窗实测尺寸算） */
-    function anchorAt(e: Event): TipAnchor {
-        const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const rectOf = (el: HTMLElement): TipAnchor => {
+        const r = el.getBoundingClientRect()
         return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+    }
+
+    function anchorAt(e: Event): TipAnchor {
+        return rectOf(e.currentTarget as HTMLElement)
     }
 
     const TIP_MARGIN = 8
     const TIP_GAP = 8
+
+    /**
+     * @desc 浮窗 portal 到 document.body：祖先里只要有 backdrop-filter（data-sf 区域表面就是），
+     *  position: fixed 就会「相对该祖先定位」并被其裁切，于是 left/top 用的是视口坐标却按祖先算 → 必然错位。
+     *  挂到 body 后 fixed 才真正相对视口，下面的 clamp 才有意义。
+     */
+    const portal = (node: HTMLElement) => {
+        document.body.appendChild(node)
+        return { destroy: () => node.remove() }
+    }
 
     /** @desc 浮窗定位：默认贴 badge 下方，下方放不下则弹到上方，最后整体 clamp 进视口（左右/上下都不越界） */
     const tipPos = $derived.by(() => {
@@ -183,6 +200,7 @@
     function openHover(e: Event, chip: Chip) {
         clearClose()
         pinned = false
+        tipTrigger = e.currentTarget as HTMLElement
         tip = { anchor: anchorAt(e), chip }
     }
 
@@ -190,7 +208,10 @@
         if (pinned) return
         clearClose()
         closeTimer = setTimeout(() => {
-            if (!pinned) tip = null
+            if (!pinned) {
+                tip = null
+                tipTrigger = null
+            }
             closeTimer = null
         }, 180)
     }
@@ -202,9 +223,11 @@
         if (pinned && tip?.chip.id === chip.id) {
             pinned = false
             tip = null
+            tipTrigger = null
             return
         }
         pinned = true
+        tipTrigger = e.currentTarget as HTMLElement
         tip = { anchor: anchorAt(e), chip }
     }
 
@@ -212,7 +235,20 @@
         clearClose()
         pinned = false
         tip = null
+        tipTrigger = null
     }
+
+    /** @desc 滚动（含结果页/弹窗内部的滚动容器，故用捕获阶段）时：固定的浮窗不会跟着 badge 走，
+     *  固定的就按最新矩形重定位、hover 预览的直接收起，避免浮窗「悬在原地」对不上来源 */
+    onMount(() => {
+        const onScroll = () => {
+            if (!tip || !tipTrigger) return
+            if (pinned) tip = { anchor: rectOf(tipTrigger), chip: tip.chip }
+            else closeTip()
+        }
+        window.addEventListener('scroll', onScroll, true)
+        return () => window.removeEventListener('scroll', onScroll, true)
+    })
 </script>
 
 <svelte:window
@@ -220,7 +256,9 @@
         viewport = { w: window.innerWidth, h: window.innerHeight }
     }}
     onmousedown={(e) => {
-        if (tip && rootEl && !rootEl.contains(e.target as Node)) closeTip()
+        // 浮窗已 portal 到 body，不再属于 rootEl，点它内部（滚动条、✕）不应视为「点外部」
+        const t = e.target as Node
+        if (tip && rootEl && !rootEl.contains(t) && !(tipEl && tipEl.contains(t))) closeTip()
     }}
     onkeydown={(e) => {
         if (e.key === 'Escape') closeTip()
@@ -288,6 +326,7 @@
     {#if tip}
         <div
             bind:this={tipEl}
+            use:portal
             in:fade={{ duration: 100 }}
             role="tooltip"
             onpointerenter={clearClose}
