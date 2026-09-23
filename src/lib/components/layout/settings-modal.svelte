@@ -648,7 +648,7 @@
                     class="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 scrollbar-none [&::-webkit-scrollbar]:hidden [&>div+div]:border-t [&>div+div]:border-(--theme-divider-border) [&>div+div]:pt-4"
                 >
                     {#if tab === 'theme'}
-                        <div class="columns-1 gap-x-8 [&>div]:mb-5 [&>div]:break-inside-avoid xl:columns-2">
+                        <div class="flex flex-col">
                             <!-- Accent color -->
                             <div class="mb-5">
                                 <span
@@ -932,7 +932,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="space-y-4">
+                                        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-x-6">
                                             <div>
                                                 <span
                                                     class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
@@ -1092,7 +1092,7 @@
                                                             >
                                                         </div>
                                                     </div>
-                                                    <div class="space-y-4">
+                                                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-x-6">
                                                         <div>
                                                             <span
                                                                 class="mb-2 flex items-center justify-between text-[11px] text-(--theme-modal-text)/55"
@@ -1271,7 +1271,7 @@
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 每行决定排轴时操作块显示的按键图标（键盘或手柄）；快速排轴输入键与界面快捷键可在「交互相关」中配置
                             </p>
-                            <div class="flex flex-col gap-2">
+                            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                                 {#each keymapEntries as entry}
                                     <div
                                         class="flex items-center gap-2 rounded-none border px-2.5 py-2"
@@ -1346,7 +1346,7 @@
                             </div>
                         </div>
                     {:else if tab === 'interaction'}
-                        <div class="columns-1 gap-x-8 [&>div]:mb-5 [&>div]:break-inside-avoid xl:columns-2">
+                        <div class="flex flex-col">
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
@@ -1590,7 +1590,7 @@
                             </div>
                         </div>
                     {:else if tab === 'shortcuts'}
-                        <div class="columns-1 gap-x-8 [&>div]:mb-5 [&>div]:break-inside-avoid xl:columns-2">
+                        <div class="flex flex-col">
                             <div class="mt-5">
                                 <span
                                     class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
@@ -1611,7 +1611,7 @@
                                         <span class="text-[11px] font-medium text-(--theme-modal-text)/45"
                                             >{g.label}</span
                                         >
-                                        <div class="mt-1 flex flex-col gap-1.5">
+                                        <div class="mt-1 grid grid-cols-1 gap-1.5 xl:grid-cols-2 xl:gap-x-4">
                                             {#each getShortcuts().filter((s) => s.group === g.key) as s}
                                                 <div
                                                     class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
@@ -1770,7 +1770,7 @@
                         </div>
                     {:else if tab === 'connection'}
                         <!-- Connection settings: 上游数据源 + 工坊/分享源 -->
-                        <div class="columns-1 gap-x-8 [&>div]:mb-5 [&>div]:break-inside-avoid xl:columns-2">
+                        <div class="flex flex-col">
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                             >
@@ -1784,7 +1784,7 @@
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 选择角色/武器/声骸等数据的来源；切换后列表与详情缓存会按新源重新加载
                             </p>
-                            <div class="flex flex-col gap-2">
+                            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                                 {#each providerOptions as opt}
                                     <div
                                         class={[
@@ -1843,7 +1843,7 @@
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 配置椰果工坊实例；单选使用，可删除或新增，分享与工坊列表将使用当前选中实例
                             </p>
-                            <div class="flex flex-col gap-2">
+                            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                                 {#each workshopInstances as inst}
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -2097,7 +2097,7 @@
                             <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
                                 仅清理接口数据缓存（列表 / 详情 / 图像），不影响你的工程与本地数据
                             </p>
-                            <div class="flex flex-col gap-2">
+                            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                                 {#each CACHE_LABELS as item}
                                     <div
                                         class="flex items-center gap-2.5 rounded-none border px-3 py-2.5"
@@ -2139,7 +2139,7 @@
                                 可配置多组「提供商 / 模型 / API Key」并一键切换，每组独立保存；API Key
                                 仅存本机。点击配置文件即可切换，点「编辑」打开独立弹窗修改
                             </p>
-                            <div class="flex flex-col gap-2">
+                            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
                                 <!-- 启用 AI 助手（独立开关，立即保存） -->
                                 <div
                                     class="flex items-center justify-between gap-3 rounded-none border px-3 py-2"
