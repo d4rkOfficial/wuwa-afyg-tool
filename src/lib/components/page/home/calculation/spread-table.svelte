@@ -458,39 +458,64 @@
     interface SourceTab {
         key: string
         label: string
+        /** @desc 角色名（无则 null，用于取头像与元素色；「其它」页签为 null） */
+        char: string | null
         element: string
         count: number
     }
     let sourceKey = $state<string | null>(null)
     const charIconMap = $derived(getCharIconMap())
 
-    /** @desc 按子表出现顺序汇总角色页签（同角色可能既有直伤表又有非直伤表，故统计子表数） */
+    /** @desc 子表归属的页签键：命中队伍槽位 → slot-N；无角色/未命中 → 「其它」 */
+    const sourceKeyOf = (charName: string): string => {
+        if (!charName) return NONE_SOURCE_KEY
+        const ci = charToIdx[charName]
+        return ci === undefined ? NONE_SOURCE_KEY : `slot-${ci}`
+    }
+
+    /** @desc 页签固定为「角色1 / 角色2 / 角色3 / 其它」四个队伍维度（不做「全部」——全部子表同时渲染最卡）：
+     *  有角色的槽位显示角色名+头像，空槽位显示「角色N」，两者都没有子表时该页签不出现；「其它」承载无角色的伤害源 */
     const sourceTabs = $derived.by<SourceTab[]>(() => {
-        const map = new Map<string, SourceTab>()
-        const order: string[] = []
+        const counts = new Map<string, number>()
         for (const g of tableData) {
-            const key = g.charName || NONE_SOURCE_KEY
-            let tab = map.get(key)
-            if (!tab) {
-                tab = { key, label: g.charName || '无角色', element: elementColor(g.charName), count: 0 }
-                map.set(key, tab)
-                order.push(key)
-            }
-            tab.count++
+            const key = sourceKeyOf(g.charName)
+            counts.set(key, (counts.get(key) ?? 0) + 1)
         }
-        return order.map((k) => map.get(k)!)
+        const tabs: SourceTab[] = []
+        team.forEach((slot, i) => {
+            const key = `slot-${i}`
+            const count = counts.get(key) ?? 0
+            if (!slot.character && count === 0) return
+            tabs.push({
+                key,
+                label: slot.character ?? `角色${i + 1}`,
+                char: slot.character ?? null,
+                element: elementColor(slot.character ?? ''),
+                count
+            })
+        })
+        tabs.push({
+            key: NONE_SOURCE_KEY,
+            label: '其它',
+            char: null,
+            element: elementColor(''),
+            count: counts.get(NONE_SOURCE_KEY) ?? 0
+        })
+        return tabs
     })
-    /** @desc 生效的过滤键：数据变化导致该角色消失时自动回落到「全部」 */
-    const activeSource = $derived(sourceKey !== null && sourceTabs.some((t) => t.key === sourceKey) ? sourceKey : null)
+    /** @desc 生效的页签：未手动选择（或所选页签已不存在）时取第一个有子表的页签 */
+    const activeSource = $derived(
+        sourceKey !== null && sourceTabs.some((t) => t.key === sourceKey)
+            ? sourceKey
+            : (sourceTabs.find((t) => t.count > 0)?.key ?? sourceTabs[0]?.key ?? null)
+    )
     /** @desc 要渲染的子表下标：始终是 tableData 的原始下标——data-group / 框选 / 高亮 / 右键全选语义不变 */
     const shownGroupIdx = $derived.by(() => {
         if (activeSource === null) return tableData.map((_, gi) => gi)
-        return tableData
-            .map((g, gi) => ((g.charName || NONE_SOURCE_KEY) === activeSource ? gi : -1))
-            .filter((gi) => gi >= 0)
+        return tableData.map((g, gi) => (sourceKeyOf(g.charName) === activeSource ? gi : -1)).filter((gi) => gi >= 0)
     })
 
-    const selectSource = (key: string | null) => {
+    const selectSource = (key: string) => {
         sourceKey = key
         // 被过滤掉的子表上的高亮随之失效，避免留下看不见的高亮状态
         highlight = null
@@ -872,26 +897,14 @@
 
 <!-- @desc 铺开表根容器：顶部伤害源页签（不滚动）+ 下方表格滚动区 -->
 <div class="flex h-full flex-col {className}" style={styleProp}>
-    <!-- @desc 伤害源切换：只看某个角色的子表（UI 对齐「词条/环境配置」的角色页签）；多角色时才显示 -->
+    <!-- @desc 伤害源切换：固定「角色1/角色2/角色3/其它」四个队伍维度页签（UI 对齐「词条/环境配置」的角色页签）；
+         不做「全部」——所有子表同时渲染最卡，故一次只看一个伤害源 -->
     {#if sourceTabs.length > 1}
         <div
             class="flex shrink-0 flex-wrap items-center gap-2 border-b border-(--theme-divider-border) px-3 py-2"
             data-sf="toolbar"
             data-sf-flat
         >
-            <button
-                class={[
-                    'flex cursor-pointer items-center gap-1.5 rounded-none border px-2.5 py-1 text-xs font-black tracking-tight transition-colors',
-                    activeSource === null
-                        ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                        : 'border-transparent text-(--theme-modal-text)/40 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/70'
-                ].join(' ')}
-                onclick={() => selectSource(null)}
-                title="显示全部角色子表"
-            >
-                全部
-                <span class="text-[10px] opacity-50">({tableData.length})</span>
-            </button>
             {#each sourceTabs as tab (tab.key)}
                 <button
                     class={[
@@ -904,11 +917,11 @@
                         ? `background: color-mix(in srgb, ${tab.element} 18%, transparent); color: ${tab.element};`
                         : ''}
                     onclick={() => selectSource(tab.key)}
-                    title={`${tab.label}：${tab.count} 张子表`}
+                    title={tab.count > 0 ? `${tab.label}：${tab.count} 张子表` : `${tab.label}：暂无伤害条目`}
                 >
-                    {#if tab.key !== NONE_SOURCE_KEY && charIconMap[tab.label]}
+                    {#if tab.char && charIconMap[tab.char]}
                         <img
-                            src={charIconMap[tab.label]}
+                            src={charIconMap[tab.char]}
                             alt=""
                             use:fallbackIcon={'/icons/placeholder-character.svg'}
                             class="size-5 shrink-0 rounded-full"
@@ -920,7 +933,6 @@
                         >
                     {/if}
                     <span>{tab.label}</span>
-                    <span class="text-[10px] opacity-50">({tab.count})</span>
                 </button>
             {/each}
         </div>
@@ -964,6 +976,10 @@
         {/if}
         {#if damageEntries.length === 0}
             <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
+        {:else if shownGroupIdx.length === 0}
+            <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">
+                该伤害源暂无伤害条目
+            </div>
         {/if}
         <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（表宽由表头内容决定）；只渲染当前伤害源页签命中的子表 -->
         {#each shownGroupIdx as gi (tableData[gi].key)}
