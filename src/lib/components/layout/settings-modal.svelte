@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
     import { fade } from 'svelte/transition'
     import { popOut } from '$lib/utils/motion'
     import {
@@ -83,10 +83,12 @@
         getConfirmDeletes,
         getLockWatermark,
         getLockWatermarkText,
+        getSidebarActions,
         getToastPosition,
         setConfirmDeletes,
         setLockWatermark,
         setLockWatermarkText,
+        setSidebarActions,
         setToastPosition,
         TOAST_POSITIONS,
         type ToastPosition
@@ -1509,6 +1511,35 @@
                                         <span
                                             class="absolute top-0.5 size-4 rounded-full transition-all"
                                             style="left: {getSimplifyToolbar()
+                                                ? '18px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+                                <div
+                                    class="mt-2 flex items-center justify-between gap-3 rounded-none border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >侧边栏显示新建 / 导入按钮</span
+                                        >
+                                        <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                            在侧边栏底部显示「新建工程 / 从本地导入 /
+                                            从工坊下载」操作区；默认开启（关闭后仍可从欢迎页使用）
+                                        </span>
+                                    </div>
+                                    <button
+                                        onclick={() => setSidebarActions(!getSidebarActions())}
+                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                        style="background: {getSidebarActions()
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 size-4 rounded-full transition-all"
+                                            style="left: {getSidebarActions()
                                                 ? '18px'
                                                 : '2px'}; background: var(--theme-modal-bg);"
                                         ></span>

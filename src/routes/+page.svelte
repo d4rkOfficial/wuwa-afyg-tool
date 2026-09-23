@@ -804,7 +804,13 @@
             setShowBuffModal(true)
         }}
         showBuffOption={activePhase === 'calculation' && !showResult}
+        oncreate={() => {
+            newName = ''
+            showNewModal = true
+        }}
+        onimport={() => importInput?.click()}
         onhome={goHome}
+        onworkshop={() => (showWorkshop = true)}
         onshare={handleShare}
         onrename={openRename}
         onclone={openClone}

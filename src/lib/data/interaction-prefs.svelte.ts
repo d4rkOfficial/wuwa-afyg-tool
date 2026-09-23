@@ -5,6 +5,7 @@ const CONFIRM_DELETES_KEY = 'wuwa-afyg:interaction-prefs:confirm-deletes'
 const TOAST_POSITION_KEY = 'wuwa-afyg:interaction-prefs:toast-position'
 const LOCK_WATERMARK_KEY = 'wuwa-afyg:interaction-prefs:lock-watermark'
 const LOCK_WATERMARK_TEXT_KEY = 'wuwa-afyg:interaction-prefs:lock-watermark-text'
+const SIDEBAR_ACTIONS_KEY = 'wuwa-afyg:interaction-prefs:sidebar-actions'
 
 /** @desc 锁定水印默认文案（文本框留空时回落到它） */
 export const DEFAULT_LOCK_WATERMARK_TEXT = '已锁定'
@@ -31,6 +32,8 @@ let _confirmDeletes = $state(true)
 let _toastPosition = $state<ToastPosition>('top-right')
 let _lockWatermark = $state(true)
 let _lockWatermarkText = $state(DEFAULT_LOCK_WATERMARK_TEXT)
+/** @desc 侧边栏底部是否显示「新建 / 从本地导入 / 从工坊下载」操作区（默认开启） */
+let _sidebarActions = $state(true)
 
 if (browser) {
     try {
@@ -57,6 +60,22 @@ if (browser) {
     } catch {
         /* ignore */
     }
+    try {
+        const saved = localStorage.getItem(SIDEBAR_ACTIONS_KEY)
+        if (saved === '0' || saved === '1') _sidebarActions = saved === '1'
+    } catch {
+        /* ignore */
+    }
+}
+
+/** @desc 侧边栏底部操作区（新建 / 从本地导入 / 从工坊下载）是否显示 */
+export function getSidebarActions(): boolean {
+    return _sidebarActions
+}
+
+export function setSidebarActions(v: boolean): void {
+    _sidebarActions = v
+    if (browser) localStorage.setItem(SIDEBAR_ACTIONS_KEY, v ? '1' : '0')
 }
 
 export function getConfirmDeletes(): boolean {

@@ -7,6 +7,7 @@
     import { setActiveTheme, getActiveId as getActiveThemeId, getThemes } from '$lib/theme'
     import { addToast } from '$lib/data/toast.svelte'
     import { getCharElementMap } from '$lib/data/char-elements.svelte'
+    import { getSidebarActions } from '$lib/data/interaction-prefs.svelte'
     import { shortName } from '$lib/utils/character'
     import { slide } from 'svelte/transition'
     import favicon from '$lib/assets/favicon.svg'
@@ -25,8 +26,11 @@
         showBuffOption?: boolean
         onToggleSidebarLookup?: () => void
         onToggleSidebarWidth?: () => void
-        /** @desc 注意：新建工程 / 从本地导入 / 从工坊下载 已移到欢迎页（底部操作区已删除） */
+        /** @desc 底部操作区（新建 / 从本地导入 / 从工坊下载）；显示与否由「设置-交互相关」开关控制，默认开启 */
+        oncreate: () => void
+        onimport: () => void
         onhome: () => void
+        onworkshop: () => void
         onshare: (id: string) => void
         onrename: (id: string) => void
         onclone: (id: string) => void
@@ -48,7 +52,10 @@
         showBuffOption = false,
         onToggleSidebarLookup,
         onToggleSidebarWidth,
+        oncreate,
+        onimport,
         onhome,
+        onworkshop,
         onshare,
         onrename,
         onclone,
@@ -66,6 +73,8 @@
     let ctxTargetId = $state<string | null>(null)
     let expandedKeys = $state<Set<string>>(new Set())
     let hoveredHeaderKey = $state<string | null>(null)
+    let actionsCollapsed = $state(false)
+
     let compact = $derived(width <= 144)
     /** @desc 侧栏偏窄时隐藏顶部「椰果工具箱」标题文本（仅留图标），避免与右侧按钮挤在一起 */
     let showTitle = $derived(width >= 233)
@@ -412,6 +421,74 @@
                         </div>
                     {/each}
                 </div>
+            {/if}
+        </div>
+    {/if}
+
+    <!-- 底部操作区：新建 / 从本地导入 / 从工坊下载（可在 设置-交互相关 关闭） -->
+    {#if !lookupPage && !lookupCompactHidden && getSidebarActions()}
+        <div class="shrink-0 border-t px-2 pt-2 pb-3 space-y-0.5" style="border-color: var(--theme-divider-border)">
+            {#if compact}
+                <button
+                    onclick={oncreate}
+                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    title="新建工程"
+                >
+                    <Icon icon="mdi:plus" class="size-4 shrink-0" />
+                </button>
+                <button
+                    onclick={onimport}
+                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    title="从本地导入"
+                >
+                    <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
+                </button>
+                <button
+                    onclick={onworkshop}
+                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    title="从工坊下载"
+                >
+                    <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+                </button>
+            {:else}
+                <button
+                    onclick={() => (actionsCollapsed = !actionsCollapsed)}
+                    class="flex w-full shrink-0 items-center justify-center rounded-none py-1 text-(--theme-sidebar-text)/40 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/80"
+                    title={actionsCollapsed ? '展开操作' : '收起操作'}
+                >
+                    <Icon
+                        icon={actionsCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'}
+                        class="size-3.5 shrink-0"
+                    />
+                </button>
+                {#if !actionsCollapsed}
+                    <div transition:slide|local={{ duration: 200 }} class="space-y-0.5">
+                        <button
+                            onclick={oncreate}
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            title="新建工程"
+                        >
+                            <Icon icon="mdi:plus" class="size-4 shrink-0" />
+                            <span>新建工程</span>
+                        </button>
+                        <button
+                            onclick={onimport}
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            title="从本地导入"
+                        >
+                            <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
+                            <span>从本地导入</span>
+                        </button>
+                        <button
+                            onclick={onworkshop}
+                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            title="从工坊下载"
+                        >
+                            <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
+                            <span>从工坊下载</span>
+                        </button>
+                    </div>
+                {/if}
             {/if}
         </div>
     {/if}

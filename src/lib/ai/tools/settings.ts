@@ -1,4 +1,4 @@
-﻿// 设置域工具：AI/WS 可修改的设置白名单——覆盖「设置」弹窗全部可配置项
+// 设置域工具：AI/WS 可修改的设置白名单——覆盖「设置」弹窗全部可配置项
 // （外观主题 / 按键图标 / 交互-拉表视图+工具栏简化+右键菜单简化+界面快捷键 / 工坊 / 性能 / 连接配置-数据源 / 缓存清理 / 助手设置）。
 // 仅「自定义主题创建/删除」需用户手动操作。
 import { defineTool } from './registry'
@@ -70,10 +70,12 @@ import {
     LOCK_WATERMARK_TEXT_MAX,
     TOAST_POSITIONS,
     getConfirmDeletes,
+    getSidebarActions,
     getEffectiveLockWatermarkText,
     getLockWatermark,
     getToastPosition,
     setConfirmDeletes,
+    setSidebarActions,
     setLockWatermark,
     setLockWatermarkText,
     setToastPosition,
@@ -258,6 +260,14 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
         apply: async (v) => {
             const b = toBool(v, 'simplify_context_menu')
             setSimplifyContextMenu(b)
+            return b
+        }
+    },
+    sidebar_actions: {
+        label: '侧边栏显示新建/导入按钮',
+        apply: async (v) => {
+            const b = toBool(v, 'sidebar_actions')
+            setSidebarActions(b)
             return b
         }
     },
@@ -447,6 +457,7 @@ defineTool('get_settings_state', {
                 simplifyContextMenu: getSimplifyContextMenu(),
                 magneticPointer: getMagneticPointer(),
                 confirmDeletes: getConfirmDeletes(),
+                sidebarActions: getSidebarActions(),
                 toastPosition: getToastPosition(),
                 lockWatermark: getLockWatermark(),
                 lockWatermarkText: getEffectiveLockWatermarkText(),
@@ -495,7 +506,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。',
     parameters: {
         type: 'object',
         properties: {
