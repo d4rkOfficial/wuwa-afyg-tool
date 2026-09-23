@@ -102,6 +102,7 @@
             <EchoSlotCard
                 class="flex-1"
                 {slot}
+                reserveSubstatRows
                 otherCost={totalCost - slot.cost}
                 oncost={(cost) => setCost(si, cost)}
                 onmainstat={() => (mainStatSlot = si)}

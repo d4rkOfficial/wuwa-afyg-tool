@@ -12,6 +12,8 @@
 
     interface Props extends ComponentsProps {
         slot: EchoSlotConfig
+        /** @desc 副词条区域固定预留 5 行高度（词条集编辑器用，使各卡片内容行高一致） */
+        reserveSubstatRows?: boolean
         /** @desc 其余槽位 cost 合计（用于判断能否切换本槽 cost） */
         otherCost: number
         /** @desc 主词条按钮的定位锚点（工程配置页用于弹出菜单） */
@@ -38,6 +40,7 @@
         slot,
         otherCost,
         mainStatTriggerKey,
+        reserveSubstatRows = false,
         oncost,
         onmainstat,
         onclearsubstats,
@@ -66,6 +69,11 @@
     const shortLabel = (label: string) => DAMAGE_SHORT[label] ?? label
 
     const second = $derived(SECOND_MAIN_STAT[slot.cost as keyof typeof SECOND_MAIN_STAT])
+
+    /** @desc 补足到 5 行的占位行序号（仅在预留模式下非空，占位行不参与交互、不可见但撑高） */
+    const placeholderRows = $derived(
+        reserveSubstatRows ? Array.from({ length: Math.max(0, 5 - slot.substats.length) }, (_, i) => i) : []
+    )
 
     const costBtnCls = (cost: number): string => {
         if (cost === 4) return 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/25 text-(--theme-accent-text)'
@@ -209,6 +217,21 @@
                 {#if dragIndex !== null && !dragOutside && dropIndex === slot.substats.length}
                     <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
                 {/if}
+                <!-- 占位行：与真实副词条行同结构、不可见，用于把区域撑到 5 行高度 -->
+                {#each placeholderRows as i (i)}
+                    <div
+                        aria-hidden="true"
+                        transition:slide={{ duration: 200 }}
+                        class="invisible flex items-center gap-2 rounded-none border px-2 py-1.5"
+                        style="border-color: var(--theme-divider-border);"
+                    >
+                        <span class="mr-2 w-20 shrink-0 text-[11px] font-black">占位</span>
+                        <div class="relative h-5 flex-1"></div>
+                        {#if onremovesubstat}
+                            <span class="shrink-0 p-0.5"><Icon icon="mdi:close" class="size-3.5" /></span>
+                        {/if}
+                    </div>
+                {/each}
             </div>
             {#if slot.substats.length > 0}
                 <div class="mt-2 flex flex-wrap items-center gap-2">
