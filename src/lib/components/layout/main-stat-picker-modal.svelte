@@ -1,5 +1,6 @@
 <script lang="ts">
     /** @desc 主词条选择弹窗（词条集的方案编辑器用）：列出该 cost 可选主词条，数值固定取池子上限 */
+    import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import { MAIN_STAT_POOL } from '$lib/consts/stat-data'
@@ -45,7 +46,10 @@
                 >
                 <button
                     onclick={onclose}
-                    class="ml-auto rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                    class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
+                    'top-left'
+                        ? 'order-first'
+                        : 'ml-auto'}"
                     aria-label="关闭"
                 >
                     <Icon icon="mdi:close" class="size-4" />

@@ -1,5 +1,6 @@
 <script lang="ts">
     /** @desc 速查弹窗：遮罩 + 居中卡片，ESC 关闭（stopPropagation 不冒泡关上层），内容复用 QuickLookupContent */
+    import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import type { CharSlot } from '$lib/types/project'
     import Icon from '@iconify/svelte'
     import { focusTrap } from '$lib/utils/focus-trap'
@@ -63,8 +64,10 @@
                 </h2>
                 <button
                     onclick={onclose}
-                    class="flex size-7 items-center justify-center rounded-none text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
-                    ><Icon icon="mdi:close" class="size-4" /></button
+                    class="flex size-7 items-center justify-center rounded-none text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text) {getModalClosePosition() ===
+                    'top-left'
+                        ? 'order-first'
+                        : ''}"><Icon icon="mdi:close" class="size-4" /></button
                 >
             </div>
             <!-- @desc 内容区（角色 tab + 滚动详情），主体与侧边栏速查共用 -->

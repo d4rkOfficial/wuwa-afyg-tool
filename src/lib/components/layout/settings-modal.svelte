@@ -694,7 +694,10 @@
                 </div>
                 <button
                     onclick={onclose}
-                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
+                    'top-left'
+                        ? 'order-first'
+                        : ''}"
                     aria-label="关闭设置"
                 >
                     <Icon icon="mdi:close" class="size-4.5" />
@@ -2777,7 +2780,10 @@
                     <span class="text-sm font-semibold">选择按键与手柄键位</span>
                     <button
                         onclick={() => (keyPickerFor = null)}
-                        class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                        class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
+                        'top-left'
+                            ? 'order-first'
+                            : ''}"
                     >
                         <Icon icon="mdi:close" class="size-4.5" />
                     </button>

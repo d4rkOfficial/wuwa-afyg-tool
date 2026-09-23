@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import type { ComponentsProps } from '$lib/types'
     import { getHelpState, closeHelp } from '$lib/data/help.svelte'
     import Icon from '@iconify/svelte'
@@ -43,7 +44,10 @@
         >
             <button
                 onclick={closeHelp}
-                class="absolute right-3 top-3 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                class="absolute top-3 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
+                'top-left'
+                    ? 'left-3'
+                    : 'right-3'}"
                 aria-label="关闭"
             >
                 <Icon icon="mdi:close" class="size-4.5" />

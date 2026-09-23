@@ -1,5 +1,6 @@
 <script lang="ts">
     /** @desc 副词条选择弹窗（工程-词条配置页与词条集的方案编辑器共用）：已存在的词条置灰不可重复选择 */
+    import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import { SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
@@ -41,7 +42,10 @@
                 <span class="text-sm font-black tracking-tight text-(--theme-modal-text)">选择副词条</span>
                 <button
                     onclick={onclose}
-                    class="ml-auto rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                    class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
+                    'top-left'
+                        ? 'order-first'
+                        : 'ml-auto'}"
                     aria-label="关闭"
                 >
                     <Icon icon="mdi:close" class="size-4" />
