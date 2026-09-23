@@ -802,6 +802,7 @@
         onToggleSidebarLookup={() => (sidebarLookupOpen = !sidebarLookupOpen)}
         onToggleSidebarWidth={toggleSidebarWidth}
         team={activeProject?.team}
+        locked={phaseLocked}
         onCreateBuff={(name) => {
             // 新建后记下 id，buff 弹窗打开时自动滚动定位到这条
             const id = createBuffSet(name)

@@ -8,6 +8,7 @@
     import QuickLookupContent from '$lib/components/layout/quick-lookup-content.svelte'
 
     interface Props extends ComponentsProps {
+        locked?: boolean
         open: boolean
         team: [CharSlot, CharSlot, CharSlot]
         onCreateBuff?: (name: string) => void
@@ -18,6 +19,7 @@
     }
 
     let {
+        locked = false,
         open,
         team,
         onCreateBuff,
@@ -73,6 +75,7 @@
             <!-- @desc 内容区（角色 tab + 滚动详情），主体与侧边栏速查共用 -->
             <div class="flex min-h-0 flex-1 flex-col">
                 <QuickLookupContent
+                    {locked}
                     {team}
                     {onCreateBuff}
                     {onCreateCustomHit}

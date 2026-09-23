@@ -24,6 +24,8 @@
         team?: [CharSlot, CharSlot, CharSlot]
         onCreateBuff?: (name: string) => void
         showBuffOption?: boolean
+        /** @desc 当前阶段是否锁定（透传给速查右键菜单） */
+        locked?: boolean
         onToggleSidebarLookup?: () => void
         onToggleSidebarWidth?: () => void
         /** @desc 底部操作区（新建 / 从本地导入 / 从工坊下载）；显示与否由「设置-交互相关」开关控制，默认开启 */
@@ -50,6 +52,7 @@
         team,
         onCreateBuff,
         showBuffOption = false,
+        locked = false,
         onToggleSidebarLookup,
         onToggleSidebarWidth,
         oncreate,
@@ -279,6 +282,7 @@
             <QuickLookupContent
                 {team}
                 {onCreateBuff}
+                {locked}
                 {showBuffOption}
                 showCustomHitOption={false}
                 tabBarPosition="bottom"

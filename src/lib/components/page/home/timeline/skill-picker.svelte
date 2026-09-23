@@ -20,7 +20,8 @@
         removeCustomHit,
         duplicateCustomHit,
         applySkillHits,
-        switchSkillPickerTab
+        switchSkillPickerTab,
+        getLocked
     } from '$lib/calc/timeline.store.svelte'
     import { parseRatioHits, summarizeSelectedHits } from '$lib/calc/skill-segments'
     import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
@@ -837,6 +838,7 @@
 {/if}
 
 <QuickLookup
+    locked={getLocked()}
     open={showLookup}
     team={getTeam()}
     showBuffOption={false}

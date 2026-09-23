@@ -35,7 +35,7 @@
     import type { CharSlot } from '$lib/types/project'
     import type { ZoneRef, BuffSet, BuffCondition } from '$lib/calc/calculation.types'
     import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
-    import { getCharIconMap, elementColor } from '$lib/calc/timeline.store.svelte'
+    import { getCharIconMap, elementColor, getLocked } from '$lib/calc/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import Icon from '@iconify/svelte'
@@ -2814,6 +2814,7 @@
 
 <!-- @desc 速查弹窗（新建 BUFF 场景：创建Buff入口）与引用速查（只读），以及 Buff 导入弹窗 -->
 <QuickLookup
+    locked={getLocked()}
     open={showLookup}
     {team}
     showCustomHitOption={false}
@@ -2822,6 +2823,7 @@
 />
 
 <QuickLookup
+    locked={getLocked()}
     open={showRefLookup}
     {team}
     showBuffOption={false}

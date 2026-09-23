@@ -15,7 +15,6 @@
     import type { CharSlot } from '$lib/types/project'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
-    import { getLocked } from '$lib/calc/timeline.store.svelte'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -24,6 +23,8 @@
         onCreateCustomHit?: (name: string) => void
         showBuffOption?: boolean
         showCustomHitOption?: boolean
+        /** @desc 当前阶段是否锁定（锁定时创建类菜单项禁用） */
+        locked?: boolean
         tabBarPosition?: 'top' | 'bottom'
         onclose?: () => void
     }
@@ -34,6 +35,7 @@
         onCreateCustomHit,
         showBuffOption = true,
         showCustomHitOption = true,
+        locked = false,
         tabBarPosition = 'top',
         onclose,
         class: className,
@@ -769,9 +771,9 @@
             {#if showBuffOption}
                 <button
                     onclick={handleCreateBuffFromSel}
-                    disabled={getLocked()}
+                    disabled={locked}
                     class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                    title={getLocked() ? '排轴已锁定，无法创建 BUFF' : undefined}
+                    title={locked ? '已锁定，无法创建 BUFF' : undefined}
                     ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</button
                 >
             {/if}
