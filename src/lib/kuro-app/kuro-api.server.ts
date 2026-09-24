@@ -270,10 +270,38 @@ interface UpstreamOwnedRole {
     weaponTypeName?: string
 }
 
+/**
+ * @desc 服务器 id 兜底（与参考实现 eventhorizonsky/WuwaWebTool 的 get_server_id 一致）：
+ *  角色列表（gamer/role/list）没带回 serverId 时，akiBox 系列接口会直接报「服务器id不能为空」。
+ *  国服是固定 hash；国际服按 roleId 段位（>= 2e8 视为国际服）映射。
+ *  可用 KURO_SERVER_ID 覆盖（临时排查/新服务器上线时不用改代码）。
+ */
+const SERVER_ID_CN = '76402e5b20be2c39f095a152090afddc'
+const SERVER_ID_NET = '919752ae5ea09c1ced910dd668a63ffb'
+const NET_SERVER_ID_MAP: Record<number, string> = {
+    5: '591d6af3a3090d8ea00d8f86cf6d7501',
+    6: '6eb2a235b30d05efd77bedb5cf60999e',
+    7: '86d52186155b148b5c138ceb41be9650',
+    8: '919752ae5ea09c1ced910dd668a63ffb',
+    9: '10cd7254d57e58ae560b15d51e34b4c'
+}
+
+/** @desc 实际使用的 serverId：优先角色列表返回值，缺失时按国服/国际服兜底 */
+export const resolveServerId = (roleId: string, serverId?: string): string => {
+    if (serverId) return serverId
+    if (process.env.KURO_SERVER_ID) return process.env.KURO_SERVER_ID
+    const numeric = Number(roleId)
+    if (Number.isFinite(numeric) && numeric >= 200000000) {
+        return NET_SERVER_ID_MAP[Math.floor(numeric / 100000000)] ?? SERVER_ID_NET
+    }
+    return SERVER_ID_CN
+}
+
 /** @desc 账号下角色列表（roleData）：roleId 字段其实是「角色 id」 */
 async function fetchOwnedRoles(token: string, roleId: string, serverId: string): Promise<UpstreamOwnedRole[]> {
     const json = await post('/aki/roleBox/akiBox/roleData', akiHeaders(token), { gameId: 3, roleId, serverId })
-    if (Number(json?.code) !== 200) throw upstreamError(json, '取角色列表失败')
+    // 失败信息带上实际使用的 serverId：下次再出「服务器id不能为空」时能直接看出兜底是否生效
+    if (Number(json?.code) !== 200) throw upstreamError(json, `取角色列表失败（serverId=${serverId || '空'}）`)
     return parseData<{ roleList?: UpstreamOwnedRole[] }>(json)?.roleList ?? []
 }
 
@@ -328,8 +356,13 @@ async function fetchCharacterDetail(token: string, roleId: string, serverId: str
 export async function fetchRoleEchoes(
     token: string,
     { roleId, serverId }: { roleId: string; serverId: string }
-): Promise<{ characters: KuroCharacterEchoes[]; stats: { characters: number; withEchoes: number } }> {
-    const owned = await fetchOwnedRoles(token, roleId, serverId)
+): Promise<{
+    characters: KuroCharacterEchoes[]
+    stats: { characters: number; withEchoes: number; serverId: string; countryCode: string }
+}> {
+    // 角色列表没带 serverId 时兜底（否则上游直接报「服务器id不能为空」）
+    const resolvedServerId = resolveServerId(roleId, serverId)
+    const owned = await fetchOwnedRoles(token, roleId, resolvedServerId)
     if (owned.length === 0) throw new Error('该账号下没有查询到角色数据（请确认已绑定角色、游戏数据已同步）')
     const characters = await mapLimit(owned, 4, async (ch): Promise<KuroCharacterEchoes> => {
         const charId = String(ch.roleId)
@@ -342,7 +375,7 @@ export async function fetchRoleEchoes(
             echoes: []
         }
         try {
-            const detail = await fetchCharacterDetail(token, roleId, serverId, charId)
+            const detail = await fetchCharacterDetail(token, roleId, resolvedServerId, charId)
             const phantoms = (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean) as UpstreamPhantom[]
             return {
                 ...base,
@@ -369,6 +402,11 @@ export async function fetchRoleEchoes(
     })
     return {
         characters,
-        stats: { characters: characters.length, withEchoes: characters.filter((c) => c.echoes.length > 0).length }
+        stats: {
+            characters: characters.length,
+            withEchoes: characters.filter((c) => c.echoes.length > 0).length,
+            serverId: resolvedServerId,
+            countryCode: countryCodeHit || COUNTRY_CODES[0]
+        }
     }
 }
