@@ -96,12 +96,14 @@
         type ToastPosition
     } from '$lib/data/interaction-prefs.svelte'
     import {
+        formatKuroSignIn,
         getKuroActiveRole,
         getKuroBusy,
         getKuroReason,
         getKuroSession,
         getKuroValid,
         kuroLogout,
+        kuroSignIn,
         setKuroLoginOpen,
         setKuroRoleId
     } from '$lib/kuro-app/kuro.svelte'
@@ -158,6 +160,20 @@
     let kuroReason = $derived(getKuroReason())
     let kuroBusy = $derived(getKuroBusy())
     let kuroActiveRole = $derived(getKuroActiveRole())
+    let kuroSigning = $state(false)
+
+    const handleKuroSignIn = async () => {
+        kuroSigning = true
+        try {
+            const results = await kuroSignIn()
+            const failed = results.some((r) => r.status === 'failed')
+            addToast(formatKuroSignIn(results) || '该账号下没有可签到的鸣潮角色', failed ? 'error' : 'success')
+        } catch (e) {
+            addToast(`鸣潮签到失败：${e instanceof Error ? e.message : String(e)}`, 'error')
+        } finally {
+            kuroSigning = false
+        }
+    }
 
     const handleKuroLogout = async () => {
         try {
@@ -2073,6 +2089,19 @@
                                         {kuroSession.loggedIn ? '登录窗口 / 重新登录' : '登录'}
                                     </button>
                                     {#if kuroSession.loggedIn}
+                                        <button
+                                            onclick={handleKuroSignIn}
+                                            disabled={kuroSigning}
+                                            class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-40"
+                                            style="border-color: var(--theme-divider-border);"
+                                            title="给账号下每个绑定的鸣潮角色签到"
+                                        >
+                                            <Icon
+                                                icon={kuroSigning ? 'mdi:loading' : 'mdi:calendar-check-outline'}
+                                                class={kuroSigning ? 'size-4 animate-spin' : 'size-4'}
+                                            />
+                                            鸣潮签到
+                                        </button>
                                         <button
                                             onclick={handleKuroLogout}
                                             disabled={kuroBusy}
