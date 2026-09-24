@@ -281,10 +281,23 @@ export async function kuroLogout(): Promise<void> {
     if (browser) localStorage.removeItem(SIGNED_KEY)
 }
 
-/** @desc 拉取某绑定角色的全部角色 + 当前装配声骸（原始数据，标签映射由前端做） */
-export async function kuroFetchRoleEchoes(role: KuroRole): Promise<KuroRoleEchoes> {
-    const q = new URLSearchParams({ roleId: role.roleId, serverId: role.serverId ?? '' })
-    const res = await call<{ characters?: KuroCharacterEchoes[] }>(`/echoes?${q.toString()}`, { timeout: 120000 })
+/**
+ * @desc 拉取某绑定角色的全部角色 + 当前装配声骸（原始数据，标签映射由前端做）。
+ *  上游对取数接口风控时会要求极验：此时抛 KuroGeetestRequiredError，
+ *  由调用方 solveGeetest 后带 geeTestData 重试一次。
+ */
+export async function kuroFetchRoleEchoes(role: KuroRole, geeTestData?: string): Promise<KuroRoleEchoes> {
+    const res = await call<{
+        characters?: KuroCharacterEchoes[]
+        geetest?: { required?: boolean; captchaId?: string; product?: string }
+    }>('/echoes', {
+        method: 'POST',
+        body: { roleId: role.roleId, serverId: role.serverId ?? '', geeTestData },
+        timeout: 120000
+    })
+    if (res.geetest?.required) {
+        throw new KuroGeetestRequiredError(res.geetest.captchaId ?? '', res.geetest.product ?? 'bind')
+    }
     return { role, characters: res.characters ?? [] }
 }
 

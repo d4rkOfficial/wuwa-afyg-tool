@@ -31,6 +31,37 @@ const COUNTRY_CODES = (process.env.KURO_COUNTRY_CODES || '1,3,900')
     .map((s) => s.trim())
     .filter(Boolean)
 
+/**
+ * @desc 角色盒（akiBox）接口触发极验时用的 captchaId：
+ *  上游对 getRoleDetail 这类取数接口会在风控时返回 `data: { geeTest: true }` 的桩数据（code 仍为 200），
+ *  参考实现（WuwaWebTool captcha/base.py）用的是 3afb60f2…；短信登录那条用的是另一个 captchaId，两者不要混。
+ */
+export const KURO_BOX_GEETEST = {
+    captchaId: process.env.KURO_GEETEST_BOX_CAPTCHA_ID || '3afb60f292fa803fa809114b9a89b3f5',
+    product: process.env.KURO_GEETEST_BOX_PRODUCT || 'bind'
+}
+
+/** @desc 上游要求人机验证：路由层据此让前端弹极验，拿到 geeTestData 后重发 */
+export class KuroGeetestError extends Error {
+    captchaId: string
+    product: string
+    constructor(captchaId = KURO_BOX_GEETEST.captchaId, product = KURO_BOX_GEETEST.product) {
+        super('上游要求完成人机验证')
+        this.name = 'KuroGeetestError'
+        this.captchaId = captchaId
+        this.product = product
+    }
+}
+
+/** @desc 检查 akiBox 返回是不是「要求人机验证」的桩数据（code 200 但 data 只有 geeTest） */
+const assertNotGeetest = (json: UpstreamEnvelope, label: string): void => {
+    const data = parseData<{ geeTest?: boolean }>(json)
+    if (data?.geeTest === true) {
+        throw new KuroGeetestError()
+    }
+    if (Number(json?.code) !== 200) throw upstreamError(json, label)
+}
+
 const distinctId = () => globalThis.crypto.randomUUID()
 const randomDevCode = () => globalThis.crypto.randomUUID().replace(/-/g, '').toUpperCase()
 
@@ -436,163 +467,6 @@ export const resolveServerId = (roleId: string, serverId?: string): string => {
     return SERVER_ID_CN
 }
 
-// ── TEMP-DIAG（排查「角色详情里没有声骸」用，定位后整块删除） ──────────────
-const rawPreview = (value: unknown, max = 900): string => {
-    const text = typeof value === 'string' ? value : JSON.stringify(value ?? null)
-    return (text ?? 'null').length > max ? `${text.slice(0, max)}…（共 ${text.length} 字）` : (text ?? 'null')
-}
-
-const shapeOf = (value: unknown, depth = 0): unknown => {
-    if (value == null || typeof value !== 'object') return typeof value
-    if (depth >= 3) return Array.isArray(value) ? `array(${value.length})` : 'object'
-    if (Array.isArray(value)) return value.length > 0 ? [shapeOf(value[0], depth + 1)] : []
-    return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, shapeOf(v, depth + 1)])
-    )
-}
-
-/**
- * @desc 临时诊断：把 roleData / getRoleDetail（各 countryCode）/ 签到状态 的原始返回打出来，
- *  用于判断「详情 200 但没有声骸」到底是字段改名、参数问题还是上游快照为空。
- */
-export async function debugRoleEchoes(
-    token: string,
-    did: string,
-    opts: { roleId?: string; serverId?: string } = {}
-): Promise<Record<string, unknown>> {
-    const report: Record<string, unknown> = { at: new Date().toISOString(), did }
-    let roleId = opts.roleId ?? ''
-    let serverId = opts.serverId ?? ''
-    try {
-        const roles = await fetchRoleList(token)
-        report.boundRoles = roles.map((r) => ({ roleId: r.roleId, serverId: r.serverId, nickname: r.nickname }))
-        if (!roleId && roles.length > 0) {
-            roleId = roles[0].roleId
-            serverId = serverId || roles[0].serverId || ''
-        }
-    } catch (e) {
-        report.boundRoles = { error: e instanceof Error ? e.message : String(e) }
-    }
-    if (!roleId) {
-        report.error = '没有可用的 roleId（账号下没有绑定角色）'
-        return report
-    }
-    const resolvedServerId = resolveServerId(roleId, serverId)
-    report.roleId = roleId
-    report.serverId = resolvedServerId
-
-    // 1) 数据令牌
-    let bat = ''
-    try {
-        const json = await post(
-            '/aki/roleBox/requestToken',
-            {
-                source: 'ios',
-                token,
-                did,
-                'b-at': '',
-                devCode: await akiDevCode(),
-                accept: 'application/json, text/plain, */*',
-                'user-agent': AKI_USER_AGENT
-            },
-            { serverId: resolvedServerId, roleId }
-        )
-        report.requestToken = { code: json?.code, msg: json?.msg, data: rawPreview(json?.data, 300) }
-        bat = parseData<{ accessToken?: string; token?: string }>(json)?.accessToken ?? ''
-    } catch (e) {
-        report.requestToken = { error: e instanceof Error ? e.message : String(e) }
-    }
-    report.hasBat = !!bat
-    const headers = await akiDataHeaders(did, bat)
-
-    // 2) roleData（角色列表）
-    let owned: UpstreamOwnedRole[] = []
-    try {
-        const json = await post('/aki/roleBox/akiBox/roleData', headers, {
-            gameId: 3,
-            roleId,
-            serverId: resolvedServerId
-        })
-        const data = parseData<{ roleList?: UpstreamOwnedRole[] }>(json)
-        owned = data?.roleList ?? []
-        report.roleData = {
-            code: json?.code,
-            msg: json?.msg,
-            count: owned.length,
-            first: owned.slice(0, 3).map((r) => ({ roleId: r.roleId, roleName: r.roleName, level: r.level })),
-            shape: shapeOf(data),
-            data: rawPreview(json?.data, 500)
-        }
-    } catch (e) {
-        report.roleData = { error: e instanceof Error ? e.message : String(e) }
-    }
-
-    // 3) 前 3 个角色：每个 countryCode 都打一次，看字段结构与声骸数量
-    const probes: unknown[] = []
-    for (const ch of owned.slice(0, 3)) {
-        const charId = String(ch.roleId)
-        for (const countryCode of COUNTRY_CODES) {
-            try {
-                const json = await post('/aki/roleBox/akiBox/getRoleDetail', headers, {
-                    gameId: 3,
-                    roleId,
-                    serverId: resolvedServerId,
-                    channelId: CHANNEL_ID,
-                    countryCode,
-                    id: charId
-                })
-                const detail = parseData<UpstreamRoleDetail>(json)
-                const phantoms = (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean)
-                probes.push({
-                    charId,
-                    charName: ch.roleName,
-                    countryCode,
-                    code: json?.code,
-                    msg: json?.msg,
-                    phantomCount: phantoms.length,
-                    detailShape: shapeOf(detail),
-                    phantomData: rawPreview(detail?.phantomData, 700)
-                })
-            } catch (e) {
-                probes.push({
-                    charId,
-                    charName: ch.roleName,
-                    countryCode,
-                    error: e instanceof Error ? e.message : String(e)
-                })
-            }
-        }
-    }
-    report.detailProbes = probes
-
-    // 4) 签到状态：确认签到接口对这个 token 是否正常（用于排除风控/参数问题）
-    try {
-        let userId = ''
-        try {
-            userId = (await fetchMine(token)).userId ?? ''
-        } catch {
-            // 忽略
-        }
-        report.userId = userId
-        const json = await post(
-            '/encourage/signIn/initSignInV2',
-            {
-                source: 'android',
-                token,
-                devCode: await ipDevCode(SIGNIN_USER_AGENT),
-                accept: 'application/json, text/plain, */*',
-                'user-agent': SIGNIN_USER_AGENT
-            },
-            { gameId: 3, serverId: resolvedServerId, roleId, userId }
-        )
-        report.signIn = { code: json?.code, msg: json?.msg, success: json?.success, data: rawPreview(json?.data, 400) }
-    } catch (e) {
-        report.signIn = { error: e instanceof Error ? e.message : String(e) }
-    }
-    return report
-}
-// ── /TEMP-DIAG ────────────────────────────────────────────────────────────
-
 /**
  * @desc 换取 akiBox 的「数据令牌」：POST /aki/roleBox/requestToken（body 只有 serverId/roleId，
  *  头带 token + did + 空的 b-at）→ data.accessToken，后续 akiBox 调用放在 `b-at` 头里。
@@ -675,11 +549,20 @@ interface UpstreamRoleDetail {
 
 /**
  * @desc 单角色详情（含装配声骸）：body 需 channelId=19 / countryCode（游戏内国家）/ id=角色id。
- *  countryCode 只影响上游按哪个「国家/地区」取数据，正常返回（code 200）就采用并记下来，
- *  只有上游明确报错时才换下一个候选；「200 但角色没声骸」是上游快照的问题，不代表码不对。
+ *  - countryCode 只影响上游按哪个「国家/地区」取数据，正常返回（code 200）就采用并记下来，
+ *    只有上游明确报错时才换下一个候选
+ *  - 风控时上游会返回 `data: { geeTest: true }` 的桩数据（code 200）：此时必须由前端解极验，
+ *    把校验数据放到 body 的 `geeTestData` 重发（参考实现同样处理），所以这里直接抛 KuroGeetestError
  */
 let countryCodeHit = ''
-async function fetchCharacterDetail(did: string, bat: string, roleId: string, serverId: string, charId: string) {
+async function fetchCharacterDetail(
+    did: string,
+    bat: string,
+    roleId: string,
+    serverId: string,
+    charId: string,
+    geeTestData?: string
+) {
     const codes = countryCodeHit
         ? [countryCodeHit, ...COUNTRY_CODES.filter((c) => c !== countryCodeHit)]
         : COUNTRY_CODES
@@ -692,12 +575,15 @@ async function fetchCharacterDetail(did: string, bat: string, roleId: string, se
                 serverId,
                 channelId: CHANNEL_ID,
                 countryCode,
-                id: charId
+                id: charId,
+                ...(geeTestData ? { geeTestData } : {})
             })
-            if (Number(json?.code) !== 200) throw upstreamError(json, `取角色详情失败（countryCode=${countryCode}）`)
+            assertNotGeetest(json, `取角色详情失败（countryCode=${countryCode}）`)
             countryCodeHit = countryCode
             return parseData<UpstreamRoleDetail>(json)
         } catch (e) {
+            // 需要人机验证 / 登录过期：换 countryCode 也没用，直接抛给上层
+            if (e instanceof KuroGeetestError) throw e
             lastErr = e
             if (String((e as Error)?.message ?? '').includes('登录已过期')) throw e
         }
@@ -705,10 +591,11 @@ async function fetchCharacterDetail(did: string, bat: string, roleId: string, se
     throw lastErr instanceof Error ? lastErr : new Error('取角色详情失败')
 }
 
-/** @desc 角色 + 当前装配声骸（同步词条方案用）：did 由路由层从 cookie 提供（与 token 同样的生命周期） */
+/** @desc 角色 + 当前装配声骸（同步词条方案用）：did 由路由层从 cookie 提供（与 token 同样的生命周期）
+ *  geeTestData：前端解完极验后的校验数据（上游对取数接口风控时必需），会带在每个详情请求的 body 里 */
 export async function fetchRoleEchoes(
     token: string,
-    { roleId, serverId, did }: { roleId: string; serverId: string; did: string }
+    { roleId, serverId, did, geeTestData }: { roleId: string; serverId: string; did: string; geeTestData?: string }
 ): Promise<{
     characters: KuroCharacterEchoes[]
     stats: { characters: number; withEchoes: number; serverId: string; countryCode: string }
@@ -751,7 +638,7 @@ export async function fetchRoleEchoes(
                 echoes: []
             }
             try {
-                const detail = await fetchCharacterDetail(did, bat, roleId, resolvedServerId, charId)
+                const detail = await fetchCharacterDetail(did, bat, roleId, resolvedServerId, charId, geeTestData)
                 const phantoms = (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean) as UpstreamPhantom[]
                 return {
                     ...base,
@@ -772,6 +659,8 @@ export async function fetchRoleEchoes(
                     })
                 }
             } catch (e) {
+                // 需要人机验证：整个同步都得先过验证，直接抛给上层（路由层转成「请完成验证」）
+                if (e instanceof KuroGeetestError) throw e
                 // 单角色失败不影响整体：返回空声骸，由前端按「不足 5 个」跳过并提示原因
                 return { ...base, error: e instanceof Error ? e.message : String(e) }
             }

@@ -43,10 +43,12 @@
     import { addToast } from '$lib/data/toast.svelte'
     import {
         isKuroLoggedIn,
+        KuroGeetestRequiredError,
         refreshKuroSession,
         requestKuroSettings,
         waitForKuroLogin
     } from '$lib/kuro-app/kuro.svelte'
+    import { solveGeetest } from '$lib/kuro-app/geetest'
     import { openPanel } from '$lib/ai/panels.svelte'
     import { ELEMENT_ORDER } from '$lib/consts/game-terms'
     import { compareRoverStarName, groupInOrder } from '$lib/utils/grouping'
@@ -283,8 +285,19 @@
                     return
                 }
             }
-            // 先只读预览，交用户在确认弹窗里挑选角色/改方案名，再落盘
-            const res = await previewSubstatPlansFromKuro()
+            // 先只读预览，交用户在确认弹窗里挑选角色/改方案名，再落盘。
+            // 上游风控（取数接口返回 data.geeTest=true）时要求极验：就地弹验证，拿到数据后重试一次。
+            let res: Awaited<ReturnType<typeof previewSubstatPlansFromKuro>>
+            try {
+                res = await previewSubstatPlansFromKuro()
+            } catch (e) {
+                if (!(e instanceof KuroGeetestRequiredError)) throw e
+                addToast('库街区要求完成人机验证，验证通过后会继续同步', 'info')
+                const validate = await solveGeetest(e.captchaId, e.product)
+                res = await previewSubstatPlansFromKuro({
+                    geeTestData: JSON.stringify({ ...validate, captcha_id: e.captchaId })
+                })
+            }
             if (!res.preview) {
                 addToast(`库街区同步失败：${res.error ?? '未知错误'}`, 'error')
                 return
