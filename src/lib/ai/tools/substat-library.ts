@@ -12,7 +12,7 @@ import {
     saveSubstatPlan,
     type SubstatPlan
 } from '$lib/data/substat-library.svelte'
-import { syncSubstatPlansFromKuro } from '$lib/data/kuro-sync.svelte'
+import { syncSubstatPlansFromKuro } from '$lib/kuro-app/kuro-sync.svelte'
 import {
     buildStandardSlots,
     cloneSlots,

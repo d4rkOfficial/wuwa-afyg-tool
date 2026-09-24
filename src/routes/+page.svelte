@@ -79,14 +79,14 @@
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
     import FirstSyncModal from '$lib/components/layout/first-sync-modal.svelte'
     import SubstatLibraryModal from '$lib/components/layout/substat-library-modal.svelte'
-    import KuroLoginModal from '$lib/components/layout/kuro-login-modal.svelte'
+    import KuroLoginModal from '$lib/kuro-app/kuro-login-modal.svelte'
     import DamageTypeModal from '$lib/components/page/home/calculation/damage-type-modal.svelte'
     import {
         getSubstatLibraryOpen,
         openSubstatLibrary,
         setSubstatLibraryOpen
     } from '$lib/data/substat-library-ui.svelte'
-    import { getKuroLoginOpen, loadKuroPrefs, setKuroLoginOpen } from '$lib/data/kuro.svelte'
+    import { getKuroLoginOpen, loadKuroPrefs, setKuroLoginOpen } from '$lib/kuro-app/kuro.svelte'
     import { shouldAskFirstSync } from '$lib/data/first-sync.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'

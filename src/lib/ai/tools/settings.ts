@@ -85,13 +85,11 @@ import {
 } from '$lib/data/interaction-prefs.svelte'
 import {
     getKuroActiveRole,
-    getKuroBase,
     getKuroReason,
     getKuroSession,
     getKuroValid,
-    setKuroBase,
     setKuroRoleId
-} from '$lib/data/kuro.svelte'
+} from '$lib/kuro-app/kuro.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -327,15 +325,6 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
     },
 
     // ── 库街区（实验性）──
-    kuro_base: {
-        label: '库街区代理服务器地址',
-        apply: async (v) => {
-            const url = str(v)
-            if (!/^https?:\/\//i.test(url)) throw new Error('kuro_base 须为 http(s):// 开头的地址')
-            setKuroBase(url)
-            return getKuroBase()
-        }
-    },
     kuro_role: {
         label: '库街区同步使用的绑定角色 roleId',
         apply: async (v) => {
@@ -512,9 +501,8 @@ defineTool('get_settings_state', {
                 lockWatermarkTextDefault: DEFAULT_LOCK_WATERMARK_TEXT
             },
             kuro: {
-                base: getKuroBase(),
                 loggedIn: getKuroSession().loggedIn,
-                phone: getKuroSession().phone,
+                phone: getKuroSession().account?.phone ?? '',
                 account: getKuroSession().account?.userName ?? null,
                 valid: getKuroValid(),
                 reason: getKuroReason(),

@@ -1,8 +1,8 @@
-import type { EchoSlotConfig } from './config.types'
+import type { EchoSlotConfig } from '$lib/calc/config.types'
 import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_LABELS, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 import { ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
-import { normalizeAnyPlanSlots } from './standard-substats'
-import type { KuroCharacterEchoes, KuroEcho } from '$lib/data/kuro.svelte'
+import { normalizeAnyPlanSlots } from '$lib/calc/standard-substats'
+import type { KuroCharacterEchoes, KuroEcho } from '$lib/kuro-app/kuro.svelte'
 
 /**
  * @desc 库街区声骸数据 → 工具箱词条方案：

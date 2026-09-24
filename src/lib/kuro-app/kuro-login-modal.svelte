@@ -1,20 +1,18 @@
 <script lang="ts">
     /**
      * @desc 库街区登录窗口（实验性）：短信验证码登录 + 查看绑定角色 + 有效性检验 / 退出登录。
-     * 凭据（token）只留在本机代理服务器（.tmp/kuro-server），本窗口只显示登录状态。
+     * 凭据（token）由应用自身的服务端路由放进 httpOnly cookie，浏览器脚本读不到；本窗口只显示登录状态。
      */
     import Icon from '@iconify/svelte'
     import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import type { ComponentsProps } from '$lib/types'
     import {
-        getKuroBase,
         getKuroSession,
         kuroLogout,
-        kuroPing,
         kuroSendSms,
         kuroVerifyLogin,
         refreshKuroSession
-    } from '$lib/data/kuro.svelte'
+    } from '$lib/kuro-app/kuro.svelte'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -30,9 +28,6 @@
     let busy = $state(false)
     let countdown = $state(0)
     let timer: ReturnType<typeof setInterval> | null = null
-    /** @desc 代理服务器是否可达：null=检测中 */
-    let serverOk = $state<boolean | null>(null)
-    let serverMsg = $state('')
 
     const session = $derived(getKuroSession())
 
@@ -60,25 +55,14 @@
         info = null
     }
 
-    /** @desc 打开时：探测代理服务器 + 拉一次会话（不校验，避免无谓请求） */
+    /** @desc 打开时：拉一次会话状态（不校验，避免无谓请求）；登录态已由 httpOnly cookie 承载 */
     $effect(() => {
         if (!open) {
             stopTimer()
             return
         }
-        let alive = true
         clearMessages()
-        serverOk = null
-        void (async () => {
-            const ping = await kuroPing()
-            if (!alive) return
-            serverOk = ping.ok
-            serverMsg = ping.ok ? `已连接（v${ping.version ?? '?'}）` : (ping.error ?? '无法连接')
-            if (ping.ok) await refreshKuroSession(false)
-        })()
-        return () => {
-            alive = false
-        }
+        void refreshKuroSession(false)
     })
 
     async function handleSend() {
@@ -181,32 +165,16 @@
             </div>
 
             <div class="theme-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto">
-                <!-- 代理服务器状态 -->
-                <div
-                    class="flex items-center gap-2 rounded-none border px-2.5 py-2 text-[10px]"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                >
-                    <Icon
-                        icon={serverOk === null
-                            ? 'mdi:progress-clock'
-                            : serverOk
-                              ? 'mdi:check-circle-outline'
-                              : 'mdi:alert-circle-outline'}
-                        class="size-3.5 shrink-0 {serverOk === false ? 'text-red-400' : 'text-(--theme-accent-text)'}"
-                    />
-                    <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)/60">
-                        代理服务器 {getKuroBase()} · {serverOk === null ? '检测中…' : serverMsg}
-                    </span>
-                </div>
-
                 {#if session.loggedIn}
                     <!-- 已登录：展示状态与绑定角色 -->
                     <div class="space-y-2">
                         <div class="flex items-center gap-2 text-xs text-(--theme-modal-text)">
                             <Icon icon="mdi:account-check-outline" class="size-4 text-(--theme-accent-text)" />
                             <span class="font-black">{session.account?.userName ?? '已登录'}</span>
-                            {#if session.phone}
-                                <span class="text-[10px] text-(--theme-modal-text)/40">{maskPhone(session.phone)}</span>
+                            {#if session.account?.phone}
+                                <span class="text-[10px] text-(--theme-modal-text)/40"
+                                    >{maskPhone(session.account?.phone ?? '')}</span
+                                >
                             {/if}
                         </div>
                         <div class="text-[10px] text-(--theme-modal-text)/40">绑定的鸣潮角色</div>
@@ -295,7 +263,8 @@
                 {/if}
 
                 <p class="text-[10px] leading-relaxed text-(--theme-modal-text)/40">
-                    登录凭据仅保存在本机代理服务器（token 不会下发到浏览器）；该功能为实验性，接口变动可能随时失效。
+                    登录凭据由应用自身的服务端路由持有（httpOnly
+                    cookie，浏览器脚本读不到）；该功能为实验性，接口变动可能随时失效。
                 </p>
             </div>
 

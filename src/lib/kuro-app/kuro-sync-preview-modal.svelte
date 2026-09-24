@@ -6,7 +6,7 @@
     import Icon from '@iconify/svelte'
     import Modal from '$lib/components/layout/modal.svelte'
     import type { ComponentsProps } from '$lib/types'
-    import { KURO_PLAN_NAME, type KuroSyncPreview } from '$lib/data/kuro-sync.svelte'
+    import { KURO_PLAN_NAME, type KuroSyncPreview } from '$lib/kuro-app/kuro-sync.svelte'
 
     interface Props extends ComponentsProps {
         open: boolean

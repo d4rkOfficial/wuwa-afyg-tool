@@ -97,18 +97,15 @@
     } from '$lib/data/interaction-prefs.svelte'
     import {
         getKuroActiveRole,
-        getKuroBase,
         getKuroBusy,
         getKuroReason,
         getKuroSession,
         getKuroValid,
         kuroLogout,
-        kuroPing,
         refreshKuroSession,
-        setKuroBase,
         setKuroLoginOpen,
         setKuroRoleId
-    } from '$lib/data/kuro.svelte'
+    } from '$lib/kuro-app/kuro.svelte'
     import { getSimplifyContextMenu, setSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
@@ -157,33 +154,12 @@
         | 'ai-conn'
     >('theme')
 
-    // ── 库街区（实验性）：代理服务器地址 + 登录态管理 ──
-    let kuroBaseInput = $state('')
-    let kuroPingState = $state<{ state: 'idle' | 'ok' | 'fail'; msg: string }>({ state: 'idle', msg: '' })
+    // ── 库街区（实验性）：登录态管理（接口走应用自身的 /api/kuro-app 服务端路由，无需配置地址）──
     let kuroSession = $derived(getKuroSession())
     let kuroValid = $derived(getKuroValid())
     let kuroReason = $derived(getKuroReason())
     let kuroBusy = $derived(getKuroBusy())
     let kuroActiveRole = $derived(getKuroActiveRole())
-
-    /** @desc 打开设置或地址被改动时，把输入框同步成已保存的地址（组件初始化早于页面 onMount 读取偏好） */
-    $effect(() => {
-        if (open) kuroBaseInput = getKuroBase()
-    })
-
-    const handleKuroPing = async () => {
-        kuroPingState = { state: 'idle', msg: '检测中…' }
-        const res = await kuroPing()
-        kuroPingState = res.ok
-            ? { state: 'ok', msg: `已连接（v${res.version ?? '?'}）` }
-            : { state: 'fail', msg: res.error ?? '无法连接' }
-    }
-
-    const handleKuroSaveBase = async () => {
-        setKuroBase(kuroBaseInput)
-        addToast(`库街区代理地址已保存：${getKuroBase()}`, 'success')
-        await handleKuroPing()
-    }
 
     const handleKuroCheck = async () => {
         await refreshKuroSession(true)
@@ -2352,7 +2328,7 @@
                             {/if}
                         </div>
                     {:else if tab === 'kuro'}
-                        <!-- 库街区（实验性）：代理服务器 + 登录态管理；登录窗口是全局单例（页面顶层挂载） -->
+                        <!-- 库街区（实验性）：登录态管理；接口由应用自身 /api/kuro-app 服务端路由代发 -->
                         <div class="flex flex-col">
                             <span
                                 class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
@@ -2370,51 +2346,9 @@
                             </span>
                             <p class="mb-3 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
                                 登录库街区后，可在「词条集 / 快速词条方案」里把账号下鸣潮角色<b>当前装配的声骸</b
-                                >同步成词条方案。 登录凭据只保存在本机代理服务器（默认
-                                <code>.tmp/kuro-server</code>），不会下发到浏览器。
+                                >同步成词条方案。登录凭据由应用自身的服务端路由持有（httpOnly
+                                cookie），浏览器脚本读不到。
                             </p>
-
-                            <!-- 代理服务器地址 -->
-                            <div class="flex flex-wrap items-end gap-2">
-                                <label class="min-w-[14rem] flex-1">
-                                    <span class="mb-1 block text-[10px] text-(--theme-modal-text)/40"
-                                        >代理服务器地址</span
-                                    >
-                                    <input
-                                        bind:value={kuroBaseInput}
-                                        spellcheck="false"
-                                        placeholder="http://127.0.0.1:8791"
-                                        class="w-full rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none"
-                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                    />
-                                </label>
-                                <button
-                                    onclick={handleKuroSaveBase}
-                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                                    style="border-color: var(--theme-divider-border);"
-                                >
-                                    <Icon icon="mdi:content-save-outline" class="size-3.5" />
-                                    保存
-                                </button>
-                                <button
-                                    onclick={handleKuroPing}
-                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                                    style="border-color: var(--theme-divider-border);"
-                                >
-                                    <Icon icon="mdi:lan-connect" class="size-3.5" />
-                                    测试连接
-                                </button>
-                            </div>
-                            {#if kuroPingState.msg}
-                                <div
-                                    class="mt-1.5 text-[10px] {kuroPingState.state === 'fail'
-                                        ? 'text-red-400'
-                                        : 'text-(--theme-modal-text)/40'}"
-                                >
-                                    {kuroPingState.state === 'ok' ? '✓' : kuroPingState.state === 'fail' ? '✗' : '…'}
-                                    {kuroPingState.msg}
-                                </div>
-                            {/if}
 
                             <!-- 登录状态 -->
                             <div
@@ -2435,9 +2369,12 @@
                                     {kuroSession.loggedIn ? (kuroSession.account?.userName ?? '已登录') : '未登录'}
                                 </span>
                                 {#if kuroSession.loggedIn}
-                                    {#if kuroSession.phone}
+                                    {#if kuroSession.account?.phone}
                                         <span class="text-[10px] text-(--theme-modal-text)/40"
-                                            >{kuroSession.phone.replace(/^(\d{3})\d+(\d{2,4})$/, '$1****$2')}</span
+                                            >{kuroSession.account.phone.replace(
+                                                /^(\d{3})\d+(\d{2,4})$/,
+                                                '$1****$2'
+                                            )}</span
                                         >
                                     {/if}
                                     <span class="text-[10px] text-(--theme-modal-text)/40">

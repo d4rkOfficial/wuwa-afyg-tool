@@ -41,9 +41,9 @@
     import type { Character } from '$lib/api/types'
     import type { EchoSlotConfig } from '$lib/calc/config.types'
     import { addToast } from '$lib/data/toast.svelte'
-    import { isKuroLoggedIn, setKuroLoginOpen } from '$lib/data/kuro.svelte'
-    import { applyKuroSync, previewSubstatPlansFromKuro, type KuroSyncPreview } from '$lib/data/kuro-sync.svelte'
-    import KuroSyncPreviewModal from '$lib/components/layout/kuro-sync-preview-modal.svelte'
+    import { isKuroLoggedIn, setKuroLoginOpen } from '$lib/kuro-app/kuro.svelte'
+    import { applyKuroSync, previewSubstatPlansFromKuro, type KuroSyncPreview } from '$lib/kuro-app/kuro-sync.svelte'
+    import KuroSyncPreviewModal from '$lib/kuro-app/kuro-sync-preview-modal.svelte'
 
     interface Props extends ComponentsProps {}
 
