@@ -37,11 +37,19 @@
     } from '$lib/calc/standard-substats'
     import { getConfig, setEchoSlots } from '$lib/calc/config.store.svelte'
     import { getActiveProject, updateConfig } from '$lib/data/project.svelte'
-    import { getCharacterIcons, getCharacterList } from '$lib/api/data-cache'
+    import { getCharacterIcons, getCharacterList, getElementIcons } from '$lib/api/data-cache'
     import type { Character } from '$lib/api/types'
     import type { EchoSlotConfig } from '$lib/calc/config.types'
     import { addToast } from '$lib/data/toast.svelte'
-    import { isKuroLoggedIn, refreshKuroSession, setKuroLoginOpen, waitForKuroLogin } from '$lib/kuro-app/kuro.svelte'
+    import {
+        isKuroLoggedIn,
+        refreshKuroSession,
+        requestKuroSettings,
+        waitForKuroLogin
+    } from '$lib/kuro-app/kuro.svelte'
+    import { openPanel } from '$lib/ai/panels.svelte'
+    import { ELEMENT_ORDER } from '$lib/consts/game-terms'
+    import { compareRoverStarName, groupInOrder } from '$lib/utils/grouping'
     import {
         applyKuroSync,
         previewSubstatPlansFromKuro,
@@ -92,6 +100,7 @@
 
     let characters = $state<Character[]>([])
     let icons = $state<Record<string, string>>({})
+    let elementIcons = $state<Record<string, string>>({})
     let dataLoaded = false
 
     const open = $derived(getSubstatLibraryOpen())
@@ -107,10 +116,11 @@
     $effect(() => {
         if (dataLoaded) return
         dataLoaded = true
-        Promise.allSettled([getCharacterList(), getCharacterIcons()]).then((results) => {
-            const [list, iconMap] = results
+        Promise.allSettled([getCharacterList(), getCharacterIcons(), getElementIcons()]).then((results) => {
+            const [list, iconMap, elementMap] = results
             if (list.status === 'fulfilled') characters = list.value
             if (iconMap.status === 'fulfilled') icons = iconMap.value
+            if (elementMap.status === 'fulfilled') elementIcons = elementMap.value
         })
     })
 
@@ -170,22 +180,22 @@
         return rows
     }
 
-    /** @desc 主页管理视图角色列表：全部角色 + 库里已有但角色目录没有的名字；有自定义方案在前，标准14词条有改动/同步过的其次，最后是无记录角色 */
-    const homeRows = $derived.by(() => {
+    /** @desc 主页管理视图角色分组：按属性分类（属性图标 + 属性名当小标题），组内漂泊者最先、再按星级与名字 */
+    const homeGroups = $derived.by(() => {
+        const byName = new Map(characters.map((c) => [c.name, c]))
         const all = characters.map((c) => c.name)
         if (selected && !all.includes(selected)) all.push(selected)
         const q = query.trim().toLowerCase()
-        const rows = all
+        const items = all
             .filter((name) => (q ? name.toLowerCase().includes(q) : true))
-            .map((name) => {
-                const hasCustom = getSubstatPlansFor(name).some((p) => !p.standard)
-                const standardChanged = !!getStoredStandardPlan(name)
-                return { name, hasCustom, standardChanged, group: hasCustom ? 0 : standardChanged ? 1 : 2 }
-            })
-        return rows.sort((a, b) =>
-            a.group !== b.group ? a.group - b.group : a.name.localeCompare(b.name, 'zh-Hans-CN')
-        )
+            .map((name) => ({ name, star: byName.get(name)?.star, element: byName.get(name)?.element ?? '' }))
+        return groupInOrder(items, (item) => item.element, ELEMENT_ORDER).map((group) => ({
+            key: group.key,
+            items: [...group.items].sort(compareRoverStarName)
+        }))
     })
+
+    const homeCount = $derived(homeGroups.reduce((n, g) => n + g.items.length, 0))
 
     const teamIndexOf = (character: string) => project?.team.findIndex((s) => s.character === character) ?? -1
     const slotLabelOf = (character: string) => {
@@ -256,16 +266,17 @@
 
     /** @desc 库街区同步：把账号下鸣潮角色「当前装配的声骸」存成自定义方案（同名覆盖，可重复同步）；
      *  与 AI/WS 工具共用 kuro-sync 里的同一份实现。
-     *  没登录时不直接报错：先按 cookie 读会话，仍没登录就开登录窗口并等登录结果（登录完自动继续）；
-     *  不做「检验有效性」——那是设置页的入口。 */
+     *  没登录时不直接报错：先按 cookie 读会话，仍没登录就打开设置（连接配置）并等登录结果，登录完自动继续；
+     *  不做「检验有效性」——那是设置里的入口。 */
     async function syncFromKuro() {
         if (kuroSyncing) return
         kuroSyncing = true
         try {
             await refreshKuroSession(false)
             if (!isKuroLoggedIn()) {
-                addToast('请先登录库街区，登录完成后会自动继续同步', 'info')
-                setKuroLoginOpen(true)
+                requestKuroSettings()
+                openPanel('settings', true)
+                addToast('请先在「设置 → 连接配置 → 库街区账号」登录，登录完成后会自动继续同步', 'info')
                 const loggedIn = await waitForKuroLogin()
                 if (!loggedIn) {
                     addToast('未完成库街区登录，已取消同步', 'error')
@@ -278,10 +289,8 @@
                 addToast(`库街区同步失败：${res.error ?? '未知错误'}`, 'error')
                 return
             }
-            if (!res.ok) {
-                addToast(`库街区同步失败：${res.error ?? '未知错误'}（跳过 ${res.preview.skipped.length} 个）`, 'error')
-                return
-            }
+            // 上游有数据但一个都没能落到方案上时，也要把确认弹窗打开：里面能看到每个角色被跳过的原因
+            if (!res.ok) addToast(`库街区同步：${res.error ?? '没有可同步的角色'}`, 'error')
             kuroPreview = res.preview
             kuroPreviewOpen = true
         } finally {
@@ -520,56 +529,61 @@
                             class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/35"
                         />
                     </div>
-                    <div class="theme-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
-                        {#each homeRows as row (row.name)}
-                            <button
-                                onclick={() => {
-                                    selected = row.name
-                                    editing = null
-                                }}
-                                in:fade={{ duration: 100 }}
-                                class={[
-                                    'flex w-full items-center gap-2 rounded-none border px-2.5 py-2 text-left text-xs transition-colors',
-                                    selected === row.name
-                                        ? 'border-(--theme-accent-bg)'
-                                        : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
-                                ].join(' ')}
-                                style={selected === row.name
-                                    ? 'background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent);'
-                                    : ''}
-                            >
-                                {#if icons[row.name]}
-                                    <img
-                                        src={icons[row.name]}
-                                        alt=""
-                                        class="size-8 shrink-0 rounded-full object-cover"
-                                    />
-                                {:else}
+                    <div class="theme-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5">
+                        {#each homeGroups as group (group.key || 'other')}
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-1.5">
+                                    {#if elementIcons[group.key]}
+                                        <img
+                                            src={elementIcons[group.key]}
+                                            alt=""
+                                            class="size-4 shrink-0 object-contain"
+                                        />
+                                    {/if}
+                                    <span class="text-[11px] font-black text-(--theme-modal-text)/60">{group.key}</span>
+                                    <span class="text-[10px] text-(--theme-modal-text)/30">{group.items.length}</span>
                                     <span
-                                        class="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--theme-input-bg) text-[10px] text-(--theme-modal-text)/40"
-                                        >{row.name.slice(0, 1)}</span
+                                        class="h-px flex-1"
+                                        style="background: color-mix(in srgb, var(--theme-modal-text) 10%, transparent);"
+                                    ></span>
+                                </div>
+                                {#each group.items as item (item.name)}
+                                    <button
+                                        onclick={() => {
+                                            selected = item.name
+                                            editing = null
+                                        }}
+                                        in:fade={{ duration: 100 }}
+                                        class={[
+                                            'flex w-full items-center gap-2 rounded-none border px-2.5 py-2 text-left text-xs transition-colors',
+                                            selected === item.name
+                                                ? 'border-(--theme-accent-bg)'
+                                                : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
+                                        ].join(' ')}
+                                        style={selected === item.name
+                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent);'
+                                            : ''}
                                     >
-                                {/if}
-                                <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)">{row.name}</span>
-                                <span class="flex shrink-0 items-center gap-1">
-                                    {#if row.hasCustom}
-                                        <span
-                                            class="rounded-none px-1 py-0.5 text-[10px] whitespace-nowrap text-(--theme-modal-text)/40"
-                                            style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text);"
-                                            >有自定义</span
+                                        {#if icons[item.name]}
+                                            <img
+                                                src={icons[item.name]}
+                                                alt=""
+                                                class="size-8 shrink-0 rounded-full object-cover"
+                                            />
+                                        {:else}
+                                            <span
+                                                class="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--theme-input-bg) text-[10px] text-(--theme-modal-text)/40"
+                                                >{item.name.slice(0, 1)}</span
+                                            >
+                                        {/if}
+                                        <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)"
+                                            >{item.name}</span
                                         >
-                                    {/if}
-                                    {#if row.standardChanged}
-                                        <span
-                                            class="rounded-none px-1 py-0.5 text-[10px] whitespace-nowrap text-(--theme-modal-text)/40"
-                                            style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);"
-                                            >14词条·改</span
-                                        >
-                                    {/if}
-                                </span>
-                            </button>
+                                    </button>
+                                {/each}
+                            </div>
                         {/each}
-                        {#if homeRows.length === 0}
+                        {#if homeCount === 0}
                             <div class="py-8 text-center text-xs text-(--theme-modal-text)/40">没有匹配的角色</div>
                         {/if}
                     </div>

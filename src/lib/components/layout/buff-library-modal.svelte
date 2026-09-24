@@ -31,6 +31,9 @@
         getEchoSetIcons
     } from '$lib/api/data-cache'
     import type { Character, Weapon, Echo, EchoSetItem } from '$lib/api/types'
+    import { ELEMENT_ORDER, WEAPON_TYPES } from '$lib/consts/game-terms'
+    import { compareRoverStarName, groupInOrder } from '$lib/utils/grouping'
+    import { getElementIcons, getWeaponTypeIcons } from '$lib/api/data-cache'
     import { fallbackIcon } from '$lib/utils/icons'
     import { fade } from 'svelte/transition'
     import BuffEntityEditModal from './buff-entity-edit-modal.svelte'
@@ -85,11 +88,16 @@
     let weaponIcons: Record<string, string> = $state({})
     let echoIcons: Record<string, string> = $state({})
     let echoSetIcons: Record<string, string> = $state({})
+    /** @desc 分类小标题用的图标：属性 / 武器类型（cost 与套件数用自制 SVG） */
+    let elementIcons: Record<string, string> = $state({})
+    let weaponTypeIcons: Record<string, string> = $state({})
 
     let dataLoaded = false
     $effect(() => {
         if (dataLoaded) return
         dataLoaded = true
+        void getElementIcons().then((m) => (elementIcons = m))
+        void getWeaponTypeIcons().then((m) => (weaponTypeIcons = m))
         Promise.allSettled([
             getCharacterList(),
             getWeaponList(),
@@ -122,6 +130,12 @@
     }
 
     let entityKeyMap = $derived(new Map(entities.map((e) => [`${e.entityType}/${e.entityName}`, e])))
+    /** @desc 分类用的查表：属性 / 武器类型 / cost / 星级 */
+    const characterElement = $derived(Object.fromEntries(characters.map((c) => [c.name, c.element])))
+    const characterStar = $derived(Object.fromEntries(characters.map((c) => [c.name, c.star])))
+    const weaponTypeOf = $derived(Object.fromEntries(weapons.map((w) => [w.name, w.weaponType])))
+    const weaponStar = $derived(Object.fromEntries(weapons.map((w) => [w.name, w.star])))
+    const echoCostOf = $derived(Object.fromEntries(echoes.map((e) => [e.name, e.cost])))
 
     function rowOf(
         entityType: BuffEntityType,
@@ -148,7 +162,6 @@
                 }
             }
         }
-
         const covered = new Set(list.map((r) => `${r.entityType}/${r.entityName}`))
         for (const e of entities) {
             if (categoryOfType(e.entityType) !== tab) continue
@@ -178,8 +191,53 @@
             list = list.filter((r) => r.count === 0)
         }
 
-        list.sort((a, b) => a.entityName.localeCompare(b.entityName, 'zh') || (a.pieces ?? 0) - (b.pieces ?? 0))
         return list
+    })
+
+    /** @desc 分类维度：角色→属性、武器→武器类型、声骸→cost、套装→套件数（顺序即分组顺序） */
+    const groupOrder = $derived.by(() => {
+        if (tab === 'character') return [...ELEMENT_ORDER]
+        if (tab === 'weapon') return [...WEAPON_TYPES]
+        if (tab === 'echo') return ['4', '3', '1']
+        return ['2', '5']
+    })
+
+    const groupKeyOf = (row: EntityRow): string => {
+        if (row.entityType === 'character') return characterElement[row.entityName] ?? ''
+        if (row.entityType === 'weapon') return weaponTypeOf[row.entityName] ?? ''
+        if (row.entityType === 'echo') return String(echoCostOf[row.entityName] ?? '')
+        return String(row.pieces ?? '')
+    }
+
+    const starOf = (row: EntityRow): number =>
+        row.entityType === 'character'
+            ? (characterStar[row.entityName] ?? 0)
+            : row.entityType === 'weapon'
+              ? (weaponStar[row.entityName] ?? 0)
+              : 0
+
+    /** @desc 小标题文案：属性 / 武器类型直接用原名，声骸用 `4C`，套装用 `2 件套` */
+    const groupLabel = (key: string): string => {
+        if (tab === 'echo') return `${key}C`
+        if (tab === 'character' || tab === 'weapon') return key
+        return `${key} 件套`
+    }
+
+    /** @desc 分组后的行（带「组首行」标记）：组内漂泊者最先 → 五星在前 → 名称拼音 */
+    const groupedRows = $derived.by(() => {
+        const sorted = [...rows].sort((a, b) =>
+            compareRoverStarName({ name: a.entityName, star: starOf(a) }, { name: b.entityName, star: starOf(b) })
+        )
+        const groups = groupInOrder(sorted, groupKeyOf, groupOrder)
+        return groups.flatMap((group) =>
+            group.items.map((row, index) => ({
+                row,
+                isGroupStart: index === 0,
+                groupKey: group.key,
+                groupLabel: groupLabel(group.key),
+                groupCount: group.items.length
+            }))
+        )
     })
 
     async function handleDownload() {
@@ -359,7 +417,75 @@
                 </div>
             {:else}
                 <div class="grid grid-cols-1 gap-1 xl:grid-cols-2 xl:gap-x-3">
-                    {#each rows as row (row.entityType + '/' + row.entityName)}
+                    {#each groupedRows as entry (entry.row.entityType + '/' + entry.row.entityName)}
+                        {@const row = entry.row}
+                        {#if entry.isGroupStart}
+                            <div class="col-span-full mt-1 flex items-center gap-2 first:mt-0">
+                                {#if tab === 'character' && elementIcons[entry.groupKey]}
+                                    <img
+                                        src={elementIcons[entry.groupKey]}
+                                        alt=""
+                                        class="size-4 shrink-0 object-contain"
+                                    />
+                                {:else if tab === 'weapon' && weaponTypeIcons[entry.groupKey]}
+                                    <img
+                                        src={weaponTypeIcons[entry.groupKey]}
+                                        alt=""
+                                        class="size-4 shrink-0 object-contain"
+                                    />
+                                {:else if tab === 'echo'}
+                                    <!-- 自制 cost 圆形图标 -->
+                                    <svg viewBox="0 0 16 16" class="size-4 shrink-0" aria-hidden="true">
+                                        <circle
+                                            cx="8"
+                                            cy="8"
+                                            r="6.6"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.4"
+                                        />
+                                        <text
+                                            x="8"
+                                            y="11.2"
+                                            text-anchor="middle"
+                                            font-size="8.5"
+                                            font-weight="700"
+                                            fill="currentColor">{entry.groupKey}</text
+                                        >
+                                    </svg>
+                                {:else}
+                                    <!-- 自制套装（叠层）图标 -->
+                                    <svg viewBox="0 0 16 16" class="size-4 shrink-0" aria-hidden="true">
+                                        <rect
+                                            x="1.4"
+                                            y="1.4"
+                                            width="9"
+                                            height="9"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.3"
+                                        />
+                                        <rect
+                                            x="5.6"
+                                            y="5.6"
+                                            width="9"
+                                            height="9"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.3"
+                                        />
+                                    </svg>
+                                {/if}
+                                <span class="text-[11px] font-black text-(--theme-modal-text)/60"
+                                    >{entry.groupLabel}</span
+                                >
+                                <span class="text-[10px] text-(--theme-modal-text)/30">{entry.groupCount}</span>
+                                <span
+                                    class="h-px flex-1"
+                                    style="background: color-mix(in srgb, var(--theme-modal-text) 10%, transparent);"
+                                ></span>
+                            </div>
+                        {/if}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div

@@ -43,20 +43,20 @@ let _valid = $state<boolean | null>(null)
 let _reason = $state<string | null>(null)
 let _busy = $state(false)
 let _loaded = false
-/** @desc 登录窗口开关（全局单例：设置页、词条集同步、AI/WS 工具共用一套入口） */
-let _loginOpen = $state(false)
 /** @desc 选用的绑定角色 roleId（持久化） */
 let _roleId = $state('')
+/** @desc 请求「打开设置并跳到连接配置」的标记：登录已内联在设置里，不再有独立登录窗口 */
+let _settingsRequest = $state(false)
 
-export const getKuroLoginOpen = () => _loginOpen
-export const setKuroLoginOpen = (open: boolean) => {
-    const wasOpen = _loginOpen
-    _loginOpen = open
-    // 关窗且仍未登录：视为用户放弃，等待中的流程（如词条集同步）不再干等
-    if (wasOpen && !open && !_session.loggedIn) settleLoginWaiters(false)
+export const getKuroSettingsRequest = () => _settingsRequest
+export const requestKuroSettings = () => {
+    _settingsRequest = true
+}
+export const consumeKuroSettingsRequest = () => {
+    _settingsRequest = false
 }
 
-/** @desc 等待登录结果的回调集合：登录成功 → true；用户关窗放弃 / 超时 → false */
+/** @desc 等待登录结果的回调集合：登录成功 → true；超时 → false */
 const loginWaiters = new Set<(ok: boolean) => void>()
 const settleLoginWaiters = (ok: boolean) => {
     for (const resolve of [...loginWaiters]) resolve(ok)
@@ -65,7 +65,7 @@ const settleLoginWaiters = (ok: boolean) => {
 
 /**
  * @desc 等待库街区登录完成（「从库街区同步」这类流程用）：已登录立即返回 true；
- *  否则等登录窗口里登录成功（true）或用户关窗放弃/超时（false）。
+ *  否则等用户在设置里登录成功（true）或超时（false）。
  */
 export function waitForKuroLogin(timeoutMs = 10 * 60 * 1000): Promise<boolean> {
     if (_session.loggedIn) return Promise.resolve(true)

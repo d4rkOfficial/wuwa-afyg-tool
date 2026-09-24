@@ -139,7 +139,8 @@
             <Icon icon="mdi:account-sync-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             <span class="text-base font-black tracking-wide text-(--theme-modal-text)">从库街区同步</span>
             {#if preview}
-                <span class="text-[11px] tracking-[0.18em] text-(--theme-modal-text)/40">来源 · {preview.roleName}</span
+                <span class="text-[11px] tracking-[0.18em] text-(--theme-modal-text)/40"
+                    >来源 · {preview.roleName} · 上游 {preview.upstreamCount} 个角色</span
                 >
             {/if}
         </span>

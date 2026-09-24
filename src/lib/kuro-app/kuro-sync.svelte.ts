@@ -15,6 +15,8 @@ export interface KuroSyncSkipped {
 export interface KuroSyncPreview {
     /** @desc 同步来源的绑定角色名 */
     roleName: string
+    /** @desc 上游返回的角色总数（用于解释「一个都没同步到」这类结果） */
+    upstreamCount: number
     plans: KuroPlanDraft[]
     skipped: KuroSyncSkipped[]
     unmatchedNames: string[]
@@ -54,19 +56,33 @@ export async function previewSubstatPlansFromKuro(): Promise<{
     try {
         // 先按 httpOnly cookie 拉一次会话：刷新页面后 store 还是空的，直接判「未登录」会误报
         await refreshKuroSession(false)
-        if (!isKuroLoggedIn()) throw new Error('尚未登录库街区，请先打开登录窗口完成登录')
+        if (!isKuroLoggedIn()) throw new Error('尚未登录库街区，请在「设置 → 连接配置 → 库街区账号」登录')
         const role = getKuroActiveRole()
         if (!role) throw new Error('该账号下没有已绑定的鸣潮角色（请先在库街区绑定游戏角色）')
         const data = await kuroFetchRoleEchoes(role)
         const { plans, skipped, unmatchedNames } = buildKuroPlans(data.characters, await knownCharacterNames())
+        const preview: KuroSyncPreview = {
+            roleName: role.nickname ?? role.roleId,
+            upstreamCount: data.characters.length,
+            plans,
+            skipped,
+            unmatchedNames
+        }
         if (plans.length === 0) {
+            // 空结果最需要原因：把上游返回数量与前几条跳过原因直接写进错误里，免得只看到一句「没有可同步的角色」
+            const reasons = skipped
+                .slice(0, 3)
+                .map((s) => `${s.character}（${s.reason}）`)
+                .join('；')
             return {
                 ok: false,
-                error: `没有可同步的角色（跳过 ${skipped.length} 个）`,
-                ...({ preview: { roleName: role.nickname ?? role.roleId, plans, skipped, unmatchedNames } } as const)
+                preview,
+                error: `上游返回 ${data.characters.length} 个角色，一个都没能写成方案${reasons ? `：${reasons}` : ''}${
+                    skipped.length > 3 ? ` 等 ${skipped.length} 个` : ''
+                }`
             }
         }
-        return { ok: true, preview: { roleName: role.nickname ?? role.roleId, plans, skipped, unmatchedNames } }
+        return { ok: true, preview }
     } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }

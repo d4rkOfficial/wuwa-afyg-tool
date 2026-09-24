@@ -96,17 +96,23 @@
         type ToastPosition
     } from '$lib/data/interaction-prefs.svelte'
     import {
+        consumeKuroSettingsRequest,
         formatKuroSignIn,
         getKuroActiveRole,
         getKuroBusy,
         getKuroReason,
         getKuroSession,
+        getKuroSettingsRequest,
         getKuroValid,
         kuroLogout,
+        kuroSendSms,
+        KuroGeetestRequiredError,
         kuroSignIn,
-        setKuroLoginOpen,
+        kuroVerifyLogin,
+        refreshKuroSession,
         setKuroRoleId
     } from '$lib/kuro-app/kuro.svelte'
+    import { solveGeetest } from '$lib/kuro-app/geetest'
     import { getSimplifyContextMenu, setSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
@@ -161,6 +167,80 @@
     let kuroBusy = $derived(getKuroBusy())
     let kuroActiveRole = $derived(getKuroActiveRole())
     let kuroSigning = $state(false)
+    /** @desc 内联登录表单（登录窗口已删除，验证码登录直接放在设置里） */
+    let kuroPhone = $state('')
+    let kuroCode = $state('')
+    let kuroLoginBusy = $state(false)
+    let kuroLoginInfo = $state<string | null>(null)
+    let kuroLoginError = $state<string | null>(null)
+    let kuroCountdown = $state(0)
+    let kuroTimer: ReturnType<typeof setInterval> | null = null
+
+    const stopKuroTimer = () => {
+        if (kuroTimer) {
+            clearInterval(kuroTimer)
+            kuroTimer = null
+        }
+    }
+
+    const startKuroCountdown = () => {
+        stopKuroTimer()
+        kuroCountdown = 60
+        kuroTimer = setInterval(() => {
+            kuroCountdown -= 1
+            if (kuroCountdown <= 0) stopKuroTimer()
+        }, 1000)
+    }
+
+    const clearKuroMessages = () => {
+        kuroLoginInfo = null
+        kuroLoginError = null
+    }
+
+    /** @desc 发验证码：先直接试发，上游要求人机验证时弹极验后带校验数据重发 */
+    const handleKuroSendCode = async () => {
+        clearKuroMessages()
+        kuroLoginBusy = true
+        const target = kuroPhone.trim()
+        try {
+            try {
+                await kuroSendSms(target)
+            } catch (e) {
+                if (!(e instanceof KuroGeetestRequiredError)) throw e
+                kuroLoginInfo = '需要先完成人机验证…'
+                const validate = await solveGeetest(e.captchaId, e.product)
+                await kuroSendSms(target, JSON.stringify({ ...validate, captcha_id: e.captchaId }))
+            }
+            kuroLoginInfo = '验证码已发送，请查看手机短信'
+            startKuroCountdown()
+        } catch (e) {
+            kuroLoginError = e instanceof Error ? e.message : String(e)
+        } finally {
+            kuroLoginBusy = false
+        }
+    }
+
+    const handleKuroLogin = async () => {
+        clearKuroMessages()
+        kuroLoginBusy = true
+        try {
+            const { signIn } = await kuroVerifyLogin(kuroPhone.trim(), kuroCode.trim())
+            const signInText = formatKuroSignIn(signIn)
+            kuroLoginInfo = `登录成功${signInText ? `；${signInText}` : ''}`
+            kuroCode = ''
+        } catch (e) {
+            kuroLoginError = e instanceof Error ? e.message : String(e)
+        } finally {
+            kuroLoginBusy = false
+        }
+    }
+
+    /** @desc 检验登录有效性（登录窗口删除后，这是唯一的主动校验入口） */
+    const handleKuroCheck = async () => {
+        await refreshKuroSession(true)
+        if (getKuroValid()) addToast('库街区登录状态有效', 'success')
+        else addToast(`库街区登录状态无效：${getKuroReason() ?? '未知原因'}`, 'error')
+    }
 
     const handleKuroSignIn = async () => {
         kuroSigning = true
@@ -183,6 +263,14 @@
             addToast(`退出失败：${e instanceof Error ? e.message : String(e)}`, 'error')
         }
     }
+
+    /** @desc 请求打开设置时可能带「跳到连接配置」的意图（词条集同步流程在未登录时发起） */
+    $effect(() => {
+        if (!open) return
+        if (!getKuroSettingsRequest()) return
+        consumeKuroSettingsRequest()
+        tab = 'connection'
+    })
 
     let currentTheme = $derived(getActiveId())
 
@@ -2078,17 +2166,92 @@
                                     {/if}
                                 </div>
 
+                                <!-- 未登录：内联验证码登录（原独立登录窗口已删除） -->
+                                {#if !kuroSession.loggedIn}
+                                    <label class="mt-3 block">
+                                        <span class="mb-1 block text-[10px] text-(--theme-modal-text)/40">手机号</span>
+                                        <input
+                                            type="tel"
+                                            inputmode="numeric"
+                                            autocomplete="tel"
+                                            maxlength="11"
+                                            placeholder="库街区绑定手机号"
+                                            bind:value={kuroPhone}
+                                            class="w-full rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none"
+                                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                        />
+                                    </label>
+                                    <div class="mt-2 flex items-end gap-2">
+                                        <label class="min-w-0 flex-1">
+                                            <span class="mb-1 block text-[10px] text-(--theme-modal-text)/40"
+                                                >短信验证码</span
+                                            >
+                                            <input
+                                                type="text"
+                                                inputmode="numeric"
+                                                maxlength="8"
+                                                placeholder="6 位验证码"
+                                                bind:value={kuroCode}
+                                                class="w-full rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none"
+                                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                            />
+                                        </label>
+                                        <button
+                                            onclick={handleKuroSendCode}
+                                            disabled={kuroLoginBusy ||
+                                                kuroCountdown > 0 ||
+                                                !/^\d{6,15}$/.test(kuroPhone.trim())}
+                                            class="h-[30px] shrink-0 rounded-none border px-2.5 text-[11px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:cursor-not-allowed disabled:opacity-40"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            {kuroCountdown > 0 ? `${kuroCountdown}s` : '发送验证码'}
+                                        </button>
+                                    </div>
+                                    <button
+                                        onclick={handleKuroLogin}
+                                        disabled={kuroLoginBusy || !kuroPhone.trim() || !kuroCode.trim()}
+                                        class="mt-2 flex w-full items-center justify-center gap-1.5 rounded-none border px-3 py-2 text-xs font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:cursor-not-allowed disabled:opacity-40"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <Icon
+                                            icon={kuroLoginBusy ? 'mdi:loading' : 'mdi:login-variant'}
+                                            class={kuroLoginBusy ? 'size-4 animate-spin' : 'size-4'}
+                                        />
+                                        登录（登录成功后自动做鸣潮签到）
+                                    </button>
+                                    {#if kuroLoginError}
+                                        <div
+                                            class="mt-2 rounded-none border px-2.5 py-1.5 text-[10px] text-red-400"
+                                            style="border-color: rgb(248 113 113 / 0.4);"
+                                        >
+                                            ✗ {kuroLoginError}
+                                        </div>
+                                    {/if}
+                                    {#if kuroLoginInfo}
+                                        <div class="mt-2 text-[10px] text-(--theme-accent-text)">✓ {kuroLoginInfo}</div>
+                                    {/if}
+                                    <p class="mt-2 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                                        登录凭据由应用自身的服务端路由持有（httpOnly
+                                        cookie，浏览器脚本读不到）；需要人机验证时会按需加载极验脚本（static.geetest.com）。
+                                    </p>
+                                {/if}
+
                                 <!-- 操作 -->
                                 <div class="mt-3 flex flex-wrap items-center gap-2">
-                                    <button
-                                        onclick={() => setKuroLoginOpen(true)}
-                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg)"
-                                        style="border-color: var(--theme-divider-border);"
-                                    >
-                                        <Icon icon="mdi:login-variant" class="size-4" />
-                                        {kuroSession.loggedIn ? '登录窗口 / 重新登录' : '登录'}
-                                    </button>
                                     {#if kuroSession.loggedIn}
+                                        <button
+                                            onclick={handleKuroCheck}
+                                            disabled={kuroBusy}
+                                            class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:opacity-40"
+                                            style="border-color: var(--theme-divider-border);"
+                                            title="让服务端向上游确认一次 token 是否仍然有效"
+                                        >
+                                            <Icon
+                                                icon={kuroBusy ? 'mdi:loading' : 'mdi:shield-refresh-outline'}
+                                                class={kuroBusy ? 'size-4 animate-spin' : 'size-4'}
+                                            />
+                                            检验登录有效性
+                                        </button>
                                         <button
                                             onclick={handleKuroSignIn}
                                             disabled={kuroSigning}
