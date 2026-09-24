@@ -41,16 +41,8 @@
     import type { Character } from '$lib/api/types'
     import type { EchoSlotConfig } from '$lib/calc/config.types'
     import { addToast } from '$lib/data/toast.svelte'
-    import {
-        getKuroActiveRole,
-        getKuroReason,
-        getKuroValid,
-        isKuroLoggedIn,
-        kuroFetchRoleEchoes,
-        refreshKuroSession,
-        setKuroLoginOpen
-    } from '$lib/data/kuro.svelte'
-    import { buildKuroPlans } from '$lib/calc/kuro-plan'
+    import { isKuroLoggedIn, setKuroLoginOpen } from '$lib/data/kuro.svelte'
+    import { syncSubstatPlansFromKuro } from '$lib/data/kuro-sync.svelte'
 
     interface Props extends ComponentsProps {}
 
@@ -253,9 +245,8 @@
         else addToast(`同步失败：${result.error ?? '未知错误'}`, 'error')
     }
 
-    /** @desc 库街区同步：把账号下鸣潮角色「当前装配的声骸」存成自定义方案（同名覆盖，可重复同步） */
-    const KURO_PLAN_NAME = '库街区同步'
-
+    /** @desc 库街区同步：把账号下鸣潮角色「当前装配的声骸」存成自定义方案（同名覆盖，可重复同步）；
+     *  与 AI/WS 工具共用 kuro-sync 里的同一份实现 */
     async function syncFromKuro() {
         if (kuroSyncing) return
         if (!isKuroLoggedIn()) {
@@ -264,45 +255,27 @@
             return
         }
         kuroSyncing = true
-        try {
-            await refreshKuroSession(true)
-            if (!getKuroValid()) throw new Error(getKuroReason() ?? '登录已失效，请重新登录')
-            const role = getKuroActiveRole()
-            if (!role) throw new Error('该账号下没有已绑定的鸣潮角色')
-            const data = await kuroFetchRoleEchoes(role)
-            const { plans, skipped, unmatchedNames } = buildKuroPlans(data.characters)
-            if (plans.length === 0) throw new Error(`没有可同步的角色（跳过 ${skipped.length} 个）`)
-            const stamp = new Date().toLocaleString('zh-CN', { hour12: false })
-            let saved = 0
-            for (const plan of plans) {
-                const id = await saveSubstatPlan({
-                    character: plan.character,
-                    name: KURO_PLAN_NAME,
-                    slots: plan.slots,
-                    note: `库街区 · ${role.nickname ?? role.roleId} · ${stamp}`
-                })
-                if (id) saved++
-            }
+        const result = await syncSubstatPlansFromKuro()
+        kuroSyncing = false
+        if (!result.ok) {
+            addToast(`库街区同步失败：${result.error ?? '未知错误'}`, 'error')
+            return
+        }
+        addToast(
+            `已从库街区同步 ${result.synced} 个角色的声骸方案${result.skipped.length > 0 ? `，跳过 ${result.skipped.length} 个` : ''}`,
+            'success'
+        )
+        if (result.skipped.length > 0) {
             addToast(
-                `已从库街区同步 ${saved} 个角色的声骸方案${skipped.length > 0 ? `，跳过 ${skipped.length} 个` : ''}`,
-                'success'
+                `跳过：${result.skipped
+                    .slice(0, 3)
+                    .map((s) => `${s.character}（${s.reason}）`)
+                    .join('；')}`,
+                'error'
             )
-            if (skipped.length > 0) {
-                addToast(
-                    `跳过：${skipped
-                        .slice(0, 3)
-                        .map((s) => `${s.character}（${s.reason}）`)
-                        .join('；')}`,
-                    'error'
-                )
-            }
-            if (unmatchedNames.length > 0) {
-                addToast(`有未识别的词条名：${unmatchedNames.slice(0, 4).join('、')}`, 'error')
-            }
-        } catch (e) {
-            addToast(`库街区同步失败：${e instanceof Error ? e.message : String(e)}`, 'error')
-        } finally {
-            kuroSyncing = false
+        }
+        if (result.unmatchedNames.length > 0) {
+            addToast(`有未识别的词条名：${result.unmatchedNames.slice(0, 4).join('、')}`, 'error')
         }
     }
 

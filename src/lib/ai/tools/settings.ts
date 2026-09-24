@@ -83,6 +83,15 @@ import {
     setToastPosition,
     type ToastPosition
 } from '$lib/data/interaction-prefs.svelte'
+import {
+    getKuroActiveRole,
+    getKuroBase,
+    getKuroReason,
+    getKuroSession,
+    getKuroValid,
+    setKuroBase,
+    setKuroRoleId
+} from '$lib/data/kuro.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -317,6 +326,32 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
         }
     },
 
+    // ── 库街区（实验性）──
+    kuro_base: {
+        label: '库街区代理服务器地址',
+        apply: async (v) => {
+            const url = str(v)
+            if (!/^https?:\/\//i.test(url)) throw new Error('kuro_base 须为 http(s):// 开头的地址')
+            setKuroBase(url)
+            return getKuroBase()
+        }
+    },
+    kuro_role: {
+        label: '库街区同步使用的绑定角色 roleId',
+        apply: async (v) => {
+            const roleId = str(v)
+            const hit = getKuroSession().roles.find((r) => r.roleId === roleId)
+            if (!hit) {
+                const list = getKuroSession()
+                    .roles.map((r) => `${r.roleId}（${r.nickname ?? '未命名'}）`)
+                    .join('、')
+                throw new Error(`未找到该 roleId；当前可用：${list || '（未登录或没有绑定角色）'}`)
+            }
+            setKuroRoleId(roleId)
+            return roleId
+        }
+    },
+
     // ── 性能相关 ──
     gpu_accel: {
         label: '渲染加速（GPU）',
@@ -475,6 +510,21 @@ defineTool('get_settings_state', {
                 lockWatermark: getLockWatermark(),
                 lockWatermarkText: getEffectiveLockWatermarkText(),
                 lockWatermarkTextDefault: DEFAULT_LOCK_WATERMARK_TEXT
+            },
+            kuro: {
+                base: getKuroBase(),
+                loggedIn: getKuroSession().loggedIn,
+                phone: getKuroSession().phone,
+                account: getKuroSession().account?.userName ?? null,
+                valid: getKuroValid(),
+                reason: getKuroReason(),
+                roles: getKuroSession().roles.map((r) => ({
+                    roleId: r.roleId,
+                    nickname: r.nickname ?? null,
+                    serverName: r.serverName ?? null,
+                    level: r.level ?? null
+                })),
+                activeRoleId: getKuroActiveRole()?.roleId ?? null
             },
             performance: {
                 gpuAccel: getGpuAccel(),

@@ -268,6 +268,7 @@
             ['substat-library', '快速词条方案', () => getSubstatLibraryOpen(), (v) => setSubstatLibraryOpen(v)],
             ['damage-type', '编辑伤害类型', () => getShowDamageTypeModal(), (v) => setShowDamageTypeModal(v)],
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
+            ['kuro-login', '库街区登录窗口', () => getKuroLoginOpen(), (v) => setKuroLoginOpen(v)],
             ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
             [
                 'workshop-frame',

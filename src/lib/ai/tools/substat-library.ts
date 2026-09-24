@@ -12,6 +12,7 @@ import {
     saveSubstatPlan,
     type SubstatPlan
 } from '$lib/data/substat-library.svelte'
+import { syncSubstatPlansFromKuro } from '$lib/data/kuro-sync.svelte'
 import {
     buildStandardSlots,
     cloneSlots,
@@ -348,5 +349,24 @@ defineTool('sync_substat_plans_from_share', {
         const result = await fetchSubstatPlansFromShare()
         if (!result.ok) throw new Error(`同步失败：${result.error ?? '工坊不可达'}`)
         return { synced: result.added }
+    }
+})
+
+defineTool('sync_substat_plans_from_kuro', {
+    description:
+        '从库街区同步当前账号下鸣潮角色「正在装配的声骸」，写成本地自定义词条方案（方案名「库街区同步」，同名覆盖、可重复同步）。' +
+        '需要先在「设置 → 库街区」登录（可用 open_panel 打开 kuro-login 窗口）；上游若缺少角色装配声骸接口会明确报错。',
+    parameters: { type: 'object', properties: {} },
+    dangerous: true,
+    handler: async () => {
+        const result = await syncSubstatPlansFromKuro()
+        if (!result.ok) throw new Error(result.error ?? '库街区同步失败')
+        return {
+            synced: result.synced,
+            role: result.roleName ?? null,
+            planName: '库街区同步',
+            skipped: result.skipped,
+            unmatchedNames: result.unmatchedNames
+        }
     }
 })
