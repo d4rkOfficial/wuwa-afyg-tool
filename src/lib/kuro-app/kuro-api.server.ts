@@ -32,12 +32,13 @@ const COUNTRY_CODES = (process.env.KURO_COUNTRY_CODES || '1,3,900')
     .filter(Boolean)
 
 /**
- * @desc 角色盒（akiBox）接口触发极验时用的 captchaId：
- *  上游对 getRoleDetail 这类取数接口会在风控时返回 `data: { geeTest: true }` 的桩数据（code 仍为 200），
- *  参考实现（WuwaWebTool captcha/base.py）用的是 3afb60f2…；短信登录那条用的是另一个 captchaId，两者不要混。
+ * @desc 角色盒（akiBox）取数接口的人机验证（风控）配置：
+ *  上游风控时会对 getRoleDetail 返回 `data: { geeTest: true }` 的桩数据（code 仍是 200）。
+ *  只有**显式配置**了 KURO_GEETEST_BOX_CAPTCHA_ID 才会让前端弹极验；默认不弹——
+ *  宁可提示「稍后再试」，也不要弹一个不属于库街区的验证界面（弹错 captchaId 的验证过了也没用）。
  */
 export const KURO_BOX_GEETEST = {
-    captchaId: process.env.KURO_GEETEST_BOX_CAPTCHA_ID || '3afb60f292fa803fa809114b9a89b3f5',
+    captchaId: process.env.KURO_GEETEST_BOX_CAPTCHA_ID || '',
     product: process.env.KURO_GEETEST_BOX_PRODUCT || 'bind'
 }
 

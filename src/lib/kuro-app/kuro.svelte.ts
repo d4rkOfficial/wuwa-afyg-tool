@@ -9,8 +9,6 @@ import { browser } from '$app/environment'
 const ROLE_KEY = 'wuwa-afyg:kuro:role'
 /** @desc 本地登录标记：只有它存在时，启动才去问服务端要会话（未登录过的用户零请求） */
 const LOGGED_KEY = 'wuwa-afyg:kuro:logged'
-/** @desc 开机签到日期（YYYY-MM-DD）：同一天只自动签一次 */
-const SIGNED_KEY = 'wuwa-afyg:kuro:signed-on'
 
 /** @desc 绑定的游戏角色（鸣潮）：roleId/serverId 用于拉取角色与声骸数据 */
 export interface KuroRole {
@@ -119,12 +117,13 @@ const setLoggedMark = (on: boolean): void => {
 /**
  * @desc 打开工具箱时自动恢复库街区登录态：只有本地存过登录标记才去问服务端
  *  （token 在 httpOnly cookie 里前端读不到，只能让服务端按 cookie 回话）。
- *  顺带静默校验一次（不弹任何窗口）：已失效则由服务端清 cookie，本地标记也跟着清掉。
+ *  只读会话（`check=false`，1 次上游调用、且不碰角色盒），不主动做任何会写游戏数据的操作；
+ *  有效性校验留给设置里的「检验登录有效性」按钮。
  */
 export async function restoreKuroSession(): Promise<void> {
     if (!browser) return
     if (localStorage.getItem(LOGGED_KEY) !== '1') return
-    await refreshKuroSession(true)
+    await refreshKuroSession(false)
 }
 
 interface CallOptions {
@@ -188,9 +187,10 @@ export async function kuroSendSms(phone: string, geeTestData?: string): Promise<
     }
 }
 
-/** @desc 验证码登录（成功后 token 由服务端写进 httpOnly cookie，前端只拿会话概览）；服务端会顺手做鸣潮签到 */
-export async function kuroVerifyLogin(phone: string, code: string): Promise<{ signIn: KuroSignInResult[] }> {
-    const res = await call<{ session: KuroSessionInfo; signIn?: KuroSignInResult[] }>('/login/verify', {
+/** @desc 验证码登录（成功后 token 由服务端写进 httpOnly cookie，前端只拿会话概览）
+ *  登录不再顺带签到：签到与角色盒取数共用上游风控额度，登录后立刻签到会让紧接着的同步被要求人机验证 */
+export async function kuroVerifyLogin(phone: string, code: string): Promise<void> {
+    const res = await call<{ session: KuroSessionInfo }>('/login/verify', {
         method: 'POST',
         body: { phone, code },
         timeout: 40000
@@ -200,7 +200,6 @@ export async function kuroVerifyLogin(phone: string, code: string): Promise<{ si
     _reason = null
     setLoggedMark(true)
     settleLoginWaiters(true)
-    return { signIn: res.signIn ?? [] }
 }
 
 /** @desc 鸣潮每日签到的单角色结果 */
@@ -216,7 +215,7 @@ export async function kuroSignIn(): Promise<KuroSignInResult[]> {
     return res.results ?? []
 }
 
-/** @desc 签到结果 → 一句人话（登录窗口/开机提示共用） */
+/** @desc 签到结果 → 一句人话（设置里的签到按钮 / 手动签到共用） */
 export function formatKuroSignIn(results: KuroSignInResult[]): string {
     if (results.length === 0) return ''
     const signed = results.filter((r) => r.status === 'signed').length
@@ -227,23 +226,6 @@ export function formatKuroSignIn(results: KuroSignInResult[]): string {
     }
     if (signed > 0) return `鸣潮签到完成（${signed} 个角色）`
     return '鸣潮签到：今天已经签过了'
-}
-
-/**
- * @desc 开机自动签到：同一天只尝试一次（本地记日期），会话失效或当天签过就直接跳过。
- *  返回可读提示（没有动作时返回 null），由 UI 决定是否弹 toast。
- */
-export async function signInWavesDaily(): Promise<string | null> {
-    if (!browser || !_session.loggedIn) return null
-    const today = new Date().toLocaleDateString('sv-SE')
-    if (localStorage.getItem(SIGNED_KEY) === today) return null
-    try {
-        const results = await kuroSignIn()
-        localStorage.setItem(SIGNED_KEY, today)
-        return formatKuroSignIn(results) || null
-    } catch (e) {
-        return `鸣潮签到失败：${e instanceof Error ? e.message : String(e)}`
-    }
 }
 
 /**
@@ -278,7 +260,6 @@ export async function kuroLogout(): Promise<void> {
     _valid = false
     _reason = null
     setLoggedMark(false)
-    if (browser) localStorage.removeItem(SIGNED_KEY)
 }
 
 /**

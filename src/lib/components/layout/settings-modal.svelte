@@ -224,9 +224,8 @@
         clearKuroMessages()
         kuroLoginBusy = true
         try {
-            const { signIn } = await kuroVerifyLogin(kuroPhone.trim(), kuroCode.trim())
-            const signInText = formatKuroSignIn(signIn)
-            kuroLoginInfo = `登录成功${signInText ? `；${signInText}` : ''}`
+            await kuroVerifyLogin(kuroPhone.trim(), kuroCode.trim())
+            kuroLoginInfo = '登录成功，可在下方用「鸣潮签到」按钮签到'
             kuroCode = ''
         } catch (e) {
             kuroLoginError = e instanceof Error ? e.message : String(e)

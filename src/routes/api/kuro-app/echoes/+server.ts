@@ -33,7 +33,7 @@ const run = async (
                 ok: true,
                 geetest: { required: true, captchaId: e.captchaId, product: e.product },
                 characters: [],
-                error: '库街区要求完成人机验证后才能读取角色数据'
+                error: '上游要求人机验证（短时间请求过多会触发风控）：请等几分钟再同步一次'
             })
         }
         return json({ ok: false, error: e instanceof Error ? e.message : String(e) })

@@ -85,7 +85,7 @@
         openSubstatLibrary,
         setSubstatLibraryOpen
     } from '$lib/data/substat-library-ui.svelte'
-    import { loadKuroPrefs, restoreKuroSession, signInWavesDaily } from '$lib/kuro-app/kuro.svelte'
+    import { loadKuroPrefs, restoreKuroSession } from '$lib/kuro-app/kuro.svelte'
     import { shouldAskFirstSync } from '$lib/data/first-sync.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
@@ -321,12 +321,9 @@
         loadShortcuts()
         loadWorkshop()
         loadKuroPrefs()
-        // 库街区：本地有登录标记就自动恢复登录态（token 在 httpOnly cookie 里，前端只能问服务端）；
-        // 恢复成功后按天做一次鸣潮签到（同一天只试一次，失败不打扰）
-        void restoreKuroSession().then(async () => {
-            const message = await signInWavesDaily()
-            if (message) addToast(message, message.includes('失败') ? 'error' : 'success')
-        })
+        // 库街区：本地有登录标记就自动恢复登录态（token 在 httpOnly cookie 里，前端只能问服务端）。
+        // 只读会话、不做会写游戏数据的操作（签到是设置里的显式按钮），避免触发上游取数风控。
+        void restoreKuroSession()
         await ensureVersion()
         if (browser) {
             const prev = localStorage.getItem('wuwa-afyg:version')

@@ -292,6 +292,11 @@
                 res = await previewSubstatPlansFromKuro()
             } catch (e) {
                 if (!(e instanceof KuroGeetestRequiredError)) throw e
+                // 没配置库街区的极验 captchaId 就不弹验证窗口（弹错租户的验证过了也没用），只给可执行的提示
+                if (!e.captchaId) {
+                    addToast('上游要求人机验证（短时间请求过多会触发风控）：请等几分钟再同步一次', 'error')
+                    return
+                }
                 addToast('库街区要求完成人机验证，请在弹出的验证窗口里完成', 'info')
                 let validate: Awaited<ReturnType<typeof solveGeetest>>
                 try {
