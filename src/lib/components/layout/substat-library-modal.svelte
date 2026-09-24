@@ -42,7 +42,8 @@
     import type { EchoSlotConfig } from '$lib/calc/config.types'
     import { addToast } from '$lib/data/toast.svelte'
     import { isKuroLoggedIn, setKuroLoginOpen } from '$lib/data/kuro.svelte'
-    import { syncSubstatPlansFromKuro } from '$lib/data/kuro-sync.svelte'
+    import { applyKuroSync, previewSubstatPlansFromKuro, type KuroSyncPreview } from '$lib/data/kuro-sync.svelte'
+    import KuroSyncPreviewModal from '$lib/components/layout/kuro-sync-preview-modal.svelte'
 
     interface Props extends ComponentsProps {}
 
@@ -78,6 +79,9 @@
     let syncing = $state(false)
     /** @desc 库街区同步进行中（与工坊同步分开，两者可各自独立禁用） */
     let kuroSyncing = $state(false)
+    /** @desc 库街区同步预览（确认弹窗展示，确认后才落盘） */
+    let kuroPreview = $state<KuroSyncPreview | null>(null)
+    let kuroPreviewOpen = $state(false)
     let renameId = $state<string | null>(null)
     let renameText = $state('')
 
@@ -255,8 +259,28 @@
             return
         }
         kuroSyncing = true
-        const result = await syncSubstatPlansFromKuro()
+        // 先只读预览，交用户在确认弹窗里挑选角色/改方案名，再落盘
+        const res = await previewSubstatPlansFromKuro()
         kuroSyncing = false
+        if (!res.preview) {
+            addToast(`库街区同步失败：${res.error ?? '未知错误'}`, 'error')
+            return
+        }
+        if (!res.ok) {
+            addToast(`库街区同步失败：${res.error ?? '未知错误'}（跳过 ${res.preview.skipped.length} 个）`, 'error')
+            return
+        }
+        kuroPreview = res.preview
+        kuroPreviewOpen = true
+    }
+
+    /** @desc 确认弹窗里点「写入」：按勾选角色落盘（同名方案覆盖） */
+    async function confirmKuroSync(opts: { planName: string; characters: string[] }) {
+        if (!kuroPreview) return
+        kuroSyncing = true
+        const result = await applyKuroSync(kuroPreview, opts)
+        kuroSyncing = false
+        kuroPreviewOpen = false
         if (!result.ok) {
             addToast(`库街区同步失败：${result.error ?? '未知错误'}`, 'error')
             return
@@ -265,18 +289,10 @@
             `已从库街区同步 ${result.synced} 个角色的声骸方案${result.skipped.length > 0 ? `，跳过 ${result.skipped.length} 个` : ''}`,
             'success'
         )
-        if (result.skipped.length > 0) {
-            addToast(
-                `跳过：${result.skipped
-                    .slice(0, 3)
-                    .map((s) => `${s.character}（${s.reason}）`)
-                    .join('；')}`,
-                'error'
-            )
-        }
         if (result.unmatchedNames.length > 0) {
             addToast(`有未识别的词条名：${result.unmatchedNames.slice(0, 4).join('、')}`, 'error')
         }
+        kuroPreview = null
     }
 
     /** @desc 进入编辑：标准卡带出当前标准方案，自定义卡带出该方案；新建卡以标准14词条为起点 */
@@ -658,4 +674,16 @@
     {saving}
     onsave={saveEditing}
     oncancel={cancelEdit}
+/>
+
+<!-- 库街区同步预览/确认弹窗：与列表弹窗同级、DOM 在后，因此叠在列表之上 -->
+<KuroSyncPreviewModal
+    open={kuroPreviewOpen}
+    preview={kuroPreview}
+    busy={kuroSyncing}
+    onconfirm={confirmKuroSync}
+    onclose={() => {
+        kuroPreviewOpen = false
+        kuroPreview = null
+    }}
 />

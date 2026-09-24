@@ -104,7 +104,12 @@ export function kuroEchoToSlot(echo: KuroEcho): { slot: EchoSlotConfig | null; u
 }
 
 export interface KuroPlanDraft {
+    /** @desc 写入方案用的角色名（命中工具箱角色名录时用工具箱名，避免出现「同名不同写法」的角色） */
     character: string
+    /** @desc 上游返回的角色名（便于 UI 提示改名情况） */
+    upstreamName: string
+    /** @desc 是否在工具箱角色名录里找到该角色 */
+    matched: boolean
     slots: EchoSlotConfig[]
 }
 
@@ -115,8 +120,23 @@ export interface KuroPlanBuildResult {
     unmatchedNames: string[]
 }
 
-/** @desc 把服务器返回的角色+声骸数据整批转成方案草稿；不满足 5 槽/合法性校验的角色记入 skipped */
-export function buildKuroPlans(characters: KuroCharacterEchoes[]): KuroPlanBuildResult {
+/** @desc 角色名归一：去掉空白与常见分隔符，用于上游名 ↔ 工具箱名的宽松匹配 */
+const normName = (s: string) => strip(s).replace(/[·・\-—_]/g, '')
+
+/** @desc 把上游角色名尽量对上工具箱角色名录；命中则用工具箱写法 */
+export function matchCharacterName(upstream: string, knownNames: string[]): { name: string; matched: boolean } {
+    const raw = strip(upstream)
+    if (!raw) return { name: upstream, matched: false }
+    const exact = knownNames.find((n) => strip(n) === raw)
+    if (exact) return { name: exact, matched: true }
+    const loose = knownNames.find((n) => normName(n) === normName(raw))
+    if (loose) return { name: loose, matched: true }
+    return { name: upstream, matched: false }
+}
+
+/** @desc 把服务器返回的角色+声骸数据整批转成方案草稿；不满足 5 槽/合法性校验的角色记入 skipped
+ *  knownNames：工具箱角色名录（用于把上游角色名对到工具箱写法，可传空数组） */
+export function buildKuroPlans(characters: KuroCharacterEchoes[], knownNames: string[] = []): KuroPlanBuildResult {
     const plans: KuroPlanDraft[] = []
     const skipped: { character: string; reason: string }[] = []
     const unmatched = new Set<string>()
@@ -146,7 +166,8 @@ export function buildKuroPlans(characters: KuroCharacterEchoes[]): KuroPlanBuild
             skipped.push({ character: ch.name, reason: '声骸数据不满足工具箱方案约束（cost 合计 >12 或词条非法）' })
             continue
         }
-        plans.push({ character: ch.name, slots: normalized })
+        const { name, matched } = matchCharacterName(ch.name, knownNames)
+        plans.push({ character: name, upstreamName: ch.name, matched, slots: normalized })
     }
     return { plans, skipped, unmatchedNames: [...unmatched] }
 }
