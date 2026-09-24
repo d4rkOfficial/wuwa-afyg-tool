@@ -307,6 +307,14 @@
                 }
                 res = await previewSubstatPlansFromKuro({
                     geeTestData: JSON.stringify({ ...validate, captcha_id: e.captchaId })
+                }).catch((err) => {
+                    // 验证数据已提交但上游仍要验证：说明该 captchaId 不是这个接口的租户，或验证只对单次请求有效
+                    if (err instanceof KuroGeetestRequiredError) {
+                        throw new Error(
+                            '验证已提交但上游仍然要求人机验证（可能极验租户不对，或验证数据只对单次请求有效）'
+                        )
+                    }
+                    throw err
                 })
             }
             if (!res.preview) {
