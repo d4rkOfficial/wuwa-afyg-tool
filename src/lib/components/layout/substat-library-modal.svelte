@@ -95,6 +95,10 @@
     /** @desc 库街区同步预览（确认弹窗展示，确认后才落盘） */
     let kuroPreview = $state<KuroSyncPreview | null>(null)
     let kuroPreviewOpen = $state(false)
+    /** @desc 预览用的数据是否来自本地暂存（来自缓存时不打上游，只给「刷新数据」按钮） */
+    let kuroPreviewFromCache = $state(false)
+    /** @desc 预览数据的时间戳（弹窗据此计算刷新冷却与显示数据时间） */
+    let kuroPreviewFetchedAt = $state(0)
     let renameId = $state<string | null>(null)
     let renameText = $state('')
 
@@ -272,7 +276,10 @@
         if (kuroSyncing) return
         kuroSyncing = true
         try {
-            await refreshKuroSession(false)
+            if (!isKuroLoggedIn()) {
+                await refreshKuroSession(false)
+            }
+            // 有本地暂存就直接用（不打上游）；没有才请求一次
             if (!isKuroLoggedIn()) {
                 requestKuroSettings()
                 openPanel('settings', true)
@@ -283,20 +290,37 @@
                     return
                 }
             }
-            // 先只读预览，交用户在确认弹窗里挑选角色/改方案名，再落盘。
-            // 上游风控（取数接口返回 data.geeTest=true）时不走极验：服务端会直接回「被风控」的明确错误，
-            // 这里原样提示，让用户等风控过去（实测对取数接口解验证无效）。
-            const res = await previewSubstatPlansFromKuro()
-            if (!res.preview) {
-                addToast(`库街区同步失败：${res.error ?? '未知错误'}`, 'error')
-                return
-            }
-            // 上游有数据但一个都没能落到方案上时，也要把确认弹窗打开：里面能看到每个角色被跳过的原因
-            if (!res.ok) addToast(`库街区同步：${res.error ?? '没有可同步的角色'}`, 'error')
-            kuroPreview = res.preview
-            kuroPreviewOpen = true
+            // 只读预览：优先用本地暂存的声骸数据（没缓存才请求上游，避免被风控）。
+            // 上游风控时服务端会直接回明确的「被风控」错误，这里原样提示。
+            await openKuroPreview()
+        } finally {
+            kuroSyncing = false
+        }
+    }
+
+    /** @desc 打开/更新预览弹窗：refresh=true 表示用户手动刷新（受 5 分钟限流） */
+    async function openKuroPreview(refresh = false) {
+        const res = await previewSubstatPlansFromKuro({ refresh })
+        if (!res.preview) {
+            addToast(`库街区同步失败：${res.error ?? '未知错误'}`, 'error')
+            return
+        }
+        // 有数据但一个都没能落到方案上时，也要把确认弹窗打开：里面能看到每个角色被跳过的原因
+        if (!res.ok) addToast(`库街区同步：${res.error ?? '没有可同步的角色'}`, 'error')
+        kuroPreview = res.preview
+        kuroPreviewFromCache = !!res.fromCache
+        kuroPreviewFetchedAt = res.fetchedAt ?? 0
+        kuroPreviewOpen = true
+    }
+
+    /** @desc 预览弹窗里的「刷新数据」：重新拉一次上游（5 分钟内只允许一次） */
+    async function refreshKuroPreview() {
+        if (kuroSyncing) return
+        kuroSyncing = true
+        try {
+            await openKuroPreview(true)
         } catch (e) {
-            addToast(`库街区同步失败：${e instanceof Error ? e.message : String(e)}`, 'error')
+            addToast(`刷新失败：${e instanceof Error ? e.message : String(e)}`, 'error')
         } finally {
             kuroSyncing = false
         }
@@ -715,6 +739,9 @@
     preview={kuroPreview}
     {characters}
     {icons}
+    fromCache={kuroPreviewFromCache}
+    fetchedAt={kuroPreviewFetchedAt}
+    onrefresh={refreshKuroPreview}
     busy={kuroSyncing}
     onconfirm={confirmKuroSync}
     onclose={() => {

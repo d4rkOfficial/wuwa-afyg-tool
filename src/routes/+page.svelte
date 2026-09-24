@@ -85,6 +85,7 @@
         openSubstatLibrary,
         setSubstatLibraryOpen
     } from '$lib/data/substat-library-ui.svelte'
+    import { loadKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
     import { loadKuroPrefs, restoreKuroSession } from '$lib/kuro-app/kuro.svelte'
     import { shouldAskFirstSync } from '$lib/data/first-sync.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
@@ -321,6 +322,8 @@
         loadShortcuts()
         loadWorkshop()
         loadKuroPrefs()
+        // 库街区：读一次本地暂存的声骸数据（有缓存就不必再打上游）
+        loadKuroEchoCache()
         // 库街区：本地有登录标记就自动恢复登录态（token 在 httpOnly cookie 里，前端只能问服务端）。
         // 只读会话：不主动做任何会写游戏数据的操作。
         void restoreKuroSession()

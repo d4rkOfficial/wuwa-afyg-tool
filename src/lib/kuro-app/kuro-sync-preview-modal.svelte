@@ -14,6 +14,7 @@
     import type { ComponentsProps } from '$lib/types'
     import { KURO_PLAN_NAME, type KuroPlanPick, type KuroSyncPreview } from '$lib/kuro-app/kuro-sync.svelte'
     import type { KuroPlanDraft } from '$lib/kuro-app/kuro-plan'
+    import { KURO_REFRESH_COOLDOWN_MS } from '$lib/kuro-app/kuro-echo-cache.svelte'
     import { abbrevMainStat } from '$lib/utils/substat-abbrev'
 
     interface Props extends ComponentsProps {
@@ -23,6 +24,12 @@
         characters?: Character[]
         /** @desc 角色头像表（角色名 → 图像地址） */
         icons?: Record<string, string>
+        /** @desc 数据取自本地暂存（没有请求上游） */
+        fromCache?: boolean
+        /** @desc 数据取到的时间戳 */
+        fetchedAt?: number
+        /** @desc 手动刷新上游数据（内部 5 分钟限流） */
+        onrefresh?: () => void
         /** @desc 写入中：禁用确认按钮 */
         busy?: boolean
         onconfirm: (opts: { planName: string; picks: KuroPlanPick[] }) => void
@@ -34,12 +41,41 @@
         preview,
         characters = [],
         icons = {},
+        fromCache = false,
+        fetchedAt = 0,
+        onrefresh,
         busy = false,
         onconfirm,
         onclose,
         class: className,
         style: styleProp
     }: Props = $props()
+
+    /** @desc 数据时间（本地时间，精确到分钟） */
+    const fetchedAtText = $derived(
+        fetchedAt
+            ? new Date(fetchedAt).toLocaleString('zh-CN', {
+                  hour12: false,
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+              })
+            : ''
+    )
+
+    /** @desc 刷新冷却：由数据时间戳推算（打开弹窗期间每 30s 走一次，保证文案跟着变） */
+    let now = $state(Date.now())
+    let prevOpen = false
+    $effect(() => {
+        if (open && !prevOpen) now = Date.now()
+        prevOpen = open
+        if (!open) return
+        const timer = setInterval(() => (now = Date.now()), 30000)
+        return () => clearInterval(timer)
+    })
+    const cooldownLeft = $derived(fetchedAt ? Math.max(0, KURO_REFRESH_COOLDOWN_MS - (now - fetchedAt)) : 0)
+    const cooldownText = $derived(cooldownLeft > 0 ? `${Math.ceil(cooldownLeft / 60000)} 分钟后可刷新` : '')
 
     let planName = $state(KURO_PLAN_NAME)
     /** @desc 选中的角色（按上游名定位；默认一张都不选） */
@@ -165,6 +201,29 @@
                             .length}
                         {#if preview.skipped.length > 0}· 跳过 {preview.skipped.length}{/if}
                     </span>
+                    {#if fetchedAtText}
+                        <span class="text-[10px] tracking-[0.14em] text-(--theme-modal-text)/35"
+                            >数据时间 {fetchedAtText}{fromCache ? '（本地暂存）' : '（刚刚获取）'}</span
+                        >
+                    {/if}
+                    {#if onrefresh}
+                        <button
+                            onclick={onrefresh}
+                            disabled={busy || cooldownLeft > 0}
+                            class="flex items-center gap-1 rounded-none border px-2 py-0.5 text-[11px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-40"
+                            style="border-color: var(--theme-divider-border);"
+                            title={cooldownLeft > 0
+                                ? `同一份数据 5 分钟只能刷新一次（${cooldownText}）`
+                                : '重新从库街区拉取一次声骸数据'}
+                        >
+                            <Icon
+                                icon={busy ? 'mdi:loading' : 'mdi:refresh'}
+                                class={busy ? 'size-3 animate-spin' : 'size-3'}
+                            />
+                            刷新数据
+                            {#if cooldownLeft > 0}<span class="text-[10px]">（{cooldownText}）</span>{/if}
+                        </button>
+                    {/if}
                     <button
                         onclick={() => (picked = allPicked ? [] : allKeys)}
                         class="rounded-none border px-2 py-0.5 text-[11px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"

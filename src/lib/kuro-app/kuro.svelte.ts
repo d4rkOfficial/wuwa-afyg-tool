@@ -1,4 +1,5 @@
 import { browser } from '$app/environment'
+import { clearKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
 
 /**
  * @desc 库街区（实验性）同步：前端只调用应用自身的服务端路由 `/api/kuro-app/*`，
@@ -226,13 +227,14 @@ export async function refreshKuroSession(check = true): Promise<void> {
     }
 }
 
-/** @desc 退出登录（服务端清掉 cookie 里的 token） */
+/** @desc 退出登录（服务端清掉 cookie 里的 token）；顺带清掉本地声骸暂存，避免串账号 */
 export async function kuroLogout(): Promise<void> {
     await call('/logout', { method: 'POST' })
     _session = EMPTY_SESSION
     _valid = false
     _reason = null
     setLoggedMark(false)
+    clearKuroEchoCache()
 }
 
 /**
