@@ -16,7 +16,12 @@
     import { DAMAGE_TYPE_SHORT, LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$lib/calc/calculation.consts'
     import { getCalcElementMap, compareNatural } from '$lib/calc/calculation.store.svelte'
     import { elementColor, getCharIconMap } from '$lib/calc/timeline.store.svelte'
-    import { getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
+    import {
+        getGlobalBuffCollapsed,
+        getScrollAxisDefault,
+        setGlobalBuffCollapsed,
+        setScrollAxisDefault
+    } from '$lib/data/calc-view.svelte'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
@@ -799,6 +804,13 @@
         }
     }
 
+    /** @desc 全局 BUFF 条展开/收起（偏好持久化在 calc-view 里） */
+    let globalBuffCollapsed = $state(getGlobalBuffCollapsed())
+    const toggleGlobalBuffCollapsed = () => {
+        globalBuffCollapsed = !globalBuffCollapsed
+        setGlobalBuffCollapsed(globalBuffCollapsed)
+    }
+
     /** @desc 方向键滚动：↑↓ 沿「主轴」（默认滚动方向），←→ 沿次轴；Shift 键本身直接切换默认方向 */
     const ARROW_STEP = 60
     function handleArrowKey(e: KeyboardEvent) {
@@ -945,22 +957,42 @@
             {/each}
         </div>
     {/if}
-    <!-- @desc 全局 BUFF 条：当前伤害源涉及的所有全局 buff 直接列在表上方（不再折叠进各表标题里），chips 自动换行 -->
+    <!-- @desc 全局 BUFF 条：当前伤害源涉及的所有全局 buff 列在表上方，chips 自动换行；可展开/收起（偏好持久化） -->
     {#if shownGlobalBuffs.length > 0}
-        <div
-            class="theme-scrollbar flex max-h-28 shrink-0 flex-wrap items-center gap-1 overflow-y-auto border-b border-(--theme-divider-border) px-3 py-2"
-            data-sf="toolbar"
-            data-sf-flat
-        >
-            <span class="mr-1 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50">全局 BUFF</span>
-            {#each shownGlobalBuffs as gb (gb.id)}
-                <span
-                    class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
-                    style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
+        <div class="flex shrink-0 flex-col border-b border-(--theme-divider-border)" data-sf="toolbar" data-sf-flat>
+            <div class="flex items-center gap-1.5 px-3 py-1.5">
+                <button
+                    onclick={toggleGlobalBuffCollapsed}
+                    class="inline-flex items-center gap-1 rounded-none px-1 py-0.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50 transition-colors hover:text-(--theme-modal-text)"
+                    title={globalBuffCollapsed ? '展开全局 BUFF' : '收起全局 BUFF'}
+                    aria-expanded={!globalBuffCollapsed}
                 >
-                    <Icon icon="mdi:crown" class="size-3" />{gb.name}
-                </span>
-            {/each}
+                    <Icon
+                        icon={globalBuffCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'}
+                        class="size-3.5 shrink-0"
+                    />
+                    全局 BUFF
+                    <span class="text-(--theme-modal-text)/30">{shownGlobalBuffs.length}</span>
+                </button>
+                {#if globalBuffCollapsed}
+                    <!-- 收起时给一行摘要，知道当前吃到了哪些（超出宽度截断） -->
+                    <span class="min-w-0 flex-1 truncate text-[10px] text-(--theme-modal-text)/35"
+                        >{shownGlobalBuffs.map((gb) => gb.name).join('、')}</span
+                    >
+                {/if}
+            </div>
+            {#if !globalBuffCollapsed}
+                <div class="theme-scrollbar flex max-h-28 flex-wrap items-center gap-1 overflow-y-auto px-3 pb-2">
+                    {#each shownGlobalBuffs as gb (gb.id)}
+                        <span
+                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
+                            style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
+                        >
+                            <Icon icon="mdi:crown" class="size-3" />{gb.name}
+                        </span>
+                    {/each}
+                </div>
+            {/if}
         </div>
     {/if}
     <!-- @desc 表格滚动容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->

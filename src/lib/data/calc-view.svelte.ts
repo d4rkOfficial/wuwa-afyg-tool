@@ -6,9 +6,12 @@ export type CalcScrollAxis = 'vertical' | 'horizontal'
 
 const STORAGE_KEY = 'wuwa-afyg:calc-view'
 const SCROLL_AXIS_KEY = 'wuwa-afyg:calc-scroll-axis'
+const GLOBAL_BUFF_COLLAPSED_KEY = 'wuwa-afyg:calc-global-buff-collapsed'
 
 let _viewMode: CalcViewMode = $state('dropdown')
 let _scrollAxisDefault: CalcScrollAxis = $state('vertical')
+/** @desc 平铺模式的「全局 BUFF」条是否收起（持久化，默认展开） */
+let _globalBuffCollapsed: boolean = $state(false)
 
 // 模块加载时从 localStorage 恢复
 if (browser) {
@@ -16,6 +19,7 @@ if (browser) {
     if (saved === 'dropdown' || saved === 'spread') _viewMode = saved
     const axisSaved = localStorage.getItem(SCROLL_AXIS_KEY)
     if (axisSaved === 'vertical' || axisSaved === 'horizontal') _scrollAxisDefault = axisSaved
+    _globalBuffCollapsed = localStorage.getItem(GLOBAL_BUFF_COLLAPSED_KEY) === '1'
 }
 
 export function getCalcViewMode(): CalcViewMode {
@@ -35,4 +39,14 @@ export function getScrollAxisDefault(): CalcScrollAxis {
 export function setScrollAxisDefault(axis: CalcScrollAxis): void {
     _scrollAxisDefault = axis
     if (browser) localStorage.setItem(SCROLL_AXIS_KEY, axis)
+}
+
+/** @desc 平铺模式「全局 BUFF」条是否收起 */
+export function getGlobalBuffCollapsed(): boolean {
+    return _globalBuffCollapsed
+}
+
+export function setGlobalBuffCollapsed(collapsed: boolean): void {
+    _globalBuffCollapsed = collapsed
+    if (browser) localStorage.setItem(GLOBAL_BUFF_COLLAPSED_KEY, collapsed ? '1' : '0')
 }
