@@ -436,6 +436,163 @@ export const resolveServerId = (roleId: string, serverId?: string): string => {
     return SERVER_ID_CN
 }
 
+// ── TEMP-DIAG（排查「角色详情里没有声骸」用，定位后整块删除） ──────────────
+const rawPreview = (value: unknown, max = 900): string => {
+    const text = typeof value === 'string' ? value : JSON.stringify(value ?? null)
+    return (text ?? 'null').length > max ? `${text.slice(0, max)}…（共 ${text.length} 字）` : (text ?? 'null')
+}
+
+const shapeOf = (value: unknown, depth = 0): unknown => {
+    if (value == null || typeof value !== 'object') return typeof value
+    if (depth >= 3) return Array.isArray(value) ? `array(${value.length})` : 'object'
+    if (Array.isArray(value)) return value.length > 0 ? [shapeOf(value[0], depth + 1)] : []
+    return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, shapeOf(v, depth + 1)])
+    )
+}
+
+/**
+ * @desc 临时诊断：把 roleData / getRoleDetail（各 countryCode）/ 签到状态 的原始返回打出来，
+ *  用于判断「详情 200 但没有声骸」到底是字段改名、参数问题还是上游快照为空。
+ */
+export async function debugRoleEchoes(
+    token: string,
+    did: string,
+    opts: { roleId?: string; serverId?: string } = {}
+): Promise<Record<string, unknown>> {
+    const report: Record<string, unknown> = { at: new Date().toISOString(), did }
+    let roleId = opts.roleId ?? ''
+    let serverId = opts.serverId ?? ''
+    try {
+        const roles = await fetchRoleList(token)
+        report.boundRoles = roles.map((r) => ({ roleId: r.roleId, serverId: r.serverId, nickname: r.nickname }))
+        if (!roleId && roles.length > 0) {
+            roleId = roles[0].roleId
+            serverId = serverId || roles[0].serverId || ''
+        }
+    } catch (e) {
+        report.boundRoles = { error: e instanceof Error ? e.message : String(e) }
+    }
+    if (!roleId) {
+        report.error = '没有可用的 roleId（账号下没有绑定角色）'
+        return report
+    }
+    const resolvedServerId = resolveServerId(roleId, serverId)
+    report.roleId = roleId
+    report.serverId = resolvedServerId
+
+    // 1) 数据令牌
+    let bat = ''
+    try {
+        const json = await post(
+            '/aki/roleBox/requestToken',
+            {
+                source: 'ios',
+                token,
+                did,
+                'b-at': '',
+                devCode: await akiDevCode(),
+                accept: 'application/json, text/plain, */*',
+                'user-agent': AKI_USER_AGENT
+            },
+            { serverId: resolvedServerId, roleId }
+        )
+        report.requestToken = { code: json?.code, msg: json?.msg, data: rawPreview(json?.data, 300) }
+        bat = parseData<{ accessToken?: string; token?: string }>(json)?.accessToken ?? ''
+    } catch (e) {
+        report.requestToken = { error: e instanceof Error ? e.message : String(e) }
+    }
+    report.hasBat = !!bat
+    const headers = await akiDataHeaders(did, bat)
+
+    // 2) roleData（角色列表）
+    let owned: UpstreamOwnedRole[] = []
+    try {
+        const json = await post('/aki/roleBox/akiBox/roleData', headers, {
+            gameId: 3,
+            roleId,
+            serverId: resolvedServerId
+        })
+        const data = parseData<{ roleList?: UpstreamOwnedRole[] }>(json)
+        owned = data?.roleList ?? []
+        report.roleData = {
+            code: json?.code,
+            msg: json?.msg,
+            count: owned.length,
+            first: owned.slice(0, 3).map((r) => ({ roleId: r.roleId, roleName: r.roleName, level: r.level })),
+            shape: shapeOf(data),
+            data: rawPreview(json?.data, 500)
+        }
+    } catch (e) {
+        report.roleData = { error: e instanceof Error ? e.message : String(e) }
+    }
+
+    // 3) 前 3 个角色：每个 countryCode 都打一次，看字段结构与声骸数量
+    const probes: unknown[] = []
+    for (const ch of owned.slice(0, 3)) {
+        const charId = String(ch.roleId)
+        for (const countryCode of COUNTRY_CODES) {
+            try {
+                const json = await post('/aki/roleBox/akiBox/getRoleDetail', headers, {
+                    gameId: 3,
+                    roleId,
+                    serverId: resolvedServerId,
+                    channelId: CHANNEL_ID,
+                    countryCode,
+                    id: charId
+                })
+                const detail = parseData<UpstreamRoleDetail>(json)
+                const phantoms = (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean)
+                probes.push({
+                    charId,
+                    charName: ch.roleName,
+                    countryCode,
+                    code: json?.code,
+                    msg: json?.msg,
+                    phantomCount: phantoms.length,
+                    detailShape: shapeOf(detail),
+                    phantomData: rawPreview(detail?.phantomData, 700)
+                })
+            } catch (e) {
+                probes.push({
+                    charId,
+                    charName: ch.roleName,
+                    countryCode,
+                    error: e instanceof Error ? e.message : String(e)
+                })
+            }
+        }
+    }
+    report.detailProbes = probes
+
+    // 4) 签到状态：确认签到接口对这个 token 是否正常（用于排除风控/参数问题）
+    try {
+        let userId = ''
+        try {
+            userId = (await fetchMine(token)).userId ?? ''
+        } catch {
+            // 忽略
+        }
+        report.userId = userId
+        const json = await post(
+            '/encourage/signIn/initSignInV2',
+            {
+                source: 'android',
+                token,
+                devCode: await ipDevCode(SIGNIN_USER_AGENT),
+                accept: 'application/json, text/plain, */*',
+                'user-agent': SIGNIN_USER_AGENT
+            },
+            { gameId: 3, serverId: resolvedServerId, roleId, userId }
+        )
+        report.signIn = { code: json?.code, msg: json?.msg, success: json?.success, data: rawPreview(json?.data, 400) }
+    } catch (e) {
+        report.signIn = { error: e instanceof Error ? e.message : String(e) }
+    }
+    return report
+}
+// ── /TEMP-DIAG ────────────────────────────────────────────────────────────
+
 /**
  * @desc 换取 akiBox 的「数据令牌」：POST /aki/roleBox/requestToken（body 只有 serverId/roleId，
  *  头带 token + did + 空的 b-at）→ data.accessToken，后续 akiBox 调用放在 `b-at` 头里。
