@@ -480,14 +480,18 @@ async function fetchOwnedRoles(
  * @desc 刷新角色盒数据（refreshData）：库街区的角色盒是**官方快照**，账号从未在 App 里刷新过时
  *  roleData 会返回空 roleList（参考实现因此在每次读取前都会先刷新）。官方有频率限制，
  *  失败时如实抛出上游 msg（例如「刷新过于频繁」）。
+ *  另外刷新后上游需要时间重新同步，3 分钟内不重复触发，免得把快照一直按在「同步中」。
  */
+let lastRoleBoxRefresh = 0
 async function refreshRoleBox(did: string, bat: string, roleId: string, serverId: string): Promise<void> {
+    if (Date.now() - lastRoleBoxRefresh < 3 * 60 * 1000) return
     const json = await post('/aki/roleBox/akiBox/refreshData', await akiDataHeaders(did, bat), {
         gameId: 3,
         roleId,
         serverId
     })
     if (Number(json?.code) !== 200) throw upstreamError(json, '刷新角色盒数据失败')
+    lastRoleBoxRefresh = Date.now()
 }
 
 interface UpstreamProp {
@@ -506,8 +510,14 @@ interface UpstreamRoleDetail {
     phantomData?: { cost?: number; equipPhantomList?: (UpstreamPhantom | null)[] }
 }
 
+/** @desc 详情里实际带回的声骸数量（用于判断这个 countryCode / 这次快照是不是有效数据） */
+const phantomCount = (detail?: UpstreamRoleDetail | null): number =>
+    (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean).length
+
 /**
- * @desc 单角色详情（含装配声骸）：countryCode 逐个试并记住成功值（模块级缓存，Serverless 复用实例时生效）
+ * @desc 单角色详情（含装配声骸）：countryCode 逐个试，**只有真带回声骸的才算命中**。
+ *  之前只要 code=200 就记住该 countryCode，一旦某个码返回「200 但空数据」（例如角色盒正在同步、
+ *  或该码对不上账号），后续所有角色都会套用这个错码 → 表现就是「所有角色都没有装备声骸」。
  *  body 需 channelId=19 / countryCode / id=角色id
  */
 let countryCodeHit = ''
@@ -515,6 +525,7 @@ async function fetchCharacterDetail(did: string, bat: string, roleId: string, se
     const codes = countryCodeHit
         ? [countryCodeHit, ...COUNTRY_CODES.filter((c) => c !== countryCodeHit)]
         : COUNTRY_CODES
+    let firstOk: { countryCode: string; detail?: UpstreamRoleDetail } | null = null
     let lastErr: unknown
     for (const countryCode of codes) {
         try {
@@ -527,12 +538,22 @@ async function fetchCharacterDetail(did: string, bat: string, roleId: string, se
                 id: charId
             })
             if (Number(json?.code) !== 200) throw upstreamError(json, `取角色详情失败（countryCode=${countryCode}）`)
-            countryCodeHit = countryCode
-            return parseData<UpstreamRoleDetail>(json)
+            const detail = parseData<UpstreamRoleDetail>(json)
+            if (phantomCount(detail) > 0) {
+                countryCodeHit = countryCode
+                return detail
+            }
+            // 200 但没声骸：先当候选，继续试其它码；已经是确认过的码就说明这个角色确实没装配
+            if (!firstOk) firstOk = { countryCode, detail }
+            if (countryCodeHit) break
         } catch (e) {
             lastErr = e
             if (String((e as Error)?.message ?? '').includes('登录已过期')) throw e
         }
+    }
+    if (firstOk) {
+        if (!countryCodeHit) countryCodeHit = firstOk.countryCode
+        return firstOk.detail
     }
     throw lastErr instanceof Error ? lastErr : new Error('取角色详情失败')
 }
@@ -569,42 +590,68 @@ export async function fetchRoleEchoes(
         }
     }
     const owned = ownedResult.list
-    const characters = await mapLimit(owned, 4, async (ch): Promise<KuroCharacterEchoes> => {
-        const charId = String(ch.roleId)
-        const base: KuroCharacterEchoes = {
-            id: charId,
-            name: ch.roleName ?? '',
-            level: Number(ch.level) || undefined,
-            chain: ch.chainUnlockNum != null ? Number(ch.chainUnlockNum) : undefined,
-            weapon: ch.weaponTypeName ?? undefined,
-            echoes: []
-        }
-        try {
-            const detail = await fetchCharacterDetail(did, bat, roleId, resolvedServerId, charId)
-            const phantoms = (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean) as UpstreamPhantom[]
-            return {
-                ...base,
-                weapon: detail?.weaponData?.weapon?.weaponName ?? base.weapon,
-                chain: detail?.chainList ? detail.chainList.filter((c) => c?.unlocked).length : base.chain,
-                echoes: phantoms.map((p) => {
-                    const main = (p.mainProps ?? [])[0]
-                    return {
-                        cost: Number(p.cost ?? p.phantomProp?.cost) || 0,
-                        name: p.phantomProp?.name ?? '',
-                        mainStatName: main?.attributeName ?? '',
-                        mainStatValue: parseNum(main?.attributeValue),
-                        substats: (p.subProps ?? []).map((s) => ({
-                            name: s?.attributeName ?? '',
-                            value: parseNum(s?.attributeValue)
-                        }))
-                    }
-                })
+    // 每次同步重新探测 countryCode：避免上一次留下的记忆（可能是「200 但空数据」的错码）一直生效
+    countryCodeHit = ''
+    const collect = async (): Promise<KuroCharacterEchoes[]> =>
+        mapLimit(owned, 4, async (ch): Promise<KuroCharacterEchoes> => {
+            const charId = String(ch.roleId)
+            const base: KuroCharacterEchoes = {
+                id: charId,
+                name: ch.roleName ?? '',
+                level: Number(ch.level) || undefined,
+                chain: ch.chainUnlockNum != null ? Number(ch.chainUnlockNum) : undefined,
+                weapon: ch.weaponTypeName ?? undefined,
+                echoes: []
             }
+            try {
+                const detail = await fetchCharacterDetail(did, bat, roleId, resolvedServerId, charId)
+                const phantoms = (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean) as UpstreamPhantom[]
+                return {
+                    ...base,
+                    weapon: detail?.weaponData?.weapon?.weaponName ?? base.weapon,
+                    chain: detail?.chainList ? detail.chainList.filter((c) => c?.unlocked).length : base.chain,
+                    echoes: phantoms.map((p) => {
+                        const main = (p.mainProps ?? [])[0]
+                        return {
+                            cost: Number(p.cost ?? p.phantomProp?.cost) || 0,
+                            name: p.phantomProp?.name ?? '',
+                            mainStatName: main?.attributeName ?? '',
+                            mainStatValue: parseNum(main?.attributeValue),
+                            substats: (p.subProps ?? []).map((s) => ({
+                                name: s?.attributeName ?? '',
+                                value: parseNum(s?.attributeValue)
+                            }))
+                        }
+                    })
+                }
+            } catch (e) {
+                // 单角色失败不影响整体：返回空声骸，由前端按「不足 5 个」跳过并提示原因
+                return { ...base, error: e instanceof Error ? e.message : String(e) }
+            }
+        })
+
+    let characters = await collect()
+    // 全员「详情 200 但一个声骸都没有」= 可疑快照（角色盒正在同步 / 刚触发过刷新 / 登录签到后上游要重同步），
+    // 不是真的没装备：刷新一次 + 稍等后用重新探测的 countryCode 再取一遍，仍为空就明确报错而不是逐个说「没有装配声骸」
+    const suspicious = characters.length > 0 && characters.every((c) => c.echoes.length === 0 && !c.error)
+    if (suspicious) {
+        let note = ''
+        try {
+            await refreshRoleBox(did, bat, roleId, resolvedServerId)
         } catch (e) {
-            // 单角色失败不影响整体：返回空声骸，由前端按「不足 5 个」跳过并提示原因
-            return { ...base, error: e instanceof Error ? e.message : String(e) }
+            note = `（刷新请求未成功：${e instanceof Error ? e.message : String(e)}）`
         }
-    })
+        await new Promise((resolve) => setTimeout(resolve, 2500))
+        countryCodeHit = ''
+        characters = await collect()
+        if (characters.every((c) => c.echoes.length === 0)) {
+            throw new Error(
+                `上游返回的 ${characters.length} 个角色详情里都没有声骸数据${note}：` +
+                    `角色盒数据可能正在同步（刚刷新过，或登录签到触发了上游重新同步），请等 1~2 分钟后再同步一次；` +
+                    `若仍然如此，请在库街区 App 打开「鸣潮 → 角色盒」确认能看到角色与声骸`
+            )
+        }
+    }
     return {
         characters,
         stats: {
