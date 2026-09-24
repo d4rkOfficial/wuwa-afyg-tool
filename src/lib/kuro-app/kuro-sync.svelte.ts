@@ -1,14 +1,7 @@
 import { buildKuroPlans, type KuroPlanDraft } from '$lib/kuro-app/kuro-plan'
 import { getCharacterList } from '$lib/api/data-cache'
 import { saveSubstatPlan } from '$lib/data/substat-library.svelte'
-import {
-    getKuroActiveRole,
-    getKuroReason,
-    getKuroValid,
-    isKuroLoggedIn,
-    kuroFetchRoleEchoes,
-    refreshKuroSession
-} from '$lib/kuro-app/kuro.svelte'
+import { getKuroActiveRole, isKuroLoggedIn, kuroFetchRoleEchoes, refreshKuroSession } from '$lib/kuro-app/kuro.svelte'
 
 /** @desc 方案名：同一角色重复同步会覆盖同一份，不堆积（时间与角色记在 note 里） */
 export const KURO_PLAN_NAME = '库街区同步'
@@ -51,17 +44,17 @@ async function knownCharacterNames(): Promise<string[]> {
 
 /**
  * @desc 只读预览：校验登录 → 取选中角色 → 拉数据 → 映射成方案草稿（不写库）。
- *  未登录/失效/上游缺接口都会返回 ok:false + error。
+ *  这里只按 cookie 读一次会话（不做「检验有效性」，那是设置页的事）；未登录/上游缺接口返回 ok:false + error。
  */
 export async function previewSubstatPlansFromKuro(): Promise<{
     ok: boolean
     preview?: KuroSyncPreview
     error?: string
 }> {
-    if (!isKuroLoggedIn()) return { ok: false, error: '尚未登录库街区，请先打开登录窗口完成登录' }
     try {
-        await refreshKuroSession(true)
-        if (!getKuroValid()) throw new Error(getKuroReason() ?? '登录已失效，请重新登录')
+        // 先按 httpOnly cookie 拉一次会话：刷新页面后 store 还是空的，直接判「未登录」会误报
+        await refreshKuroSession(false)
+        if (!isKuroLoggedIn()) throw new Error('尚未登录库街区，请先打开登录窗口完成登录')
         const role = getKuroActiveRole()
         if (!role) throw new Error('该账号下没有已绑定的鸣潮角色（请先在库街区绑定游戏角色）')
         const data = await kuroFetchRoleEchoes(role)

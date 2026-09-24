@@ -46,7 +46,34 @@ let _roleId = $state('')
 
 export const getKuroLoginOpen = () => _loginOpen
 export const setKuroLoginOpen = (open: boolean) => {
+    const wasOpen = _loginOpen
     _loginOpen = open
+    // 关窗且仍未登录：视为用户放弃，等待中的流程（如词条集同步）不再干等
+    if (wasOpen && !open && !_session.loggedIn) settleLoginWaiters(false)
+}
+
+/** @desc 等待登录结果的回调集合：登录成功 → true；用户关窗放弃 / 超时 → false */
+const loginWaiters = new Set<(ok: boolean) => void>()
+const settleLoginWaiters = (ok: boolean) => {
+    for (const resolve of [...loginWaiters]) resolve(ok)
+    loginWaiters.clear()
+}
+
+/**
+ * @desc 等待库街区登录完成（「从库街区同步」这类流程用）：已登录立即返回 true；
+ *  否则等登录窗口里登录成功（true）或用户关窗放弃/超时（false）。
+ */
+export function waitForKuroLogin(timeoutMs = 10 * 60 * 1000): Promise<boolean> {
+    if (_session.loggedIn) return Promise.resolve(true)
+    return new Promise<boolean>((resolve) => {
+        const done = (ok: boolean) => {
+            clearTimeout(timer)
+            loginWaiters.delete(done)
+            resolve(ok)
+        }
+        const timer = setTimeout(() => done(false), timeoutMs)
+        loginWaiters.add(done)
+    })
 }
 
 export const getKuroSession = () => _session
@@ -149,6 +176,7 @@ export async function kuroVerifyLogin(phone: string, code: string): Promise<void
     _session = res.session ?? EMPTY_SESSION
     _valid = true
     _reason = null
+    settleLoginWaiters(true)
 }
 
 /**
@@ -165,6 +193,8 @@ export async function refreshKuroSession(check = true): Promise<void> {
         _session = res.session ?? EMPTY_SESSION
         _valid = res.valid ?? false
         _reason = res.reason ?? null
+        // cookie 里其实还有登录态（store 之前是空的）时，等待中的流程也能直接继续
+        if (_session.loggedIn) settleLoginWaiters(true)
     } catch (e) {
         _reason = e instanceof Error ? e.message : String(e)
         _valid = false

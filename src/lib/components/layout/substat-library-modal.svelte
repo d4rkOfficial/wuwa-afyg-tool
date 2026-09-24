@@ -41,7 +41,7 @@
     import type { Character } from '$lib/api/types'
     import type { EchoSlotConfig } from '$lib/calc/config.types'
     import { addToast } from '$lib/data/toast.svelte'
-    import { isKuroLoggedIn, setKuroLoginOpen } from '$lib/kuro-app/kuro.svelte'
+    import { isKuroLoggedIn, refreshKuroSession, setKuroLoginOpen, waitForKuroLogin } from '$lib/kuro-app/kuro.svelte'
     import {
         applyKuroSync,
         previewSubstatPlansFromKuro,
@@ -255,28 +255,38 @@
     }
 
     /** @desc 库街区同步：把账号下鸣潮角色「当前装配的声骸」存成自定义方案（同名覆盖，可重复同步）；
-     *  与 AI/WS 工具共用 kuro-sync 里的同一份实现 */
+     *  与 AI/WS 工具共用 kuro-sync 里的同一份实现。
+     *  没登录时不直接报错：先按 cookie 读会话，仍没登录就开登录窗口并等登录结果（登录完自动继续）；
+     *  不做「检验有效性」——那是设置页的入口。 */
     async function syncFromKuro() {
         if (kuroSyncing) return
-        if (!isKuroLoggedIn()) {
-            addToast('请先登录库街区（登录窗口已打开）', 'error')
-            setKuroLoginOpen(true)
-            return
-        }
         kuroSyncing = true
-        // 先只读预览，交用户在确认弹窗里挑选角色/改方案名，再落盘
-        const res = await previewSubstatPlansFromKuro()
-        kuroSyncing = false
-        if (!res.preview) {
-            addToast(`库街区同步失败：${res.error ?? '未知错误'}`, 'error')
-            return
+        try {
+            await refreshKuroSession(false)
+            if (!isKuroLoggedIn()) {
+                addToast('请先登录库街区，登录完成后会自动继续同步', 'info')
+                setKuroLoginOpen(true)
+                const loggedIn = await waitForKuroLogin()
+                if (!loggedIn) {
+                    addToast('未完成库街区登录，已取消同步', 'error')
+                    return
+                }
+            }
+            // 先只读预览，交用户在确认弹窗里挑选角色/改方案名，再落盘
+            const res = await previewSubstatPlansFromKuro()
+            if (!res.preview) {
+                addToast(`库街区同步失败：${res.error ?? '未知错误'}`, 'error')
+                return
+            }
+            if (!res.ok) {
+                addToast(`库街区同步失败：${res.error ?? '未知错误'}（跳过 ${res.preview.skipped.length} 个）`, 'error')
+                return
+            }
+            kuroPreview = res.preview
+            kuroPreviewOpen = true
+        } finally {
+            kuroSyncing = false
         }
-        if (!res.ok) {
-            addToast(`库街区同步失败：${res.error ?? '未知错误'}（跳过 ${res.preview.skipped.length} 个）`, 'error')
-            return
-        }
-        kuroPreview = res.preview
-        kuroPreviewOpen = true
     }
 
     /** @desc 确认弹窗里点「写入」：按勾选角色落盘（同名方案覆盖），漂泊者等形态在弹窗里已指定 */
@@ -685,6 +695,8 @@
 <KuroSyncPreviewModal
     open={kuroPreviewOpen}
     preview={kuroPreview}
+    {characters}
+    {icons}
     busy={kuroSyncing}
     onconfirm={confirmKuroSync}
     onclose={() => {

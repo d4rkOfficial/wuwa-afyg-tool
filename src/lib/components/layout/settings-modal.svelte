@@ -147,7 +147,6 @@
         | 'shortcuts'
         | 'performance'
         | 'connection'
-        | 'kuro'
         | 'cache'
         | 'archive'
         | 'ai'
@@ -194,7 +193,6 @@
         { group: '界面', key: 'shortcuts', label: '快捷键位', icon: 'mdi:keyboard-settings-outline' },
         { group: '界面', key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
-        { group: '数据', key: 'kuro', label: '库街区', icon: 'mdi:account-key-outline' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
         { group: '数据', key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
         { group: 'AI助手', key: 'ai-conn', label: '启用 / 接入配置', icon: 'mdi:connection' },
@@ -2010,144 +2008,277 @@
                             </div>
                         </div>
                     {:else if tab === 'connection'}
-                        <!-- Connection settings: 上游数据源 + 工坊/分享源 -->
-                        <div class="flex flex-col">
-                            <span
-                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
-                            >
-                                <Icon
-                                    icon="mdi:cloud-download-outline"
-                                    class="size-4 shrink-0"
-                                    style="color: var(--theme-accent-text);"
-                                />
-                                上游数据源
-                            </span>
-                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
-                                选择角色/武器/声骸等数据的来源；切换后列表与详情缓存会按新源重新加载
-                            </p>
-                            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
-                                {#each providerOptions as opt}
-                                    <div
-                                        class={[
-                                            'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
-                                            opt.id === activeProviderId
-                                                ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
-                                                : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
-                                        ].join(' ')}
-                                        onclick={() => handleSwitchProvider(opt.id)}
-                                        title="点击切换该数据源"
-                                    >
-                                        <Icon
-                                            icon={opt.id === activeProviderId
-                                                ? 'mdi:radiobox-marked'
-                                                : 'mdi:radiobox-blank'}
-                                            class="size-4 shrink-0 text-(--theme-accent-text)"
-                                        />
-                                        <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)"
-                                            >{opt.label}</span
-                                        >
-                                        <span
-                                            class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
-                                            title="最新数据版本"
-                                        >
-                                            {providerVersions[opt.id] || opt.id}
-                                        </span>
-                                    </div>
-                                {/each}
-                            </div>
-                            <div class="mt-3 mb-2">
-                                <button
-                                    onclick={handleResetProvider}
-                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                                    style="border-color: var(--theme-divider-border);"
+                        <!-- Connection settings（左右结构）：左=库街区账号，右=上游数据源 + 工坊/分享源 -->
+                        <div class="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:gap-8">
+                            <!-- ── 库街区（实验性）：登录态管理；接口由应用自身 /api/kuro-app 服务端路由代发 ── -->
+                            <div class="order-2 flex flex-col xl:order-1">
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
-                                    <Icon icon="mdi:restore" class="size-3.5" />
-                                    恢复默认
-                                </button>
-                            </div>
-
-                            <div
-                                class="my-4 border-t xl:hidden"
-                                style="border-color: var(--theme-divider-border);"
-                            ></div>
-
-                            <span
-                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
-                            >
-                                <Icon
-                                    icon="mdi:storefront-outline"
-                                    class="size-4 shrink-0"
-                                    style="color: var(--theme-accent-text);"
-                                />
-                                工坊 / 分享源
-                            </span>
-                            <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
-                                配置椰果工坊实例；单选使用，可删除或新增，分享与工坊列表将使用当前选中实例
-                            </p>
-                            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
-                                {#each workshopInstances as inst}
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <div
-                                        class={[
-                                            'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
-                                            inst.id === workshopActiveId
-                                                ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
-                                                : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
-                                        ].join(' ')}
-                                        onclick={() => handleSwitchWorkshop(inst.id)}
-                                        title="点击选中该实例"
+                                    <Icon
+                                        icon="mdi:account-key-outline"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    库街区账号
+                                    <span
+                                        class="rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                        >实验性</span
                                     >
-                                        <Icon
-                                            icon={inst.id === workshopActiveId
-                                                ? 'mdi:radiobox-marked'
-                                                : 'mdi:radiobox-blank'}
-                                            class="size-4 shrink-0 text-(--theme-accent-text)"
-                                        />
-                                        <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)"
-                                            >{inst.url}</span
-                                        >
-                                        {#if workshopInstances.length > 1}
-                                            <button
-                                                onclick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleRemoveWorkshop(inst.id)
-                                                }}
-                                                class="shrink-0 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
-                                                title="删除"
-                                            >
-                                                <Icon icon="mdi:close" class="size-3.5" />
-                                            </button>
-                                        {/if}
-                                    </div>
-                                {/each}
-                            </div>
-                            <div class="mt-3 flex gap-2">
-                                <input
-                                    bind:value={newWorkshopUrl}
-                                    onkeydown={(e) => e.key === 'Enter' && handleAddWorkshop()}
-                                    placeholder="https://example.com 工坊地址"
-                                    class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none placeholder:text-(--theme-modal-text)/30"
+                                </span>
+                                <p class="mb-3 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                                    登录库街区后，可在「词条集 / 快速词条方案」里把账号下鸣潮角色<b>当前装配的声骸</b
+                                    >同步成词条方案。登录凭据由应用自身的服务端路由持有（httpOnly
+                                    cookie），浏览器脚本读不到。
+                                </p>
+
+                                <!-- 登录状态 -->
+                                <div
+                                    class="mt-3 flex flex-wrap items-center gap-2 rounded-none border px-2.5 py-2 text-xs"
                                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                />
-                                <button
-                                    onclick={handleAddWorkshop}
-                                    class="flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1.5 text-xs font-medium transition-all hover:brightness-125"
-                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
                                 >
-                                    <Icon icon="mdi:plus" class="size-3.5" />
-                                    添加
-                                </button>
+                                    <Icon
+                                        icon={kuroSession.loggedIn
+                                            ? kuroValid === false
+                                                ? 'mdi:shield-alert-outline'
+                                                : 'mdi:shield-check-outline'
+                                            : 'mdi:shield-off-outline'}
+                                        class="size-4 shrink-0 {kuroSession.loggedIn && kuroValid !== false
+                                            ? 'text-(--theme-accent-text)'
+                                            : 'text-(--theme-modal-text)/40'}"
+                                    />
+                                    <span class="font-black text-(--theme-modal-text)">
+                                        {kuroSession.loggedIn ? (kuroSession.account?.userName ?? '已登录') : '未登录'}
+                                    </span>
+                                    {#if kuroSession.loggedIn}
+                                        {#if kuroSession.account?.phone}
+                                            <span class="text-[10px] text-(--theme-modal-text)/40"
+                                                >{kuroSession.account.phone.replace(
+                                                    /^(\d{3})\d+(\d{2,4})$/,
+                                                    '$1****$2'
+                                                )}</span
+                                            >
+                                        {/if}
+                                        <span class="text-[10px] text-(--theme-modal-text)/40">
+                                            · 绑定角色 {kuroSession.roles.length} 个 · 有效性：{kuroValid === null
+                                                ? '未校验'
+                                                : kuroValid
+                                                  ? '有效'
+                                                  : `无效（${kuroReason ?? '未知'}）`}
+                                        </span>
+                                    {/if}
+                                </div>
+
+                                <!-- 操作 -->
+                                <div class="mt-3 flex flex-wrap items-center gap-2">
+                                    <button
+                                        onclick={() => setKuroLoginOpen(true)}
+                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg)"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <Icon icon="mdi:login-variant" class="size-4" />
+                                        {kuroSession.loggedIn ? '登录窗口 / 重新登录' : '登录'}
+                                    </button>
+                                    {#if kuroSession.loggedIn}
+                                        <button
+                                            onclick={handleKuroCheck}
+                                            disabled={kuroBusy}
+                                            class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-40"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            <Icon icon="mdi:shield-refresh-outline" class="size-4" />
+                                            检验有效性
+                                        </button>
+                                        <button
+                                            onclick={handleKuroLogout}
+                                            disabled={kuroBusy}
+                                            class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-red-400 disabled:opacity-40"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            <Icon icon="mdi:logout-variant" class="size-4" />
+                                            退出登录
+                                        </button>
+                                    {/if}
+                                </div>
+
+                                <!-- 绑定角色：同步时使用选中的这个 -->
+                                {#if kuroSession.roles.length > 0}
+                                    <div class="mt-4">
+                                        <span class="mb-1 block text-[10px] text-(--theme-modal-text)/40"
+                                            >同步使用的绑定角色</span
+                                        >
+                                        <div class="grid grid-cols-1 gap-2">
+                                            {#each kuroSession.roles as role (role.roleId)}
+                                                <div
+                                                    class={[
+                                                        'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
+                                                        kuroActiveRole?.roleId === role.roleId
+                                                            ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
+                                                            : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
+                                                    ].join(' ')}
+                                                    onclick={() => setKuroRoleId(role.roleId)}
+                                                >
+                                                    <Icon
+                                                        icon={kuroActiveRole?.roleId === role.roleId
+                                                            ? 'mdi:radiobox-marked'
+                                                            : 'mdi:radiobox-blank'}
+                                                        class="size-4 shrink-0 text-(--theme-accent-text)"
+                                                    />
+                                                    <span
+                                                        class="min-w-0 flex-1 truncate text-xs font-black text-(--theme-modal-text)"
+                                                        >{role.nickname || role.roleId}</span
+                                                    >
+                                                    <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40"
+                                                        >{role.serverName ?? role.serverId}{role.level
+                                                            ? ` · Lv.${role.level}`
+                                                            : ''}</span
+                                                    >
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
                             </div>
-                            <div class="mt-3">
-                                <button
-                                    onclick={handleResetWorkshop}
-                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                                    style="border-color: var(--theme-divider-border);"
+
+                            <!-- ── 上游数据源 + 工坊/分享源 ── -->
+                            <div class="order-1 flex flex-col xl:order-2">
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
                                 >
-                                    <Icon icon="mdi:restore" class="size-3.5" />
-                                    恢复默认
-                                </button>
+                                    <Icon
+                                        icon="mdi:cloud-download-outline"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    上游数据源
+                                </span>
+                                <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                    选择角色/武器/声骸等数据的来源；切换后列表与详情缓存会按新源重新加载
+                                </p>
+                                <div class="grid grid-cols-1 gap-2">
+                                    {#each providerOptions as opt}
+                                        <div
+                                            class={[
+                                                'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
+                                                opt.id === activeProviderId
+                                                    ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
+                                                    : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
+                                            ].join(' ')}
+                                            onclick={() => handleSwitchProvider(opt.id)}
+                                            title="点击切换该数据源"
+                                        >
+                                            <Icon
+                                                icon={opt.id === activeProviderId
+                                                    ? 'mdi:radiobox-marked'
+                                                    : 'mdi:radiobox-blank'}
+                                                class="size-4 shrink-0 text-(--theme-accent-text)"
+                                            />
+                                            <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)"
+                                                >{opt.label}</span
+                                            >
+                                            <span
+                                                class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                                title="最新数据版本"
+                                            >
+                                                {providerVersions[opt.id] || opt.id}
+                                            </span>
+                                        </div>
+                                    {/each}
+                                </div>
+                                <div class="mt-3 mb-2">
+                                    <button
+                                        onclick={handleResetProvider}
+                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <Icon icon="mdi:restore" class="size-3.5" />
+                                        恢复默认
+                                    </button>
+                                </div>
+
+                                <div
+                                    class="my-4 border-t xl:hidden"
+                                    style="border-color: var(--theme-divider-border);"
+                                ></div>
+
+                                <span
+                                    class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    <Icon
+                                        icon="mdi:storefront-outline"
+                                        class="size-4 shrink-0"
+                                        style="color: var(--theme-accent-text);"
+                                    />
+                                    工坊 / 分享源
+                                </span>
+                                <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+                                    配置椰果工坊实例；单选使用，可删除或新增，分享与工坊列表将使用当前选中实例
+                                </p>
+                                <div class="grid grid-cols-1 gap-2">
+                                    {#each workshopInstances as inst}
+                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                        <div
+                                            class={[
+                                                'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
+                                                inst.id === workshopActiveId
+                                                    ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
+                                                    : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
+                                            ].join(' ')}
+                                            onclick={() => handleSwitchWorkshop(inst.id)}
+                                            title="点击选中该实例"
+                                        >
+                                            <Icon
+                                                icon={inst.id === workshopActiveId
+                                                    ? 'mdi:radiobox-marked'
+                                                    : 'mdi:radiobox-blank'}
+                                                class="size-4 shrink-0 text-(--theme-accent-text)"
+                                            />
+                                            <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)"
+                                                >{inst.url}</span
+                                            >
+                                            {#if workshopInstances.length > 1}
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleRemoveWorkshop(inst.id)
+                                                    }}
+                                                    class="shrink-0 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                                                    title="删除"
+                                                >
+                                                    <Icon icon="mdi:close" class="size-3.5" />
+                                                </button>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                                <div class="mt-3 flex gap-2">
+                                    <input
+                                        bind:value={newWorkshopUrl}
+                                        onkeydown={(e) => e.key === 'Enter' && handleAddWorkshop()}
+                                        placeholder="https://example.com 工坊地址"
+                                        class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none placeholder:text-(--theme-modal-text)/30"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    />
+                                    <button
+                                        onclick={handleAddWorkshop}
+                                        class="flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1.5 text-xs font-medium transition-all hover:brightness-125"
+                                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
+                                    >
+                                        <Icon icon="mdi:plus" class="size-3.5" />
+                                        添加
+                                    </button>
+                                </div>
+                                <div class="mt-3">
+                                    <button
+                                        onclick={handleResetWorkshop}
+                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <Icon icon="mdi:restore" class="size-3.5" />
+                                        恢复默认
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     {:else if tab === 'archive'}
@@ -2324,136 +2455,6 @@
                                             </div>
                                         </div>
                                     {/each}
-                                </div>
-                            {/if}
-                        </div>
-                    {:else if tab === 'kuro'}
-                        <!-- 库街区（实验性）：登录态管理；接口由应用自身 /api/kuro-app 服务端路由代发 -->
-                        <div class="flex flex-col">
-                            <span
-                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
-                            >
-                                <Icon
-                                    icon="mdi:account-key-outline"
-                                    class="size-4 shrink-0"
-                                    style="color: var(--theme-accent-text);"
-                                />
-                                库街区账号
-                                <span
-                                    class="rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
-                                    >实验性</span
-                                >
-                            </span>
-                            <p class="mb-3 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
-                                登录库街区后，可在「词条集 / 快速词条方案」里把账号下鸣潮角色<b>当前装配的声骸</b
-                                >同步成词条方案。登录凭据由应用自身的服务端路由持有（httpOnly
-                                cookie），浏览器脚本读不到。
-                            </p>
-
-                            <!-- 登录状态 -->
-                            <div
-                                class="mt-3 flex flex-wrap items-center gap-2 rounded-none border px-2.5 py-2 text-xs"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                            >
-                                <Icon
-                                    icon={kuroSession.loggedIn
-                                        ? kuroValid === false
-                                            ? 'mdi:shield-alert-outline'
-                                            : 'mdi:shield-check-outline'
-                                        : 'mdi:shield-off-outline'}
-                                    class="size-4 shrink-0 {kuroSession.loggedIn && kuroValid !== false
-                                        ? 'text-(--theme-accent-text)'
-                                        : 'text-(--theme-modal-text)/40'}"
-                                />
-                                <span class="font-black text-(--theme-modal-text)">
-                                    {kuroSession.loggedIn ? (kuroSession.account?.userName ?? '已登录') : '未登录'}
-                                </span>
-                                {#if kuroSession.loggedIn}
-                                    {#if kuroSession.account?.phone}
-                                        <span class="text-[10px] text-(--theme-modal-text)/40"
-                                            >{kuroSession.account.phone.replace(
-                                                /^(\d{3})\d+(\d{2,4})$/,
-                                                '$1****$2'
-                                            )}</span
-                                        >
-                                    {/if}
-                                    <span class="text-[10px] text-(--theme-modal-text)/40">
-                                        · 绑定角色 {kuroSession.roles.length} 个 · 有效性：{kuroValid === null
-                                            ? '未校验'
-                                            : kuroValid
-                                              ? '有效'
-                                              : `无效（${kuroReason ?? '未知'}）`}
-                                    </span>
-                                {/if}
-                            </div>
-
-                            <!-- 操作 -->
-                            <div class="mt-3 flex flex-wrap items-center gap-2">
-                                <button
-                                    onclick={() => setKuroLoginOpen(true)}
-                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg)"
-                                    style="border-color: var(--theme-divider-border);"
-                                >
-                                    <Icon icon="mdi:login-variant" class="size-4" />
-                                    {kuroSession.loggedIn ? '登录窗口 / 重新登录' : '登录'}
-                                </button>
-                                {#if kuroSession.loggedIn}
-                                    <button
-                                        onclick={handleKuroCheck}
-                                        disabled={kuroBusy}
-                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-40"
-                                        style="border-color: var(--theme-divider-border);"
-                                    >
-                                        <Icon icon="mdi:shield-refresh-outline" class="size-4" />
-                                        检验有效性
-                                    </button>
-                                    <button
-                                        onclick={handleKuroLogout}
-                                        disabled={kuroBusy}
-                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-red-400 disabled:opacity-40"
-                                        style="border-color: var(--theme-divider-border);"
-                                    >
-                                        <Icon icon="mdi:logout-variant" class="size-4" />
-                                        退出登录
-                                    </button>
-                                {/if}
-                            </div>
-
-                            <!-- 绑定角色：同步时使用选中的这个 -->
-                            {#if kuroSession.roles.length > 0}
-                                <div class="mt-4">
-                                    <span class="mb-1 block text-[10px] text-(--theme-modal-text)/40"
-                                        >同步使用的绑定角色</span
-                                    >
-                                    <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
-                                        {#each kuroSession.roles as role (role.roleId)}
-                                            <div
-                                                class={[
-                                                    'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
-                                                    kuroActiveRole?.roleId === role.roleId
-                                                        ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
-                                                        : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
-                                                ].join(' ')}
-                                                onclick={() => setKuroRoleId(role.roleId)}
-                                            >
-                                                <Icon
-                                                    icon={kuroActiveRole?.roleId === role.roleId
-                                                        ? 'mdi:radiobox-marked'
-                                                        : 'mdi:radiobox-blank'}
-                                                    class="size-4 shrink-0 text-(--theme-accent-text)"
-                                                />
-                                                <span
-                                                    class="min-w-0 flex-1 truncate text-xs font-black text-(--theme-modal-text)"
-                                                    >{role.nickname || role.roleId}</span
-                                                >
-                                                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40"
-                                                    >{role.serverName ?? role.serverId}{role.level
-                                                        ? ` · Lv.${role.level}`
-                                                        : ''}</span
-                                                >
-                                            </div>
-                                        {/each}
-                                    </div>
                                 </div>
                             {/if}
                         </div>
