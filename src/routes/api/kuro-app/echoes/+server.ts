@@ -5,7 +5,7 @@
 import { json } from '@sveltejs/kit'
 import type { RequestHandler } from './$types'
 import { fetchRoleEchoes } from '$lib/kuro-app/kuro-api.server'
-import { readToken } from '$lib/kuro-app/kuro-session.server'
+import { readOrCreateDid, readToken } from '$lib/kuro-app/kuro-session.server'
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
     const token = readToken(cookies)
@@ -14,7 +14,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     const serverId = url.searchParams.get('serverId') ?? ''
     if (!roleId) return json({ ok: false, error: '缺少 roleId' })
     try {
-        const data = await fetchRoleEchoes(token, { roleId, serverId })
+        const data = await fetchRoleEchoes(token, { roleId, serverId, did: readOrCreateDid(cookies) })
         return json({ ok: true, ...data })
     } catch (e) {
         return json({ ok: false, error: e instanceof Error ? e.message : String(e) })

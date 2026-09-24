@@ -12,6 +12,9 @@ const BASE = 'https://api.kurobbs.com'
 /** @desc 旧 APP 端固定 devCode（文档值） */
 const DEV_CODE_OLD = '2fba3859fe9bfe9099f2696b8648c2c6'
 const DEV_CODE_SMS = '073A9EFAC18FC50616DD15808DAE719DBCB904B7'
+/** @desc akiBox 系列用的 iOS UA（与参考实现一致，库街区 App 社区端） */
+const AKI_USER_AGENT =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)  KuroGameBox/3.0.3'
 /** @desc 渠道号与服务器区域：countryCode 逐个试（隍陇=1 / 黑海岸=900 / 黎那汐塔=3） */
 const CHANNEL_ID = process.env.KURO_CHANNEL_ID || '19'
 const COUNTRY_CODES = (process.env.KURO_COUNTRY_CODES || '1,3,900')
@@ -40,13 +43,19 @@ const oldHeaders = (token: string | null, { sms = false, withDistinct = true } =
     ...(token ? { token } : {})
 })
 
-/** @desc 新版 akiBox 最简三件套：source + token + devCode（随机即可） */
-const akiHeaders = (token: string): Record<string, string> => ({
-    source: 'android',
+/**
+ * @desc akiBox 系列接口请求头（与参考实现一致）：source/UA/devCode 之外还要 `did`（设备号）与
+ *  `b-at`（数据令牌，先用 /aki/roleBox/requestToken 换）。只带 token 会被上游拒绝。
+ */
+const akiHeaders = (token: string, did: string, bat: string): Record<string, string> => ({
+    source: 'ios',
     token,
+    did,
+    'b-at': bat,
     devCode: randomDevCode(),
     accept: 'application/json, text/plain, */*',
-    'accept-language': 'zh-CN,zh;q=0.9'
+    'accept-language': 'zh-CN,zh;q=0.9',
+    'user-agent': AKI_USER_AGENT
 })
 
 interface UpstreamEnvelope {
@@ -58,6 +67,8 @@ interface UpstreamEnvelope {
     traceId?: string
 }
 
+const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded; charset=utf-8'
+
 const post = async (
     path: string,
     headers: Record<string, string>,
@@ -65,7 +76,9 @@ const post = async (
 ): Promise<UpstreamEnvelope> => {
     const res = await fetch(`${BASE}${path}`, {
         method: 'POST',
-        headers,
+        // ⚠️ 必须显式给表单 Content-Type：fetch 对字符串 body 默认发 text/plain，
+        // 上游会因此解析不到参数（表现为「服务器id不能为空」这类误报）
+        headers: { 'content-type': FORM_CONTENT_TYPE, ...headers },
         body: new URLSearchParams(Object.entries(body).map(([k, v]) => [k, String(v)])).toString()
     })
     const text = await res.text()
@@ -297,9 +310,40 @@ export const resolveServerId = (roleId: string, serverId?: string): string => {
     return SERVER_ID_CN
 }
 
+/**
+ * @desc 换取 akiBox 的「数据令牌」：POST /aki/roleBox/requestToken（body 只有 serverId/roleId，
+ *  头带 token + did + 空的 b-at）→ data.accessToken，后续 akiBox 调用放在 `b-at` 头里。
+ */
+async function fetchBatToken(token: string, did: string, roleId: string, serverId: string): Promise<string> {
+    const json = await post(
+        '/aki/roleBox/requestToken',
+        { source: 'ios', token, did, 'b-at': '', devCode: randomDevCode(), 'user-agent': AKI_USER_AGENT },
+        { serverId, roleId }
+    )
+    if (Number(json?.code) !== 200) throw upstreamError(json, '换取数据令牌失败')
+    // data 可能是对象，也可能是字符串化 JSON（akiBox 常见），统一用 parseData 解
+    const data = parseData<{ accessToken?: string; token?: string }>(json)
+    const accessToken = data?.accessToken ?? data?.token
+    if (!accessToken) {
+        const preview = typeof json?.data === 'string' ? json.data.slice(0, 240) : JSON.stringify(data ?? json?.data)
+        throw new Error(`换取数据令牌失败：上游未返回 accessToken（data=${preview ?? '空'}）`)
+    }
+    return accessToken
+}
+
 /** @desc 账号下角色列表（roleData）：roleId 字段其实是「角色 id」 */
-async function fetchOwnedRoles(token: string, roleId: string, serverId: string): Promise<UpstreamOwnedRole[]> {
-    const json = await post('/aki/roleBox/akiBox/roleData', akiHeaders(token), { gameId: 3, roleId, serverId })
+async function fetchOwnedRoles(
+    token: string,
+    did: string,
+    bat: string,
+    roleId: string,
+    serverId: string
+): Promise<UpstreamOwnedRole[]> {
+    const json = await post('/aki/roleBox/akiBox/roleData', akiHeaders(token, did, bat), {
+        gameId: 3,
+        roleId,
+        serverId
+    })
     // 失败信息带上实际使用的 serverId：下次再出「服务器id不能为空」时能直接看出兜底是否生效
     if (Number(json?.code) !== 200) throw upstreamError(json, `取角色列表失败（serverId=${serverId || '空'}）`)
     return parseData<{ roleList?: UpstreamOwnedRole[] }>(json)?.roleList ?? []
@@ -326,14 +370,21 @@ interface UpstreamRoleDetail {
  *  body 需 channelId=19 / countryCode / id=角色id
  */
 let countryCodeHit = ''
-async function fetchCharacterDetail(token: string, roleId: string, serverId: string, charId: string) {
+async function fetchCharacterDetail(
+    token: string,
+    did: string,
+    bat: string,
+    roleId: string,
+    serverId: string,
+    charId: string
+) {
     const codes = countryCodeHit
         ? [countryCodeHit, ...COUNTRY_CODES.filter((c) => c !== countryCodeHit)]
         : COUNTRY_CODES
     let lastErr: unknown
     for (const countryCode of codes) {
         try {
-            const json = await post('/aki/roleBox/akiBox/getRoleDetail', akiHeaders(token), {
+            const json = await post('/aki/roleBox/akiBox/getRoleDetail', akiHeaders(token, did, bat), {
                 gameId: 3,
                 roleId,
                 serverId,
@@ -352,17 +403,19 @@ async function fetchCharacterDetail(token: string, roleId: string, serverId: str
     throw lastErr instanceof Error ? lastErr : new Error('取角色详情失败')
 }
 
-/** @desc 角色 + 当前装配声骸（同步词条方案用） */
+/** @desc 角色 + 当前装配声骸（同步词条方案用）：did 由路由层从 cookie 提供（与 token 同样的生命周期） */
 export async function fetchRoleEchoes(
     token: string,
-    { roleId, serverId }: { roleId: string; serverId: string }
+    { roleId, serverId, did }: { roleId: string; serverId: string; did: string }
 ): Promise<{
     characters: KuroCharacterEchoes[]
     stats: { characters: number; withEchoes: number; serverId: string; countryCode: string }
 }> {
     // 角色列表没带 serverId 时兜底（否则上游直接报「服务器id不能为空」）
     const resolvedServerId = resolveServerId(roleId, serverId)
-    const owned = await fetchOwnedRoles(token, roleId, resolvedServerId)
+    // akiBox 调用前必须先换数据令牌（b-at），否则上游会拒（典型表现就是「服务器id不能为空」这类误报）
+    const bat = await fetchBatToken(token, did, roleId, resolvedServerId)
+    const owned = await fetchOwnedRoles(token, did, bat, roleId, resolvedServerId)
     if (owned.length === 0) throw new Error('该账号下没有查询到角色数据（请确认已绑定角色、游戏数据已同步）')
     const characters = await mapLimit(owned, 4, async (ch): Promise<KuroCharacterEchoes> => {
         const charId = String(ch.roleId)
@@ -375,7 +428,7 @@ export async function fetchRoleEchoes(
             echoes: []
         }
         try {
-            const detail = await fetchCharacterDetail(token, roleId, resolvedServerId, charId)
+            const detail = await fetchCharacterDetail(token, did, bat, roleId, resolvedServerId, charId)
             const phantoms = (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean) as UpstreamPhantom[]
             return {
                 ...base,
