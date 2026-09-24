@@ -12,8 +12,15 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     if (!token) return json({ ok: true, session: emptySession(), valid: false, reason: '未登录' })
 
     if (!url.searchParams.has('check')) {
-        // 只想知道「登录了没」：不做上游请求，账号/角色留空由前端按需 check
-        const session: KuroSessionPayload = { loggedIn: true, account: null, roles: [], savedAt: 0 }
+        // 不校验有效性（省一次请求），但仍取一次绑定角色：设置页/登录窗口/同步都要用角色列表，
+        // 之前留空会让 UI 误显示「没有绑定角色」
+        let roles: KuroSessionPayload['roles'] = []
+        try {
+            roles = await fetchRoleList(token)
+        } catch {
+            roles = []
+        }
+        const session: KuroSessionPayload = { loggedIn: true, account: null, roles, savedAt: 0 }
         return json({ ok: true, session, valid: true })
     }
 

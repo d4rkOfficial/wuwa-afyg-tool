@@ -143,7 +143,9 @@ export function buildKuroPlans(characters: KuroCharacterEchoes[], knownNames: st
     for (const ch of characters) {
         const echoes = ch.echoes ?? []
         if (echoes.length !== 5) {
-            skipped.push({ character: ch.name, reason: `声骸数量为 ${echoes.length}（需要 5 个）` })
+            // 服务端把「该角色详情拉取失败」的原因带在 error 上：优先展示它，比「声骸数量为 0」有用得多
+            const reason = ch.error ? `拉取失败：${ch.error}` : `声骸数量为 ${echoes.length}（需要 5 个）`
+            skipped.push({ character: ch.name, reason })
             continue
         }
         const slots: EchoSlotConfig[] = []
