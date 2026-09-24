@@ -79,12 +79,14 @@
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
     import FirstSyncModal from '$lib/components/layout/first-sync-modal.svelte'
     import SubstatLibraryModal from '$lib/components/layout/substat-library-modal.svelte'
+    import KuroLoginModal from '$lib/components/layout/kuro-login-modal.svelte'
     import DamageTypeModal from '$lib/components/page/home/calculation/damage-type-modal.svelte'
     import {
         getSubstatLibraryOpen,
         openSubstatLibrary,
         setSubstatLibraryOpen
     } from '$lib/data/substat-library-ui.svelte'
+    import { getKuroLoginOpen, loadKuroPrefs, setKuroLoginOpen } from '$lib/data/kuro.svelte'
     import { shouldAskFirstSync } from '$lib/data/first-sync.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
@@ -110,6 +112,7 @@
     let showSettings = $state(false)
     /** @desc 「编辑伤害类型」弹窗开关（底部工具栏按钮 / AI、WS 面板工具共用，状态在 calculation store 里） */
     let showDamageTypeModal = $derived(getShowDamageTypeModal())
+    let kuroLoginOpen = $derived(getKuroLoginOpen())
     let showWorkshopFrame = $state(false)
     /** @desc 工坊 iframe 弹窗的目标路径（空 = 工坊首页；如 /share/xxx = 详情页） */
     let workshopFramePath = $state('')
@@ -319,6 +322,7 @@
         loadKeyMap()
         loadShortcuts()
         loadWorkshop()
+        loadKuroPrefs()
         await ensureVersion()
         if (browser) {
             const prev = localStorage.getItem('wuwa-afyg:version')
@@ -1012,6 +1016,9 @@
 <FirstSyncModal open={showFirstSync} onclose={() => (showFirstSync = false)} />
 
 <SubstatLibraryModal />
+
+<!-- @desc 库街区登录窗口（实验性）：设置页与词条集「从库街区同步」共用同一入口 -->
+<KuroLoginModal open={kuroLoginOpen} onclose={() => setKuroLoginOpen(false)} />
 
 <!-- @desc 编辑伤害类型弹窗：与词条集一样挂在页面顶层（底部工具栏按钮打开） -->
 <DamageTypeModal

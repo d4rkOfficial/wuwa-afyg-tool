@@ -95,6 +95,20 @@
         TOAST_POSITIONS,
         type ToastPosition
     } from '$lib/data/interaction-prefs.svelte'
+    import {
+        getKuroActiveRole,
+        getKuroBase,
+        getKuroBusy,
+        getKuroReason,
+        getKuroSession,
+        getKuroValid,
+        kuroLogout,
+        kuroPing,
+        refreshKuroSession,
+        setKuroBase,
+        setKuroLoginOpen,
+        setKuroRoleId
+    } from '$lib/data/kuro.svelte'
     import { getSimplifyContextMenu, setSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import {
         SHORTCUT_GROUPS,
@@ -136,11 +150,55 @@
         | 'shortcuts'
         | 'performance'
         | 'connection'
+        | 'kuro'
         | 'cache'
         | 'archive'
         | 'ai'
         | 'ai-conn'
     >('theme')
+
+    // ── 库街区（实验性）：代理服务器地址 + 登录态管理 ──
+    let kuroBaseInput = $state('')
+    let kuroPingState = $state<{ state: 'idle' | 'ok' | 'fail'; msg: string }>({ state: 'idle', msg: '' })
+    let kuroSession = $derived(getKuroSession())
+    let kuroValid = $derived(getKuroValid())
+    let kuroReason = $derived(getKuroReason())
+    let kuroBusy = $derived(getKuroBusy())
+    let kuroActiveRole = $derived(getKuroActiveRole())
+
+    /** @desc 打开设置或地址被改动时，把输入框同步成已保存的地址（组件初始化早于页面 onMount 读取偏好） */
+    $effect(() => {
+        if (open) kuroBaseInput = getKuroBase()
+    })
+
+    const handleKuroPing = async () => {
+        kuroPingState = { state: 'idle', msg: '检测中…' }
+        const res = await kuroPing()
+        kuroPingState = res.ok
+            ? { state: 'ok', msg: `已连接（v${res.version ?? '?'}）` }
+            : { state: 'fail', msg: res.error ?? '无法连接' }
+    }
+
+    const handleKuroSaveBase = async () => {
+        setKuroBase(kuroBaseInput)
+        addToast(`库街区代理地址已保存：${getKuroBase()}`, 'success')
+        await handleKuroPing()
+    }
+
+    const handleKuroCheck = async () => {
+        await refreshKuroSession(true)
+        if (getKuroValid()) addToast('库街区登录状态有效', 'success')
+        else addToast(`库街区登录状态无效：${getKuroReason() ?? '未知原因'}`, 'error')
+    }
+
+    const handleKuroLogout = async () => {
+        try {
+            await kuroLogout()
+            addToast('已退出库街区登录', 'success')
+        } catch (e) {
+            addToast(`退出失败：${e instanceof Error ? e.message : String(e)}`, 'error')
+        }
+    }
 
     let currentTheme = $derived(getActiveId())
 
@@ -160,6 +218,7 @@
         { group: '界面', key: 'shortcuts', label: '快捷键位', icon: 'mdi:keyboard-settings-outline' },
         { group: '界面', key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
+        { group: '数据', key: 'kuro', label: '库街区', icon: 'mdi:account-key-outline' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
         { group: '数据', key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
         { group: 'AI助手', key: 'ai-conn', label: '启用 / 接入配置', icon: 'mdi:connection' },
@@ -2289,6 +2348,175 @@
                                             </div>
                                         </div>
                                     {/each}
+                                </div>
+                            {/if}
+                        </div>
+                    {:else if tab === 'kuro'}
+                        <!-- 库街区（实验性）：代理服务器 + 登录态管理；登录窗口是全局单例（页面顶层挂载） -->
+                        <div class="flex flex-col">
+                            <span
+                                class="mb-1 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
+                            >
+                                <Icon
+                                    icon="mdi:account-key-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                库街区账号
+                                <span
+                                    class="rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                    >实验性</span
+                                >
+                            </span>
+                            <p class="mb-3 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                                登录库街区后，可在「词条集 / 快速词条方案」里把账号下鸣潮角色<b>当前装配的声骸</b
+                                >同步成词条方案。 登录凭据只保存在本机代理服务器（默认
+                                <code>.tmp/kuro-server</code>），不会下发到浏览器。
+                            </p>
+
+                            <!-- 代理服务器地址 -->
+                            <div class="flex flex-wrap items-end gap-2">
+                                <label class="min-w-[14rem] flex-1">
+                                    <span class="mb-1 block text-[10px] text-(--theme-modal-text)/40"
+                                        >代理服务器地址</span
+                                    >
+                                    <input
+                                        bind:value={kuroBaseInput}
+                                        spellcheck="false"
+                                        placeholder="http://127.0.0.1:8791"
+                                        class="w-full rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    />
+                                </label>
+                                <button
+                                    onclick={handleKuroSaveBase}
+                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <Icon icon="mdi:content-save-outline" class="size-3.5" />
+                                    保存
+                                </button>
+                                <button
+                                    onclick={handleKuroPing}
+                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <Icon icon="mdi:lan-connect" class="size-3.5" />
+                                    测试连接
+                                </button>
+                            </div>
+                            {#if kuroPingState.msg}
+                                <div
+                                    class="mt-1.5 text-[10px] {kuroPingState.state === 'fail'
+                                        ? 'text-red-400'
+                                        : 'text-(--theme-modal-text)/40'}"
+                                >
+                                    {kuroPingState.state === 'ok' ? '✓' : kuroPingState.state === 'fail' ? '✗' : '…'}
+                                    {kuroPingState.msg}
+                                </div>
+                            {/if}
+
+                            <!-- 登录状态 -->
+                            <div
+                                class="mt-3 flex flex-wrap items-center gap-2 rounded-none border px-2.5 py-2 text-xs"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <Icon
+                                    icon={kuroSession.loggedIn
+                                        ? kuroValid === false
+                                            ? 'mdi:shield-alert-outline'
+                                            : 'mdi:shield-check-outline'
+                                        : 'mdi:shield-off-outline'}
+                                    class="size-4 shrink-0 {kuroSession.loggedIn && kuroValid !== false
+                                        ? 'text-(--theme-accent-text)'
+                                        : 'text-(--theme-modal-text)/40'}"
+                                />
+                                <span class="font-black text-(--theme-modal-text)">
+                                    {kuroSession.loggedIn ? (kuroSession.account?.userName ?? '已登录') : '未登录'}
+                                </span>
+                                {#if kuroSession.loggedIn}
+                                    {#if kuroSession.phone}
+                                        <span class="text-[10px] text-(--theme-modal-text)/40"
+                                            >{kuroSession.phone.replace(/^(\d{3})\d+(\d{2,4})$/, '$1****$2')}</span
+                                        >
+                                    {/if}
+                                    <span class="text-[10px] text-(--theme-modal-text)/40">
+                                        · 绑定角色 {kuroSession.roles.length} 个 · 有效性：{kuroValid === null
+                                            ? '未校验'
+                                            : kuroValid
+                                              ? '有效'
+                                              : `无效（${kuroReason ?? '未知'}）`}
+                                    </span>
+                                {/if}
+                            </div>
+
+                            <!-- 操作 -->
+                            <div class="mt-3 flex flex-wrap items-center gap-2">
+                                <button
+                                    onclick={() => setKuroLoginOpen(true)}
+                                    class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg)"
+                                    style="border-color: var(--theme-divider-border);"
+                                >
+                                    <Icon icon="mdi:login-variant" class="size-4" />
+                                    {kuroSession.loggedIn ? '登录窗口 / 重新登录' : '登录'}
+                                </button>
+                                {#if kuroSession.loggedIn}
+                                    <button
+                                        onclick={handleKuroCheck}
+                                        disabled={kuroBusy}
+                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-40"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <Icon icon="mdi:shield-refresh-outline" class="size-4" />
+                                        检验有效性
+                                    </button>
+                                    <button
+                                        onclick={handleKuroLogout}
+                                        disabled={kuroBusy}
+                                        class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-red-400 disabled:opacity-40"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        <Icon icon="mdi:logout-variant" class="size-4" />
+                                        退出登录
+                                    </button>
+                                {/if}
+                            </div>
+
+                            <!-- 绑定角色：同步时使用选中的这个 -->
+                            {#if kuroSession.roles.length > 0}
+                                <div class="mt-4">
+                                    <span class="mb-1 block text-[10px] text-(--theme-modal-text)/40"
+                                        >同步使用的绑定角色</span
+                                    >
+                                    <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
+                                        {#each kuroSession.roles as role (role.roleId)}
+                                            <div
+                                                class={[
+                                                    'flex min-w-0 cursor-pointer items-center gap-2 rounded-none border px-2.5 py-2 transition-colors',
+                                                    kuroActiveRole?.roleId === role.roleId
+                                                        ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
+                                                        : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
+                                                ].join(' ')}
+                                                onclick={() => setKuroRoleId(role.roleId)}
+                                            >
+                                                <Icon
+                                                    icon={kuroActiveRole?.roleId === role.roleId
+                                                        ? 'mdi:radiobox-marked'
+                                                        : 'mdi:radiobox-blank'}
+                                                    class="size-4 shrink-0 text-(--theme-accent-text)"
+                                                />
+                                                <span
+                                                    class="min-w-0 flex-1 truncate text-xs font-black text-(--theme-modal-text)"
+                                                    >{role.nickname || role.roleId}</span
+                                                >
+                                                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40"
+                                                    >{role.serverName ?? role.serverId}{role.level
+                                                        ? ` · Lv.${role.level}`
+                                                        : ''}</span
+                                                >
+                                            </div>
+                                        {/each}
+                                    </div>
                                 </div>
                             {/if}
                         </div>
