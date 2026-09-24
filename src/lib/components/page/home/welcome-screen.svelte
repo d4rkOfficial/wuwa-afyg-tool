@@ -48,7 +48,7 @@
         {
             watermark: 'WORKSHOP',
             title: '工坊',
-            desc: '把工程上传到工坊，生成带有效期的分享链接——别人打开链接就能载入这份工程，排轴、拉表、配装一并带走；也能浏览社区公开的工程，看看别人的思路。',
+            desc: '把工程上传到工坊，生成带有效期的分享链接——别人打开链接就能载入这份工程，排轴、拉表、配装一并带走；也能浏览社区公开的工程、Buff 集与标准词条集。',
             icon: 'mdi:storefront-outline',
             action: onWorkshopFrame,
             wide: true
