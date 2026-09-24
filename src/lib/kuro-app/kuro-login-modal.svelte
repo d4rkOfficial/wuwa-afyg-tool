@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @desc 库街区登录窗口（实验性）：短信验证码登录 + 查看绑定角色 + 有效性检验 / 退出登录。
+     * @desc 库街区登录窗口（实验性）：短信验证码登录（上游要求时弹极验） + 查看绑定角色 + 有效性检验 / 退出登录。
      * 凭据（token）由应用自身的服务端路由放进 httpOnly cookie，浏览器脚本读不到；本窗口只显示登录状态。
      */
     import Icon from '@iconify/svelte'
@@ -10,9 +10,11 @@
         getKuroSession,
         kuroLogout,
         kuroSendSms,
+        KuroGeetestRequiredError,
         kuroVerifyLogin,
         refreshKuroSession
     } from '$lib/kuro-app/kuro.svelte'
+    import { solveGeetest } from '$lib/kuro-app/geetest'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -65,11 +67,28 @@
         void refreshKuroSession(false)
     })
 
+    /**
+     * @desc 发验证码：先直接试发；上游要求人机验证时弹极验，拿到校验数据后带 geeTestData 重发。
+     *  极验脚本只在需要时才从 static.geetest.com 加载。
+     */
+    async function sendSmsWithGeetest() {
+        const target = phone.trim()
+        try {
+            await kuroSendSms(target)
+            return
+        } catch (e) {
+            if (!(e instanceof KuroGeetestRequiredError)) throw e
+            info = '需要先完成人机验证…'
+            const validate = await solveGeetest(e.captchaId, e.product)
+            await kuroSendSms(target, JSON.stringify({ ...validate, captcha_id: e.captchaId }))
+        }
+    }
+
     async function handleSend() {
         clearMessages()
         busy = true
         try {
-            await kuroSendSms(phone.trim())
+            await sendSmsWithGeetest()
             info = '验证码已发送，请查看手机短信'
             startCountdown()
         } catch (e) {
@@ -264,7 +283,8 @@
 
                 <p class="text-[10px] leading-relaxed text-(--theme-modal-text)/40">
                     登录凭据由应用自身的服务端路由持有（httpOnly
-                    cookie，浏览器脚本读不到）；该功能为实验性，接口变动可能随时失效。
+                    cookie，浏览器脚本读不到）；需要人机验证时会按需加载极验脚本（static.geetest.com）。
+                    该功能为实验性，接口变动可能随时失效。
                 </p>
             </div>
 

@@ -147,13 +147,43 @@ export interface KuroCharacterEchoes {
     error?: string
 }
 
-/** @desc 发短信验证码；极验要求时明确报错（不伪造通过） */
-export async function sendSmsCode(phone: string): Promise<void> {
-    const json = await post('/user/getSmsCode', oldHeaders(null, { sms: true }), { mobile: phone, geeTestData: '' })
-    if ((json?.data as { geeTest?: boolean } | undefined)?.geeTest === true) {
-        throw new Error('库街区要求先通过极验（geetest）；请先在库街区 App/网页登录一次后再试')
-    }
-    if (Number(json?.code) !== 200) throw upstreamError(json, '发送验证码失败')
+/** @desc 极验（geetest v4）参数：与库街区 H5 端一致；可用环境变量覆盖 */
+export const KURO_GEETEST = {
+    captchaId: process.env.KURO_GEETEST_CAPTCHA_ID || 'ec4aa4174277d822d73f2442a165a2cd',
+    product: process.env.KURO_GEETEST_PRODUCT || 'bind'
+} as const
+
+/** @desc H5/社区端请求头（发验证码用，与极验 captchaId 配套；UA 与参考实现一致） */
+const H5_USER_AGENT =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)  KuroGameBox/3.0.3'
+const randomDevCode32 = () => globalThis.crypto.randomUUID().replace(/-/g, '')
+const h5Headers = (): Record<string, string> => ({
+    source: 'h5',
+    version: '3.0.3',
+    'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
+    'user-agent': H5_USER_AGENT,
+    devCode: randomDevCode32()
+})
+
+export interface SmsSendResult {
+    /** @desc true = 上游要求先过极验（此时短信并未真正发出） */
+    geetestRequired: boolean
+}
+
+/**
+ * @desc 发送短信验证码（H5 端接口 /user/getSmsCodeForH5，与极验 captchaId 配套）。
+ *  geeTestData = 极验数据 JSON **字符串**（含 captcha_id / lot_number / pass_token / gen_time / captcha_output）：
+ *  参考实现就是把 captcha.getValidate() 的结果补上 captcha_id 后 JSON.stringify 直接作为表单字段。
+ *  不带它时上游若要求极验，会以 data.geeTest === true 告知（code 仍是 200，但短信没发出去）。
+ */
+export async function sendSmsCode(phone: string, geeTestData?: string): Promise<SmsSendResult> {
+    const body: Record<string, string> = { mobile: phone }
+    if (geeTestData) body.geeTestData = geeTestData
+    const json = await post('/user/getSmsCodeForH5', h5Headers(), body)
+    if ((json?.data as { geeTest?: boolean } | undefined)?.geeTest === true) return { geetestRequired: true }
+    const code = Number(json?.code)
+    if (code === 0 || code === 200) return { geetestRequired: false }
+    throw upstreamError(json, '发送验证码失败')
 }
 
 interface LoginData {

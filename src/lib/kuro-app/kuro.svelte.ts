@@ -115,9 +115,28 @@ async function call<T extends Record<string, unknown>>(path: string, opts: CallO
     }
 }
 
-/** @desc 发送短信验证码 */
-export async function kuroSendSms(phone: string): Promise<void> {
-    await call('/login/sms', { method: 'POST', body: { phone }, timeout: 25000 })
+/** @desc 上游要求先过极验：由调用方弹极验、拿到验证数据后带 geeTestData 重发 */
+export class KuroGeetestRequiredError extends Error {
+    captchaId: string
+    product: string
+    constructor(captchaId: string, product: string) {
+        super('需要完成人机验证')
+        this.name = 'KuroGeetestRequiredError'
+        this.captchaId = captchaId
+        this.product = product
+    }
+}
+
+/** @desc 发送短信验证码；geeTestData 为极验校验数据 JSON 字符串（可选） */
+export async function kuroSendSms(phone: string, geeTestData?: string): Promise<void> {
+    const res = await call<{ geetest?: { required?: boolean; captchaId?: string; product?: string } }>('/login/sms', {
+        method: 'POST',
+        body: { phone, geeTestData },
+        timeout: 30000
+    })
+    if (res.geetest?.required) {
+        throw new KuroGeetestRequiredError(res.geetest.captchaId ?? '', res.geetest.product ?? 'bind')
+    }
 }
 
 /** @desc 验证码登录（成功后 token 由服务端写进 httpOnly cookie，前端只拿会话概览） */
