@@ -18,7 +18,13 @@ const AKI_USER_AGENT =
 /** @desc 签到接口用的 Android WebView UA（文档里签到请求就是这个 UA） */
 const SIGNIN_USER_AGENT =
     'Mozilla/5.0 (Linux; Android 14; 23127PN0CC Build/UKQ1.230804.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/127.0.6533.15 Mobile Safari/537.36 Kuro/2.2.0 KuroGameBox/2.2.0'
-/** @desc 渠道号与服务器区域：countryCode 逐个试（隍陇=1 / 黑海岸=900 / 黎那汐塔=3） */
+/**
+ * @desc 渠道号 + countryCode：
+ *  - `channelId` 是渠道号，固定 19（可用 KURO_CHANNEL_ID 覆盖）
+ *  - `countryCode` 是**游戏内的国家/地区**（隍陇 = 1 / 黎那汐塔 = 3 / 黑海岸 = 900），
+ *    不是服务器、也不代表账号归属；取角色详情时按顺序试，上游正常返回（code 200）就用它，
+ *    可用 KURO_COUNTRY_CODES 覆盖候选列表
+ */
 const CHANNEL_ID = process.env.KURO_CHANNEL_ID || '19'
 const COUNTRY_CODES = (process.env.KURO_COUNTRY_CODES || '1,3,900')
     .split(',')
@@ -510,22 +516,16 @@ interface UpstreamRoleDetail {
     phantomData?: { cost?: number; equipPhantomList?: (UpstreamPhantom | null)[] }
 }
 
-/** @desc 详情里实际带回的声骸数量（用于判断这个 countryCode / 这次快照是不是有效数据） */
-const phantomCount = (detail?: UpstreamRoleDetail | null): number =>
-    (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean).length
-
 /**
- * @desc 单角色详情（含装配声骸）：countryCode 逐个试，**只有真带回声骸的才算命中**。
- *  之前只要 code=200 就记住该 countryCode，一旦某个码返回「200 但空数据」（例如角色盒正在同步、
- *  或该码对不上账号），后续所有角色都会套用这个错码 → 表现就是「所有角色都没有装备声骸」。
- *  body 需 channelId=19 / countryCode / id=角色id
+ * @desc 单角色详情（含装配声骸）：body 需 channelId=19 / countryCode（游戏内国家）/ id=角色id。
+ *  countryCode 只影响上游按哪个「国家/地区」取数据，正常返回（code 200）就采用并记下来，
+ *  只有上游明确报错时才换下一个候选；「200 但角色没声骸」是上游快照的问题，不代表码不对。
  */
 let countryCodeHit = ''
 async function fetchCharacterDetail(did: string, bat: string, roleId: string, serverId: string, charId: string) {
     const codes = countryCodeHit
         ? [countryCodeHit, ...COUNTRY_CODES.filter((c) => c !== countryCodeHit)]
         : COUNTRY_CODES
-    let firstOk: { countryCode: string; detail?: UpstreamRoleDetail } | null = null
     let lastErr: unknown
     for (const countryCode of codes) {
         try {
@@ -538,22 +538,12 @@ async function fetchCharacterDetail(did: string, bat: string, roleId: string, se
                 id: charId
             })
             if (Number(json?.code) !== 200) throw upstreamError(json, `取角色详情失败（countryCode=${countryCode}）`)
-            const detail = parseData<UpstreamRoleDetail>(json)
-            if (phantomCount(detail) > 0) {
-                countryCodeHit = countryCode
-                return detail
-            }
-            // 200 但没声骸：先当候选，继续试其它码；已经是确认过的码就说明这个角色确实没装配
-            if (!firstOk) firstOk = { countryCode, detail }
-            if (countryCodeHit) break
+            countryCodeHit = countryCode
+            return parseData<UpstreamRoleDetail>(json)
         } catch (e) {
             lastErr = e
             if (String((e as Error)?.message ?? '').includes('登录已过期')) throw e
         }
-    }
-    if (firstOk) {
-        if (!countryCodeHit) countryCodeHit = firstOk.countryCode
-        return firstOk.detail
     }
     throw lastErr instanceof Error ? lastErr : new Error('取角色详情失败')
 }
@@ -590,7 +580,7 @@ export async function fetchRoleEchoes(
         }
     }
     const owned = ownedResult.list
-    // 每次同步重新探测 countryCode：避免上一次留下的记忆（可能是「200 但空数据」的错码）一直生效
+    // 每次同步重新从默认 countryCode（游戏内国家）开始试，避免沿用上一次的记忆
     countryCodeHit = ''
     const collect = async (): Promise<KuroCharacterEchoes[]> =>
         mapLimit(owned, 4, async (ch): Promise<KuroCharacterEchoes> => {
@@ -631,8 +621,8 @@ export async function fetchRoleEchoes(
         })
 
     let characters = await collect()
-    // 全员「详情 200 但一个声骸都没有」= 可疑快照（角色盒正在同步 / 刚触发过刷新 / 登录签到后上游要重同步），
-    // 不是真的没装备：刷新一次 + 稍等后用重新探测的 countryCode 再取一遍，仍为空就明确报错而不是逐个说「没有装配声骸」
+    // 全员「详情 200 但一个声骸都没有」= 上游角色盒快照还是空的（例如刚刷新过、数据仍在同步），
+    // 不是真的没装备：刷新一次 + 稍等后重取，仍为空就明确报错而不是逐个角色说「没有装配声骸」
     const suspicious = characters.length > 0 && characters.every((c) => c.echoes.length === 0 && !c.error)
     if (suspicious) {
         let note = ''
@@ -647,7 +637,7 @@ export async function fetchRoleEchoes(
         if (characters.every((c) => c.echoes.length === 0)) {
             throw new Error(
                 `上游返回的 ${characters.length} 个角色详情里都没有声骸数据${note}：` +
-                    `角色盒数据可能正在同步（刚刷新过，或登录签到触发了上游重新同步），请等 1~2 分钟后再同步一次；` +
+                    `角色盒快照可能还是空的（刚刷新过、数据仍在同步），请等 1~2 分钟后再同步一次；` +
                     `若仍然如此，请在库街区 App 打开「鸣潮 → 角色盒」确认能看到角色与声骸`
             )
         }
