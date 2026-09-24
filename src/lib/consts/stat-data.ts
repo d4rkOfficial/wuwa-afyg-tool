@@ -69,8 +69,10 @@ export const MAIN_STAT_POOL: Record<number, StatOption[]> = {
         { label: '暴击伤害', maxValue: 44, unit: '%' },
         { label: '攻击%', maxValue: 33, unit: '%' },
         { label: '生命%', maxValue: 33, unit: '%' },
-        { label: '防御%', maxValue: 41.8, unit: '%' }
-        // { label: '治疗加成', maxValue: 26.4, unit: '%' }
+        { label: '防御%', maxValue: 41.8, unit: '%' },
+        // 4cost 主词条里唯一不进伤害公式的一条（compute.ts 里按 no-op 处理），但真实存在，
+        // 库街区同步需要它才能解析装备了治疗声骸的角色
+        { label: '治疗加成', maxValue: 26.4, unit: '%' }
     ],
     3: [
         ...MAIN_STAT_ELEMENT_BONUS,

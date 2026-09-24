@@ -355,6 +355,8 @@ defineTool('sync_substat_plans_from_share', {
 defineTool('sync_substat_plans_from_kuro', {
     description:
         '从库街区同步当前账号下鸣潮角色「正在装配的声骸」，写成本地自定义词条方案（方案名「库街区同步」，同名覆盖、可重复同步）。' +
+        '声骸不齐的角色按实际装配写入（缺的槽位留空），只有完全没声骸的角色才跳过；' +
+        '上游只给「漂泊者」这类不带形态的名字时需要用户指定属性，工具链里会跳过并回报，让用户在预览弹窗里选。' +
         '需要先在「设置 → 库街区」登录（可用 open_panel 打开 kuro-login 窗口）；上游若缺少角色装配声骸接口会明确报错。',
     parameters: { type: 'object', properties: {} },
     dangerous: true,

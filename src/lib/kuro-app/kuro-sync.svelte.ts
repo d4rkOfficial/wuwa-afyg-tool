@@ -79,20 +79,38 @@ export async function previewSubstatPlansFromKuro(): Promise<{
     }
 }
 
-/** @desc 落盘：把预览里选中的角色写成自定义方案（同名覆盖） */
+/** @desc 一条写入选择：upstreamName 定位预览里的角色（角色名可能被用户改成某个形态，如漂泊者的属性） */
+export interface KuroPlanPick {
+    upstreamName: string
+    character: string
+}
+
+/** @desc 落盘：把预览里选中的角色写成自定义方案（同名覆盖）
+ *  - picks 为空表示「全部写入」（AI/工具链）；给了 picks 就只写列表里的
+ *  - 需要指定形态（漂泊者）但没给名字的角色记入 skipped，不静默写成错形态 */
 export async function applyKuroSync(
     preview: KuroSyncPreview,
-    opts: { planName?: string; characters?: string[] } = {}
+    opts: { planName?: string; picks?: KuroPlanPick[] } = {}
 ): Promise<KuroSyncResult> {
     const planName = (opts.planName ?? KURO_PLAN_NAME).trim() || KURO_PLAN_NAME
-    const picked = opts.characters ? new Set(opts.characters) : null
-    const targets = preview.plans.filter((p) => !picked || picked.has(p.character))
+    const picked = opts.picks ? new Map(opts.picks.map((p) => [p.upstreamName, p.character])) : null
+    const skipped: KuroSyncSkipped[] = [...preview.skipped]
+    const targets: KuroPlanDraft[] = []
+    for (const plan of preview.plans) {
+        if (picked && !picked.has(plan.upstreamName)) continue
+        const character = picked ? (picked.get(plan.upstreamName) ?? '') : plan.options?.length ? '' : plan.character
+        if (!character) {
+            skipped.push({ character: plan.upstreamName, reason: '需要先指定角色形态（如漂泊者的属性）' })
+            continue
+        }
+        targets.push({ ...plan, character })
+    }
     if (targets.length === 0) {
         return {
             ok: false,
             ...empty(),
             roleName: preview.roleName,
-            skipped: preview.skipped,
+            skipped,
             unmatchedNames: preview.unmatchedNames,
             error: '没有勾选任何角色'
         }
@@ -112,7 +130,7 @@ export async function applyKuroSync(
         ok: synced > 0,
         synced,
         roleName: preview.roleName,
-        skipped: preview.skipped,
+        skipped,
         unmatchedNames: preview.unmatchedNames,
         ...(synced > 0 ? {} : { error: '写入失败：方案数据未通过校验' })
     }

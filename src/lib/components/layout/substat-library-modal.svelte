@@ -42,7 +42,12 @@
     import type { EchoSlotConfig } from '$lib/calc/config.types'
     import { addToast } from '$lib/data/toast.svelte'
     import { isKuroLoggedIn, setKuroLoginOpen } from '$lib/kuro-app/kuro.svelte'
-    import { applyKuroSync, previewSubstatPlansFromKuro, type KuroSyncPreview } from '$lib/kuro-app/kuro-sync.svelte'
+    import {
+        applyKuroSync,
+        previewSubstatPlansFromKuro,
+        type KuroPlanPick,
+        type KuroSyncPreview
+    } from '$lib/kuro-app/kuro-sync.svelte'
     import KuroSyncPreviewModal from '$lib/kuro-app/kuro-sync-preview-modal.svelte'
 
     interface Props extends ComponentsProps {}
@@ -274,8 +279,8 @@
         kuroPreviewOpen = true
     }
 
-    /** @desc 确认弹窗里点「写入」：按勾选角色落盘（同名方案覆盖） */
-    async function confirmKuroSync(opts: { planName: string; characters: string[] }) {
+    /** @desc 确认弹窗里点「写入」：按勾选角色落盘（同名方案覆盖），漂泊者等形态在弹窗里已指定 */
+    async function confirmKuroSync(opts: { planName: string; picks: KuroPlanPick[] }) {
         if (!kuroPreview) return
         kuroSyncing = true
         const result = await applyKuroSync(kuroPreview, opts)

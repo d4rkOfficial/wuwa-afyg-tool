@@ -18,6 +18,14 @@ const strip = (s: string) =>
 
 const hasPct = (name: string) => name.includes('%') || name.includes('％')
 
+/** @desc 主词条别名：上游写法 → 工具箱池子标签（池子里没有的生物不会出现在这里） */
+const MAIN_STAT_ALIAS: Record<string, string> = {
+    治疗效果加成: '治疗加成',
+    治疗加成: '治疗加成',
+    暴击: '暴击率',
+    暴伤: '暴击伤害'
+}
+
 /** @desc 主词条名称归一：游戏名 → 工具箱 MAIN_STAT_POOL 标签（不在池子里返回 null） */
 export function canonicalMainStat(name: string, cost: number): string | null {
     const raw = strip(name)
@@ -25,8 +33,14 @@ export function canonicalMainStat(name: string, cost: number): string | null {
     const pool = MAIN_STAT_POOL[cost] ?? []
     const exact = pool.find((o) => strip(o.label) === raw)
     if (exact) return exact.label
-    // 去掉「属性/伤害」等修饰后按包含关系再匹配一次（如「冷凝属性伤害加成」→「冷凝伤害加成」）
-    const loose = raw.replace(/属性/g, '').replace(/%|％/g, '')
+    // 别名（治疗加成 / 暴击 / 暴伤 等简写与「效果」这类多字）
+    const alias = MAIN_STAT_ALIAS[raw]
+    if (alias) {
+        const hit = pool.find((o) => o.label === alias)
+        if (hit) return hit.label
+    }
+    // 去掉「属性/伤害/效果」等修饰后按包含关系再匹配一次（如「冷凝属性伤害加成」→「冷凝伤害加成」）
+    const loose = raw.replace(/属性|效果/g, '').replace(/%|％/g, '')
     const hit = pool.find((o) => {
         const label = strip(o.label).replace(/%|％/g, '')
         return label === loose || loose.endsWith(label) || label.endsWith(loose)
@@ -38,9 +52,6 @@ export function canonicalMainStat(name: string, cost: number): string | null {
         const key = Object.keys(ELEMENT_BONUS_MAP).find((k) => strip(k).startsWith(element))
         if (key) return key
     }
-    // 4cost 常见的「暴击」「暴伤」简写
-    if (raw === '暴击') return pool.some((o) => o.label === '暴击率') ? '暴击率' : null
-    if (raw === '暴伤') return pool.some((o) => o.label === '暴击伤害') ? '暴击伤害' : null
     return null
 }
 
@@ -111,6 +122,13 @@ export interface KuroPlanDraft {
     /** @desc 是否在工具箱角色名录里找到该角色 */
     matched: boolean
     slots: EchoSlotConfig[]
+    /** @desc 上游给了几个声骸（< 5 表示声骸不齐，缺失槽位是空槽） */
+    echoCount: number
+    /**
+     * @desc 同名多形态候选（如上游只给「漂泊者」，工具箱名录里有各属性漂泊者）：
+     *  非空时由用户指定要写入哪个形态，character 本身不含形态。
+     */
+    options?: string[]
 }
 
 export interface KuroPlanBuildResult {
@@ -123,29 +141,74 @@ export interface KuroPlanBuildResult {
 /** @desc 角色名归一：去掉空白与常见分隔符，用于上游名 ↔ 工具箱名的宽松匹配 */
 const normName = (s: string) => strip(s).replace(/[·・\-—_]/g, '')
 
-/** @desc 把上游角色名尽量对上工具箱角色名录；命中则用工具箱写法 */
-export function matchCharacterName(upstream: string, knownNames: string[]): { name: string; matched: boolean } {
+/**
+ * @desc 把上游角色名尽量对上工具箱角色名录；命中则用工具箱写法。
+ *  上游只给「漂泊者」这类不带形态的名字时，返回同名多形态候选（options）交给用户指定。
+ */
+export function matchCharacterName(
+    upstream: string,
+    knownNames: string[]
+): { name: string; matched: boolean; options: string[] } {
     const raw = strip(upstream)
-    if (!raw) return { name: upstream, matched: false }
+    if (!raw) return { name: upstream, matched: false, options: [] }
     const exact = knownNames.find((n) => strip(n) === raw)
-    if (exact) return { name: exact, matched: true }
+    if (exact) return { name: exact, matched: true, options: [] }
     const loose = knownNames.find((n) => normName(n) === normName(raw))
-    if (loose) return { name: loose, matched: true }
-    return { name: upstream, matched: false }
+    if (loose) return { name: loose, matched: true, options: [] }
+    // 没精确命中：看看是不是「同名的多个形态」（漂泊者·衍射/湮灭/…）
+    const key = normName(raw)
+    const options = knownNames.filter((n) => normName(n).length > key.length && normName(n).startsWith(key))
+    if (options.length >= 2) return { name: '', matched: false, options }
+    return { name: upstream, matched: false, options: [] }
 }
 
-/** @desc 把服务器返回的角色+声骸数据整批转成方案草稿；不满足 5 槽/合法性校验的角色记入 skipped
- *  knownNames：工具箱角色名录（用于把上游角色名对到工具箱写法，可传空数组） */
+/** @desc 标准 cost 布局，用于给「声骸不齐」的角色补空槽（补出来的槽没有主词条） */
+const PAD_COST_LAYOUT = [4, 3, 3, 1, 1]
+
+const blankSlot = (cost: number): EchoSlotConfig => {
+    const second = SECOND_MAIN_STAT[cost as keyof typeof SECOND_MAIN_STAT]
+    return {
+        cost,
+        mainStat: null,
+        secondMainStat: second ? { type: second.label, value: second.value, unit: second.unit } : null,
+        substats: []
+    }
+}
+
+/**
+ * @desc 声骸不齐（不足 5 个）时补空槽到 5 个：先吃掉标准布局里没用到的 cost，
+ *  并保证总 cost ≤ 12（工具箱方案约束）；补不满返回 null。
+ */
+export function padSlots(slots: EchoSlotConfig[]): EchoSlotConfig[] | null {
+    if (slots.length >= 5) return slots.slice(0, 5)
+    const leftovers = [...PAD_COST_LAYOUT]
+    for (const slot of slots) {
+        const i = leftovers.indexOf(slot.cost)
+        if (i >= 0) leftovers.splice(i, 1)
+    }
+    const padded = [...slots]
+    let total = padded.reduce((sum, s) => sum + s.cost, 0)
+    for (const cost of leftovers) {
+        if (padded.length >= 5) break
+        if (total + cost > 12) continue
+        padded.push(blankSlot(cost))
+        total += cost
+    }
+    return padded.length === 5 ? padded : null
+}
+
+/** @desc 把服务器返回的角色+声骸数据整批转成方案草稿
+ *  - 完全没声骸（或详情拉取失败）的角色才跳过；声骸不齐的补空槽后照常导入
+ *  - knownNames：工具箱角色名录（用于把上游角色名对到工具箱写法，可传空数组） */
 export function buildKuroPlans(characters: KuroCharacterEchoes[], knownNames: string[] = []): KuroPlanBuildResult {
     const plans: KuroPlanDraft[] = []
     const skipped: { character: string; reason: string }[] = []
     const unmatched = new Set<string>()
     for (const ch of characters) {
         const echoes = ch.echoes ?? []
-        if (echoes.length !== 5) {
-            // 服务端把「该角色详情拉取失败」的原因带在 error 上：优先展示它，比「声骸数量为 0」有用得多
-            const reason = ch.error ? `拉取失败：${ch.error}` : `声骸数量为 ${echoes.length}（需要 5 个）`
-            skipped.push({ character: ch.name, reason })
+        if (echoes.length === 0) {
+            // 服务端把「该角色详情拉取失败」的原因带在 error 上：优先展示它
+            skipped.push({ character: ch.name, reason: ch.error ? `拉取失败：${ch.error}` : '没有装配声骸' })
             continue
         }
         const slots: EchoSlotConfig[] = []
@@ -163,13 +226,25 @@ export function buildKuroPlans(characters: KuroCharacterEchoes[], knownNames: st
             skipped.push({ character: ch.name, reason: '存在无法识别的声骸数据' })
             continue
         }
-        const normalized = normalizeAnyPlanSlots(slots)
+        const padded = padSlots(slots)
+        if (!padded) {
+            skipped.push({ character: ch.name, reason: '声骸 cost 组合不满足工具箱方案约束（合计 >12）' })
+            continue
+        }
+        const normalized = normalizeAnyPlanSlots(padded)
         if (!normalized) {
             skipped.push({ character: ch.name, reason: '声骸数据不满足工具箱方案约束（cost 合计 >12 或词条非法）' })
             continue
         }
-        const { name, matched } = matchCharacterName(ch.name, knownNames)
-        plans.push({ character: name, upstreamName: ch.name, matched, slots: normalized })
+        const { name, matched, options } = matchCharacterName(ch.name, knownNames)
+        plans.push({
+            character: name,
+            upstreamName: ch.name,
+            matched,
+            slots: normalized,
+            echoCount: echoes.length,
+            ...(options.length > 0 ? { options } : {})
+        })
     }
     return { plans, skipped, unmatchedNames: [...unmatched] }
 }
