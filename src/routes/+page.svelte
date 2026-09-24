@@ -322,7 +322,7 @@
         loadWorkshop()
         loadKuroPrefs()
         // 库街区：本地有登录标记就自动恢复登录态（token 在 httpOnly cookie 里，前端只能问服务端）。
-        // 只读会话、不做会写游戏数据的操作（签到是设置里的显式按钮），避免触发上游取数风控。
+        // 只读会话：不主动做任何会写游戏数据的操作。
         void restoreKuroSession()
         await ensureVersion()
         if (browser) {

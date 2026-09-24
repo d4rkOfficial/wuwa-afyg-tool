@@ -187,8 +187,7 @@ export async function kuroSendSms(phone: string, geeTestData?: string): Promise<
     }
 }
 
-/** @desc 验证码登录（成功后 token 由服务端写进 httpOnly cookie，前端只拿会话概览）
- *  登录不再顺带签到：签到与角色盒取数共用上游风控额度，登录后立刻签到会让紧接着的同步被要求人机验证 */
+/** @desc 验证码登录（成功后 token 由服务端写进 httpOnly cookie，前端只拿会话概览） */
 export async function kuroVerifyLogin(phone: string, code: string): Promise<void> {
     const res = await call<{ session: KuroSessionInfo }>('/login/verify', {
         method: 'POST',
@@ -200,32 +199,6 @@ export async function kuroVerifyLogin(phone: string, code: string): Promise<void
     _reason = null
     setLoggedMark(true)
     settleLoginWaiters(true)
-}
-
-/** @desc 鸣潮每日签到的单角色结果 */
-export interface KuroSignInResult {
-    roleId: string
-    status: 'signed' | 'already' | 'failed'
-    message: string
-}
-
-/** @desc 鸣潮每日签到（服务端给每个绑定角色各签一次） */
-export async function kuroSignIn(): Promise<KuroSignInResult[]> {
-    const res = await call<{ results?: KuroSignInResult[] }>('/signin', { method: 'POST', timeout: 60000 })
-    return res.results ?? []
-}
-
-/** @desc 签到结果 → 一句人话（设置里的签到按钮 / 手动签到共用） */
-export function formatKuroSignIn(results: KuroSignInResult[]): string {
-    if (results.length === 0) return ''
-    const signed = results.filter((r) => r.status === 'signed').length
-    const already = results.filter((r) => r.status === 'already').length
-    const failed = results.filter((r) => r.status === 'failed')
-    if (failed.length > 0) {
-        return `鸣潮签到：成功 ${signed} 个、已签到 ${already} 个、失败 ${failed.length} 个（${failed[0].message}）`
-    }
-    if (signed > 0) return `鸣潮签到完成（${signed} 个角色）`
-    return '鸣潮签到：今天已经签过了'
 }
 
 /**

@@ -97,7 +97,6 @@
     } from '$lib/data/interaction-prefs.svelte'
     import {
         consumeKuroSettingsRequest,
-        formatKuroSignIn,
         getKuroActiveRole,
         getKuroBusy,
         getKuroReason,
@@ -107,7 +106,6 @@
         kuroLogout,
         kuroSendSms,
         KuroGeetestRequiredError,
-        kuroSignIn,
         kuroVerifyLogin,
         refreshKuroSession,
         setKuroRoleId
@@ -166,7 +164,6 @@
     let kuroReason = $derived(getKuroReason())
     let kuroBusy = $derived(getKuroBusy())
     let kuroActiveRole = $derived(getKuroActiveRole())
-    let kuroSigning = $state(false)
     /** @desc 内联登录表单（登录窗口已删除，验证码登录直接放在设置里） */
     let kuroPhone = $state('')
     let kuroCode = $state('')
@@ -225,7 +222,7 @@
         kuroLoginBusy = true
         try {
             await kuroVerifyLogin(kuroPhone.trim(), kuroCode.trim())
-            kuroLoginInfo = '登录成功，可在下方用「鸣潮签到」按钮签到'
+            kuroLoginInfo = '登录成功'
             kuroCode = ''
         } catch (e) {
             kuroLoginError = e instanceof Error ? e.message : String(e)
@@ -239,19 +236,6 @@
         await refreshKuroSession(true)
         if (getKuroValid()) addToast('库街区登录状态有效', 'success')
         else addToast(`库街区登录状态无效：${getKuroReason() ?? '未知原因'}`, 'error')
-    }
-
-    const handleKuroSignIn = async () => {
-        kuroSigning = true
-        try {
-            const results = await kuroSignIn()
-            const failed = results.some((r) => r.status === 'failed')
-            addToast(formatKuroSignIn(results) || '该账号下没有可签到的鸣潮角色', failed ? 'error' : 'success')
-        } catch (e) {
-            addToast(`鸣潮签到失败：${e instanceof Error ? e.message : String(e)}`, 'error')
-        } finally {
-            kuroSigning = false
-        }
     }
 
     const handleKuroLogout = async () => {
@@ -2216,7 +2200,7 @@
                                             icon={kuroLoginBusy ? 'mdi:loading' : 'mdi:login-variant'}
                                             class={kuroLoginBusy ? 'size-4 animate-spin' : 'size-4'}
                                         />
-                                        登录（登录成功后自动做鸣潮签到）
+                                        登录
                                     </button>
                                     {#if kuroLoginError}
                                         <div
@@ -2250,19 +2234,6 @@
                                                 class={kuroBusy ? 'size-4 animate-spin' : 'size-4'}
                                             />
                                             检验登录有效性
-                                        </button>
-                                        <button
-                                            onclick={handleKuroSignIn}
-                                            disabled={kuroSigning}
-                                            class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-40"
-                                            style="border-color: var(--theme-divider-border);"
-                                            title="给账号下每个绑定的鸣潮角色签到"
-                                        >
-                                            <Icon
-                                                icon={kuroSigning ? 'mdi:loading' : 'mdi:calendar-check-outline'}
-                                                class={kuroSigning ? 'size-4 animate-spin' : 'size-4'}
-                                            />
-                                            鸣潮签到
                                         </button>
                                         <button
                                             onclick={handleKuroLogout}

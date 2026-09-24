@@ -1,6 +1,4 @@
-/** @desc 库街区：验证码登录（成功后 token 写入 httpOnly cookie，不下发浏览器）
- *  注意：这里**不**再顺手做鸣潮签到——签到属于游戏数据写操作，与角色盒取数共用上游风控额度，
- *  登录后立刻签到会让随后的「从库街区同步」被上游要求人机验证（实测踩过）。签到改为设置里的显式按钮。 */
+/** @desc 库街区：验证码登录（成功后 token 写入 httpOnly cookie，不下发浏览器） */
 import { json } from '@sveltejs/kit'
 import type { RequestHandler } from './$types'
 import { fetchMine, fetchRoleList, loginBySms } from '$lib/kuro-app/kuro-api.server'
