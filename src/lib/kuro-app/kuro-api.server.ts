@@ -29,35 +29,22 @@ const COUNTRY_CODES = (process.env.KURO_COUNTRY_CODES || '1,3,900')
     .filter(Boolean)
 
 /**
- * @desc 角色盒（akiBox）取数接口的人机验证（风控）配置：
- *  上游风控时会对 getRoleDetail 返回 `data: { geeTest: true }` 的桩数据（code 仍是 200），
- *  与短信登录那个 `geeTest` 是同一套语义（那边我们已经跑通：v4 验证数据放 `geeTestData` 重发）。
- *  captchaId 默认用**已验证过的库街区 H5 租户**（与短信登录同一个，product=bind）；
- *  若某天失效，可用 KURO_GEETEST_BOX_CAPTCHA_ID / KURO_GEETEST_BOX_PRODUCT 覆盖，或置空关闭弹窗。
+ * @desc 角色盒（akiBox）取数接口被风控时的判定：
+ *  上游风控时会对 getRoleDetail / roleData 返回 `data: { geeTest: true }` 的桩数据（code 仍是 200），
+ *  此时**不做人机验证**（实测走极验这条路对取数接口无效：解完再发仍被打回），
+ *  直接明确报「被风控」，让用户等风控过去，而不是弹一堆验证。
  */
-export const KURO_BOX_GEETEST = {
-    captchaId: process.env.KURO_GEETEST_BOX_CAPTCHA_ID ?? 'ec4aa4174277d822d73f2442a165a2cd',
-    product: process.env.KURO_GEETEST_BOX_PRODUCT || 'bind'
-}
-
-/** @desc 上游要求人机验证：路由层据此让前端弹极验，拿到 geeTestData 后重发 */
-export class KuroGeetestError extends Error {
-    captchaId: string
-    product: string
-    constructor(captchaId = KURO_BOX_GEETEST.captchaId, product = KURO_BOX_GEETEST.product) {
-        super('上游要求完成人机验证')
-        this.name = 'KuroGeetestError'
-        this.captchaId = captchaId
-        this.product = product
+export class KuroRiskControlError extends Error {
+    constructor() {
+        super('库街区取数被风控（上游要求人机验证）：请等待一段时间（通常几小时）后再同步')
+        this.name = 'KuroRiskControlError'
     }
 }
 
-/** @desc 检查 akiBox 返回是不是「要求人机验证」的桩数据（code 200 但 data 只有 geeTest） */
+/** @desc code 必须是 200；风控桩数据（data 只有 geeTest）直接抛 KuroRiskControlError */
 const assertNotGeetest = (json: UpstreamEnvelope, label: string): void => {
     const data = parseData<{ geeTest?: boolean }>(json)
-    if (data?.geeTest === true) {
-        throw new KuroGeetestError()
-    }
+    if (data?.geeTest === true) throw new KuroRiskControlError()
     if (Number(json?.code) !== 200) throw upstreamError(json, label)
 }
 
@@ -486,18 +473,11 @@ interface UpstreamRoleDetail {
  * @desc 单角色详情（含装配声骸）：body 需 channelId=19 / countryCode（游戏内国家）/ id=角色id。
  *  - countryCode 只影响上游按哪个「国家/地区」取数据，正常返回（code 200）就采用并记下来，
  *    只有上游明确报错时才换下一个候选
- *  - 风控时上游会返回 `data: { geeTest: true }` 的桩数据（code 200）：此时必须由前端解极验，
- *    把校验数据放到 body 的 `geeTestData` 重发（参考实现同样处理），所以这里直接抛 KuroGeetestError
+ *  - 风控时上游会返回 `data: { geeTest: true }` 的桩数据（code 200）：
+ *    不做人机验证（实测对取数接口无效），直接抛 KuroRiskControlError 明确报被风控
  */
 let countryCodeHit = ''
-async function fetchCharacterDetail(
-    did: string,
-    bat: string,
-    roleId: string,
-    serverId: string,
-    charId: string,
-    geeTestData?: string
-) {
+async function fetchCharacterDetail(did: string, bat: string, roleId: string, serverId: string, charId: string) {
     const codes = countryCodeHit
         ? [countryCodeHit, ...COUNTRY_CODES.filter((c) => c !== countryCodeHit)]
         : COUNTRY_CODES
@@ -510,15 +490,14 @@ async function fetchCharacterDetail(
                 serverId,
                 channelId: CHANNEL_ID,
                 countryCode,
-                id: charId,
-                ...(geeTestData ? { geeTestData } : {})
+                id: charId
             })
             assertNotGeetest(json, `取角色详情失败（countryCode=${countryCode}）`)
             countryCodeHit = countryCode
             return parseData<UpstreamRoleDetail>(json)
         } catch (e) {
-            // 需要人机验证 / 登录过期：换 countryCode 也没用，直接抛给上层
-            if (e instanceof KuroGeetestError) throw e
+            // 被风控 / 登录过期：换 countryCode 也没用，直接抛给上层
+            if (e instanceof KuroRiskControlError) throw e
             lastErr = e
             if (String((e as Error)?.message ?? '').includes('登录已过期')) throw e
         }
@@ -526,11 +505,10 @@ async function fetchCharacterDetail(
     throw lastErr instanceof Error ? lastErr : new Error('取角色详情失败')
 }
 
-/** @desc 角色 + 当前装配声骸（同步词条方案用）：did 由路由层从 cookie 提供（与 token 同样的生命周期）
- *  geeTestData：前端解完极验后的校验数据（上游对取数接口风控时必需），会带在每个详情请求的 body 里 */
+/** @desc 角色 + 当前装配声骸（同步词条方案用）：did 由路由层从 cookie 提供（与 token 同样的生命周期） */
 export async function fetchRoleEchoes(
     token: string,
-    { roleId, serverId, did, geeTestData }: { roleId: string; serverId: string; did: string; geeTestData?: string }
+    { roleId, serverId, did }: { roleId: string; serverId: string; did: string }
 ): Promise<{
     characters: KuroCharacterEchoes[]
     stats: { characters: number; withEchoes: number; serverId: string; countryCode: string }
@@ -573,7 +551,7 @@ export async function fetchRoleEchoes(
                 echoes: []
             }
             try {
-                const detail = await fetchCharacterDetail(did, bat, roleId, resolvedServerId, charId, geeTestData)
+                const detail = await fetchCharacterDetail(did, bat, roleId, resolvedServerId, charId)
                 const phantoms = (detail?.phantomData?.equipPhantomList ?? []).filter(Boolean) as UpstreamPhantom[]
                 return {
                     ...base,
@@ -595,7 +573,7 @@ export async function fetchRoleEchoes(
                 }
             } catch (e) {
                 // 需要人机验证：整个同步都得先过验证，直接抛给上层（路由层转成「请完成验证」）
-                if (e instanceof KuroGeetestError) throw e
+                if (e instanceof KuroRiskControlError) throw e
                 // 单角色失败不影响整体：返回空声骸，由前端按「不足 5 个」跳过并提示原因
                 return { ...base, error: e instanceof Error ? e.message : String(e) }
             }

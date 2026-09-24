@@ -1,13 +1,7 @@
 import { buildKuroPlans, type KuroPlanDraft } from '$lib/kuro-app/kuro-plan'
 import { getCharacterList } from '$lib/api/data-cache'
 import { saveSubstatPlan } from '$lib/data/substat-library.svelte'
-import {
-    getKuroActiveRole,
-    isKuroLoggedIn,
-    KuroGeetestRequiredError,
-    kuroFetchRoleEchoes,
-    refreshKuroSession
-} from '$lib/kuro-app/kuro.svelte'
+import { getKuroActiveRole, isKuroLoggedIn, kuroFetchRoleEchoes, refreshKuroSession } from '$lib/kuro-app/kuro.svelte'
 
 /** @desc 方案名：同一角色重复同步会覆盖同一份，不堆积（时间与角色记在 note 里） */
 export const KURO_PLAN_NAME = '库街区同步'
@@ -52,10 +46,9 @@ async function knownCharacterNames(): Promise<string[]> {
 
 /**
  * @desc 只读预览：校验登录 → 取选中角色 → 拉数据 → 映射成方案草稿（不写库）。
- *  这里只按 cookie 读一次会话（不做「检验有效性」，那是设置里的事）；未登录/上游缺接口返回 ok:false + error。
- *  上游要求极验时**抛出 KuroGeetestRequiredError**（不吞掉），由 UI 弹极验后带 geeTestData 重试。
+ *  这里只按 cookie 读一次会话（不做「检验有效性」，那是设置里的事）；未登录/上游缺接口/被风控都返回 ok:false + error。
  */
-export async function previewSubstatPlansFromKuro(opts: { geeTestData?: string } = {}): Promise<{
+export async function previewSubstatPlansFromKuro(): Promise<{
     ok: boolean
     preview?: KuroSyncPreview
     error?: string
@@ -66,7 +59,7 @@ export async function previewSubstatPlansFromKuro(opts: { geeTestData?: string }
         if (!isKuroLoggedIn()) throw new Error('尚未登录库街区，请在「设置 → 连接配置 → 库街区账号」登录')
         const role = getKuroActiveRole()
         if (!role) throw new Error('该账号下没有已绑定的鸣潮角色（请先在库街区绑定游戏角色）')
-        const data = await kuroFetchRoleEchoes(role, opts.geeTestData)
+        const data = await kuroFetchRoleEchoes(role)
         const { plans, skipped, unmatchedNames } = buildKuroPlans(data.characters, await knownCharacterNames())
         const preview: KuroSyncPreview = {
             roleName: role.nickname ?? role.roleId,
@@ -91,8 +84,6 @@ export async function previewSubstatPlansFromKuro(opts: { geeTestData?: string }
         }
         return { ok: true, preview }
     } catch (e) {
-        // 极验要求必须让 UI 处理（弹验证再重试），不能当成普通失败吞掉
-        if (e instanceof KuroGeetestRequiredError) throw e
         return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 }
@@ -154,21 +145,9 @@ export async function applyKuroSync(
     }
 }
 
-/** @desc 一步到位（AI/WS 工具用）：预览 + 全部写入；上游要极验时无法自动完成，如实回报让用户手动同步 */
+/** @desc 一步到位（AI/WS 工具用）：预览 + 全部写入 */
 export async function syncSubstatPlansFromKuro(): Promise<KuroSyncResult> {
-    let res: Awaited<ReturnType<typeof previewSubstatPlansFromKuro>>
-    try {
-        res = await previewSubstatPlansFromKuro()
-    } catch (e) {
-        if (e instanceof KuroGeetestRequiredError) {
-            return {
-                ok: false,
-                ...empty(),
-                error: '上游要求人机验证：请打开「词条集」手动点一次「从库街区同步」完成验证'
-            }
-        }
-        throw e
-    }
+    const res = await previewSubstatPlansFromKuro()
     if (!res.ok || !res.preview) {
         return {
             ok: false,

@@ -43,12 +43,10 @@
     import { addToast } from '$lib/data/toast.svelte'
     import {
         isKuroLoggedIn,
-        KuroGeetestRequiredError,
         refreshKuroSession,
         requestKuroSettings,
         waitForKuroLogin
     } from '$lib/kuro-app/kuro.svelte'
-    import { solveGeetest } from '$lib/kuro-app/geetest'
     import { openPanel } from '$lib/ai/panels.svelte'
     import { ELEMENT_ORDER } from '$lib/consts/game-terms'
     import { compareRoverStarName, groupInOrder } from '$lib/utils/grouping'
@@ -286,37 +284,9 @@
                 }
             }
             // 先只读预览，交用户在确认弹窗里挑选角色/改方案名，再落盘。
-            // 上游风控（取数接口返回 data.geeTest=true）时要求极验：就地弹验证，拿到数据后重试一次。
-            let res: Awaited<ReturnType<typeof previewSubstatPlansFromKuro>>
-            try {
-                res = await previewSubstatPlansFromKuro()
-            } catch (e) {
-                if (!(e instanceof KuroGeetestRequiredError)) throw e
-                // 没配置库街区的极验 captchaId 就不弹验证窗口（弹错租户的验证过了也没用），只给可执行的提示
-                if (!e.captchaId) {
-                    addToast('上游要求人机验证（短时间请求过多会触发风控）：请等几分钟再同步一次', 'error')
-                    return
-                }
-                addToast('库街区要求完成人机验证，请在弹出的验证窗口里完成', 'info')
-                let validate: Awaited<ReturnType<typeof solveGeetest>>
-                try {
-                    validate = await solveGeetest(e.captchaId, e.product)
-                } catch (err) {
-                    addToast(`人机验证失败：${err instanceof Error ? err.message : String(err)}`, 'error')
-                    return
-                }
-                res = await previewSubstatPlansFromKuro({
-                    geeTestData: JSON.stringify({ ...validate, captcha_id: e.captchaId })
-                }).catch((err) => {
-                    // 验证数据已提交但上游仍要验证：说明该 captchaId 不是这个接口的租户，或验证只对单次请求有效
-                    if (err instanceof KuroGeetestRequiredError) {
-                        throw new Error(
-                            '验证已提交但上游仍然要求人机验证（可能极验租户不对，或验证数据只对单次请求有效）'
-                        )
-                    }
-                    throw err
-                })
-            }
+            // 上游风控（取数接口返回 data.geeTest=true）时不走极验：服务端会直接回「被风控」的明确错误，
+            // 这里原样提示，让用户等风控过去（实测对取数接口解验证无效）。
+            const res = await previewSubstatPlansFromKuro()
             if (!res.preview) {
                 addToast(`库街区同步失败：${res.error ?? '未知错误'}`, 'error')
                 return

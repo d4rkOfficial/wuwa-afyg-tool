@@ -237,21 +237,15 @@ export async function kuroLogout(): Promise<void> {
 
 /**
  * @desc 拉取某绑定角色的全部角色 + 当前装配声骸（原始数据，标签映射由前端做）。
- *  上游对取数接口风控时会要求极验：服务端用 `ok:true + geetest.required` 回应（约定同 /login/sms），
- *  这里转成 KuroGeetestRequiredError，由调用方 solveGeetest 后带 geeTestData 重试。
+ *  取数接口被上游风控时（服务端识别到 geeTest 桩数据）会回明确错误，这里原样抛出；
+ *  极验只用于短信登录，取数不走验证。
  */
-export async function kuroFetchRoleEchoes(role: KuroRole, geeTestData?: string): Promise<KuroRoleEchoes> {
-    const res = await call<{
-        characters?: KuroCharacterEchoes[]
-        geetest?: { required?: boolean; captchaId?: string; product?: string }
-    }>('/echoes', {
+export async function kuroFetchRoleEchoes(role: KuroRole): Promise<KuroRoleEchoes> {
+    const res = await call<{ characters?: KuroCharacterEchoes[] }>('/echoes', {
         method: 'POST',
-        body: { roleId: role.roleId, serverId: role.serverId ?? '', geeTestData },
+        body: { roleId: role.roleId, serverId: role.serverId ?? '' },
         timeout: 120000
     })
-    if (res.geetest?.required) {
-        throw new KuroGeetestRequiredError(res.geetest.captchaId ?? '', res.geetest.product ?? 'bind')
-    }
     return { role, characters: res.characters ?? [] }
 }
 
