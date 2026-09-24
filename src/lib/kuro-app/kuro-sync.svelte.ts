@@ -16,6 +16,8 @@ export const KURO_PLAN_NAME = '库街区同步'
 export interface KuroSyncSkipped {
     character: string
     reason: string
+    /** @desc 角色属性（有就按属性归组） */
+    element?: string
 }
 
 /** @desc 同步预览：先算清楚要写什么、跳过什么，交用户确认后再落盘 */

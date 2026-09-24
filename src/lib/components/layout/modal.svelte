@@ -12,6 +12,8 @@
         backdropClose?: boolean
         /** @desc 弹窗整体不滚动，由内容自行管理内部滚动（内部列表滚动） */
         noScroll?: boolean
+        /** @desc 不渲染右上/左上角关闭按钮（由内容自己提供关闭入口，如底栏按钮） */
+        hideClose?: boolean
         children?: Snippet
         title?: Snippet
         footer?: Snippet
@@ -22,6 +24,7 @@
         onclose,
         backdropClose = false,
         noScroll = false,
+        hideClose = false,
         backgroundImage,
         textColor,
         class: className,
@@ -75,7 +78,16 @@
             aria-modal="true"
             out:popOut
         >
-            {#if getModalClosePosition() === 'top-left' && title}
+            {#if hideClose && title}
+                <div
+                    class="mb-4 flex items-center gap-2 border-b pb-2.5 text-base font-black tracking-tight {footer
+                        ? 'shrink-0'
+                        : ''}"
+                    style="border-color: var(--theme-divider-border);"
+                >
+                    {@render title()}
+                </div>
+            {:else if getModalClosePosition() === 'top-left' && title}
                 <!-- 左上角模式且带标题：关闭按钮进入标题行，形成「关闭 | 图标 标题」 -->
                 <div
                     class="mb-4 flex items-center gap-2 border-b pb-2.5 pr-6 text-base font-black tracking-tight {footer

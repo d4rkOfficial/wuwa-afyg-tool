@@ -739,6 +739,7 @@
     preview={kuroPreview}
     {characters}
     {icons}
+    {elementIcons}
     fromCache={kuroPreviewFromCache}
     fetchedAt={kuroPreviewFetchedAt}
     onrefresh={refreshKuroPreview}

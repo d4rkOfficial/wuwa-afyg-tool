@@ -124,6 +124,8 @@ export interface KuroPlanDraft {
     slots: EchoSlotConfig[]
     /** @desc 上游给了几个声骸（< 5 表示声骸不齐，缺失槽位是空槽） */
     echoCount: number
+    /** @desc 角色属性（上游 roleData 的 attributeName），用于属性分组 */
+    element?: string
     /**
      * @desc 同名多形态候选（如上游只给「漂泊者」，工具箱名录里有各属性漂泊者）：
      *  非空时由用户指定要写入哪个形态，character 本身不含形态。
@@ -131,9 +133,17 @@ export interface KuroPlanDraft {
     options?: string[]
 }
 
+/** @desc 被跳过的角色（也会以灰化卡片出现在列表里，只是不可选） */
+export interface KuroPlanSkipped {
+    character: string
+    reason: string
+    /** @desc 角色属性（有就按属性归组） */
+    element?: string
+}
+
 export interface KuroPlanBuildResult {
     plans: KuroPlanDraft[]
-    skipped: { character: string; reason: string }[]
+    skipped: KuroPlanSkipped[]
     /** @desc 未能映射的原始名称（供 UI 提示「有词条名没认出来」） */
     unmatchedNames: string[]
 }
@@ -202,13 +212,17 @@ export function padSlots(slots: EchoSlotConfig[]): EchoSlotConfig[] | null {
  *  - knownNames：工具箱角色名录（用于把上游角色名对到工具箱写法，可传空数组） */
 export function buildKuroPlans(characters: KuroCharacterEchoes[], knownNames: string[] = []): KuroPlanBuildResult {
     const plans: KuroPlanDraft[] = []
-    const skipped: { character: string; reason: string }[] = []
+    const skipped: KuroPlanSkipped[] = []
     const unmatched = new Set<string>()
+    /** @desc 跳过项也带属性，UI 才能把灰化卡片放进对应属性分组 */
+    const skip = (ch: KuroCharacterEchoes, reason: string) => {
+        skipped.push({ character: ch.name, reason, ...(ch.element ? { element: ch.element } : {}) })
+    }
     for (const ch of characters) {
         const echoes = ch.echoes ?? []
         if (echoes.length === 0) {
             // 服务端把「该角色详情拉取失败」的原因带在 error 上：优先展示它
-            skipped.push({ character: ch.name, reason: ch.error ? `拉取失败：${ch.error}` : '没有装配声骸' })
+            skip(ch, ch.error ? `拉取失败：${ch.error}` : '没有装配声骸')
             continue
         }
         const slots: EchoSlotConfig[] = []
@@ -223,17 +237,17 @@ export function buildKuroPlans(characters: KuroCharacterEchoes[], knownNames: st
             slots.push(slot)
         }
         if (bad) {
-            skipped.push({ character: ch.name, reason: '存在无法识别的声骸数据' })
+            skip(ch, '存在无法识别的声骸数据')
             continue
         }
         const padded = padSlots(slots)
         if (!padded) {
-            skipped.push({ character: ch.name, reason: '声骸 cost 组合不满足工具箱方案约束（合计 >12）' })
+            skip(ch, '声骸 cost 组合不满足工具箱方案约束（合计 >12）')
             continue
         }
         const normalized = normalizeAnyPlanSlots(padded)
         if (!normalized) {
-            skipped.push({ character: ch.name, reason: '声骸数据不满足工具箱方案约束（cost 合计 >12 或词条非法）' })
+            skip(ch, '声骸数据不满足工具箱方案约束（cost 合计 >12 或词条非法）')
             continue
         }
         const { name, matched, options } = matchCharacterName(ch.name, knownNames)
@@ -243,6 +257,7 @@ export function buildKuroPlans(characters: KuroCharacterEchoes[], knownNames: st
             matched,
             slots: normalized,
             echoCount: echoes.length,
+            ...(ch.element ? { element: ch.element } : {}),
             ...(options.length > 0 ? { options } : {})
         })
     }

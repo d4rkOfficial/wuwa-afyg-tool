@@ -267,6 +267,8 @@ export interface KuroCharacterEchoes {
     level?: number
     chain?: number
     weapon?: string
+    /** @desc 角色属性（上游 roleData 的 attributeName），用于按属性分组 */
+    element?: string
     echoes: KuroEcho[]
     /** @desc 该角色详情拉取失败时的原因（整体同步不受影响） */
     error?: string

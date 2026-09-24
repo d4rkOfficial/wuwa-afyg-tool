@@ -360,6 +360,8 @@ interface UpstreamOwnedRole {
     level?: string | number
     chainUnlockNum?: number
     weaponTypeName?: string
+    /** @desc 角色属性（衍射 / 湮灭 / 气动…）：上游 roleData 直接带回，用于属性分组 */
+    attributeName?: string
 }
 
 /**
@@ -548,6 +550,7 @@ export async function fetchRoleEchoes(
                 level: Number(ch.level) || undefined,
                 chain: ch.chainUnlockNum != null ? Number(ch.chainUnlockNum) : undefined,
                 weapon: ch.weaponTypeName ?? undefined,
+                ...(ch.attributeName ? { element: ch.attributeName } : {}),
                 echoes: []
             }
             try {
