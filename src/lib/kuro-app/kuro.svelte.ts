@@ -9,6 +9,8 @@ import { browser } from '$app/environment'
 const ROLE_KEY = 'wuwa-afyg:kuro:role'
 /** @desc 本地登录标记：只有它存在时，启动才去问服务端要会话（未登录过的用户零请求） */
 const LOGGED_KEY = 'wuwa-afyg:kuro:logged'
+/** @desc 开机签到日期（YYYY-MM-DD）：同一天只自动签一次 */
+const SIGNED_KEY = 'wuwa-afyg:kuro:signed-on'
 
 /** @desc 绑定的游戏角色（鸣潮）：roleId/serverId 用于拉取角色与声骸数据 */
 export interface KuroRole {
@@ -186,18 +188,62 @@ export async function kuroSendSms(phone: string, geeTestData?: string): Promise<
     }
 }
 
-/** @desc 验证码登录（成功后 token 由服务端写进 httpOnly cookie，前端只拿会话概览） */
-export async function kuroVerifyLogin(phone: string, code: string): Promise<void> {
-    const res = await call<{ session: KuroSessionInfo }>('/login/verify', {
+/** @desc 验证码登录（成功后 token 由服务端写进 httpOnly cookie，前端只拿会话概览）；服务端会顺手做鸣潮签到 */
+export async function kuroVerifyLogin(phone: string, code: string): Promise<{ signIn: KuroSignInResult[] }> {
+    const res = await call<{ session: KuroSessionInfo; signIn?: KuroSignInResult[] }>('/login/verify', {
         method: 'POST',
         body: { phone, code },
-        timeout: 25000
+        timeout: 40000
     })
     _session = res.session ?? EMPTY_SESSION
     _valid = true
     _reason = null
     setLoggedMark(true)
     settleLoginWaiters(true)
+    return { signIn: res.signIn ?? [] }
+}
+
+/** @desc 鸣潮每日签到的单角色结果 */
+export interface KuroSignInResult {
+    roleId: string
+    status: 'signed' | 'already' | 'failed'
+    message: string
+}
+
+/** @desc 鸣潮每日签到（服务端给每个绑定角色各签一次） */
+export async function kuroSignIn(): Promise<KuroSignInResult[]> {
+    const res = await call<{ results?: KuroSignInResult[] }>('/signin', { method: 'POST', timeout: 60000 })
+    return res.results ?? []
+}
+
+/** @desc 签到结果 → 一句人话（登录窗口/开机提示共用） */
+export function formatKuroSignIn(results: KuroSignInResult[]): string {
+    if (results.length === 0) return ''
+    const signed = results.filter((r) => r.status === 'signed').length
+    const already = results.filter((r) => r.status === 'already').length
+    const failed = results.filter((r) => r.status === 'failed')
+    if (failed.length > 0) {
+        return `鸣潮签到：成功 ${signed} 个、已签到 ${already} 个、失败 ${failed.length} 个（${failed[0].message}）`
+    }
+    if (signed > 0) return `鸣潮签到完成（${signed} 个角色）`
+    return '鸣潮签到：今天已经签过了'
+}
+
+/**
+ * @desc 开机自动签到：同一天只尝试一次（本地记日期），会话失效或当天签过就直接跳过。
+ *  返回可读提示（没有动作时返回 null），由 UI 决定是否弹 toast。
+ */
+export async function signInWavesDaily(): Promise<string | null> {
+    if (!browser || !_session.loggedIn) return null
+    const today = new Date().toLocaleDateString('sv-SE')
+    if (localStorage.getItem(SIGNED_KEY) === today) return null
+    try {
+        const results = await kuroSignIn()
+        localStorage.setItem(SIGNED_KEY, today)
+        return formatKuroSignIn(results) || null
+    } catch (e) {
+        return `鸣潮签到失败：${e instanceof Error ? e.message : String(e)}`
+    }
 }
 
 /**
@@ -232,6 +278,7 @@ export async function kuroLogout(): Promise<void> {
     _valid = false
     _reason = null
     setLoggedMark(false)
+    if (browser) localStorage.removeItem(SIGNED_KEY)
 }
 
 /** @desc 拉取某绑定角色的全部角色 + 当前装配声骸（原始数据，标签映射由前端做） */

@@ -102,7 +102,6 @@
         getKuroSession,
         getKuroValid,
         kuroLogout,
-        refreshKuroSession,
         setKuroLoginOpen,
         setKuroRoleId
     } from '$lib/kuro-app/kuro.svelte'
@@ -159,12 +158,6 @@
     let kuroReason = $derived(getKuroReason())
     let kuroBusy = $derived(getKuroBusy())
     let kuroActiveRole = $derived(getKuroActiveRole())
-
-    const handleKuroCheck = async () => {
-        await refreshKuroSession(true)
-        if (getKuroValid()) addToast('库街区登录状态有效', 'success')
-        else addToast(`库街区登录状态无效：${getKuroReason() ?? '未知原因'}`, 'error')
-    }
 
     const handleKuroLogout = async () => {
         try {
@@ -2080,15 +2073,6 @@
                                         {kuroSession.loggedIn ? '登录窗口 / 重新登录' : '登录'}
                                     </button>
                                     {#if kuroSession.loggedIn}
-                                        <button
-                                            onclick={handleKuroCheck}
-                                            disabled={kuroBusy}
-                                            class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-40"
-                                            style="border-color: var(--theme-divider-border);"
-                                        >
-                                            <Icon icon="mdi:shield-refresh-outline" class="size-4" />
-                                            检验有效性
-                                        </button>
                                         <button
                                             onclick={handleKuroLogout}
                                             disabled={kuroBusy}

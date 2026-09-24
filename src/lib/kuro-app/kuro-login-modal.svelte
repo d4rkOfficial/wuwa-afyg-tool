@@ -1,12 +1,14 @@
 <script lang="ts">
     /**
-     * @desc 库街区登录窗口（实验性）：短信验证码登录（上游要求时弹极验） + 查看绑定角色 + 有效性检验 / 退出登录。
-     * 凭据（token）由应用自身的服务端路由放进 httpOnly cookie，浏览器脚本读不到；本窗口只显示登录状态。
+     * @desc 库街区登录窗口（实验性）：短信验证码登录（上游要求时弹极验） + 查看绑定角色 + 退出/重新登录。
+     *  「检验有效性」已移除——打开工具箱时会自动静默校验一次会话状态。
+     *  凭据（token）由应用自身的服务端路由放进 httpOnly cookie，浏览器脚本读不到；本窗口只显示登录状态。
      */
     import Icon from '@iconify/svelte'
     import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import type { ComponentsProps } from '$lib/types'
     import {
+        formatKuroSignIn,
         getKuroSession,
         kuroLogout,
         kuroSendSms,
@@ -98,26 +100,22 @@
         }
     }
 
+    /**
+     * @desc 登录：成功后展示账号/角色数量 + 服务端顺手做的鸣潮签到结果。
+     *  （不再提供「检验有效性」：打开工具箱时会自动静默校验一次会话）
+     */
     async function handleLogin() {
         clearMessages()
         busy = true
         try {
-            await kuroVerifyLogin(phone.trim(), code.trim())
-            info = `登录成功${session.roles.length > 0 ? `，已读取到 ${session.roles.length} 个绑定角色` : ''}`
+            const { signIn } = await kuroVerifyLogin(phone.trim(), code.trim())
+            const signInText = formatKuroSignIn(signIn)
+            info = `登录成功${session.roles.length > 0 ? `，已读取到 ${session.roles.length} 个绑定角色` : ''}${
+                signInText ? `；${signInText}` : ''
+            }`
             code = ''
         } catch (e) {
             error = e instanceof Error ? e.message : String(e)
-        } finally {
-            busy = false
-        }
-    }
-
-    async function handleCheck() {
-        clearMessages()
-        busy = true
-        try {
-            await refreshKuroSession(true)
-            info = '已重新校验登录状态'
         } finally {
             busy = false
         }
@@ -293,15 +291,6 @@
                     class="mt-3 flex shrink-0 flex-wrap items-center gap-2 border-t pt-3"
                     style="border-color: var(--theme-divider-border);"
                 >
-                    <button
-                        onclick={handleCheck}
-                        disabled={busy}
-                        class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-[11px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-40"
-                        style="border-color: var(--theme-divider-border);"
-                    >
-                        <Icon icon="mdi:shield-check-outline" class="size-3.5" />
-                        检验有效性
-                    </button>
                     <button
                         onclick={handleRelogin}
                         disabled={busy}

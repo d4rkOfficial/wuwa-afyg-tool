@@ -15,6 +15,9 @@ const DEV_CODE_SMS = '073A9EFAC18FC50616DD15808DAE719DBCB904B7'
 /** @desc akiBox 系列用的 iOS UA（与参考实现一致，库街区 App 社区端） */
 const AKI_USER_AGENT =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)  KuroGameBox/3.0.3'
+/** @desc 签到接口用的 Android WebView UA（文档里签到请求就是这个 UA） */
+const SIGNIN_USER_AGENT =
+    'Mozilla/5.0 (Linux; Android 14; 23127PN0CC Build/UKQ1.230804.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/127.0.6533.15 Mobile Safari/537.36 Kuro/2.2.0 KuroGameBox/2.2.0'
 /** @desc 渠道号与服务器区域：countryCode 逐个试（隍陇=1 / 黑海岸=900 / 黎那汐塔=3） */
 const CHANNEL_ID = process.env.KURO_CHANNEL_ID || '19'
 const COUNTRY_CODES = (process.env.KURO_COUNTRY_CODES || '1,3,900')
@@ -44,11 +47,11 @@ const oldHeaders = (token: string | null, { sms = false, withDistinct = true } =
 })
 
 /**
- * @desc akiBox 数据接口的 devCode：参考实现是 `"{公网IP}, {IOS UA}"`（IP 走 event.kurobbs.com/event/ip），
+ * @desc devCode：参考实现是 `"{公网IP}, {UA}"`（IP 走 event.kurobbs.com/event/ip），
  *  取不到时退化为随机串。IP 在进程内缓存（Serverless 复用实例时省一次请求）。
  */
 let publicIpCache = ''
-async function akiDevCode(): Promise<string> {
+async function ipDevCode(userAgent: string): Promise<string> {
     if (!publicIpCache) {
         try {
             const res = await fetch('https://event.kurobbs.com/event/ip', {
@@ -60,8 +63,10 @@ async function akiDevCode(): Promise<string> {
             publicIpCache = ''
         }
     }
-    return publicIpCache ? `${publicIpCache}, ${AKI_USER_AGENT}` : randomDevCode()
+    return publicIpCache ? `${publicIpCache}, ${userAgent}` : randomDevCode()
 }
+
+const akiDevCode = () => ipDevCode(AKI_USER_AGENT)
 
 /**
  * @desc akiBox「取数据」系列接口请求头：source/UA/devCode + `did`（设备号）+ `b-at`（数据令牌）。
@@ -282,6 +287,70 @@ export async function checkToken(token: string): Promise<boolean> {
     const json = await post('/user/role/findRoleList', oldHeaders(token, { withDistinct: false }), { gameId: 3 })
     if (Number(json?.code) === 220) return false
     return Number(json?.code) === 200 && json?.success === true
+}
+
+/** @desc 鸣潮每日签到的结果（每个绑定角色一条） */
+export interface KuroSignInResult {
+    roleId: string
+    status: 'signed' | 'already' | 'failed'
+    message: string
+}
+
+/**
+ * @desc 库街区「鸣潮」每日签到（gameId=3）：先 initSignInV2 看今天签没签（isSigIn），
+ *  没签再打 signIn/v2（1511 = 今天已签、1505 = 活动过期）。签到按「游戏角色」计，所以要带 roleId/serverId。
+ */
+export async function signInWaves(
+    token: string,
+    role: { roleId: string; serverId?: string },
+    userId: string
+): Promise<KuroSignInResult> {
+    const roleId = String(role.roleId)
+    const serverId = resolveServerId(roleId, role.serverId)
+    const headers: Record<string, string> = {
+        source: 'android',
+        token,
+        devCode: await ipDevCode(SIGNIN_USER_AGENT),
+        accept: 'application/json, text/plain, */*',
+        'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
+        'accept-language': 'zh-CN,zh;q=0.9',
+        'user-agent': SIGNIN_USER_AGENT
+    }
+    const body = { gameId: 3, serverId, roleId, userId }
+    const init = await post('/encourage/signIn/initSignInV2', headers, body)
+    if (Number(init?.code) !== 200) throw upstreamError(init, '取签到状态失败')
+    const info = parseData<{ isSigIn?: boolean; sigInNum?: number }>(init)
+    if (info?.isSigIn) {
+        return { roleId, status: 'already', message: `今天已签到（累计 ${info.sigInNum ?? '?'} 天）` }
+    }
+    const reqMonth = String(new Date().getMonth() + 1).padStart(2, '0')
+    const res = await post('/encourage/signIn/v2', headers, { ...body, reqMonth })
+    const code = Number(res?.code)
+    if (code === 200) return { roleId, status: 'signed', message: '签到成功' }
+    if (code === 1511) return { roleId, status: 'already', message: '今天已签到' }
+    if (code === 1505) return { roleId, status: 'failed', message: '签到活动已过期（code 1505）' }
+    throw upstreamError(res, '签到失败')
+}
+
+/** @desc 给账号下所有绑定角色签到：单个失败不影响其它（结果里如实标注） */
+export async function signInWavesRoles(
+    token: string,
+    roles: { roleId: string; serverId?: string }[],
+    userId: string
+): Promise<KuroSignInResult[]> {
+    const out: KuroSignInResult[] = []
+    for (const role of roles) {
+        try {
+            out.push(await signInWaves(token, role, userId))
+        } catch (e) {
+            out.push({
+                roleId: String(role.roleId),
+                status: 'failed',
+                message: e instanceof Error ? e.message : String(e)
+            })
+        }
+    }
+    return out
 }
 
 interface UpstreamGameRole {
