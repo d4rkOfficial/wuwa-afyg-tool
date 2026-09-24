@@ -36,3 +36,18 @@ export function setSubstatLibraryOpen(v: boolean): void {
     _open = v
     if (!v) _character = null
 }
+
+/** @desc 「从库街区同步」预览弹窗的打开请求（AI/WS 工具发起，词条集弹窗消费后清掉） */
+let _kuroPreviewRequested = $state(false)
+
+export function requestKuroSyncPreview(): boolean {
+    if (!_open) return false
+    _kuroPreviewRequested = true
+    return true
+}
+
+export function consumeKuroSyncPreviewRequest(): boolean {
+    if (!_kuroPreviewRequested) return false
+    _kuroPreviewRequested = false
+    return true
+}

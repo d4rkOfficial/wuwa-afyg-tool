@@ -23,6 +23,7 @@
     } from '$lib/data/substat-library.svelte'
     import {
         closeSubstatLibrary,
+        consumeKuroSyncPreviewRequest,
         getSubstatLibraryCharacter,
         getSubstatLibraryMode,
         getSubstatLibraryOpen
@@ -139,6 +140,8 @@
             expandOverride = {}
         }
         prevOpen = open
+        // AI/WS 工具请求打开「从库街区同步」预览：面板已在工具里打开，这里补上弹窗
+        if (open && consumeKuroSyncPreviewRequest()) void syncFromKuro()
     })
 
     /** @desc 角色数据（标准词条按角色元素/固有属性自动生成，需要先补齐） */
