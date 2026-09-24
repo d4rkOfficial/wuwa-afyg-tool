@@ -113,6 +113,7 @@ const post = async (
 const upstreamError = (json: UpstreamEnvelope, fallback = '上游返回异常'): Error => {
     const code = Number(json?.code)
     if (code === 220) return new Error('库街区登录已过期（code 220），请重新登录')
+    if (code === 10903) return new Error('数据令牌已失效（code 10903），请重新登录后再同步')
     if (code === 242) return new Error('验证码发送过于频繁（code 242），请稍后再试')
     if (code === -130) return new Error('验证码错误或已过期（code -130）')
     if (code === 6001) return new Error('暂无数据：请先在库街区绑定鸣潮角色（code 6001）')
@@ -130,6 +131,36 @@ const parseData = <T>(json: UpstreamEnvelope): T | undefined => {
         }
     }
     return raw as T | undefined
+}
+
+/**
+ * @desc 从 akiBox 返回里挖出角色数组：data 可能是字符串化 JSON、数组本身，或再套一层
+ *  （参考实现前端同样兼容 `data.roleList` / `data.list` / `data` 是数组三种形态）。
+ */
+const pickRoleList = (value: unknown, depth = 0): UpstreamOwnedRole[] => {
+    if (depth > 3 || value == null) return []
+    if (Array.isArray(value)) return value as UpstreamOwnedRole[]
+    if (typeof value === 'string') {
+        try {
+            return pickRoleList(JSON.parse(value), depth + 1)
+        } catch {
+            return []
+        }
+    }
+    if (typeof value === 'object') {
+        const record = value as Record<string, unknown>
+        for (const key of ['roleList', 'list', 'data']) {
+            const found = pickRoleList(record[key], depth + 1)
+            if (found.length > 0) return found
+        }
+    }
+    return []
+}
+
+/** @desc data 的短预览，用于把「空列表」这类可疑响应带回给用户/日志 */
+const previewData = (json: UpstreamEnvelope): string => {
+    const raw = typeof json?.data === 'string' ? json.data : JSON.stringify(json?.data ?? null)
+    return (raw ?? 'null').slice(0, 200)
 }
 
 const parseNum = (v: unknown): number => {
@@ -365,7 +396,7 @@ async function fetchOwnedRoles(
     bat: string,
     roleId: string,
     serverId: string
-): Promise<UpstreamOwnedRole[]> {
+): Promise<{ list: UpstreamOwnedRole[]; preview: string }> {
     const json = await post('/aki/roleBox/akiBox/roleData', await akiDataHeaders(did, bat), {
         gameId: 3,
         roleId,
@@ -373,7 +404,21 @@ async function fetchOwnedRoles(
     })
     // 失败信息带上实际使用的 serverId：再出「服务器id不能为空」时能直接看出兜底是否生效
     if (Number(json?.code) !== 200) throw upstreamError(json, `取角色列表失败（serverId=${serverId || '空'}）`)
-    return parseData<{ roleList?: UpstreamOwnedRole[] }>(json)?.roleList ?? []
+    return { list: pickRoleList(parseData<unknown>(json) ?? json), preview: previewData(json) }
+}
+
+/**
+ * @desc 刷新角色盒数据（refreshData）：库街区的角色盒是**官方快照**，账号从未在 App 里刷新过时
+ *  roleData 会返回空 roleList（参考实现因此在每次读取前都会先刷新）。官方有频率限制，
+ *  失败时如实抛出上游 msg（例如「刷新过于频繁」）。
+ */
+async function refreshRoleBox(did: string, bat: string, roleId: string, serverId: string): Promise<void> {
+    const json = await post('/aki/roleBox/akiBox/refreshData', await akiDataHeaders(did, bat), {
+        gameId: 3,
+        roleId,
+        serverId
+    })
+    if (Number(json?.code) !== 200) throw upstreamError(json, '刷新角色盒数据失败')
 }
 
 interface UpstreamProp {
@@ -435,8 +480,26 @@ export async function fetchRoleEchoes(
     const resolvedServerId = resolveServerId(roleId, serverId)
     // akiBox 调用前必须先换数据令牌（b-at），否则上游会拒（典型表现就是「服务器id不能为空」这类误报）
     const bat = await fetchBatToken(token, did, roleId, resolvedServerId)
-    const owned = await fetchOwnedRoles(did, bat, roleId, resolvedServerId)
-    if (owned.length === 0) throw new Error('该账号下没有查询到角色数据（请确认已绑定角色、游戏数据已同步）')
+    let ownedResult = await fetchOwnedRoles(did, bat, roleId, resolvedServerId)
+    if (ownedResult.list.length === 0) {
+        // 官方快照未刷新（或从未在 App 里打开过角色盒）时 roleList 为空：先刷新再读一次。
+        // 刷新本身可能被频率限制，此时把上游原因一并带上，避免只剩一句「没有角色数据」。
+        let refreshNote = ''
+        try {
+            await refreshRoleBox(did, bat, roleId, resolvedServerId)
+            ownedResult = await fetchOwnedRoles(did, bat, roleId, resolvedServerId)
+        } catch (e) {
+            refreshNote = `；刷新角色盒失败：${e instanceof Error ? e.message : String(e)}`
+        }
+        if (ownedResult.list.length === 0) {
+            throw new Error(
+                `该账号下没有查询到角色数据（serverId=${resolvedServerId}）：` +
+                    `请先在库街区 App 打开「鸣潮 → 角色盒」刷新一次数据` +
+                    `${refreshNote}；响应=${ownedResult.preview}`
+            )
+        }
+    }
+    const owned = ownedResult.list
     const characters = await mapLimit(owned, 4, async (ch): Promise<KuroCharacterEchoes> => {
         const charId = String(ch.roleId)
         const base: KuroCharacterEchoes = {
