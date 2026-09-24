@@ -48,7 +48,7 @@
         {
             watermark: 'WORKSHOP',
             title: '工坊',
-            desc: '浏览社区分享的排轴拉表工程并一键导入；也可上传自己的工程，生成带有效期的分享链接。',
+            desc: '把自己的工程上传到工坊，生成带有效期的分享链接；也能浏览社区公开的工程，看看别人怎么排轴、怎么拉表。',
             icon: 'mdi:storefront-outline',
             action: onWorkshopFrame,
             wide: true
@@ -56,21 +56,21 @@
         {
             watermark: 'BUFF',
             title: 'Buff 集',
-            desc: '按角色 / 武器 / 声骸 / 套装维护增益条目，拉表时勾选导入；可从工坊同步。',
+            desc: '按角色 / 武器 / 声骸 / 套装维护增益条目，拉表时勾选生效；可从工坊同步社区维护的 Buff 预设。',
             icon: 'mdi:view-dashboard-outline',
             action: onBuffLibrary
         },
         {
             watermark: 'STAT',
             title: '词条集',
-            desc: '标准 14 词条与自定义声骸词条方案，一键套用到队伍角色。',
+            desc: '标准 14 词条与自定义声骸词条方案，可一键套用到队伍角色；支持从库街区导入账号下角色的当前声骸。',
             icon: 'mdi:clipboard-text-outline',
             action: onSubstatLibrary
         },
         {
             watermark: 'COCONUT',
             title: '设置',
-            desc: '主题外观、交互与快捷键、AI 助手、数据源与工坊实例。',
+            desc: '外观（主题、背景图、表面质感）、交互（二次确认、提示位置、水印、侧栏动作、关闭按钮位置）、按键图标与快捷键、性能与重载；数据（上游数据源、工坊实例、库街区账号、缓存清理、归档管理）；AI 助手（接入配置、权限与人设提示词）。',
             icon: 'mdi:cog-outline',
             action: onSettings,
             wide: true
