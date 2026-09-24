@@ -283,8 +283,8 @@ export async function kuroLogout(): Promise<void> {
 
 /**
  * @desc 拉取某绑定角色的全部角色 + 当前装配声骸（原始数据，标签映射由前端做）。
- *  上游对取数接口风控时会要求极验：此时抛 KuroGeetestRequiredError，
- *  由调用方 solveGeetest 后带 geeTestData 重试一次。
+ *  上游对取数接口风控时会要求极验：服务端用 `ok:true + geetest.required` 回应（约定同 /login/sms），
+ *  这里转成 KuroGeetestRequiredError，由调用方 solveGeetest 后带 geeTestData 重试。
  */
 export async function kuroFetchRoleEchoes(role: KuroRole, geeTestData?: string): Promise<KuroRoleEchoes> {
     const res = await call<{

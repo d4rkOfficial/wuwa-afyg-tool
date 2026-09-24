@@ -292,8 +292,14 @@
                 res = await previewSubstatPlansFromKuro()
             } catch (e) {
                 if (!(e instanceof KuroGeetestRequiredError)) throw e
-                addToast('库街区要求完成人机验证，验证通过后会继续同步', 'info')
-                const validate = await solveGeetest(e.captchaId, e.product)
+                addToast('库街区要求完成人机验证，请在弹出的验证窗口里完成', 'info')
+                let validate: Awaited<ReturnType<typeof solveGeetest>>
+                try {
+                    validate = await solveGeetest(e.captchaId, e.product)
+                } catch (err) {
+                    addToast(`人机验证失败：${err instanceof Error ? err.message : String(err)}`, 'error')
+                    return
+                }
                 res = await previewSubstatPlansFromKuro({
                     geeTestData: JSON.stringify({ ...validate, captcha_id: e.captchaId })
                 })
@@ -306,6 +312,8 @@
             if (!res.ok) addToast(`库街区同步：${res.error ?? '没有可同步的角色'}`, 'error')
             kuroPreview = res.preview
             kuroPreviewOpen = true
+        } catch (e) {
+            addToast(`库街区同步失败：${e instanceof Error ? e.message : String(e)}`, 'error')
         } finally {
             kuroSyncing = false
         }

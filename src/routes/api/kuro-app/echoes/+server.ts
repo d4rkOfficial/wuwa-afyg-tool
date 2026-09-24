@@ -23,13 +23,17 @@ const run = async (
     if (!roleId) return json({ ok: false, error: '缺少 roleId' })
     try {
         const data = await fetchRoleEchoes(token, { roleId, serverId, did, geeTestData })
-        return json({ ok: true, ...data })
+        return json({ ok: true, geetest: { required: false }, ...data })
     } catch (e) {
         if (e instanceof KuroGeetestError) {
+            // 注意：必须是 ok:true —— 客户端 call() 见到 ok:false 会直接抛错，
+            // 只有 ok:true + geetest.required 才能让前端走到「弹极验再重试」那条分支
+            // （与 /login/sms 的约定一致）
             return json({
-                ok: false,
-                error: '库街区要求完成人机验证后才能读取角色数据',
-                geetest: { required: true, captchaId: e.captchaId, product: e.product }
+                ok: true,
+                geetest: { required: true, captchaId: e.captchaId, product: e.product },
+                characters: [],
+                error: '库街区要求完成人机验证后才能读取角色数据'
             })
         }
         return json({ ok: false, error: e instanceof Error ? e.message : String(e) })
