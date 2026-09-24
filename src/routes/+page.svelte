@@ -86,7 +86,7 @@
         openSubstatLibrary,
         setSubstatLibraryOpen
     } from '$lib/data/substat-library-ui.svelte'
-    import { getKuroLoginOpen, loadKuroPrefs, setKuroLoginOpen } from '$lib/kuro-app/kuro.svelte'
+    import { getKuroLoginOpen, loadKuroPrefs, restoreKuroSession, setKuroLoginOpen } from '$lib/kuro-app/kuro.svelte'
     import { shouldAskFirstSync } from '$lib/data/first-sync.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
@@ -324,6 +324,8 @@
         loadShortcuts()
         loadWorkshop()
         loadKuroPrefs()
+        // 库街区：本地有登录标记就自动恢复登录态（token 在 httpOnly cookie 里，前端只能问服务端）
+        void restoreKuroSession()
         await ensureVersion()
         if (browser) {
             const prev = localStorage.getItem('wuwa-afyg:version')

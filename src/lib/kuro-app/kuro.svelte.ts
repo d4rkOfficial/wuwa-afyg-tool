@@ -7,6 +7,8 @@ import { browser } from '$app/environment'
  */
 
 const ROLE_KEY = 'wuwa-afyg:kuro:role'
+/** @desc 本地登录标记：只有它存在时，启动才去问服务端要会话（未登录过的用户零请求） */
+const LOGGED_KEY = 'wuwa-afyg:kuro:logged'
 
 /** @desc 绑定的游戏角色（鸣潮）：roleId/serverId 用于拉取角色与声骸数据 */
 export interface KuroRole {
@@ -105,6 +107,24 @@ export function loadKuroPrefs(): void {
     _roleId = localStorage.getItem(ROLE_KEY) ?? ''
 }
 
+/** @desc 维护本地登录标记（登录成功/退出/会话失效时更新） */
+const setLoggedMark = (on: boolean): void => {
+    if (!browser) return
+    if (on) localStorage.setItem(LOGGED_KEY, '1')
+    else localStorage.removeItem(LOGGED_KEY)
+}
+
+/**
+ * @desc 打开工具箱时自动恢复库街区登录态：只有本地存过登录标记才去问服务端
+ *  （token 在 httpOnly cookie 里前端读不到，只能让服务端按 cookie 回话）。
+ *  顺带静默校验一次（不弹任何窗口）：已失效则由服务端清 cookie，本地标记也跟着清掉。
+ */
+export async function restoreKuroSession(): Promise<void> {
+    if (!browser) return
+    if (localStorage.getItem(LOGGED_KEY) !== '1') return
+    await refreshKuroSession(true)
+}
+
 interface CallOptions {
     method?: 'GET' | 'POST'
     body?: unknown
@@ -176,6 +196,7 @@ export async function kuroVerifyLogin(phone: string, code: string): Promise<void
     _session = res.session ?? EMPTY_SESSION
     _valid = true
     _reason = null
+    setLoggedMark(true)
     settleLoginWaiters(true)
 }
 
@@ -193,6 +214,7 @@ export async function refreshKuroSession(check = true): Promise<void> {
         _session = res.session ?? EMPTY_SESSION
         _valid = res.valid ?? false
         _reason = res.reason ?? null
+        setLoggedMark(_session.loggedIn && _valid !== false)
         // cookie 里其实还有登录态（store 之前是空的）时，等待中的流程也能直接继续
         if (_session.loggedIn) settleLoginWaiters(true)
     } catch (e) {
@@ -209,6 +231,7 @@ export async function kuroLogout(): Promise<void> {
     _session = EMPTY_SESSION
     _valid = false
     _reason = null
+    setLoggedMark(false)
 }
 
 /** @desc 拉取某绑定角色的全部角色 + 当前装配声骸（原始数据，标签映射由前端做） */
