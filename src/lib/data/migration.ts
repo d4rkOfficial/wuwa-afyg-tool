@@ -11,6 +11,7 @@
 import type { BuffCondition, BuffInstance, BuffVariant, BuffZoneValue, CalcState } from '$lib/calc/calculation.types'
 import { ZONE_MAP } from '$lib/calc/calculation.consts'
 import { isConditionEmpty, normalizeCondition, normalizeConditionForScope } from '$lib/calc/condition'
+import { bindPaneEffectSources, entryOwnersFromTimeline } from '$lib/calc/pane-effects'
 import type { ConfigState } from '$lib/calc/config.types'
 import type { TimelineData } from '$lib/calc/timeline.types'
 import type {
@@ -485,7 +486,40 @@ const migrateV1toV2: Migration = {
     }
 }
 
-const PROJECT_MIGRATIONS: Migration[] = [migrateV0toV1, migrateV1toV2]
+/** @desc 迁移 v2 → v3（当前版本）：引用语义修正 —— 把旧工程「跨角色副作用 buff」补勾到引用它们的伤害段 */
+const migrateV2toV3: Migration = {
+    from: 2,
+    to: 3,
+    migrate(raw) {
+        const encounter = asRecord(raw.encounter)
+        const calcContainer = asRecord(encounter.calculation)
+        const calcState = migrateCalcState(calcContainer.data ?? asRecord(raw.calc))
+        const team = normalizeTeam(raw.team)
+        const owners = entryOwnersFromTimeline(asRecord(encounter.timeline).data)
+        const bindings = bindPaneEffectSources(calcState.buffSets, calcState.damageEntryBuffSetIds, owners, team)
+
+        return {
+            ...raw,
+            version: 3,
+            team,
+            encounter: {
+                ...encounter,
+                timeline: {
+                    locked: lockedOf(encounter, 'timeline'),
+                    data: (asRecord(encounter.timeline).data ?? null) as TimelineData | null
+                },
+                calculation: { ...calcContainer, data: { ...calcState, damageEntryBuffSetIds: bindings } },
+                config: {
+                    locked: lockedOf(encounter, 'config'),
+                    data: (asRecord(encounter.config).data ?? null) as ConfigState | null
+                }
+            },
+            buffs: calcState.buffSets
+        }
+    }
+}
+
+const PROJECT_MIGRATIONS: Migration[] = [migrateV0toV1, migrateV1toV2, migrateV2toV3]
 
 /** @desc 读取数据的版本号：无版本号（老导出格式 / 老 IndexedDB）视为 0 */
 export const readVersion = (raw: Record<string, unknown>): number => {

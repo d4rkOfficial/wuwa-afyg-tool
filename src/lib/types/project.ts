@@ -53,9 +53,9 @@ export interface EncounterState {
     config: PhaseStateV2<ConfigState>
 }
 
-// ── 新工程结构（version 2）──
+// ── 新工程结构（version 3：引用语义修正，v2→v3 迁移补齐跨角色影响源绑定）──
 
-export const PROJECT_VERSION = 2
+export const PROJECT_VERSION = 3
 
 export interface ProjectV2 {
     version: number

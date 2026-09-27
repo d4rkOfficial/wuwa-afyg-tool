@@ -110,6 +110,11 @@ interface BuffCondition {
   （`buffId → { 被引用角色槽位, 被改写的面板乘区键 }`，映射表 `PANEL_TO_ZONES` 把面板属性映射到会改写它的乘区键）。
   它们作为**普通可勾选项**出现在拉表里 —— 平铺模式下是该角色组内的列（表头带 `mdi:transit-connection-variant` 标记），
   下拉模式下是该条目 BUFF 区里的 chip；引用配置弹窗里不再显示任何副作用列表。
+- **v2 → v3 迁移（`migrateV2toV3`）**：旧语义下被引用角色的面板由该角色**全部条目**上绑定的 Buff 组成，
+  改口径后只勾在被引用角色身上的副作用 Buff 会突然失效。迁移用 `bindPaneEffectSources()` 把它们
+  补勾到引用这些面板的伤害段上（`entryOwnersFromTimeline()` 从时间线推导条目归属）：
+  只加不减、幂等、跳过全局 Buff 与自引用，且**不按条件过滤**（与旧语义跨条件变化保持等价）。
+  纯逻辑集中在 `src/lib/calc/pane-effects.ts`，store、界面与迁移共用同一口径。
 
 ## 4. 新增乘区的步骤
 

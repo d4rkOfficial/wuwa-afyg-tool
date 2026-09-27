@@ -19,6 +19,7 @@ import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from './calculation.consts'
 import type { ZoneId } from './calculation.consts'
 import type { ConditionProfile } from './compute'
 import { isConditionEmpty, normalizeCondition, normalizeConditionForScope } from './condition'
+import { paneEffectSourcesOf, type PaneEffectSource } from './pane-effects'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffSet[]>([])
@@ -980,54 +981,7 @@ export function setBuffSetZoneValue(setId: string, zoneId: string, value: number
 
 /** @desc ── 跨角色引用：本条目可勾选的「影响源」Buff ── */
 
-/** @desc 影响源：作用域指向被引用角色、且会改写被引用面板乘区的 Buff */
-export interface PaneEffectSource {
-    /** @desc 被本条目引用的角色槽位（这些 Buff 作用于该角色） */
-    charIdx: number
-    /** @desc 被改写的面板乘区键（ZONE_REF_DEFS 的 id） */
-    zoneIds: string[]
-}
-
-/** @desc 面板属性 id → 会改写它的乘区键（与 compute 的 applyZone 口径一致） */
-const PANEL_TO_ZONES: Record<string, string[]> = {
-    baseAtk: ['atkFlat', 'atkPct'],
-    totalAtk: ['atkFlat', 'atkPct'],
-    baseHp: ['hpFlat', 'hpPct'],
-    totalHp: ['hpFlat', 'hpPct'],
-    baseDef: ['defFlat', 'defPct'],
-    totalDef: ['defFlat', 'defPct'],
-    recharge: ['recharge'],
-    tuneBreakBoost: ['tuneBreakBoost'],
-    offTuneBuildupRate: ['offTuneBuildupRate'],
-    critRate: ['critRate'],
-    critDmg: ['critDmg']
-}
-
-/** @desc 某 Buff 是否作用于给定角色槽位（scope 判定，与引擎同口径） */
-const buffTouchesChar = (buff: BuffSet, charIdx: number): boolean => {
-    if (buff.scope === 'all') return true
-    if (buff.scope.length === 0) return false
-    return buff.scope.includes(charIdx)
-}
-
-/** @desc 某 Buff 在各变体里出现的乘区键（去重） */
-const buffZoneIds = (buff: BuffSet): Set<string> => {
-    const ids = new Set<string>()
-    for (const variant of variantsOf(buff)) {
-        for (const z of variant.zones) {
-            if (z.ref || z.override || z.value === 0) continue
-            ids.add(z.zoneId)
-        }
-    }
-    return ids
-}
-
-/** @desc 该条目是否真正生效某 Buff（scope 与引擎 scopeMatches 同口径） */
-const buffActiveForEntry = (buff: BuffSet, entry: DamageEntry, charIdx: number): boolean => {
-    if (buff.scope === 'all') return true
-    if (buff.scope.length === 0) return entry.isEffect && charIdx < 0
-    return buff.scope.includes(charIdx)
-}
+export type { PaneEffectSource } from './pane-effects'
 
 /**
  * @desc 某条目的「影响源」Buff：这些 Buff 的作用域指向**被本条目引用的角色**，且会改写被引用的那个面板乘区。
@@ -1043,37 +997,7 @@ export function getPaneEffectSources(entryId: string): Record<string, PaneEffect
     if (!entry) return {}
     const team = _initTeam
     const charIdx = entry.character && team ? team.findIndex((s) => s.character === entry.character) : -1
-    const boundIds = _damageEntryBuffSetIds[entryId] ?? []
-    if (boundIds.length === 0) return {}
-    const out: Record<string, PaneEffectSource> = {}
-    for (const buff of _buffSets) {
-        // 只有在本条目真正生效的 Buff，它的引用才谈得上「影响源」
-        if (!boundIds.includes(buff.id)) continue
-        if (!buffActiveForEntry(buff, entry, charIdx)) continue
-        for (const variant of variantsOf(buff)) {
-            for (const z of variant.zones) {
-                const ref = z.ref
-                if (!ref || ref.characterIdx === charIdx) continue
-                const zoneKeys = PANEL_TO_ZONES[ref.zoneId]
-                if (!zoneKeys?.length) continue
-                for (const other of _buffSets) {
-                    if (other.id === buff.id) continue
-                    if (!buffTouchesChar(other, ref.characterIdx)) continue
-                    const zones = buffZoneIds(other)
-                    const hits = zoneKeys.filter((k) => zones.has(k))
-                    if (hits.length === 0) continue
-                    const existing = out[other.id]
-                    if (existing && existing.charIdx === ref.characterIdx) {
-                        for (const h of hits) if (!existing.zoneIds.includes(h)) existing.zoneIds.push(h)
-                        continue
-                    }
-                    if (existing) continue
-                    out[other.id] = { charIdx: ref.characterIdx, zoneIds: [...hits] }
-                }
-            }
-        }
-    }
-    return out
+    return paneEffectSourcesOf(charIdx, entry.isEffect, _damageEntryBuffSetIds[entryId] ?? [], _buffSets)
 }
 
 /** @desc ── 同名多乘区：变体 CRUD（每个变体的乘区各自带条件）── */
