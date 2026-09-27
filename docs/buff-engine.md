@@ -56,13 +56,25 @@ BuffInstance ─┘
 
 ```ts
 interface BuffCondition {
-    logic?: 'and' | 'or' // 子句之间：全部满足 / 满足任一（默认 and）
     chains?: { charIdx: number; min: number }[]
     refinements?: { charIdx: number; min: number }[]
     elements?: string[]
     damageTypes?: string[]
 }
 ```
+
+### 组合口径（固定，无可选项）
+
+**类内「或」、类间「与」**：
+
+| 类别             | 内部                   | 类别之间                    |
+| ---------------- | ---------------------- | --------------------------- |
+| 伤害类型（多选） | 或（任一命中）         | 与                          |
+| 伤害属性（多选） | 或（任一命中）         | 与                          |
+| 链 / 阶门条件    | 与（同类子句全部满足） | 与（且与类型/属性同时满足） |
+
+- 链条件与阶条件**二选一**（见下）；需要条目上下文的子句在角色级聚合（无条目上下文）时视为不满足。
+- 乘区级条件不满足时只有该乘区不计入，同一条目其它乘区照常生效。
 
 ### 分层裁剪
 
@@ -83,15 +95,21 @@ interface BuffCondition {
 角色共鸣链与武器精炼档位的**真源是角色槽位**（`CharSlot.chain` / `CharSlot.refinement`），由「角色详情配置」
 编辑；`conditionProfileFromTeam(team)` 把它派生成条件系统读取的 `ConditionProfile`，不参与任何变量机制。
 
-## 3. 引用转模与跨角色副作用
+## 3. 引用转模与跨角色「影响源」
 
 `ZoneRef` 让某个乘区引用角色面板（`atkPct += 攻击白值 × pct%`、离散取整、上下限 clamp 等）。
 
-- **本条目可见面板**：本角色槽位用该条目的 `partialStats`（只含绑定到本条目的 Buff），
-  其它角色槽位沿用角色级 full stats —— 避免单条目绑定的 Buff 泄漏到其它条目的转模。
-- **跨角色副作用**：若 B 的 Buff 引用了 A 的面板属性 X，而 A 上有 Buff 会改写 X，则配置 B 时也需要能配置 A 的那些 Buff。
-  引擎侧由 `getPanelDependencies()` / `getBuffsAffectingPanel()` 给出依赖关系（`PANEL_TO_ZONES` 把面板属性映射到
-  会改写它的乘区键），界面在引用配置弹窗与拉表页提示条中列出，可一键跳过去编辑。
+**口径：伤害是当下的，buff 也是当下的。**
+
+- **本条目可见面板**：每个角色槽位的面板都只由**绑定到本条目**的 Buff 组成 ——
+  本角色槽位用 `partialStats`，其它角色槽位由 `buildEntryPanel()` 按需现算（同一槽位带缓存）。
+  因此：
+    - 某角色在**它自己其它条目**上勾的 Buff **不会**泄漏到本段的转模读数；
+    - 把「作用域指向被引用角色」的 Buff **勾到本段**上，它就会参与该角色在这一段的面板计算（勾了才生效，且不重复计算）。
+- **影响源（界面）**：`getPaneEffectSources(entryId)` 给出「会改写本段所引用面板」的 Buff 列表
+  （`buffId → { 被引用角色槽位, 被改写的面板乘区键 }`，映射表 `PANEL_TO_ZONES` 把面板属性映射到会改写它的乘区键）。
+  它们作为**普通可勾选项**出现在拉表里 —— 平铺模式下是该角色组内的列（表头带 `mdi:transit-connection-variant` 标记），
+  下拉模式下是该条目 BUFF 区里的 chip；引用配置弹窗里不再显示任何副作用列表。
 
 ## 4. 新增乘区的步骤
 

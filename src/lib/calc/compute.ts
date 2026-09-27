@@ -78,12 +78,12 @@ const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
     critDmg: 'critDmg'
 }
 
-function resolveRefValue(ref: ZoneRef, allCharStats: CharacterComputed[]): number {
-    const stats = allCharStats[ref.characterIdx]
-    if (!stats) return 0
+/** @desc 解析引用转模读数：从「本条目可见面板」里取被引用角色的属性（无面板时视为 0） */
+function resolveRefValue(ref: ZoneRef, panel: CharacterComputed | undefined): number {
+    if (!panel) return 0
     const key = REF_STAT_MAP[ref.zoneId]
     if (!key) return 0
-    const statValue = stats[key] as number
+    const statValue = panel[key] as number
     const excess = statValue - ref.threshold
     let value: number
     if (ref.discrete) {
@@ -335,6 +335,37 @@ export function getBoundBuffSets(
     ).map((b) => b.buff)
 }
 
+/** @desc 绑定到该条目的 Buff 候选（只按绑定关系取，不做作用域 / 条件过滤；再按每个角色槽位分别激活） */
+const entryCandidateBuffs = (
+    entry: DamageEntry,
+    buffSets: BuffInstance[],
+    damageEntryBuffSetIds: Record<string, string[]>
+): BuffInstance[] => {
+    const boundIds = damageEntryBuffSetIds[entry.id] ?? []
+    if (boundIds.length === 0) return []
+    return buffSets.filter((b) => boundIds.includes(b.id))
+}
+
+/**
+ * @desc 某角色槽位在「本条目」下真正生效的 Buff 及变体：作用域匹配 + 整块硬性条件 + 变体子条件。
+ * 条件里的链/阶以**该角色槽位**为参考（作用域指向谁，就按谁的链阶判定）。
+ */
+const activeBoundForChar = (
+    candidates: BuffInstance[],
+    charIdx: number,
+    isEffect: boolean,
+    profile: ConditionProfile,
+    ctx: Partial<ConditionContext>
+): BoundBuff[] => {
+    const out: BoundBuff[] = []
+    for (const buff of candidates) {
+        if (!scopeMatches(buff, charIdx, isEffect)) continue
+        const variants = activeVariants(buff, profile, charIdx, ctx)
+        if (variants.length > 0) out.push({ buff, variants })
+    }
+    return out
+}
+
 /** @desc 生效 Buff 及其生效变体（引擎内部用：逐变体写入乘区） */
 function boundBuffs(
     entry: DamageEntry,
@@ -347,24 +378,19 @@ function boundBuffs(
     echoDescByEntry?: Record<string, string>,
     matchEntry = true
 ): BoundBuff[] {
-    const boundIds = damageEntryBuffSetIds[entry.id] ?? []
-    const damageTypes = matchEntry
-        ? resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
-        : undefined
-    const ctx: ConditionContext = {
-        chains: profile.chains,
-        refinements: profile.refinements,
-        refCharIdx: charIndex >= 0 ? charIndex : undefined,
-        ...(matchEntry ? { element: entry.damageElement, damageTypes: damageTypes ?? [] } : {})
-    }
-    const out: BoundBuff[] = []
-    for (const buff of buffSets) {
-        if (!boundIds.includes(buff.id)) continue
-        if (!scopeMatches(buff, charIndex, entry.isEffect)) continue
-        const variants = activeVariants(buff, profile, charIndex, ctx)
-        if (variants.length > 0) out.push({ buff, variants })
-    }
-    return out
+    const ctx: Partial<ConditionContext> = matchEntry
+        ? {
+              element: entry.damageElement,
+              damageTypes: resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
+          }
+        : {}
+    return activeBoundForChar(
+        entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds),
+        charIndex,
+        entry.isEffect,
+        profile,
+        ctx
+    )
 }
 
 /** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 变体）。
@@ -1050,54 +1076,59 @@ function computeEffectEntry(
 
 // ── 引用转模：按「本条目可见面板」解析（乘区算子统一走 ZONE_OPS）──
 
-/** @desc 按「本条目可见面板」解析 ref（转模）：本角色槽位用该条目的 partialStats（仅含绑定到本条目的 buff），
- *  其它角色槽位沿用角色级 full stats（跨角色引用无时间轴粒度）；避免单条目绑定的 buff 泄漏到其它条目的转模 */
+/**
+ * @desc 按「本条目可见面板」解析 ref（转模）。
+ *
+ * 口径：**伤害是当下的，buff 也是当下的** —— 被引用角色的面板只由**绑定到本条目**的 Buff 组成
+ * （作用域指向被引用角色的 Buff 被勾到本条目上，就参与该角色在这一段的面板；未勾选的其它条目绑定不参与）。
+ * 本角色槽位直接用本条目面板 `partialStats`；其它角色槽位按需现算（`panelOf` 内部带缓存）。
+ */
 function resolveRefsForEntry(
     stats: CharacterComputed,
-    partialStats: CharacterComputed,
-    refSource: CharacterComputed[],
-    charIndex: number,
+    panelOf: (charIdx: number) => CharacterComputed,
     boundBuffs: BoundBuff[],
     ctx?: ZoneCtx
 ): void {
-    const entryRefStats = refSource.slice()
-    if (charIndex >= 0) entryRefStats[charIndex] = partialStats
     for (const { zoneId, ref } of refZonesOf(boundBuffs, ctx)) {
-        const resolved = resolveRefValue(ref, entryRefStats)
+        const resolved = resolveRefValue(ref, panelOf(ref.characterIdx))
         if (resolved === 0) continue
         applyZone(stats, zoneId, resolved)
         recomputeTotals(stats)
     }
 }
 
-/** @desc 某角色槽位在其全部条目上绑定过的 Buff 集合（角色级聚合面板用：取并集后按条件过滤） */
-function charLevelBoundBuffs(
+/**
+ * @desc 构建「本条目可见」的某角色槽位面板：装备/词条 + 绑定到本条目的、作用域指向该角色的 Buff。
+ * 与角色槽位级面板（把该角色全部条目上的绑定取并集）的区别：这里严格只看这一段伤害勾了什么。
+ */
+function buildEntryPanel(
+    refIdx: number,
+    ownStats: CharacterComputed,
     charIndex: number,
-    charName: string | null,
-    damageEntries: DamageEntry[],
-    buffSets: BuffInstance[],
-    damageEntryBuffSetIds: Record<string, string[]>,
-    conditionProfile: ConditionProfile
-): BoundBuff[] {
-    if (!charName || charIndex < 0) return []
-    const boundIds = new Set<string>()
-    for (const entry of damageEntries) {
-        if (entry.character !== charName) continue
-        for (const id of damageEntryBuffSetIds[entry.id] ?? []) boundIds.add(id)
-    }
-    const ctx: ConditionContext = {
-        chains: conditionProfile.chains,
-        refinements: conditionProfile.refinements,
-        refCharIdx: charIndex
-    }
-    const out: BoundBuff[] = []
-    for (const buff of buffSets) {
-        if (!boundIds.has(buff.id)) continue
-        if (!scopeMatches(buff, charIndex, false)) continue
-        const variants = activeVariants(buff, conditionProfile, charIndex, ctx)
-        if (variants.length > 0) out.push({ buff, variants })
-    }
-    return out
+    entry: DamageEntry,
+    candidates: BuffInstance[],
+    profile: ConditionProfile,
+    ctx: ZoneCtx,
+    team: CharSlot[],
+    configState: ConfigState,
+    charInfoMap: Record<string, CharacterInfo>,
+    weaponInfoMap: Record<string, WeaponInfo>
+): CharacterComputed {
+    if (refIdx === charIndex) return ownStats
+    const slot = team[refIdx]
+    if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats()
+    const bound = activeBoundForChar(candidates, refIdx, entry.isEffect, profile, ctx)
+    const panel = computeCharacterStats(
+        charInfoMap[slot.character],
+        slot.weapon,
+        weaponInfoMap[slot.weapon ?? ''] ?? null,
+        configState.characters[refIdx]?.echoes ?? [],
+        bound,
+        ctx
+    )
+    for (const z of overrideZonesOf(bound, ctx)) applyZone(panel, z.zoneId, z.value, 'override')
+    recomputeTotals(panel)
+    return panel
 }
 
 // ── main entry point ──
@@ -1115,28 +1146,7 @@ export function computeAll(
 ): ResultEntry[] {
     const enemy = configState.enemy
 
-    // Phase 1: per-character full stats (echo+weapon + all non-ref buffs from all entries)
-    // Used as the data source for ZoneRef resolution
-    const charFullStats: CharacterComputed[] = team.map((slot, i) => {
-        if (!slot.character || !charInfoMap[slot.character]) return emptyCharacterStats()
-        const bound = charLevelBoundBuffs(
-            i,
-            slot.character,
-            damageEntries,
-            buffSets,
-            damageEntryBuffSetIds,
-            conditionProfile
-        )
-        return computeCharacterStats(
-            charInfoMap[slot.character],
-            slot.weapon,
-            weaponInfoMap[slot.weapon ?? ''] ?? null,
-            configState.characters[i]?.echoes ?? [],
-            bound
-        )
-    })
-
-    // Phase 2: per-entry computation with ref resolution as final step
+    // 逐条目计算：条目面板 = 装备 + 绑定到本条目的 Buff；被引用角色的面板同样只看本条目勾选的 Buff
     /** @desc 声骸技能文案索引（伤害类型规则2：声骸技能条目的「视为/为 XX 伤害」） */
     const echoDescByEntry = buildEchoDescByEntry(damageEntries, team, getEchoSkillText())
     return damageEntries.map((entry) => {
@@ -1145,17 +1155,6 @@ export function computeAll(
         const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
         const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
         const echoes = charIndex >= 0 ? (configState.characters[charIndex]?.echoes ?? []) : []
-        const entryBound = boundBuffs(
-            entry,
-            charIndex,
-            buffSets,
-            damageEntryBuffSetIds,
-            damageEntryDamageTypes,
-            conditionProfile,
-            charInfoMap,
-            echoDescByEntry
-        )
-        const charInfo = charName ? charInfoMap[charName] : undefined
         const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
         /** @desc 乘区级条件上下文（伤害段属性/类型 + 链阶档位） */
         const zoneCtx: ZoneCtx = {
@@ -1164,11 +1163,14 @@ export function computeAll(
             element: entry.damageElement,
             damageTypes
         }
+        const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
+        const entryBound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx)
+        const charInfo = charName ? charInfoMap[charName] : undefined
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
         let partialStats: CharacterComputed
         if (charInfo) {
-            partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, entryBound)
+            partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, entryBound, zoneCtx)
         } else {
             partialStats = emptyCharacterStats()
             for (const z of activeZonesOf(entryBound, zoneCtx)) {
@@ -1177,9 +1179,32 @@ export function computeAll(
             recomputeTotals(partialStats)
         }
 
+        // 被引用角色面板：按需现算（同一槽位只算一次）
+        const panelCache = new Map<number, CharacterComputed>()
+        const panelOf = (refIdx: number): CharacterComputed => {
+            if (refIdx === charIndex) return partialStats
+            const cached = panelCache.get(refIdx)
+            if (cached) return cached
+            const built = buildEntryPanel(
+                refIdx,
+                partialStats,
+                charIndex,
+                entry,
+                candidates,
+                conditionProfile,
+                zoneCtx,
+                team,
+                configState,
+                charInfoMap,
+                weaponInfoMap
+            )
+            panelCache.set(refIdx, built)
+            return built
+        }
+
         // Resolve ref zones and apply to stats
         const stats = { ...partialStats }
-        resolveRefsForEntry(stats, partialStats, charFullStats, charIndex, entryBound, zoneCtx)
+        resolveRefsForEntry(stats, panelOf, entryBound, zoneCtx)
 
         // Apply override zones (set value directly, takes precedence over everything)
         for (const z of overrideZonesOf(entryBound, zoneCtx)) {
@@ -1202,43 +1227,11 @@ export function computeAll(
     })
 }
 
-export function getCharFullStatsForChar(
-    charIndex: number,
-    echoes: EchoSlotConfig[],
-    damageEntries: DamageEntry[],
-    buffSets: BuffInstance[],
-    damageEntryBuffSetIds: Record<string, string[]>,
-    charInfoMap: Record<string, CharacterInfo>,
-    team: CharSlot[],
-    weaponInfoMap: Record<string, WeaponInfo>,
-    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
-): CharacterComputed {
-    const slot = team[charIndex]
-    if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats()
-
-    const bound = charLevelBoundBuffs(
-        charIndex,
-        slot.character,
-        damageEntries,
-        buffSets,
-        damageEntryBuffSetIds,
-        conditionProfile
-    )
-
-    return computeCharacterStats(
-        charInfoMap[slot.character],
-        slot.weapon,
-        weaponInfoMap[slot.weapon ?? ''] ?? null,
-        echoes,
-        bound
-    )
-}
-
+/** @desc 单条目重算：面板与引用同样只看「这一段伤害勾选的 Buff」（与 computeAll 同口径） */
 export function computeOneEntry(
     entry: DamageEntry,
     charIndex: number,
     echoes: EchoSlotConfig[],
-    fullStats: CharacterComputed[],
     buffSets: BuffInstance[],
     damageEntryBuffSetIds: Record<string, string[]>,
     damageEntryDamageTypes: Record<string, string[]>,
@@ -1255,16 +1248,6 @@ export function computeOneEntry(
     const charInfo = charName ? charInfoMap[charName] : undefined
     /** @desc 声骸技能文案索引（伤害类型规则2） */
     const echoDescByEntry = buildEchoDescByEntry([entry], team, getEchoSkillText())
-    const bound = boundBuffs(
-        entry,
-        charIndex,
-        buffSets,
-        damageEntryBuffSetIds,
-        damageEntryDamageTypes,
-        conditionProfile,
-        charInfoMap,
-        echoDescByEntry
-    )
 
     // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
     const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
@@ -1275,15 +1258,40 @@ export function computeOneEntry(
         element: entry.damageElement,
         damageTypes
     }
+    const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
+    const bound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx)
 
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo
         ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, bound, zoneCtx)
         : emptyCharacterStats()
 
+    // 被引用角色面板：按需现算（同一槽位只算一次）
+    const panelCache = new Map<number, CharacterComputed>()
+    const panelOf = (refIdx: number): CharacterComputed => {
+        if (refIdx === charIndex) return partialStats
+        const cached = panelCache.get(refIdx)
+        if (cached) return cached
+        const built = buildEntryPanel(
+            refIdx,
+            partialStats,
+            charIndex,
+            entry,
+            candidates,
+            conditionProfile,
+            zoneCtx,
+            team,
+            configState,
+            charInfoMap,
+            weaponInfoMap
+        )
+        panelCache.set(refIdx, built)
+        return built
+    }
+
     // resolve ref zones
     const stats = { ...partialStats }
-    resolveRefsForEntry(stats, partialStats, fullStats, charIndex, bound, zoneCtx)
+    resolveRefsForEntry(stats, panelOf, bound, zoneCtx)
     for (const z of overrideZonesOf(bound, zoneCtx)) {
         applyZone(stats, z.zoneId, z.value, 'override')
     }

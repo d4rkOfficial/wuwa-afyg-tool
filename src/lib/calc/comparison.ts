@@ -42,6 +42,13 @@ export function getComparisonEligibility(
     const refinements = new Set<number>()
     for (const bs of buffSets) {
         if (!bs.condition || !mounted.has(bs.id)) continue
+        // 条件已归一化为 arrays（chains / refinements）；旧字段 chain / refinement 作兼容读取
+        for (const clause of bs.condition.chains ?? []) {
+            if (typeof clause?.min === 'number' && clause.min >= 0) chains.add(clause.min)
+        }
+        for (const clause of bs.condition.refinements ?? []) {
+            if (typeof clause?.min === 'number' && clause.min >= 0) refinements.add(clause.min)
+        }
         if (bs.condition.chain !== undefined && bs.condition.chain >= 0) chains.add(bs.condition.chain)
         if (bs.condition.refinement !== undefined && bs.condition.refinement >= 0)
             refinements.add(bs.condition.refinement)

@@ -4,13 +4,7 @@ import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharSubstatAnalysis, SubstatContribution, EchoContribution } from '../result.types'
 import type { ConditionProfile } from '../compute'
-import {
-    computeAll,
-    getCharFullStatsForChar,
-    computeOneEntry,
-    cloneEchoesWithoutAllSubstats,
-    DEFAULT_CONDITION_PROFILE
-} from '../compute'
+import { computeAll, computeOneEntry, cloneEchoesWithoutAllSubstats, DEFAULT_CONDITION_PROFILE } from '../compute'
 
 function factorial(n: number): number {
     let r = 1
@@ -73,21 +67,6 @@ export function computeSubstatContributions(
 
         const echoes = configState.characters[ci]?.echoes ?? []
 
-        const baseFullStats = team.map((_, i) => {
-            const echos = i === ci ? echoes : (configState.characters[i]?.echoes ?? [])
-            return getCharFullStatsForChar(
-                i,
-                echos,
-                damageEntries,
-                buffSets,
-                damageEntryBuffSetIds,
-                charInfoMap,
-                team,
-                weaponInfoMap,
-                conditionProfile
-            )
-        })
-
         function computeDamageForEchoes(
             modEchoes: EchoSlotConfig[],
             rig: boolean
@@ -96,21 +75,6 @@ export function computeSubstatContributions(
             rigVal: number
             noCritVal: number
         } {
-            const modFullStats = baseFullStats.map((fs, i) => {
-                if (i !== ci) return fs
-                return getCharFullStatsForChar(
-                    ci,
-                    modEchoes,
-                    damageEntries,
-                    buffSets,
-                    damageEntryBuffSetIds,
-                    charInfoMap,
-                    team,
-                    weaponInfoMap,
-                    conditionProfile
-                )
-            })
-
             let norm = 0
             let rigVal = 0
             let noCritVal = 0
@@ -119,7 +83,6 @@ export function computeSubstatContributions(
                     de,
                     ci,
                     modEchoes,
-                    modFullStats,
                     buffSets,
                     damageEntryBuffSetIds,
                     damageEntryDamageTypes,

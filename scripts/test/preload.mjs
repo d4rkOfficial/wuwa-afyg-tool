@@ -65,10 +65,11 @@ registerHooks({
         }
 
         // 2) 相对/绝对 无扩展名导入 → 尝试补 .ts 等
+        //    注意：`xxx.consts` / `xxx.types` 这类「点号在文件名里、但不是真扩展名」的模块也要补 .ts
         if (bare.startsWith('.') || path.isAbsolute(bare)) {
             const parentDir = context.parentURL ? path.dirname(fileURLToPath(context.parentURL)) : undefined
             const base = parentDir ? path.resolve(parentDir, bare) : bare
-            if (!path.extname(base)) {
+            if (!isFile(base)) {
                 for (const ext of EXTENSIONS) {
                     if (isFile(base + ext)) return { url: urlFromAbs(base + ext), shortCircuit: true }
                 }

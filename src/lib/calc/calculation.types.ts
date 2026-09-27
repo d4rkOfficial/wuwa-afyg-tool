@@ -65,10 +65,11 @@ export interface BuffZoneValue {
  * @desc 生效条件。按「挂载位置」区分能力：
  * - **Buff 实例级**（`BuffInstance.condition`）：链条件、阶条件是硬性条件只能挂这里；也可挂类型/属性条件
  * - **乘区级**（`BuffZoneValue.condition`）：只允许类型 / 属性条件（链阶由实例级统一把关）
- * `logic` 决定各子句之间的组合方式（默认 and：全部满足）。
+ *
+ * 组合口径固定为：**类内「或」、类间「与」**——
+ * 伤害类型多选内部为或、伤害属性多选内部为或，而类型条件 / 属性条件 / 链阶门条件之间必须同时满足。
  */
 export interface BuffCondition {
-    logic?: 'and' | 'or'
     /** @desc 链条件：角色共鸣链档位 ≥ min（硬性条件，仅 Buff 实例级） */
     chains?: { charIdx: number; min: number }[]
     /** @desc 阶条件：武器精炼档位 ≥ min（硬性条件，仅 Buff 实例级） */

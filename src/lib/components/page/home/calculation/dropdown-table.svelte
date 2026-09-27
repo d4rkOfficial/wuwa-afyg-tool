@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
     /** @desc 下拉表（拉表默认视图）：每条伤害可点击展开，配置伤害类型/增益勾选/叠层文件夹/复制前后段，支持 Buff 差异模式展示 */
     import { tick } from 'svelte'
     import { slide } from 'svelte/transition'
@@ -13,7 +13,7 @@
         setDamageTypesForEntry,
         syncDamageTypesToSameName,
         countSameNameEntries,
-        getBuffsAffectingPanel
+        getPaneEffectSources
     } from '$lib/calc/calculation.store.svelte'
     import { inferDamageTypes } from '$lib/calc/utils'
     import { conditionMet } from '$lib/calc/compute'
@@ -106,10 +106,30 @@
         return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap, charInfoMap, echoDescByEntry)
     }
 
-    /** @desc 对当前展开条目可见（非全局、作用域匹配、条件满足）的 Buff，并按叠层规则分组 */
+    /**
+     * @desc 当前条目的「影响源」Buff：作用域指向**被本条目的引用所指向的角色**、且会改写该面板乘区的 Buff。
+     * 伤害是当下的 —— 勾上它们就会参与该角色在这一段伤害下的面板计算，所以它们要和普通 Buff 一样
+     * 出现在本条目的 BUFF 区里（可勾选），而不是塞进引用配置弹窗。
+     */
+    const entryPaneSources = $derived.by(() => (selectedEntry ? getPaneEffectSources(selectedEntry.id) : {}))
+
+    /** @desc 影响源提示文案（chips tooltip） */
+    const paneSourceText = (buffId: string): string => {
+        const src = entryPaneSources[buffId]
+        if (!src) return ''
+        const charName = team[src.charIdx]?.character ?? `角色${src.charIdx + 1}`
+        const labels = src.zoneIds.map((z) => ZONE_REF_MAP.get(z)?.label ?? z)
+        return `影响源：${charName} 的${labels.join('、')}会被它改写，而本段伤害引用了该面板 —— 勾上后参与该角色在这一段的面板计算`
+    }
+
+    /** @desc 对当前展开条目可见（非全局、作用域匹配或属于跨角色引用影响源、条件满足）的 Buff，并按叠层规则分组 */
     let visibleBuffSets = $derived(
         buffSets.filter((b) => {
             if (globalBuffSetIds.includes(b.id)) return false
+            // 影响源：作用域不含本角色，但会改写「本段引用到的角色面板」，勾上即生效
+            if (entryPaneSources[b.id] !== undefined) {
+                return !selectedEntry || buffMatches(b, selectedEntry)
+            }
             const scopeOk = selectedEntry?.isEffect
                 ? b.scope === 'all' || (Array.isArray(b.scope) && b.scope.length === 0)
                 : entryCharIdx >= 0 && (b.scope === 'all' || (b.scope as number[]).includes(entryCharIdx))
@@ -223,45 +243,6 @@
             })
         }
     }
-
-    /**
-     * @desc 跨角色副作用：当前条目的某个已绑定 Buff 引用了别的角色面板，且那些角色上有 Buff 会改写该面板。
-     * 这些 Buff 通过面板间接影响本条目的伤害，因此在本条目的下拉区域一并提示。
-     */
-    const entryPaneEffects = $derived.by(() => {
-        const out: Array<{ buffId: string; refLabel: string; charName: string; names: string[] }> = []
-        if (!selectedEntry) return out
-        const charIdx = entryCharIdx
-        const boundIds = new Set(entryBuffSetIdMap[selectedEntry.id] ?? [])
-        for (const buff of buffSets) {
-            if (!boundIds.has(buff.id)) continue
-            const variants = buff.variants ?? [{ id: `${buff.id}-v1`, zones: buff.zones }]
-            for (const variant of variants) {
-                for (const zone of variant.zones) {
-                    const ref = zone.ref
-                    if (!ref || ref.characterIdx === charIdx) continue
-                    const names = getBuffsAffectingPanel(ref.characterIdx, ref.zoneId)
-                        .filter((a) => a.buffId !== buff.id && boundIds.has(a.buffId))
-                        .map((a) => a.buffName)
-                    if (names.length === 0) continue
-                    out.push({
-                        buffId: buff.id,
-                        refLabel: ZONE_REF_MAP.get(ref.zoneId)?.label ?? ref.zoneId,
-                        charName: team[ref.characterIdx]?.character ?? `角色${ref.characterIdx + 1}`,
-                        names: [...new Set(names)]
-                    })
-                }
-            }
-        }
-        return out
-    })
-
-    /** @desc 副作用提示文案 */
-    const entryPaneEffectText = $derived(
-        entryPaneEffects
-            .map((e) => `引用${e.charName}的${e.refLabel}，受其 BUFF 影响：${e.names.join('、')}`)
-            .join('\n')
-    )
 
     /** @desc 切换当前展开条目与某 Buff 的绑定并持久化 */
     function handleToggleBuffSetForEntry(setId: string) {
@@ -872,6 +853,19 @@
                                                                         .match(LAYERED_BUFF_PATTERN)
                                                                         ?.slice(2)
                                                                         .join('') ?? child.name}
+                                                                    {#if entryPaneSources[child.id] !== undefined}
+                                                                        <!-- @desc 影响源（叠层子项） -->
+                                                                        <span
+                                                                            class="ml-0.5 inline-flex shrink-0 align-middle"
+                                                                            title={paneSourceText(child.id)}
+                                                                            style="color: var(--theme-accent-text);"
+                                                                        >
+                                                                            <Icon
+                                                                                icon="mdi:transit-connection-variant"
+                                                                                class="size-2.5"
+                                                                            />
+                                                                        </span>
+                                                                    {/if}
                                                                 </button>
                                                             {/each}
                                                         </div>
@@ -883,6 +877,7 @@
                                             <div class="flex flex-wrap gap-1">
                                                 {#each groupedStandaloneItems as item (item.key)}
                                                     {@const checked = selectedEntrySetIds.includes(item.buffSet!.id)}
+                                                    {@const paneSrc = entryPaneSources[item.buffSet!.id] !== undefined}
                                                     <button
                                                         onclick={(e) => {
                                                             e.stopPropagation()
@@ -903,10 +898,11 @@
                                                             class="size-3 shrink-0"
                                                         />
                                                         {item.buffSet!.name}
-                                                        {#if entryPaneEffects.some((e) => e.buffId === item.buffSet!.id)}
+                                                        {#if paneSrc}
+                                                            <!-- @desc 影响源：作用于本段引用到的角色面板，勾上即参与该角色在这一段的面板 -->
                                                             <span
                                                                 class="shrink-0"
-                                                                title={entryPaneEffectText}
+                                                                title={paneSourceText(item.buffSet!.id)}
                                                                 style="color: var(--theme-accent-text);"
                                                             >
                                                                 <Icon

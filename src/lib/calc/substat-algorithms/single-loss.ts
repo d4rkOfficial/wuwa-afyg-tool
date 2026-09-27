@@ -6,7 +6,6 @@ import type { CharSubstatAnalysis, SubstatContribution, EchoContribution } from 
 import type { ConditionProfile } from '../compute'
 import {
     computeAll,
-    getCharFullStatsForChar,
     computeOneEntry,
     cloneEchoesWithoutSubstat,
     cloneEchoesWithoutAllSubstats,
@@ -61,41 +60,11 @@ export function computeSubstatContributions(
         const info: EchoContribution[] = []
         const allSubstats: SubstatContribution[] = []
 
-        const baseFullStats = team.map((_, i) => {
-            const echos = i === ci ? echoes : (configState.characters[i]?.echoes ?? [])
-            return getCharFullStatsForChar(
-                i,
-                echos,
-                damageEntries,
-                buffSets,
-                damageEntryBuffSetIds,
-                charInfoMap,
-                team,
-                weaponInfoMap,
-                conditionProfile
-            )
-        })
-
         function computeDamageForEchoes(modEchoes: EchoSlotConfig[]): {
             norm: number
             rigVal: number
             noCritVal: number
         } {
-            const modFullStats = baseFullStats.map((fs, i) => {
-                if (i !== ci) return fs
-                return getCharFullStatsForChar(
-                    ci,
-                    modEchoes,
-                    damageEntries,
-                    buffSets,
-                    damageEntryBuffSetIds,
-                    charInfoMap,
-                    team,
-                    weaponInfoMap,
-                    conditionProfile
-                )
-            })
-
             let norm = 0
             let rigVal = 0
             let noCritVal = 0
@@ -104,7 +73,6 @@ export function computeSubstatContributions(
                     de,
                     ci,
                     modEchoes,
-                    modFullStats,
                     buffSets,
                     damageEntryBuffSetIds,
                     damageEntryDamageTypes,
@@ -134,21 +102,6 @@ export function computeSubstatContributions(
                 const sub = echo.substats[si]
                 const modified = cloneEchoesWithoutSubstat(echoes, ei, si)
 
-                const modFullStats = baseFullStats.map((fs, i) => {
-                    if (i !== ci) return fs
-                    return getCharFullStatsForChar(
-                        ci,
-                        modified,
-                        damageEntries,
-                        buffSets,
-                        damageEntryBuffSetIds,
-                        charInfoMap,
-                        team,
-                        weaponInfoMap,
-                        conditionProfile
-                    )
-                })
-
                 let reducedNorm = 0
                 let reducedRig = 0
                 let reducedNoCrit = 0
@@ -157,7 +110,6 @@ export function computeSubstatContributions(
                         de,
                         ci,
                         modified,
-                        modFullStats,
                         buffSets,
                         damageEntryBuffSetIds,
                         damageEntryDamageTypes,

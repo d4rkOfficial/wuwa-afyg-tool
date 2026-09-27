@@ -53,45 +53,52 @@ export interface ConditionContext {
 
 /**
  * @desc 判定生效条件。
- * - 无任何子句 -> true
- * - `logic: 'or'` -> 任一子句满足即生效；默认 `and` -> 全部满足才生效
- * - 链/阶子句**互斥**：同一个条件里若同时出现链与阶，只判定链条件（见下方运行时护栏）
- * - 属性/类型子句：无条目上下文（element/damageTypes 未提供）时视为不生效
+ *
+ * 组合口径（固定，没有可选项）：
+ * - **伤害类型**：内部「或」—— 列出多个类型时，命中任意一个即满足
+ * - **伤害属性**：内部「或」—— 同上
+ * - **类别之间**：「与」—— 类型条件、属性条件、链/阶门条件三者必须同时满足（各自为空则视为满足）
+ * - **链 / 阶门条件**：二选一（同一个条件里同时出现链与阶时只判定链，见下方运行时护栏）；
+ *   同类子句（如多条链要求）之间为「与」——全部满足才生效
+ * - 需要条目上下文（伤害属性 / 伤害类型）的子句，在没有条目上下文时视为不满足
  */
 export const evaluateCondition = (cond: BuffCondition | undefined, ctx: ConditionContext): boolean => {
     if (!cond) return true
-    const results: boolean[] = []
 
+    // ── 类别 1：伤害类型（内部或）──
+    if (cond.damageTypes?.length) {
+        const types = ctx.damageTypes ?? []
+        if (ctx.element === undefined || !cond.damageTypes.some((dt) => types.includes(dt))) return false
+    }
+
+    // ── 类别 2：伤害属性（内部或）──
+    if (cond.elements?.length) {
+        if (ctx.element === undefined || !cond.elements.includes(ctx.element)) return false
+    }
+
+    // ── 类别 3：链 / 阶门条件（二选一；同类子句内部为与）──
+    const legacyRefIdx = ctx.refCharIdx ?? 0
+    const chainClauses = [
+        ...(cond.chains ?? []),
+        ...(cond.chain !== undefined ? [{ charIdx: legacyRefIdx, min: cond.chain }] : [])
+    ]
+    const refineClauses = [
+        ...(cond.refinements ?? []),
+        ...(cond.refinement !== undefined ? [{ charIdx: legacyRefIdx, min: cond.refinement }] : [])
+    ]
     /**
      * @desc 链条件与阶条件互斥：同一个 Buff 只能生效其中一个。
      * 界面已做互斥编辑、迁移会把同时带链与阶的 Buff 拆成两个；这里再做一道运行时护栏 ——
      * 若数据被其它途径（导入 / AI / 手改 JSON）写成了两者并存，则**只判定链条件**（阶条件整体忽略），
      * 保证「二选一」在任何路径下都成立。
      */
-    const legacyRefIdx = ctx.refCharIdx ?? 0
-    const hasChainClause = cond.chain !== undefined || (cond.chains?.length ?? 0) > 0
-    if (hasChainClause) {
-        for (const clause of cond.chains ?? []) {
-            results.push((ctx.chains[clause.charIdx] ?? 0) >= clause.min)
-        }
-        if (cond.chain !== undefined) results.push((ctx.chains[legacyRefIdx] ?? 0) >= cond.chain)
-    } else {
-        for (const clause of cond.refinements ?? []) {
-            results.push((ctx.refinements[clause.charIdx] ?? 1) >= clause.min)
-        }
-        if (cond.refinement !== undefined) results.push((ctx.refinements[legacyRefIdx] ?? 1) >= cond.refinement)
+    if (chainClauses.length > 0) {
+        if (!chainClauses.every((c) => (ctx.chains[c.charIdx] ?? 0) >= c.min)) return false
+    } else if (refineClauses.length > 0) {
+        if (!refineClauses.every((c) => (ctx.refinements[c.charIdx] ?? 1) >= c.min)) return false
     }
 
-    if (cond.elements?.length) {
-        results.push(ctx.element !== undefined && cond.elements.includes(ctx.element))
-    }
-    if (cond.damageTypes?.length) {
-        const types = ctx.damageTypes ?? []
-        results.push(ctx.element !== undefined && cond.damageTypes.some((dt) => types.includes(dt)))
-    }
-
-    if (results.length === 0) return true
-    return cond.logic === 'or' ? results.some(Boolean) : results.every(Boolean)
+    return true
 }
 
 /** @desc 条件摘要文案（界面 chip / 工具说明共用） */
@@ -100,15 +107,17 @@ export const describeCondition = (
     slotName = (i: number) => `角色${i + 1}`
 ): string => {
     if (!cond) return '无条件'
-    const parts: string[] = []
-    const logic = cond.logic === 'or' ? ' 或 ' : ' 且 '
-    for (const c of cond.chains ?? []) parts.push(`${slotName(c.charIdx)} ≥ ${c.min}链`)
-    for (const c of cond.refinements ?? []) parts.push(`${slotName(c.charIdx)}武器 ≥ ${c.min}阶`)
-    if (cond.chain !== undefined) parts.push(`共鸣链 ≥ ${cond.chain}`)
-    if (cond.refinement !== undefined) parts.push(`武器精炼 ≥ ${cond.refinement}`)
-    if (cond.elements?.length) parts.push(cond.elements.join('/'))
-    if (cond.damageTypes?.length) parts.push(cond.damageTypes.join('/'))
-    return parts.length ? parts.join(logic) : '无条件'
+    const groups: string[] = []
+    const gate: string[] = []
+    for (const c of cond.chains ?? []) gate.push(`${slotName(c.charIdx)} ≥ ${c.min}链`)
+    for (const c of cond.refinements ?? []) gate.push(`${slotName(c.charIdx)}武器 ≥ ${c.min}阶`)
+    if (cond.chain !== undefined) gate.push(`共鸣链 ≥ ${cond.chain}`)
+    if (cond.refinement !== undefined) gate.push(`武器精炼 ≥ ${cond.refinement}`)
+    if (gate.length) groups.push(gate.join(' 且 '))
+    // 属性 / 类型各自内部为「或」，与门条件之间为「且」
+    if (cond.elements?.length) groups.push(cond.elements.join(' 或 '))
+    if (cond.damageTypes?.length) groups.push(cond.damageTypes.join(' 或 '))
+    return groups.length ? groups.join(' 且 ') : '无条件'
 }
 
 // ── 条件归一化（迁移与界面共用的唯一入口）──
@@ -116,6 +125,7 @@ export const describeCondition = (
 /**
  * @desc 归一化生效条件。
  * - 过滤非法子句；旧字段 `chain` / `refinement` 升级为 `chains` / `refinements`（参考角色取 refCharIdx）
+ * - 丢弃已废弃的 `logic`（组合口径固定：类内或、类间与）
  * - 按层级裁剪：除 Buff 实例级外，链条件/阶条件一律剥离（链阶只能作为整个 Buff 的硬性条件）
  */
 export const normalizeCondition = (
@@ -134,7 +144,8 @@ export const normalizeCondition = (
     }
     delete next.chain
     delete next.refinement
-    if (!next.logic) delete next.logic
+    // 旧数据可能还带已废弃的 `logic` 字段（类型上已移除，这里显式清理）
+    delete (next as Record<string, unknown>).logic
     return normalizeConditionForScope(next, scope)
 }
 

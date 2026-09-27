@@ -19,7 +19,7 @@
         LAYERED_BUFF_VAR,
         ZONE_REF_MAP
     } from '$lib/calc/calculation.consts'
-    import { getCalcElementMap, compareNatural, getBuffsAffectingPanel } from '$lib/calc/calculation.store.svelte'
+    import { getCalcElementMap, compareNatural, getPaneEffectSources } from '$lib/calc/calculation.store.svelte'
     import { elementColor, getCharIconMap } from '$lib/calc/timeline.store.svelte'
     import {
         getGlobalBuffCollapsed,
@@ -263,6 +263,8 @@
     interface CellData {
         buffId: string
         enabled: boolean
+        /** @desc 该格是「影响源」：作用域指向本条目引用的角色面板，勾上后参与该角色在这一段的面板计算 */
+        pane: boolean
     }
     interface RowData {
         entry: DamageEntry
@@ -283,8 +285,8 @@
         // 单元格 tooltip 预算好，避免每次渲染为每格拼字符串
         titleOn: string
         titleOff: string
-        /** @desc 跨角色副作用提示（该 Buff 引用了别的角色面板且本组已绑定会改写它的 Buff） */
-        paneEffects: Array<{ refLabel: string; charName: string; names: string[] }>
+        /** @desc 该列是本组的「影响源」：作用域指向被本组某段伤害引用的角色面板（勾选即参与该角色在这一段的面板） */
+        paneSource?: { charName: string; zoneLabels: string[] }
     }
     interface HeadGroupCell {
         span: number
@@ -346,10 +348,13 @@
                 const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
                 const cells: CellData[] = []
                 const enabledBuffIds: string[] = []
+                // 影响源：本条目引用的他角色面板会被哪些（作用域指向该角色的）Buff 改写
+                const paneSources = getPaneEffectSources(entry.id)
                 for (let ci = 0; ci < cols.length; ci++) {
                     const bs = cols[ci]
-                    const enabled = buffEnabledForEntryCached(bs, entry, charIdx)
-                    cells.push({ buffId: bs.id, enabled })
+                    const pane = paneSources[bs.id] !== undefined
+                    const enabled = buffEnabledForEntryCached(bs, entry, charIdx) || pane
+                    cells.push({ buffId: bs.id, enabled, pane })
                     if (enabled) {
                         enabledCounts[ci]++
                         enabledBuffIds.push(bs.id)
@@ -376,6 +381,18 @@
             const visibleColIdx = cols.map((_, ci) => ci).filter((ci) => enabledCounts[ci] > 0)
 
             // 表头两行一次算好：第一行仅叠层组（组起点列输出 colspan 组名，普通列输出占位），第二行列名（叠层子列显示层号/层号+后缀）
+            /** @desc 本组「影响源」列：被本组任一条目引用的角色面板，其改写者在该组内的并集 */
+            const groupPaneSources = new Map<string, { charIdx: number; zoneIds: string[] }>()
+            for (const { entry } of g.items) {
+                for (const [id, src] of Object.entries(getPaneEffectSources(entry.id))) {
+                    const existing = groupPaneSources.get(id)
+                    if (!existing) {
+                        groupPaneSources.set(id, { charIdx: src.charIdx, zoneIds: [...src.zoneIds] })
+                        continue
+                    }
+                    for (const z of src.zoneIds) if (!existing.zoneIds.includes(z)) existing.zoneIds.push(z)
+                }
+            }
             const headerGroups: HeadGroupCell[] = []
             const headerCols: HeadCell[] = []
             for (let p = 0; p < visibleColIdx.length; p++) {
@@ -385,12 +402,14 @@
                 const sep = colSepClass(bs.id, nextId)
                 const grp = folderGroupOf.get(bs.id)
                 const layerNum = grp ? (bs.name.match(LAYERED_BUFF_PATTERN)?.[2] ?? '') : ''
-                // 跨角色副作用：该列 Buff 引用了别的角色面板，且本组条目上已绑定会改写该面板的 Buff
-                const groupBoundIds = new Set<string>()
-                for (const { entry } of g.items) {
-                    for (const id of entryBuffSetIdMap[entry.id] ?? []) groupBoundIds.add(id)
-                }
-                const paneEffects = resolvePaneEffects(bs, charToIdx[g.charName] ?? -1, true, groupBoundIds)
+                // 影响源列：该 Buff 作用于被本组引用的角色，会改写那个角色的面板乘区
+                const paneSrc = groupPaneSources.get(bs.id)
+                const paneSource = paneSrc
+                    ? {
+                          charName: team[paneSrc.charIdx]?.character ?? `角色${paneSrc.charIdx + 1}`,
+                          zoneLabels: paneSrc.zoneIds.map((z) => ZONE_REF_MAP.get(z)?.label ?? z)
+                      }
+                    : undefined
                 headerCols.push({
                     ci,
                     label: grp ? (grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum) : bs.name,
@@ -402,7 +421,7 @@
                     nameMaxClass: grp ? 'max-w-[43px]' : 'max-w-[106px]',
                     titleOn: `取消勾选：${bs.name}`,
                     titleOff: `勾选：${bs.name}`,
-                    paneEffects
+                    ...(paneSource ? { paneSource } : {})
                 })
                 if (!grp) {
                     headerGroups.push({ span: 1, sepClass: sep })
@@ -441,44 +460,11 @@
     })
 
     /**
-     * @desc 跨角色副作用：该 Buff 是否引用了别的角色面板，且那些角色上有 Buff 会改写该面板。
-     * `boundOnly=true` 时只统计「已绑定到本条目」的副作用 Buff（表格内展示用，与勾选状态一致）。
+     * @desc 影响源提示文案：该列 Buff 作用于「被本组某段伤害引用的角色」，会改写那个角色的面板乘区。
+     * 伤害是当下的 —— 勾上它，它就会参与该角色在这一段伤害下的面板计算。
      */
-    const resolvePaneEffects = (
-        buff: BuffSet,
-        charIdx: number,
-        boundOnly: boolean,
-        boundIds: Set<string>
-    ): Array<{ refLabel: string; charName: string; names: string[] }> => {
-        const variants = buff.variants ?? [{ id: `${buff.id}-v1`, zones: buff.zones }]
-        const out: Array<{ refLabel: string; charName: string; names: string[] }> = []
-        const seen = new Set<string>()
-        for (const variant of variants) {
-            for (const zone of variant.zones) {
-                const ref = zone.ref
-                if (!ref || ref.characterIdx === charIdx) continue
-                const affects = getBuffsAffectingPanel(ref.characterIdx, ref.zoneId)
-                const names = affects
-                    .filter((a) => a.buffId !== buff.id && (!boundOnly || boundIds.has(a.buffId)))
-                    .map((a) => a.buffName)
-                if (names.length === 0) continue
-                const refLabel = ZONE_REF_MAP.get(ref.zoneId)?.label ?? ref.zoneId
-                const key = `${ref.characterIdx}|${refLabel}`
-                if (seen.has(key)) continue
-                seen.add(key)
-                out.push({
-                    refLabel,
-                    charName: team[ref.characterIdx]?.character ?? `角色${ref.characterIdx + 1}`,
-                    names: [...new Set(names)]
-                })
-            }
-        }
-        return out
-    }
-
-    /** @desc 副作用提示文案（表头/选项 tooltip 共用） */
-    const paneEffectText = (effects: Array<{ refLabel: string; charName: string; names: string[] }>): string =>
-        effects.map((e) => `引用${e.charName}的${e.refLabel}，受其 BUFF 影响：${e.names.join('、')}`).join('\n')
+    const paneSourceText = (src: { charName: string; zoneLabels: string[] }): string =>
+        `影响源：${src.charName} 的${src.zoneLabels.join('、')}会被它改写，而本组的伤害引用了该面板 —— 勾上后参与该角色在这一段的面板计算`
 
     /** @desc 勾选统计（已选数）：按「已绑定的 (条目, buff) 对」增量累加——成本 O(已绑定数)，而非 O(行×列)；
      *  仅供行头/列头 tooltip 展示，勾选变化不触发结构重建，只失效这两个标题表达式 */
@@ -1178,7 +1164,7 @@
                                     highlight?.gi === gi && highlight.kind === 'col' && highlight.index === hc.ci}
                                 {@const selCount = selStats.colCounts[gi]?.get(hc.ci) ?? 0}
                                 {@const headTitle = `${hc.title}（${selCount}/${hc.enabled}）：单击高亮列，右键全选/全不选${
-                                    hc.paneEffects.length > 0 ? `\n${paneEffectText(hc.paneEffects)}` : ''
+                                    hc.paneSource ? `\n${paneSourceText(hc.paneSource)}` : ''
                                 }`}
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <th
@@ -1212,11 +1198,12 @@
                                                 class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
                                                 title={hc.title}>{hc.label}</span
                                             >
-                                            <!-- @desc 跨角色副作用标记：该列的 BUFF 引用了别的角色面板，且已绑定会改写该面板的 BUFF -->
-                                            {#if hc.paneEffects.length > 0}
+                                            <!-- @desc 影响源标记：该列作用于被本组引用的角色面板（勾上即参与该角色在这一段的面板） -->
+                                            {#if hc.paneSource}
                                                 <span
                                                     class="flex shrink-0 items-center"
                                                     style="color: var(--theme-accent-text);"
+                                                    title={paneSourceText(hc.paneSource)}
                                                 >
                                                     <Icon icon="mdi:transit-connection-variant" class="size-3" />
                                                 </span>
@@ -1294,6 +1281,12 @@
                                     {@const colHighlighted = colHighlightActive && highlight?.index === ci}
                                     {@const on = selIds.includes(cell.buffId)}
                                     {@const named = on && (colHighlighted || rowHighlighted)}
+                                    {@const cellTitle =
+                                        cell.pane && head?.paneSource
+                                            ? `${paneSourceText(head.paneSource)}\n${on ? '点击取消勾选' : '点击勾选'}`
+                                            : on
+                                              ? head?.titleOn
+                                              : head?.titleOff}
                                     <td
                                         class="min-w-9 border-b border-(--theme-divider-border) p-0 text-center {head?.sepClass ??
                                             ''}"
@@ -1306,7 +1299,7 @@
                                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                                             <button
                                                 onclick={() => toggleCell(row, cell)}
-                                                title={on ? head?.titleOn : head?.titleOff}
+                                                title={cellTitle}
                                                 class="flex min-h-6 w-full cursor-pointer items-center justify-center px-1.5 py-1.5 transition-colors hover:bg-(--theme-modal-text)/10"
                                             >
                                                 {#if on}
@@ -1326,6 +1319,12 @@
                                                             >{columns[ci].name}</span
                                                         >
                                                     {/if}
+                                                {:else if cell.pane}
+                                                    <!-- 影响源（未勾选）：用连接图标提示这是别的角色面板的改写者 -->
+                                                    <Icon
+                                                        icon="mdi:transit-connection-variant"
+                                                        class="size-3.5 shrink-0 opacity-30"
+                                                    />
                                                 {/if}
                                             </button>
                                         {:else}

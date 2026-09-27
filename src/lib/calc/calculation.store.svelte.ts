@@ -978,17 +978,14 @@ export function setBuffSetZoneValue(setId: string, zoneId: string, value: number
     zone.value = value
 }
 
-/** @desc ── 跨角色副作用：Buff 引用了别的角色的面板时，列出「影响了该面板乘区」的其它 Buff ── */
+/** @desc ── 跨角色引用：本条目可勾选的「影响源」Buff ── */
 
-export interface PanelDependency {
-    /** @desc 被引用的角色槽位 */
+/** @desc 影响源：作用域指向被引用角色、且会改写被引用面板乘区的 Buff */
+export interface PaneEffectSource {
+    /** @desc 被本条目引用的角色槽位（这些 Buff 作用于该角色） */
     charIdx: number
-    /** @desc 被引用的面板属性（ZONE_REF_DEFS 的 id，如 recharge / totalAtk） */
-    refZoneId: string
-    /** @desc 面板属性显示名 */
-    refLabel: string
-    /** @desc 该角色的哪些 Buff 会改写这个面板：{ buffId, buffName, zoneIds } */
-    affecting: { buffId: string; buffName: string; zoneIds: string[] }[]
+    /** @desc 被改写的面板乘区键（ZONE_REF_DEFS 的 id） */
+    zoneIds: string[]
 }
 
 /** @desc 面板属性 id → 会改写它的乘区键（与 compute 的 applyZone 口径一致） */
@@ -1025,72 +1022,58 @@ const buffZoneIds = (buff: BuffSet): Set<string> => {
     return ids
 }
 
+/** @desc 该条目是否真正生效某 Buff（scope 与引擎 scopeMatches 同口径） */
+const buffActiveForEntry = (buff: BuffSet, entry: DamageEntry, charIdx: number): boolean => {
+    if (buff.scope === 'all') return true
+    if (buff.scope.length === 0) return entry.isEffect && charIdx < 0
+    return buff.scope.includes(charIdx)
+}
+
 /**
- * @desc 当前表格里所有「跨角色面板引用」及其副作用来源。
- * 语义：B 的某个 Buff 引用了 A 的面板属性 X，且 A 上有 Buff 会改写 X —— 那么配置 B 的伤害条目时，
- * 也需要能够一并配置 A 的这些 Buff（它们通过面板间接影响 B 的伤害）。
+ * @desc 某条目的「影响源」Buff：这些 Buff 的作用域指向**被本条目引用的角色**，且会改写被引用的那个面板乘区。
+ *
+ * 口径与引擎一致（伤害是当下的）：本条目引用的角色面板只由**绑定到本条目**的 Buff 组成，
+ * 所以把这些 Buff 勾到本条目上就会参与该角色在这一段的面板计算 —— 因此它们要作为本条目的可勾选项
+ * 出现在拉表里（平铺的该角色组、下拉的该条目 BUFF 区），而不是塞进引用配置弹窗。
+ *
+ * @returns buffId → { 被引用角色槽位, 被改写的面板乘区键 }
  */
-export function getPanelDependencies(): PanelDependency[] {
-    const out: PanelDependency[] = []
+export function getPaneEffectSources(entryId: string): Record<string, PaneEffectSource> {
+    const entry = _entries.find((e) => e.id === entryId)
+    if (!entry) return {}
+    const team = _initTeam
+    const charIdx = entry.character && team ? team.findIndex((s) => s.character === entry.character) : -1
+    const boundIds = _damageEntryBuffSetIds[entryId] ?? []
+    if (boundIds.length === 0) return {}
+    const out: Record<string, PaneEffectSource> = {}
     for (const buff of _buffSets) {
+        // 只有在本条目真正生效的 Buff，它的引用才谈得上「影响源」
+        if (!boundIds.includes(buff.id)) continue
+        if (!buffActiveForEntry(buff, entry, charIdx)) continue
         for (const variant of variantsOf(buff)) {
             for (const z of variant.zones) {
                 const ref = z.ref
-                if (!ref) continue
+                if (!ref || ref.characterIdx === charIdx) continue
                 const zoneKeys = PANEL_TO_ZONES[ref.zoneId]
                 if (!zoneKeys?.length) continue
-                const affecting: PanelDependency['affecting'] = []
                 for (const other of _buffSets) {
                     if (other.id === buff.id) continue
                     if (!buffTouchesChar(other, ref.characterIdx)) continue
                     const zones = buffZoneIds(other)
                     const hits = zoneKeys.filter((k) => zones.has(k))
                     if (hits.length === 0) continue
-                    affecting.push({ buffId: other.id, buffName: other.name, zoneIds: hits })
+                    const existing = out[other.id]
+                    if (existing && existing.charIdx === ref.characterIdx) {
+                        for (const h of hits) if (!existing.zoneIds.includes(h)) existing.zoneIds.push(h)
+                        continue
+                    }
+                    if (existing) continue
+                    out[other.id] = { charIdx: ref.characterIdx, zoneIds: [...hits] }
                 }
-                if (affecting.length === 0) continue
-                out.push({
-                    charIdx: ref.characterIdx,
-                    refZoneId: ref.zoneId,
-                    refLabel: ZONE_REF_MAP.get(ref.zoneId)?.label ?? ref.zoneId,
-                    affecting
-                })
             }
         }
     }
-    // 合并同一 (角色, 面板) 的重复项，去重 affecting
-    const merged = new Map<string, PanelDependency>()
-    for (const dep of out) {
-        const key = `${dep.charIdx}|${dep.refZoneId}`
-        const existing = merged.get(key)
-        if (!existing) {
-            merged.set(key, dep)
-            continue
-        }
-        for (const a of dep.affecting) {
-            if (!existing.affecting.some((x) => x.buffId === a.buffId)) existing.affecting.push(a)
-        }
-    }
-    return [...merged.values()]
-}
-
-/** @desc 影响「某角色某面板属性」的其它 Buff 列表（配置该角色的 Buff 时提示副作用来源） */
-export function getBuffsAffectingPanel(charIdx: number, refZoneId: string): PanelDependency['affecting'] {
-    const zoneKeys = PANEL_TO_ZONES[refZoneId] ?? []
-    if (zoneKeys.length === 0) return []
-    const out: PanelDependency['affecting'] = []
-    for (const buff of _buffSets) {
-        if (!buffTouchesChar(buff, charIdx)) continue
-        const zones = buffZoneIds(buff)
-        const hits = zoneKeys.filter((k) => zones.has(k))
-        if (hits.length > 0) out.push({ buffId: buff.id, buffName: buff.name, zoneIds: hits })
-    }
     return out
-}
-
-/** @desc 当前表格是否存在跨角色面板引用（供界面显示提示） */
-export function hasPanelDependencies(): boolean {
-    return getPanelDependencies().length > 0
 }
 
 /** @desc ── 同名多乘区：变体 CRUD（每个变体的乘区各自带条件）── */

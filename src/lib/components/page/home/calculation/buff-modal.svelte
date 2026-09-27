@@ -17,7 +17,6 @@
         setBuffSetScope,
         setBuffSetCondition,
         setBuffSetConditionRef,
-        getBuffsAffectingPanel,
         addBuffVariant,
         removeBuffVariant,
         setBuffVariantCondition,
@@ -643,22 +642,6 @@
         if (!selectedBuffSetId) return
         setZoneRefAt(selectedBuffSetId, refZoneIndex, null, activeVariant?.id)
         showRefModal = false
-    }
-
-    /**
-     * @desc 跨角色副作用提示：本乘区引用了「角色 X 的面板属性 Y」，而 X 上有 Buff 会改写 Y。
-     * 这些 Buff 通过面板间接影响本 BUFF 的取值，因此需要在 X 的 Buff 列表里一并配置。
-     */
-    const refAffectingBuffs = $derived(showRefModal ? getBuffsAffectingPanel(refCharacterIdx, refTargetZoneId) : [])
-    const refCharName = $derived(team[refCharacterIdx]?.character ?? `角色 ${refCharacterIdx + 1}`)
-    const refZoneLabel = $derived(ZONE_REF_MAP.get(refTargetZoneId)?.label ?? refTargetZoneId)
-
-    /** @desc 跳到某个副作用来源 Buff：选中它并展开其所属变体，便于直接改数值/条件 */
-    const focusAffectingBuff = (buffId: string) => {
-        showRefModal = false
-        selectedBuffSetId = buffId
-        activeVariantId = null
-        addToast('已切换到影响该面板的 BUFF，可直接改它的乘区数值', 'success')
     }
 
     /** @desc 折叠/展开叠层文件夹 */
@@ -2391,7 +2374,6 @@
                                             {#if expandedZoneIndex === zoneIndex}
                                                 <ZoneConditionPanel
                                                     condition={zone.condition}
-                                                    locked={getLocked()}
                                                     onchange={(next) => handleZoneConditionChange(zoneIndex, next)}
                                                 />
                                             {/if}
@@ -2511,40 +2493,6 @@
             </div>
 
             <div class="space-y-4">
-                <!-- @desc 跨角色副作用：引用的面板会被它自己的 Buff 改写 -> 一并列出，可一键跳过去配置 -->
-                {#if refAffectingBuffs.length > 0}
-                    <div
-                        class="space-y-1.5 border px-2.5 py-2"
-                        style="border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent);"
-                    >
-                        <div
-                            class="flex items-center gap-1.5 text-[11px] font-black tracking-tight"
-                            style="color: var(--theme-accent-text);"
-                        >
-                            <Icon icon="mdi:transit-connection-variant" class="size-3.5 shrink-0" />
-                            跨角色副作用：{refCharName} 的这些 BUFF 会影响「{refZoneLabel}」
-                        </div>
-                        <p class="text-[10px] leading-relaxed text-(--theme-modal-text)/55">
-                            本乘区引用的是 {refCharName} 的{refZoneLabel}，而下面这些 BUFF 会改写该面板 ——
-                            它们通过面板间接影响本 BUFF 的数值，需要一并配置。
-                        </p>
-                        <div class="flex flex-wrap gap-1">
-                            {#each refAffectingBuffs as dep (dep.buffId)}
-                                <button
-                                    onclick={() => focusAffectingBuff(dep.buffId)}
-                                    class="flex items-center gap-1 border px-1.5 py-0.5 text-[10px] transition-colors hover:brightness-125"
-                                    style="border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent); background: var(--theme-card-bg); color: var(--theme-accent-text);"
-                                    title={`切到「${dep.buffName}」并编辑它（改写 ${dep.zoneIds.join('、')}）`}
-                                >
-                                    <Icon icon="mdi:tune-variant" class="size-3" />
-                                    {dep.buffName}
-                                    <span class="opacity-60">（{dep.zoneIds.join('、')}）</span>
-                                </button>
-                            {/each}
-                        </div>
-                    </div>
-                {/if}
-
                 <!-- Character selector (top) -->
                 <div role="group" aria-label="引用角色">
                     <span class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用角色</span>
