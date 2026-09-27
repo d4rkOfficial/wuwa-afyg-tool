@@ -603,8 +603,8 @@
                         {#if getQuickMode() && getQuickSpecial() !== 'none'}
                             <span
                                 class="text-[10px] font-black {getQuickSpecial() === 'intro'
-                                    ? 'text-yellow-400'
-                                    : 'text-cyan-400'}"
+                                    ? 'text-(--theme-intro-text)'
+                                    : 'text-(--theme-switchback-text)'}"
                             >
                                 {getQuickSpecial() === 'intro' ? '变奏' : '切回'}
                             </span>
@@ -727,10 +727,14 @@
                                             use:measureWidth={block.id}
                                         >
                                             {#if block.intro}
-                                                <span class="text-xs text-yellow-400 font-black shrink-0">变奏</span>
+                                                <span class="text-xs text-(--theme-intro-text) font-black shrink-0"
+                                                    >变奏</span
+                                                >
                                             {/if}
                                             {#if block.switchback}
-                                                <span class="text-xs text-cyan-400 font-black shrink-0">切回</span>
+                                                <span class="text-xs text-(--theme-switchback-text) font-black shrink-0"
+                                                    >切回</span
+                                                >
                                             {/if}
                                             {#if blockIcon}
                                                 <img

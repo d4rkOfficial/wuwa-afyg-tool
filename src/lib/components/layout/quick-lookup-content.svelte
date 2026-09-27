@@ -360,7 +360,7 @@
                                 >{/if}
                         </div>
                     </div>
-                    <!-- @desc 角色标签区：上游定位标签（主力输出/快速协奏…）；图标是白色蒙版，用标签色上色 -->
+                    <!-- @desc 角色标签区：上游定位标签（主力输出/快速协奏…）；图标是白色蒙版，用同一「墨水色」上色 -->
                     {#if charTags.length > 0}
                         <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
                             <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -374,20 +374,16 @@
                             <div class="flex flex-wrap gap-2">
                                 {#each charTags as tag (tag.id)}
                                     <span
-                                        class="inline-flex items-center gap-1.5 rounded-none border px-2 py-1 text-[11px] font-black"
-                                        style="border-color: color-mix(in srgb, {tagColor(
+                                        class="tag-chip inline-flex items-center gap-1.5 rounded-none border px-2 py-1 text-[11px] font-black"
+                                        style="--tag-color: {tagColor(
                                             tag
-                                        )} 45%, transparent); background: color-mix(in srgb, {tagColor(
-                                            tag
-                                        )} 12%, transparent); color: {tagColor(tag)};"
+                                        )}; border-color: color-mix(in srgb, var(--tag-ink) 45%, transparent); background: color-mix(in srgb, var(--tag-ink) 12%, transparent);"
                                         title={tag.desc || tag.name}
                                     >
                                         {#if tag.icon}
                                             <span
-                                                class="size-3.5 shrink-0"
-                                                style="-webkit-mask: url('{tag.icon}') center / contain no-repeat; mask: url('{tag.icon}') center / contain no-repeat; background-color: {tagColor(
-                                                    tag
-                                                )};"
+                                                class="tag-chip-icon size-3.5 shrink-0"
+                                                style="-webkit-mask: url('{tag.icon}') center / contain no-repeat; mask: url('{tag.icon}') center / contain no-repeat;"
                                             ></span>
                                         {/if}
                                         {tag.name}
@@ -903,6 +899,22 @@
 <!-- @desc 富文本着色样式：属性标题/高亮/元素色/数字/上下标等全局样式 -->
 
 <style>
+    /* 角色标签「墨水色」：上游只给一个为深色底挑的亮色，白天近白底上直接当文字色会糊（1.25~3.47:1）。
+       色相法：保留上游色相/彩度，只按昼夜挪 OKLCh 明度 —— 白天 --theme-tag-ink-l 存在 → 压到 42%；
+       黑夜主题清掉该变量 → var(..., l) 落到 l 关键字 = 上游原色（观感不变）。
+       不支持相对颜色语法的浏览器退回上游原色（文字偏淡，但不至于看不见）。 */
+    .tag-chip {
+        --tag-ink: var(--tag-color);
+        color: var(--tag-ink);
+    }
+    .tag-chip-icon {
+        background-color: var(--tag-ink);
+    }
+    @supports (color: oklch(from red l c h)) {
+        .tag-chip {
+            --tag-ink: oklch(from var(--tag-color) var(--theme-tag-ink-l, l) c h);
+        }
+    }
     :global(.select-text) ::selection {
         background: color-mix(in srgb, var(--theme-modal-text) 25%, transparent);
     }

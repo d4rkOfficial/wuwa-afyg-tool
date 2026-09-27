@@ -13,6 +13,7 @@ import type {
 import { SURFACE_KEYS } from './types'
 import { DEFAULT_BACKGROUND_DARK, DEFAULT_BACKGROUND_LIGHT } from './default-backgrounds'
 import { bgMaskCss } from './bg-mask'
+import { TAG_INK_LIGHT_L } from './tag-ink'
 import darkPreset from './preset/dark.json'
 import lightPreset from './preset/light.json'
 
@@ -196,6 +197,15 @@ function applyThemeCSS() {
     root.style.setProperty('--theme-buff-yellow-text', isLight ? '#854d0e' : '#eab308')
     root.style.setProperty('--theme-buff-green-bg', isLight ? 'rgba(22,101,52,0.3)' : 'rgba(34,197,94,0.15)')
     root.style.setProperty('--theme-buff-green-text', isLight ? '#14532d' : '#22c55e')
+
+    // 排轴操作块的「变奏 / 切回」角标：同样白天加深（原 yellow-400 / cyan-400 在近白底上只有 1.5:1 左右）
+    root.style.setProperty('--theme-intro-text', isLight ? '#a16207' : '#facc15')
+    root.style.setProperty('--theme-switchback-text', isLight ? '#0e7490' : '#22d3ee')
+
+    // 角色标签「墨水色」：只给白天一个 OKLCh 明度，组件用 oklch(from 上游原色 var(--theme-tag-ink-l, l) c h)
+    // 现算（保留色相/彩度）；黑夜清掉该变量 → CSS 回落 l 关键字，等价于上游原色
+    if (isLight) root.style.setProperty('--theme-tag-ink-l', TAG_INK_LIGHT_L)
+    else root.style.removeProperty('--theme-tag-ink-l')
 
     applyOverridesCSS(root)
 
