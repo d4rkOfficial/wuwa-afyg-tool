@@ -11,9 +11,8 @@
         updateGenPrefs
     } from '$lib/data/ai-prefs.svelte'
     import { addToast } from '$lib/data/toast.svelte'
-    import { GENERATE_TOOLS } from '$lib/ai/generate/tools'
-    import { buildTools } from '$lib/ai/tools'
-    import { groupToolDefinitions, toolSummary } from '$lib/ai/tools/tool-groups'
+    import ToolPicker from '$lib/components/layout/tool-picker.svelte'
+    import { insertTextAt } from '$lib/utils/text-insert'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -66,19 +65,7 @@
               : 'AI 助手的角色与行为规则（system prompt）；清空则使用默认人设'
     )
 
-    // 可调用工具列表（右侧面板，点击插入光标处）：
-    // 「Buff 生成流程」是生成管线专用工具表，其余按业务域分组（分组规则见 tool-groups.ts）
-    const toolGroups = $derived([
-        {
-            label: 'Buff 生成流程',
-            items: GENERATE_TOOLS.map((t) => ({
-                name: t.function.name,
-                desc: toolSummary(t.function.description),
-                full: t.function.description
-            }))
-        },
-        ...groupToolDefinitions(buildTools())
-    ])
+    // 可调用工具列表见 ToolPicker（与技能编辑弹窗共用）
 
     async function handleSave() {
         if (isNaming) {
@@ -95,12 +82,13 @@
 
     function insertTool(name: string) {
         const ta = textareaEl
-        const start = ta?.selectionStart ?? draft.length
-        const end = ta?.selectionEnd ?? start
-        draft = draft.slice(0, start) + name + draft.slice(end)
+        const start = ta?.selectionStart
+        const end = ta?.selectionEnd
+        const next = insertTextAt(draft, name, start, end)
+        draft = next.text
         requestAnimationFrame(() => {
             ta?.focus()
-            ta?.setSelectionRange(start + name.length, start + name.length)
+            ta?.setSelectionRange(next.cursor, next.cursor)
         })
     }
 </script>
@@ -159,42 +147,7 @@
             <p class="text-[10px] text-(--theme-modal-text)/40">{hintText}</p>
         </div>
 
-        <!-- 可调用工具列表 -->
-        <div
-            class="theme-scrollbar max-h-[32rem] w-80 shrink-0 overflow-y-auto rounded-none border p-2.5"
-            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-        >
-            <div
-                class="mb-1.5 flex items-center gap-1.5 text-[10px] font-black tracking-tight text-(--theme-modal-text)/70"
-            >
-                <Icon icon="mdi:toolbox-outline" class="size-3.5 shrink-0" style="color: var(--theme-accent-text);" />
-                可调用工具（点击插入工具名）
-            </div>
-            {#each toolGroups as group}
-                <div
-                    class="mb-1 mt-3 flex items-center gap-1.5 border-b pb-1 text-[10px] font-black tracking-[0.16em] text-(--theme-modal-text)/45"
-                    style="border-color: color-mix(in srgb, var(--theme-modal-text) 10%, transparent);"
-                >
-                    <span>{group.label}</span>
-                    <span class="text-(--theme-modal-text)/25">{group.items.length}</span>
-                </div>
-                <div class="flex flex-col gap-0.5">
-                    {#each group.items as tool}
-                        <button
-                            onclick={() => insertTool(tool.name)}
-                            title={tool.full}
-                            class="rounded-none px-1.5 py-1 text-left transition-colors hover:bg-(--theme-accent-bg)/15"
-                        >
-                            <span class="block truncate font-mono text-[11px] text-(--theme-modal-text)/80"
-                                >{tool.name}</span
-                            >
-                            <span class="mt-0.5 block text-[10px] leading-snug text-(--theme-modal-text)/40"
-                                >{tool.desc}</span
-                            >
-                        </button>
-                    {/each}
-                </div>
-            {/each}
-        </div>
+        <!-- 可调用工具列表（与技能编辑弹窗共用 ToolPicker） -->
+        <ToolPicker onpick={insertTool} />
     </div>
 </Modal>

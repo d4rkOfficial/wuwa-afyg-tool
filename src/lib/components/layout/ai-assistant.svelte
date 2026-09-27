@@ -12,18 +12,6 @@
     import { cancelActiveDrags } from '$lib/utils/drag-guard'
     import { marked } from 'marked'
     import { getOpenPanelsSummary } from '../../ai/panels.svelte'
-    import {
-        loadSkills,
-        getSkills,
-        getEnabledSkills,
-        addSkill,
-        updateSkill,
-        deleteSkill,
-        toggleSkillEnabled,
-        importSkills,
-        type AiSkill
-    } from '$lib/data/ai-skills.svelte'
-    import { getPendingChangeCount, clearChanges, renderPendingSummary } from '$lib/ai/change-queue.svelte'
     import { DeepSeekError, type ChatMessage } from '../../ai/client'
     import type { ComponentsProps } from '$lib/types'
 
@@ -85,84 +73,7 @@
     let dragging = $state(false)
     let dragStart = $state({ mx: 0, my: 0, x: 0, y: 0 })
 
-    // ── Skill 管理（自定义技能卡：启用开关 / 新建 / 编辑 / 删除 / 导入导出）──
-    let skills = $derived(getSkills())
-    let enabledSkills = $derived(getEnabledSkills())
-    let showSkills = $state(false)
-    let skillEditing = $state<AiSkill | null>(null)
-    let skillDraft = $state({ name: '', description: '', body: '' })
-    let skillImportInput: HTMLInputElement | undefined = $state()
-
-    const openSkillEditor = (skill?: AiSkill) => {
-        skillEditing = skill ?? null
-        skillDraft = skill
-            ? { name: skill.name, description: skill.description, body: skill.body }
-            : { name: '', description: '', body: '' }
-    }
-
-    const saveSkillDraft = async () => {
-        if (!skillDraft.name.trim()) {
-            addToast('请填写技能名', 'info')
-            return
-        }
-        const ok = skillEditing
-            ? await updateSkill(skillEditing.id, { ...skillDraft })
-            : Boolean(await addSkill({ ...skillDraft }))
-        if (!ok) {
-            addToast('技能名重复或为空', 'error')
-            return
-        }
-        addToast(skillEditing ? '技能已更新' : '技能已创建', 'success')
-        skillEditing = null
-        skillDraft = { name: '', description: '', body: '' }
-    }
-
-    const handleDeleteSkill = async (skill: AiSkill) => {
-        if (skill.builtin) {
-            addToast('内置技能不可删除，可改为禁用', 'info')
-            return
-        }
-        if (await deleteSkill(skill.id)) addToast('技能已删除', 'info')
-    }
-
-    /** @desc 快捷运用：把技能指令塞进输入框（用户可直接回车发送） */
-    const applySkillQuickly = (skill: AiSkill) => {
-        const prefix = `请按技能「${skill.name}」的规范处理：`
-        input = input.trim() ? `${prefix}\n${input}` : prefix
-        showSkills = false
-    }
-
-    const exportSkills = () => {
-        const payload = JSON.stringify({ kind: 'wuwa-afyg-skills', skills }, null, 2)
-        const blob = new Blob([payload], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `椰果工具箱-技能-${new Date().toISOString().slice(0, 10)}.json`
-        a.click()
-        URL.revokeObjectURL(url)
-        addToast('技能已导出', 'success')
-    }
-
-    const handleSkillImport = async (e: Event) => {
-        const file = (e.target as HTMLInputElement).files?.[0]
-        if (!file) return
-        try {
-            const raw = JSON.parse(await file.text()) as { skills?: AiSkill[] }
-            const list = Array.isArray(raw?.skills) ? raw.skills : []
-            const count = await importSkills(list)
-            addToast(
-                count > 0 ? `已导入 ${count} 个技能` : '没有可导入的新技能（同名跳过）',
-                count > 0 ? 'success' : 'info'
-            )
-        } catch {
-            addToast('导入失败：文件不是合法的技能 JSON', 'error')
-        }
-        if (skillImportInput) skillImportInput.value = ''
-    }
-
-    // ── 变化队列（工程四阶段/切换工程的改动，供 AI 感知；可查看与清空）──
-    let pendingChanges = $derived(getPendingChangeCount())
+    // ── 技能管理已迁到「设置 → AI助手 → 权限 / 提示词 → 技能」；工程变化队列纯后台静默，界面都不显示 ──
 
     function startDrag(e: PointerEvent) {
         const target = e.target as HTMLElement
@@ -518,7 +429,6 @@
     onMount(() => {
         loadAiConfig()
         loadGenPrefs()
-        loadSkills()
     })
 </script>
 
@@ -608,15 +518,6 @@
                         {aiConfig.label}
                     </div>
                 </div>
-                <button
-                    onclick={() => (showSkills = !showSkills)}
-                    class="relative rounded-none p-1 transition-colors {showSkills
-                        ? 'text-(--theme-accent-text)'
-                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)'}"
-                    title={`技能（${enabledSkills.length}/${skills.length} 启用）`}
-                >
-                    <Icon icon="mdi:lightning-bolt-outline" class="size-4" />
-                </button>
                 <button
                     onclick={clearConversation}
                     class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
@@ -792,186 +693,8 @@
                 {/if}
             </div>
 
-            <!-- 变化队列条：工程/环节改动会被自动带入下一轮对话 -->
-            {#if pendingChanges > 0}
-                <div
-                    class="flex shrink-0 items-center gap-1.5 border-t px-3 py-1.5 text-[10px]"
-                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 7%, transparent);"
-                >
-                    <Icon icon="mdi:history" class="size-3.5 shrink-0" style="color: var(--theme-accent-text);" />
-                    <span class="text-(--theme-modal-text)/60"
-                        >已记录 {pendingChanges} 条工程变化，将在下次提问时告知助手</span
-                    >
-                    <div class="flex-1"></div>
-                    <button
-                        onclick={() => {
-                            clearChanges()
-                            addToast('已忽略记录的变化', 'info')
-                        }}
-                        class="shrink-0 text-(--theme-modal-text)/45 transition-colors hover:text-(--theme-modal-text)"
-                        title="忽略这些变化（不再带入下一轮对话）"
-                    >
-                        忽略
-                    </button>
-                </div>
-            {/if}
-
-            <!-- 技能面板：启用开关 / 新建 / 编辑 / 删除 / 导入导出，点击技能名快捷运用 -->
-            {#if showSkills}
-                <div
-                    class="theme-scrollbar max-h-56 shrink-0 space-y-1.5 overflow-y-auto border-t px-3 py-2"
-                    style="border-color: var(--theme-divider-border);"
-                >
-                    <div class="flex items-center gap-1.5">
-                        <Icon
-                            icon="mdi:lightning-bolt-outline"
-                            class="size-3.5 shrink-0"
-                            style="color: var(--theme-accent-text);"
-                        />
-                        <span class="text-[11px] font-black tracking-tight">技能</span>
-                        <span class="text-[10px] text-(--theme-modal-text)/40">
-                            启用后助手可按需激活；点击名称快捷运用
-                        </span>
-                        <div class="flex-1"></div>
-                        <button
-                            onclick={() => openSkillEditor()}
-                            class="shrink-0 rounded-none p-0.5 text-(--theme-accent-text) transition-colors hover:brightness-125"
-                            title="新建技能"
-                        >
-                            <Icon icon="mdi:plus" class="size-3.5" />
-                        </button>
-                        <button
-                            onclick={exportSkills}
-                            class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/45 transition-colors hover:text-(--theme-modal-text)"
-                            title="导出技能为 JSON"
-                        >
-                            <Icon icon="mdi:download-outline" class="size-3.5" />
-                        </button>
-                        <input
-                            type="file"
-                            accept=".json,application/json"
-                            class="hidden"
-                            bind:this={skillImportInput}
-                            onchange={handleSkillImport}
-                        />
-                        <button
-                            onclick={() => skillImportInput?.click()}
-                            class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/45 transition-colors hover:text-(--theme-modal-text)"
-                            title="从 JSON 导入技能"
-                        >
-                            <Icon icon="mdi:upload-outline" class="size-3.5" />
-                        </button>
-                    </div>
-
-                    {#each skills as skill (skill.id)}
-                        <div
-                            class="flex items-center gap-1.5 border px-2 py-1"
-                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                        >
-                            <button
-                                onclick={() => toggleSkillEnabled(skill.id)}
-                                class="shrink-0 rounded-none p-0.5 transition-colors {skill.enabled
-                                    ? 'text-(--theme-accent-text)'
-                                    : 'text-(--theme-modal-text)/25'}"
-                                title={skill.enabled ? '已启用，点击禁用' : '已禁用，点击启用'}
-                            >
-                                <Icon
-                                    icon={skill.enabled ? 'mdi:toggle-switch' : 'mdi:toggle-switch-off-outline'}
-                                    class="size-4"
-                                />
-                            </button>
-                            <button
-                                onclick={() => applySkillQuickly(skill)}
-                                disabled={!skill.enabled}
-                                class="min-w-0 flex-1 text-left text-[11px] transition-colors hover:text-(--theme-accent-text) disabled:opacity-40"
-                                title={skill.description || skill.name}
-                            >
-                                <div class="truncate font-black">{skill.name}</div>
-                                <div class="truncate text-[10px] text-(--theme-modal-text)/40">{skill.description}</div>
-                            </button>
-                            <button
-                                onclick={() => openSkillEditor(skill)}
-                                class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
-                                title="编辑"
-                            >
-                                <Icon icon="mdi:pencil-outline" class="size-3.5" />
-                            </button>
-                            {#if !skill.builtin}
-                                <button
-                                    onclick={() => handleDeleteSkill(skill)}
-                                    class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-400"
-                                    title="删除"
-                                >
-                                    <Icon icon="mdi:delete-outline" class="size-3.5" />
-                                </button>
-                            {/if}
-                        </div>
-                    {/each}
-
-                    {#if skillEditing || skillDraft.name || showSkills}
-                        <div
-                            class="space-y-1.5 border p-2"
-                            style="border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);"
-                        >
-                            <div class="text-[10px] font-black tracking-tight" style="color: var(--theme-accent-text);">
-                                {skillEditing ? `编辑「${skillEditing.name}」` : '新建技能'}
-                            </div>
-                            <input
-                                bind:value={skillDraft.name}
-                                placeholder="技能名（唯一）"
-                                class="w-full border px-2 py-1 text-[11px] outline-none"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-card-bg); color: var(--theme-modal-text);"
-                            />
-                            <input
-                                bind:value={skillDraft.description}
-                                placeholder="一句话描述（助手据此判断何时激活）"
-                                class="w-full border px-2 py-1 text-[11px] outline-none"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-card-bg); color: var(--theme-modal-text);"
-                            />
-                            <textarea
-                                bind:value={skillDraft.body}
-                                placeholder="技能正文（激活后注入的完整指令）"
-                                rows="4"
-                                class="w-full resize-none border px-2 py-1 text-[11px] leading-relaxed outline-none"
-                                style="border-color: var(--theme-divider-border); background: var(--theme-card-bg); color: var(--theme-modal-text);"
-                            ></textarea>
-                            <div class="flex justify-end gap-1.5">
-                                <button
-                                    onclick={() => {
-                                        skillEditing = null
-                                        skillDraft = { name: '', description: '', body: '' }
-                                    }}
-                                    class="rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                                    style="border-color: var(--theme-divider-border);">取消</button
-                                >
-                                <button
-                                    onclick={saveSkillDraft}
-                                    class="rounded-none px-2 py-0.5 text-[10px] font-black transition-all hover:brightness-110"
-                                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                                    >保存</button
-                                >
-                            </div>
-                        </div>
-                    {/if}
-                </div>
-            {/if}
-
             <!-- 输入区 -->
             <div class="shrink-0 border-t p-2.5" style="border-color: var(--theme-divider-border);">
-                {#if enabledSkills.length > 0}
-                    <div class="mb-1.5 flex flex-wrap gap-1">
-                        {#each enabledSkills as skill (skill.id)}
-                            <button
-                                onclick={() => applySkillQuickly(skill)}
-                                class="border px-1.5 py-0.5 text-[10px] transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-accent-text)"
-                                style="border-color: var(--theme-divider-border); color: color-mix(in srgb, var(--theme-modal-text) 60%, transparent);"
-                                title={skill.description}
-                            >
-                                ⚡ {skill.name}
-                            </button>
-                        {/each}
-                    </div>
-                {/if}
                 <div class="flex items-end gap-2">
                     <textarea
                         bind:value={input}

@@ -12,7 +12,8 @@ import { buildTools, executeTool, type ToolContext } from './tools'
 import { getAiConfig } from './config.svelte'
 import { getGenPrefs, loadGenPrefs } from '$lib/data/ai-prefs.svelte'
 import { drainChanges, renderChangesForPrompt } from './change-queue.svelte'
-import { loadSkills, renderSkillListing } from '$lib/data/ai-skills.svelte'
+import { getSkills, loadSkills, renderActiveSkillListing, renderPassiveSkillsPrompt } from '$lib/data/ai-skills.svelte'
+import { buildTurnMessages } from './turn-context'
 import { DEFAULT_SYSTEM_PROMPT } from './persona'
 
 export const MAX_TOOL_ROUNDS = 8
@@ -194,26 +195,21 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
     await loadSkills()
     const systemPrompt = getGenPrefs().systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
 
-    const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }]
+    /** @desc 技能卡：被动技能正文常驻注入；主动技能只进「名称 + 描述」清单（正文由 use_skill 按需激活） */
+    const skills = getSkills()
 
-    /** @desc 技能清单：名称 + 一句话，正文由 use_skill 按需激活（省 token） */
-    const skillListing = renderSkillListing()
-    if (skillListing) messages.push({ role: 'system', content: skillListing })
-
-    if (options.context?.trim()) {
-        messages.push({
-            role: 'system',
-            content: `【当前状态】${options.context.trim()}\n注意：工程与视图可能在对话期间被用户切换，以本条状态为准。`
-        })
-    }
-
-    /** @desc 变化队列：把用户在上轮之后的工程/环节改动作为系统消息上报，消费后清空 */
+    /** @desc 变化队列：把用户在上轮之后的工程/环节改动作为系统消息上报，消费后清空（界面不可见） */
     const changes = renderChangesForPrompt(drainChanges())
-    if (changes) messages.push({ role: 'system', content: changes })
 
-    const history = Array.isArray(options.history) ? options.history : []
-    if (history.length > 0) messages.push(...history)
-    if (options.newUserMessage?.trim()) messages.push({ role: 'user', content: options.newUserMessage.trim() })
+    const messages = buildTurnMessages({
+        systemPrompt,
+        passiveSkills: renderPassiveSkillsPrompt(skills),
+        skillListing: renderActiveSkillListing(skills),
+        context: options.context,
+        changes,
+        history: Array.isArray(options.history) ? options.history : [],
+        userMessage: options.newUserMessage
+    })
 
     let text = ''
     const useResponses = supportsResponsesWebSearch(cfg.baseUrl, cfg.model)

@@ -137,6 +137,7 @@
     import AiProfileEditModal from '$lib/components/layout/ai-profile-edit-modal.svelte'
     import AiPromptEditModal from '$lib/components/layout/ai-prompt-edit-modal.svelte'
     import ConfigSection from '$lib/components/layout/settings/config-section.svelte'
+    import SkillSection from '$lib/components/layout/settings/skill-section.svelte'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -3035,6 +3036,16 @@
                                         </div>
                                     {/if}
                                 </div>
+
+                                <!-- 技能卡管理（主动 / 被动）：从助手头部 ⚡ 面板迁移至此 -->
+                                {#if tab === 'ai'}
+                                    <div
+                                        class="mt-2 rounded-none border px-3 py-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <SkillSection />
+                                    </div>
+                                {/if}
                             </div>
                         </div>
                     {/if}

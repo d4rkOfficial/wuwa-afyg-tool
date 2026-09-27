@@ -6,7 +6,8 @@
  * - 只记录**摘要**（kind + 一句话 + 可选指纹），不保存全量工程数据，避免内存与 token 膨胀
  * - 同帧 / 短窗口内的同 kind 变化合并为一条（防抖），并保留发生次数
  * - 环形上限：超出后丢弃最旧的记录，只保留最近的 N 条
- * - AI 回合开始时 `drain()` 取出并清空，保证同一条变化不会被重复上报
+ * - AI 回合开始时 `drainChanges()` 取出并清空，保证同一条变化不会被重复上报
+ * - **静默队列**：只对 AI 生效，界面上不显示任何提示（用户看不到，AI 下一轮仍能收到）
  */
 
 import { browser } from '$app/environment'
@@ -31,8 +32,6 @@ export const MAX_CHANGES = 50
 const COALESCE_MS = 1500
 
 let _changes = $state<ProjectChange[]>([])
-/** @desc 变化队列版本号（供界面徽标响应式） */
-let _version = $state(0)
 /** @desc kind → 最后一次入队时间（用于合并窗口判定） */
 const _lastAt = new Map<ChangeKind, number>()
 
@@ -58,13 +57,11 @@ export function pushChange(kind: ChangeKind, summary: string, phase?: string): v
     ) {
         _changes = _changes.map((c, i) => (i === _changes.length - 1 ? { ...c, count: c.count + 1, summary } : c))
         _lastAt.set(kind, now)
-        _version++
         return
     }
     const next = [..._changes, { kind, summary, phase, at: now, count: 1 }]
     _changes = next.length > MAX_CHANGES ? next.slice(next.length - MAX_CHANGES) : next
     _lastAt.set(kind, now)
-    _version++
 }
 
 /** @desc 记录「切换当前工程」 */
@@ -83,38 +80,12 @@ export function pushTeamChange(detail: string): void {
     pushChange('team', `队伍配置变化：${detail}`)
 }
 
-/** @desc 当前待消费的变化（只读，供界面展示徽标） */
-export function getPendingChanges(): ProjectChange[] {
-    return _changes
-}
-
-/** @desc 待消费变化条数（响应式） */
-export function getPendingChangeCount(): number {
-    const version = _version
-    void version
-    return _changes.length
-}
-
-/** @desc 队列摘要（界面 tooltip 用；不消费队列） */
-export function renderPendingSummary(): string {
-    if (_changes.length === 0) return ''
-    return _changes.map((c) => `${c.summary}${c.count > 1 ? `（×${c.count}）` : ''}`).join('\n')
-}
-
 /** @desc 取出并清空队列（AI 回合开始时调用一次） */
 export function drainChanges(): ProjectChange[] {
     const drained = _changes
     _changes = []
     _lastAt.clear()
-    _version++
     return drained
-}
-
-/** @desc 清空队列（切换会话 / 用户手动忽略时调用） */
-export function clearChanges(): void {
-    _changes = []
-    _lastAt.clear()
-    _version++
 }
 
 /**
