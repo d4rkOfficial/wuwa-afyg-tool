@@ -1274,21 +1274,33 @@
                                                     class="size-4 shrink-0 text-(--theme-accent-text)"
                                                 />
                                             {:else}
-                                                {#if isAutoFolder && item.gateKind === 'weapon' && weaponIconOf(item.charIdx)}
-                                                    <!-- @desc 武器目录：用角色当前装配武器的图标 -->
-                                                    <img
-                                                        src={weaponIconOf(item.charIdx)}
-                                                        alt=""
-                                                        draggable="false"
-                                                        class="size-4 shrink-0 rounded-sm object-cover"
-                                                    />
-                                                {:else if isAutoFolder && item.charIdx !== undefined && teamIconOf(item.charIdx)}
-                                                    <img
-                                                        src={teamIconOf(item.charIdx)}
-                                                        alt=""
-                                                        draggable="false"
-                                                        class="size-4 shrink-0 rounded-full object-cover"
-                                                    />
+                                                {#if isAutoFolder && item.charIdx !== undefined && teamIconOf(item.charIdx)}
+                                                    <!-- @desc 二级目录：角色图标 + 角标（链目录=链阶角标；武器目录=当前装配武器图标） -->
+                                                    <span class="relative shrink-0">
+                                                        <img
+                                                            src={teamIconOf(item.charIdx)}
+                                                            alt=""
+                                                            draggable="false"
+                                                            class="size-4 rounded-full object-cover"
+                                                        />
+                                                        {#if item.gateKind === 'weapon'}
+                                                            {#if weaponIconOf(item.charIdx)}
+                                                                <img
+                                                                    src={weaponIconOf(item.charIdx)}
+                                                                    alt=""
+                                                                    draggable="false"
+                                                                    class="absolute -bottom-0.5 -right-1 size-3 rounded-sm border object-cover"
+                                                                    style="border-color: var(--theme-modal-bg);"
+                                                                />
+                                                            {/if}
+                                                        {:else}
+                                                            <span
+                                                                class="absolute -bottom-1 -right-1 flex h-3 min-w-3 items-center justify-center px-0.5 text-[8px] font-black leading-none"
+                                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                                                >{item.gateMin ?? 0}</span
+                                                            >
+                                                        {/if}
+                                                    </span>
                                                 {:else}
                                                     <Icon
                                                         icon={isGlobalFolder
@@ -1451,28 +1463,6 @@
                                                                             <span class="truncate flex-1"
                                                                                 >{subChild.name}</span
                                                                             >
-                                                                            {#if subChild.scope === 'all'}
-                                                                                <span
-                                                                                    class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                                                    >(通用)</span
-                                                                                >
-                                                                            {:else if Array.isArray(subChild.scope) && subChild.scope.length === 0}
-                                                                                <span
-                                                                                    class="text-[10px] text-(--theme-accent-text)/50 whitespace-nowrap"
-                                                                                    >(效应)</span
-                                                                                >
-                                                                            {:else}
-                                                                                <span
-                                                                                    class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                                                    >({teamNames
-                                                                                        .filter((_, i) =>
-                                                                                            (
-                                                                                                subChild.scope as number[]
-                                                                                            ).includes(i)
-                                                                                        )
-                                                                                        .join(', ')})</span
-                                                                                >
-                                                                            {/if}
                                                                         </button>
                                                                     {/each}
                                                                 </div>
@@ -1515,26 +1505,6 @@
                                                                 />
                                                             {/if}
                                                             <span class="truncate flex-1">{sub.buffSet!.name}</span>
-                                                            {#if sub.buffSet!.scope === 'all'}
-                                                                <span
-                                                                    class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                                    >(通用)</span
-                                                                >
-                                                            {:else if Array.isArray(sub.buffSet!.scope) && sub.buffSet!.scope.length === 0}
-                                                                <span
-                                                                    class="text-[10px] text-(--theme-accent-text)/50 whitespace-nowrap"
-                                                                    >(效应)</span
-                                                                >
-                                                            {:else}
-                                                                <span
-                                                                    class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                                    >({teamNames
-                                                                        .filter((_, i) =>
-                                                                            (sub.buffSet!.scope as number[]).includes(i)
-                                                                        )
-                                                                        .join(', ')})</span
-                                                                >
-                                                            {/if}
                                                         </button>
                                                     {/if}
                                                 {/each}
@@ -1612,26 +1582,6 @@
                                                             />
                                                         {/if}
                                                         <span class="truncate flex-1">{child.name}</span>
-                                                        {#if child.scope === 'all'}
-                                                            <span
-                                                                class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                                >(通用)</span
-                                                            >
-                                                        {:else if Array.isArray(child.scope) && child.scope.length === 0}
-                                                            <span
-                                                                class="text-[10px] text-(--theme-accent-text)/50 whitespace-nowrap"
-                                                                >(效应)</span
-                                                            >
-                                                        {:else}
-                                                            <span
-                                                                class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                                >({teamNames
-                                                                    .filter((_, i) =>
-                                                                        (child.scope as number[]).includes(i)
-                                                                    )
-                                                                    .join(', ')})</span
-                                                            >
-                                                        {/if}
                                                     </button>
                                                 {/each}
                                             {/if}
@@ -1718,21 +1668,7 @@
                                     {/if}
                                     <span class="truncate flex-1">{item.buffSet!.name}</span>
                                     {#if !isGlobal}
-                                        {#if item.buffSet!.scope === 'all'}
-                                            <span class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                >(通用)</span
-                                            >
-                                        {:else if Array.isArray(item.buffSet!.scope) && item.buffSet!.scope.length === 0}
-                                            <span class="text-[10px] text-(--theme-accent-text)/50 whitespace-nowrap"
-                                                >(效应)</span
-                                            >
-                                        {:else}
-                                            <span class="text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                >({teamNames
-                                                    .filter((_, i) => (item.buffSet!.scope as number[]).includes(i))
-                                                    .join(', ')})</span
-                                            >
-                                        {/if}
+
                                     {/if}
                                 </button>
                             {/if}

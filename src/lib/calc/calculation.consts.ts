@@ -129,6 +129,10 @@ export interface GroupedBuffSetItem {
     children?: BuffSet[]
 }
 
+/** @desc 自然序比较（数字段按数值比较），用于最低一级数字目录排序 */
+const compareNaturalKey = (a: string, b: string): number =>
+    a.localeCompare(b, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' })
+
 /** @desc 按叠层命名规则把 Buff 列表分组：同「前缀+后缀」且 ≥2 条归入一个 folder（folder 内按数字升序），其余保持 item */
 export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
     const result: GroupedBuffSetItem[] = []
@@ -160,13 +164,17 @@ export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
     }
 
     const seenFolders = new Set<string>()
+    const folders: GroupedBuffSetItem[] = []
+    const items: GroupedBuffSetItem[] = []
     for (const bs of buffSets) {
         const m = bs.name.match(pattern)
         if (m) {
             const key = m[1] + m[3]
-            if (folderKeys.has(key) && !seenFolders.has(key)) {
+            if (folderKeys.has(key)) {
+                if (seenFolders.has(key)) continue
                 seenFolders.add(key)
-                result.push({
+                // 最低一级目录：数字文件夹总是排在所有 buff 条目的上方（按自然序）
+                folders.push({
                     key: `folder:${key}`,
                     type: 'folder',
                     name: m[1] + LAYERED_BUFF_VAR + m[3],
@@ -175,13 +183,13 @@ export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
                     suffixText: m[3],
                     children: prefixGroups.get(key)!.items
                 })
-            } else if (!folderKeys.has(key)) {
-                result.push({ key: bs.id, type: 'item', buffSet: bs })
+                continue
             }
-        } else {
-            result.push({ key: bs.id, type: 'item', buffSet: bs })
         }
+        items.push({ key: bs.id, type: 'item', buffSet: bs })
     }
+    folders.sort((a, b) => compareNaturalKey(a.prefix ?? '', b.prefix ?? ''))
+    result.push(...folders, ...items)
 
     return result
 }
