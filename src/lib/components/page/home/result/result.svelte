@@ -36,14 +36,11 @@
     import {
         CARD,
         CARD_PAD,
-        CARD_SURFACE_STYLE,
         CARD_TITLE,
         CELL_VALUE_STRONG,
-        ICON_INLINE,
         NUMERIC_FONT_STYLE,
         SECTION_LABEL,
         SECTION_NOTE,
-        STAT_CARD_GRADIENT_STYLE,
         STAT_ROW,
         STAT_VALUE_LG,
         STAT_VALUE_SM,
@@ -403,53 +400,60 @@
     {:else if entries.length === 0}
         <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {:else}
-        <!-- Summary：与数据分析弹窗同口径的卡片（总伤害卡 + 各角色伤害卡），数值用主题色强调 -->
+        <!-- Summary：总伤害卡（较实的主题色底）+ 各角色卡（角色属性色 + 头像叠底）+ 数据分析方形按钮 -->
         <div class="shrink-0 border-b px-5 py-4" style="border-color: var(--theme-divider-border);">
             <div class="flex flex-wrap items-stretch gap-3">
-                <div class={`${CARD} ${CARD_PAD} min-w-48 flex-1 md:max-w-72`} style={STAT_CARD_GRADIENT_STYLE}>
-                    <div class={`${SECTION_LABEL} text-(--theme-modal-text)/45`}>总伤害</div>
+                <div
+                    class={`${CARD} ${CARD_PAD} min-w-48 flex-1 md:max-w-72`}
+                    style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 38%, var(--theme-card-bg)), color-mix(in srgb, var(--theme-accent-bg) 18%, var(--theme-card-bg))); border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);"
+                >
+                    <div class={`${SECTION_LABEL} text-(--theme-modal-text)/55`}>总伤害</div>
                     <div class={`mt-1.5 ${STAT_VALUE_LG} text-(--theme-accent-text)`}>
                         {Math.round(totalDamage).toLocaleString()}
                     </div>
-                    <div class={`${SECTION_NOTE} text-(--theme-modal-text)/45`}>{entries.length} 条伤害记录</div>
+                    <div class={`${SECTION_NOTE} text-(--theme-modal-text)/50`}>{entries.length} 条伤害记录</div>
                 </div>
                 {#each charSummaries as cs (cs.character)}
-                    <div class={`${CARD} ${CARD_PAD} min-w-40 flex-1 md:max-w-56`} style={CARD_SURFACE_STYLE}>
-                        <div class="flex items-center gap-1.5">
-                            <span
-                                class={SWATCH_DOT}
-                                style="background: {cs.character
-                                    ? `var(--theme-element-${charElements[cs.character]}, #888)`
-                                    : 'var(--theme-modal-text)'};"
-                            ></span>
-                            <span
-                                class="truncate text-[10px] font-black"
-                                style="color: {cs.character
-                                    ? `var(--theme-element-${charElements[cs.character]}, #888)`
-                                    : 'var(--theme-modal-text)'};"
-                            >
-                                {cs.character || '—'}
+                    {@const isOther = !cs.character}
+                    {@const elementColor = isOther
+                        ? 'var(--theme-modal-text)'
+                        : `var(--theme-element-${charElements[cs.character]}, #888)`}
+                    <div
+                        class={`${CARD} ${CARD_PAD} relative min-w-40 flex-1 overflow-hidden md:max-w-56`}
+                        style={isOther
+                            ? 'background: color-mix(in srgb, var(--theme-modal-text) 10%, var(--theme-input-bg)); border-color: var(--theme-divider-border);'
+                            : `background: color-mix(in srgb, ${elementColor} 20%, var(--theme-input-bg)); border-color: color-mix(in srgb, ${elementColor} 45%, transparent);`}
+                    >
+                        {#if !isOther && charIcons[cs.character]}
+                            <!-- @desc 角色头像叠底（半透明背景层，不参与点击与阅读） -->
+                            <img
+                                src={charIcons[cs.character]}
+                                alt=""
+                                aria-hidden="true"
+                                draggable="false"
+                                class="pointer-events-none absolute -bottom-2 -right-2 h-24 w-24 object-contain opacity-25"
+                            />
+                        {/if}
+                        <div class="relative flex min-w-0 items-center gap-1.5">
+                            <span class={SWATCH_DOT} style="background: {elementColor};"></span>
+                            <span class="truncate text-sm font-black" style="color: {elementColor};">
+                                {cs.character || '其它伤害'}
                             </span>
                         </div>
-                        <div class={`mt-1.5 ${STAT_VALUE_SM} text-(--theme-modal-text)`}>
+                        <div class={`relative mt-1.5 ${STAT_VALUE_SM} text-(--theme-modal-text)`}>
                             {Math.round(cs.totalDamage).toLocaleString()}
-                        </div>
-                        <div class={`${SECTION_NOTE} text-(--theme-modal-text)/45`}>
-                            占比 {totalDamage > 0 ? ((cs.totalDamage / totalDamage) * 100).toFixed(1) : '0.0'}% · {cs.entryCount}
-                            条
                         </div>
                     </div>
                 {/each}
-                <div class="ml-auto flex items-start">
-                    <button
-                        onclick={handleOpenAnalysis}
-                        class="flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
-                        style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
-                    >
-                        <Icon icon="mdi:chart-box-outline" class={ICON_INLINE} />
-                        数据分析
-                    </button>
-                </div>
+                <button
+                    onclick={handleOpenAnalysis}
+                    class="flex aspect-square shrink-0 flex-col items-center justify-center gap-1 rounded-none border transition-colors hover:opacity-80"
+                    style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
+                    title="打开数据分析"
+                >
+                    <Icon icon="mdi:chart-box-outline" class="size-[45%] min-h-6 shrink-0" />
+                    <span class="text-[11px] font-black tracking-tight">数据分析</span>
+                </button>
             </div>
         </div>
 
