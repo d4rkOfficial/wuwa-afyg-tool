@@ -79,6 +79,21 @@ export async function executeTool(ctx: ToolContext, name: string, args: Record<s
     }
 }
 
+/** @desc 从工具输出 JSON 里提取「成功 / 失败 + 一行梗概」，供实时运行情况面板展示 */
+export const summarizeToolOutput = (output: string): { ok?: boolean; summary: string } => {
+    try {
+        const parsed = JSON.parse(output) as { ok?: boolean; error?: string; cancelled?: boolean; data?: unknown }
+        const ok = typeof parsed?.ok === 'boolean' ? parsed.ok : undefined
+        if (ok === false) {
+            const reason = parsed.cancelled ? '用户已取消' : (parsed.error ?? '执行失败')
+            return { ok: false, summary: String(reason) }
+        }
+        return { ok, summary: `${output.length} 字符` }
+    } catch {
+        return { ok: undefined, summary: `${output.length} 字符` }
+    }
+}
+
 function describeArgs(args: Record<string, unknown>): string {
     const parts = Object.entries(args ?? {})
         .filter(([, v]) => v !== undefined && v !== null && v !== '')

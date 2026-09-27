@@ -88,6 +88,22 @@ export function drainChanges(): ProjectChange[] {
     return drained
 }
 
+/** @desc 当前待上报的变化条数（上下文面板展示用；队列本身仍然静默） */
+export function getChangeCount(): number {
+    return _changes.length
+}
+
+/** @desc 当前待上报的变化（只读快照，不消费队列） */
+export function getChanges(): ProjectChange[] {
+    return _changes
+}
+
+/** @desc 丢弃队列里待上报的变化（上下文面板的「清空变化队列」按钮） */
+export function clearChanges(): void {
+    _changes = []
+    _lastAt.clear()
+}
+
 /**
  * @desc 把变化队列渲染成注入 AI 的系统消息正文。
  * 返回空串表示没有变化（调用方据此跳过注入）。

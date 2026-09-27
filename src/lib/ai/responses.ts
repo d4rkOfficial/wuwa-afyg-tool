@@ -211,7 +211,10 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
                         break
                     case 'response.completed': {
                         completedPayload = chunk.response as Record<string, unknown> | null
-                        if (chunk.usage) usage = chunk.usage as Record<string, unknown>
+                        // usage 真源在 response 对象上（规范形态）；少数实现放在事件顶层，两者都认
+                        const responseUsage = completedPayload?.usage
+                        if (responseUsage) usage = responseUsage as Record<string, unknown>
+                        else if (chunk.usage) usage = chunk.usage as Record<string, unknown>
                         if (typeof (chunk.response as { status?: string })?.status === 'string') {
                             finishReason = (chunk.response as { status?: string }).status ?? ''
                         }

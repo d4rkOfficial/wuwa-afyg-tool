@@ -13,6 +13,14 @@
     import { marked } from 'marked'
     import { getOpenPanelsSummary } from '../../ai/panels.svelte'
     import { DeepSeekError, type ChatMessage } from '../../ai/client'
+    import {
+        describeTurnPhase,
+        getLastTurnSummary,
+        getTurnRuntime,
+        resetAiSessionState
+    } from '../../ai/turn-state.svelte'
+    import { formatDuration, summarizeTurn } from '../../ai/token-usage'
+    import AiContextPanel from './ai-context-panel.svelte'
     import type { ComponentsProps } from '$lib/types'
 
     interface ToolCard {
@@ -72,6 +80,16 @@
     let dragPos = $state<{ x: number; y: number } | null>(null)
     let dragging = $state(false)
     let dragStart = $state({ mx: 0, my: 0, x: 0, y: 0 })
+
+    // 上下文 / 用量 / 运行情况面板（默认收起，入口在头部按钮）
+    let contextOpen = $state(false)
+    const runtime = $derived(getTurnRuntime())
+    const turnSummary = $derived(getLastTurnSummary())
+    // 状态条：运行中显示实时阶段与耗时；空闲时保留最后一次回合汇总
+    const statusText = $derived.by(() => {
+        if (runtime.running) return `${describeTurnPhase(runtime)} · ${formatDuration(runtime.elapsedMs)}`
+        return turnSummary ? summarizeTurn(turnSummary) : ''
+    })
 
     // ── 技能管理已迁到「设置 → AI助手 → 权限 / 提示词 → 技能」；工程变化队列纯后台静默，界面都不显示 ──
 
@@ -232,6 +250,8 @@
         abortCtrl?.abort()
         messages = []
         display = []
+        // 会话级用量累计 / 分段快照 / 回合汇总一并清掉（分段临时禁用选择保留）
+        resetAiSessionState()
     }
 
     function stopGenerating() {
@@ -519,6 +539,15 @@
                     </div>
                 </div>
                 <button
+                    onclick={() => (contextOpen = !contextOpen)}
+                    class="rounded-none p-1 transition-colors {contextOpen
+                        ? 'text-(--theme-accent-text)'
+                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)'}"
+                    title="上下文 / 用量 / 运行情况"
+                >
+                    <Icon icon="mdi:layers-triple-outline" class="size-4" />
+                </button>
+                <button
                     onclick={clearConversation}
                     class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
                     title="清空对话"
@@ -533,6 +562,29 @@
                     <Icon icon={size === 'small' ? 'mdi:arrow-expand' : 'mdi:arrow-collapse'} class="size-4" />
                 </button>
             </div>
+
+            <!-- 实时状态条：运行中走时钟，结束后保留最后一次回合汇总 -->
+            {#if statusText}
+                <div
+                    class="flex shrink-0 items-center gap-1.5 border-b px-3 py-1 text-[10px] tabular-nums"
+                    style="border-color: var(--theme-divider-border);"
+                >
+                    <span
+                        class="inline-block size-1.5 shrink-0 rounded-full"
+                        style="background: var(--theme-accent-bg); opacity: {runtime.running ? 1 : 0.3};"
+                    ></span>
+                    <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)/50" title={statusText}>
+                        {statusText}
+                    </span>
+                </div>
+            {/if}
+
+            <!-- 上下文 / 用量 / 运行情况面板（默认收起） -->
+            <AiContextPanel
+                open={contextOpen}
+                onClose={() => (contextOpen = false)}
+                onClearHistory={clearConversation}
+            />
 
             <!-- 消息区 -->
             <div bind:this={bodyEl} class="theme-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
