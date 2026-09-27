@@ -50,7 +50,7 @@
     import QuickLookup from '$lib/components/layout/quick-lookup.svelte'
     import BuffImportModal from './buff-import-modal.svelte'
     import ZoneConditionPanel from './zone-condition-panel.svelte'
-    import { describeCondition } from '$lib/calc/condition'
+    import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
     import { slide } from 'svelte/transition'
     import { onMount, onDestroy } from 'svelte'
@@ -1932,6 +1932,7 @@
                                         {@const zoneKey = zone.zoneId as string}
                                         {@const overridden = !zone.override && overrideZoneIds.has(zoneKey)}
                                         {@const external = externalOverrides[zoneKey] ?? []}
+                                        {@const condBadge = describeZoneConditionBadge(zone.condition)}
                                         {#if def}
                                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                                             <div
@@ -1946,6 +1947,15 @@
                                                 <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
                                                     >{def.label}</span
                                                 >
+                                                <!-- @desc 乘区条件徽标：紧跟在乘区名后，样式与同行「覆盖」按钮同款（同尺寸/圆角/内边距/字号），仅背景改为半透明 -->
+                                                {#if condBadge}
+                                                    <span
+                                                        class="shrink-0 max-w-32 truncate rounded-none border px-1.5 py-0.5 text-[10px]"
+                                                        style="border-color: transparent; background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text);"
+                                                        title={`该乘区条件：${describeCondition(zone.condition)}`}
+                                                        >{condBadge}</span
+                                                    >
+                                                {/if}
                                                 {#if zone.override}
                                                     <span
                                                         class="shrink-0 px-1 py-0.5 text-[10px] font-black tracking-tight"
@@ -2082,7 +2092,7 @@
                                                             : 'mdi:filter-outline'}
                                                         class="size-3"
                                                     />
-                                                    条件{#if zone.condition}<span class="ml-0.5">•</span>{/if}
+                                                    条件
                                                 </button>
                                                 <!-- @desc 移除该乘区条目（同名乘区可添加多个，逐个移除） -->
                                                 <button
@@ -2117,7 +2127,11 @@
                         </div>
                         <!-- @desc 右栏乘区清单：点击即**添加**一个乘区条目（同一乘区可添加多次，各自独立配置）；宽度固定 -->
                         {#if selectedBuffSet}
-                            <div class="shrink-0 border-l flex flex-col" style="width: {ZONE_BAR_WIDTH}px;">
+                            <!-- @desc 与左栏列表同款的一条 1px 分割线（不再用 Tailwind 默认 currentColor 的 border-l，避免白色轮廓/光晕） -->
+                            <div
+                                class="shrink-0 flex flex-col"
+                                style="width: {ZONE_BAR_WIDTH}px; border-left: 1px solid var(--theme-divider-border);"
+                            >
                                 <div class="shrink-0 px-3 pt-3 pb-1.5">
                                     <div class="flex items-center gap-1.5">
                                         <Icon
@@ -2143,9 +2157,15 @@
                                                     ).length}
                                                     <button
                                                         onclick={() => addZoneToBuffSet(selectedBuffSet!.id, def.id)}
-                                                        class="w-full text-left rounded-none px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5 text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5 hover:text-(--theme-accent-text)"
+                                                        class={[
+                                                            'w-full text-left rounded-none px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5 hover:bg-(--theme-modal-text)/5 active:bg-(--theme-accent-bg)/15',
+                                                            count > 0
+                                                                ? 'text-(--theme-accent-text)'
+                                                                : 'text-(--theme-modal-text)/50 hover:text-(--theme-accent-text)'
+                                                        ].join(' ')}
                                                         title={`添加「${def.label}」${count > 0 ? `（已有 ${count} 个）` : ''}`}
                                                     >
+                                                        <!-- @desc 图标取 currentColor：生效乘区随按钮文字一起走主题色 -->
                                                         <Icon icon="mdi:plus" class="size-3.5 shrink-0" />
                                                         <span class="min-w-0 flex-1 truncate">{def.label}</span>
                                                         {#if count > 0}

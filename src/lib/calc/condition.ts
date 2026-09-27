@@ -7,6 +7,7 @@
  */
 
 import type { BuffCondition } from './calculation.types'
+import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
 
 /** @desc 条件挂载层级：buff=实例级（可含链/阶硬性条件）；zone=乘区级 */
 export type ConditionScope = 'buff' | 'zone'
@@ -136,6 +137,25 @@ export const describeCondition = (
     if (cond.elements?.length) groups.push(cond.elements.join(' 或 '))
     if (cond.damageTypes?.length) groups.push(cond.damageTypes.join(' 或 '))
     return groups.length ? groups.join(' 且 ') : '无条件'
+}
+
+/**
+ * @desc 乘区条件**徽标**文案（乘区列表里跟在乘区名后的短摘要，仅供展示）。
+ *
+ * 口径：
+ * - 伤害类型在前、伤害属性在后，各自的多项用 `/` 连接，两类之间用 `·` 连接
+ * - 只命中一类时只输出该类；条件为空时返回空串（调用方据此不渲染徽标）
+ * - 伤害类型取简称（`DAMAGE_TYPE_SHORT`），属性取原名
+ * - 文案内**不出现任何括号**（徽标位于窄行内，超长由界面自行 `truncate`）
+ *
+ * 与 `describeCondition` 的分工：后者是完整口径的工具说明（含链/阶、带括号分隔），
+ * 这里只服务于乘区行的紧凑徽标。
+ */
+export const describeZoneConditionBadge = (cond: BuffCondition | undefined): string => {
+    if (!cond) return ''
+    const types = (cond.damageTypes ?? []).map((dt) => DAMAGE_TYPE_SHORT[dt] ?? dt)
+    const elements = cond.elements ?? []
+    return [types.join('/'), elements.join('/')].filter((part) => part.length > 0).join('·')
 }
 
 // ── 条件归一化（迁移与界面共用的唯一入口）──
