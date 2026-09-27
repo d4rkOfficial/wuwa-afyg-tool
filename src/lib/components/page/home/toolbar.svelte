@@ -243,12 +243,12 @@
                     {#if !simplifyToolbar}
                         <span
                             >{getQuickMode()
-                                ? '快速排轴(关闭' +
+                                ? '快速排轴(已开启' +
                                   (getQuickSpecial() !== 'none'
                                       ? `·${getQuickSpecial() === 'intro' ? '变奏' : '切回'}`
                                       : '') +
                                   ')'
-                                : '快速排轴(开启)'}</span
+                                : '快速排轴(未开启)'}</span
                         >
                     {/if}
                 </button>
