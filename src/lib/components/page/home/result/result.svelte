@@ -39,7 +39,6 @@
         CARD_TITLE,
         CELL_VALUE_STRONG,
         NUMERIC_FONT_STYLE,
-        SECTION_LABEL,
         STAT_ROW,
         STAT_VALUE_SM,
         SWATCH_DOT
@@ -408,7 +407,7 @@
         <!-- Summary：总伤害卡（较实的主题色底）+ 各角色卡（角色属性色 + 头像叠底）+ 数据分析方形按钮 -->
         <div class="shrink-0 border-b pl-3 pr-5 py-4" style="border-color: var(--theme-divider-border);">
             <div class="flex items-stretch gap-3">
-                <div class="flex flex-1 flex-wrap items-stretch gap-3">
+                <div class="flex min-w-0 flex-1 flex-nowrap items-stretch gap-3 overflow-x-auto">
                     <div
                         class={`${CARD} ${CARD_PAD} min-w-48 flex-1`}
                         data-sf="card"
@@ -462,11 +461,11 @@
                 <thead>
                     <tr
                         data-sf="card"
-                        class={`${SECTION_LABEL} text-(--theme-modal-text)/45`}
-                        style="border-bottom: 1px solid var(--theme-divider-border);"
+                        class="text-[11px] font-black tracking-[0.16em] text-(--theme-modal-text)/45"
+                        style="border-bottom: 1px solid var(--theme-divider-border); {NUMERIC_FONT_STYLE}"
                     >
                         <th
-                            class="sticky top-0 z-10 py-2 px-3 text-left"
+                            class="sticky top-0 z-30 py-2 px-3 text-left"
                             data-sf="toolbar"
                             data-sf-under="card"
                             style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
@@ -474,7 +473,7 @@
                             来源
                         </th>
                         <th
-                            class="sticky top-0 z-10 py-2 px-3 text-left"
+                            class="sticky top-0 z-30 py-2 px-3 text-left"
                             data-sf="toolbar"
                             data-sf-under="card"
                             style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
@@ -482,7 +481,7 @@
                             条目
                         </th>
                         <th
-                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            class="sticky top-0 z-30 py-2 px-3 text-right"
                             data-sf="toolbar"
                             data-sf-under="card"
                             style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
@@ -490,7 +489,7 @@
                             倍率
                         </th>
                         <th
-                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            class="sticky top-0 z-30 py-2 px-3 text-right"
                             data-sf="toolbar"
                             data-sf-under="card"
                             style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
@@ -498,7 +497,7 @@
                             单位
                         </th>
                         <th
-                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            class="sticky top-0 z-30 py-2 px-3 text-right"
                             data-sf="toolbar"
                             data-sf-under="card"
                             style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
@@ -506,7 +505,7 @@
                             暴击
                         </th>
                         <th
-                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            class="sticky top-0 z-30 py-2 px-3 text-right"
                             data-sf="toolbar"
                             data-sf-under="card"
                             style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
@@ -514,7 +513,7 @@
                             不暴击
                         </th>
                         <th
-                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            class="sticky top-0 z-30 py-2 px-3 text-right"
                             data-sf="toolbar"
                             data-sf-under="card"
                             style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
@@ -522,7 +521,7 @@
                             期望
                         </th>
                         <th
-                            class="sticky top-0 z-10 py-2 px-3 w-8 text-right"
+                            class="sticky top-0 z-30 py-2 px-3 w-8 text-right"
                             data-sf="toolbar"
                             data-sf-under="card"
                             style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
