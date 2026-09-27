@@ -413,7 +413,7 @@
                     <div
                         class={`${CARD} ${CARD_PAD} min-w-48 flex-1`}
                         data-sf="card"
-                        style="border-width: 2px; border-color: var(--theme-accent-bg);"
+                        style="border-width: 1.5px; border-color: var(--theme-accent-bg);"
                     >
                         <div class="text-sm font-black tracking-tight text-(--theme-modal-text)">总伤害</div>
                         <div class={`mt-1.5 ${STAT_VALUE_SM} text-(--theme-accent-text)`}>
@@ -429,8 +429,8 @@
                             class={`${CARD} ${CARD_PAD} relative min-w-40 flex-1 overflow-hidden`}
                             data-sf="card"
                             style={isOther
-                                ? 'border-width: 2px; border-style: dashed; border-color: var(--theme-divider-border);'
-                                : `border-width: 2px; border-style: dashed; border-color: ${elementColor};`}
+                                ? 'border-width: 1.5px; border-style: dashed; border-color: var(--theme-divider-border);'
+                                : `border-width: 1.5px; border-style: dashed; border-color: ${elementColor};`}
                         >
                             <div class="relative flex min-w-0 items-center gap-1.5">
                                 <span class={SWATCH_DOT} style="background: {elementColor};"></span>
