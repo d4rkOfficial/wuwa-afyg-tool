@@ -429,8 +429,8 @@
                             class={`${CARD} ${CARD_PAD} relative min-w-40 flex-1 overflow-hidden`}
                             data-sf="card"
                             style={isOther
-                                ? 'border-width: 2px; border-color: var(--theme-divider-border);'
-                                : `border-width: 2px; border-color: ${elementColor};`}
+                                ? 'border-width: 2px; border-style: dashed; border-color: var(--theme-divider-border);'
+                                : `border-width: 2px; border-style: dashed; border-color: ${elementColor};`}
                         >
                             <div class="relative flex min-w-0 items-center gap-1.5">
                                 <span class={SWATCH_DOT} style="background: {elementColor};"></span>
