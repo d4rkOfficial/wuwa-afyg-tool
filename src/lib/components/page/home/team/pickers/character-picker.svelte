@@ -161,7 +161,7 @@
                                         }}
                                         role="button"
                                         tabindex="0"
-                                        data-sf="card"
+                                        data-sf="widget"
                                         data-sf-flat
                                         style="--sf-base: var(--theme-input-bg)"
                                         class={itemClass(c)}
@@ -218,7 +218,7 @@
                                                 }}
                                                 role="button"
                                                 tabindex="0"
-                                                data-sf="card"
+                                                data-sf="widget"
                                                 data-sf-flat
                                                 style="--sf-base: var(--theme-input-bg)"
                                                 class={itemClass(c)}

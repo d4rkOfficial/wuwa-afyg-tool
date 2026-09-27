@@ -62,7 +62,7 @@
 <div class="space-y-4">
     <!-- Enemy card (type + level + defense) -->
     <div
-        data-sf="card"
+        data-sf="widget"
         data-sf-flat
         class="rounded-none border p-3.5"
         style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
@@ -156,7 +156,7 @@
 
     <!-- Resistances card -->
     <div
-        data-sf="card"
+        data-sf="widget"
         data-sf-flat
         class="rounded-none border p-3.5"
         style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
@@ -275,7 +275,7 @@
 
     <!-- Damage reduction card -->
     <div
-        data-sf="card"
+        data-sf="widget"
         data-sf-flat
         class="rounded-none border p-3.5"
         style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
