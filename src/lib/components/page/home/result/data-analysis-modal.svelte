@@ -15,6 +15,14 @@
     import { openPanel } from '$lib/ai/panels.svelte'
     import { aggregateDirectDamageByType } from '$lib/calc/utils'
     import { COMPARISON_PALETTE } from '$lib/calc/comparison'
+    import {
+        CARD_BG_STYLE,
+        SECTION_LABEL,
+        SECTION_NOTE,
+        STAT_CARD_GRADIENT_STYLE,
+        STAT_CARD_GRADIENT_SUBTLE_STYLE,
+        STAT_VALUE_MD
+    } from '$lib/calc/result.styles'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -883,8 +891,8 @@
     })
 
     // ── 通用样式常量 ──
-    const cardBg = 'var(--theme-input-bg)'
-    const mutedText = 'color: var(--theme-modal-text); opacity: 0.45;'
+    /** @desc 卡片 / 分区容器／数值行等共享样式口径（与结果页卡片刻意保持同一份定义） */
+    const cardBg = CARD_BG_STYLE
 </script>
 
 <!-- svelte-ignore a11y_interactive_supports_focus -->
@@ -991,7 +999,7 @@
         <div class="theme-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
             <!-- ── KPI 总览（口径随「分段 DPS」里选中的时段切换，默认总计）── -->
             <section class="space-y-2">
-                <div class="flex flex-wrap items-center gap-2 text-[11px]" style={mutedText}>
+                <div class="flex flex-wrap items-center gap-2 text-[11px] text-(--theme-modal-text)/45">
                     <Icon icon="mdi:cursor-default-click-outline" class="size-3.5" />
                     <span>当前口径：{rangeLabel}</span>
                     <span class="tabular-nums">（时长 {rangeStats.span.toFixed(1)}s）</span>
@@ -1001,32 +1009,32 @@
                     <!-- ① 总伤害 -->
                     <div
                         class="relative col-span-2 overflow-hidden rounded-none border p-4 lg:col-span-1"
-                        style="border-color: var(--theme-divider-border); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, transparent), transparent 65%);"
+                        style={STAT_CARD_GRADIENT_STYLE}
                     >
-                        <div class="text-[10px] tracking-[0.22em]" style={mutedText}>总伤害</div>
+                        <div class={`${SECTION_LABEL} text-(--theme-modal-text)/45`}>总伤害</div>
                         <div
                             class="mt-1.5 text-2xl font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
                             style="color: var(--theme-accent-text);"
                         >
                             {Math.round(rangeStats.damage).toLocaleString()}
                         </div>
-                        <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
+                        <div class={`${SECTION_NOTE} text-(--theme-modal-text)/45`}>
                             {rangeStats.entryCount} 条伤害记录
                         </div>
                     </div>
                     <!-- ② 总 DPS -->
                     <div
                         class="relative overflow-hidden rounded-none border p-4"
-                        style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 10%, transparent), transparent 70%);"
+                        style={STAT_CARD_GRADIENT_SUBTLE_STYLE}
                     >
-                        <div class="text-[10px] tracking-[0.22em]" style={mutedText}>总 DPS</div>
+                        <div class={`${SECTION_LABEL} text-(--theme-modal-text)/45`}>总 DPS</div>
                         <div
                             class="mt-1.5 text-2xl font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
                             style="color: var(--theme-accent-text);"
                         >
                             {rangeStats.dps > 0 ? Math.round(rangeStats.dps).toLocaleString() : '—'}
                         </div>
-                        <div class="mt-1 text-[10px]" style={mutedText}>
+                        <div class={`${SECTION_NOTE} text-(--theme-modal-text)/45`}>
                             {rangeLabel} · {rangeStats.span.toFixed(1)}s
                         </div>
                     </div>
@@ -1058,7 +1066,7 @@
                                 >
                                     {Math.round(card.damage).toLocaleString()}
                                 </div>
-                                <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
+                                <div class={`${SECTION_NOTE} text-(--theme-modal-text)/45`}>
                                     占比 {rangeStats.damage > 0
                                         ? ((card.damage / rangeStats.damage) * 100).toFixed(1)
                                         : '0.0'}% · {card.count} 条
@@ -1088,7 +1096,7 @@
                                 >
                                     {Math.round(card.damage).toLocaleString()}
                                 </div>
-                                <div class="mt-1 text-[10px] tabular-nums" style={mutedText}>
+                                <div class={`${SECTION_NOTE} text-(--theme-modal-text)/45`}>
                                     占比 {rangeStats.damage > 0
                                         ? ((card.damage / rangeStats.damage) * 100).toFixed(1)
                                         : '0.0'}% · {card.count} 条
@@ -1672,10 +1680,7 @@
                                                 </div>
                                             </div>
                                             <div class="flex shrink-0 flex-col items-end gap-0.5">
-                                                <div
-                                                    class="text-xl font-black leading-none tabular-nums [text-shadow:0_0_3px_var(--theme-halo-color)]"
-                                                    style="color: var(--theme-accent-text);"
-                                                >
+                                                <div class={`${STAT_VALUE_MD} text-(--theme-accent-text)`}>
                                                     {charSA.substatTotalPctNorm.toFixed(1)}
                                                 </div>
                                                 <div

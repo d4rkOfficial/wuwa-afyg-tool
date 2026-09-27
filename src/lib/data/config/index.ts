@@ -64,6 +64,12 @@ const CONFIG_ENTRIES: ConfigEntry[] = [
     },
     { key: 'wuwa-afyg:interaction-prefs:sidebar-actions', store: 'local', group: 'interaction', label: '侧栏底部操作' },
     {
+        key: 'wuwa-afyg:interaction-prefs:multi-entry-expand',
+        store: 'local',
+        group: 'interaction',
+        label: '结果页多条目展开'
+    },
+    {
         key: 'wuwa-afyg:interaction-prefs:modal-close-position',
         store: 'local',
         group: 'interaction',

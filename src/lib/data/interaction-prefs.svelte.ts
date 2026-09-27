@@ -1,4 +1,5 @@
-// 交互偏好（持久化到 localStorage）：删除二次确认弹窗开关、Toast 弹出位置、锁定水印
+// 交互偏好（持久化到 localStorage）：删除二次确认弹窗开关、Toast 弹出位置、锁定水印、
+// 侧边栏底部操作区、弹窗关闭按钮位置、结果页伤害条目多开
 import { browser } from '$app/environment'
 
 const CONFIRM_DELETES_KEY = 'wuwa-afyg:interaction-prefs:confirm-deletes'
@@ -7,6 +8,7 @@ const LOCK_WATERMARK_KEY = 'wuwa-afyg:interaction-prefs:lock-watermark'
 const LOCK_WATERMARK_TEXT_KEY = 'wuwa-afyg:interaction-prefs:lock-watermark-text'
 const SIDEBAR_ACTIONS_KEY = 'wuwa-afyg:interaction-prefs:sidebar-actions'
 const MODAL_CLOSE_KEY = 'wuwa-afyg:interaction-prefs:modal-close-position'
+const MULTI_ENTRY_EXPAND_KEY = 'wuwa-afyg:interaction-prefs:multi-entry-expand'
 
 /** @desc 锁定水印默认文案（文本框留空时回落到它） */
 export const DEFAULT_LOCK_WATERMARK_TEXT = '已锁定'
@@ -40,6 +42,8 @@ let _lockWatermarkText = $state(DEFAULT_LOCK_WATERMARK_TEXT)
 let _sidebarActions = $state(true)
 /** @desc 弹窗关闭按钮位置（默认右上角；B 站 Toy 平台首次进入默认左上角） */
 let _modalClosePosition = $state<ModalClosePosition>('top-right')
+/** @desc 结果页是否允许同时展开多个伤害条目（默认关闭 = 同时只展开一个） */
+let _multiEntryExpand = $state(false)
 
 if (browser) {
     try {
@@ -72,6 +76,12 @@ if (browser) {
     } catch {
         /* ignore */
     }
+    try {
+        const saved = localStorage.getItem(MULTI_ENTRY_EXPAND_KEY)
+        if (saved === '0' || saved === '1') _multiEntryExpand = saved === '1'
+    } catch {
+        /* ignore */
+    }
 }
 
 /** @desc 弹窗关闭按钮位置 */
@@ -92,6 +102,16 @@ export function getSidebarActions(): boolean {
 export function setSidebarActions(v: boolean): void {
     _sidebarActions = v
     if (browser) localStorage.setItem(SIDEBAR_ACTIONS_KEY, v ? '1' : '0')
+}
+
+/** @desc 结果页是否允许同时展开多个伤害条目（关闭 = 同时只展开一个，默认关闭） */
+export function getMultiEntryExpand(): boolean {
+    return _multiEntryExpand
+}
+
+export function setMultiEntryExpand(v: boolean): void {
+    _multiEntryExpand = v
+    if (browser) localStorage.setItem(MULTI_ENTRY_EXPAND_KEY, v ? '1' : '0')
 }
 
 export function getConfirmDeletes(): boolean {

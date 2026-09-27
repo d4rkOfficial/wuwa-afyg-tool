@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
     import type { CalcState } from '$lib/calc/calculation.types'
     import type { ConfigState } from '$lib/calc/config.types'
@@ -7,6 +7,8 @@
     import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { getCharElementMap } from '$lib/calc/timeline.store.svelte'
     import { getActiveProject, updateResultAnalysis, updateComparisonPoints } from '$lib/data/project.svelte'
+    import { getMultiEntryExpand } from '$lib/data/interaction-prefs.svelte'
+    import { nextExpandedIds } from '$lib/utils/expand-state'
     import { computeAll as computeAllDamage } from '$lib/calc/compute'
     import {
         getAllDamageEntries,
@@ -31,6 +33,22 @@
     import ComparisonModal from './comparison-modal.svelte'
     import DamageTraceView from './damage-trace-view.svelte'
     import type { DamageTraceCtx, CritDisplayMode } from '$lib/calc/damage-trace'
+    import {
+        CARD,
+        CARD_PAD,
+        CARD_SURFACE_STYLE,
+        CARD_TITLE,
+        CELL_VALUE_STRONG,
+        ICON_INLINE,
+        NUMERIC_FONT_STYLE,
+        SECTION_LABEL,
+        SECTION_NOTE,
+        STAT_CARD_GRADIENT_STYLE,
+        STAT_ROW,
+        STAT_VALUE_LG,
+        STAT_VALUE_SM,
+        SWATCH_DOT
+    } from '$lib/calc/result.styles'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
@@ -344,8 +362,11 @@
         if (showDataAnalysis) untrack(() => scheduleAnalysis())
     })
 
-    let expandedEntry = $state<string | null>(null)
+    let expandedEntryIds = $state<Set<string>>(new Set())
     let showDataAnalysis = $state(false)
+
+    /** @desc 允许多开（设置-交互相关）：派生值，设置变化即生效 */
+    let multiEntryExpand = $derived(getMultiEntryExpand())
 
     onMount(() => {
         registerPanel(
@@ -358,9 +379,10 @@
     })
     let tableContainer = $state<HTMLDivElement | undefined>()
 
+    /** @desc 条目展开状态的选择逻辑见 $lib/utils/expand-state（单开 / 多开兼容，纯函数） */
     function toggleExpand(id: string, _index: number) {
-        const expanding = expandedEntry !== id
-        expandedEntry = expanding ? id : null
+        const expanding = !expandedEntryIds.has(id)
+        expandedEntryIds = nextExpandedIds(expandedEntryIds, id, multiEntryExpand)
         if (expanding) {
             tick().then(() => {
                 tableContainer
@@ -381,39 +403,50 @@
     {:else if entries.length === 0}
         <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {:else}
-        <!-- Summary -->
+        <!-- Summary：与数据分析弹窗同口径的卡片（总伤害卡 + 各角色伤害卡），数值用主题色强调 -->
         <div class="shrink-0 border-b px-5 py-4" style="border-color: var(--theme-divider-border);">
-            <div class="flex items-end gap-6">
-                <div>
-                    <div class="mb-1 text-[10px] text-(--theme-modal-text)/40">总伤害</div>
-                    <div
-                        class="text-2xl font-black tabular-nums text-(--theme-accent-text) [text-shadow:0_0_3px_var(--theme-halo-color)]"
-                    >
+            <div class="flex flex-wrap items-stretch gap-3">
+                <div class={`${CARD} ${CARD_PAD} min-w-48 flex-1 md:max-w-72`} style={STAT_CARD_GRADIENT_STYLE}>
+                    <div class={`${SECTION_LABEL} text-(--theme-modal-text)/45`}>总伤害</div>
+                    <div class={`mt-1.5 ${STAT_VALUE_LG} text-(--theme-accent-text)`}>
                         {Math.round(totalDamage).toLocaleString()}
                     </div>
+                    <div class={`${SECTION_NOTE} text-(--theme-modal-text)/45`}>{entries.length} 条伤害记录</div>
                 </div>
-                {#each charSummaries as cs}
-                    <div>
-                        <div
-                            class="mb-1 text-[10px]"
-                            style="color: {cs.character
-                                ? `var(--theme-element-${charElements[cs.character]}, #888)`
-                                : 'var(--theme-modal-text)'}"
-                        >
-                            {cs.character || '—'}
+                {#each charSummaries as cs (cs.character)}
+                    <div class={`${CARD} ${CARD_PAD} min-w-40 flex-1 md:max-w-56`} style={CARD_SURFACE_STYLE}>
+                        <div class="flex items-center gap-1.5">
+                            <span
+                                class={SWATCH_DOT}
+                                style="background: {cs.character
+                                    ? `var(--theme-element-${charElements[cs.character]}, #888)`
+                                    : 'var(--theme-modal-text)'};"
+                            ></span>
+                            <span
+                                class="truncate text-[10px] font-black"
+                                style="color: {cs.character
+                                    ? `var(--theme-element-${charElements[cs.character]}, #888)`
+                                    : 'var(--theme-modal-text)'};"
+                            >
+                                {cs.character || '—'}
+                            </span>
                         </div>
-                        <div class="text-sm font-black tabular-nums">
+                        <div class={`mt-1.5 ${STAT_VALUE_SM} text-(--theme-modal-text)`}>
                             {Math.round(cs.totalDamage).toLocaleString()}
+                        </div>
+                        <div class={`${SECTION_NOTE} text-(--theme-modal-text)/45`}>
+                            占比 {totalDamage > 0 ? ((cs.totalDamage / totalDamage) * 100).toFixed(1) : '0.0'}% · {cs.entryCount}
+                            条
                         </div>
                     </div>
                 {/each}
-                <div class="ml-auto flex items-center gap-2">
+                <div class="ml-auto flex items-start">
                     <button
                         onclick={handleOpenAnalysis}
                         class="flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
                         style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
                     >
-                        <Icon icon="mdi:chart-box-outline" class="size-3.5" />
+                        <Icon icon="mdi:chart-box-outline" class={ICON_INLINE} />
                         数据分析
                     </button>
                 </div>
@@ -426,21 +459,24 @@
                 <thead>
                     <tr
                         data-sf="card"
-                        class="text-(--theme-modal-text)/50 sticky top-0"
+                        class={`${SECTION_LABEL} sticky top-0 text-(--theme-modal-text)/45`}
                         style="--sf-base: var(--theme-modal-bg); border-bottom: 1px solid var(--theme-divider-border);"
                     >
-                        <th class="text-left font-medium py-2 px-3">来源</th>
-                        <th class="text-left font-medium py-2 px-3">条目</th>
-                        <th class="text-right font-medium py-2 px-3">倍率</th>
-                        <th class="text-right font-medium py-2 px-3">单位</th>
-                        <th class="text-right font-medium py-2 px-3">暴击</th>
-                        <th class="text-right font-medium py-2 px-3">不暴击</th>
-                        <th class="text-right font-medium py-2 px-3">期望</th>
-                        <th class="text-right font-medium py-2 px-3 w-8"></th>
+                        <th class="py-2 px-3 text-left font-medium">来源</th>
+                        <th class={`py-2 px-3 text-left ${CARD_TITLE}`}>条目</th>
+                        <th class="py-2 px-3 text-right font-medium">倍率</th>
+                        <th class="py-2 px-3 text-right font-medium">单位</th>
+                        <th class="py-2 px-3 text-right font-medium">暴击</th>
+                        <th class="py-2 px-3 text-right font-medium">不暴击</th>
+                        <th class="py-2 px-3 text-right font-medium">期望</th>
+                        <th class="py-2 px-3 w-8 text-right font-medium"></th>
                     </tr>
                 </thead>
                 <tbody data-sf="card" style="--sf-base: var(--theme-modal-bg);">
-                    {#each entries as entry, i}
+                    {#each entries as entry, i (entry.id)}
+                        {@const isExpanded = multiEntryExpand
+                            ? expandedEntryIds.has(entry.id)
+                            : expandedEntryIds.has(entry.id) && expandedEntryIds.size === 1}
                         <tr
                             onclick={() => toggleExpand(entry.id, i)}
                             data-entry-id={entry.id}
@@ -461,25 +497,27 @@
                                 {entry.displayName}
                                 {#each entry.damageTypes as dt}
                                     <span
-                                        class="ml-1 rounded-none px-1 text-[9px] font-medium align-middle"
-                                        style="background: var(--theme-input-bg); color: var(--theme-modal-text)/60;"
+                                        class="ml-1 rounded-none border px-1 text-[9px] font-medium align-middle"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                                         >{DAMAGE_TYPE_SHORT[dt] ?? dt}</span
                                     >
                                 {/each}
                             </td>
-                            <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
+                            <td
+                                class={`py-1.5 px-3 text-right ${STAT_ROW} text-(--theme-modal-text)/60`}
+                                style={NUMERIC_FONT_STYLE}
                                 >{((entry.ratioNum / entry.hits) * 100).toFixed(2)}%{#if entry.hits > 1}
                                     ×{entry.hits}{/if}</td
                             >
                             <td class="py-1.5 px-3 text-right text-(--theme-modal-text)/60">{entry.baseUnit}</td>
-                            <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
+                            <td class={`py-1.5 px-3 text-right ${STAT_ROW} text-(--theme-modal-text)/60`}
                                 >{entry.canCrit ? entry.critPerHit.toLocaleString() : '—'}</td
                             >
-                            <td class="py-1.5 px-3 text-right tabular-nums text-(--theme-modal-text)/60"
+                            <td class={`py-1.5 px-3 text-right ${STAT_ROW} text-(--theme-modal-text)/60`}
                                 >{entry.canCrit ? entry.nonCritPerHit.toLocaleString() : '—'}</td
                             >
                             <td
-                                class="py-1.5 px-3 text-right tabular-nums font-black"
+                                class={`py-1.5 px-3 text-right ${CELL_VALUE_STRONG}`}
                                 style={missEntryIds.includes(entry.id)
                                     ? MISS_TEXT
                                     : rigCritEntryIds.includes(entry.id)
@@ -490,12 +528,12 @@
                             >
                             <td class="py-1.5 w-8"></td>
                         </tr>
-                        {#if expandedEntry === entry.id}
+                        {#if isExpanded}
                             <tr style="background: var(--theme-input-bg);">
                                 <td colspan="8" class="p-0">
                                     <div
                                         transition:slide|local={{ duration: 200 }}
-                                        class="border-b px-6 py-3 space-y-3 text-xs text-(--theme-modal-text)/60"
+                                        class="space-y-3 border-b px-6 py-3 text-xs text-(--theme-modal-text)/60"
                                         style="border-color: var(--theme-divider-border);"
                                     >
                                         {#if entry.baseUnit === '固定'}

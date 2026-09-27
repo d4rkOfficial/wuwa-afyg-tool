@@ -246,6 +246,7 @@
         }
     }
 
+    /** @desc 清空对话（入口已从头部右上角移到上下文面板底部的「清空对话历史」按钮） */
     function clearConversation() {
         abortCtrl?.abort()
         messages = []
@@ -548,13 +549,6 @@
                     <Icon icon="mdi:layers-triple-outline" class="size-4" />
                 </button>
                 <button
-                    onclick={clearConversation}
-                    class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
-                    title="清空对话"
-                >
-                    <Icon icon="mdi:broom" class="size-4" />
-                </button>
-                <button
                     onclick={toggleScale}
                     class="rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
                     title={size === 'small' ? '放大到全尺寸' : '缩小'}
@@ -579,7 +573,7 @@
                 </div>
             {/if}
 
-            <!-- 上下文 / 用量 / 运行情况面板（默认收起） -->
+            <!-- 上下文 / 用量 / 运行情况面板（默认收起；入口为头部 layers 按钮） -->
             <AiContextPanel
                 open={contextOpen}
                 onClose={() => (contextOpen = false)}

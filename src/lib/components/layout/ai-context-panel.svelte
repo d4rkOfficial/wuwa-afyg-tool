@@ -1,5 +1,7 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
+    import { slide } from 'svelte/transition'
+    import { browser } from '$app/environment'
     import type { ComponentsProps } from '$lib/types'
     import {
         describeTurnPhase,
@@ -80,10 +82,30 @@
         clearChanges()
         addToast(count > 0 ? `已清空 ${count} 条待上报变化` : '变化队列本就是空的', 'info')
     }
+
+    /**
+     * @desc 面板展开 / 收起的高度过渡（`svelte/transition` 的 slide）。
+     *  `layout.css` 里的 `prefers-reduced-motion` 只关 CSS 动画，管不到 JS 过渡，
+     *  所以这里按仓库既有做法（`magnetic-pointer.svelte`）自行跟随系统设置：
+     *  减弱动态效果时把时长压到 1ms（保留过渡钩子，避免结构分支变化）。
+     */
+    let reducedMotion = $state(false)
+
+    $effect(() => {
+        if (!browser) return
+        const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+        reducedMotion = motion.matches
+        const onMotion = (e: MediaQueryListEvent) => (reducedMotion = e.matches)
+        motion.addEventListener('change', onMotion)
+        return () => motion.removeEventListener('change', onMotion)
+    })
+
+    const SLIDE_PARAMS = $derived({ duration: reducedMotion ? 1 : 200 })
 </script>
 
 {#if open}
     <div
+        transition:slide|local={SLIDE_PARAMS}
         class="theme-scrollbar flex max-h-[52%] shrink-0 flex-col gap-2 overflow-y-auto border-b px-3 py-2.5 {className ||
             ''}"
         style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-input-bg) 55%, transparent); {styleProp ||

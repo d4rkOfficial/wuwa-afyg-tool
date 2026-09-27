@@ -84,12 +84,14 @@
         getLockWatermark,
         getLockWatermarkText,
         getModalClosePosition,
+        getMultiEntryExpand,
         getSidebarActions,
         getToastPosition,
         setConfirmDeletes,
         setLockWatermark,
         setLockWatermarkText,
         setModalClosePosition,
+        setMultiEntryExpand,
         setSidebarActions,
         setToastPosition,
         TOAST_POSITIONS,
@@ -1662,6 +1664,35 @@
                                         <span
                                             class="absolute top-0.5 size-4 rounded-full transition-all"
                                             style="left: {getSidebarActions()
+                                                ? '18px'
+                                                : '2px'}; background: var(--theme-modal-bg);"
+                                        ></span>
+                                    </button>
+                                </div>
+                                <div
+                                    class="mt-2 flex items-center justify-between gap-3 rounded-none border px-3 py-2"
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-medium text-(--theme-modal-text)/70"
+                                            >允许结果页同时展开多个伤害条目</span
+                                        >
+                                        <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                                            开启后结果页的伤害条目可各自独立展开 /
+                                            收起；关闭（默认）时同时只展开一个，展开新条目会收起上一个
+                                        </span>
+                                    </div>
+                                    <button
+                                        onclick={() => setMultiEntryExpand(!getMultiEntryExpand())}
+                                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+                                        style="background: {getMultiEntryExpand()
+                                            ? 'var(--theme-accent-bg)'
+                                            : 'color-mix(in srgb, var(--theme-modal-text) 25%, transparent)'};"
+                                        title="点击切换"
+                                    >
+                                        <span
+                                            class="absolute top-0.5 size-4 rounded-full transition-all"
+                                            style="left: {getMultiEntryExpand()
                                                 ? '18px'
                                                 : '2px'}; background: var(--theme-modal-bg);"
                                         ></span>
