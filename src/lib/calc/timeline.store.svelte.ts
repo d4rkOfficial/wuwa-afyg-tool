@@ -241,6 +241,15 @@ export function redo() {
     if (_onupdate) _onupdate(next)
 }
 
+/** @desc 是否可撤销 / 可重做（底部工具栏按钮禁用态用） */
+export function canUndo(): boolean {
+    return _undoStack.length > 0
+}
+
+export function canRedo(): boolean {
+    return _redoStack.length > 0
+}
+
 // ── Getters ──
 export function getRefLines() {
     return _refLines

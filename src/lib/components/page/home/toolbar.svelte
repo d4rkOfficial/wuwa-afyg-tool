@@ -1,14 +1,18 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
-    import type { PhaseKey } from '$lib/types/project'
+    import type { PhaseKey, CharSlot } from '$lib/types/project'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import {
         setShowDamageList,
         getQuickMode,
         getQuickSpecial,
         toggleQuickMode,
-        formatTimeline
+        formatTimeline,
+        undo as undoTimeline,
+        redo as redoTimeline,
+        canUndo as canUndoTimeline,
+        canRedo as canRedoTimeline
     } from '$lib/calc/timeline.store.svelte'
     import {
         setShowBuffModal,
@@ -16,7 +20,12 @@
         getBuffDiffMode,
         toggleBuffDiffMode,
         getHideConditionMismatch,
-        toggleHideConditionMismatch
+        toggleHideConditionMismatch,
+        getConditionProfile,
+        undoTable,
+        redoTable,
+        canUndoTable,
+        canRedoTable
     } from '$lib/calc/calculation.store.svelte'
     import { getCalcViewMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
     import { openSubstatLibrary } from '$lib/data/substat-library-ui.svelte'
@@ -28,6 +37,8 @@
         showResult: boolean
         phaseLocked: boolean
         canLock: boolean
+        /** @desc 当前队伍（用于角色详情按钮展示链阶档位） */
+        team?: [CharSlot, CharSlot, CharSlot]
         onCharDetail: () => void
         onRefresh: () => void
         onLockToggle: () => void
@@ -38,12 +49,49 @@
         showResult,
         phaseLocked,
         canLock,
+        team,
         onCharDetail,
         onRefresh,
         onLockToggle,
         class: className,
         style: styleProp
     }: Props = $props()
+
+    /**
+     * @desc 链阶文案：每个角色两位 —— 链数 + 阶数，按角色 1→3 依次拼接。
+     * 例：`016100` = 角色1（0链1阶）、角色2（6链0阶）、角色3（0链0阶）。
+     * 未配置角色的档位按角色面板为空处理（链 0 / 阶 0）。
+     */
+    let chainLabel = $derived.by(() => {
+        const profile = getConditionProfile()
+        return [0, 1, 2]
+            .map((i) => {
+                if (!team?.[i]?.character) return '00'
+                const chain = profile.chains[i] ?? 0
+                const refine = profile.refinements[i] ?? 0
+                return `${chain}${refine}`
+            })
+            .join('')
+    })
+
+    /**
+     * @desc 底部撤销/重做：排轴阶段回退时间线，拉表阶段只回退表格（Buff / 绑定 / 乘区条件）。
+     * 依赖 store 的响应式 getter，禁用态自动跟随历史栈。
+     */
+    const showUndoRedo = $derived(activePhase === 'timeline' || activePhase === 'calculation')
+    const undoDisabled = $derived(activePhase === 'timeline' ? !canUndoTimeline() : !canUndoTable())
+    const redoDisabled = $derived(activePhase === 'timeline' ? !canRedoTimeline() : !canRedoTable())
+    const undoTitle = $derived(
+        activePhase === 'timeline' ? '撤销排轴操作' : '撤销表格操作（只回退 Buff / 绑定 / 乘区条件，不动排轴与配装）'
+    )
+    const handleUndo = () => {
+        if (activePhase === 'timeline') undoTimeline()
+        else undoTable()
+    }
+    const handleRedo = () => {
+        if (activePhase === 'timeline') redoTimeline()
+        else redoTable()
+    }
 
     // ── 简化底部工具栏：fixed 圆角矩形，仅水平拖动，磁吸侧栏右缘 / 屏幕右缘 ──
     let toolbarEl = $state<HTMLElement | null>(null)
@@ -149,10 +197,11 @@
         class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
             ? 'rounded-none px-3 py-2'
             : 'rounded-none px-3 py-1.5'}"
-        title="角色详情配置"
+        title="角色详情配置（链阶：链1链2链3 阶1阶2阶3 = {chainLabel}）"
     >
         <Icon icon="mdi:account-details" class="size-4 shrink-0" />
-        {#if !simplifyToolbar}<span>角色详情配置</span>{/if}
+        <span class="truncate">角色详情配置</span>
+        <span class="shrink-0 font-black tabular-nums" style="color: var(--theme-accent-text);">{chainLabel}</span>
     </button>
     {#if !showResult}
         {#if activePhase === 'timeline'}
@@ -322,6 +371,30 @@
         ></div>
     {:else}
         <div class="flex-1"></div>
+    {/if}
+    {#if showUndoRedo}
+        <button
+            onclick={handleUndo}
+            disabled={undoDisabled}
+            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
+                ? 'rounded-none px-3 py-2'
+                : 'rounded-none px-3 py-1.5'}"
+            title={undoTitle}
+        >
+            <Icon icon="mdi:undo-variant" class="size-4 shrink-0" />
+            {#if !simplifyToolbar}<span>撤销</span>{/if}
+        </button>
+        <button
+            onclick={handleRedo}
+            disabled={redoDisabled}
+            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
+                ? 'rounded-none px-3 py-2'
+                : 'rounded-none px-3 py-1.5'}"
+            title={activePhase === 'timeline' ? '重做排轴操作' : '重做表格操作'}
+        >
+            <Icon icon="mdi:redo-variant" class="size-4 shrink-0" />
+            {#if !simplifyToolbar}<span>重做</span>{/if}
+        </button>
     {/if}
     {#if showResult}
         <button

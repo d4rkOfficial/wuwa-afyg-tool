@@ -1,9 +1,11 @@
-import type { DamageEntry, BuffSet, ZoneRef } from './calculation.types'
+import type { DamageEntry, BuffInstance, BuffVariant, BuffCondition, ZoneRef } from './calculation.types'
 import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone } from './result.types'
 import type { CharSlot } from '$lib/types/project'
 import { ZONE_NO_REF_IDS } from './calculation.consts'
+import { applyZone, recomputeTotals, type CharacterComputed } from './zone-ops'
+import { evaluateCondition, type ConditionContext } from './condition'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
     NON_DIRECT_ELEMENT,
@@ -106,47 +108,8 @@ function isTypeBonus(label: string): boolean {
     return label in TYPE_BONUS_MAP
 }
 
-// ── zone -> normal stat map ──
-
-function applyZoneToAccum(zoneId: string, value: number, acc: CharAccum) {
-    switch (zoneId) {
-        case 'atkFlat':
-            acc.flatAtk += value
-            break
-        case 'atkPct':
-            acc.pctAtk += value
-            break
-        case 'hpFlat':
-            acc.flatHp += value
-            break
-        case 'hpPct':
-            acc.pctHp += value
-            break
-        case 'defFlat':
-            acc.flatDef += value
-            break
-        case 'defPct':
-            acc.pctDef += value
-            break
-        case 'critRate':
-            acc.critRate += value
-            break
-        case 'critDmg':
-            acc.critDmg += value
-            break
-        case 'recharge':
-            acc.recharge += value
-            break
-        case 'tuneBreakBoost':
-            acc.tuneBreakBoost += value
-            break
-        case 'offTuneBuildupRate':
-            acc.offTuneBuildupRate += value
-            break
-    }
-}
-
-function applyEntryStatToAccum(label: string, value: number, acc: CharAccum) {
+/** @desc 把装备/词条上的属性词条（元素加成 / 类型加成 / 面板词条）写入角色贡献累加器 */
+function applyEntryStatToAccum(label: string, value: number, acc: CharacterComputed) {
     if (isElementBonus(label)) {
         const el = ELEMENT_BONUS_MAP[label]
         acc.elementBonus[el] = (acc.elementBonus[el] ?? 0) + value
@@ -159,66 +122,70 @@ function applyEntryStatToAccum(label: string, value: number, acc: CharAccum) {
     }
     switch (label) {
         case '攻击':
-            acc.flatAtk += value
+            applyZone(acc, 'atkFlat', value)
             break
         case '生命':
-            acc.flatHp += value
+            applyZone(acc, 'hpFlat', value)
             break
         case '防御':
-            acc.flatDef += value
+            applyZone(acc, 'defFlat', value)
             break
         case '攻击%':
-            acc.pctAtk += value
+            applyZone(acc, 'atkPct', value)
             break
         case '生命%':
-            acc.pctHp += value
+            applyZone(acc, 'hpPct', value)
             break
         case '防御%':
-            acc.pctDef += value
+            applyZone(acc, 'defPct', value)
             break
         case '暴击率':
-            acc.critRate += value
+            applyZone(acc, 'critRate', value)
             break
         case '暴击伤害':
-            acc.critDmg += value
+            applyZone(acc, 'critDmg', value)
             break
         case '共鸣效率':
-            acc.recharge += value
+            applyZone(acc, 'recharge', value)
             break
         case '治疗加成':
             break // not used in damage formula
     }
 }
 
-interface CharAccum {
-    flatAtk: number
-    pctAtk: number
-    flatHp: number
-    pctHp: number
-    flatDef: number
-    pctDef: number
-    critRate: number
-    critDmg: number
-    recharge: number
-    tuneBreakBoost: number
-    offTuneBuildupRate: number
-    elementBonus: Record<string, number>
-    typeBonus: Record<string, number>
-}
-
-function emptyAccum(): CharAccum {
+function emptyAccum(): CharacterComputed {
     return {
-        flatAtk: 0,
-        pctAtk: 0,
-        flatHp: 0,
-        pctHp: 0,
-        flatDef: 0,
-        pctDef: 0,
+        baseAtk: 0,
+        baseHp: 0,
+        baseDef: 0,
+        totalAtk: 0,
+        totalHp: 0,
+        totalDef: 0,
+        totalTuneBreakBoost: 0,
+        offTuneBuildupRate: 100,
+        recharge: 100,
+        atkPctSum: 0,
+        atkFlatSum: 0,
+        hpPctSum: 0,
+        hpFlatSum: 0,
+        defPctSum: 0,
+        defFlatSum: 0,
         critRate: 5,
         critDmg: 150,
-        recharge: 100,
-        tuneBreakBoost: 0,
-        offTuneBuildupRate: 100,
+        bonusDmg: 0,
+        deepenDmg: 0,
+        resPen: 0,
+        defPen: 0,
+        defDown: 0,
+        resDown: 0,
+        tuneStrainLayer: 0,
+        unisonBoonLayer: 0,
+        finalDmg: 0,
+        dmgTakenInc: 0,
+        customMult: 0,
+        customFinalDmgMul: 1,
+        dmgRedPen: 0,
+        extraRatio: 0,
         elementBonus: {},
         typeBonus: {}
     }
@@ -230,7 +197,7 @@ function accumulateEchoes(
     echoes: EchoSlotConfig[],
     weaponSubstatValue: number,
     weaponSubstatLabel: string | undefined,
-    acc: CharAccum
+    acc: CharacterComputed
 ) {
     if (weaponSubstatLabel) {
         applyEntryStatToAccum(weaponSubstatLabel, weaponSubstatValue, acc)
@@ -240,13 +207,13 @@ function accumulateEchoes(
             applyEntryStatToAccum(echo.mainStat.type, echo.mainStat.value, acc)
         }
         if (echo.secondMainStat) {
-            if (echo.secondMainStat.type === '攻击') acc.flatAtk += echo.secondMainStat.value
-            else if (echo.secondMainStat.type === '生命') acc.flatHp += echo.secondMainStat.value
+            if (echo.secondMainStat.type === '攻击') applyZone(acc, 'atkFlat', echo.secondMainStat.value)
+            else if (echo.secondMainStat.type === '生命') applyZone(acc, 'hpFlat', echo.secondMainStat.value)
         } else {
             const secData = SECOND_MAIN_STAT[echo.cost as keyof typeof SECOND_MAIN_STAT]
             if (secData) {
-                if (secData.label === '攻击') acc.flatAtk += secData.value
-                else if (secData.label === '生命') acc.flatHp += secData.value
+                if (secData.label === '攻击') applyZone(acc, 'atkFlat', secData.value)
+                else if (secData.label === '生命') applyZone(acc, 'hpFlat', secData.value)
             }
         }
         for (const sub of echo.substats) {
@@ -257,45 +224,6 @@ function accumulateEchoes(
 
 // ── build final character stats (per-entry, includes buffs bound to this entry) ──
 
-interface CharacterComputed {
-    baseAtk: number
-    baseHp: number
-    baseDef: number
-    totalAtk: number
-    totalHp: number
-    totalDef: number
-    totalTuneBreakBoost: number
-    offTuneBuildupRate: number
-    recharge: number
-    atkPctSum: number
-    atkFlatSum: number
-    hpPctSum: number
-    hpFlatSum: number
-    defPctSum: number
-    defFlatSum: number
-    critRate: number
-    critDmg: number
-    // buff multipliers (as percentages, divide by 100 in formula)
-    bonusDmg: number
-    deepenDmg: number
-    resPen: number
-    defPen: number
-    defDown: number
-    resDown: number
-    tuneStrainLayer: number
-    /** @desc 同奏增益层数（flat 层数）：同奏区 = 1 + 3% × 层数 */
-    unisonBoonLayer: number
-    finalDmg: number
-    dmgTakenInc: number
-    customMult: number
-    /** @desc 特殊区（连乘）：每个来源独立乘算 (1 + value/100)，最终与 customMult 组合为统一特殊区 **/
-    customFinalDmgMul: number
-    dmgRedPen: number
-    extraRatio: number
-    elementBonus: Record<string, number>
-    typeBonus: Record<string, number>
-}
-
 export interface ConditionProfile {
     chains: number[]
     refinements: number[]
@@ -303,12 +231,47 @@ export interface ConditionProfile {
 
 export const DEFAULT_CONDITION_PROFILE: ConditionProfile = { chains: [0, 0, 0], refinements: [1, 1, 1] }
 
-// 生效条件判定：chain/refinement 参考其归属角色（conditionRefCharIdx）的链/精炼，
-// 未指定参考角色则回退到当前角色自身判断；charIndex<0（效应/无角色）时条件型 buff 不生效。
-// elements/damageTypes 为条目级条件，需结合 entry 判定；无 entry（角色级聚合）时不生效。
-// 供计算与「隐藏条件不匹配」过滤共用。
+/** @desc 判定某个 buff / 变体的生效条件（引擎与「隐藏条件不匹配」筛选共用同一口径） */
+export function buffConditionMet(
+    condition: BuffInstance['condition'],
+    profile: ConditionProfile,
+    charIndex: number,
+    ctx: Partial<ConditionContext> = {},
+    refCharIdx?: number
+): boolean {
+    const chains = ctx.chains ?? profile.chains
+    const refinements = ctx.refinements ?? profile.refinements
+    return evaluateCondition(condition, {
+        chains,
+        refinements,
+        refCharIdx: refCharIdx ?? (charIndex >= 0 ? charIndex : undefined),
+        ...(ctx.element !== undefined ? { element: ctx.element } : {}),
+        ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
+    })
+}
+
+/**
+ * @desc 某个 Buff 实例对给定条目实际生效的变体列表（整块条件 + 各变体子条件均满足）。
+ * 同名多乘区 buff 的语义在此落地：一个实例的多个变体各自判定子条件，满足者全部叠加。
+ */
+export function activeVariants(
+    buff: BuffInstance,
+    profile: ConditionProfile,
+    charIndex: number,
+    ctx: Partial<ConditionContext> = {}
+): BuffVariant[] {
+    if (!buffConditionMet(buff.condition, profile, charIndex, ctx, buff.conditionRefCharIdx)) return []
+    const variants = buff.variants?.length ? buff.variants : [{ id: `${buff.id}-v1`, zones: buff.zones }]
+    return variants.filter((v) => buffConditionMet(v.condition, profile, charIndex, ctx, buff.conditionRefCharIdx))
+}
+
+/**
+ * @desc 兼容旧口径的条件判定（表格「隐藏条件不匹配」筛选复用）：
+ * 同时支持新条件结构（chains/refinements）与旧字段（chain/refinement/elements/damageTypes）。
+ * 传入 entry 时按条目属性/伤害类型判定；不传时忽略条目级子条件（角色级聚合）。
+ */
 export function conditionMet(
-    bs: BuffSet,
+    bs: BuffInstance,
     profile: ConditionProfile,
     charIndex: number,
     entry?: DamageEntry,
@@ -316,63 +279,103 @@ export function conditionMet(
     charInfoMap?: Record<string, CharacterInfo>,
     echoDescByEntry?: Record<string, string>
 ): boolean {
-    const cond = bs.condition
-    if (!cond) return true
-    const refIdx = bs.conditionRefCharIdx ?? charIndex
-    if (cond.chain !== undefined) {
-        if (refIdx < 0) return false
-        if ((profile.chains[refIdx] ?? 0) < cond.chain) return false
-    }
-    if (cond.refinement !== undefined) {
-        if (refIdx < 0) return false
-        if ((profile.refinements[refIdx] ?? 1) < cond.refinement) return false
-    }
-    if (cond.elements?.length) {
-        if (!entry) return false
-        if (!cond.elements.includes(entry.damageElement)) return false
-    }
-    if (cond.damageTypes?.length) {
-        if (!entry) return false
-        const types = resolveDamageTypes(entry, damageEntryDamageTypes ?? {}, charInfoMap, echoDescByEntry)
-        if (!cond.damageTypes.some((dt) => types.includes(dt))) return false
-    }
-    return true
+    const element = entry?.damageElement
+    const damageTypes = entry
+        ? resolveDamageTypes(entry, damageEntryDamageTypes ?? {}, charInfoMap, echoDescByEntry)
+        : undefined
+    return buffConditionMet(
+        bs.condition,
+        profile,
+        charIndex,
+        {
+            ...(element !== undefined ? { element } : {}),
+            ...(damageTypes !== undefined ? { damageTypes } : {})
+        },
+        bs.conditionRefCharIdx
+    )
 }
 
-/** @desc 返回某伤害条目实际生效的 Buff 集（按范围+条件过滤），溯源模块复用同一口径 */
+interface BoundBuff {
+    buff: BuffInstance
+    variants: BuffVariant[]
+}
+
+/** @desc 条目是否绑定该 Buff（scope 按作用域匹配） */
+const scopeMatches = (buff: BuffInstance, charIndex: number, isEffect: boolean): boolean => {
+    if (buff.scope === 'all') return true
+    if (buff.scope.length === 0) return isEffect && charIndex < 0
+    return buff.scope.includes(charIndex)
+}
+
+/**
+ * @desc 返回某伤害条目实际生效的 Buff 集（按范围 + 整块条件 + 变体子条件过滤），溯源模块复用同一口径。
+ * `matchEntry=false` 时忽略条目级的属性/类型条件（用于角色级聚合面板，与旧行为一致）。
+ */
 export function getBoundBuffSets(
     entry: DamageEntry,
     charIndex: number,
-    buffSets: BuffSet[],
+    buffSets: BuffInstance[],
     damageEntryBuffSetIds: Record<string, string[]>,
     damageEntryDamageTypes: Record<string, string[]>,
     profile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
     charInfoMap?: Record<string, CharacterInfo>,
-    echoDescByEntry?: Record<string, string>
-): BuffSet[] {
-    const boundIds = damageEntryBuffSetIds[entry.id] ?? []
-    return buffSets.filter((bs) => {
-        if (!boundIds.includes(bs.id)) return false
-        if (bs.scope === 'all')
-            return conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
-        if (Array.isArray(bs.scope) && bs.scope.length === 0)
-            return (
-                charIndex < 0 &&
-                conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
-            )
-        return (
-            (bs.scope as number[]).includes(charIndex) &&
-            conditionMet(bs, profile, charIndex, entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
-        )
-    })
+    echoDescByEntry?: Record<string, string>,
+    matchEntry = true
+): BuffInstance[] {
+    return boundBuffs(
+        entry,
+        charIndex,
+        buffSets,
+        damageEntryBuffSetIds,
+        damageEntryDamageTypes,
+        profile,
+        charInfoMap,
+        echoDescByEntry,
+        matchEntry
+    ).map((b) => b.buff)
 }
 
+/** @desc 生效 Buff 及其生效变体（引擎内部用：逐变体写入乘区） */
+function boundBuffs(
+    entry: DamageEntry,
+    charIndex: number,
+    buffSets: BuffInstance[],
+    damageEntryBuffSetIds: Record<string, string[]>,
+    damageEntryDamageTypes: Record<string, string[]>,
+    profile: ConditionProfile,
+    charInfoMap?: Record<string, CharacterInfo>,
+    echoDescByEntry?: Record<string, string>,
+    matchEntry = true
+): BoundBuff[] {
+    const boundIds = damageEntryBuffSetIds[entry.id] ?? []
+    const damageTypes = matchEntry
+        ? resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
+        : undefined
+    const ctx: ConditionContext = {
+        chains: profile.chains,
+        refinements: profile.refinements,
+        refCharIdx: charIndex >= 0 ? charIndex : undefined,
+        ...(matchEntry ? { element: entry.damageElement, damageTypes: damageTypes ?? [] } : {})
+    }
+    const out: BoundBuff[] = []
+    for (const buff of buffSets) {
+        if (!boundIds.includes(buff.id)) continue
+        if (!scopeMatches(buff, charIndex, entry.isEffect)) continue
+        const variants = activeVariants(buff, profile, charIndex, ctx)
+        if (variants.length > 0) out.push({ buff, variants })
+    }
+    return out
+}
+
+/** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 变体）。
+ *  条件判定（实例级硬性条件 + 变体子条件 + 乘区级条件）均已在此前完成，此处只做乘区写入。 */
 function computeCharacterStats(
     charInfo: CharacterInfo,
     weaponName: string | null,
     weaponInfo: WeaponInfo | null,
     echoes: EchoSlotConfig[],
-    boundBuffSets: BuffSet[]
+    boundBuffs: BoundBuff[],
+    ctx?: ZoneCtx
 ): CharacterComputed {
     const baseAtk = Math.round(charInfo.lv90BaseStats.atk + (weaponInfo?.lv90BaseAtk ?? 0))
     const baseHp = Math.round(charInfo.lv90BaseStats.hp)
@@ -380,7 +383,10 @@ function computeCharacterStats(
     const baseTuneBreakBoost = Math.round(charInfo.lv90BaseStats.tuneBreakBoost)
 
     const acc = emptyAccum()
-    acc.tuneBreakBoost = baseTuneBreakBoost
+    acc.baseAtk = baseAtk
+    acc.baseHp = baseHp
+    acc.baseDef = baseDef
+    acc.totalTuneBreakBoost = baseTuneBreakBoost
 
     const wSubValue = weaponInfo?.substat ? parseFloat(weaponInfo.substat.value) : 0
     const wSubName = weaponInfo?.substat?.name
@@ -394,118 +400,73 @@ function computeCharacterStats(
     }
     accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, acc)
 
-    // buff multipliers (separate from base stat accum)
-    let bonusDmg = 0,
-        deepenDmg = 0
-    let resPen = 0,
-        defPen = 0,
-        defDown = 0
-    let resDown = 0,
-        tuneStrainLayer = 0,
-        unisonBoonLayer = 0
-    let finalDmg = 0,
-        dmgTakenInc = 0
-    let customMult = 0,
-        customFinalDmgMul = 1,
-        dmgRedPen = 0,
-        extraRatio = 0
-
-    for (const bs of boundBuffSets) {
-        for (const z of bs.zones) {
-            if (z.ref || z.override) continue
-            if (z.value === 0) continue
-            const value = z.value
-            switch (z.zoneId) {
-                case 'bonusDmg':
-                    bonusDmg += value
-                    break
-                case 'deepenDmg':
-                    deepenDmg += value
-                    break
-                case 'resPen':
-                    resPen += value
-                    break
-                case 'defPen':
-                    defPen += value
-                    break
-                case 'defDown':
-                    defDown += value
-                    break
-                case 'resDown':
-                    resDown += value
-                    break
-                case 'tuneStrainLayer':
-                    tuneStrainLayer += value
-                    break
-                case 'unisonBoonLayer':
-                    unisonBoonLayer += value
-                    break
-                case 'finalDmg':
-                    finalDmg += value
-                    break
-                case 'dmgTakenInc':
-                    dmgTakenInc += value
-                    break
-                case 'customFinalDmg':
-                    customMult += value
-                    break
-                case 'customFinalDmgMul':
-                    customFinalDmgMul *= 1 + value / 100
-                    break
-                case 'dmgRedPen':
-                    dmgRedPen += value
-                    break
-                case 'extraRatio':
-                    extraRatio += value
-                    break
-                default:
-                    applyZoneToAccum(z.zoneId, value, acc)
-                    break
-            }
-        }
+    // 一切皆 buff：绑定到该角色的 Buff 逐变体写入同一贡献累加器（乘区级条件在此过滤）
+    for (const z of activeZonesOf(boundBuffs, ctx)) {
+        applyZone(acc, z.zoneId, z.value)
     }
 
-    const atkGreen = Math.round(acc.flatAtk + (baseAtk * acc.pctAtk) / 100)
-    const hpGreen = Math.round(acc.flatHp + (baseHp * acc.pctHp) / 100)
-    const defGreen = Math.round(acc.flatDef + (baseDef * acc.pctDef) / 100)
-    const totalTuneBreakBoost = Math.round(acc.tuneBreakBoost)
+    const atkGreen = Math.round(acc.atkFlatSum + (baseAtk * acc.atkPctSum) / 100)
+    const hpGreen = Math.round(acc.hpFlatSum + (baseHp * acc.hpPctSum) / 100)
+    const defGreen = Math.round(acc.defFlatSum + (baseDef * acc.defPctSum) / 100)
 
     return {
+        ...acc,
         baseAtk,
         baseHp,
         baseDef,
         totalAtk: baseAtk + atkGreen,
         totalHp: baseHp + hpGreen,
         totalDef: baseDef + defGreen,
-        totalTuneBreakBoost,
-        offTuneBuildupRate: acc.offTuneBuildupRate,
-        recharge: acc.recharge,
-        atkPctSum: acc.pctAtk,
-        atkFlatSum: acc.flatAtk,
-        hpPctSum: acc.pctHp,
-        hpFlatSum: acc.flatHp,
-        defPctSum: acc.pctDef,
-        defFlatSum: acc.flatDef,
-        critRate: acc.critRate,
-        critDmg: acc.critDmg,
-        bonusDmg,
-        deepenDmg,
-        resPen,
-        defPen,
-        defDown,
-        resDown,
-        tuneStrainLayer,
-        unisonBoonLayer,
-        finalDmg,
-        dmgTakenInc,
-        customMult,
-        customFinalDmgMul,
-        dmgRedPen,
-        extraRatio,
-        elementBonus: acc.elementBonus,
-        typeBonus: acc.typeBonus
+        totalTuneBreakBoost: Math.round(acc.totalTuneBreakBoost)
     }
 }
+
+/** @desc 展平「生效 Buff → 生效变体」列表（引擎逐变体写入乘区的唯一出口） */
+const collectVariants = (buffs: BoundBuff[]): BuffVariant[] => buffs.flatMap((b) => b.variants)
+
+/** @desc 乘区级条件求值上下文：伤害段上下文 + 链阶档位 */
+interface ZoneCtx {
+    chains: number[]
+    refinements: number[]
+    element?: string
+    damageTypes?: string[]
+}
+
+/** @desc 乘区自身条件是否满足（乘区级只允许 伤害类型/属性；链阶由实例级把关） */
+const zoneConditionMet = (zone: { condition?: BuffCondition }, ctx: ZoneCtx): boolean =>
+    evaluateCondition(zone.condition, {
+        chains: ctx.chains,
+        refinements: ctx.refinements,
+        ...(ctx.element !== undefined ? { element: ctx.element } : {}),
+        ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
+    })
+
+/** @desc 生效变体提供的直接贡献乘区（跳过引用/覆盖/零值；乘区级条件不满足者剔除） */
+const activeZonesOf = (buffs: BoundBuff[], ctx?: ZoneCtx): { zoneId: string; value: number }[] =>
+    collectVariants(buffs).flatMap((v) =>
+        v.zones
+            .filter((z) => !z.ref && !z.override && z.value !== 0)
+            .filter((z) => !ctx || zoneConditionMet(z, ctx))
+            .map((z) => ({ zoneId: z.zoneId as string, value: z.value }))
+    )
+
+/** @desc 生效变体里带引用标记的乘区（转模：稍后按面板解析；乘区级条件不满足者剔除） */
+const refZonesOf = (buffs: BoundBuff[], ctx?: ZoneCtx): { zoneId: string; ref: ZoneRef }[] =>
+    collectVariants(buffs).flatMap((v) =>
+        v.zones
+            .filter((z): z is typeof z & { ref: ZoneRef } => Boolean(z.ref) && !ZONE_NO_REF_IDS.has(z.zoneId))
+            .filter((z) => !ctx || zoneConditionMet(z, ctx))
+            .map((z) => ({ zoneId: z.zoneId as string, ref: z.ref }))
+    )
+
+/** @desc 生效变体里带覆盖标记的乘区（直接覆盖合计值；乘区级条件不满足者剔除） */
+const overrideZonesOf = (buffs: BoundBuff[], ctx?: ZoneCtx): { zoneId: string; value: number }[] =>
+    collectVariants(buffs).flatMap((v) =>
+        v.zones
+            .filter((z) => Boolean(z.override) && !z.ref && z.value !== 0)
+            .filter((z) => !ctx || zoneConditionMet(z, ctx))
+            .map((z) => ({ zoneId: z.zoneId as string, value: z.value }))
+    )
 
 // ── compute a single ResultEntry ──
 
@@ -1087,158 +1048,7 @@ function computeEffectEntry(
     }
 }
 
-// ── apply resolved ref value to stats (after partial stats are computed) ──
-
-function applyRefToStats(stats: CharacterComputed, zoneId: string, value: number): void {
-    switch (zoneId) {
-        case 'bonusDmg':
-            stats.bonusDmg += value
-            break
-        case 'deepenDmg':
-            stats.deepenDmg += value
-            break
-        case 'resPen':
-            stats.resPen += value
-            break
-        case 'defPen':
-            stats.defPen += value
-            break
-        case 'defDown':
-            stats.defDown += value
-            break
-        case 'resDown':
-            stats.resDown += value
-            break
-        case 'tuneStrainLayer':
-            stats.tuneStrainLayer += value
-            break
-        case 'unisonBoonLayer':
-            stats.unisonBoonLayer += value
-            break
-        case 'finalDmg':
-            stats.finalDmg += value
-            break
-        case 'dmgTakenInc':
-            stats.dmgTakenInc += value
-            break
-        case 'customFinalDmg':
-            stats.customMult += value
-            break
-        case 'customFinalDmgMul':
-            stats.customFinalDmgMul *= 1 + value / 100
-            break
-        case 'dmgRedPen':
-            stats.dmgRedPen += value
-            break
-        case 'extraRatio':
-            stats.extraRatio += value
-            break
-        case 'atkFlat':
-            stats.atkFlatSum += value
-            break
-        case 'atkPct':
-            stats.atkPctSum += value
-            break
-        case 'hpFlat':
-            stats.hpFlatSum += value
-            break
-        case 'hpPct':
-            stats.hpPctSum += value
-            break
-        case 'defFlat':
-            stats.defFlatSum += value
-            break
-        case 'defPct':
-            stats.defPctSum += value
-            break
-        case 'critRate':
-            stats.critRate += value
-            break
-        case 'critDmg':
-            stats.critDmg += value
-            break
-        case 'recharge':
-            stats.recharge += value
-            break
-        case 'tuneBreakBoost':
-            stats.totalTuneBreakBoost += value
-            break
-        case 'offTuneBuildupRate':
-            stats.offTuneBuildupRate += value
-            break
-    }
-    stats.totalAtk = stats.baseAtk + Math.round(stats.atkFlatSum + (stats.baseAtk * stats.atkPctSum) / 100)
-    stats.totalHp = stats.baseHp + Math.round(stats.hpFlatSum + (stats.baseHp * stats.hpPctSum) / 100)
-    stats.totalDef = stats.baseDef + Math.round(stats.defFlatSum + (stats.baseDef * stats.defPctSum) / 100)
-}
-
-function applyOverrideToStats(stats: CharacterComputed, zoneId: string, value: number): void {
-    switch (zoneId) {
-        case 'bonusDmg':
-            stats.bonusDmg = value
-            break
-        case 'deepenDmg':
-            stats.deepenDmg = value
-            break
-        case 'resPen':
-            stats.resPen = value
-            break
-        case 'defPen':
-            stats.defPen = value
-            break
-        case 'defDown':
-            stats.defDown = value
-            break
-        case 'resDown':
-            stats.resDown = value
-            break
-        case 'tuneStrainLayer':
-            stats.tuneStrainLayer = value
-            break
-        case 'unisonBoonLayer':
-            stats.unisonBoonLayer = value
-            break
-        case 'finalDmg':
-            stats.finalDmg = value
-            break
-        case 'dmgTakenInc':
-            stats.dmgTakenInc = value
-            break
-        case 'customFinalDmg':
-            stats.customMult = value
-            break
-        case 'customFinalDmgMul':
-            stats.customFinalDmgMul = 1 + value / 100
-            break
-        case 'dmgRedPen':
-            stats.dmgRedPen = value
-            break
-        case 'atkFlat':
-            stats.totalAtk = value
-            break
-        case 'hpFlat':
-            stats.totalHp = value
-            break
-        case 'defFlat':
-            stats.totalDef = value
-            break
-        case 'critRate':
-            stats.critRate = value
-            break
-        case 'critDmg':
-            stats.critDmg = value
-            break
-        case 'recharge':
-            stats.recharge = value
-            break
-        case 'tuneBreakBoost':
-            stats.totalTuneBreakBoost = value
-            break
-        case 'offTuneBuildupRate':
-            stats.offTuneBuildupRate = value
-            break
-    }
-}
+// ── 引用转模：按「本条目可见面板」解析（乘区算子统一走 ZONE_OPS）──
 
 /** @desc 按「本条目可见面板」解析 ref（转模）：本角色槽位用该条目的 partialStats（仅含绑定到本条目的 buff），
  *  其它角色槽位沿用角色级 full stats（跨角色引用无时间轴粒度）；避免单条目绑定的 buff 泄漏到其它条目的转模 */
@@ -1247,25 +1057,54 @@ function resolveRefsForEntry(
     partialStats: CharacterComputed,
     refSource: CharacterComputed[],
     charIndex: number,
-    boundBuffSets: BuffSet[]
+    boundBuffs: BoundBuff[],
+    ctx?: ZoneCtx
 ): void {
     const entryRefStats = refSource.slice()
     if (charIndex >= 0) entryRefStats[charIndex] = partialStats
-    for (const bs of boundBuffSets) {
-        for (const z of bs.zones) {
-            if (!z.ref || ZONE_NO_REF_IDS.has(z.zoneId)) continue
-            const resolved = resolveRefValue(z.ref, entryRefStats)
-            if (resolved === 0) continue
-            applyRefToStats(stats, z.zoneId, resolved)
-        }
+    for (const { zoneId, ref } of refZonesOf(boundBuffs, ctx)) {
+        const resolved = resolveRefValue(ref, entryRefStats)
+        if (resolved === 0) continue
+        applyZone(stats, zoneId, resolved)
+        recomputeTotals(stats)
     }
+}
+
+/** @desc 某角色槽位在其全部条目上绑定过的 Buff 集合（角色级聚合面板用：取并集后按条件过滤） */
+function charLevelBoundBuffs(
+    charIndex: number,
+    charName: string | null,
+    damageEntries: DamageEntry[],
+    buffSets: BuffInstance[],
+    damageEntryBuffSetIds: Record<string, string[]>,
+    conditionProfile: ConditionProfile
+): BoundBuff[] {
+    if (!charName || charIndex < 0) return []
+    const boundIds = new Set<string>()
+    for (const entry of damageEntries) {
+        if (entry.character !== charName) continue
+        for (const id of damageEntryBuffSetIds[entry.id] ?? []) boundIds.add(id)
+    }
+    const ctx: ConditionContext = {
+        chains: conditionProfile.chains,
+        refinements: conditionProfile.refinements,
+        refCharIdx: charIndex
+    }
+    const out: BoundBuff[] = []
+    for (const buff of buffSets) {
+        if (!boundIds.has(buff.id)) continue
+        if (!scopeMatches(buff, charIndex, false)) continue
+        const variants = activeVariants(buff, conditionProfile, charIndex, ctx)
+        if (variants.length > 0) out.push({ buff, variants })
+    }
+    return out
 }
 
 // ── main entry point ──
 
 export function computeAll(
     damageEntries: DamageEntry[],
-    buffSets: BuffSet[],
+    buffSets: BuffInstance[],
     damageEntryBuffSetIds: Record<string, string[]>,
     damageEntryDamageTypes: Record<string, string[]>,
     configState: ConfigState,
@@ -1280,26 +1119,20 @@ export function computeAll(
     // Used as the data source for ZoneRef resolution
     const charFullStats: CharacterComputed[] = team.map((slot, i) => {
         if (!slot.character || !charInfoMap[slot.character]) return emptyCharacterStats()
-
-        const charBuffSetIds = new Set<string>()
-        for (const entry of damageEntries) {
-            if (entry.character !== slot.character) continue
-            const boundIds = damageEntryBuffSetIds[entry.id] ?? []
-            for (const id of boundIds) charBuffSetIds.add(id)
-        }
-
-        const charBoundBuffSets = buffSets.filter((bs) => {
-            if (!charBuffSetIds.has(bs.id)) return false
-            if (bs.scope === 'all') return conditionMet(bs, conditionProfile, i)
-            return (bs.scope as number[]).includes(i) && conditionMet(bs, conditionProfile, i)
-        })
-
+        const bound = charLevelBoundBuffs(
+            i,
+            slot.character,
+            damageEntries,
+            buffSets,
+            damageEntryBuffSetIds,
+            conditionProfile
+        )
         return computeCharacterStats(
             charInfoMap[slot.character],
             slot.weapon,
             weaponInfoMap[slot.weapon ?? ''] ?? null,
             configState.characters[i]?.echoes ?? [],
-            charBoundBuffSets
+            bound
         )
     })
 
@@ -1312,7 +1145,7 @@ export function computeAll(
         const weaponName = charIndex >= 0 ? (team[charIndex]?.weapon ?? null) : null
         const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
         const echoes = charIndex >= 0 ? (configState.characters[charIndex]?.echoes ?? []) : []
-        const boundBuffSets = getBoundBuffSets(
+        const entryBound = boundBuffs(
             entry,
             charIndex,
             buffSets,
@@ -1323,35 +1156,35 @@ export function computeAll(
             echoDescByEntry
         )
         const charInfo = charName ? charInfoMap[charName] : undefined
+        const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
+        /** @desc 乘区级条件上下文（伤害段属性/类型 + 链阶档位） */
+        const zoneCtx: ZoneCtx = {
+            chains: conditionProfile.chains,
+            refinements: conditionProfile.refinements,
+            element: entry.damageElement,
+            damageTypes
+        }
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
         let partialStats: CharacterComputed
         if (charInfo) {
-            partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, boundBuffSets)
+            partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, entryBound)
         } else {
             partialStats = emptyCharacterStats()
-            for (const bs of boundBuffSets) {
-                for (const z of bs.zones) {
-                    if (z.ref || z.override || z.value === 0) continue
-                    applyRefToStats(partialStats, z.zoneId, z.value)
-                }
+            for (const z of activeZonesOf(entryBound, zoneCtx)) {
+                applyZone(partialStats, z.zoneId, z.value)
             }
+            recomputeTotals(partialStats)
         }
 
         // Resolve ref zones and apply to stats
         const stats = { ...partialStats }
-        resolveRefsForEntry(stats, partialStats, charFullStats, charIndex, boundBuffSets)
+        resolveRefsForEntry(stats, partialStats, charFullStats, charIndex, entryBound, zoneCtx)
 
         // Apply override zones (set value directly, takes precedence over everything)
-        for (const bs of boundBuffSets) {
-            for (const z of bs.zones) {
-                if (!z.override || z.value === 0 || z.ref) continue
-                applyOverrideToStats(stats, z.zoneId, z.value)
-            }
+        for (const z of overrideZonesOf(entryBound, zoneCtx)) {
+            applyZone(stats, z.zoneId, z.value, 'override')
         }
-
-        // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
-        const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
 
         // effect damage
         if (entry.isEffect) {
@@ -1373,7 +1206,7 @@ export function getCharFullStatsForChar(
     charIndex: number,
     echoes: EchoSlotConfig[],
     damageEntries: DamageEntry[],
-    buffSets: BuffSet[],
+    buffSets: BuffInstance[],
     damageEntryBuffSetIds: Record<string, string[]>,
     charInfoMap: Record<string, CharacterInfo>,
     team: CharSlot[],
@@ -1383,25 +1216,21 @@ export function getCharFullStatsForChar(
     const slot = team[charIndex]
     if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats()
 
-    const charBuffSetIds = new Set<string>()
-    for (const entry of damageEntries) {
-        if (entry.character !== slot.character) continue
-        const boundIds = damageEntryBuffSetIds[entry.id] ?? []
-        for (const id of boundIds) charBuffSetIds.add(id)
-    }
-
-    const charBoundBuffSets = buffSets.filter((bs) => {
-        if (!charBuffSetIds.has(bs.id)) return false
-        if (bs.scope === 'all') return conditionMet(bs, conditionProfile, charIndex)
-        return (bs.scope as number[]).includes(charIndex) && conditionMet(bs, conditionProfile, charIndex)
-    })
+    const bound = charLevelBoundBuffs(
+        charIndex,
+        slot.character,
+        damageEntries,
+        buffSets,
+        damageEntryBuffSetIds,
+        conditionProfile
+    )
 
     return computeCharacterStats(
         charInfoMap[slot.character],
         slot.weapon,
         weaponInfoMap[slot.weapon ?? ''] ?? null,
         echoes,
-        charBoundBuffSets
+        bound
     )
 }
 
@@ -1410,7 +1239,7 @@ export function computeOneEntry(
     charIndex: number,
     echoes: EchoSlotConfig[],
     fullStats: CharacterComputed[],
-    buffSets: BuffSet[],
+    buffSets: BuffInstance[],
     damageEntryBuffSetIds: Record<string, string[]>,
     damageEntryDamageTypes: Record<string, string[]>,
     configState: ConfigState,
@@ -1426,7 +1255,7 @@ export function computeOneEntry(
     const charInfo = charName ? charInfoMap[charName] : undefined
     /** @desc 声骸技能文案索引（伤害类型规则2） */
     const echoDescByEntry = buildEchoDescByEntry([entry], team, getEchoSkillText())
-    const boundBuffSets = getBoundBuffSets(
+    const bound = boundBuffs(
         entry,
         charIndex,
         buffSets,
@@ -1437,17 +1266,27 @@ export function computeOneEntry(
         echoDescByEntry
     )
 
+    // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
+    const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
+    /** @desc 乘区级条件上下文 */
+    const zoneCtx: ZoneCtx = {
+        chains: conditionProfile.chains,
+        refinements: conditionProfile.refinements,
+        element: entry.damageElement,
+        damageTypes
+    }
+
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo
-        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, boundBuffSets)
+        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, bound, zoneCtx)
         : emptyCharacterStats()
 
     // resolve ref zones
     const stats = { ...partialStats }
-    resolveRefsForEntry(stats, partialStats, fullStats, charIndex, boundBuffSets)
-
-    // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
-    const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
+    resolveRefsForEntry(stats, partialStats, fullStats, charIndex, bound, zoneCtx)
+    for (const z of overrideZonesOf(bound, zoneCtx)) {
+        applyZone(stats, z.zoneId, z.value, 'override')
+    }
 
     if (entry.isEffect) {
         return computeEffectEntry(entry, stats, enemy, damageTypes)

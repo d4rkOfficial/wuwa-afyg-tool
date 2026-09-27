@@ -9,13 +9,19 @@
         duplicateBuffSet,
         renameBuffSet,
         addZoneToBuffSet,
-        removeZoneFromBuffSet,
-        setBuffSetZoneValue,
+        removeZoneAt,
+        setZoneValueAt,
+        setZoneOverrideAt,
+        setZoneRefAt,
+        setZoneConditionAt,
         setBuffSetScope,
-        setBuffSetZoneRef,
-        setBuffSetZoneOverride,
         setBuffSetCondition,
         setBuffSetConditionRef,
+        getBuffsAffectingPanel,
+        addBuffVariant,
+        removeBuffVariant,
+        setBuffVariantCondition,
+        updateBuffVariant,
         getGlobalBuffSetIds,
         reorderNonGlobalBuffSets,
         toggleBuffSetStarred,
@@ -41,6 +47,8 @@
     import Icon from '@iconify/svelte'
     import QuickLookup from '$lib/components/layout/quick-lookup.svelte'
     import BuffImportModal from './buff-import-modal.svelte'
+    import ZoneConditionPanel from './zone-condition-panel.svelte'
+    import { describeCondition } from '$lib/calc/condition'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
     import { slide } from 'svelte/transition'
     import { onMount, onDestroy } from 'svelte'
@@ -195,7 +203,7 @@
 
     /** @desc ── ZoneRef 引用配置弹窗状态 ── */
     let showRefModal = $state(false)
-    let refZoneId = $state<string>('')
+    let refZoneIndex = $state<number>(-1)
     let refCharacterIdx = $state<number>(0)
     let refTargetZoneId = $state<string>('base_atk')
     let refThreshold = $state<number>(0)
@@ -280,6 +288,9 @@
     /** @desc 当前选中的 Buff 块、其作用域对应角色勾选态、是否效应专属 */
     let selectedBuffSet = $derived(buffSets.find((s) => s.id === selectedBuffSetId) ?? null)
 
+    /** @desc 当前编辑乘区的 zoneId（由下标推出，供引用弹窗过滤目标属性；乘区可重复添加，故用下标定位） */
+    let refZoneId = $derived(refZoneIndex >= 0 ? (selectedBuffSet?.zones?.[refZoneIndex]?.zoneId ?? '') : '')
+
     let scopeChars = $derived.by(() => {
         if (!selectedBuffSet || selectedBuffSet.scope === 'all') return [true, true, true]
         const s = selectedBuffSet.scope
@@ -296,8 +307,8 @@
     /** @desc 引用弹窗相关派生：目标乘区定义/单位、当前乘区定义/单位 */
     let refTargetDef = $derived(ZONE_REF_MAP.get(refTargetZoneId) ?? ZONE_MAP.get(refTargetZoneId as any) ?? null)
     let refTargetDefUnit = $derived(refTargetDef?.unit === '%' ? '%' : '点')
+    let currentZoneUnit = $derived(ZONE_MAP.get(refZoneId as ZoneId)?.unit === '%' ? '%' : '点')
     let currentZoneDef = $derived(ZONE_MAP.get(refZoneId as ZoneId) ?? null)
-    let currentZoneUnit = $derived(currentZoneDef?.unit === '%' ? '%' : '点')
 
     /** @desc 新建 Buff 块：先创建（默认名），选中后自动聚焦名称编辑框供用户填写 */
     function handleCreateBuffSet() {
@@ -405,6 +416,58 @@
 
     let condPanelOpen = $state(false)
 
+    // ── 同名多乘区：变体（每个变体下的乘区各自带条件）──
+    /** @desc 当前正在编辑乘区的变体 id（null = 首个变体） */
+    let activeVariantId = $state<string | null>(null)
+    const activeVariant = $derived(
+        selectedBuffSet?.variants?.find((v) => v.id === activeVariantId) ?? selectedBuffSet?.variants?.[0] ?? null
+    )
+    /** @desc 当前变体的乘区列表（无变体时回退到单变体视图 zones） */
+    const activeVariantZones = $derived(activeVariant?.zones ?? selectedBuffSet?.zones ?? [])
+
+    /** @desc 新增同名变体（复制源变体乘区结构） */
+    const handleAddVariant = () => {
+        if (!selectedBuffSetId) return
+        const id = addBuffVariant(selectedBuffSetId, undefined, activeVariant?.id)
+        if (id) {
+            activeVariantId = id
+            addToast('已新增同名变体', 'success')
+        }
+    }
+
+    /** @desc 删除当前变体（至少保留一个） */
+    const handleRemoveVariant = () => {
+        if (!selectedBuffSetId || !activeVariant) return
+        if ((selectedBuffSet?.variants?.length ?? 0) <= 1) {
+            addToast('至少保留一个变体', 'info')
+            return
+        }
+        removeBuffVariant(selectedBuffSetId, activeVariant.id)
+        activeVariantId = selectedBuffSet?.variants?.[0]?.id ?? null
+    }
+
+    // 切换所选 Buff 时把变体编辑目标重置为首个变体
+    $effect(() => {
+        selectedBuffSetId
+        activeVariantId = null
+    })
+
+    /** @desc 乘区级条件的行内展开目标（按下标定位，同一乘区可添加多次） */
+    let expandedZoneIndex = $state<number | null>(null)
+    const toggleZoneCondition = (index: number) => {
+        expandedZoneIndex = expandedZoneIndex === index ? null : index
+    }
+    const handleZoneConditionChange = (index: number, next: BuffCondition | null) => {
+        if (!selectedBuffSetId) return
+        setZoneConditionAt(selectedBuffSetId, index, next, activeVariant?.id)
+    }
+    // 切换 Buff/变体时收起行内条件面板
+    $effect(() => {
+        selectedBuffSetId
+        activeVariantId
+        expandedZoneIndex = null
+    })
+
     /** @desc 展开/收起生效条件面板 */
     function toggleCondPanel() {
         if (!selectedBuffSetId || !selectedBuffSet) return
@@ -419,79 +482,84 @@
         condPanelOpen = false
     }
 
-    /** @desc 生效条件摘要文案（链/精炼/属性/类型拼接） */
+    /** @desc 生效条件摘要文案（仅链/阶：它们是整个 BUFF 的硬性条件；属性/类型挂在乘区上） */
     const conditionSummary = $derived.by(() => {
         const cond = selectedBuffSet?.condition
         if (!cond) return ''
         const parts: string[] = []
-        if (cond.chain !== undefined) {
-            const refIdx = selectedBuffSet.conditionRefCharIdx ?? 0
-            const name = team[refIdx]?.character ?? `角色 ${refIdx + 1}`
-            parts.push(`${name} ≥${cond.chain}链`)
-        }
-        if (cond.refinement !== undefined) {
-            const name =
-                team[selectedBuffSet.conditionRefCharIdx ?? 0]?.character ??
-                `角色 ${(selectedBuffSet.conditionRefCharIdx ?? 0) + 1}`
-            parts.push(`${name}的武器 ≥${cond.refinement}阶`)
-        }
-        if (cond.elements?.length) parts.push(`伤害属性 ${cond.elements.join('/')}`)
-        if (cond.damageTypes?.length)
-            parts.push(`伤害类型 ${cond.damageTypes.map((d) => DAMAGE_TYPE_SHORT[d] ?? d).join('/')}`)
+        const refIdx = selectedBuffSet?.conditionRefCharIdx ?? 0
+        const name = team[refIdx]?.character ?? `角色 ${refIdx + 1}`
+        const chainMin = cond.chains?.[0]?.min ?? cond.chain
+        const refineMin = cond.refinements?.[0]?.min ?? cond.refinement
+        if (chainMin !== undefined) parts.push(`${name} ≥${chainMin}链`)
+        else if (refineMin !== undefined) parts.push(`${name}的武器 ≥${refineMin}阶`)
         return parts.join('，')
     })
 
-    /** @desc 参考角色必须恰好一个：设置了链/精炼但未选参考角色时，默认参考第一位 */
+    /** @desc 参考角色必须恰好一个：设置了链/阶但未选参考角色时，默认参考第一位 */
     function ensureConditionRef() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (selectedBuffSet.conditionRefCharIdx === undefined) setBuffSetConditionRef(selectedBuffSetId, 0)
     }
 
-    /** @desc 设置共鸣链门槛（再次点击取消）；设置链/精炼时自动补参考角色 */
+    /** @desc 当前参考角色槽位 */
+    const condRefIdx = $derived(selectedBuffSet?.conditionRefCharIdx ?? 0)
+    /** @desc 当前链门槛（chains 数组形式；兼容旧 chain 字段） */
+    const currentChain = $derived(selectedBuffSet?.condition?.chains?.[0]?.min ?? selectedBuffSet?.condition?.chain)
+    /** @desc 当前阶门槛（refinements 数组形式；兼容旧 refinement 字段） */
+    const currentRefine = $derived(
+        selectedBuffSet?.condition?.refinements?.[0]?.min ?? selectedBuffSet?.condition?.refinement
+    )
+
+    /**
+     * @desc 设置链门槛（再次点击取消）。
+     * 链条件与阶条件**只能生效其中一个**：设置链会清空全部阶条件。
+     */
     function setBuffChain(min: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) return
         const cond = selectedBuffSet.condition ?? {}
-        const next: BuffCondition = { ...cond }
-        if (next.chain === min) delete next.chain
-        else next.chain = min
+        const clearing = currentChain === min
+        const next: BuffCondition = {
+            ...cond,
+            chain: undefined,
+            chains: clearing ? undefined : [{ charIdx: condRefIdx, min }],
+            ...(clearing ? {} : { refinement: undefined, refinements: undefined })
+        }
         setBuffSetCondition(selectedBuffSetId, next)
-        if (next.chain !== undefined || next.refinement !== undefined) ensureConditionRef()
+        if (!clearing) ensureConditionRef()
     }
 
-    /** @desc 设置武器精炼门槛（再次点击取消） */
+    /** @desc 设置阶门槛（再次点击取消）；设置阶会清空全部链条件 */
     function setBuffRefinement(min: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) return
         const cond = selectedBuffSet.condition ?? {}
-        const next: BuffCondition = { ...cond }
-        if (next.refinement === min) delete next.refinement
-        else next.refinement = min
+        const clearing = currentRefine === min
+        const next: BuffCondition = {
+            ...cond,
+            refinement: undefined,
+            refinements: clearing ? undefined : [{ charIdx: condRefIdx, min }],
+            ...(clearing ? {} : { chain: undefined, chains: undefined })
+        }
         setBuffSetCondition(selectedBuffSetId, next)
-        if (next.chain !== undefined || next.refinement !== undefined) ensureConditionRef()
+        if (!clearing) ensureConditionRef()
     }
 
-    /** @desc 切换伤害属性条件（多选） */
-    function toggleConditionElement(el: string) {
+    /** @desc 清除链/阶硬性条件（保留其它子句） */
+    function clearGateConditions() {
         if (!selectedBuffSetId || !selectedBuffSet) return
-        if (isDefaultGlobalBuff()) return
         const cond = selectedBuffSet.condition ?? {}
-        const list = cond.elements ?? []
-        const next = list.includes(el) ? list.filter((e) => e !== el) : [...list, el]
-        setBuffSetCondition(selectedBuffSetId, { ...cond, elements: next })
+        setBuffSetCondition(selectedBuffSetId, {
+            ...cond,
+            chain: undefined,
+            chains: undefined,
+            refinement: undefined,
+            refinements: undefined
+        })
     }
 
-    /** @desc 切换伤害类型条件（多选） */
-    function toggleConditionDamageType(dt: string) {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        if (isDefaultGlobalBuff()) return
-        const cond = selectedBuffSet.condition ?? {}
-        const list = cond.damageTypes ?? []
-        const next = list.includes(dt) ? list.filter((d) => d !== dt) : [...list, dt]
-        setBuffSetCondition(selectedBuffSetId, { ...cond, damageTypes: next })
-    }
-
-    /** @desc 设置参考角色槽位（默认全局 buff 拒绝） */
+    /** @desc 设置参考角色槽位（默认全局 buff 拒绝）；链/阶门槛同步迁移到新参考角色 */
     function setConditionRef(i: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) {
@@ -499,14 +567,26 @@
             return
         }
         setBuffSetConditionRef(selectedBuffSetId, i)
+        const cond = selectedBuffSet.condition
+        if (!cond) return
+        const next: BuffCondition = { ...cond }
+        if (cond.chains?.length) next.chains = cond.chains.map(() => ({ charIdx: i, min: cond.chains![0].min }))
+        if (cond.refinements?.length) {
+            next.refinements = cond.refinements.map(() => ({ charIdx: i, min: cond.refinements![0].min }))
+        }
+        setBuffSetCondition(selectedBuffSetId, next)
     }
 
-    /** @desc 打开引用配置弹窗：有现成引用则回填各字段，否则按当前乘区初始化（同目标时自动换一个可引用属性） */
-    function openRefModal(zoneId: string) {
-        const zone = selectedBuffSet?.zones.find((z) => z.zoneId === zoneId)
-        refZoneId = zoneId
+    /**
+     * @desc 打开引用配置弹窗（按**下标**定位乘区，同一乘区可添加多次）：
+     * 有现成引用则回填各字段，否则按当前乘区初始化（同目标时自动换一个可引用属性）。
+     */
+    function openRefModal(zoneIndex: number) {
+        const zone = activeVariantZones[zoneIndex]
+        if (!zone) return
+        refZoneIndex = zoneIndex
         showRefZoneMenu = false
-        if (zone?.ref) {
+        if (zone.ref) {
             refCharacterIdx = zone.ref.characterIdx
             refTargetZoneId = zone.ref.zoneId
             refThreshold = zone.ref.threshold
@@ -521,7 +601,7 @@
             refHasUpper = zone.ref.upper !== undefined
         } else {
             refCharacterIdx = 0
-            refTargetZoneId = zoneId
+            refTargetZoneId = zone.zoneId
             refThreshold = 0
             refLower = undefined
             refUpper = undefined
@@ -532,8 +612,8 @@
             refHasLower = false
             refHasUpper = false
         }
-        if (refTargetZoneId === refZoneId) {
-            const fallback = ZONE_REF_DEFS.find((d) => d.id !== refZoneId)
+        if (refTargetZoneId === zone.zoneId) {
+            const fallback = ZONE_REF_DEFS.find((d) => d.id !== zone.zoneId)
             refTargetZoneId = fallback?.id ?? ''
         }
         showRefModal = true
@@ -554,15 +634,31 @@
             divisor: refDivisor,
             multiplier: refMultiplier
         }
-        setBuffSetZoneRef(selectedBuffSetId, refZoneId, ref)
+        setZoneRefAt(selectedBuffSetId, refZoneIndex, ref, activeVariant?.id)
         showRefModal = false
     }
 
     /** @desc 清除引用 */
     function handleClearRef() {
         if (!selectedBuffSetId) return
-        setBuffSetZoneRef(selectedBuffSetId, refZoneId, null)
+        setZoneRefAt(selectedBuffSetId, refZoneIndex, null, activeVariant?.id)
         showRefModal = false
+    }
+
+    /**
+     * @desc 跨角色副作用提示：本乘区引用了「角色 X 的面板属性 Y」，而 X 上有 Buff 会改写 Y。
+     * 这些 Buff 通过面板间接影响本 BUFF 的取值，因此需要在 X 的 Buff 列表里一并配置。
+     */
+    const refAffectingBuffs = $derived(showRefModal ? getBuffsAffectingPanel(refCharacterIdx, refTargetZoneId) : [])
+    const refCharName = $derived(team[refCharacterIdx]?.character ?? `角色 ${refCharacterIdx + 1}`)
+    const refZoneLabel = $derived(ZONE_REF_MAP.get(refTargetZoneId)?.label ?? refTargetZoneId)
+
+    /** @desc 跳到某个副作用来源 Buff：选中它并展开其所属变体，便于直接改数值/条件 */
+    const focusAffectingBuff = (buffId: string) => {
+        showRefModal = false
+        selectedBuffSetId = buffId
+        activeVariantId = null
+        addToast('已切换到影响该面板的 BUFF，可直接改它的乘区数值', 'success')
     }
 
     /** @desc 折叠/展开叠层文件夹 */
@@ -1823,6 +1919,91 @@
                                     {/if}
                                 </div>
 
+                                <!-- @desc ── 同名多乘区：变体列表（每个变体可单独设置子条件与乘区数值）── -->
+                                <div
+                                    class="shrink-0 border-b px-3 py-2.5 space-y-2"
+                                    style="border-bottom: 1px solid var(--theme-divider-border);"
+                                >
+                                    <div class="flex items-center gap-1.5">
+                                        <Icon
+                                            icon="mdi:layers-triple-outline"
+                                            class="size-3.5 shrink-0"
+                                            style="color: var(--theme-accent-text);"
+                                        />
+                                        <span class="text-xs font-black tracking-tight">同名变体</span>
+                                        <span class="text-[10px] text-(--theme-modal-text)/40">
+                                            {selectedBuffSet.variants?.length ?? 0} 个 · 各自子条件，满足者全部叠加
+                                        </span>
+                                        <div class="flex-1"></div>
+                                        <button
+                                            onclick={handleAddVariant}
+                                            class="flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
+                                            style="border-color: var(--theme-divider-border);"
+                                            title="新增同名变体（复制当前变体乘区结构）"
+                                        >
+                                            <Icon icon="mdi:plus" class="size-3" />
+                                            新增变体
+                                        </button>
+                                        {#if (selectedBuffSet.variants?.length ?? 0) > 1}
+                                            <button
+                                                onclick={handleRemoveVariant}
+                                                class="flex items-center gap-1 rounded-none border border-red-500 px-2 py-1 text-[10px] text-red-500 transition-colors hover:bg-red-500/20"
+                                                title="删除当前变体"
+                                            >
+                                                <Icon icon="mdi:minus" class="size-3" />
+                                                删除当前
+                                            </button>
+                                        {/if}
+                                    </div>
+
+                                    {#if (selectedBuffSet.variants?.length ?? 0) === 0}
+                                        <p class="text-[10px] text-(--theme-modal-text)/35">
+                                            尚未创建变体（等价于单乘区
+                                            buff）。点击「新增变体」后可让同名乘区分别按不同子条件生效。
+                                        </p>
+                                    {:else}
+                                        <div class="flex flex-wrap gap-1">
+                                            {#each selectedBuffSet.variants ?? [] as v, i (v.id)}
+                                                <button
+                                                    onclick={() => (activeVariantId = v.id)}
+                                                    class="px-2 py-1 text-[10px] transition-colors"
+                                                    style={v.id === activeVariant?.id
+                                                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);'
+                                                        : 'background: var(--theme-card-bg); color: color-mix(in srgb, var(--theme-modal-text) 60%, transparent);'}
+                                                    title={v.condition ? describeCondition(v.condition) : '无子条件'}
+                                                >
+                                                    {v.label ?? `变体${i + 1}`}
+                                                    {#if v.condition}·条件{/if}
+                                                    <span class="opacity-60">（{v.zones.length} 乘区）</span>
+                                                </button>
+                                            {/each}
+                                        </div>
+
+                                        {#if activeVariant}
+                                            <div
+                                                class="flex items-center gap-1.5 border px-2 py-1.5"
+                                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                            >
+                                                <span class="text-[10px] text-(--theme-modal-text)/40">变体名称</span>
+                                                <input
+                                                    type="text"
+                                                    value={activeVariant.label ?? ''}
+                                                    onchange={(e) =>
+                                                        updateBuffVariant(selectedBuffSet.id, activeVariant!.id, {
+                                                            label: e.currentTarget.value
+                                                        })}
+                                                    placeholder="变体名称"
+                                                    class="min-w-0 flex-1 border px-1.5 py-0.5 text-[11px] outline-none"
+                                                    style="border-color: var(--theme-divider-border); background: var(--theme-card-bg); color: var(--theme-modal-text);"
+                                                />
+                                                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/35"
+                                                    >条件写在下方每个乘区里</span
+                                                >
+                                            </div>
+                                        {/if}
+                                    {/if}
+                                </div>
+
                                 <!-- @desc 作用域区：角色头像勾选（可吃到的角色）+ 效应专属切换（全局块锁定） -->
                                 <!-- Character scope -->
                                 <div
@@ -1947,7 +2128,7 @@
                                                     >默认全局buff无法设置生效条件</span
                                                 >
                                             {/if}
-                                            <!-- 共鸣链 -->
+                                            <!-- 共鸣链（与阶互斥：设置链会清空阶） -->
                                             <div class="flex items-center gap-1.5">
                                                 <span
                                                     class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
@@ -1960,9 +2141,12 @@
                                                     {#each Array.from({ length: 7 }, (_, k) => k) as n}
                                                         <button
                                                             onclick={() => setBuffChain(n)}
+                                                            title={currentRefine !== undefined
+                                                                ? '已设置阶条件：链与阶只能生效其一，点击会替换为链条件'
+                                                                : `≥${n}链`}
                                                             class={[
                                                                 'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                                                cond.chain === n
+                                                                currentChain === n
                                                                     ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                                                             ].join(' ')}
@@ -1971,14 +2155,14 @@
                                                         </button>
                                                     {/each}
                                                 </div>
-                                                {#if cond.chain !== undefined}
+                                                {#if currentChain !== undefined}
                                                     <span
                                                         class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
-                                                        >≥{cond.chain}链</span
+                                                        >≥{currentChain}链</span
                                                     >
                                                 {/if}
                                             </div>
-                                            <!-- 武器精炼 -->
+                                            <!-- 武器精炼（与链互斥：设置阶会清空链） -->
                                             <div class="flex items-center gap-1.5">
                                                 <span
                                                     class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
@@ -1991,9 +2175,12 @@
                                                     {#each Array.from({ length: 5 }, (_, k) => k + 1) as n}
                                                         <button
                                                             onclick={() => setBuffRefinement(n)}
+                                                            title={currentChain !== undefined
+                                                                ? '已设置链条件：链与阶只能生效其一，点击会替换为阶条件'
+                                                                : `≥${n}阶`}
                                                             class={[
                                                                 'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                                                cond.refinement === n
+                                                                currentRefine === n
                                                                     ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                                                             ].join(' ')}
@@ -2002,15 +2189,15 @@
                                                         </button>
                                                     {/each}
                                                 </div>
-                                                {#if cond.refinement}
+                                                {#if currentRefine !== undefined}
                                                     <span
                                                         class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
-                                                        >≥{cond.refinement}阶</span
+                                                        >≥{currentRefine}阶</span
                                                     >
                                                 {/if}
                                             </div>
-                                            <!-- 参考角色（仅共鸣链 / 精炼需要） -->
-                                            {#if cond.chain !== undefined || cond.refinement !== undefined}
+                                            <!-- 参考角色（仅链 / 阶需要） -->
+                                            {#if currentChain !== undefined || currentRefine !== undefined}
                                                 <div class="flex items-center gap-1">
                                                     <span
                                                         class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/50"
@@ -2021,11 +2208,11 @@
                                                             onclick={() => setConditionRef(i)}
                                                             class={[
                                                                 'size-6 rounded-full overflow-hidden border-2 transition-all',
-                                                                (selectedBuffSet.conditionRefCharIdx ?? 0) === i
+                                                                condRefIdx === i
                                                                     ? 'border-(--theme-accent-bg)'
                                                                     : 'border-(--theme-divider-border) grayscale opacity-40 hover:opacity-70'
                                                             ].join(' ')}
-                                                            title={`看 ${slot.character ?? `角色 ${i + 1}`} 的链 / 精炼`}
+                                                            title={`看 ${slot.character ?? `角色 ${i + 1}`} 的链 / 阶`}
                                                         >
                                                             {#if slot.character && charIconMap[slot.character]}
                                                                 <img
@@ -2045,54 +2232,17 @@
                                                     {/each}
                                                 </div>
                                             {/if}
-                                            <!-- 伤害属性 -->
-                                            <div class="flex flex-wrap items-center gap-1">
-                                                <span
-                                                    class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
-                                                    >伤害属性</span
-                                                >
-                                                {#each ELEMENTS as el}
-                                                    <button
-                                                        onclick={() => toggleConditionElement(el)}
-                                                        class={[
-                                                            'rounded-none px-1.5 py-0.5 text-[10px] transition-colors',
-                                                            (cond.elements ?? []).includes(el)
-                                                                ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                                        ].join(' ')}
-                                                    >
-                                                        {el}
-                                                    </button>
-                                                {/each}
-                                            </div>
-                                            <!-- 伤害类型 -->
-                                            <div class="flex flex-wrap items-center gap-1">
-                                                <span
-                                                    class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
-                                                    >伤害类型</span
-                                                >
-                                                {#each DAMAGE_TYPES as dt}
-                                                    <button
-                                                        onclick={() => toggleConditionDamageType(dt)}
-                                                        title={dt}
-                                                        class={[
-                                                            'rounded-none px-1.5 py-0.5 text-[10px] transition-colors',
-                                                            (cond.damageTypes ?? []).includes(dt)
-                                                                ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                                        ].join(' ')}
-                                                    >
-                                                        {DAMAGE_TYPE_SHORT[dt] ?? dt}
-                                                    </button>
-                                                {/each}
-                                            </div>
+                                            <span class="text-[10px] text-(--theme-modal-text)/35">
+                                                伤害类型 / 伤害属性条件挂在下面的具体乘区上
+                                            </span>
                                             <button
-                                                onclick={clearCondition}
-                                                class="flex h-6 items-center gap-1 rounded-none border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
+                                                onclick={clearGateConditions}
+                                                disabled={currentChain === undefined && currentRefine === undefined}
+                                                class="flex h-6 items-center gap-1 rounded-none border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500 disabled:pointer-events-none disabled:opacity-30"
                                                 style="border-color: var(--theme-divider-border);"
                                             >
                                                 <Icon icon="mdi:close-circle-outline" class="size-3" />
-                                                清除
+                                                清除链/阶
                                             </button>
                                         </div>
                                     {/if}
@@ -2101,7 +2251,7 @@
                                 <!-- @desc 乘区列表：已配置乘区的数值输入/引用展示/追加覆盖切换/引用配置入口 -->
                                 <!-- Zone list -->
                                 <div class="theme-scrollbar flex-1 overflow-y-auto p-3 space-y-1">
-                                    {#each selectedBuffSet.zones as zone}
+                                    {#each activeVariantZones as zone, zoneIndex (zoneIndex)}
                                         {@const def = ZONE_MAP.get(zone.zoneId)}
                                         {#if def}
                                             <div
@@ -2162,10 +2312,11 @@
                                                                 const v = parseFloat(
                                                                     (e.target as HTMLInputElement).value
                                                                 )
-                                                                setBuffSetZoneValue(
+                                                                setZoneValueAt(
                                                                     selectedBuffSet.id,
-                                                                    zone.zoneId,
-                                                                    isNaN(v) ? 0 : v
+                                                                    zoneIndex,
+                                                                    isNaN(v) ? 0 : v,
+                                                                    activeVariant?.id
                                                                 )
                                                             }}
                                                             class="w-14 h-6 rounded-none border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
@@ -2179,10 +2330,11 @@
                                                 {#if zone.zoneId !== 'atkPct' && zone.zoneId !== 'hpPct' && zone.zoneId !== 'defPct' && zone.zoneId !== 'extraRatio'}
                                                     <button
                                                         onclick={() =>
-                                                            setBuffSetZoneOverride(
+                                                            setZoneOverrideAt(
                                                                 selectedBuffSet.id,
-                                                                zone.zoneId,
-                                                                !zone.override
+                                                                zoneIndex,
+                                                                !zone.override,
+                                                                activeVariant?.id
                                                             )}
                                                         class={[
                                                             'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
@@ -2197,7 +2349,7 @@
                                                 {/if}
                                                 {#if !ZONE_NO_REF_IDS.has(zone.zoneId)}
                                                     <button
-                                                        onclick={() => openRefModal(zone.zoneId)}
+                                                        onclick={() => openRefModal(zoneIndex)}
                                                         class="shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5"
                                                         style="border-color: var(--theme-divider-border);"
                                                     >
@@ -2205,10 +2357,47 @@
                                                         引用
                                                     </button>
                                                 {/if}
+                                                <!-- @desc 乘区级生效条件（行内下拉展开）：伤害类型 / 伤害属性 -->
+                                                <button
+                                                    onclick={() => toggleZoneCondition(zoneIndex)}
+                                                    class={[
+                                                        'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                                        zone.condition
+                                                            ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                                                            : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
+                                                    ].join(' ')}
+                                                    title={zone.condition
+                                                        ? `该乘区条件：${describeCondition(zone.condition)}`
+                                                        : '为该乘区设置生效条件（伤害类型/属性）'}
+                                                >
+                                                    <Icon
+                                                        icon={expandedZoneIndex === zoneIndex
+                                                            ? 'mdi:chevron-up'
+                                                            : 'mdi:filter-outline'}
+                                                        class="size-3"
+                                                    />
+                                                    条件{#if zone.condition}<span class="ml-0.5">•</span>{/if}
+                                                </button>
+                                                <!-- @desc 移除该乘区实例（同名乘区可添加多个，逐个移除） -->
+                                                <button
+                                                    onclick={() =>
+                                                        removeZoneAt(selectedBuffSet.id, zoneIndex, activeVariant?.id)}
+                                                    class="shrink-0 rounded-none border border-transparent px-1 py-0.5 text-[10px] text-(--theme-modal-text)/30 transition-colors hover:border-red-500/40 hover:text-red-500"
+                                                    title="移除该乘区"
+                                                >
+                                                    <Icon icon="mdi:close" class="size-3" />
+                                                </button>
                                             </div>
+                                            {#if expandedZoneIndex === zoneIndex}
+                                                <ZoneConditionPanel
+                                                    condition={zone.condition}
+                                                    locked={getLocked()}
+                                                    onchange={(next) => handleZoneConditionChange(zoneIndex, next)}
+                                                />
+                                            {/if}
                                         {/if}
                                     {/each}
-                                    {#if selectedBuffSet.zones.length === 0}
+                                    {#if activeVariantZones.length === 0}
                                         <div class="text-xs text-(--theme-modal-text)/30 py-4 text-center">
                                             暂无乘区
                                         </div>
@@ -2222,36 +2411,46 @@
                                 </div>
                             {/if}
                         </div>
-                        <!-- @desc 右栏乘区清单：全部可配置乘区，点击加入/移出当前 Buff -->
+                        <!-- @desc 右栏乘区清单：点击即**添加**一个乘区实例（同一乘区可添加多次，各自独立配置） -->
                         {#if selectedBuffSet}
                             <div
                                 class="w-52 shrink-0 border-l flex flex-col"
                                 style="border-left: 1px solid var(--theme-divider-border);"
                             >
-                                <div class="theme-scrollbar flex-1 overflow-y-auto p-3">
+                                <div class="shrink-0 px-3 pt-3 pb-1.5">
+                                    <div class="flex items-center gap-1.5">
+                                        <Icon
+                                            icon="mdi:playlist-plus"
+                                            class="size-3.5 shrink-0"
+                                            style="color: var(--theme-accent-text);"
+                                        />
+                                        <span class="text-xs font-black tracking-tight">添加乘区</span>
+                                    </div>
+                                    <p class="mt-1 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                                        点击即添加一个乘区；同名乘区可添加多次，各自配置数值与生效条件。
+                                    </p>
+                                </div>
+                                <div class="theme-scrollbar flex-1 overflow-y-auto px-3 pb-3">
                                     <div class="flex flex-col gap-0.5">
                                         {#each ZONE_DEFS as def}
-                                            {@const exists = selectedBuffSet.zones.some((z) => z.zoneId === def.id)}
+                                            {@const count = activeVariantZones.filter(
+                                                (z) => z.zoneId === def.id
+                                            ).length}
                                             <button
-                                                onclick={() => {
-                                                    if (exists) {
-                                                        removeZoneFromBuffSet(selectedBuffSet.id, def.id)
-                                                    } else {
-                                                        addZoneToBuffSet(selectedBuffSet.id, def.id)
-                                                    }
-                                                }}
-                                                class={[
-                                                    'w-full text-left rounded-none px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5',
-                                                    exists
-                                                        ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
-                                                        : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
-                                                ].join(' ')}
+                                                onclick={() =>
+                                                    addZoneToBuffSet(selectedBuffSet!.id, def.id, activeVariant?.id)}
+                                                class="w-full text-left rounded-none px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5 text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5 hover:text-(--theme-accent-text)"
+                                                title={`添加「${def.label}」${count > 0 ? `（已有 ${count} 个）` : ''}`}
                                             >
-                                                <Icon
-                                                    icon={exists ? 'mdi:check' : 'mdi:circle-outline'}
-                                                    class="size-3.5 shrink-0"
-                                                />
-                                                {def.label}
+                                                <Icon icon="mdi:plus" class="size-3.5 shrink-0" />
+                                                <span class="min-w-0 flex-1 truncate">{def.label}</span>
+                                                {#if count > 0}
+                                                    <span
+                                                        class="shrink-0 px-1 text-[10px] tabular-nums"
+                                                        style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text);"
+                                                        >{count}</span
+                                                    >
+                                                {/if}
                                             </button>
                                         {/each}
                                     </div>
@@ -2312,6 +2511,40 @@
             </div>
 
             <div class="space-y-4">
+                <!-- @desc 跨角色副作用：引用的面板会被它自己的 Buff 改写 -> 一并列出，可一键跳过去配置 -->
+                {#if refAffectingBuffs.length > 0}
+                    <div
+                        class="space-y-1.5 border px-2.5 py-2"
+                        style="border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent);"
+                    >
+                        <div
+                            class="flex items-center gap-1.5 text-[11px] font-black tracking-tight"
+                            style="color: var(--theme-accent-text);"
+                        >
+                            <Icon icon="mdi:transit-connection-variant" class="size-3.5 shrink-0" />
+                            跨角色副作用：{refCharName} 的这些 BUFF 会影响「{refZoneLabel}」
+                        </div>
+                        <p class="text-[10px] leading-relaxed text-(--theme-modal-text)/55">
+                            本乘区引用的是 {refCharName} 的{refZoneLabel}，而下面这些 BUFF 会改写该面板 ——
+                            它们通过面板间接影响本 BUFF 的数值，需要一并配置。
+                        </p>
+                        <div class="flex flex-wrap gap-1">
+                            {#each refAffectingBuffs as dep (dep.buffId)}
+                                <button
+                                    onclick={() => focusAffectingBuff(dep.buffId)}
+                                    class="flex items-center gap-1 border px-1.5 py-0.5 text-[10px] transition-colors hover:brightness-125"
+                                    style="border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent); background: var(--theme-card-bg); color: var(--theme-accent-text);"
+                                    title={`切到「${dep.buffName}」并编辑它（改写 ${dep.zoneIds.join('、')}）`}
+                                >
+                                    <Icon icon="mdi:tune-variant" class="size-3" />
+                                    {dep.buffName}
+                                    <span class="opacity-60">（{dep.zoneIds.join('、')}）</span>
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+                {/if}
+
                 <!-- Character selector (top) -->
                 <div role="group" aria-label="引用角色">
                     <span class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用角色</span>

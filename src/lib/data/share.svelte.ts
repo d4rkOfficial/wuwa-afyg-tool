@@ -51,11 +51,69 @@ export const shareState = $state({
     sort: 'newest' as ShareSort,
     page: 1,
     total: 0,
-    perPage: 12
+    perPage: 12,
+    /** @desc 分享冷却剩余秒数（>0 时禁用分享按钮） */
+    cooldownRemaining: 0
 })
 
 export function getShareState() {
     return shareState
+}
+
+// ── 分享频率限制：10 分钟内只能分享一次（本地持久化，刷新页面仍然生效）──
+
+/** @desc 分享冷却时长：10 分钟 */
+export const SHARE_COOLDOWN_MS = 10 * 60 * 1000
+const SHARE_LAST_AT_KEY = 'wuwa-afyg:share-last-at'
+
+let _cooldownTimer: ReturnType<typeof setInterval> | null = null
+
+const readLastShareAt = (): number => {
+    if (!browser) return 0
+    const raw = localStorage.getItem(SHARE_LAST_AT_KEY)
+    const value = raw ? Number(raw) : 0
+    return Number.isFinite(value) ? value : 0
+}
+
+/** @desc 剩余冷却毫秒数（0 表示可以分享） */
+export function shareCooldownRemaining(now = Date.now()): number {
+    const elapsed = now - readLastShareAt()
+    return elapsed >= SHARE_COOLDOWN_MS ? 0 : SHARE_COOLDOWN_MS - elapsed
+}
+
+/** @desc 是否处于分享冷却中 */
+export function isShareCoolingDown(): boolean {
+    return shareState.cooldownRemaining > 0
+}
+
+/** @desc 剩余冷却的可读文案（mm:ss） */
+export function shareCooldownLabel(): string {
+    const total = Math.ceil(shareState.cooldownRemaining / 1000)
+    const m = Math.floor(total / 60)
+    const s = total % 60
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+/** @desc 刷新冷却剩余秒数（启动时与分享成功后调用；到期自动停止计时器） */
+export function refreshShareCooldown(): void {
+    if (!browser) return
+    const sync = () => {
+        shareState.cooldownRemaining = Math.ceil(shareCooldownRemaining() / 1000)
+        if (shareState.cooldownRemaining <= 0 && _cooldownTimer) {
+            clearInterval(_cooldownTimer)
+            _cooldownTimer = null
+        }
+    }
+    sync()
+    if (shareState.cooldownRemaining > 0 && !_cooldownTimer) {
+        _cooldownTimer = setInterval(sync, 1000)
+    }
+}
+
+/** @desc 记录一次成功分享并开始冷却 */
+const markShared = (): void => {
+    if (browser) localStorage.setItem(SHARE_LAST_AT_KEY, String(Date.now()))
+    refreshShareCooldown()
 }
 
 let _seq = 0
@@ -204,7 +262,12 @@ export function setPage(page: number) {
     return checkShare(true)
 }
 
+/** @desc 分享工程（10 分钟频率限制）：冷却中直接拒绝；成功后记录时间戳并开始倒计时 */
 export async function shareProject(project: Project): Promise<ShareResult> {
+    refreshShareCooldown()
+    if (isShareCoolingDown()) {
+        return { ok: false, error: `分享冷却中，请在 ${shareCooldownLabel()} 后重试` }
+    }
     const file = buildExportFile(project, getPhaseOrder(), true)
     try {
         const res = await fetch(`${getShareBase()}/api/public/projects`, {
@@ -214,6 +277,7 @@ export async function shareProject(project: Project): Promise<ShareResult> {
         })
         const json = (await res.json().catch(() => ({}))) as { code?: string; url?: string; error?: string }
         if (!res.ok) return { ok: false, error: json.error ?? `HTTP ${res.status}` }
+        markShared()
         return { ok: true, code: json.code, url: json.url }
     } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : '网络错误' }
@@ -230,6 +294,24 @@ export async function getShareLink(project: Project): Promise<string | null> {
     const res = await shareProject(project)
     if (!res.ok || !res.code) return null
     return buildImportLink(res.code)
+}
+
+/** @desc 分享并把链接写入剪贴板：返回可读结果，供侧栏/归档区共用 */
+export async function shareAndCopy(project: Project): Promise<ShareResult> {
+    const res = await shareProject(project)
+    if (!res.ok) return res
+    if (res.url || res.code) {
+        const link = res.url
+            ? `${location.origin}#import_project=${encodeURIComponent(res.url)}`
+            : buildImportLink(res.code!)
+        try {
+            await navigator.clipboard.writeText(link)
+        } catch {
+            // 剪贴板不可用：链接仍可通过返回结果展示
+        }
+        return { ...res, url: link }
+    }
+    return res
 }
 
 export interface DownloadResult {

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     /** @desc 下拉表（拉表默认视图）：每条伤害可点击展开，配置伤害类型/增益勾选/叠层文件夹/复制前后段，支持 Buff 差异模式展示 */
     import { tick } from 'svelte'
     import { slide } from 'svelte/transition'
@@ -12,7 +12,8 @@
         toggleDamageTypeForEntry,
         setDamageTypesForEntry,
         syncDamageTypesToSameName,
-        countSameNameEntries
+        countSameNameEntries,
+        getBuffsAffectingPanel
     } from '$lib/calc/calculation.store.svelte'
     import { inferDamageTypes } from '$lib/calc/utils'
     import { conditionMet } from '$lib/calc/compute'
@@ -20,7 +21,13 @@
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { addToast } from '$lib/data/toast.svelte'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
-    import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT, groupBuffSets, LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
+    import {
+        DAMAGE_TYPES,
+        DAMAGE_TYPE_SHORT,
+        groupBuffSets,
+        LAYERED_BUFF_PATTERN,
+        ZONE_REF_MAP
+    } from '$lib/calc/calculation.consts'
     import type { GroupedBuffSetItem } from '$lib/calc/calculation.consts'
     import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
     import type { ConditionProfile } from '$lib/calc/compute'
@@ -216,6 +223,45 @@
             })
         }
     }
+
+    /**
+     * @desc 跨角色副作用：当前条目的某个已绑定 Buff 引用了别的角色面板，且那些角色上有 Buff 会改写该面板。
+     * 这些 Buff 通过面板间接影响本条目的伤害，因此在本条目的下拉区域一并提示。
+     */
+    const entryPaneEffects = $derived.by(() => {
+        const out: Array<{ buffId: string; refLabel: string; charName: string; names: string[] }> = []
+        if (!selectedEntry) return out
+        const charIdx = entryCharIdx
+        const boundIds = new Set(entryBuffSetIdMap[selectedEntry.id] ?? [])
+        for (const buff of buffSets) {
+            if (!boundIds.has(buff.id)) continue
+            const variants = buff.variants ?? [{ id: `${buff.id}-v1`, zones: buff.zones }]
+            for (const variant of variants) {
+                for (const zone of variant.zones) {
+                    const ref = zone.ref
+                    if (!ref || ref.characterIdx === charIdx) continue
+                    const names = getBuffsAffectingPanel(ref.characterIdx, ref.zoneId)
+                        .filter((a) => a.buffId !== buff.id && boundIds.has(a.buffId))
+                        .map((a) => a.buffName)
+                    if (names.length === 0) continue
+                    out.push({
+                        buffId: buff.id,
+                        refLabel: ZONE_REF_MAP.get(ref.zoneId)?.label ?? ref.zoneId,
+                        charName: team[ref.characterIdx]?.character ?? `角色${ref.characterIdx + 1}`,
+                        names: [...new Set(names)]
+                    })
+                }
+            }
+        }
+        return out
+    })
+
+    /** @desc 副作用提示文案 */
+    const entryPaneEffectText = $derived(
+        entryPaneEffects
+            .map((e) => `引用${e.charName}的${e.refLabel}，受其 BUFF 影响：${e.names.join('、')}`)
+            .join('\n')
+    )
 
     /** @desc 切换当前展开条目与某 Buff 的绑定并持久化 */
     function handleToggleBuffSetForEntry(setId: string) {
@@ -857,6 +903,18 @@
                                                             class="size-3 shrink-0"
                                                         />
                                                         {item.buffSet!.name}
+                                                        {#if entryPaneEffects.some((e) => e.buffId === item.buffSet!.id)}
+                                                            <span
+                                                                class="shrink-0"
+                                                                title={entryPaneEffectText}
+                                                                style="color: var(--theme-accent-text);"
+                                                            >
+                                                                <Icon
+                                                                    icon="mdi:transit-connection-variant"
+                                                                    class="size-3"
+                                                                />
+                                                            </span>
+                                                        {/if}
                                                     </button>
                                                 {/each}
                                             </div>
