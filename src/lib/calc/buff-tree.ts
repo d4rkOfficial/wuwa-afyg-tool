@@ -3,7 +3,7 @@
  *
  * 一级：全局 Buff（并入全局的那些）
  * 二级：角色名X链 / 角色名的武器X阶 —— 依据 Buff 的**链/阶硬性条件**（参考角色取条件里的角色槽位）；
- *      没有链/阶条件的 Buff 留在最外层平铺（与一级同级）
+ *      没有链/阶条件的 Buff 留在最外层平铺（与一级同级）；「全局 Buff」目录内部同样按此规则分子目录
  * 三级：名字里「前缀+数字+后缀」规律相同的 ≥2 条自动归档，目录内按数字升序
  *
  * 目录是**派生**的（随时按条件/名字算出来），所以拖拽只改变同一父容器内的顺序；
@@ -35,6 +35,11 @@ export interface BuffTreeNode extends GroupedBuffSetItem {
     parentKey: string
     /** @desc 目录下的全部 Buff id（含嵌套数字目录，按展示顺序） */
     memberIds?: string[]
+    /**
+     * @desc 目录内的二级（链/武器）子目录：仅「全局 Buff」目录需要
+     * （全局 buff 同样按链/阶条件分子目录；非全局的二级目录直接就是顶层节点）
+     */
+    gateChildren?: BuffTreeNode[]
 }
 
 export interface BuffTree {
@@ -70,12 +75,105 @@ export const gateFolderOf = (gate: BuffGate, team: readonly CharSlot[]): { key: 
     }
 }
 
+/** @desc 一个二级目录桶：key 主体（不含顶层/全局前缀）+ 标题 + 成员 */
+interface GateBucket {
+    raw: string
+    title: string
+    charIdx?: number
+    gateKind?: 'chain' | 'weapon'
+    gateMin?: number
+    items: BuffInstance[]
+}
+
+/** @desc 二级目录分桶结果：目录桶（已排序）+ 无链/阶条件的散条目 */
+interface GateBuckets {
+    buckets: GateBucket[]
+    loose: BuffInstance[]
+}
+
+/** @desc 二级目录排序键：角色槽位 → 目录种类（链 0 / 武器 1）→ 门槛或武器名自然序 */
+const gateSortKey = (key: string): [number, number, string | number] => {
+    const chain = /^chain:(\d+):(\d+)$/.exec(key)
+    if (chain) return [Number(chain[1]), 0, Number(chain[2])]
+    const weapon = /^weapon:(\d+):(.*)$/.exec(key)
+    if (weapon) return [Number(weapon[1]), 1, weapon[2]]
+    return [99, 99, '']
+}
+
+const compareGateKey = (a: string, b: string): number => {
+    const ka = gateSortKey(a)
+    const kb = gateSortKey(b)
+    if (ka[0] !== kb[0]) return ka[0] - kb[0]
+    if (ka[1] !== kb[1]) return ka[1] - kb[1]
+    if (typeof ka[2] === 'number' && typeof kb[2] === 'number') return ka[2] - kb[2]
+    return String(ka[2]).localeCompare(String(kb[2]))
+}
+
+/**
+ * @desc 按链/阶条件把 Buff 分到二级目录（同一套口径同时服务顶层与「全局 Buff」目录内部）：
+ * 链条件 → `角色名X链`；阶条件 → `角色名的武器名`（按角色 + 武器划分，不按阶数）。
+ * 无链/阶条件的 Buff 原样留在 `loose`（由界面就地做数字归并）。
+ */
+const gateBucketsOf = (buffs: readonly BuffInstance[], team: readonly CharSlot[]): GateBuckets => {
+    const map = new Map<string, GateBucket>()
+    const order: string[] = []
+    const loose: BuffInstance[] = []
+    for (const buff of buffs) {
+        const gate = gateOf(buff)
+        if (!gate) {
+            loose.push(buff)
+            continue
+        }
+        const folder = gateFolderOf(gate, team)
+        let bucket = map.get(folder.key)
+        if (!bucket) {
+            bucket = {
+                raw: folder.key,
+                title: folder.title,
+                charIdx: gate.charIdx,
+                gateKind: gate.kind === 'chain' ? 'chain' : 'weapon',
+                gateMin: gate.min,
+                items: []
+            }
+            map.set(folder.key, bucket)
+            order.push(folder.key)
+        }
+        bucket.items.push(buff)
+    }
+    return { buckets: order.sort(compareGateKey).map((key) => map.get(key)!), loose }
+}
+
+/**
+ * @desc 二级目录桶 → 渲染节点。
+ * `keyPrefix` 区分顶层（`folder:`）与「全局 Buff」目录内部（`global:`），
+ * 避免两处同名目录（如都叫「今汐的时和岁稔」）在折叠状态上互相影响。
+ */
+const gateNodesOf = (buckets: readonly GateBucket[], parentKey: string, keyPrefix: string): BuffTreeNode[] =>
+    buckets.map((bucket) => ({
+        key: `${keyPrefix}${bucket.raw}`,
+        type: 'folder',
+        name: bucket.title,
+        prefix: `${keyPrefix}${bucket.raw}`,
+        prefixText: bucket.title,
+        suffixText: '',
+        folderKind: 'char-gate',
+        charIdx: bucket.charIdx,
+        gateKind: bucket.gateKind,
+        gateMin: bucket.gateMin,
+        parentKey,
+        memberIds: bucket.items.map((b) => b.id),
+        children: bucket.items
+    }))
+
 /**
  * @desc 构建三级归类树（一级全局 / 二级角色链阶 / 三级数字前后缀）。
  *
  * 输出沿用左侧列表既有的 `GroupedBuffSetItem` 结构：目录节点的 `children` 是该容器下的**原始 Buff 列表**，
  * 三级数字目录由界面用 `groupBuffSets(children)` 就地派生（该函数已按键数字升序）。这样既满足「三级归类」，
  * 又不改变既有列表渲染/拖拽/右键菜单的实现。
+ *
+ * 「全局 Buff」目录内部同样按二级规则分子目录：`gateChildren` 放链/武器子目录，
+ * `children` 只留无链/阶条件的全局 buff（界面内做数字归并）。
  *
  * @param globalIds 已并入全局的 Buff id（归入一级「全局 Buff」目录）
  */
@@ -86,54 +184,14 @@ export const buildBuffTree = (
 ): BuffTree => {
     const globalSet = new Set(globalIds)
     const globals: BuffInstance[] = []
-    /** @desc 二级目录 key → 成员（**只按链条件归目录**；无链条件的走 __top__ 平铺） */
-    const buckets = new Map<
-        string,
-        { title: string; charIdx?: number; gateKind?: 'chain' | 'weapon'; gateMin?: number; items: BuffInstance[] }
-    >()
-    const bucketOrder: string[] = []
+    const nonGlobals: BuffInstance[] = []
 
     for (const buff of buffSets) {
-        if (globalSet.has(buff.id)) {
-            globals.push(buff)
-            continue
-        }
-        const gate = gateOf(buff)
-        // 链条件 → 角色名X链；阶条件 → 角色名的武器名（按角色+武器划分，不按阶数）
-        const key = gate ? `folder:${gateFolderOf(gate, team).key}` : '__top__'
-        let bucket = buckets.get(key)
-        if (!bucket) {
-            bucket = {
-                title: gate ? gateFolderOf(gate, team).title : '',
-                charIdx: gate?.charIdx,
-                gateKind: gate?.kind === 'chain' ? 'chain' : 'weapon',
-                gateMin: gate?.min,
-                items: []
-            }
-            buckets.set(key, bucket)
-            bucketOrder.push(key)
-        }
-        bucket.items.push(buff)
+        if (globalSet.has(buff.id)) globals.push(buff)
+        else nonGlobals.push(buff)
     }
 
-    // 二级目录排序：按角色槽位 → 同角色内「链目录在前（门槛升序）、武器目录在后（武器名自然序）」
-    const gateSortKey = (key: string): [number, number, string | number] => {
-        const chain = /^folder:chain:(\d+):(\d+)$/.exec(key)
-        if (chain) return [Number(chain[1]), 0, Number(chain[2])]
-        const weapon = /^folder:weapon:(\d+):(.*)$/.exec(key)
-        if (weapon) return [Number(weapon[1]), 1, weapon[2]]
-        return [99, 99, '']
-    }
-    const orderedKeys = bucketOrder
-        .filter((k) => k !== '__top__')
-        .sort((a, b) => {
-            const ka = gateSortKey(a)
-            const kb = gateSortKey(b)
-            if (ka[0] !== kb[0]) return ka[0] - kb[0]
-            if (ka[1] !== kb[1]) return ka[1] - kb[1]
-            if (typeof ka[2] === 'number' && typeof kb[2] === 'number') return ka[2] - kb[2]
-            return String(ka[2]).localeCompare(String(kb[2]))
-        })
+    const topGates = gateBucketsOf(nonGlobals, team)
 
     const nodes: BuffTreeNode[] = []
     const folderKeys: string[] = []
@@ -141,7 +199,9 @@ export const buildBuffTree = (
 
     if (globals.length > 0) {
         const folderKey = 'folder:global'
-        folderKeys.push(folderKey)
+        const globalGates = gateBucketsOf(globals, team)
+        const gateChildren = gateNodesOf(globalGates.buckets, folderKey, 'global:')
+        folderKeys.push(folderKey, ...gateChildren.map((node) => node.prefix!))
         nodes.push({
             key: folderKey,
             type: 'folder',
@@ -152,35 +212,20 @@ export const buildBuffTree = (
             folderKind: 'global',
             parentKey: '__root__',
             memberIds: globals.map((b) => b.id),
-            children: globals
+            children: globalGates.loose,
+            gateChildren
         })
     }
 
-    for (const key of orderedKeys) {
-        const bucket = buckets.get(key)!
-        folderKeys.push(key)
-        nodes.push({
-            key,
-            type: 'folder',
-            name: bucket.title,
-            prefix: key,
-            prefixText: bucket.title,
-            suffixText: '',
-            folderKind: 'char-gate',
-            charIdx: bucket.charIdx,
-            gateKind: bucket.gateKind,
-            gateMin: bucket.gateMin,
-            parentKey: '__root__',
-            memberIds: bucket.items.map((b) => b.id),
-            children: bucket.items
-        })
-        treeBuckets.push({ parentKey: key, memberIds: bucket.items.map((b) => b.id) })
+    for (const node of gateNodesOf(topGates.buckets, '__root__', 'folder:')) {
+        folderKeys.push(node.prefix!)
+        nodes.push(node)
+        treeBuckets.push({ parentKey: node.prefix!, memberIds: node.memberIds! })
     }
 
-    // 无链/阶条件的 Buff：留在最外层平铺（其中的数字目录仍由 groupBuffSets 就地派生）
-    const top = buckets.get('__top__')
-    if (top && top.items.length > 0) {
-        for (const item of groupBuffSets(top.items)) {
+    // 无链/阶条件的非全局 Buff：留在最外层平铺（其中的数字目录仍由 groupBuffSets 就地派生）
+    if (topGates.loose.length > 0) {
+        for (const item of groupBuffSets(topGates.loose)) {
             if (item.type === 'folder') {
                 folderKeys.push(`folder:${item.prefix}`)
                 nodes.push({
@@ -204,7 +249,7 @@ export const buildBuffTree = (
                 })
             }
         }
-        treeBuckets.push({ parentKey: '__top__', memberIds: top.items.map((b) => b.id) })
+        treeBuckets.push({ parentKey: '__top__', memberIds: topGates.loose.map((b) => b.id) })
     }
 
     return { nodes, folderKeys, buckets: treeBuckets }

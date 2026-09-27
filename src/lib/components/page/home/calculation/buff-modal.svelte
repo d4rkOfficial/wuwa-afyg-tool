@@ -35,6 +35,7 @@
     } from '$lib/calc/calculation.consts'
     import type { ZoneId, GroupedBuffSetItem } from '$lib/calc/calculation.consts'
     import { buildBuffTree } from '$lib/calc/buff-tree'
+    import type { BuffTreeNode } from '$lib/calc/buff-tree'
     import type { CharSlot } from '$lib/types/project'
     import type { ZoneRef, BuffSet, BuffCondition } from '$lib/calc/calculation.types'
     import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
@@ -167,6 +168,7 @@
     /** @desc ── 右栏「添加乘区」宽度拖拽调节（同一套三态高亮 + rAF 节流；拖的是左缘分割线） ── */
     let zoneBarWidth = $state(208)
     let zoneBarDragging = $state(false)
+    let zoneBarHover = $state(false)
     let zoneBarStartX = 0
     let zoneBarStartWidth = 208
     $effect(() => {
@@ -360,10 +362,10 @@
     function handleCopyBuffSet() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         const folder = groupedBuffSets.find(
-            (item) => item.type === 'folder' && item.children?.some((c) => c.id === selectedBuffSetId)
+            (item) => item.type === 'folder' && folderMembersOf(item).some((c) => c.id === selectedBuffSetId)
         )
         if (folder) {
-            const nums = (folder.children ?? [])
+            const nums = folderMembersOf(folder)
                 .map((c) => {
                     const m = c.name.match(LAYERED_BUFF_PATTERN)
                     return m ? parseInt(m[2]) : 0
@@ -501,7 +503,9 @@
         const chainMin = cond.chains?.[0]?.min ?? cond.chain
         const refineMin = cond.refinements?.[0]?.min ?? cond.refinement
         if (chainMin !== undefined) parts.push(`${name} ≥${chainMin}链`)
-        else if (refineMin !== undefined) parts.push(`${name}的武器 ≥${refineMin}阶`)
+        // 0 阶表示「本体」（未精炼武器），与「阶」档位按钮上的短文案保持一致
+        else if (refineMin !== undefined)
+            parts.push(refineMin > 0 ? `${name}的武器 ≥${refineMin}阶` : `${name}的武器本体`)
         return parts.join('，')
     })
 
@@ -555,24 +559,26 @@
         if (!clearing) ensureConditionRef()
     }
 
-    /** @desc 清除链/阶硬性条件（保留其它子句） */
-    function clearGateConditions() {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        const cond = selectedBuffSet.condition ?? {}
-        setBuffSetCondition(selectedBuffSetId, {
-            ...cond,
-            chain: undefined,
-            chains: undefined,
-            refinement: undefined,
-            refinements: undefined
-        })
+    /**
+     * @desc 链/阶档位按钮提示：当前档位说明「再次点击取消」，另一类已设置时说明「链阶互斥、点击替换」。
+     * 阶的 0 档 = 武器本体（未精炼）。
+     */
+    const gateOptionTitle = (kind: 'chain' | 'refinement', n: number): string => {
+        const label = kind === 'chain' ? `${n}链` : n === 0 ? '武器本体（0阶）' : `${n}阶`
+        const selected = kind === 'chain' ? currentChain === n : currentRefine === n
+        if (selected) return `≥${label}：再次点击取消`
+        const conflict = kind === 'chain' ? currentRefine !== undefined : currentChain !== undefined
+        if (!conflict) return `≥${label}`
+        return kind === 'chain'
+            ? '已设置阶条件：链与阶只能生效其一，点击会替换为链条件'
+            : '已设置链条件：链与阶只能生效其一，点击会替换为阶条件'
     }
 
     /** @desc 设置参考角色槽位（默认全局 buff 拒绝）；链/阶门槛同步迁移到新参考角色 */
     function setConditionRef(i: number) {
         if (!selectedBuffSetId || !selectedBuffSet) return
         if (isDefaultGlobalBuff()) {
-            addToast('默认全局buff无法设置生效条件', 'info')
+            addToast('默认全局buff无法设置链/阶条件', 'info')
             return
         }
         setBuffSetConditionRef(selectedBuffSetId, i)
@@ -683,7 +689,8 @@
         el.setPointerCapture(e.pointerId)
         savedCollapsedState = new Set(collapsedFolders)
         // 拖动时**收起所有文件夹**：列表变短、目录本身成为清晰的落点
-        collapsedFolders = new Set(buffTree.folderKeys)
+        // （被拖动的目录自身保持展开：否则它的成员不在 DOM 里，整组移动会算不出成员）
+        collapsedFolders = new Set(buffTree.folderKeys.filter((key) => key !== id))
 
         let idx = -1
         if (mode === 'child' && folderPrefix) {
@@ -846,12 +853,11 @@
     /** @desc 确认删除文件夹：删除其全部子 Buff 并清空选中 */
     function confirmDeleteFolder() {
         const folder = groupedBuffSets.find((g) => g.type === 'folder' && g.prefix === deleteFolderPrefix)
-        if (folder?.children) {
-            for (const child of folder.children) {
-                deleteBuffSet(child.id)
-            }
+        const members = folder ? folderMembersOf(folder) : []
+        for (const child of members) {
+            deleteBuffSet(child.id)
         }
-        if (selectedBuffSetId && folder?.children?.some((c) => c.id === selectedBuffSetId)) {
+        if (selectedBuffSetId && members.some((c) => c.id === selectedBuffSetId)) {
             selectedBuffSetId = null
         }
         showDeleteFolderConfirm = false
@@ -873,7 +879,7 @@
     let folderMenuItems = $derived.by(() => {
         const folder = folderMenuTarget
         if (!folder) return []
-        const children = (folder.children ?? []).map((c) => c.id)
+        const children = folderMembersOf(folder).map((c) => c.id)
         const hasGlobal = children.some((id) => globalBuffSetIds.includes(id))
         const items: { label: string; action: () => void; icon: string }[] = [
             { label: '批量重命名', icon: 'mdi:rename-box', action: () => openFolderRename(folder) }
@@ -1003,7 +1009,7 @@
 
     /** @desc 文件夹整体并入全局（所有子 Buff 一次性移入） */
     function moveFolderToGlobal(folder: GroupedBuffSetItem) {
-        const ids = (folder.children ?? []).map((c) => c.id)
+        const ids = folderMembersOf(folder).map((c) => c.id)
         if (ids.length === 0) return
         setBuffSetsGlobal(ids, true)
         addToast(`已将「${folder.name}」的 ${ids.length} 条 BUFF 并入全局`, 'success')
@@ -1011,7 +1017,7 @@
 
     /** @desc 文件夹整体移出全局（所有子 Buff 一次性移出） */
     function moveFolderOutOfGlobal(folder: GroupedBuffSetItem) {
-        const ids = (folder.children ?? []).map((c) => c.id)
+        const ids = folderMembersOf(folder).map((c) => c.id)
         if (ids.length === 0) return
         setBuffSetsGlobal(ids, false)
         addToast(`已将「${folder.name}」的 ${ids.length} 条 BUFF 移出全局`, 'info')
@@ -1020,17 +1026,19 @@
     /** @desc 确认文件夹批量重命名：子 Buff 依次命名为 新前缀+1..N+新后缀 */
     function confirmFolderRename() {
         const folder = folderRenameTarget
-        if (!folder?.children) return
+        if (!folder) return
+        const members = folderMembersOf(folder)
+        if (members.length === 0) return
         const prefix = folderRenamePrefix.trim()
         const suffix = folderRenameSuffix.trim()
         if (!prefix && !suffix) {
             addToast('前缀与后缀不能同时为空', 'error')
             return
         }
-        folder.children.forEach((child, i) => {
+        members.forEach((child, i) => {
             renameBuffSet(child.id, `${prefix}${i + 1}${suffix}`)
         })
-        addToast(`已批量重命名 ${folder.children.length} 条 BUFF`, 'success')
+        addToast(`已批量重命名 ${members.length} 条 BUFF`, 'success')
         showFolderRename = false
         folderRenameTarget = null
     }
@@ -1062,9 +1070,9 @@
         multiSelectedIds = next
     }
 
-    /** @desc 多选模式切换整个文件夹勾选（全部子 buff；内置全局块跳过） */
-    function toggleMultiSelectFolder(folder: GroupedBuffSetItem) {
-        const childIds = (folder.children ?? []).map((c) => c.id).filter((id) => !isMultiSelectDisabled(id))
+    /** @desc 多选模式切换整个文件夹勾选（传入目录的全部子 buff；内置全局块跳过） */
+    function toggleMultiSelectFolder(members: BuffSet[]) {
+        const childIds = members.map((c) => c.id).filter((id) => !isMultiSelectDisabled(id))
         if (childIds.length === 0) return
         const next = new Set(multiSelectedIds)
         const allSelected = childIds.every((id) => next.has(id))
@@ -1176,6 +1184,32 @@
     /** @desc 非全局容器下的数字目录（含成员），恒排在散条目前面 */
     const foldersOf = (children: BuffSet[] | undefined): GroupedBuffSetItem[] =>
         groupBuffSets(children ?? []).filter((x) => x.type === 'folder')
+
+    /**
+     * @desc 最低一层 buff 条目的统一图标（全局目录内 / 链武器目录内 / 数字目录内 / 顶层散条目一致）：
+     * 未收藏 = 灰色空心星，已收藏 = 黄色实心星；多选态的勾选框不受影响。
+     */
+    const buffItemIcon = (starred: boolean | undefined): string => (starred ? 'mdi:star' : 'mdi:star-outline')
+    const buffItemIconClass = (starred: boolean | undefined, draggable = false): string =>
+        [
+            'size-4 shrink-0',
+            starred ? 'text-amber-400' : 'text-(--theme-modal-text)/35',
+            draggable ? 'drag-handle touch-none select-none cursor-grab active:cursor-grabbing' : ''
+        ]
+            .filter(Boolean)
+            .join(' ')
+
+    /** @desc 数字目录（三级）的折叠 key：按所属容器分区，避免不同容器下的同名目录互相影响 */
+    const layeredKeyOf = (containerKey: string, prefix: string | undefined): string => `${containerKey}/${prefix}`
+
+    /**
+     * @desc 目录下的全部成员 Buff（数字目录直接取 children；
+     * 「全局 Buff」目录还要并入二级子目录的成员，否则批量操作会漏掉它们）
+     */
+    const folderMembersOf = (folder: GroupedBuffSetItem): BuffSet[] => [
+        ...(folder.children ?? []),
+        ...((folder as BuffTreeNode).gateChildren ?? []).flatMap((gate) => gate.children ?? [])
+    ]
     const teamIconOf = (idx: number): string | undefined => {
         const name = team[idx]?.character
         return name ? charIconMap[name] : undefined
@@ -1253,413 +1287,123 @@
                             {#if item.type === 'folder'}
                                 {@const isGlobalFolder = item.folderKind === 'global'}
                                 {@const isAutoFolder = item.folderKind === 'char-gate'}
-                                {@const topIdx = topLevelIdxMap.get(item.prefix!)}
-                                {@const folderHasStar = item.children!.some((c) => c.starred)}
-                                {#if !isGlobalFolder && dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
-                                    <div class="mx-2 h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+                                {@const folderMembers = folderMembersOf(item)}
+                                {#if !isGlobalFolder}
+                                    {@const topIdx = topLevelIdxMap.get(item.prefix!)}
+                                    {#if dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
+                                        <div class="mx-2 h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+                                    {/if}
                                 {/if}
                                 <!-- 展开的文件夹头在滚动时贴顶吸附（类似表格表头）：实底 + 铺满容器宽度；
                                     吸附范围 = 整个文件夹块（头 + 子项），子项全部滚出后头随块释放 -->
                                 <div class="px-2">
-                                    <div
-                                        class={[
-                                            'flex min-w-0 items-center gap-1',
-                                            !collapsedFolders.has(item.prefix!)
-                                                ? 'sticky top-0 z-10 -mx-2 border-b border-(--theme-divider-border) px-2 py-1 bg-(--theme-modal-bg)'
-                                                : ''
-                                        ].join(' ')}
-                                    >
-                                        <button
-                                            data-folder-prefix={item.prefix}
-                                            onclick={() =>
-                                                multiSelect
-                                                    ? toggleMultiSelectFolder(item)
-                                                    : toggleFolder(item.prefix!)}
-                                            oncontextmenu={multiSelect ? undefined : (e) => openFolderMenu(e, item)}
-                                            onpointerdown={isGlobalFolder || isAutoFolder || multiSelect
-                                                ? undefined
-                                                : (e) => startDrag(e, item.prefix!, 'folder')}
-                                            onpointermove={isGlobalFolder || isAutoFolder || multiSelect
-                                                ? undefined
-                                                : onDragMove}
-                                            onpointerup={isGlobalFolder || isAutoFolder || multiSelect
-                                                ? undefined
-                                                : onDragEnd}
+                                    {#if isAutoFolder}
+                                        {@render gateFolderHead(item, 'top-0')}
+                                    {:else}
+                                        <div
                                             class={[
-                                                'flex min-w-0 flex-1 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
-                                                multiSelect && !isGlobalFolder && folderAllSelected(item.children ?? [])
-                                                    ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                    : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
-                                                !isGlobalFolder &&
-                                                    !multiSelect &&
-                                                    dragState?.id === item.prefix &&
-                                                    !dragState!.outside &&
-                                                    'ring-2 ring-(--theme-accent-bg)',
-                                                !isGlobalFolder &&
-                                                    !multiSelect &&
-                                                    dragState?.id === item.prefix &&
-                                                    dragState!.outside &&
-                                                    'ring-2 ring-red-500 opacity-50'
+                                                'flex min-w-0 items-center gap-1',
+                                                !collapsedFolders.has(item.prefix!)
+                                                    ? 'sticky top-0 z-10 -mx-2 border-b border-(--theme-divider-border) px-2 py-1 bg-(--theme-modal-bg)'
+                                                    : ''
                                             ].join(' ')}
-                                            transition:slide={{ duration: 200 }}
                                         >
-                                            {#if multiSelect && !isGlobalFolder}
-                                                <Icon
-                                                    icon={folderAllSelected(item.children ?? [])
-                                                        ? 'mdi:checkbox-marked'
-                                                        : 'mdi:checkbox-blank-outline'}
-                                                    class="size-4 shrink-0 text-(--theme-accent-text)"
-                                                />
-                                            {:else}
-                                                {#if isAutoFolder && item.charIdx !== undefined && teamIconOf(item.charIdx)}
-                                                    <!-- @desc 二级目录：角色图标 + 角标（链目录=链阶角标；武器目录=当前装配武器图标） -->
-                                                    <span class="relative shrink-0">
-                                                        <img
-                                                            src={teamIconOf(item.charIdx)}
-                                                            alt=""
-                                                            draggable="false"
-                                                            class="size-4 rounded-full object-cover"
-                                                        />
-                                                        {#if item.gateKind === 'weapon'}
-                                                            {#if weaponIconOf(item.charIdx)}
-                                                                <img
-                                                                    src={weaponIconOf(item.charIdx)}
-                                                                    alt=""
-                                                                    draggable="false"
-                                                                    class="absolute -bottom-0.5 -right-1 size-3 rounded-sm border object-cover"
-                                                                    style="border-color: var(--theme-modal-bg);"
-                                                                />
-                                                            {/if}
-                                                        {:else}
-                                                            <span
-                                                                class="absolute -bottom-1 -right-1 flex h-3 min-w-3 items-center justify-center px-0.5 text-[8px] font-black leading-none"
-                                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                                                                >{item.gateMin ?? 0}</span
-                                                            >
-                                                        {/if}
-                                                    </span>
-                                                {:else}
+                                            <button
+                                                data-folder-prefix={item.prefix}
+                                                onclick={() =>
+                                                    multiSelect
+                                                        ? toggleMultiSelectFolder(folderMembers)
+                                                        : toggleFolder(item.prefix!)}
+                                                oncontextmenu={multiSelect ? undefined : (e) => openFolderMenu(e, item)}
+                                                onpointerdown={isGlobalFolder || multiSelect
+                                                    ? undefined
+                                                    : (e) => startDrag(e, item.prefix!, 'folder')}
+                                                onpointermove={isGlobalFolder || multiSelect ? undefined : onDragMove}
+                                                onpointerup={isGlobalFolder || multiSelect ? undefined : onDragEnd}
+                                                class={[
+                                                    'flex min-w-0 flex-1 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
+                                                    multiSelect && !isGlobalFolder && folderAllSelected(folderMembers)
+                                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                        : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
+                                                    !isGlobalFolder &&
+                                                        !multiSelect &&
+                                                        dragState?.id === item.prefix &&
+                                                        !dragState!.outside &&
+                                                        'ring-2 ring-(--theme-accent-bg)',
+                                                    !isGlobalFolder &&
+                                                        !multiSelect &&
+                                                        dragState?.id === item.prefix &&
+                                                        dragState!.outside &&
+                                                        'ring-2 ring-red-500 opacity-50'
+                                                ].join(' ')}
+                                                transition:slide={{ duration: 200 }}
+                                            >
+                                                {#if multiSelect && !isGlobalFolder}
                                                     <Icon
-                                                        icon={isGlobalFolder
-                                                            ? 'mdi:crown'
-                                                            : collapsedFolders.has(item.prefix!)
-                                                              ? 'mdi:folder-account-outline'
-                                                              : 'mdi:folder-account'}
-                                                        class={[
-                                                            'size-4 shrink-0',
-                                                            isGlobalFolder
+                                                        icon={folderAllSelected(folderMembers)
+                                                            ? 'mdi:checkbox-marked'
+                                                            : 'mdi:checkbox-blank-outline'}
+                                                        class="size-4 shrink-0 text-(--theme-accent-text)"
+                                                    />
+                                                {:else if isGlobalFolder}
+                                                    <Icon icon="mdi:crown" class="size-4 shrink-0 text-amber-400" />
+                                                {:else}
+                                                    <!-- 叠层（数字前后缀）目录：可整组拖动 -->
+                                                    <Icon
+                                                        icon={collapsedFolders.has(item.prefix!)
+                                                            ? 'mdi:folder-account-outline'
+                                                            : 'mdi:folder-account'}
+                                                        class={`drag-handle touch-none select-none cursor-grab active:cursor-grabbing size-4 shrink-0 ${
+                                                            folderMembers.some((c) => c.starred)
                                                                 ? 'text-amber-400'
-                                                                : isAutoFolder
-                                                                  ? 'text-(--theme-accent-text)/70'
-                                                                  : `drag-handle touch-none select-none cursor-grab active:cursor-grabbing ${
-                                                                        folderHasStar ? 'text-amber-400' : 'opacity-60'
-                                                                    }`
-                                                        ].join(' ')}
+                                                                : 'opacity-60'
+                                                        }`}
                                                     />
                                                 {/if}
-                                            {/if}
-                                            <span class="truncate flex-1">{item.name}</span>
-                                            {#if isAutoFolder}
-                                                <span
-                                                    class="shrink-0 text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                                                    title="按 Buff 的链/阶硬性条件自动归类（改条件即换目录），因此目录本身不可拖动"
-                                                    >自动</span
-                                                >
-                                            {/if}
-                                        </button>
-                                        {#if !multiSelect}
-                                            <button
-                                                type="button"
-                                                class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
-                                                title="文件夹操作"
-                                                onclick={(e) => openFolderMenu(e, item)}
-                                                oncontextmenu={(e) => openFolderMenu(e, item)}
-                                            >
-                                                <Icon icon="mdi:dots-horizontal" class="size-4" />
+                                                <span class="truncate flex-1">{item.name}</span>
                                             </button>
-                                        {/if}
-                                    </div>
+                                            {#if !multiSelect}
+                                                <button
+                                                    type="button"
+                                                    class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                                                    title="文件夹操作"
+                                                    onclick={(e) => openFolderMenu(e, item)}
+                                                    oncontextmenu={(e) => openFolderMenu(e, item)}
+                                                >
+                                                    <Icon icon="mdi:dots-horizontal" class="size-4" />
+                                                </button>
+                                            {/if}
+                                        </div>
+                                    {/if}
                                     {#if !collapsedFolders.has(item.prefix!)}
                                         <div
                                             class="ml-3 mt-1 space-y-1 border-l pl-2"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             {#if isGlobalFolder}
-                                                <!-- 全局区嵌套分组：叠层 buff 移入全局后仍保持文件夹形态（皇冠，不可拖拽） -->
-                                                {#each groupBuffSets(item.children!) as sub (sub.key)}
-                                                    {#if sub.type === 'folder'}
-                                                        {@const subKey = 'global:' + sub.prefix}
-                                                        <div class="space-y-1">
-                                                            <!-- 全局内部文件夹头同样贴顶吸附：top-10 避开上方全局头（40px 高），
-                                             -mx-2 px-2 铺满自身宽度并保持内容不跳位 -->
+                                                <!-- @desc 全局 Buff 目录内先按链/阶条件分二级目录（与顶层同一套规则），再在每个二级目录内做数字归并 -->
+                                                {#each item.gateChildren ?? [] as gate (gate.key)}
+                                                    <div class="space-y-1">
+                                                        {@render gateFolderHead(gate, 'top-10')}
+                                                        {#if !collapsedFolders.has(gate.prefix!)}
                                                             <div
-                                                                class={[
-                                                                    'flex min-w-0 items-center gap-1',
-                                                                    !collapsedFolders.has(subKey)
-                                                                        ? 'sticky top-10 z-10 -mx-2 border-b border-(--theme-divider-border) px-2 py-1 bg-(--theme-modal-bg)'
-                                                                        : ''
-                                                                ].join(' ')}
+                                                                class="ml-2 space-y-1 border-l pl-2"
+                                                                style="border-color: var(--theme-divider-border);"
                                                             >
-                                                                <button
-                                                                    class="flex min-w-0 flex-1 items-center gap-2 rounded-none px-3 py-1.5 text-xs text-left transition-all text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5 {multiSelect &&
-                                                                    folderAllSelected(sub.children ?? [])
-                                                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                        : ''}"
-                                                                    onclick={() =>
-                                                                        multiSelect
-                                                                            ? toggleMultiSelectFolder(sub)
-                                                                            : toggleFolder(subKey)}
-                                                                    oncontextmenu={multiSelect
-                                                                        ? undefined
-                                                                        : (e) => openFolderMenu(e, sub)}
-                                                                >
-                                                                    {#if multiSelect}
-                                                                        <Icon
-                                                                            icon={folderAllSelected(sub.children ?? [])
-                                                                                ? 'mdi:checkbox-marked'
-                                                                                : 'mdi:checkbox-blank-outline'}
-                                                                            class="size-3.5 shrink-0 text-(--theme-accent-text)"
-                                                                        />
-                                                                    {:else}
-                                                                        <Icon
-                                                                            icon={collapsedFolders.has(subKey)
-                                                                                ? 'mdi:folder'
-                                                                                : 'mdi:folder-open'}
-                                                                            class="size-3.5 shrink-0 text-amber-400/70"
-                                                                        />
-                                                                    {/if}
-                                                                    <span class="truncate flex-1">{sub.name}</span>
-                                                                </button>
-                                                                {#if !multiSelect}
-                                                                    <button
-                                                                        type="button"
-                                                                        class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
-                                                                        title="文件夹操作"
-                                                                        onclick={(e) => openFolderMenu(e, sub)}
-                                                                        oncontextmenu={(e) => openFolderMenu(e, sub)}
-                                                                    >
-                                                                        <Icon
-                                                                            icon="mdi:dots-horizontal"
-                                                                            class="size-3.5"
-                                                                        />
-                                                                    </button>
-                                                                {/if}
+                                                                {@render buffContainer(gate.children, gate.prefix!)}
                                                             </div>
-                                                            {#if !collapsedFolders.has(subKey)}
-                                                                <div
-                                                                    class="ml-2 space-y-1 border-l pl-2"
-                                                                    style="border-color: var(--theme-divider-border);"
-                                                                >
-                                                                    {#each sub.children! as subChild (subChild.id)}
-                                                                        <button
-                                                                            onclick={() =>
-                                                                                multiSelect
-                                                                                    ? isMultiSelectDisabled(
-                                                                                          subChild.id
-                                                                                      ) ||
-                                                                                      toggleMultiSelectId(subChild.id)
-                                                                                    : (selectedBuffSetId = subChild.id)}
-                                                                            oncontextmenu={(e) =>
-                                                                                openItemMenu(e, subChild.id)}
-                                                                            class={[
-                                                                                'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
-                                                                                multiSelect &&
-                                                                                isMultiSelectDisabled(subChild.id)
-                                                                                    ? 'text-(--theme-modal-text)/30 opacity-50'
-                                                                                    : multiSelect
-                                                                                      ? multiSelectedIds.has(
-                                                                                            subChild.id
-                                                                                        )
-                                                                                          ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                                          : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                                                                      : selectedBuffSetId ===
-                                                                                          subChild.id
-                                                                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                                        : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                                                            ].join(' ')}
-                                                                        >
-                                                                            {#if multiSelect}
-                                                                                <Icon
-                                                                                    icon={isMultiSelectDisabled(
-                                                                                        subChild.id
-                                                                                    )
-                                                                                        ? 'mdi:checkbox-blank-off-outline'
-                                                                                        : multiSelectedIds.has(
-                                                                                                subChild.id
-                                                                                            )
-                                                                                          ? 'mdi:checkbox-marked'
-                                                                                          : 'mdi:checkbox-blank-outline'}
-                                                                                    class="size-4 shrink-0 text-(--theme-accent-text)"
-                                                                                />
-                                                                            {:else}
-                                                                                <Icon
-                                                                                    icon="mdi:crown"
-                                                                                    class="size-4 shrink-0 text-amber-400"
-                                                                                />
-                                                                            {/if}
-                                                                            <span class="truncate flex-1"
-                                                                                >{subChild.name}</span
-                                                                            >
-                                                                        </button>
-                                                                    {/each}
-                                                                </div>
-                                                            {/if}
-                                                        </div>
-                                                    {:else}
-                                                        <button
-                                                            onclick={() =>
-                                                                multiSelect
-                                                                    ? isMultiSelectDisabled(sub.buffSet!.id) ||
-                                                                      toggleMultiSelectId(sub.buffSet!.id)
-                                                                    : (selectedBuffSetId = sub.buffSet!.id)}
-                                                            oncontextmenu={(e) => openItemMenu(e, sub.buffSet!.id)}
-                                                            class={[
-                                                                'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
-                                                                multiSelect && isMultiSelectDisabled(sub.buffSet!.id)
-                                                                    ? 'text-(--theme-modal-text)/30 opacity-50'
-                                                                    : multiSelect
-                                                                      ? multiSelectedIds.has(sub.buffSet!.id)
-                                                                          ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                          : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                                                      : selectedBuffSetId === sub.buffSet!.id
-                                                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                        : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                                            ].join(' ')}
-                                                        >
-                                                            {#if multiSelect}
-                                                                <Icon
-                                                                    icon={isMultiSelectDisabled(sub.buffSet!.id)
-                                                                        ? 'mdi:checkbox-blank-off-outline'
-                                                                        : multiSelectedIds.has(sub.buffSet!.id)
-                                                                          ? 'mdi:checkbox-marked'
-                                                                          : 'mdi:checkbox-blank-outline'}
-                                                                    class="size-4 shrink-0 text-(--theme-accent-text)"
-                                                                />
-                                                            {:else}
-                                                                <Icon
-                                                                    icon="mdi:crown"
-                                                                    class="size-4 shrink-0 text-amber-400"
-                                                                />
-                                                            {/if}
-                                                            <span class="truncate flex-1">{sub.buffSet!.name}</span>
-                                                        </button>
-                                                    {/if}
+                                                        {/if}
+                                                    </div>
                                                 {/each}
-                                            {:else}
+                                                <!-- 无链/阶条件的全局 buff 直接留在全局目录下（数字归并） -->
+                                                {@render buffContainer(item.children, item.prefix!)}
+                                            {:else if isAutoFolder}
                                                 <!-- @desc 非全局容器（角色链 / 武器目录）：先做一级数字前后缀归并（文件夹排在所有条目上方），再挨个列出散条目 -->
-                                                {#each foldersOf(item.children) as sub (sub.key)}
-                                                    {#if sub.type === 'folder'}
-                                                        {@const subKey = 'sub:' + sub.prefix}
-                                                        <div class="space-y-1">
-                                                            <button
-                                                                class="flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-1.5 text-left text-xs text-(--theme-modal-text)/60 transition-all hover:bg-(--theme-modal-text)/5"
-                                                                onclick={() => toggleFolder(subKey)}
-                                                                oncontextmenu={(e) => openFolderMenu(e, sub)}
-                                                            >
-                                                                <Icon
-                                                                    icon={collapsedFolders.has(subKey)
-                                                                        ? 'mdi:folder'
-                                                                        : 'mdi:folder-open'}
-                                                                    class="size-3.5 shrink-0 text-amber-400/70"
-                                                                />
-                                                                <span class="truncate flex-1">{sub.name}</span>
-                                                                <span
-                                                                    class="shrink-0 text-[10px] text-(--theme-modal-text)/30 tabular-nums"
-                                                                    >{(sub.children ?? []).length}</span
-                                                                >
-                                                            </button>
-                                                            {#if !collapsedFolders.has(subKey)}
-                                                                <div
-                                                                    class="ml-3 space-y-1 border-l pl-2"
-                                                                    style="border-color: var(--theme-divider-border);"
-                                                                >
-                                                                    {#each sub.children ?? [] as sc (sc.id)}
-                                                                        <button
-                                                                            data-buffset-id={sc.id}
-                                                                            data-folder-child={sub.prefix}
-                                                                            onclick={() => {
-                                                                                if (multiSelect)
-                                                                                    !isMultiSelectDisabled(sc.id) &&
-                                                                                        toggleMultiSelectId(sc.id)
-                                                                                else selectedBuffSetId = sc.id
-                                                                            }}
-                                                                            oncontextmenu={(e) =>
-                                                                                openItemMenu(e, sc.id)}
-                                                                            class={[
-                                                                                'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-1.5 text-left text-xs transition-all',
-                                                                                multiSelect &&
-                                                                                isMultiSelectDisabled(sc.id)
-                                                                                    ? 'text-(--theme-modal-text)/30 opacity-50'
-                                                                                    : multiSelectedIds.has(sc.id)
-                                                                                      ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                                      : selectedBuffSetId === sc.id
-                                                                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                                        : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                                                            ].join(' ')}
-                                                                        >
-                                                                            {#if multiSelect}
-                                                                                <Icon
-                                                                                    icon={isMultiSelectDisabled(sc.id)
-                                                                                        ? 'mdi:checkbox-blank-off-outline'
-                                                                                        : multiSelectedIds.has(sc.id)
-                                                                                          ? 'mdi:checkbox-marked'
-                                                                                          : 'mdi:checkbox-blank-outline'}
-                                                                                    class="size-4 shrink-0 text-(--theme-accent-text)"
-                                                                                />
-                                                                            {:else}
-                                                                                <Icon
-                                                                                    icon={sc.starred
-                                                                                        ? 'mdi:star'
-                                                                                        : 'mdi:star-outline'}
-                                                                                    class="size-3.5 shrink-0 {sc.starred
-                                                                                        ? 'text-amber-400'
-                                                                                        : 'opacity-30'}"
-                                                                                />
-                                                                            {/if}
-                                                                            <span class="truncate flex-1"
-                                                                                >{sc.name}</span
-                                                                            >
-                                                                        </button>
-                                                                    {/each}
-                                                                </div>
-                                                            {/if}
-                                                        </div>
-                                                    {/if}
-                                                {/each}
-                                                {#each looseChildrenOf(item.children) as child (child.id)}
-                                                    <button
-                                                        data-buffset-id={child.id}
-                                                        data-folder-child={item.prefix}
-                                                        onclick={() => {
-                                                            if (multiSelect) {
-                                                                !isMultiSelectDisabled(child.id) &&
-                                                                    toggleMultiSelectId(child.id)
-                                                            } else {
-                                                                selectedBuffSetId = child.id
-                                                            }
-                                                        }}
-                                                        oncontextmenu={(e) => openItemMenu(e, child.id)}
-                                                        class={[
-                                                            'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
-                                                            multiSelect && isMultiSelectDisabled(child.id)
-                                                                ? 'text-(--theme-modal-text)/30 opacity-50'
-                                                                : multiSelect
-                                                                  ? multiSelectedIds.has(child.id)
-                                                                      ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                      : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                                                  : selectedBuffSetId === child.id
-                                                                    ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                    : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                                        ].join(' ')}
-                                                    >
-                                                        <Icon
-                                                            icon={child.starred ? 'mdi:star' : 'mdi:star-outline'}
-                                                            class="size-3.5 shrink-0 {child.starred
-                                                                ? 'text-amber-400'
-                                                                : 'opacity-30'}"
-                                                        />
-                                                        <span class="truncate flex-1">{child.name}</span>
-                                                    </button>
+                                                {@render buffContainer(item.children, item.prefix!)}
+                                            {:else}
+                                                <!-- @desc 叠层（数字前后缀）目录：children 本身就是同源条目，直接列出 -->
+                                                {#each item.children ?? [] as child (child.id)}
+                                                    {@render buffRow(child, item.prefix!, 'px-3 py-1.5')}
                                                 {/each}
                                             {/if}
                                         </div>
@@ -1724,26 +1468,11 @@
                                         />
                                     {:else}
                                         <Icon
-                                            icon={isGlobal
-                                                ? 'mdi:crown'
-                                                : item.buffSet!.starred
-                                                  ? 'mdi:star'
-                                                  : 'mdi:widgets'}
-                                            class={[
-                                                'size-4 shrink-0',
-                                                !isGlobal && item.buffSet!.starred ? 'text-amber-400' : 'opacity-60',
-                                                isGlobal
-                                                    ? ''
-                                                    : 'drag-handle touch-none select-none cursor-grab active:cursor-grabbing'
-                                            ]
-                                                .filter(Boolean)
-                                                .join(' ')}
+                                            icon={buffItemIcon(item.buffSet!.starred)}
+                                            class={buffItemIconClass(item.buffSet!.starred, !isGlobal)}
                                         />
                                     {/if}
                                     <span class="truncate flex-1">{item.buffSet!.name}</span>
-                                    {#if !isGlobal}
-
-                                    {/if}
                                 </button>
                             {/if}
                         {/each}
@@ -2072,8 +1801,8 @@
                                     </div>
                                 </div>
 
-                                <!-- @desc 生效条件区：折叠面板内配置 共鸣链/精炼/参考角色/伤害属性/伤害类型 -->
-                                <!-- 生效条件 -->
+                                <!-- @desc 链/阶条件区：折叠面板内左侧参考角色（正方形头像框）、右侧链（0-6）/ 阶（0-5）两行（链阶互斥） -->
+                                <!-- 链/阶条件 -->
                                 <div
                                     class="shrink-0 border-b"
                                     style="border-bottom: 1px solid var(--theme-divider-border);"
@@ -2086,112 +1815,38 @@
                                                 ? 'text-(--theme-accent-text)'
                                                 : 'text-(--theme-modal-text)/60'
                                         ].join(' ')}
-                                        title={isDefaultGlobal ? '生效条件（默认全局buff不可配置）' : '生效条件'}
+                                        title={isDefaultGlobal ? '链/阶条件（默认全局buff不可配置）' : '链/阶条件'}
                                     >
                                         <Icon
                                             icon={condPanelOpen ? 'mdi:chevron-down' : 'mdi:chevron-right'}
                                             class="size-4 shrink-0 text-(--theme-modal-text)/40"
                                         />
-                                        <span class="shrink-0 text-xs font-black tracking-tight">生效条件</span>
+                                        <span class="shrink-0 text-xs font-black tracking-tight">链/阶条件</span>
                                         {#if conditionSummary}
                                             <span class="min-w-0 truncate text-[11px]">：{conditionSummary}</span>
                                         {/if}
                                     </button>
                                     {#if condPanelOpen}
-                                        {@const cond = selectedBuffSet.condition ?? {}}
                                         <div
                                             transition:slide|local={{ duration: 200 }}
-                                            class="flex flex-wrap items-center gap-2 px-3 pb-2.5"
+                                            class="flex flex-wrap items-start gap-3 px-3 pb-2.5"
                                         >
-                                            {#if isDefaultGlobal}
-                                                <span class="text-[10px] text-(--theme-modal-text)/35"
-                                                    >默认全局buff无法设置生效条件</span
-                                                >
-                                            {/if}
-                                            <!-- 共鸣链（与阶互斥：设置链会清空阶） -->
-                                            <div class="flex items-center gap-1.5">
-                                                <span
-                                                    class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
-                                                    >共鸣链</span
-                                                >
-                                                <div
-                                                    class="flex overflow-hidden rounded-none border"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    {#each Array.from({ length: 7 }, (_, k) => k) as n}
-                                                        <button
-                                                            onclick={() => setBuffChain(n)}
-                                                            title={currentRefine !== undefined
-                                                                ? '已设置阶条件：链与阶只能生效其一，点击会替换为链条件'
-                                                                : `≥${n}链`}
-                                                            class={[
-                                                                'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                                                currentChain === n
-                                                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                                            ].join(' ')}
-                                                        >
-                                                            {n}
-                                                        </button>
-                                                    {/each}
-                                                </div>
-                                                {#if currentChain !== undefined}
-                                                    <span
-                                                        class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
-                                                        >≥{currentChain}链</span
-                                                    >
-                                                {/if}
-                                            </div>
-                                            <!-- 武器精炼（与链互斥：设置阶会清空链） -->
-                                            <div class="flex items-center gap-1.5">
-                                                <span
-                                                    class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/60"
-                                                    >精炼</span
-                                                >
-                                                <div
-                                                    class="flex overflow-hidden rounded-none border"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    {#each Array.from({ length: 5 }, (_, k) => k + 1) as n}
-                                                        <button
-                                                            onclick={() => setBuffRefinement(n)}
-                                                            title={currentChain !== undefined
-                                                                ? '已设置链条件：链与阶只能生效其一，点击会替换为阶条件'
-                                                                : `≥${n}阶`}
-                                                            class={[
-                                                                'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                                                currentRefine === n
-                                                                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                                            ].join(' ')}
-                                                        >
-                                                            {n}
-                                                        </button>
-                                                    {/each}
-                                                </div>
-                                                {#if currentRefine !== undefined}
-                                                    <span
-                                                        class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
-                                                        >≥{currentRefine}阶</span
-                                                    >
-                                                {/if}
-                                            </div>
-                                            <!-- 参考角色（仅链 / 阶需要） -->
-                                            {#if currentChain !== undefined || currentRefine !== undefined}
-                                                <div class="flex items-center gap-1">
-                                                    <span
-                                                        class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/50"
-                                                        >参考角色</span
-                                                    >
+                                            <!-- 参考角色：三个正方形头像框（未选降饱和/暗化，选中=主题色描边 + 光晕） -->
+                                            <div class="flex flex-col gap-1">
+                                                <span class="text-[10px] text-(--theme-modal-text)/50">参考角色</span>
+                                                <div class="flex items-center gap-1.5">
                                                     {#each team as slot, i}
                                                         <button
                                                             onclick={() => setConditionRef(i)}
                                                             class={[
-                                                                'size-6 rounded-full overflow-hidden border-2 transition-all',
+                                                                'size-8 shrink-0 overflow-hidden border-2 transition-all',
                                                                 condRefIdx === i
                                                                     ? 'border-(--theme-accent-bg)'
                                                                     : 'border-(--theme-divider-border) grayscale opacity-40 hover:opacity-70'
                                                             ].join(' ')}
+                                                            style={condRefIdx === i
+                                                                ? 'box-shadow: 0 0 8px color-mix(in srgb, var(--theme-accent-bg) 55%, transparent);'
+                                                                : ''}
                                                             title={`看 ${slot.character ?? `角色 ${i + 1}`} 的链 / 阶`}
                                                         >
                                                             {#if slot.character && charIconMap[slot.character]}
@@ -2204,26 +1859,72 @@
                                                                 />
                                                             {:else}
                                                                 <span
-                                                                    class="w-full h-full flex items-center justify-center text-[8px] font-medium text-(--theme-modal-text)/50"
+                                                                    class="w-full h-full flex items-center justify-center text-[9px] font-medium text-(--theme-modal-text)/50"
                                                                     >{slot.character?.charAt(0) ?? '?'}</span
                                                                 >
                                                             {/if}
                                                         </button>
                                                     {/each}
                                                 </div>
+                                            </div>
+                                            <!-- 链（上）/ 阶（下）：设置链会清空全部阶，设置阶会清空全部链 -->
+                                            <div class="flex flex-col gap-1">
+                                                <div class="flex items-center gap-1.5">
+                                                    <span
+                                                        class="flex h-6 w-4 shrink-0 items-center text-[10px] text-(--theme-modal-text)/60"
+                                                        >链</span
+                                                    >
+                                                    <div
+                                                        class="flex overflow-hidden rounded-none border"
+                                                        style="border-color: var(--theme-divider-border);"
+                                                    >
+                                                        {#each Array.from({ length: 7 }, (_, k) => k) as n}
+                                                            <button
+                                                                onclick={() => setBuffChain(n)}
+                                                                title={gateOptionTitle('chain', n)}
+                                                                class={[
+                                                                    'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                                                    currentChain === n
+                                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                                ].join(' ')}
+                                                            >
+                                                                {n}
+                                                            </button>
+                                                        {/each}
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-1.5">
+                                                    <span
+                                                        class="flex h-6 w-4 shrink-0 items-center text-[10px] text-(--theme-modal-text)/60"
+                                                        >阶</span
+                                                    >
+                                                    <div
+                                                        class="flex overflow-hidden rounded-none border"
+                                                        style="border-color: var(--theme-divider-border);"
+                                                    >
+                                                        {#each Array.from({ length: 6 }, (_, k) => k) as n}
+                                                            <button
+                                                                onclick={() => setBuffRefinement(n)}
+                                                                title={gateOptionTitle('refinement', n)}
+                                                                class={[
+                                                                    'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
+                                                                    currentRefine === n
+                                                                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
+                                                                        : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
+                                                                ].join(' ')}
+                                                            >
+                                                                {n === 0 ? '本体' : n}
+                                                            </button>
+                                                        {/each}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {#if isDefaultGlobal}
+                                                <span class="text-[10px] text-(--theme-modal-text)/35"
+                                                    >默认全局buff无法设置链/阶条件</span
+                                                >
                                             {/if}
-                                            <span class="text-[10px] text-(--theme-modal-text)/35">
-                                                伤害类型 / 伤害属性条件挂在下面的具体乘区上
-                                            </span>
-                                            <button
-                                                onclick={clearGateConditions}
-                                                disabled={currentChain === undefined && currentRefine === undefined}
-                                                class="flex h-6 items-center gap-1 rounded-none border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500 disabled:pointer-events-none disabled:opacity-30"
-                                                style="border-color: var(--theme-divider-border);"
-                                            >
-                                                <Icon icon="mdi:close-circle-outline" class="size-3" />
-                                                清除链/阶
-                                            </button>
                                         </div>
                                     {/if}
                                 </div>
@@ -2426,10 +2127,16 @@
                                 class="shrink-0 w-1 cursor-col-resize"
                                 style="background: {zoneBarDragging
                                     ? 'var(--theme-accent-bg)'
-                                    : 'color-mix(in srgb, var(--theme-divider-border) 80%, transparent)'};{zoneBarDragging
+                                    : zoneBarHover
+                                      ? 'color-mix(in srgb, var(--theme-accent-bg) 45%, transparent)'
+                                      : 'color-mix(in srgb, var(--theme-divider-border) 80%, transparent)'};{zoneBarDragging
                                     ? ' box-shadow: 0 0 10px color-mix(in srgb, var(--theme-accent-bg) 55%, transparent);'
-                                    : ''}"
-                                title="拖动调整乘区栏宽度"
+                                    : zoneBarHover
+                                      ? ' box-shadow: 0 0 8px color-mix(in srgb, var(--theme-accent-bg) 30%, transparent);'
+                                      : ''}"
+                                title="拖拽调整宽度"
+                                onmouseenter={() => (zoneBarHover = true)}
+                                onmouseleave={() => (zoneBarHover = false)}
                                 onpointerdown={zoneBarHandleDown}
                             ></div>
                             <div class="shrink-0 border-l flex flex-col" style="width: {zoneBarWidth}px;">
@@ -2901,8 +2608,8 @@
                 批量重命名文件夹
             </h3>
             <p class="text-xs text-(--theme-modal-text)/60 mb-3">
-                「{folderRenameTarget.name}」内的 <strong>{folderRenameTarget.children!.length}</strong> 条 BUFF 将按 「新前缀
-                + 序号 + 新后缀」重新编号
+                「{folderRenameTarget.name}」内的 <strong>{folderMembersOf(folderRenameTarget).length}</strong> 条 BUFF 将按
+                「新前缀 + 序号 + 新后缀」重新编号
             </p>
             <div class="flex items-center gap-2 mb-1">
                 <input
@@ -2925,7 +2632,7 @@
                 class="theme-scrollbar max-h-28 overflow-y-auto mb-3 rounded-none border p-2 text-[11px] text-(--theme-modal-text)/50"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
-                {#each folderRenameTarget.children! as child, i (child.id)}
+                {#each folderMembersOf(folderRenameTarget) as child, i (child.id)}
                     <div class="flex items-center gap-1 py-0.5">
                         <span class="line-through text-(--theme-modal-text)/30">{child.name}</span>
                         <Icon icon="mdi:arrow-right" class="size-3 shrink-0" />
@@ -3052,3 +2759,165 @@
 />
 
 <BuffImportModal open={showImport} {team} onclose={() => (showImport = false)} />
+
+<!-- @desc ── 列表复用部件：最低一层 buff 条目 / 容器内容（数字目录 + 散条目）/ 二级（链·武器）目录头 ── -->
+
+{#snippet buffRow(child: BuffSet, containerKey: string, rowPad: string)}
+    <button
+        data-buffset-id={child.id}
+        data-folder-child={containerKey}
+        onclick={() => {
+            if (multiSelect) !isMultiSelectDisabled(child.id) && toggleMultiSelectId(child.id)
+            else selectedBuffSetId = child.id
+        }}
+        oncontextmenu={(e) => openItemMenu(e, child.id)}
+        class={[
+            `flex w-full min-w-0 items-center gap-2 rounded-none ${rowPad} text-left text-xs transition-all`,
+            multiSelect && isMultiSelectDisabled(child.id)
+                ? 'text-(--theme-modal-text)/30 opacity-50'
+                : (multiSelect ? multiSelectedIds.has(child.id) : selectedBuffSetId === child.id)
+                  ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                  : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
+        ].join(' ')}
+    >
+        {#if multiSelect}
+            <Icon
+                icon={isMultiSelectDisabled(child.id)
+                    ? 'mdi:checkbox-blank-off-outline'
+                    : multiSelectedIds.has(child.id)
+                      ? 'mdi:checkbox-marked'
+                      : 'mdi:checkbox-blank-outline'}
+                class="size-4 shrink-0 text-(--theme-accent-text)"
+            />
+        {:else}
+            <Icon icon={buffItemIcon(child.starred)} class={buffItemIconClass(child.starred)} />
+        {/if}
+        <span class="truncate flex-1">{child.name}</span>
+    </button>
+{/snippet}
+
+{#snippet buffContainer(children: BuffSet[] | undefined, containerKey: string)}
+    {#each foldersOf(children) as sub (sub.key)}
+        {@const subKey = layeredKeyOf(containerKey, sub.prefix)}
+        <div class="space-y-1">
+            <button
+                class={[
+                    'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-1.5 text-left text-xs transition-all',
+                    multiSelect && folderAllSelected(sub.children ?? [])
+                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                        : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5'
+                ].join(' ')}
+                onclick={() => (multiSelect ? toggleMultiSelectFolder(sub.children ?? []) : toggleFolder(subKey))}
+                oncontextmenu={multiSelect ? undefined : (e) => openFolderMenu(e, sub)}
+            >
+                {#if multiSelect}
+                    <Icon
+                        icon={folderAllSelected(sub.children ?? [])
+                            ? 'mdi:checkbox-marked'
+                            : 'mdi:checkbox-blank-outline'}
+                        class="size-3.5 shrink-0 text-(--theme-accent-text)"
+                    />
+                {:else}
+                    <Icon
+                        icon={collapsedFolders.has(subKey) ? 'mdi:folder' : 'mdi:folder-open'}
+                        class="size-3.5 shrink-0 text-amber-400/70"
+                    />
+                {/if}
+                <span class="truncate flex-1">{sub.name}</span>
+                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/30 tabular-nums"
+                    >{(sub.children ?? []).length}</span
+                >
+            </button>
+            {#if !collapsedFolders.has(subKey)}
+                <div class="ml-3 space-y-1 border-l pl-2" style="border-color: var(--theme-divider-border);">
+                    {#each sub.children ?? [] as sc (sc.id)}
+                        {@render buffRow(sc, containerKey, 'px-3 py-1.5')}
+                    {/each}
+                </div>
+            {/if}
+        </div>
+    {/each}
+    {#each looseChildrenOf(children) as child (child.id)}
+        {@render buffRow(child, containerKey, 'px-3 py-2')}
+    {/each}
+{/snippet}
+
+{#snippet gateFolderHead(node: BuffTreeNode, stickyTop: string)}
+    {@const members = folderMembersOf(node)}
+    <div
+        class={[
+            'flex min-w-0 items-center gap-1',
+            !collapsedFolders.has(node.prefix!)
+                ? `sticky ${stickyTop} z-10 -mx-2 border-b border-(--theme-divider-border) px-2 py-1 bg-(--theme-modal-bg)`
+                : ''
+        ].join(' ')}
+    >
+        <button
+            data-folder-prefix={node.prefix}
+            onclick={() => (multiSelect ? toggleMultiSelectFolder(members) : toggleFolder(node.prefix!))}
+            oncontextmenu={multiSelect ? undefined : (e) => openFolderMenu(e, node)}
+            class={[
+                'flex min-w-0 flex-1 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
+                multiSelect && folderAllSelected(members)
+                    ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                    : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5'
+            ].join(' ')}
+            transition:slide={{ duration: 200 }}
+        >
+            {#if multiSelect}
+                <Icon
+                    icon={folderAllSelected(members) ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline'}
+                    class="size-4 shrink-0 text-(--theme-accent-text)"
+                />
+            {:else if node.charIdx !== undefined && teamIconOf(node.charIdx)}
+                <!-- @desc 二级目录：角色图标 + 角标（链目录=链门槛角标；武器目录=当前装配武器图标） -->
+                <span class="relative shrink-0">
+                    <img
+                        src={teamIconOf(node.charIdx)}
+                        alt=""
+                        draggable="false"
+                        class="size-4 rounded-full object-cover"
+                    />
+                    {#if node.gateKind === 'weapon'}
+                        {#if weaponIconOf(node.charIdx)}
+                            <img
+                                src={weaponIconOf(node.charIdx)}
+                                alt=""
+                                draggable="false"
+                                class="absolute -bottom-0.5 -right-1 size-3 rounded-sm border object-cover"
+                                style="border-color: var(--theme-modal-bg);"
+                            />
+                        {/if}
+                    {:else}
+                        <span
+                            class="absolute -bottom-1 -right-1 flex h-3 min-w-3 items-center justify-center px-0.5 text-[8px] font-black leading-none"
+                            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                            >{node.gateMin ?? 0}</span
+                        >
+                    {/if}
+                </span>
+            {:else}
+                <Icon
+                    icon={collapsedFolders.has(node.prefix!) ? 'mdi:folder-account-outline' : 'mdi:folder-account'}
+                    class="size-4 shrink-0 text-(--theme-accent-text)/70"
+                />
+            {/if}
+            <span class="truncate flex-1">{node.name}</span>
+            <span
+                class="shrink-0 text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
+                title="按 Buff 的链/阶硬性条件自动归类（改条件即换目录），因此目录本身不可拖动">自动</span
+            >
+        </button>
+        {#if !multiSelect}
+            <button
+                type="button"
+                class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/10 hover:text-(--theme-modal-text)"
+                title="文件夹操作"
+                onclick={(e) => openFolderMenu(e, node)}
+                oncontextmenu={(e) => openFolderMenu(e, node)}
+            >
+                <Icon icon="mdi:dots-horizontal" class="size-4" />
+            </button>
+        {/if}
+    </div>
+{/snippet}

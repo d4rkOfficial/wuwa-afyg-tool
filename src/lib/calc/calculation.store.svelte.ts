@@ -570,15 +570,24 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
             if (z.override) zone.override = true
             zones.push(zone)
         }
+        const owner = item.ownerIdx ?? ownerIdx
+        /**
+         * @desc 来源是某个角色的 buff（有归属角色槽位）且本身没有链/阶条件时，
+         * 条件补成「角色 ≥ 0 阶」—— **0 阶表示本体**（未精炼武器），
+         * 这样条目既保留了「挂在谁的武器上」的归属（左侧列表按「角色名的武器名」归档），
+         * 又不会因为精炼档位把本体效果挡掉。
+         */
+        const baseCondition = normalizeCondition(item.condition, 'buff', owner)
+        const hasGate = (baseCondition.chains?.length ?? 0) > 0 || (baseCondition.refinements?.length ?? 0) > 0
+        const condition =
+            owner >= 0 && !hasGate ? { ...baseCondition, refinements: [{ charIdx: owner, min: 0 }] } : baseCondition
         const buffSet: BuffSet = {
             id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name,
             zones,
-            scope: mapImportedScope(item.scope, item.ownerIdx ?? ownerIdx, teamSize),
-            ...(item.condition ? { condition: { ...item.condition } } : {}),
-            ...(item.condition && (item.ownerIdx ?? ownerIdx) >= 0
-                ? { conditionRefCharIdx: item.ownerIdx ?? ownerIdx }
-                : {})
+            scope: mapImportedScope(item.scope, owner, teamSize),
+            ...(isConditionEmpty(condition) ? {} : { condition }),
+            ...(owner >= 0 && !isConditionEmpty(condition) ? { conditionRefCharIdx: owner } : {})
         }
         fresh.push(buffSet)
     }
