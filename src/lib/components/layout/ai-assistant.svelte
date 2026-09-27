@@ -12,7 +12,7 @@
     import { cancelActiveDrags } from '$lib/utils/drag-guard'
     import { marked } from 'marked'
     import { getOpenPanelsSummary } from '../../ai/panels.svelte'
-    import { DeepSeekError, type ChatMessage } from '../../ai/client'
+    import { AiClientError, type ChatMessage } from '../../ai/client'
     import {
         describeTurnPhase,
         getLastTurnSummary,
@@ -373,7 +373,7 @@
                 }
             })
         } catch (e) {
-            const isAborted = e instanceof DeepSeekError && e.debug === 'aborted'
+            const isAborted = e instanceof AiClientError && e.debug === 'aborted'
             if (!isAborted) {
                 last().text =
                     (last().text ? last().text + '\n' : '') + `⚠ ${e instanceof Error ? e.message : 'AI 请求失败'}`

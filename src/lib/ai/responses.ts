@@ -1,6 +1,6 @@
 // DeepSeek Responses API 流式客户端：原生服务端 web_search + 函数工具（仅 DeepSeek 官方 / deepseek-v4-flash 支持）
 // 协议差异：POST /responses、items 消息结构、reasoning.effort、max_output_tokens、SSE 事件带 type 字段、无 [DONE]
-import { DeepSeekError } from './client'
+import { AiClientError } from './client'
 
 const TIMEOUT_MS = 240000
 const MAX_OUTPUT_TOKENS = 65536
@@ -87,7 +87,7 @@ function parseErrorPayload(payload: unknown): string {
 
 export async function responsesStream(options: ResponsesStreamOptions): Promise<ResponsesStreamResult> {
     const { apiKey, model, baseUrl, input, signal } = options
-    if (!apiKey.trim()) throw new DeepSeekError('未配置 AI API Key', 'no-key')
+    if (!apiKey.trim()) throw new AiClientError('未配置 AI API Key', 'no-key')
 
     const body: Record<string, unknown> = {
         model,
@@ -115,10 +115,10 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
     } catch (e) {
         const err = e instanceof Error ? e.message : String(e)
         if (err.includes('AbortError') || err.includes('TimeoutError')) {
-            if (signal?.aborted) throw new DeepSeekError('已停止生成', 'aborted')
-            throw new DeepSeekError('AI 请求超时', '请求超时，请重试或换模型')
+            if (signal?.aborted) throw new AiClientError('已停止生成', 'aborted')
+            throw new AiClientError('AI 请求超时', '请求超时，请重试或换模型')
         }
-        throw new DeepSeekError(`无法连接 AI 服务（${base}）：${err}`, err)
+        throw new AiClientError(`无法连接 AI 服务（${base}）：${err}`, err)
     }
 
     if (!res.ok) {
@@ -129,10 +129,10 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
         } catch {
             /* ignore */
         }
-        throw new DeepSeekError(`AI 接口错误（HTTP ${res.status}）：${detail || res.statusText}`, `HTTP ${res.status}`)
+        throw new AiClientError(`AI 接口错误（HTTP ${res.status}）：${detail || res.statusText}`, `HTTP ${res.status}`)
     }
 
-    if (!res.body) throw new DeepSeekError('AI 响应无 body', '响应无 body')
+    if (!res.body) throw new AiClientError('AI 响应无 body', '响应无 body')
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -222,7 +222,7 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
                     }
                     case 'response.failed': {
                         const errPayload = (chunk.response as { error?: unknown }) ?? chunk
-                        throw new DeepSeekError(`AI 流错误：${parseErrorPayload(errPayload) || '生成失败'}`, payload)
+                        throw new AiClientError(`AI 流错误：${parseErrorPayload(errPayload) || '生成失败'}`, payload)
                     }
                     default:
                         break
@@ -230,9 +230,9 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
             }
         }
     } catch (e) {
-        if (e instanceof DeepSeekError) throw e
+        if (e instanceof AiClientError) throw e
         const err = e instanceof Error ? e.message : String(e)
-        throw new DeepSeekError(`读取流失败：${err}`, err)
+        throw new AiClientError(`读取流失败：${err}`, err)
     }
 
     // 以 response.completed 的 output 为准组装 items（兜底：用事件累积的数据）
