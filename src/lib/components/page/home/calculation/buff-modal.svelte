@@ -38,6 +38,7 @@
     import type { ZoneRef, BuffSet, BuffCondition } from '$lib/calc/calculation.types'
     import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { getCharIconMap, elementColor, getLocked } from '$lib/calc/timeline.store.svelte'
+    import { getWeaponIcons } from '$lib/api/data-cache'
     import { addToast } from '$lib/data/toast.svelte'
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import Icon from '@iconify/svelte'
@@ -1137,11 +1138,22 @@
     }
 
     let teamNames = $derived(team.map((s) => s.character ?? '?'))
-    /** @desc 队伍槽位头像（二级「角色名X链 / 角色名的武器X阶」目录用） */
+    /** @desc 队伍槽位头像（二级「角色名X链」目录用） */
     const teamIconOf = (idx: number): string | undefined => {
         const name = team[idx]?.character
         return name ? charIconMap[name] : undefined
     }
+    /** @desc 队伍槽位当前装配武器的图标（二级「角色名的武器名」目录用） */
+    const weaponIconOf = (idx: number | undefined): string | undefined => {
+        if (idx === undefined) return undefined
+        const weapon = team[idx]?.weapon
+        return weapon ? weaponIcons[weapon] : undefined
+    }
+    /** @desc 武器图标表（按需加载，失败静默；角色详情/队伍配置共用同一份数据） */
+    let weaponIcons = $state<Record<string, string>>({})
+    $effect(() => {
+        void getWeaponIcons().then((map) => (weaponIcons = map))
+    })
 </script>
 
 <!-- @desc BUFF 配置弹窗根容器：遮罩 + 主卡片（标题栏/左侧列表/右侧编辑器/底部保存） -->
@@ -1262,7 +1274,15 @@
                                                     class="size-4 shrink-0 text-(--theme-accent-text)"
                                                 />
                                             {:else}
-                                                {#if isAutoFolder && item.charIdx !== undefined && teamIconOf(item.charIdx)}
+                                                {#if isAutoFolder && item.gateKind === 'weapon' && weaponIconOf(item.charIdx)}
+                                                    <!-- @desc 武器目录：用角色当前装配武器的图标 -->
+                                                    <img
+                                                        src={weaponIconOf(item.charIdx)}
+                                                        alt=""
+                                                        draggable="false"
+                                                        class="size-4 shrink-0 rounded-sm object-cover"
+                                                    />
+                                                {:else if isAutoFolder && item.charIdx !== undefined && teamIconOf(item.charIdx)}
                                                     <img
                                                         src={teamIconOf(item.charIdx)}
                                                         alt=""

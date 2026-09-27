@@ -27,6 +27,8 @@ export interface BuffTreeNode extends GroupedBuffSetItem {
     folderKind?: 'global' | 'char-gate' | 'layered'
     /** @desc 角色链阶目录的归属角色槽位（渲染头像用） */
     charIdx?: number
+    /** @desc 二级目录种类：链条件目录（角色头像）/ 武器条件目录（当前装配武器图标） */
+    gateKind?: 'chain' | 'weapon'
     /** @desc 所属父容器 key（拖拽「同父重排」判定用） */
     parentKey: string
     /** @desc 目录下的全部 Buff id（含嵌套数字目录，按展示顺序） */
@@ -83,7 +85,10 @@ export const buildBuffTree = (
     const globalSet = new Set(globalIds)
     const globals: BuffInstance[] = []
     /** @desc 二级目录 key → 成员（**只按链条件归目录**；无链条件的走 __top__ 平铺） */
-    const buckets = new Map<string, { title: string; charIdx?: number; items: BuffInstance[] }>()
+    const buckets = new Map<
+        string,
+        { title: string; charIdx?: number; gateKind?: 'chain' | 'weapon'; items: BuffInstance[] }
+    >()
     const bucketOrder: string[] = []
 
     for (const buff of buffSets) {
@@ -99,6 +104,7 @@ export const buildBuffTree = (
             bucket = {
                 title: gate ? gateFolderOf(gate, team).title : '',
                 charIdx: gate?.charIdx,
+                gateKind: gate?.kind === 'chain' ? 'chain' : 'weapon',
                 items: []
             }
             buckets.set(key, bucket)
@@ -159,6 +165,7 @@ export const buildBuffTree = (
             suffixText: '',
             folderKind: 'char-gate',
             charIdx: bucket.charIdx,
+            gateKind: bucket.gateKind,
             parentKey: '__root__',
             memberIds: bucket.items.map((b) => b.id),
             children: bucket.items
