@@ -400,12 +400,12 @@
         <div class="flex items-center justify-center py-20 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
     {:else}
         <!-- Summary：总伤害卡（较实的主题色底）+ 各角色卡（角色属性色 + 头像叠底）+ 数据分析方形按钮 -->
-        <div class="shrink-0 border-b px-5 py-4" style="border-color: var(--theme-divider-border);">
+        <div class="shrink-0 border-b pl-3 pr-5 py-4" style="border-color: var(--theme-divider-border);">
             <div class="flex items-stretch gap-3">
                 <div class="flex flex-1 flex-wrap items-stretch gap-3">
                     <div
                         class={`${CARD} ${CARD_PAD} min-w-48 flex-1`}
-                        style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 26%, var(--theme-card-bg)), color-mix(in srgb, var(--theme-accent-bg) 14%, var(--theme-card-bg))); border-color: color-mix(in srgb, var(--theme-accent-bg) 34%, transparent);"
+                        style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, var(--theme-card-bg)), color-mix(in srgb, var(--theme-accent-bg) 8%, var(--theme-card-bg))); border-color: color-mix(in srgb, var(--theme-accent-bg) 24%, transparent);"
                     >
                         <div class="text-base font-black tracking-tight text-(--theme-modal-text)">总伤害</div>
                         <div class={`mt-1.5 ${STAT_VALUE_LG} text-(--theme-accent-text)`}>
@@ -420,19 +420,9 @@
                         <div
                             class={`${CARD} ${CARD_PAD} relative min-w-40 flex-1 overflow-hidden`}
                             style={isOther
-                                ? 'background: color-mix(in srgb, var(--theme-modal-text) 8%, var(--theme-input-bg)); border-color: var(--theme-divider-border);'
-                                : `background: color-mix(in srgb, ${elementColor} 16%, var(--theme-input-bg)); border-color: color-mix(in srgb, ${elementColor} 32%, transparent);`}
+                                ? 'background: color-mix(in srgb, var(--theme-modal-text) 4%, var(--theme-input-bg)); border-color: var(--theme-divider-border);'
+                                : `background: color-mix(in srgb, ${elementColor} 10%, var(--theme-input-bg)); border-color: color-mix(in srgb, ${elementColor} 22%, transparent);`}
                         >
-                            {#if !isOther && charIcons[cs.character]}
-                                <!-- @desc 角色头像叠底（半透明背景层，不参与点击与阅读） -->
-                                <img
-                                    src={charIcons[cs.character]}
-                                    alt=""
-                                    aria-hidden="true"
-                                    draggable="false"
-                                    class="pointer-events-none absolute -bottom-2 -right-2 h-24 w-24 object-contain opacity-25"
-                                />
-                            {/if}
                             <div class="relative flex min-w-0 items-center gap-1.5">
                                 <span class={SWATCH_DOT} style="background: {elementColor};"></span>
                                 <span class="truncate text-sm font-black" style="color: {elementColor};">
@@ -442,17 +432,27 @@
                             <div class={`relative mt-1.5 ${STAT_VALUE_SM} text-(--theme-modal-text)`}>
                                 {Math.round(cs.totalDamage).toLocaleString()}
                             </div>
+                            {#if !isOther && charIcons[cs.character]}
+                                <!-- @desc 角色头像叠在顶层（75% 不透明，右下半区，不拦截交互） -->
+                                <img
+                                    src={charIcons[cs.character]}
+                                    alt=""
+                                    aria-hidden="true"
+                                    draggable="false"
+                                    class="pointer-events-none absolute -bottom-3 -right-3 h-28 w-28 object-contain opacity-75"
+                                />
+                            {/if}
                         </div>
                     {/each}
                 </div>
-                <!-- @desc 数据分析入口：与左侧卡片组等高，宽高相同 → 正方形 -->
+                <!-- @desc 数据分析入口：固定正方形（宽高同为 88px），图标在上、文字在下 -->
                 <button
                     onclick={handleOpenAnalysis}
-                    class="flex aspect-square shrink-0 self-stretch flex-col items-center justify-center gap-1 rounded-none border transition-colors hover:opacity-80"
-                    style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
+                    class="flex h-[88px] w-[88px] shrink-0 self-center flex-col items-center justify-center gap-1 rounded-none border transition-colors hover:opacity-80"
+                    style="background: color-mix(in srgb, var(--theme-accent-bg) 10%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
                     title="打开数据分析"
                 >
-                    <Icon icon="mdi:chart-box-outline" class="size-[42%] min-h-6 shrink-0" />
+                    <Icon icon="mdi:chart-box-outline" class="size-8 shrink-0" />
                     <span class="text-[11px] font-black tracking-tight">数据分析</span>
                 </button>
             </div>

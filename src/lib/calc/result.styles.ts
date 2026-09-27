@@ -16,8 +16,8 @@
 /** @desc 共享样式类（Tailwind class 字符串，仅允许字面量以便构建期扫描） */
 export type StyleToken = string
 
-/** @desc 结果页「×倍率」这类需要回落默认无衬线字体的数值行内联样式 */
-export const NUMERIC_FONT_STYLE = 'font-family: ui-sans-serif, system-ui, sans-serif;'
+/** @desc 结果页「×倍率」这类数值行内联样式：数字用放芯数（FangXinShu），缺失时回落到无衬线 */
+export const NUMERIC_FONT_STYLE = "font-family: 'FangXinShu', ui-sans-serif, system-ui, sans-serif;"
 
 // ── 卡片容器 ──────────────────────────────────────────────────────────
 /** @desc 卡片外框：直角 + 分隔线边框（底色由使用处的 `style` 指定） */
