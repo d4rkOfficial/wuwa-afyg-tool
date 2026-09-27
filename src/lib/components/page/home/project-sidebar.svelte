@@ -247,12 +247,9 @@
                         e.stopPropagation()
                         onToggleSidebarLookup?.()
                     }}
-                    data-sf="widget"
-                    data-sf-flat
                     class="rounded-none p-1 transition-colors hover:bg-(--theme-sidebar-text)/5 {sidebarLookupOpen
                         ? 'text-(--theme-accent-text)'
                         : 'text-(--theme-sidebar-text)/40 hover:text-(--theme-sidebar-text)/70'}"
-                    style="--sf-base: var(--theme-input-bg)"
                     title="速查"
                 >
                     <Icon icon="mdi:book-search-outline" class="size-4" />
@@ -263,10 +260,7 @@
                     e.stopPropagation()
                     onToggleSidebarWidth?.()
                 }}
-                data-sf="widget"
-                data-sf-flat
                 class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-(--theme-sidebar-text)/5"
-                style="--sf-base: var(--theme-input-bg)"
                 title={sidebarWide ? '收窄侧栏' : '展宽侧栏'}
             >
                 <Icon icon={sidebarWide ? 'mdi:arrow-collapse' : 'mdi:arrow-expand'} class="size-4" />
@@ -280,10 +274,7 @@
                         addToast(`已切换至「${t?.name ?? next}」`, 'success')
                     })
                 }}
-                data-sf="widget"
-                data-sf-flat
                 class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-(--theme-sidebar-text)/5"
-                style="--sf-base: var(--theme-input-bg)"
                 title="切换明暗主题"
             >
                 <Icon icon="mdi:theme-light-dark" class="size-4" />

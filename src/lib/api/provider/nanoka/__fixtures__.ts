@@ -75,7 +75,34 @@ export const characterDetail: ZhCharacterDetail = {
         '5': { '80': { life: 9000, atk: 300, def: 400 }, '90': { life: 9500, atk: 320, def: 420 } },
         '6': { '90': { life: 10000, atk: 340, def: 440 } }
     },
-    tag: { tune: { name: '震谐响应', desc: '', icon: '', color: '' } },
+    // 角色定位标签：忌炎真实的 3 条（主力输出/重击伤害/牵引）+ 1 条真实「震谐响应」样本
+    // （震谐响应用于覆盖 tuneBreakBoost 的 hasTune 分支；真实数据里它属于莫宁等角色）
+    tag: {
+        '2': {
+            name: '主力输出',
+            desc: '拥有较强的输出能力',
+            icon: '/Game/Aki/UI/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelA2.SP_RoleLabelA2',
+            color: 'ff8441'
+        },
+        '5': {
+            name: '重击伤害',
+            desc: '重击伤害较高',
+            icon: '/Game/Aki/UI/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelB2.SP_RoleLabelB2',
+            color: 'ffde73'
+        },
+        '8': {
+            name: '牵引',
+            desc: '可以将一定范围内的目标牵引至特定位置',
+            icon: '/Game/Aki/UI/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelC1.SP_RoleLabelC1',
+            color: '77adff'
+        },
+        '33': {
+            name: '震谐响应',
+            desc: '可以对目标造成震谐伤害',
+            icon: '/Game/Aki/UI/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelI2.SP_RoleLabelI2',
+            color: 'ff7777'
+        }
+    },
     skill_trees: {
         n1: skillTreeLeaf({
             node_type: 1,

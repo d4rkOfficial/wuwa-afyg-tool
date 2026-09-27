@@ -6,6 +6,7 @@ import { ASSET_BASE } from './consts'
 import { ELEMENT_MAP, WEAPON_TYPE_MAP, COST_MAP } from '$lib/consts/game-terms'
 import type {
     Character,
+    CharacterTag,
     Weapon,
     Echo,
     EchoSetItem,
@@ -23,6 +24,7 @@ import type {
     NanokaEcho,
     NanokaSonata,
     ZhCharacterDetail,
+    ZhCharacterTag,
     ZhWeaponDetail,
     ZhEchoDetail,
     ZhSonataDetail,
@@ -385,11 +387,29 @@ function transformCharacterInfoCommon(data: ZhCharacterDetail, rich: boolean): C
         rarity: data.rarity as 4 | 5,
         element: elementName,
         weaponType: (WEAPON_TYPE_MAP[data.weapon] ?? '') as '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪',
+        tags: transformCharacterTags(data.tag),
         lv90BaseStats: baseStats,
         skills,
         statNodes,
         chains
     }
+}
+
+/**
+ * @desc 角色定位标签归一化：按 id 升序（JS 对整数型 key 本就按升序枚举，这里显式排序以防手写 JSON 乱序）、
+ * 域名去空白、color 补上 CSS 需要的 `#`、icon 转成可直接渲染的 CDN URL；无名标签丢弃。
+ */
+export function transformCharacterTags(raw: Record<string, ZhCharacterTag> | undefined): CharacterTag[] {
+    return Object.entries(raw ?? {})
+        .filter(([, t]) => (t?.name ?? '').trim() !== '')
+        .map(([id, t]) => ({
+            id,
+            name: t.name.trim(),
+            desc: (t.desc ?? '').trim(),
+            color: /^[0-9a-f]{6}$/i.test(t.color ?? '') ? `#${t.color}` : '',
+            icon: ueToCdn(t.icon ?? '')
+        }))
+        .sort((a, b) => Number(a.id) - Number(b.id))
 }
 
 export function transformWeaponInfo(data: ZhWeaponDetail): WeaponInfo {

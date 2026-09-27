@@ -16,7 +16,7 @@
         slots: EchoSlotConfig[]
         /** @desc 标准14词条卡片（显示来源角标、图标不同） */
         standard?: boolean
-        /** @desc 标准方案的来源角标：工坊 / 本地自定义 / 自动生成 */
+        /** @desc 标准方案的来源角标：自动14词 / 工坊14词 / 修正14词 */
         origin?: string
         expanded?: boolean
         onexpand?: () => void

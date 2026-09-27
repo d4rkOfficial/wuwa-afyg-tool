@@ -716,7 +716,7 @@
                                     >
                                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                                         <div
-                                            data-sf="card"
+                                            data-sf="widget"
                                             data-sf-flat
                                             class="flex items-center gap-1 h-full rounded-none {getEditingBlockId() ===
                                             block.id
@@ -726,7 +726,7 @@
                                             isSelected
                                                 ? 'var(--theme-accent-bg)'
                                                 : 'var(--theme-divider-border)'};{isHighlighted || isSelected
-                                                ? ' background: color-mix(in srgb, var(--theme-accent-bg) 12%, color-mix(in srgb, var(--theme-timeline-bg) 80%, transparent)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);'
+                                                ? ' background: color-mix(in srgb, var(--theme-accent-bg) 12%, var(--sf-mix, transparent)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);'
                                                 : ''}"
                                             use:measureWidth={block.id}
                                         >

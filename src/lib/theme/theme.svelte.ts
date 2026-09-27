@@ -18,16 +18,19 @@ import lightPreset from './preset/light.json'
 const ACTIVE_KEY = 'theme-active'
 const OVERRIDES_KEY = 'theme-overrides'
 
+/** @desc 用户未选过昼夜主题时的默认主题（白天） */
+const DEFAULT_ACTIVE_ID = 'light'
+
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
-/** @desc 五类区域兜底外观（= 黑夜默认；仅用于缺项回落与旧数据归一化） */
+/** @desc 六类区域兜底外观（= 黑夜默认；仅用于缺项回落与旧数据归一化） */
 export const DEFAULT_SURFACES: Record<SurfaceKey, SurfaceStyle> = {
-    card: { opacity: 20, blur: 5, depth: 5 },
+    card: { opacity: 20, blur: 0, depth: 5 },
     modal: { opacity: 40, blur: 32, depth: 100 },
-    sidebar: { opacity: 0, blur: 32, depth: 0 },
+    sidebar: { opacity: 40, blur: 0, depth: 0 },
     content: { opacity: 0, blur: 0, depth: 0 },
     toolbar: { opacity: 0, blur: 0, depth: 0 },
-    widget: { opacity: 20, blur: 5, depth: 5 }
+    widget: { opacity: 20, blur: 32, depth: 100 }
 }
 
 /** @desc 首次进入时的默认外观（昼夜各一份）：白天更通透、黑夜更沉浸 */
@@ -36,24 +39,24 @@ export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
         bgImageBlur: 0,
         bgImageMask: 200,
         surfaces: {
-            card: { opacity: 20, blur: 5, depth: 5 },
-            modal: { opacity: 40, blur: 32, depth: 0 },
-            sidebar: { opacity: 60, blur: 0, depth: 0 },
-            content: { opacity: 0, blur: 0, depth: 0 },
-            toolbar: { opacity: 0, blur: 0, depth: 0 },
-            widget: { opacity: 20, blur: 5, depth: 5 }
+            card: { opacity: 0, blur: 0, depth: 0 },
+            modal: { opacity: 40, blur: 32, depth: 100 },
+            sidebar: { opacity: 40, blur: 0, depth: 12 },
+            content: { opacity: 40, blur: 0, depth: 0 },
+            toolbar: { opacity: 20, blur: 32, depth: 0 },
+            widget: { opacity: 20, blur: 32, depth: 0 }
         }
     },
     dark: {
         bgImageBlur: 0,
         bgImageMask: -100,
         surfaces: {
-            card: { opacity: 20, blur: 5, depth: 5 },
+            card: { opacity: 20, blur: 0, depth: 5 },
             modal: { opacity: 40, blur: 32, depth: 100 },
-            sidebar: { opacity: 0, blur: 32, depth: 0 },
+            sidebar: { opacity: 40, blur: 0, depth: 0 },
             content: { opacity: 0, blur: 0, depth: 0 },
             toolbar: { opacity: 0, blur: 0, depth: 0 },
-            widget: { opacity: 20, blur: 5, depth: 5 }
+            widget: { opacity: 20, blur: 32, depth: 100 }
         }
     }
 }
@@ -63,7 +66,7 @@ const DEFAULT_OVERRIDES: ThemeOverrides = {
     backgroundImage: '',
     backgroundImageLight: '',
     appearance: structuredClone(DEFAULT_APPEARANCE),
-    neonText: 0
+    neonText: 1
 }
 
 /**
@@ -336,7 +339,7 @@ function applyBgBlend(root: HTMLElement) {
               : 'transparent'
     root.style.setProperty('--theme-bg-mask', maskValue)
 
-    // ── 五类区域：透明度 / 毛玻璃强度 / 背景深度（由 layout.css 的 [data-sf] 规则消费）──
+    // ── 六类区域：透明度 / 毛玻璃强度 / 背景深度（由 layout.css 的 [data-sf] 规则消费）──
     for (const key of SURFACE_KEYS) {
         const style = appearance.surfaces[key] ?? DEFAULT_APPEARANCE[activeMode()].surfaces[key]
         const depth = clamp(style.depth, 0, 100)
@@ -401,11 +404,9 @@ export async function loadThemes() {
     themes = structuredClone(PRESETS)
 
     const activeSaved = await dbGet<string>(ACTIVE_KEY)
-    if (activeSaved && themes.find((t) => t.id === activeSaved.data)) {
-        activeId = activeSaved.data
-    } else {
-        activeId = themes[0]?.id ?? ''
-    }
+    const savedId = activeSaved && themes.find((t) => t.id === activeSaved.data) ? activeSaved.data : null
+    // 用户没选过主题时回落到默认昼夜（白天，与内置默认外观一致）；选过之后一律按保存值
+    activeId = savedId ?? themes.find((t) => t.id === DEFAULT_ACTIVE_ID)?.id ?? themes[0]?.id ?? ''
 
     const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
     if (ov) {

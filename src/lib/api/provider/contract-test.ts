@@ -74,6 +74,16 @@ export function runContractTests(provider: DataProvider): void {
             assert.ok(Array.isArray(info.skills), 'skills array')
             assert.ok(Array.isArray(info.statNodes), 'statNodes array')
             assert.ok(Array.isArray(info.chains), 'chains array')
+            assert.ok(Array.isArray(info.tags), 'tags array')
+            for (const t of info.tags) {
+                assert.ok(isNonEmptyString(t.id), 'tag id')
+                assert.ok(isNonEmptyString(t.name), 'tag name')
+                assert.equal(typeof t.desc, 'string')
+                assert.equal(typeof t.color, 'string')
+                assert.equal(typeof t.icon, 'string')
+                // 有图标时必须是可直接渲染的 URL
+                if (t.icon) assert.ok(/^(https?:|\/)/.test(t.icon), `tag icon looks like a URL: ${t.icon}`)
+            }
             for (const s of info.skills) {
                 assert.ok(isNonEmptyString(s.name), 'skill name')
                 assert.ok(Array.isArray(s.values), 'skill values')

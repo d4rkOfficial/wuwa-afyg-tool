@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **117** 个工具。
+> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **143** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
@@ -27,6 +27,53 @@ AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注
 - `remove_op_block`
 - `format_timeline`
 - `remove_ref_line`
+
+## AI 助手自身（上下文 / 用量 / 运行情况）
+
+### `get_ai_context_state`
+
+读取 AI 助手的**上下文管理器**状态：本轮装配进请求的各分段（人设 / 被动技能 / 主动技能 / 工程上下文 / 变更队列 / 历史 / 用户输入）的字符数、估算 token 与占用比例，以及哪些分段被临时禁用。首轮请求前快照为空（hasSnapshot=false）。返回的 id 可直接传给 set_ai_context_segment 临时禁用或恢复。
+
+_无参数_
+
+### `set_ai_context_segment`
+
+临时启用 / 禁用 AI 上下文的某一个分段（只影响当前会话后续请求，不持久化，刷新即恢复）。segmentId 取自 get_ai_context_state 返回的 availableSegmentIds：persona（人设）/ passiveSkills（被动技能）/ activeSkills（主动技能清单）/ context（工程上下文）/ changes（变更队列）/ history（对话历史）/ user（用户输入）。enabled=false 即把该段从后续请求里剔除（用于压缩上下文、排障）；enabled=true 恢复注入。返回切换后的禁用清单。
+
+| 参数        | 必填   | 类型    | 说明                                        |
+| ----------- | ------ | ------- | ------------------------------------------- |
+| `segmentId` | **是** | string  |                                             |
+| `enabled`   | 否     | boolean | true=恢复注入，false=临时禁用（默认 false） |
+
+### `reset_ai_context_segments`
+
+恢复全部被临时禁用的 AI 上下文分段（把所有分段重新纳入后续请求）。只影响当前会话，不动持久化配置。
+
+_无参数_
+
+### `clear_ai_context_snapshot`
+
+清空 AI 上下文的分段**快照**（下一次请求前上下文面板显示空态）。用于排障或强制下一轮重建上下文快照；不会清空对话历史（对话历史由界面上的「清空对话历史」按钮处理），也不动用量的会话累计。
+
+_无参数_
+
+### `get_ai_usage`
+
+读取 AI 助手的 **token 与缓存命中用量**：本轮（turn）合计、本会话（session）累计，含 prompt / completion / total token、缓存命中与未命中 token、缓存命中率、请求数与其中「无服务商 usage、走本地估算回退」的请求数。字段缺失时返回 null（界面显示「—」，绝不臆造），estimatedRequests>0 说明有请求是本地估算值，不能当计费依据。
+
+_无参数_
+
+### `get_ai_turn_state`
+
+读取 AI 助手的**实时运行情况**：是否正在请求、当前阶段（思考中 / 收到流式文本 / 正在调用工具 / 等待工具结果 / 空闲）、已耗时、当前工具名与补充说明，以及本轮已发生的工具调用列表（名称 / 参数 / 耗时 / 成败 / 结果梗概）。用于自检卡在哪一步或复盘本轮调用了哪些工具。
+
+_无参数_
+
+### `get_share_cooldown`
+
+读取工程「分享」的 10 分钟频率限制状态：是否处于冷却中、剩余毫秒与 mm:ss 文案、冷却时长常量。分享本身是上传+本地导出动作，需用户在工程侧边栏右键发起（AI/WS 不代发），本工具只用于告知用户还要等多久。
+
+_无参数_
 
 ## Buff 生成
 
@@ -58,13 +105,13 @@ AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注
 
 ### `get_naming_rule`
 
-获取当前已保存的 Buff 命名规则（用户自定义）。返回空字符串表示尚未定义，生成前需要先询问用户。
+获取当前的 Buff 命名规则（即内置技能卡「Buff 命名规则」的正文，用户可自行编辑）。返回空字符串表示该技能已禁用或正文被清空，生成前需要先询问用户。
 
 _无参数_
 
 ### `set_naming_rule`
 
-保存用户自定义的 Buff 命名规则（由用户从零定义，无预设风格，可能包含格式示例/简写习惯等）。保存后生成 Buff 会自动遵守。
+保存用户自定义的 Buff 命名规则：写入内置技能卡「Buff 命名规则」的正文（由用户从零定义，无预设风格，可能包含格式示例/简写习惯等）并启用它。保存后生成 Buff 会自动遵守。
 
 | 参数   | 必填   | 类型   | 说明                       |
 | ------ | ------ | ------ | -------------------------- |
@@ -76,11 +123,11 @@ _无参数_
 
 为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地集（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。
 
-| 参数         | 必填   | 类型   | 说明                                 |
-| ------------ | ------ | ------ | ------------------------------------ |
-| `entityType` | **是** | string | 实体类型                             |
-| `entityName` | **是** | string | 实体名称（中文）                     |
-| `namingRule` | 否     | string | 可选：用户新定义的命名规则（会记住） |
+| 参数         | 必填   | 类型   | 说明                                                            |
+| ------------ | ------ | ------ | --------------------------------------------------------------- |
+| `entityType` | **是** | string | 实体类型                                                        |
+| `entityName` | **是** | string | 实体名称（中文）                                                |
+| `namingRule` | 否     | string | 可选：用户新定义的命名规则（会写入内置技能卡「Buff 命名规则」） |
 
 ### `generate_project_buffs`
 
@@ -88,11 +135,11 @@ _无参数_
 
 为当前工程队伍中的实体（角色/武器/首位声骸/触发套装）逐个生成 Buff 集并导入当前工程拉表（含归属绑定）。该工具会自动查询各实体官方详情并提取 Buff，无需先调用其它查询工具。默认遍历全队，可用 slot（1-3）或 entityType 过滤。生成前若未定义命名规则会先询问用户。
 
-| 参数         | 必填 | 类型   | 说明                                 |
-| ------------ | ---- | ------ | ------------------------------------ |
-| `slot`       | 否   | number | 可选：只处理该槽位（1-3）            |
-| `entityType` | 否   | string | 可选：只处理该实体类型               |
-| `namingRule` | 否   | string | 可选：用户新定义的命名规则（会记住） |
+| 参数         | 必填 | 类型   | 说明                                                            |
+| ------------ | ---- | ------ | --------------------------------------------------------------- |
+| `slot`       | 否   | number | 可选：只处理该槽位（1-3）                                       |
+| `entityType` | 否   | string | 可选：只处理该实体类型                                          |
+| `namingRule` | 否   | string | 可选：用户新定义的命名规则（会写入内置技能卡「Buff 命名规则」） |
 
 ## Buff 集
 
@@ -279,7 +326,7 @@ _无参数_
 
 ### `get_buff_set_detail`
 
-获取指定 Buff 集的完整详情：作用范围、是否全局、生效条件、每个乘区（zoneId/数值/是否覆盖/引用）及其生效角色槽位。
+获取指定 Buff 集的完整详情：作用范围、是否全局、生效条件（链/阶硬门槛 + 属性/类型条件）、每个乘区条目（zoneId/数值/是否覆盖/引用/**各自的乘区级条件**）及其生效角色槽位。同一乘区可有多条，每条各自判定条件后相加；覆盖唯一（同一乘区仅一个覆盖条目）。
 
 | 参数 | 必填   | 类型   | 说明                             |
 | ---- | ------ | ------ | -------------------------------- |
@@ -287,35 +334,62 @@ _无参数_
 
 ### `set_buff_zone`
 
-设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/finalDmg/dmgTakenInc/specialFinal1/specialFinal2/extraRatio。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）。
+设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/finalDmg/dmgTakenInc/specialFinal1/specialFinal2/extraRatio。旧 id customFinalDmg/customFinalDmgMul 会被自动重映射为 specialFinal1/specialFinal2（返回值里用 remappedFrom/remapNote 标注）。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）；同一 Buff 内每个乘区只允许一个覆盖条目，开启时落在该乘区第一条、其余条目自动取消覆盖。
 
-| 参数       | 必填   | 类型    | 说明                             |
-| ---------- | ------ | ------- | -------------------------------- |
-| `setId`    | **是** | string  | Buff 集 id                       |
-| `zoneId`   | **是** | string  | 乘区 id                          |
-| `value`    | **是** | number  | 数值                             |
-| `override` | 否     | boolean | 可选，是否覆盖其它 Buff 的同乘区 |
+| 参数       | 必填   | 类型    | 说明                               |
+| ---------- | ------ | ------- | ---------------------------------- |
+| `setId`    | **是** | string  | Buff 集 id                         |
+| `zoneId`   | **是** | string  | 乘区 id（接受旧 id，会自动重映射） |
+| `value`    | **是** | number  | 数值                               |
+| `override` | 否     | boolean | 可选，是否覆盖其它 Buff 的同乘区   |
 
 ### `set_buff_zone_ref`
 
-设置 Buff 集内指定乘区的引用（跟随某角色的属性按百分比折算），ref 为 null 时清除引用。ref 结构：{"targetZoneId":"引用目标","pct":百分比,"characterIdx":槽位 1-3,"threshold":阈值,"lower"/"upper"/"discrete"/"divisor"/"multiplier"可选}。targetZoneId 可选：baseAtk/totalAtk/baseHp/totalHp/baseDef/totalDef/recharge/tuneBreakBoost/offTuneBuildupRate/critRate/critDmg。
+设置 Buff 集内指定乘区的引用（跟随某角色的属性按百分比折算），ref 为 null 时清除引用。ref 结构：{"targetZoneId":"引用目标","pct":百分比,"characterIdx":槽位 1-3,"threshold":阈值,"lower"/"upper"/"discrete"/"divisor"/"multiplier"可选}。targetZoneId 可选：baseAtk/totalAtk/baseHp/totalHp/baseDef/totalDef/recharge/tuneBreakBoost/offTuneBuildupRate/critRate/critDmg。乘区 id 接受旧 id（customFinalDmg/customFinalDmgMul 会自动重映射）。**跨角色影响源**：引用他角色面板（characterIdx 与目标角色不同）后，作用域指向该角色的 Buff 必须用 bind_buff_to_entry 勾到本段才会参与面板计算，可用 get_buff_set_detail 或 get_damage_entry_buff_sources 查影响源清单。
 
-| 参数     | 必填   | 类型   | 说明                 |
-| -------- | ------ | ------ | -------------------- |
-| `setId`  | **是** | string |                      |
-| `zoneId` | **是** | string | 乘区 id              |
-| `ref`    | 否     | object | 引用定义或 null 清除 |
+| 参数     | 必填   | 类型   | 说明                               |
+| -------- | ------ | ------ | ---------------------------------- |
+| `setId`  | **是** | string |                                    |
+| `zoneId` | **是** | string | 乘区 id（接受旧 id，会自动重映射） |
+| `ref`    | 否     | object | 引用定义或 null 清除               |
 
 ### `remove_buff_zone`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-从 Buff 集中删除指定乘区（不可恢复）。
+从 Buff 集中删除指定乘区（不可恢复；同一乘区的多条贡献条目会全部删除）。乘区 id 接受旧 id（customFinalDmg/customFinalDmgMul 会自动重映射）。
 
-| 参数     | 必填   | 类型   | 说明 |
-| -------- | ------ | ------ | ---- |
-| `setId`  | **是** | string |      |
-| `zoneId` | **是** | string |      |
+| 参数     | 必填   | 类型   | 说明                               |
+| -------- | ------ | ------ | ---------------------------------- |
+| `setId`  | **是** | string |                                    |
+| `zoneId` | **是** | string | 乘区 id（接受旧 id，会自动重映射） |
+
+### `get_buff_zone_condition`
+
+读取某 Buff 集内指定乘区的**乘区级生效条件**（伤害属性 / 伤害类型；类内「或」）。只读取，不修改。同一乘区有多条贡献条目时返回第一条的条件，完整逐条清单请用 get_buff_set_detail。
+
+| 参数     | 必填   | 类型   | 说明                               |
+| -------- | ------ | ------ | ---------------------------------- |
+| `setId`  | **是** | string | Buff 集 id                         |
+| `zoneId` | **是** | string | 乘区 id（接受旧 id，会自动重映射） |
+
+### `set_buff_zone_condition`
+
+设置某 Buff 集内指定乘区的**乘区级生效条件**，传 null 清除。只接受 elements（伤害属性）与 damageTypes（伤害类型）两类，可只给其中一类；condition 对象形如 {"elements":["冷凝","热熔"],"damageTypes":["普攻伤害","重击伤害"]}。取值边界：属性取自 game-terms 的 ELEMENTS、伤害类型取自 DAMAGE_TYPES（见参数说明里的完整可选值）。判定口径为**类内「或」、类间「与」**——同类多选任一命中即满足，两类都给了则必须同时满足。链条件（chains）与阶条件（refinements）是整个 Buff 的硬门槛，不允许挂到乘区上（传了会被忽略并回传 strippedKeys），请用 set_buff_condition 设置。生效效果：不满足时仅该乘区不计入，同一条目的其它乘区照常生效。
+
+| 参数        | 必填   | 类型   | 说明                                                  |
+| ----------- | ------ | ------ | ----------------------------------------------------- |
+| `setId`     | **是** | string | Buff 集 id                                            |
+| `zoneId`    | **是** | string | 乘区 id（接受旧 id，会自动重映射）                    |
+| `condition` | 否     | object | 乘区级条件（只认 elements/damageTypes），或 null 清除 |
+
+### `get_damage_entry_buff_sources`
+
+查询某伤害条目的**跨角色影响源**：本段引用了其它角色的面板（乘区 ref 里 characterIdx 指向他角色）时，作用域指向那个角色、且会改写被引用面板乘区的 Buff —— 这些 Buff 必须用 bind_buff_to_entry 勾到本段才会参与该角色在这一段的面板计算（拉表里它们以「影响源」列/勾选项出现，不是自动生效的）。返回 buffId → { 被引用角色槽位, 被改写的面板乘区 }。
+
+| 参数      | 必填   | 类型   | 说明                                   |
+| --------- | ------ | ------ | -------------------------------------- |
+| `entryId` | **是** | string | 伤害条目 id（get_damage_entries 获取） |
 
 ### `set_buff_scope`
 
@@ -334,6 +408,24 @@ _无参数_
 | ----------- | ------ | ------ | -------------------- |
 | `setId`     | **是** | string |                      |
 | `condition` | 否     | object | 条件定义或 null 清除 |
+
+### `get_table_history`
+
+读取拉表（表格）撤销/重做历史状态：是否可撤销、是否可重做。拉表历史与排轴历史相互独立——本工具只看表格，排轴用 get_timeline_summary 配合 undo_timeline/redo_timeline。
+
+_无参数_
+
+### `undo_table`
+
+撤销上一次**拉表（表格）**变更（Buff 集增删改、条目↔Buff 绑定、伤害类型勾选等）。只回退表格，不动排轴与词条；排轴请用 undo_timeline。没有可撤销的操作时 ok=false 并给出原因（不会静默成功）。
+
+_无参数_
+
+### `redo_table`
+
+重做上一次被撤销的**拉表（表格）**变更。只影响表格，不动排轴与词条；排轴请用 redo_timeline。没有可重做的操作时 ok=false 并给出原因。
+
+_无参数_
 
 ## 配装
 
@@ -416,7 +508,7 @@ _无参数_
 | `element` | **是** | string |      |
 | `value`   | **是** | number |      |
 
-## kuro
+## 库街区
 
 ### `get_kuro_state`
 
@@ -571,24 +663,6 @@ _无参数_
 
 _无参数_
 
-## registry.test
-
-### `__dup_test`
-
-第一版
-
-| 参数 | 必填 | 类型   | 说明 |
-| ---- | ---- | ------ | ---- |
-| `a`  | 否   | string |      |
-
-### `__dup_test`
-
-第二版
-
-| 参数 | 必填 | 类型   | 说明 |
-| ---- | ---- | ------ | ---- |
-| `b`  | 否   | string |      |
-
 ## 结果
 
 ### `get_result_summary`
@@ -621,7 +695,7 @@ _无参数_
 
 ### `set_setting`
 
-修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"\|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card\|modal\|sidebar\|content\|toolbar", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"\|"dark"}，按昼夜分别保存)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。
+修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"\|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card\|modal\|sidebar\|content\|toolbar\|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"\|"dark"}，按昼夜分别保存；widget=小部件，覆盖侧栏列表项、配队页角色/武器/首位声骸/触发套装四张 picker 卡、排轴操作块、词条 4c/3c/1c 与词条卡、怪物属性/抗性/免伤输入框等小控件与其小按钮)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。
 
 | 参数    | 必填   | 类型     | 说明                           |
 | ------- | ------ | -------- | ------------------------------ |
@@ -697,23 +771,23 @@ _无参数_
 
 _无参数_
 
-## skills
+## 技能卡
 
 ### `list_skills`
 
-列出用户的技能卡（名称 + 一句话描述 + 是否启用）。技能卡是用户预置的操作规范，任务匹配时用 use_skill 激活其正文。
+列出用户的技能卡（名称 + 类型 + 一句话描述 + 是否启用）。主动技能在任务匹配时用 use_skill 激活其正文；被动技能已常驻生效，正文已在系统提示中，无需激活。
 
 _无参数_
 
 ### `use_skill`
 
-激活一张技能卡：返回该技能的完整正文，之后请严格按正文中的规范继续处理当前任务。名称必须来自技能清单。
+激活一张**主动**技能卡：返回该技能的完整正文，之后请严格按正文中的规范继续处理当前任务。名称必须来自技能清单（被动技能无需激活，其正文已常驻生效）。
 
 | 参数   | 必填   | 类型   | 说明                               |
 | ------ | ------ | ------ | ---------------------------------- |
 | `name` | **是** | string | 技能名（来自技能清单，需完全一致） |
 
-## substat-library
+## 词条集（方案）
 
 ### `list_substat_plans`
 
@@ -810,6 +884,14 @@ _无参数_
 获取可用的队伍配置数据：角色（元素/武器类型）、武器（类型/星级）、声骸（cost/所属套装）、套装（支持件数）。设置队伍前先调用以获取准确名称。
 
 _无参数_
+
+### `get_recommended_weapons`
+
+获取某角色的推荐武器（官方推荐顺序，首项通常为最优）。为队伍角色挑武器、或需要了解某角色常用武器时调用；返回的武器名可直接传给 set_team_weapon。
+
+| 参数            | 必填   | 类型   | 说明                                         |
+| --------------- | ------ | ------ | -------------------------------------------- |
+| `characterName` | **是** | string | 角色名称（中文，可用 get_team_catalog 查询） |
 
 ### `set_team_character`
 
@@ -1045,35 +1127,125 @@ _无参数_
 | ------------ | ------ | ------ | -------- |
 | `entityType` | **是** | string | 实体类型 |
 
+### `search_entities`
+
+按关键词模糊搜索实体名称（支持角色/武器/声骸/套装任意类型）。实体很多时用它定位准确名称，再调用 get_entity_info。
+
+| 参数         | 必填   | 类型   | 说明                               |
+| ------------ | ------ | ------ | ---------------------------------- |
+| `query`      | **是** | string | 搜索关键词（中文片段）             |
+| `entityType` | 否     | string | 实体类型（可选，不填则搜全部类型） |
+
+### `get_entity_info`
+
+获取单个实体的官方信息（角色技能/武器效果/声骸技能/套装加成等），用于提取增益 Buff。返回精简后的 JSON。
+
+| 参数         | 必填   | 类型   | 说明             |
+| ------------ | ------ | ------ | ---------------- |
+| `entityType` | **是** | string |                  |
+| `entityName` | **是** | string | 实体名称（中文） |
+
+### `get_character_terms`
+
+按需获取某角色的结构化术语速查：效果名【】、触发关键词（Highlight）、术语链接，以及每条技能/共鸣链（俗称命座）/固有去标签后的纯文本摘要。用于识别 buff 名称的触发来源与归属、以及判定元素/效果。
+
+| 参数         | 必填   | 类型   | 说明             |
+| ------------ | ------ | ------ | ---------------- |
+| `entityName` | **是** | string | 角色名称（中文） |
+
+### `get_buff_sets`
+
+查询已收录的 Buff 集（本地 Buff 集或当前工程拉表）。可按实体类型/实体名精确过滤，或用 query 模糊搜索实体名或 buff 名。返回现有 buff 的 buff_name/scope/exclusive/乘区数值，用于对比、去重或核对。
+
+| 参数         | 必填 | 类型   | 说明                       |
+| ------------ | ---- | ------ | -------------------------- |
+| `entityType` | 否   | string | 实体类型（可选）           |
+| `entityName` | 否   | string | 实体名称（可选，精确匹配） |
+| `query`      | 否   | string | 模糊搜索关键词（可选）     |
+
+### `get_editing_context`
+
+获取当前正在生成的实体：实体类型、实体名，以及该实体已收录的全部 Buff（用于了解现状、避免重复）。
+
+_无参数_
+
+### `diff_buffs`
+
+将你拟定的 buff 列表与已收录的 buff 做差异对比，返回「新增/需修改/重复/可删除」清单。用于精准增改、避免与已有内容冲突。
+
+| 参数         | 必填   | 类型   | 说明                           |
+| ------------ | ------ | ------ | ------------------------------ |
+| `entityType` | 否     | string | 实体类型（可选，默认当前实体） |
+| `entityName` | 否     | string | 实体名称（可选，默认当前实体） |
+| `buffs`      | **是** | array  | 拟定的 buff 列表               |
+
+### `get_zone`
+
+获取某个乘区（zoneId）的说明（含义/单位/判定提示），用于确认该增益应归入哪个乘区。
+
+| 参数     | 必填   | 类型   | 说明                      |
+| -------- | ------ | ------ | ------------------------- |
+| `zoneId` | **是** | string | 乘区 id（乘区或引用乘区） |
+
+### `get_effects`
+
+获取游戏内六种"效应"的说明（光噪/霜渐/聚爆/电磁/风蚀/虚湮），以及效应专属 buff 的映射规则。
+
+_无参数_
+
+### `get_scope_rules`
+
+获取受影响者（scope）的取值与判定细则（self/self_except/team/effect_only）。
+
+_无参数_
+
+### `get_condition_rules`
+
+获取 Buff 生效条件（condition）的取值与判定细则（角色共鸣链 chain / 武器精炼 refinement / 伤害属性 elements / 伤害类型 damageTypes，多字段可并存）。当某增益确实存在共鸣链/精炼门槛或属性/类型限定时调用。
+
+_无参数_
+
+### `get_ref_rules`
+
+获取引用乘区（ref）的转模字段规则（threshold 阈值 / 线性 pct / 离散 discrete+divisor+multiplier / lower、upper 上下限 / refOwner）。当增益数值按"某属性百分比"、"每 X 转 Y"、"超过 X 的部分"、"最高/至少"等规则换算时调用。
+
+_无参数_
+
+### `get_slang_dict`
+
+获取黑话词典（官方/生僻叫法 → 玩家黑话），用于 buff 命名优化。
+
+_无参数_
+
+### `get_naming_rules`
+
+获取当前 Buff 命名规则（用户自定义规则或默认要求，含叠层/精炼拆分硬性要求）。开始命名前调用。
+
+_无参数_
+
+### `get_examples`
+
+获取 few-shot 示例（声骸套装/武器叠层/角色引用属性的输入输出对照），用于理解格式与判定。
+
+_无参数_
+
 ## 附录：AI 不可修改的设置
 
 以下设置不允许 AI/WS 修改（调用 `set_setting` 会报错并提示手动调整）：
 
-- 按键图标（设置 → 按键图标）
-- 界面快捷键（设置 → 交互相关 → 界面快捷键）
-- 归档管理（设置 → 归档管理）
-- 缓存清理（设置 → 缓存清理）
-- 助手设置（启用开关、危险操作权限、AI 配置文件、提示词、黑话词典）
-- 自定义主题的创建/删除（设置 → 外观主题，仅支持明暗切换/主色调/背景与质感参数）
+- 自定义主题的创建 / 删除（设置 → 外观主题；仅支持明暗切换与主色调）
 - 背景图本地文件上传（AI 仅可设置远程 URL / data:image 数据 / 清除）
+- 磁力光标的跟手性 / 灵敏度 / 旋转 / 描边 / 晃动参数（已固定，调用静默忽略）
 
-### `set_setting` 白名单一览
+以下设置虽不可直接用 `set_setting`，但有专用工具，**可以**由 AI/WS 修改：
 
-| key                        | 说明              | 取值                                                                                                                                       |
-| -------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `theme_mode`               | 明暗模式          | dark / light                                                                                                                               |
-| `theme_accent_hue`         | 主色调            | default(青色) / orange(橘红) / orangeyellow(橘黄) / magenta(品红) / cyan(青色别名) / indigo(靛蓝) / green(墨绿) / mono(黑白) 或 0-360 整数 |
-| `theme_background_image`   | 背景图            | http(s):// 地址 / data:image 数据 / 空串清除                                                                                               |
-| `theme_bg_opacity`         | 卡片透明度        | 30-100                                                                                                                                     |
-| `theme_bg_blur`            | 毛玻璃强度        | 0-32                                                                                                                                       |
-| `theme_bg_dim`             | 背景暗度          | 0-100                                                                                                                                      |
-| `theme_bg_image_blur`      | 背景图模糊        | 0-32                                                                                                                                       |
-| `theme_bg_image_mask`      | 背景图遮罩        | 0-100                                                                                                                                      |
-| `calc_view`                | 拉表视图          | dropdown / spread                                                                                                                          |
-| `simplify_toolbar`         | 简化底部工具栏    | true / false                                                                                                                               |
-| `magnetic_pointer`         | 磁力光标          | true / false                                                                                                                               |
-| `gpu_accel`                | 渲染加速（GPU）   | true / false                                                                                                                               |
-| `reload_on_result_refresh` | 刷新结果重载数据  | true / false                                                                                                                               |
-| `reload_on_profile_change` | 链/阶变动重载数据 | true / false                                                                                                                               |
+- 按键图标 → `get_keymap` / `set_keymap_entry`
+- 界面快捷键 → `get_shortcuts` / `set_shortcut`
+- 归档管理 → `archive_project` / `unarchive_project` / `delete_project`
+- 缓存清理 → `set_setting` key=`clear_cache`（或 `get_cache_counts` 只读）
+- 助手设置（启用开关 / 危险操作权限 / 人设提示词）→ `set_setting`
+- AI 配置文件 → `get_ai_profiles` / `manage_ai_profile`
+- 工坊实例 → `get_settings_state` / `manage_workshop`
+- AI 上下文分段 / 用量 / 运行情况 → `get_ai_context_state` / `set_ai_context_segment` 等
 
-工坊实例管理请使用 `manage_workshop`（action：switch / add / remove / reset）。
+> 完整 key 白名单以 `set_setting` 的工具描述为准（`get_settings_state` 会回传 `modifiableKeys` 实时清单）。

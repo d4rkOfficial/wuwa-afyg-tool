@@ -293,7 +293,7 @@
             {@const charData = characterMap.get(slot.character ?? '')}
             {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
-                data-sf="widget"
+                data-sf="card"
                 data-sf-flat
                 class="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border p-6"
                 style="border-color: var(--theme-divider-border)"
@@ -327,13 +327,16 @@
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
+                                data-sf="widget"
+                                data-sf-flat
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--sf-mix,var(--theme-input-bg)))]!',
                                     slot.character
-                                        ? 'border-(--theme-divider-border) bg-(--theme-input-bg)'
+                                        ? 'border-(--theme-divider-border)'
                                         : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'border-dashed border-(--theme-card-border)' : ''
                                 ].join(' ')}
+                                style="--sf-base: var(--theme-input-bg)"
                                 onclick={() => openPicker(i, 'character')}
                             >
                                 <span class="picker-badge">角色</span>
@@ -389,15 +392,18 @@
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
+                                data-sf="widget"
+                                data-sf-flat
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--sf-mix,var(--theme-input-bg)))]!',
                                     slot.weapon
-                                        ? 'border-(--theme-divider-border) bg-(--theme-input-bg)'
+                                        ? 'border-(--theme-divider-border)'
                                         : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                                 ]
                                     .filter(Boolean)
                                     .join(' ')}
+                                style="--sf-base: var(--theme-input-bg)"
                                 onclick={() => openPicker(i, 'weapon')}
                             >
                                 <span class="picker-badge">武器</span>
@@ -439,15 +445,18 @@
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
+                                data-sf="widget"
+                                data-sf-flat
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]',
+                                    'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--sf-mix,var(--theme-input-bg)))]!',
                                     slot.echoes[0].name
-                                        ? 'border-(--theme-divider-border) bg-(--theme-input-bg)'
+                                        ? 'border-(--theme-divider-border)'
                                         : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                                 ]
                                     .filter(Boolean)
                                     .join(' ')}
+                                style="--sf-base: var(--theme-input-bg)"
                                 onclick={() => openPicker(i, 'echo')}
                             >
                                 <span class="picker-badge">首位声骸</span>
@@ -480,15 +489,18 @@
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
+                                data-sf="widget"
+                                data-sf-flat
                                 class={[
-                                    'relative flex flex-1 cursor-pointer items-center gap-2 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]',
+                                    'relative flex flex-1 cursor-pointer items-center gap-2 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--sf-mix,var(--theme-input-bg)))]!',
                                     slot.triggerSets.length > 0
-                                        ? 'border-(--theme-divider-border) bg-(--theme-input-bg)'
+                                        ? 'border-(--theme-divider-border)'
                                         : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
                                 ]
                                     .filter(Boolean)
                                     .join(' ')}
+                                style="--sf-base: var(--theme-input-bg)"
                                 onclick={() => openPicker(i, 'sets')}
                             >
                                 <span class="picker-badge">触发套装</span>

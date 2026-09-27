@@ -24,7 +24,9 @@ export default tseslint.config(
             'static/**',
             '**/*.min.js',
             'research/**',
-            '.eslint-report.json'
+            '.eslint-report.json',
+            // 临时草稿（与 .gitignore 的 .tmp* 一致，如 .tmp-compute.ts 之类的导出 dump）
+            '**/.tmp*'
         ]
     },
 

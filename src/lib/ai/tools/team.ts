@@ -1,8 +1,14 @@
 // 队伍域写入工具（Phase 1 补全）：设置槽位角色/武器/首位声骸/触发套装，校验逻辑与 UI 选择器一致
 import { defineTool } from './registry'
 import { getActiveProject, updateTeam, isPhaseReadonly } from '$lib/data/project.svelte'
-import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$lib/api/data-cache'
-import type { Character } from '$lib/api/types'
+import {
+    getCharacterList,
+    getWeaponList,
+    getEchoList,
+    getEchoSetList,
+    getRecommendedWeapons
+} from '$lib/api/data-cache'
+import type { Character, Weapon } from '$lib/api/types'
 import type { CharSlot, EchoSlot, SelectedSet } from '$lib/types/project'
 import { HECATE_ECHO } from '$lib/consts/game-terms'
 
@@ -72,6 +78,43 @@ defineTool('get_team_catalog', {
             weapons: weapons.map((w) => ({ name: w.name, weaponType: w.weaponType, star: w.star })),
             echoes: echoes.map((e) => ({ name: e.name, cost: e.cost, sets: e.sets })),
             echoSets: echoSets.map((s) => ({ name: s.name, pieces: s.pieces }))
+        }
+    }
+})
+
+defineTool('get_recommended_weapons', {
+    description:
+        '获取某角色的推荐武器（官方推荐顺序，首项通常为最优）。为队伍角色挑武器、或需要了解某角色常用武器时调用；返回的武器名可直接传给 set_team_weapon。',
+    parameters: {
+        type: 'object',
+        properties: {
+            characterName: { type: 'string', description: '角色名称（中文，可用 get_team_catalog 查询）' }
+        },
+        required: ['characterName']
+    },
+    handler: async (args) => {
+        const characterName = str(args.characterName)
+        if (!characterName) throw new Error('角色名不能为空')
+        let names: string[]
+        try {
+            names = await getRecommendedWeapons(characterName)
+        } catch (e) {
+            if (/404/.test(String(e))) throw new Error(`未找到角色「${characterName}」，请用 get_team_catalog 确认名称`)
+            throw e
+        }
+        // 附带武器类型 / 星级：便于判断能否装给该角色（武器列表已有缓存，取不到时降级为纯名称）
+        const weapons = await getWeaponList().catch(() => [] as Weapon[])
+        const byName = new Map(weapons.map((w) => [w.name, w]))
+        return {
+            characterName,
+            count: names.length,
+            weapons: names.map((name, index) => ({
+                name,
+                rank: index + 1,
+                weaponType: byName.get(name)?.weaponType ?? null,
+                star: byName.get(name)?.star ?? null
+            })),
+            hint: names.length ? '按推荐顺序排列，rank=1 通常为最优' : '该角色暂无官方推荐武器数据'
         }
     }
 })

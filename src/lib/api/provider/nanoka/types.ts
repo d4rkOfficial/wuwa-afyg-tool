@@ -72,6 +72,14 @@ export interface ZhSkillTreeNode {
     }
 }
 
+/** @desc 角色定位标签；color 为不带 # 的 6 位 hex，icon 为 UE 资源路径（Atlas 下每标签一张独立小图） */
+export interface ZhCharacterTag {
+    name: string
+    desc: string
+    icon: string
+    color: string
+}
+
 export interface ZhCharacterDetail {
     id: number
     rarity: number
@@ -81,7 +89,7 @@ export interface ZhCharacterDetail {
     desc: string
     icon: string
     stats: Record<string, Record<string, { life: number; atk: number; def: number }>>
-    tag: Record<string, { name: string; desc: string; icon: string; color: string }>
+    tag: Record<string, ZhCharacterTag>
     skill_trees: Record<string, ZhSkillTreeNode>
     chains: Record<
         string,

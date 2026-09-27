@@ -11,7 +11,7 @@
     } from '$lib/api/data-cache'
     import { richTextToHtml, colorizeNumbers } from '$lib/utils/rich-text'
     import { ELEMENT_COLORS } from '$lib/consts/game-terms'
-    import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
+    import type { CharacterInfo, CharacterTag, WeaponInfo } from '$lib/api/types'
     import type { CharSlot } from '$lib/types/project'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
@@ -68,6 +68,10 @@
 
     let charNames = $derived(team.map((s) => s.character).filter((c): c is string => c !== null))
     let currentSlot = $derived(team[charIndex])
+    /** @desc 角色定位标签（v3 角色详情带回；老缓存里没有该字段时兜底为空） */
+    let charTags = $derived(charData?.tags ?? [])
+    /** @desc 标签色：上游缺色时回落到当前文字色，保证边框/底色/图标三处取色一致 */
+    const tagColor = (tag: CharacterTag): string => tag.color || 'currentColor'
     /** @desc 固有技能（名字不以「提升」结尾）与固有属性（以「提升」结尾，按名称+数值排序） */
     let inherentSkills = $derived(charData?.statNodes.filter((n) => !n.name.endsWith('提升')) ?? [])
     let statAttrs = $derived(charData?.statNodes.filter((n) => n.name.endsWith('提升')) ?? [])
@@ -356,6 +360,42 @@
                                 >{/if}
                         </div>
                     </div>
+                    <!-- @desc 角色标签区：上游定位标签（主力输出/快速协奏…）；图标是白色蒙版，用标签色上色 -->
+                    {#if charTags.length > 0}
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:tag-multiple-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">角色标签</h3>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                {#each charTags as tag (tag.id)}
+                                    <span
+                                        class="inline-flex items-center gap-1.5 rounded-none border px-2 py-1 text-[11px] font-black"
+                                        style="border-color: color-mix(in srgb, {tagColor(
+                                            tag
+                                        )} 45%, transparent); background: color-mix(in srgb, {tagColor(
+                                            tag
+                                        )} 12%, transparent); color: {tagColor(tag)};"
+                                        title={tag.desc || tag.name}
+                                    >
+                                        {#if tag.icon}
+                                            <span
+                                                class="size-3.5 shrink-0"
+                                                style="-webkit-mask: url('{tag.icon}') center / contain no-repeat; mask: url('{tag.icon}') center / contain no-repeat; background-color: {tagColor(
+                                                    tag
+                                                )};"
+                                            ></span>
+                                        {/if}
+                                        {tag.name}
+                                    </span>
+                                {/each}
+                            </div>
+                        </section>
+                    {/if}
                     <!-- @desc 基础属性区：Lv90 生命/攻击/防御/谐度破坏增幅 -->
                     <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
                         <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">

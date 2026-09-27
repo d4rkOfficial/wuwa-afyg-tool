@@ -12,6 +12,7 @@ import {
     transformEchoSetList,
     transformCharacterInfo,
     transformCharacterInfoRich,
+    transformCharacterTags,
     transformWeaponInfo,
     transformEchoInfo,
     transformEchoSetInfo,
@@ -102,6 +103,11 @@ describe('transformCharacterInfo', () => {
         assert.deepEqual(out.statNodes, [{ name: '共鸣回路·律', desc: '层数叠加。' }])
         assert.deepEqual(out.chains, [{ name: '止戈', desc: '共鸣技能伤害30%' }])
         assert.equal(out.skills.length, 3)
+        // v3：角色详情直接带回定位标签
+        assert.deepEqual(
+            out.tags.map((t) => t.name),
+            ['主力输出', '重击伤害', '牵引', '震谐响应']
+        )
     })
 
     it('strips rich-text tags and builds skill values incl. energy', () => {
@@ -120,6 +126,65 @@ describe('transformCharacterInfo', () => {
         // 60.00%*2 → rate 6000/energy 50/weakness 1000；40.00%*3 → rate 4000/energy 30/weakness 800
         // energy = 0.5×2 + 0.3×3 = 1.9；tune = 10×2 + 8×3 = 44
         assert.deepEqual(skill?.values, [['共鸣技能伤害', '60.00%*2+40.00%*3', '导电', '1.9', '44']])
+    })
+})
+
+describe('transformCharacterTags', () => {
+    it('normalizes real tag objects (color gets #, icon becomes a CDN webp URL)', () => {
+        const out = transformCharacterTags(characterDetail.tag)
+        assert.deepEqual(out, [
+            {
+                id: '2',
+                name: '主力输出',
+                desc: '拥有较强的输出能力',
+                color: '#ff8441',
+                icon: 'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelA2.webp'
+            },
+            {
+                id: '5',
+                name: '重击伤害',
+                desc: '重击伤害较高',
+                color: '#ffde73',
+                icon: 'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelB2.webp'
+            },
+            {
+                id: '8',
+                name: '牵引',
+                desc: '可以将一定范围内的目标牵引至特定位置',
+                color: '#77adff',
+                icon: 'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelC1.webp'
+            },
+            {
+                id: '33',
+                name: '震谐响应',
+                desc: '可以对目标造成震谐伤害',
+                color: '#ff7777',
+                icon: 'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelI2.webp'
+            }
+        ])
+    })
+
+    it('sorts by numeric id, drops unnamed tags and tolerates missing color/icon', () => {
+        const out = transformCharacterTags({
+            10: { name: '凝滞', desc: ' 减速 ', icon: '', color: '' },
+            3: { name: '快速协奏', desc: '', icon: '/Game/Aki/UI/x.webp', color: 'ff4040' },
+            7: { name: '   ', desc: '无名', icon: '', color: 'ffffff' }
+        })
+        assert.deepEqual(
+            out.map((t) => t.id),
+            ['3', '10']
+        )
+        assert.equal(out[0].name, '快速协奏')
+        assert.equal(out[0].desc, '')
+        assert.equal(out[0].color, '#ff4040')
+        assert.equal(out[1].name, '凝滞')
+        assert.equal(out[1].desc, '减速')
+        assert.equal(out[1].color, '')
+        assert.equal(out[1].icon, '')
+    })
+
+    it('returns an empty array when the upstream has no tag field', () => {
+        assert.deepEqual(transformCharacterTags(undefined), [])
     })
 })
 

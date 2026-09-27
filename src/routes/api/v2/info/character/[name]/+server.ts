@@ -1,19 +1,12 @@
-import { CACHE_CONTROL } from '$lib/api/consts'
-import { createJsonResponse } from '$lib/api/fetch'
-import { getProvider, providerIdFromUrl } from '$lib/api/provider'
+import { redirect } from '@sveltejs/kit'
 
-export const GET = async ({ params, url }: { params: { name: string }; url?: URL }) => {
-    const { name } = params
-    if (!name) return createJsonResponse({ error: 'Missing name parameter' }, 400)
-
-    try {
-        const provider = getProvider(url ? providerIdFromUrl(url) : undefined)
-        // v2 使用富文本描述（保留原始描述文本），目前仅角色详情有此富数据。
-        const data = await provider.getCharacterInfo(name, { rich: true })
-        return createJsonResponse(data, 200, { 'Cache-Control': CACHE_CONTROL })
-    } catch (e) {
-        const msg = String(e)
-        const status = /not found/i.test(msg) ? 404 : 500
-        return createJsonResponse({ error: status === 404 ? msg : 'Failed to fetch data: ' + msg }, status)
-    }
+/**
+ * @desc v2 角色详情已被 v3 取代（v3 在富文本描述之上补了角色定位标签 tags），本路由不再返回数据。
+ * 用 308 永久重定向把调用方路由到 v3，并借状态码本身告知「请改用 v3 角色详情」；
+ * 查询串（如 ?provider=xxx）原样带过去，保证数据源选择不丢。
+ */
+export const GET = ({ params, url }: { params: { name: string }; url: URL }) => {
+    const target = new URL(`/api/v3/info/character/${encodeURIComponent(params.name)}`, url.origin)
+    target.search = url.search
+    redirect(308, target.pathname + target.search)
 }

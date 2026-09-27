@@ -51,10 +51,24 @@ export interface ResonanceChain {
     desc: string
 }
 
+/** @desc 角色定位标签（上游 tag 字段，如「主力输出」「快速协奏」） */
+export interface CharacterTag {
+    /** @desc 上游标签 id（同一 id 在所有角色上语义固定，可用于稳定比较） */
+    id: string
+    name: string
+    desc: string
+    /** @desc CSS 颜色（#RRGGBB；上游给的是不带 # 的 6 位 hex，缺失时为空串） */
+    color: string
+    /** @desc 可直接渲染的图片 URL（白色蒙版图形，展示时按 color 上色）；缺失时为空串 */
+    icon: string
+}
+
 export interface CharacterInfo {
     rarity: 4 | 5
     element: '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'
     weaponType: '长刃' | '迅刀' | '佩枪' | '臂铠' | '音感仪'
+    /** @desc 定位标签（按上游 id 升序；无标签时为空数组） */
+    tags: CharacterTag[]
     lv90BaseStats: {
         hp: number
         atk: number

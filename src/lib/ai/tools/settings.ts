@@ -71,12 +71,14 @@ import {
     TOAST_POSITIONS,
     getConfirmDeletes,
     getModalClosePosition,
+    getMultiEntryExpand,
     getSidebarActions,
     getEffectiveLockWatermarkText,
     getLockWatermark,
     getToastPosition,
     setConfirmDeletes,
     setModalClosePosition,
+    setMultiEntryExpand,
     setSidebarActions,
     setLockWatermark,
     setLockWatermarkText,
@@ -307,6 +309,14 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
             return pos
         }
     },
+    multi_entry_expand: {
+        label: '结果页允许同时展开多个伤害条目',
+        apply: async (v) => {
+            const b = toBool(v, 'multi_entry_expand')
+            setMultiEntryExpand(b)
+            return b
+        }
+    },
     lock_watermark: {
         label: '显示锁定水印',
         apply: async (v) => {
@@ -423,22 +433,6 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
             return mode
         }
     },
-    ai_naming_rule: {
-        label: 'Buff 命名规则',
-        apply: async (v) => {
-            const rule = str(v)
-            await updateGenPrefs({ namingRule: rule })
-            return rule ? '已设置' : '已清除（恢复默认）'
-        }
-    },
-    ai_slang_dict: {
-        label: '黑话词典',
-        apply: async (v) => {
-            const dict = str(v)
-            await updateGenPrefs({ slangDict: dict })
-            return dict ? '已设置' : '已清除（恢复默认）'
-        }
-    },
     ai_persona_prompt: {
         label: 'AI 助手人设提示词',
         apply: async (v) => {
@@ -496,6 +490,7 @@ defineTool('get_settings_state', {
                 sidebarActions: getSidebarActions(),
                 modalClosePosition: getModalClosePosition(),
                 toastPosition: getToastPosition(),
+                multiEntryExpand: getMultiEntryExpand(),
                 lockWatermark: getLockWatermark(),
                 lockWatermarkText: getEffectiveLockWatermarkText(),
                 lockWatermarkTextDefault: DEFAULT_LOCK_WATERMARK_TEXT
@@ -534,9 +529,8 @@ defineTool('get_settings_state', {
             ai: {
                 enabled: prefs.enabled,
                 dangerMode: prefs.dangerMode,
-                namingRule: prefs.namingRule ? '已自定义' : '默认',
-                slangDict: prefs.slangDict ? '已自定义' : '默认',
                 personaPrompt: prefs.systemPrompt ? '已自定义' : '默认',
+                skillHint: '命名规则 / 黑话词典已是内置技能卡，用 list_skills / use_skill 查看（设置里可编辑正文）',
                 profileCount: getAiProfiles().length,
                 activeProfileId: getActiveProfileId()
             },
@@ -557,7 +551,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存；widget=小部件，覆盖侧栏列表项、配队页角色/武器/首位声骸/触发套装四张 picker 卡、排轴操作块、词条 4c/3c/1c 与词条卡、怪物属性/抗性/免伤输入框等小控件与其小按钮)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。',
     parameters: {
         type: 'object',
         properties: {

@@ -157,13 +157,17 @@
         if (stored) return stored.slots
         const info = charInfoMap[character]
         if (!info) return null
-        return buildStandardSlots({ element: info.element, statNodes: info.statNodes })
+        return buildStandardSlots({ element: info.element, statNodes: info.statNodes, tags: info.tags })
     }
 
-    const standardOriginFor = (character: string): string => {
+    /** @desc 该角色是否已有保存过的标准14词条（工坊同步或本地修正）；没有则按角色数据自动生成 */
+    const hasStoredStandard = (character: string): boolean => !!getStoredStandardPlan(character)
+
+    /** @desc 标准14词条的来源标签：自动生成 / 工坊同步 / 本地修正（角色列表项与方案卡共用同一套文案） */
+    const standardOriginTagFor = (character: string): string => {
         const stored = getStoredStandardPlan(character)
-        if (!stored) return '自动生成'
-        return stored.source === 'share' ? '工坊' : '本地自定义'
+        if (!stored) return '自动14词'
+        return stored.source === 'share' ? '工坊14词' : '修正14词'
     }
 
     /** @desc 某角色的全部方案：标准14词条在最前，其余为该角色的自定义方案（按名称排序） */
@@ -176,7 +180,7 @@
                 standard: true,
                 name: STANDARD_PLAN_NAME,
                 slots: standardSlots,
-                origin: standardOriginFor(character)
+                origin: standardOriginTagFor(character)
             })
         }
         for (const plan of getSubstatPlansFor(character)
@@ -616,6 +620,12 @@
                                         <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)"
                                             >{item.name}</span
                                         >
+                                        <!-- @desc 标准14词条来源角标：自动14词 / 工坊14词 / 修正14词 -->
+                                        <span
+                                            class="shrink-0 rounded-none px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/40"
+                                            style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);"
+                                            title="该角色标准14词条的来源">{standardOriginTagFor(item.name)}</span
+                                        >
                                     </button>
                                 {/each}
                             </div>
@@ -688,7 +698,7 @@
                                             class="rounded-none border border-(--theme-accent-bg) px-2.5 py-1 text-[10px] text-(--theme-accent-text) transition-colors hover:bg-(--theme-accent-bg)/10"
                                             title="修改该角色的标准14词条（保存时需恰好 14 条副词条）">修改</button
                                         >
-                                        {#if standardOriginFor(selected) !== '自动生成'}
+                                        {#if hasStoredStandard(selected)}
                                             <button
                                                 onclick={() => resetStandard(selected)}
                                                 class="rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"

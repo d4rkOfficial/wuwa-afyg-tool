@@ -223,18 +223,3 @@ export const EXAMPLES_TEXT = `—— 示例1（角色固有属性合并）——
 输出：
 {"buffs":[{"buffName":"共鸣技能终伤(乘算)","scope":"self","exclusive":false,"zones":[{"zoneId":"specialFinal2","value":10,"ref":null,"override":false}]}]}
 说明：文案明确"与其它效果相乘/连乘"→ specialFinal2（特殊终伤(2)，各来源独立乘算 1+v/100）；普通相加语义的终伤用 specialFinal1。`
-
-// ── 默认黑话词典（get_slang_dict 工具返回；每行：原叫法=黑话；行尾可用 // 注释）──
-export const DEFAULT_SLANG_DICT = `普攻=A
-重击=Z
-施放共鸣技能=E
-施放共鸣解放=R
-施放声骸技能=Q
-施放谐度破坏=F // 俗称处决
-漂泊者·衍射=光主
-漂泊者·湮灭=暗主
-漂泊者·气动=风主
-漂泊者·导电=雷主
-漂泊者·热熔=火主
-漂泊者·冷凝=冰主
-布兰特=船长`

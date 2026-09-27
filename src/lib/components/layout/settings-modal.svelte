@@ -338,7 +338,7 @@
     let aiActiveId = $derived(getActiveProfileId())
     let aiEditTarget = $state<AiProfile | null>(null)
     let aiDeleteConfirm = $state<AiProfile | null>(null)
-    let promptEditKind = $state<'naming' | 'persona' | 'slang' | null>(null)
+    let promptEditOpen = $state(false)
 
     async function toggleAiEnabled() {
         await updateGenPrefs({ enabled: !getGenPrefs().enabled })
@@ -746,7 +746,9 @@
         weapon: '武器',
         echo: '声骸',
         'echo-set': '声骸套装',
-        'character-v2': '角色详情'
+        'character-v3': '角色详情',
+        // 旧版角色详情缓存（v2 接口已下线）：保留标签便于单独清理残留条目
+        'character-v2': '角色详情（旧）'
     }
 
     const entityLabel = (entity: string): string => CACHE_ENTITY_LABELS[entity] ?? entity
@@ -1138,7 +1140,7 @@
 
                                         <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/35">
                                             按昼夜分别保存；当前编辑「{modeKey === 'light' ? '白天' : '黑夜'}
-                                            」主题。五类区域可各自设置不透明度 / 毛玻璃强度 / 背景深度
+                                            」主题。六类区域可各自设置不透明度 / 毛玻璃强度 / 背景深度
                                         </p>
 
                                         <!-- 区域选择 -->
@@ -2988,57 +2990,10 @@
                                                 >提示词设置</span
                                             >
                                             <p class="mb-2 mt-1 text-[10px] text-(--theme-modal-text)/40">
-                                                命名规则与人设提示词，与模型配置分开保存
+                                                人设提示词与模型配置分开保存；Buff
+                                                命名规则与黑话词典已内置为技能卡（见下方「技能」）
                                             </p>
                                             <div class="flex flex-col gap-1">
-                                                <div
-                                                    class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <div class="min-w-0 flex-1">
-                                                        <span
-                                                            class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                                            >Buff 命名规则</span
-                                                        >
-                                                        <span
-                                                            class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
-                                                        >
-                                                            生成 Buff 时的命名规范；清空则每次由 AI 询问
-                                                        </span>
-                                                    </div>
-                                                    <button
-                                                        onclick={() => (promptEditKind = 'naming')}
-                                                        class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
-                                                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                                                    >
-                                                        <Icon icon="mdi:pencil-outline" class="size-3" />
-                                                        编辑
-                                                    </button>
-                                                </div>
-                                                <div
-                                                    class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <div class="min-w-0 flex-1">
-                                                        <span
-                                                            class="block text-xs font-medium text-(--theme-modal-text)/70"
-                                                            >黑话词典</span
-                                                        >
-                                                        <span
-                                                            class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40"
-                                                        >
-                                                            官方/生僻叫法 → 玩家黑话；
-                                                        </span>
-                                                    </div>
-                                                    <button
-                                                        onclick={() => (promptEditKind = 'slang')}
-                                                        class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
-                                                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                                                    >
-                                                        <Icon icon="mdi:pencil-outline" class="size-3" />
-                                                        编辑
-                                                    </button>
-                                                </div>
                                                 <div
                                                     class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
                                                     style="border-color: var(--theme-divider-border);"
@@ -3055,7 +3010,7 @@
                                                         </span>
                                                     </div>
                                                     <button
-                                                        onclick={() => (promptEditKind = 'persona')}
+                                                        onclick={() => (promptEditOpen = true)}
                                                         class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
                                                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                                                     >
@@ -3119,13 +3074,8 @@
     {/if}
 
     <!-- AI prompt edit -->
-    {#if promptEditKind}
-        <AiPromptEditModal
-            open
-            kind={promptEditKind}
-            onclose={() => (promptEditKind = null)}
-            onsaved={() => (promptEditKind = null)}
-        />
+    {#if promptEditOpen}
+        <AiPromptEditModal open onclose={() => (promptEditOpen = false)} onsaved={() => (promptEditOpen = false)} />
     {/if}
 
     <!-- Key picker（键盘图标 + 手柄键位） -->

@@ -1,6 +1,6 @@
 # WS 远程接管
 
-椰果工具箱支持通过 URL hash 连接用户指定的 WebSocket 服务器，由服务器**接管操作**：AI 助手能做什么、能查什么，WS 服务器就能做什么、查什么（两者共用同一套工具注册表与执行引擎（完整清单见 docs/tools.md，共 86 个））。
+椰果工具箱支持通过 URL hash 连接用户指定的 WebSocket 服务器，由服务器**接管操作**：AI 助手能做什么、能查什么，WS 服务器就能做什么、查什么（两者共用同一套工具注册表与执行引擎（完整清单见 docs/tools.md，共 128 个））。
 
 ## 快速开始
 
@@ -113,12 +113,12 @@ exec set_team_character {"slot":1,"character":"散华"}
 
 ## 工具清单
 
-86 个工具，与 AI 助手完全一致，按领域分组（可用 `node scripts/ws-demo-server.mjs` 后输入 `tools` 查看完整清单，或参考 `src/lib/ai/tools/`）：
+128 个工具，与 AI 助手完全一致，按领域分组（可用 `node scripts/ws-demo-server.mjs` 后输入 `tools` 查看完整清单，或参考 `src/lib/ai/tools/`）：
 
 | 领域         | 工具（节选）                                                                                                                                                                                                                                                                                            |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 工程         | `list_projects` `get_project_state` `get_team` `create_project` `rename_project` `set_active_project` `archive_project` `delete_project` `clone_project` `lock_phase` `unlock_phase`                                                                                                                    |
-| 队伍         | `get_team_catalog` `set_team_character` `set_team_weapon` `set_team_first_echo` `set_team_trigger_sets`                                                                                                                                                                                                 |
+| 队伍         | `get_team_catalog` `get_recommended_weapons` `set_team_character` `set_team_weapon` `set_team_first_echo` `set_team_trigger_sets`                                                                                                                                                                       |
 | 排轴         | `get_timeline_summary` `get_char_skills` `add_op_block` `bind_damage_to_block` `bind_non_direct_to_block` `remove_op_block` `move_op_block` `add_ref_line` `get_ref_line_timings` `enable_ref_line_timing` `disable_ref_line_timing` `set_ref_line_timing_seconds` `format_timeline` `undo_timeline` 等 |
 | 拉表         | `get_damage_entries` `get_buff_sets` `create_buff_set` `rename_buff_set` `delete_buff_set` `bind_buff_to_entry` `set_buff_zone` `set_buff_zone_ref` `set_chain` `set_refinement` `get_condition_profile` 等                                                                                             |
 | 配装         | `get_config_summary` `set_echo_cost` `set_main_stat` `add_substat` `remove_substat` `update_substat_value` `update_enemy` `update_resistance`                                                                                                                                                           |

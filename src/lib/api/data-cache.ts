@@ -344,8 +344,8 @@ export function getUiBtnIcons(): Promise<Record<string, string>> {
 
 export function getCharacterInfo(name: string): Promise<CharacterInfo> {
     return fetchJSON<CharacterInfo>(
-        withProviderUrl(`/api/v2/info/character/${encodeURIComponent(name)}`),
-        cacheKey('info', 'character-v2', name),
+        withProviderUrl(`/api/v3/info/character/${encodeURIComponent(name)}`),
+        cacheKey('info', 'character-v3', name),
         INFO_TTL
     )
 }
@@ -370,6 +370,15 @@ export function getEchoSetInfo(name: string): Promise<EchoSetInfo> {
     return fetchJSON<EchoSetInfo>(
         withProviderUrl(`/api/v1/info/echo-set/${encodeURIComponent(name)}`),
         cacheKey('info', 'echo-set', name),
+        INFO_TTL
+    )
+}
+
+/** @desc 角色推荐武器名列表（官方推荐顺序，首项通常为最佳选择） */
+export function getRecommendedWeapons(characterName: string): Promise<string[]> {
+    return fetchJSON<string[]>(
+        withProviderUrl(`/api/v1/recommend-weapon/${encodeURIComponent(characterName)}`),
+        cacheKey('info', 'recommend-weapon', characterName),
         INFO_TTL
     )
 }
@@ -403,7 +412,7 @@ export interface CacheEntry {
     category: CacheCategory
     /** 上游数据源 id（默认源为 nanoka） */
     provider: string
-    /** 实体名：列表/图像为 character·weapon·echo…，详情为 character-v2·weapon… */
+    /** 实体名：列表/图像为 character·weapon·echo…，详情为 character-v3·weapon… */
     entity: string
     /** 详情类缓存的条目名（列表/图像类为 null） */
     name: string | null

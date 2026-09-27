@@ -86,7 +86,6 @@
     } from '$lib/data/interaction-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
     import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
-    import FirstSyncModal from '$lib/components/layout/first-sync-modal.svelte'
     import SubstatLibraryModal from '$lib/components/layout/substat-library-modal.svelte'
     import DamageTypeModal from '$lib/components/page/home/calculation/damage-type-modal.svelte'
     import {
@@ -96,7 +95,7 @@
     } from '$lib/data/substat-library-ui.svelte'
     import { loadKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
     import { loadKuroPrefs, restoreKuroSession } from '$lib/kuro-app/kuro.svelte'
-    import { shouldAskFirstSync } from '$lib/data/first-sync.svelte'
+    import { fetchSubstatPlansFromShare } from '$lib/data/substat-library.svelte'
     import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/layout/settings-modal.svelte'
     import CharacterDetailModal from '$lib/components/page/home/config/character-detail-modal.svelte'
@@ -293,7 +292,8 @@
         hideSplash()
         initToyProfileBridge()
         initToyEnvironmentBridge()
-        // 首次进入（任意端）：拉表默认平铺模式；禁用磁力光标；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）
+        // 首次进入（任意端）：拉表默认平铺模式；禁用磁力光标；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
+        // 静默从工坊同步「标准词条集」（不再弹「同步工坊数据」弹窗；Buff 集不自动同步，由用户自行同步）
         if (isFirstVisit()) {
             setCalcViewMode('spread')
             setMagneticPointer(false)
@@ -302,6 +302,8 @@
             // B 站 Toy 平台首次进入：弹窗关闭按钮默认放左上角（其它平台保持右上角）
             if (isToyMobile()) setModalClosePosition('top-left')
             void applyFirstRunAppearance()
+            // 同步失败静默忽略（工坊不可达等）：用户可在「词条方案」面板随时手动同步
+            void fetchSubstatPlansFromShare()
             markVisited()
         }
         // 进入 Toy 环境（消息异步到达，每会话首次触发）：
@@ -360,12 +362,6 @@
     let projects = $derived(getProjects())
     let activeId = $derived(getActiveId())
     let activeProject = $derived(getActiveProject())
-
-    /** @desc 首次进入（已有工程时）询问是否从工坊同步 Buff 集与标准词条集；跳过/同步后不再提示 */
-    let showFirstSync = $state(false)
-    $effect(() => {
-        if (activeProject && shouldAskFirstSync()) showFirstSync = true
-    })
 
     $effect(() => {
         if (activeProject) loadCustomHits(activeProject.customSkillHits ?? {})
@@ -1009,8 +1005,6 @@
 />
 
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
-
-<FirstSyncModal open={showFirstSync} onclose={() => (showFirstSync = false)} />
 
 <SubstatLibraryModal />
 

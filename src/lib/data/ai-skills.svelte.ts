@@ -6,17 +6,21 @@ import {
     BUILTIN_SKILLS,
     activeSkillsOf,
     coerceSkillMode,
+    enabledSkillBodyOf,
     enabledSkillsOf,
+    legacyPrefsToSkillOverrides,
     mergeBuiltinSkills,
     normalizeSkill,
     passiveSkillsOf,
     renderActiveSkillListing,
     renderPassiveSkillsPrompt,
+    SKILL_IDS,
     type AiSkill,
     type SkillMode
 } from '$lib/ai/skills'
+import { getGenPrefs, loadGenPrefs } from '$lib/data/ai-prefs.svelte'
 
-export { BUILTIN_SKILLS, renderActiveSkillListing, renderPassiveSkillsPrompt }
+export { BUILTIN_SKILLS, renderActiveSkillListing, renderPassiveSkillsPrompt, SKILL_IDS }
 export type { AiSkill, SkillMode }
 
 const SKILLS_KEY = 'ai-skills'
@@ -48,13 +52,22 @@ export function findSkillByName(name: string): AiSkill | undefined {
     return _skills.find((s) => s.name.toLowerCase() === target)
 }
 
+/** @desc 取指定技能（启用中）的正文：生成流程按 id 读取命名规则 / 黑话词典，禁用或清空时返回空串 */
+export function getEnabledSkillBody(id: string): string {
+    return enabledSkillBodyOf(_skills, id)
+}
+
 export async function loadSkills(): Promise<void> {
     if (!browser || _loaded) return
     const stored = await dbGet<AiSkill[]>(SKILLS_KEY)
     const saved = Array.isArray(stored?.data) ? stored.data.filter((s) => s && typeof s.name === 'string') : []
     // 旧数据兼容：缺 mode 字段 → 按主动处理（mergeBuiltinSkills → normalizeSkill → coerceSkillMode）
-    _skills = mergeBuiltinSkills(saved)
+    // 一次性迁移：旧版「提示词设置」里的命名规则 / 黑话词典 → 对应内置技能卡的正文覆盖
+    await loadGenPrefs()
+    const legacy = legacyPrefsToSkillOverrides(getGenPrefs()).filter((o) => !saved.some((s) => s.id === o.id))
+    _skills = mergeBuiltinSkills([...saved, ...legacy])
     _loaded = true
+    if (legacy.length > 0) await persist()
 }
 
 async function persist(): Promise<void> {

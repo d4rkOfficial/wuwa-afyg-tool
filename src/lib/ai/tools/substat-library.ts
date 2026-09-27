@@ -63,7 +63,7 @@ const standardSlotsFor = async (character: string): Promise<EchoSlotConfig[] | n
     await ensureCharInfo(character)
     const info = getCharInfoMap()[character]
     if (!info) return null
-    return buildStandardSlots({ element: info.element, statNodes: info.statNodes })
+    return buildStandardSlots({ element: info.element, statNodes: info.statNodes, tags: info.tags })
 }
 
 const standardOriginOf = (character: string) => {

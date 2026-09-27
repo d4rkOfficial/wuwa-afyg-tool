@@ -16,7 +16,6 @@
     import { getCharIconMap, getCharElementMap } from '$lib/calc/timeline.store.svelte'
     import { fillCharElementsFromList } from '$lib/data/char-elements.svelte'
     import { addToast } from '$lib/data/toast.svelte'
-    import { shortName } from '$lib/utils/character'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -247,7 +246,7 @@
                                     )}; background: color-mix(in srgb, {elementColor(name)} 12%, transparent);"
                                     title={`搜索角色「${name}」`}
                                 >
-                                    {shortName(name)}
+                                    {name}
                                     <Icon icon="mdi:magnify" class="size-3 shrink-0" />
                                 </button>
                             {/each}

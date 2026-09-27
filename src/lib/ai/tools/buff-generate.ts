@@ -1,4 +1,4 @@
-// AI 生成工具：本地库实体生成 + 当前工程队伍生成（复用 share 生成流程；命名规则由用户从零定义并持久化）
+// AI 生成工具：本地库实体生成 + 当前工程队伍生成（复用 share 生成流程；命名规则 / 黑话词典取自内置技能卡）
 import { defineTool } from './registry'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { getBuffEntities, updateEntityBuffs, ENTITY_TYPES, loadBuffLibrary } from '$lib/data/buff-library.svelte'
@@ -6,34 +6,33 @@ import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$l
 import { importBuffSets } from '$lib/calc/calculation.store.svelte'
 import type { ImportBuffInput } from '$lib/calc/calculation.store.svelte'
 import { generateBuffSet } from '../generate'
-import { getSlangDict } from '$lib/data/ai-prefs.svelte'
+import { getEnabledSkillBody, loadSkills, SKILL_IDS, updateSkill } from '$lib/data/ai-skills.svelte'
 import {
     createLibraryDataSource,
     createProjectDataSource,
     type GenerateEntityType,
     type GeneratedBuff
 } from '../generate/tools'
-import { getNamingRule, loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
 import { ownerIdxFor } from '$lib/calc/buff-import-utils'
 import { getAiConfig } from '../config.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
-// 命名规则解析：工具参数优先（并记住）；否则用已保存的；都没有 → 提示先询问用户
+// 命名规则解析：工具参数优先（写入内置技能卡）；否则用技能卡现有正文；都没有 → 提示先询问用户
 async function resolveNamingRule(argsRule: string): Promise<{ rule: string; missing: boolean }> {
-    await loadGenPrefs()
+    await loadSkills()
     const r = argsRule.trim()
     if (r) {
-        updateGenPrefs({ namingRule: r })
+        await updateSkill(SKILL_IDS.buffNaming, { body: r, enabled: true })
         return { rule: r, missing: false }
     }
-    const stored = getNamingRule()
+    const stored = getEnabledSkillBody(SKILL_IDS.buffNaming)
     if (stored) return { rule: stored, missing: false }
     return { rule: '', missing: true }
 }
 
 const NEEDS_RULE_MSG =
-    '尚未定义 Buff 命名规则。请先询问用户希望如何为 Buff 命名（完全由用户从零定义，无预设风格），然后用 set_naming_rule 保存用户给出的规则，再重新调用生成工具。'
+    '尚未定义 Buff 命名规则（内置技能卡「Buff 命名规则」已禁用或正文为空）。请先询问用户希望如何为 Buff 命名（完全由用户从零定义，无预设风格），然后用 set_naming_rule 保存用户给出的规则，再重新调用生成工具。'
 
 function aiRuntime() {
     const cfg = getAiConfig()
@@ -122,17 +121,18 @@ defineTool('get_entity_info', {
 })
 
 defineTool('get_naming_rule', {
-    description: '获取当前已保存的 Buff 命名规则（用户自定义）。返回空字符串表示尚未定义，生成前需要先询问用户。',
+    description:
+        '获取当前的 Buff 命名规则（即内置技能卡「Buff 命名规则」的正文，用户可自行编辑）。返回空字符串表示该技能已禁用或正文被清空，生成前需要先询问用户。',
     parameters: { type: 'object', properties: {} },
     handler: async () => {
-        await loadGenPrefs()
-        return { namingRule: getNamingRule() }
+        await loadSkills()
+        return { namingRule: getEnabledSkillBody(SKILL_IDS.buffNaming) }
     }
 })
 
 defineTool('set_naming_rule', {
     description:
-        '保存用户自定义的 Buff 命名规则（由用户从零定义，无预设风格，可能包含格式示例/简写习惯等）。保存后生成 Buff 会自动遵守。',
+        '保存用户自定义的 Buff 命名规则：写入内置技能卡「Buff 命名规则」的正文（由用户从零定义，无预设风格，可能包含格式示例/简写习惯等）并启用它。保存后生成 Buff 会自动遵守。',
     parameters: {
         type: 'object',
         properties: { rule: { type: 'string', description: '用户给出的完整命名规则描述' } },
@@ -141,7 +141,10 @@ defineTool('set_naming_rule', {
     handler: async (args) => {
         const rule = str(args.rule)
         if (!rule) throw new Error('命名规则不能为空')
-        await updateGenPrefs({ namingRule: rule })
+        await loadSkills()
+        if (!(await updateSkill(SKILL_IDS.buffNaming, { body: rule, enabled: true }))) {
+            throw new Error('命名规则保存失败：未找到内置技能卡「Buff 命名规则」')
+        }
         return { saved: rule }
     }
 })
@@ -155,7 +158,10 @@ defineTool('generate_entity_buffs', {
         properties: {
             entityType: { type: 'string', description: '实体类型' },
             entityName: { type: 'string', description: '实体名称（中文）' },
-            namingRule: { type: 'string', description: '可选：用户新定义的命名规则（会记住）' }
+            namingRule: {
+                type: 'string',
+                description: '可选：用户新定义的命名规则（会写入内置技能卡「Buff 命名规则」）'
+            }
         },
         required: ['entityType', 'entityName']
     },
@@ -178,7 +184,7 @@ defineTool('generate_entity_buffs', {
             entityType,
             entityName,
             namingRule: rule,
-            slangDict: getSlangDict(),
+            slangDict: getEnabledSkillBody(SKILL_IDS.slangDict),
             data: createLibraryDataSource(),
             onProgress: (t) => ctx.onGenerateProgress?.(t)
         })
@@ -203,7 +209,10 @@ defineTool('generate_project_buffs', {
         properties: {
             slot: { type: 'number', description: '可选：只处理该槽位（1-3）' },
             entityType: { type: 'string', description: '可选：只处理该实体类型' },
-            namingRule: { type: 'string', description: '可选：用户新定义的命名规则（会记住）' }
+            namingRule: {
+                type: 'string',
+                description: '可选：用户新定义的命名规则（会写入内置技能卡「Buff 命名规则」）'
+            }
         }
     },
     handler: async (args, ctx) => {
@@ -248,7 +257,7 @@ defineTool('generate_project_buffs', {
                 entityType: e.entityType,
                 entityName: e.entityName,
                 namingRule: rule,
-                slangDict: getSlangDict(),
+                slangDict: getEnabledSkillBody(SKILL_IDS.slangDict),
                 data: createProjectDataSource(),
                 onProgress: (t) => ctx.onGenerateProgress?.(t)
             })

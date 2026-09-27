@@ -3,7 +3,8 @@ import { ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
 import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 import type { SubstatLabel } from '$lib/consts/stat-data'
 
-/** @desc 标准词条集：5 个声骸合计 14 条副词条（5 暴击 + 5 暴伤 + 2 百分比 + 2 固定值） */
+/** @desc 标准词条集：5 个声骸合计 14 条副词条（5 暴击 + 5 暴伤 + 2 百分比 + 2 固定值；
+ *  角色带伤害类型标签时，两条固定值换成对应的伤害加成，见 buildStandardSlots） */
 export const STANDARD_SUBSTAT_TOTAL = 14
 
 /** @desc 标准词条集方案名（工坊同步的唯一一种方案，也是本地不可删除的方案） */
@@ -72,6 +73,27 @@ function elementMainStatLabel(element: string): string {
 export interface StandardPlanInput {
     element: string
     statNodes?: { name: string; desc: string }[]
+    /** @desc 角色定位标签（只取 name）；含伤害类型标签时，两条固定值副词条换成对应的伤害加成 */
+    tags?: { name: string }[]
+}
+
+/** @desc 伤害类型标签 → 副词条「XX伤害加成」：角色有该标签时，标准方案的固定值副词条换用它 */
+const DAMAGE_TAG_SUBSTAT: Record<string, SubstatLabel> = {
+    普攻伤害: '普攻伤害加成',
+    重击伤害: '重击伤害加成',
+    共鸣技能伤害: '共鸣技能伤害加成',
+    共鸣解放伤害: '共鸣解放伤害加成'
+}
+
+/**
+ * @desc 从角色标签里挑出伤害类型加成词条（按上表固定顺序，至多两条 =
+ * 标准方案里固定值副词条的条数；声骸副词条同一槽位不重复，跨槽位可以重复）。
+ */
+function damageBonusLabels(tags?: { name: string }[]): SubstatLabel[] {
+    const names = new Set((tags ?? []).map((t) => t.name))
+    return Object.entries(DAMAGE_TAG_SUBSTAT)
+        .filter(([tag]) => names.has(tag))
+        .map(([, label]) => label)
 }
 
 /**
@@ -79,16 +101,23 @@ export interface StandardPlanInput {
  * - 主词条 43311：4cost 取暴击率（固有属性含暴击率时）否则暴击伤害；两个 3cost 取角色属性伤害加成；
  *   两个 1cost 取固有属性对应的攻击%/生命%/防御%；
  * - 副词条：每个声骸各 1 条暴击率 + 1 条暴击伤害；前两个声骸各再加 1 条百分比 + 1 条固定值（同固有属性族）；
- * - 数值一律取中位档（偏低）。
+ * - 角色带伤害类型标签（普攻/重击/共鸣技能/共鸣解放伤害）时，两条固定值副词条（小攻击/小生命/小防御）
+ *   换成对应的伤害加成；只有一个标签时两条都换成它，两个标签时各占一条；
+ * - 数值一律取中位档（偏低），伤害加成即 8.6%。
  */
 export function buildStandardSlots(info: StandardPlanInput): EchoSlotConfig[] {
     const { hasCritRate, family } = parseInherentStats(info.statNodes)
     const elementLabel = elementMainStatLabel(info.element)
     const mainLabels = [hasCritRate ? '暴击率' : '暴击伤害', elementLabel, elementLabel, `${family}%`, `${family}%`]
+    const [firstBonus, secondBonus] = damageBonusLabels(info.tags)
+    // 前两个声骸的第二条副词条：有伤害类型标签用对应加成，否则用同固有属性族的固定值（小攻击/小生命/小防御）
+    const secondSubstats = firstBonus
+        ? [substat(firstBonus), substat(secondBonus ?? firstBonus)]
+        : [substat(family as SubstatLabel), substat(family as SubstatLabel)]
     return STANDARD_COST_LAYOUT.map((cost, i) => {
         const substats = [substat('暴击率'), substat('暴击伤害')]
         if (i < 2) {
-            substats.push(substat(`${family}%` as SubstatLabel), substat(family as SubstatLabel))
+            substats.push(substat(`${family}%` as SubstatLabel), secondSubstats[i])
         }
         return {
             cost,

@@ -15,7 +15,7 @@ const GROUP_RULES: { label: string; test: RegExp }[] = [
         test: /buff_set|_buff_zone|^bind_buff|^unbind_buff|^import_entity_buffs|condition|^toggle_damage_type$|^set_entry_damage_types$/
     },
     { label: '计算 · 条目与档位', test: /^set_chain$|^set_refinement$|^get_damage_entries$|^set_buff_scope$/ },
-    { label: '配队', test: /^team|_team|member/ },
+    { label: '配队', test: /^team|_team|member|recommended_weapon/ },
     {
         label: '时间轴',
         test: /timeline|_block|_ref_line|^get_char_skills$|^reflow_track$|^get_non_direct_options$/

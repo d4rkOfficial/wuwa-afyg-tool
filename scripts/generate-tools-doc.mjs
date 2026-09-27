@@ -22,7 +22,11 @@ const DOMAIN_LABELS = {
     'buff-generate.ts': 'Buff 生成',
     'panels.ts': '面板',
     'view.ts': '视图',
-    'settings.ts': '设置'
+    'settings.ts': '设置',
+    'ai-session.ts': 'AI 助手自身（上下文 / 用量 / 运行情况）',
+    'skills.ts': '技能卡',
+    'kuro.ts': '库街区',
+    'substat-library.ts': '词条集（方案）'
 }
 
 function pickString(objText, key) {
@@ -31,6 +35,10 @@ function pickString(objText, key) {
 }
 
 function matchBalanced(src, openIdx) {
+    // 同时跟踪 {} 与 []：只跟踪 {} 时，对象内部出现数组（如 `required: ['a']`、
+    // `enum: [...]`）会让配对数提前归零，导致解析被截断（历史上 Buff 生成辅助
+    // 15 个工具只抽出 1 个就是这个原因）。
+    const OPEN = { '{': '}', '[': ']' }
     const stack = []
     let quote = null
     for (let i = openIdx; i < src.length; i++) {
@@ -44,8 +52,9 @@ function matchBalanced(src, openIdx) {
             quote = ch
             continue
         }
-        if (ch === '{') stack.push(i)
-        else if (ch === '}') {
+        if (OPEN[ch]) stack.push(OPEN[ch])
+        else if (ch === '}' || ch === ']') {
+            if (stack[stack.length - 1] !== ch) continue // 类型无关的杂散括号，忽略
             stack.pop()
             if (stack.length === 0) return { end: i, text: src.slice(openIdx, i) }
         }
@@ -123,7 +132,12 @@ function extractDefineToolBlocks(src) {
 function extractGenerateTools(src) {
     const start = src.indexOf('export const GENERATE_TOOLS')
     if (start === -1) return []
-    const arrOpen = src.indexOf('[', start)
+    // 必须从 `=` 之后取第一个 `[`：声明里是 `GENERATE_TOOLS: ToolDefinition[] = [`
+    // 直接取第一个 `[` 会命中类型注解 `ToolDefinition[]` 的空数组，导致整段抽不出来。
+    const eqIdx = src.indexOf('=', start)
+    if (eqIdx === -1) return []
+    const arrOpen = src.indexOf('[', eqIdx)
+    if (arrOpen === -1) return []
     const { end, text: arrText } = matchBalanced(src, arrOpen)
     if (end === -1) return []
     const tools = []
@@ -166,9 +180,14 @@ function main() {
     let total = 0
     const dangerous = []
 
-    for (const file of fs
-        .readdirSync(TOOLS_DIR)
-        .filter((f) => f.endsWith('.ts') && f !== 'index.ts' && f !== 'registry.ts')) {
+    for (const file of fs.readdirSync(TOOLS_DIR).filter(
+        (f) =>
+            f.endsWith('.ts') &&
+            // 注册表自身与测试夹具不是暴露给 AI/WS 的工具，文档里必须排除
+            f !== 'index.ts' &&
+            f !== 'registry.ts' &&
+            !f.endsWith('.test.ts')
+    )) {
         const src = fs.readFileSync(path.join(TOOLS_DIR, file), 'utf8')
         const tools = extractDefineToolBlocks(src)
         if (!tools.length) continue
@@ -219,36 +238,24 @@ function main() {
     lines.push('')
     lines.push('以下设置不允许 AI/WS 修改（调用 `set_setting` 会报错并提示手动调整）：')
     lines.push('')
-    lines.push('- 按键图标（设置 → 按键图标）')
-    lines.push('- 界面快捷键（设置 → 交互相关 → 界面快捷键）')
-    lines.push('- 归档管理（设置 → 归档管理）')
-    lines.push('- 缓存清理（设置 → 缓存清理）')
-    lines.push('- 助手设置（启用开关、危险操作权限、AI 配置文件、提示词、黑话词典）')
-    lines.push('- 自定义主题的创建/删除（设置 → 外观主题，仅支持明暗切换/主色调/背景与质感参数）')
+    lines.push('- 自定义主题的创建 / 删除（设置 → 外观主题；仅支持明暗切换与主色调）')
     lines.push('- 背景图本地文件上传（AI 仅可设置远程 URL / data:image 数据 / 清除）')
+    lines.push('- 磁力光标的跟手性 / 灵敏度 / 旋转 / 描边 / 晃动参数（已固定，调用静默忽略）')
     lines.push('')
-    lines.push('### `set_setting` 白名单一览')
+    lines.push('以下设置虽不可直接用 `set_setting`，但有专用工具，**可以**由 AI/WS 修改：')
     lines.push('')
-    lines.push('| key | 说明 | 取值 |')
-    lines.push('| --- | --- | --- |')
-    lines.push('| `theme_mode` | 明暗模式 | dark / light |')
+    lines.push('- 按键图标 → `get_keymap` / `set_keymap_entry`')
+    lines.push('- 界面快捷键 → `get_shortcuts` / `set_shortcut`')
+    lines.push('- 归档管理 → `archive_project` / `unarchive_project` / `delete_project`')
+    lines.push('- 缓存清理 → `set_setting` key=`clear_cache`（或 `get_cache_counts` 只读）')
+    lines.push('- 助手设置（启用开关 / 危险操作权限 / 人设提示词）→ `set_setting`')
+    lines.push('- AI 配置文件 → `get_ai_profiles` / `manage_ai_profile`')
+    lines.push('- 工坊实例 → `get_settings_state` / `manage_workshop`')
+    lines.push('- AI 上下文分段 / 用量 / 运行情况 → `get_ai_context_state` / `set_ai_context_segment` 等')
+    lines.push('')
     lines.push(
-        '| `theme_accent_hue` | 主色调 | default(青色) / orange(橘红) / orangeyellow(橘黄) / magenta(品红) / cyan(青色别名) / indigo(靛蓝) / green(墨绿) / mono(黑白) 或 0-360 整数 |'
+        '> 完整 key 白名单以 `set_setting` 的工具描述为准（`get_settings_state` 会回传 `modifiableKeys` 实时清单）。'
     )
-    lines.push('| `theme_background_image` | 背景图 | http(s):// 地址 / data:image 数据 / 空串清除 |')
-    lines.push('| `theme_bg_opacity` | 卡片透明度 | 30-100 |')
-    lines.push('| `theme_bg_blur` | 毛玻璃强度 | 0-32 |')
-    lines.push('| `theme_bg_dim` | 背景暗度 | 0-100 |')
-    lines.push('| `theme_bg_image_blur` | 背景图模糊 | 0-32 |')
-    lines.push('| `theme_bg_image_mask` | 背景图遮罩 | 0-100 |')
-    lines.push('| `calc_view` | 拉表视图 | dropdown / spread |')
-    lines.push('| `simplify_toolbar` | 简化底部工具栏 | true / false |')
-    lines.push('| `magnetic_pointer` | 磁力光标 | true / false |')
-    lines.push('| `gpu_accel` | 渲染加速（GPU） | true / false |')
-    lines.push('| `reload_on_result_refresh` | 刷新结果重载数据 | true / false |')
-    lines.push('| `reload_on_profile_change` | 链/阶变动重载数据 | true / false |')
-    lines.push('')
-    lines.push('工坊实例管理请使用 `manage_workshop`（action：switch / add / remove / reset）。')
     lines.push('')
 
     fs.writeFileSync(OUT, lines.join('\n'), 'utf8')

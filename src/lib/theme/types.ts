@@ -24,10 +24,10 @@ export interface SurfaceStyle {
     depth: number
 }
 
-/** @desc 可独立配置透明度/毛玻璃/深度的五类区域 */
+/** @desc 可独立配置透明度/毛玻璃/深度的六类区域 */
 export type SurfaceKey = 'card' | 'modal' | 'sidebar' | 'content' | 'toolbar' | 'widget'
 
-/** @desc 五类区域说明（顺序即设置面板顺序；labels 供 UI 与 AI 工具复用） */
+/** @desc 六类区域说明（顺序即设置面板顺序；labels 供 UI 与 AI 工具复用） */
 export const SURFACE_GROUPS: { label: string; items: { key: SurfaceKey; label: string; hint: string }[] }[] = [
     {
         label: '外观质感',
@@ -35,7 +35,7 @@ export const SURFACE_GROUPS: { label: string; items: { key: SurfaceKey; label: s
             {
                 key: 'card',
                 label: '卡片',
-                hint: '声骸/套装/方案等一般卡片、排轴操作块、下拉拉表与结果页的行、平铺拉表单元格'
+                hint: '声骸/套装/方案等一般卡片、配队角色槽位大卡、下拉拉表与结果页的行、平铺拉表单元格'
             },
             { key: 'modal', label: '弹窗', hint: '所有对话框（设置、工坊、选择器、确认框等）' },
             { key: 'sidebar', label: '侧边栏', hint: '工程列表侧边栏、顶部标题栏' },
@@ -48,7 +48,7 @@ export const SURFACE_GROUPS: { label: string; items: { key: SurfaceKey; label: s
             {
                 key: 'widget',
                 label: '小部件',
-                hint: '侧栏列表项、队伍角色/武器/首位声骸/套装卡、词条 4c/3c/1c 与词条卡、怪物属性/抗性/免伤输入框等小控件与其小按钮'
+                hint: '侧栏列表项、配队页角色/武器/首位声骸/触发套装四张 picker 卡、排轴操作块、词条 4c/3c/1c 与词条卡、怪物属性/抗性/免伤输入框等小控件与其小按钮'
             }
         ]
     }

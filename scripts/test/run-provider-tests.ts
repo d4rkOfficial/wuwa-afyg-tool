@@ -7,5 +7,6 @@
 import '../../src/lib/api/provider/index.test.ts'
 import '../../src/lib/api/provider/nanoka/utils.test.ts'
 import '../../src/lib/api/provider/nanoka.provider.test.ts'
+import '../../src/lib/calc/standard-substats.test.ts'
 import '../../src/lib/ai/proxy-guard.test.ts'
 import '../../src/lib/ai/tools/registry.test.ts'

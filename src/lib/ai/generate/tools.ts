@@ -13,7 +13,7 @@ import { providerQuery } from '$lib/api/provider'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getAllBuffSets } from '$lib/calc/calculation.store.svelte'
 import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
-import { DEFAULT_SLANG_DICT, EFFECTS_TEXT, SCOPE_RULES_TEXT, EXAMPLES_TEXT, REF_RULES_TEXT } from './prompts.config'
+import { EFFECTS_TEXT, SCOPE_RULES_TEXT, EXAMPLES_TEXT, REF_RULES_TEXT } from './prompts.config'
 import { renderConditionRules, renderNamingRules } from './prompts'
 import { analyzeCharacterTerms } from './terms'
 import { sanitizeCondition } from './sanitize'
@@ -83,13 +83,13 @@ export function createLibraryDataSource(): GenerateDataSource {
             }
         },
         async getCharacterTerms(entityName) {
-            const res = await fetch(`/api/v2/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
+            const res = await fetch(`/api/v3/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store'
             })
             if (!res.ok)
                 return {
-                    error: res.status === 404 ? `未找到角色「${entityName}」` : `v2 接口失败（HTTP ${res.status}）`
+                    error: res.status === 404 ? `未找到角色「${entityName}」` : `v3 接口失败（HTTP ${res.status}）`
                 }
             const info = await res.json()
             if ((info as { error?: string }).error) return info
@@ -145,13 +145,13 @@ export function createProjectDataSource(): GenerateDataSource {
             }
         },
         async getCharacterTerms(entityName) {
-            const res = await fetch(`/api/v2/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
+            const res = await fetch(`/api/v3/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store'
             })
             if (!res.ok)
                 return {
-                    error: res.status === 404 ? `未找到角色「${entityName}」` : `v2 接口失败（HTTP ${res.status}）`
+                    error: res.status === 404 ? `未找到角色「${entityName}」` : `v3 接口失败（HTTP ${res.status}）`
                 }
             const info = await res.json()
             if ((info as { error?: string }).error) return info
@@ -444,7 +444,8 @@ export async function executeGenerateTool(
         case 'get_ref_rules':
             return REF_RULES_TEXT
         case 'get_slang_dict':
-            return ctx.slangDict?.trim() || DEFAULT_SLANG_DICT
+            // 词典正文来自内置技能卡「黑话词典」；被禁用 / 清空时如实告知，不再回落硬编码词典
+            return ctx.slangDict?.trim() || '（黑话词典技能已被用户清空或禁用，本次不做黑话对照）'
         case 'get_naming_rules':
             return renderNamingRules(namingRule)
         case 'get_examples':
