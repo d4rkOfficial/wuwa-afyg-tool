@@ -270,7 +270,7 @@
         })
     }
 
-    /** @desc 设置栏目：按「界面 / 数据 / AI助手」三组重新规划归类 */
+    /** @desc 设置栏目：按「界面 / 数据 / AI助手 / 配置」分组归类（配置导入导出是独立一级栏目，不再挂在「数据」下） */
     const SETTING_TABS = [
         { group: '界面', key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
         { group: '界面', key: 'interaction', label: '交互相关', icon: 'mdi:gesture-tap' },
@@ -280,9 +280,9 @@
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
         { group: '数据', key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
-        { group: '数据', key: 'config', label: '配置导入导出', icon: 'mdi:cog-sync-outline' },
         { group: 'AI助手', key: 'ai-conn', label: '启用 / 接入配置', icon: 'mdi:connection' },
-        { group: 'AI助手', key: 'ai', label: '权限 / 提示词', icon: 'mdi:shield-account-outline' }
+        { group: 'AI助手', key: 'ai', label: '权限 / 提示词', icon: 'mdi:shield-account-outline' },
+        { group: '配置', key: 'config', label: '配置导入导出', icon: 'mdi:cog-sync-outline' }
     ] as const
 
     /** @desc 按 group 聚合栏目（保持声明顺序） */
@@ -2785,7 +2785,7 @@
                             </div>
                         </div>
                     {:else if tab === 'config'}
-                        <!-- 一切皆「配置」：设置偏好整体导出 / 导入（JSON） -->
+                        <!-- 一切皆「配置」：独立一级栏目 → 分「设置 / 本地库」两类整体导出 / 导入（JSON） -->
                         <div>
                             <span
                                 class="mb-2 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
