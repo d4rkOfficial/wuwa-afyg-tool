@@ -42,10 +42,13 @@
                 <span class="text-sm font-black tracking-tight text-(--theme-modal-text)">选择副词条</span>
                 <button
                     onclick={onclose}
+                    data-sf="widget"
+                    data-sf-flat
                     class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
                     'top-left'
                         ? 'order-first'
                         : 'ml-auto'}"
+                    style="--sf-base: var(--theme-input-bg)"
                     aria-label="关闭"
                 >
                     <Icon icon="mdi:close" class="size-4" />
@@ -59,12 +62,15 @@
                             if (!exists) onpick(opt.label)
                         }}
                         disabled={exists}
+                        data-sf="widget"
+                        data-sf-flat
                         class={[
                             'flex w-full items-center gap-2 rounded-none border px-3 py-2 text-xs text-left transition-colors',
                             exists
-                                ? 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/20 cursor-not-allowed'
-                                : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text) hover:border-(--theme-accent-bg)'
+                                ? 'border-(--theme-divider-border) text-(--theme-modal-text)/20 cursor-not-allowed'
+                                : 'border-(--theme-divider-border) text-(--theme-modal-text) hover:border-(--theme-accent-bg)'
                         ].join(' ')}
+                        style="--sf-base: var(--theme-input-bg)"
                     >
                         <span class="flex-1 font-black">{opt.label}</span>
                         <span class="text-[10px] font-black text-(--theme-modal-text)/40">{opt.unit}</span>

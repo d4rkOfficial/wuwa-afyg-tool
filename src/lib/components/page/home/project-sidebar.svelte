@@ -247,9 +247,12 @@
                         e.stopPropagation()
                         onToggleSidebarLookup?.()
                     }}
+                    data-sf="widget"
+                    data-sf-flat
                     class="rounded-none p-1 transition-colors hover:bg-(--theme-sidebar-text)/5 {sidebarLookupOpen
                         ? 'text-(--theme-accent-text)'
                         : 'text-(--theme-sidebar-text)/40 hover:text-(--theme-sidebar-text)/70'}"
+                    style="--sf-base: var(--theme-input-bg)"
                     title="速查"
                 >
                     <Icon icon="mdi:book-search-outline" class="size-4" />
@@ -260,7 +263,10 @@
                     e.stopPropagation()
                     onToggleSidebarWidth?.()
                 }}
+                data-sf="widget"
+                data-sf-flat
                 class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-(--theme-sidebar-text)/5"
+                style="--sf-base: var(--theme-input-bg)"
                 title={sidebarWide ? '收窄侧栏' : '展宽侧栏'}
             >
                 <Icon icon={sidebarWide ? 'mdi:arrow-collapse' : 'mdi:arrow-expand'} class="size-4" />
@@ -274,7 +280,10 @@
                         addToast(`已切换至「${t?.name ?? next}」`, 'success')
                     })
                 }}
+                data-sf="widget"
+                data-sf-flat
                 class="rounded-none p-1 text-(--theme-sidebar-text)/40 transition-colors hover:text-(--theme-sidebar-text)/70 hover:bg-(--theme-sidebar-text)/5"
+                style="--sf-base: var(--theme-input-bg)"
                 title="切换明暗主题"
             >
                 <Icon icon="mdi:theme-light-dark" class="size-4" />
@@ -367,8 +376,8 @@
                                             : 'border-(--theme-divider-border) text-(--theme-sidebar-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-sidebar-text)/90'
                                     ].join(' ')}
                                     style={project.id === activeId
-                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
-                                        : 'background: var(--theme-input-bg);'}
+                                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, var(--sf-mix, transparent));'
+                                        : '--sf-base: var(--theme-input-bg);'}
                                 >
                                     {#if compact}
                                         <span
@@ -409,6 +418,8 @@
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
+                            data-sf="widget"
+                            data-sf-flat
                             onclick={() => selectProject(project.id)}
                             oncontextmenu={(e) => handleContextMenu(e, project.id)}
                             class={[
@@ -419,8 +430,8 @@
                                     : 'border-(--theme-divider-border) text-(--theme-sidebar-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-sidebar-text)/90'
                             ].join(' ')}
                             style={project.id === activeId
-                                ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);'
-                                : 'background: var(--theme-input-bg);'}
+                                ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, var(--sf-mix, transparent));'
+                                : '--sf-base: var(--theme-input-bg);'}
                         >
                             {#if compact}
                                 <span

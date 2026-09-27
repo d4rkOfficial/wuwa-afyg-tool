@@ -452,8 +452,10 @@
             {#each project!.team as slot, ci (ci)}
                 {@const character = slot.character}
                 <div
+                    data-sf="widget"
+                    data-sf-flat
                     class="flex min-h-0 flex-col gap-3 rounded-none border p-3.5"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                    style="border-color: var(--theme-divider-border); --sf-base: var(--theme-input-bg);"
                 >
                     <!-- 栏头：角色 + 位次 -->
                     <div class="flex shrink-0 items-center gap-2.5">
@@ -522,8 +524,10 @@
                     <button
                         onclick={syncFromKuro}
                         disabled={kuroSyncing}
+                        data-sf="widget"
+                        data-sf-flat
                         class="inline-flex items-center gap-1 rounded-none border px-3 py-1.5 text-[11px] font-medium text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:opacity-40"
-                        style="border-color: var(--theme-divider-border);"
+                        style="border-color: var(--theme-divider-border); --sf-base: var(--theme-input-bg);"
                         title="登录库街区后，把账号下鸣潮角色当前装配的声骸同步成自定义方案（实验性）"
                     >
                         <Icon
@@ -585,15 +589,17 @@
                                             editing = null
                                         }}
                                         in:fade={{ duration: 100 }}
+                                        data-sf="widget"
+                                        data-sf-flat
                                         class={[
                                             'flex w-full items-center gap-2 rounded-none border px-2.5 py-2 text-left text-xs transition-colors',
                                             selected === item.name
                                                 ? 'border-(--theme-accent-bg)'
-                                                : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:bg-(--theme-modal-text)/5'
+                                                : 'border-(--theme-divider-border) hover:bg-(--theme-modal-text)/5'
                                         ].join(' ')}
-                                        style={selected === item.name
-                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent);'
-                                            : ''}
+                                        style="--sf-base: var(--theme-input-bg);{selected === item.name
+                                            ? ' background: color-mix(in srgb, var(--theme-accent-bg) 18%, var(--sf-mix, transparent));'
+                                            : ''}"
                                     >
                                         {#if icons[item.name]}
                                             <img

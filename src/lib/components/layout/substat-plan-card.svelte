@@ -59,7 +59,8 @@
 </script>
 
 <div
-    data-sf="card"
+    data-sf="widget"
+    data-sf-flat
     class="rounded-none border {className ?? ''}"
     style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border); {styleProp || ''}"
 >

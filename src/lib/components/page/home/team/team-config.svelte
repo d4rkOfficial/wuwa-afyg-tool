@@ -306,8 +306,10 @@
 
                 {#if slot.character}
                     <button
-                        class="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-none border bg-(--theme-input-bg) text-(--theme-modal-text)/40 opacity-0 backdrop-blur-sm transition-colors hover:text-(--theme-accent-text) group-hover:opacity-100"
-                        style="border-color: var(--theme-divider-border);"
+                        data-sf="widget"
+                        data-sf-flat
+                        class="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-none border text-(--theme-modal-text)/40 opacity-0 backdrop-blur-sm transition-colors hover:text-(--theme-accent-text) group-hover:opacity-100"
+                        style="border-color: var(--theme-divider-border); --sf-base: var(--theme-input-bg);"
                         onclick={(e) => {
                             e.stopPropagation()
                             resetSlot(i)

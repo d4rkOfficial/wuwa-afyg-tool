@@ -101,7 +101,10 @@
                 {#if query}
                     <button
                         onclick={() => (query = '')}
+                        data-sf="widget"
+                        data-sf-flat
                         class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                        style="--sf-base: var(--theme-input-bg)"
                         aria-label="Clear search"
                     >
                         <Icon icon="mdi:close" class="size-4" />

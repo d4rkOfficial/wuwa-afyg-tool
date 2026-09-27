@@ -126,8 +126,10 @@
         <span class="flex-1"></span>
         <button
             onclick={oncancel}
+            data-sf="widget"
+            data-sf-flat
             class="inline-flex shrink-0 items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-            style="border-color: var(--theme-divider-border);">取消</button
+            style="border-color: var(--theme-divider-border); --sf-base: var(--theme-input-bg);">取消</button
         >
         <button
             onclick={() => onsave(cloneSlots(draft))}

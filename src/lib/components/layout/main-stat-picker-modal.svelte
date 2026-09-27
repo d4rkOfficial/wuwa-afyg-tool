@@ -46,10 +46,13 @@
                 >
                 <button
                     onclick={onclose}
+                    data-sf="widget"
+                    data-sf-flat
                     class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {getModalClosePosition() ===
                     'top-left'
                         ? 'order-first'
                         : 'ml-auto'}"
+                    style="--sf-base: var(--theme-input-bg)"
                     aria-label="关闭"
                 >
                     <Icon icon="mdi:close" class="size-4" />
@@ -58,13 +61,18 @@
             <div class="theme-scrollbar space-y-0.5 max-h-56 overflow-y-auto">
                 <button
                     onclick={() => onpick(null)}
-                    class="flex w-full items-center gap-2 rounded-none border border-(--theme-divider-border) bg-(--theme-input-bg) px-3 py-2 text-xs text-left text-(--theme-modal-text)/40 transition-colors hover:border-(--theme-accent-bg)"
-                    >未选择</button
+                    data-sf="widget"
+                    data-sf-flat
+                    class="flex w-full items-center gap-2 rounded-none border border-(--theme-divider-border) px-3 py-2 text-xs text-left text-(--theme-modal-text)/40 transition-colors hover:border-(--theme-accent-bg)"
+                    style="--sf-base: var(--theme-input-bg)">未选择</button
                 >
                 {#each pool as opt (opt.label)}
                     <button
                         onclick={() => onpick({ type: opt.label, value: opt.maxValue, unit: opt.unit })}
-                        class="flex w-full items-center gap-2 rounded-none border border-(--theme-divider-border) bg-(--theme-input-bg) px-3 py-2 text-xs text-left text-(--theme-modal-text) transition-colors hover:border-(--theme-accent-bg)"
+                        data-sf="widget"
+                        data-sf-flat
+                        class="flex w-full items-center gap-2 rounded-none border border-(--theme-divider-border) px-3 py-2 text-xs text-left text-(--theme-modal-text) transition-colors hover:border-(--theme-accent-bg)"
+                        style="--sf-base: var(--theme-input-bg)"
                     >
                         <span class="flex-1 font-black">{opt.label}</span>
                         <span class="text-[10px] font-black text-(--theme-modal-text)/40">{opt.maxValue}{opt.unit}</span

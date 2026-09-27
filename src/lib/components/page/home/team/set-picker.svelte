@@ -160,17 +160,20 @@
                                         <button
                                             onclick={() => togglePiece(set.name, piece)}
                                             disabled={!isPieceAvailable(set.name, piece)}
+                                            data-sf="widget"
+                                            data-sf-flat
                                             class={[
                                                 'rounded-none border px-2.5 py-1 text-xs font-black transition-colors',
                                                 isPieceSelected(set.name, piece)
                                                     ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_15%,transparent)] text-(--theme-accent-text)'
-                                                    : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)',
+                                                    : 'border-(--theme-divider-border) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)',
                                                 !isPieceAvailable(set.name, piece) && !isSelected(set.name)
                                                     ? 'opacity-30 pointer-events-none'
                                                     : ''
                                             ]
                                                 .filter(Boolean)
                                                 .join(' ')}
+                                            style="--sf-base: var(--theme-input-bg)"
                                         >
                                             {piece}件套
                                         </button>
@@ -210,17 +213,20 @@
                                         <button
                                             onclick={() => togglePiece(set.name, piece)}
                                             disabled={!isPieceAvailable(set.name, piece)}
+                                            data-sf="widget"
+                                            data-sf-flat
                                             class={[
                                                 'rounded-none border px-2.5 py-1 text-xs font-black transition-colors',
                                                 isPieceSelected(set.name, piece)
                                                     ? 'border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_15%,transparent)] text-(--theme-accent-text)'
-                                                    : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)',
+                                                    : 'border-(--theme-divider-border) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)',
                                                 !isPieceAvailable(set.name, piece) && !isSelected(set.name)
                                                     ? 'opacity-30 pointer-events-none'
                                                     : ''
                                             ]
                                                 .filter(Boolean)
                                                 .join(' ')}
+                                            style="--sf-base: var(--theme-input-bg)"
                                         >
                                             {piece}件套
                                         </button>

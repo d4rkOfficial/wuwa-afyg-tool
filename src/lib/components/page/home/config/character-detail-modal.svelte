@@ -321,8 +321,10 @@
             <div class="flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">角色</span>
                 <div
+                    data-sf="widget"
+                    data-sf-flat
                     class="flex w-fit gap-1 rounded-none border p-1"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                    style="border-color: var(--theme-divider-border); --sf-base: var(--theme-card-bg);"
                 >
                     {#each [0, 1, 2, 3, 4, 5, 6] as n}
                         {@const active = savedChain === n}
@@ -343,8 +345,10 @@
             <div class="mt-2 flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">武器</span>
                 <div
+                    data-sf="widget"
+                    data-sf-flat
                     class="flex w-fit gap-1 rounded-none border p-1"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
+                    style="border-color: var(--theme-divider-border); --sf-base: var(--theme-card-bg);"
                 >
                     {#each [0, 1, 2, 3, 4, 5] as n}
                         {@const active = savedRefine === n}
@@ -364,8 +368,10 @@
                 </div>
                 <button
                     onclick={() => openHelp('链/阶生效条件说明', refineHelpItems)}
+                    data-sf="widget"
+                    data-sf-flat
                     class="flex size-6 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--theme-modal-text)/10"
-                    style="color: var(--theme-accent-text);"
+                    style="color: var(--theme-accent-text); --sf-base: var(--theme-input-bg);"
                     title="链/阶生效条件说明"
                 >
                     <Icon icon="mdi:help-circle-outline" class="size-4" />

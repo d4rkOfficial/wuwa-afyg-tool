@@ -5,6 +5,8 @@
      * 数据由父组件持有，本组件只渲染与回调，不直接读写 store。
      * costTabsAside=true 时改为左右结构（cost 页签竖排在卡片左侧、文本 4C/3C/1C，左侧底部是无边框图标式重置），工程-词条配置页使用；
      * 不传（默认）则维持上下结构 + 「4 COST」文案，词条集方案编辑器样式不变。
+     * 区域质感：卡片本体、cost 页签、主词条按钮、逐条副词条行与其小按钮统一接入「小部件」区域
+     * （`data-sf="widget" data-sf-flat` + `--sf-base: var(--theme-input-bg)`），底色由「设置-外观主题-背景质感-小部件」管理。
      */
     import Icon from '@iconify/svelte'
     import { slide } from 'svelte/transition'
@@ -80,11 +82,19 @@
         reserveSubstatRows ? Array.from({ length: Math.max(0, 5 - slot.substats.length) }, (_, i) => i) : []
     )
 
-    const costBtnCls = (cost: number): string => {
-        if (cost === 4) return 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/25 text-(--theme-accent-text)'
-        if (cost === 3) return 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-        return 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/8 text-(--theme-accent-text)'
-    }
+    /** @desc 选中态 cost 页签的强调强度（4c / 3c / 1c 依次 25% / 15% / 8%） */
+    const COST_ACTIVE_ALPHA: Record<number, number> = { 4: 25, 3: 15, 1: 8 }
+
+    const costBtnCls = (): string => 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+
+    /**
+     * @desc cost 页签内联底色：未选中交给「小部件」区域底色（`--sf-base` 保持 input 底色）；
+     * 选中态的强调底色内联下发，确保始终优先于区域底色（不依赖工具类与区域底色的层叠先后）
+     */
+    const costBtnStyle = (cost: number, active: boolean): string =>
+        active
+            ? `--sf-base: var(--theme-input-bg); background: color-mix(in srgb, var(--theme-accent-bg) ${COST_ACTIVE_ALPHA[cost] ?? 8}%, transparent)`
+            : '--sf-base: var(--theme-input-bg)'
 
     const getTierIndex = (tiers: number[], value: number): number => {
         if (value <= 0) return -1
@@ -104,17 +114,22 @@
 {/snippet}
 
 {#snippet costTabs()}
+    <!-- 词条 4C/3C/1C 页签本体：底色交给「小部件」区域（未选中取 --sf-base = input 底色，
+         选中态由 costBtnStyle 内联主题色强调），透明度/毛玻璃/深度改由「设置-背景质感-小部件」管理 -->
     {#each COST_OPTIONS as c}
         <button
             onclick={() => oncost(c)}
             disabled={c !== slot.cost && otherCost + c > 12}
+            data-sf="widget"
+            data-sf-flat
             class={[
                 'rounded-none border text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-30',
                 costTabsAside ? 'flex size-8 shrink-0 items-center justify-center' : 'h-6 min-w-0 flex-1 px-1',
                 slot.cost === c
-                    ? costBtnCls(slot.cost)
-                    : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/40 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
-            ].join(' ')}>{costTabsAside ? `${c}C` : `${c} COST`}</button
+                    ? costBtnCls()
+                    : 'border-(--theme-divider-border) text-(--theme-modal-text)/40 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
+            ].join(' ')}
+            style={costBtnStyle(c, slot.cost === c)}>{costTabsAside ? `${c}C` : `${c} COST`}</button
         >
     {/each}
 {/snippet}
@@ -127,8 +142,8 @@
             onclick={onmainstat}
             data-sf="widget"
             data-sf-flat
-            class="w-full rounded-none border px-3 py-2 transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]"
-            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+            class="w-full rounded-none border px-3 py-2 transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--sf-mix,var(--theme-input-bg)))]"
+            style="border-color: var(--theme-divider-border); --sf-base: var(--theme-input-bg);"
         >
             <div class="flex items-center justify-between">
                 <div class="flex flex-col text-left">
@@ -171,6 +186,8 @@
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         data-substat
+                        data-sf="widget"
+                        data-sf-flat
                         role="listitem"
                         transition:slide={{ duration: 200 }}
                         class={[
@@ -179,7 +196,7 @@
                             isDragged && !dragOutside && 'ring-2 ring-(--theme-accent-bg)',
                             isDragged && dragOutside && 'ring-2 ring-red-500 opacity-50'
                         ].join(' ')}
-                        style="background: var(--theme-input-bg);"
+                        style="--sf-base: var(--theme-input-bg);"
                         onpointerdown={(e) => ondragstart?.(e, idx)}
                         onpointermove={ondragmove}
                         onpointerup={(e) => ondragend?.(e, idx)}
@@ -215,7 +232,10 @@
                         {#if onremovesubstat}
                             <button
                                 onclick={() => onremovesubstat(idx)}
+                                data-sf="widget"
+                                data-sf-flat
                                 class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                                style="--sf-base: var(--theme-input-bg)"
                                 title="移除该副词条"
                             >
                                 <Icon icon="mdi:close" class="size-3.5" />
@@ -248,7 +268,10 @@
                 {#if slot.substats.length < 5}
                     <button
                         onclick={onaddsubstat}
+                        data-sf="widget"
+                        data-sf-flat
                         class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
+                        style="--sf-base: var(--theme-input-bg)"
                     >
                         <Icon icon="mdi:plus" class="size-3" />
                         选择副词条
@@ -257,7 +280,10 @@
                 {#if !costTabsAside}
                     <button
                         onclick={onclearsubstats}
+                        data-sf="widget"
+                        data-sf-flat
                         class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
+                        style="--sf-base: var(--theme-input-bg)"
                         title="清空该声骸的副词条"
                     >
                         <Icon icon="mdi:refresh" class="size-3" />
@@ -269,7 +295,10 @@
             <div class="mt-2 flex flex-wrap items-center gap-2">
                 <button
                     onclick={onaddsubstat}
+                    data-sf="widget"
+                    data-sf-flat
                     class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
+                    style="--sf-base: var(--theme-input-bg)"
                 >
                     <Icon icon="mdi:plus" class="size-3" />
                     选择副词条
@@ -277,7 +306,10 @@
                 {#if onenhance}
                     <button
                         onclick={onenhance}
+                        data-sf="widget"
+                        data-sf-flat
                         class="flex items-center gap-1 rounded-none border border-(--theme-divider-border) px-2 py-1 text-[10px] font-black text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-input-bg)"
+                        style="--sf-base: var(--theme-input-bg)"
                     >
                         <Icon icon="mdi:dice-5" class="size-3" />
                         随机强化
@@ -289,7 +321,8 @@
 {/snippet}
 
 <div
-    data-sf="card"
+    data-sf="widget"
+    data-sf-flat
     class="relative min-w-[13rem] rounded-none border p-4 {className ?? ''}"
     style="border-color: var(--theme-divider-border); {styleProp || ''}"
 >
@@ -302,7 +335,10 @@
                     <div class="mt-auto flex flex-col items-center border-t border-(--theme-divider-border) pt-1.5">
                         <button
                             onclick={onclearsubstats}
+                            data-sf="widget"
+                            data-sf-flat
                             class="flex size-8 cursor-pointer items-center justify-center rounded-none text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
+                            style="--sf-base: var(--theme-input-bg)"
                             title="清空该声骸的副词条"
                         >
                             <Icon icon="mdi:refresh" class="size-4" />

@@ -21,10 +21,12 @@
 </script>
 
 <div
-    class={['flex rounded-none border border-(--theme-divider-border) bg-(--theme-input-bg) p-0.5', className || '']
+    data-sf="widget"
+    data-sf-flat
+    class={['flex rounded-none border border-(--theme-divider-border) p-0.5', className || '']
         .filter(Boolean)
         .join(' ')}
-    style={styleProp}
+    style="--sf-base: var(--theme-input-bg); {styleProp || ''}"
     role="tablist"
 >
     {#each tabs as tab, i}

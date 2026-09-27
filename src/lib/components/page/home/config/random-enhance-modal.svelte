@@ -57,7 +57,10 @@
             <button
                 onclick={onclose}
                 disabled={running}
+                data-sf="widget"
+                data-sf-flat
                 class="ml-auto rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                style="--sf-base: var(--theme-input-bg)"
             >
                 <Icon icon="mdi:close" class="size-4" />
             </button>
@@ -72,13 +75,17 @@
                 <button
                     onclick={() => toggleType(type)}
                     disabled={running}
+                    data-sf="widget"
+                    data-sf-flat
                     class={[
                         'flex w-full items-center gap-2 rounded-none border px-3 py-2 text-xs text-left transition-colors',
                         isSelected
                             ? 'border-(--theme-accent-bg) font-black text-(--theme-modal-text)'
-                            : 'border-(--theme-divider-border) bg-(--theme-input-bg) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
+                            : 'border-(--theme-divider-border) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
                     ].join(' ')}
-                    style={isSelected ? 'background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);' : ''}
+                    style="--sf-base: var(--theme-input-bg);{isSelected
+                        ? ' background: color-mix(in srgb, var(--theme-accent-bg) 12%, var(--sf-mix, transparent));'
+                        : ''}"
                 >
                     <span class="flex-1">{type}</span>
                     {#if isSelected}

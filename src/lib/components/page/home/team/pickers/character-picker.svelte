@@ -132,7 +132,10 @@
                 {#if query}
                     <button
                         onclick={() => (query = '')}
+                        data-sf="widget"
+                        data-sf-flat
                         class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
+                        style="--sf-base: var(--theme-input-bg)"
                         aria-label="Clear search"
                     >
                         <Icon icon="mdi:close" class="size-4" />
@@ -263,7 +266,10 @@
                         {#each ELEMENT_ORDER as el}
                             <button
                                 onclick={() => scrollToElement(el)}
+                                data-sf="widget"
+                                data-sf-flat
                                 class="flex size-7 items-center justify-center rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-(--theme-modal-text)"
+                                style="--sf-base: var(--theme-input-bg)"
                                 title={el}
                             >
                                 {#if elementIcons[el]}
