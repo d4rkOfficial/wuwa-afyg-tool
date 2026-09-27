@@ -60,12 +60,22 @@ let _historyBase: CalcState | null = null
 let _historyVersion = $state(0)
 let _historyDirty = false
 let _historyScheduled = false
+/**
+ * @desc store 自身触发的回写标记：`markTableDirty()` / 撤销重做 / AI 工具改写都会用 `_onupdate` 通知宿主，
+ * 宿主把新状态作为 `savedState` 再传回 `init()` —— 这属于「自证回写」，**不是**外部数据变化，
+ * 因此不能刷新基线与历史。置位后由下一次 `init()` 消费并清除。
+ */
+let _updateInFlight = false
 
 /** @desc 表格快照（撤销/重做只覆盖这些数据；条目由时间线派生，不纳入历史） */
 const tableSnapshot = (): CalcState => getCalcState()
 
 /** @desc 标记表格已变更：微任务合并后压入撤销栈（与基线无差异时忽略） */
 export function markTableDirty(): void {
+    // 基线兜底：`markTableDirty()` 必须在写操作**之前**调用（各 mutation 均遵守），
+    // 因此此刻的快照就是「变更前状态」。若基线尚未建立（例如本会话还没有任何 init 落基线），
+    // 这里同步补种基线 —— 保证第一次修改也能撤销（微任务里的基线会晚于本 tick 内的同步写操作）。
+    if (_historyBase === null) _historyBase = tableSnapshot()
     _historyDirty = true
     if (_historyScheduled) return
     _historyScheduled = true
@@ -91,7 +101,10 @@ const applyTableSnapshot = (snap: CalcState): void => {
     _damageEntryBuffSetIds = JSON.parse(JSON.stringify(snap.damageEntryBuffSetIds ?? {}))
     _damageEntryDamageTypes = JSON.parse(JSON.stringify(snap.damageEntryDamageTypes ?? {}))
     _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
-    if (_onupdate) _onupdate(tableSnapshot())
+    if (_onupdate) {
+        _updateInFlight = true
+        _onupdate(tableSnapshot())
+    }
 }
 
 /** @desc 撤销上一次表格变更（只回退表格，不动排轴/词条） */
@@ -149,24 +162,33 @@ export function resetTableHistory(): void {
 }
 
 /** @desc 初始化/重建整个 store：写入队伍与时间线、加载保存态（过滤[配置]自动块）、重建伤害条目、同步全局 buff；返回前清理孤儿绑定 */
-/** @desc 上次 init 的轻量指纹（数据未变时幂等短路，避免勾选回写触发全量重建） */
-let _lastInitKey = ''
+/**
+ * @desc 上次 init 的「身份指纹」：队伍 + 时间线身份 + 锁定态（**不含** savedState 内容）。
+ * 身份变化 = 换工程 / 换队伍 / 换阶段锁定态 → 表格历史必须重置；
+ * 同一工程内数据自身变化（勾选回写）只刷新基线，不得清空历史。
+ */
+let _lastInitIdentity = ''
+/**
+ * @desc 上次 init 的「数据指纹」：savedState 内容。数据指纹变化只更新基线（不重建、不清历史）。
+ */
+let _lastInitData = ''
 
-function initKey(
+/** @desc 队伍指纹：角色 + 武器（换人/换武器都属于身份变化） */
+const teamFingerprint = (team: [CharSlot, CharSlot, CharSlot]): string =>
+    team.map((s) => `${s.character ?? ''}|${s.weapon ?? ''}`).join(',')
+
+/** @desc 时间线身份指纹：参考线/操作块/伤害块的数量与首末 id（内容位移不算身份变化） */
+const timelineFingerprint = (timelineData: TimelineData | null): string => {
+    const tl = timelineData
+    if (!tl) return 'null'
+    return `${tl.refLines.length}:${tl.refLines[0]?.id ?? ''}:${tl.refLines[tl.refLines.length - 1]?.id ?? ''}|${tl.opBlocks.length}:${tl.opBlocks[0]?.id ?? ''}:${tl.opBlocks[tl.opBlocks.length - 1]?.id ?? ''}|${tl.damageBlocks.length}:${tl.damageBlocks[0]?.id ?? ''}:${tl.damageBlocks[tl.damageBlocks.length - 1]?.id ?? ''}`
+}
+
+const initIdentity = (
     team: [CharSlot, CharSlot, CharSlot],
     timelineData: TimelineData | null,
-    savedState: CalcState | null,
     locked: boolean
-): string {
-    const tl = timelineData
-    const tlFp = tl
-        ? `${tl.refLines.length}:${tl.refLines[0]?.id ?? ''}:${tl.refLines[tl.refLines.length - 1]?.id ?? ''}|${tl.opBlocks.length}:${tl.opBlocks[0]?.id ?? ''}:${tl.opBlocks[tl.opBlocks.length - 1]?.id ?? ''}|${tl.damageBlocks.length}:${tl.damageBlocks[0]?.id ?? ''}:${tl.damageBlocks[tl.damageBlocks.length - 1]?.id ?? ''}`
-        : 'null'
-    const st = savedState ? JSON.stringify(savedState) : null
-    const stFp = st ?? 'null'
-    const teamFp = team.map((s) => `${s.character ?? ''}|${s.weapon ?? ''}`).join(',')
-    return `${teamFp}|${tlFp}|${stFp}|${locked}`
-}
+): string => `${teamFingerprint(team)}|${timelineFingerprint(timelineData)}|${locked}`
 
 export function init(
     team: [CharSlot, CharSlot, CharSlot],
@@ -177,16 +199,28 @@ export function init(
 ) {
     _locked = locked
     _onupdate = onupdate
-    const key = initKey(team, timelineData, savedState, locked)
-    if (key === _lastInitKey) {
-        // 幂等短路：数据未变（如 onupdate 回写自证），仅更新回调引用，跳过全量重建
+    const identity = initIdentity(team, timelineData, locked)
+    const dataFp = savedState ? JSON.stringify(savedState) : 'null'
+    if (identity === _lastInitIdentity && dataFp === _lastInitData) {
+        // 幂等短路：身份与数据都未变（如 onupdate 回写自证），仅更新回调引用，跳过全量重建
+        _updateInFlight = false
         _initTeam = team
         _initTimelineData = timelineData
         return
     }
-    _lastInitKey = key
+    const identityChanged = identity !== _lastInitIdentity
+    /** @desc 本次 savedState 是否来自 store 自身的回写（而非外部数据变化） */
+    const selfEcho = _updateInFlight
+    _updateInFlight = false
+    _lastInitIdentity = identity
+    _lastInitData = dataFp
     _initTeam = team
     _initTimelineData = timelineData
+
+    if (!identityChanged && selfEcho) {
+        // 自身编辑的回写：store 内部已是权威状态，不做任何重载（避免覆盖进行中的编辑）
+        return
+    }
 
     const names = team.map((s) => s.character).filter(Boolean) as string[]
     const haveAllElements = names.every((n) => getCharElementMap()[n])
@@ -220,10 +254,19 @@ export function init(
     }
     _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
     rebindGlobalBuffs()
-    // 重载工程后历史基线重置（避免把上一个工程的表格状态撤销回来）
-    resetTableHistory()
-    if (pruneOrphanedBindings()) {
-        if (_onupdate) _onupdate(getCalcState())
+    if (identityChanged) {
+        // 身份变化（换工程/换队伍/换锁定态）：清空历史，避免把上一个身份的表格状态撤销回来；
+        // 随后立刻落一次基线 —— 让「第一次修改」也能被撤销
+        // （markTableDirty 在没有基线时只建立基线不压栈）。
+        resetTableHistory()
+        _historyBase = tableSnapshot()
+    }
+    const pruned = pruneOrphanedBindings()
+    if (pruned) {
+        if (_onupdate) {
+            _updateInFlight = true
+            _onupdate(getCalcState())
+        }
     }
 }
 
@@ -490,6 +533,7 @@ export function createBuffSet(name: string): string | undefined {
         zones: [],
         scope: 'all'
     }
+    markTableDirty()
     _buffSets = [..._buffSets, buffSet]
     return buffSet.id
 }
@@ -594,6 +638,7 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
     if (!fresh.length) return 0
     // 导入前按条目名自然排序：数字段按数值（1层 < 2层 < 10层 < 11层），其余按 unicode 码点
     fresh.sort((a, b) => compareNatural(a.name, b.name))
+    markTableDirty()
     _buffSets = [..._buffSets, ...fresh]
     return fresh.length
 }
@@ -639,6 +684,7 @@ export function duplicateBuffSet(id: string, customName?: string): string | unde
     const idx = _buffSets.findIndex((s) => s.id === id)
     const next = [..._buffSets]
     next.splice(idx + 1, 0, buffSet)
+    markTableDirty()
     _buffSets = next
     return newId
 }
@@ -847,7 +893,10 @@ export function setBuffSetGlobal(id: string, global: boolean): boolean {
     }
 
     rebindGlobalBuffs()
-    if (_onupdate) _onupdate(getCalcState())
+    if (_onupdate) {
+        _updateInFlight = true
+        _onupdate(getCalcState())
+    }
     return true
 }
 
@@ -900,7 +949,10 @@ export function setBuffSetsGlobal(ids: string[], global: boolean): boolean {
         _damageEntryBuffSetIds = next
     }
     rebindGlobalBuffs()
-    if (_onupdate) _onupdate(getCalcState())
+    if (_onupdate) {
+        _updateInFlight = true
+        _onupdate(getCalcState())
+    }
     return true
 }
 
@@ -1159,6 +1211,7 @@ export function reorderNonGlobalBuffSets(orderedIds: string[]) {
     const nonGlobalMap = new Map(_buffSets.filter((bs) => !_globalBuffSetIds.includes(bs.id)).map((bs) => [bs.id, bs]))
     const reordered = orderedIds.map((id) => nonGlobalMap.get(id)).filter(Boolean) as BuffSet[]
     const remaining = _buffSets.filter((bs) => !_globalBuffSetIds.includes(bs.id) && !orderedIds.includes(bs.id))
+    markTableDirty()
     _buffSets = [...global, ...reordered, ...remaining]
 }
 
@@ -1186,7 +1239,10 @@ export function getCalcState(): CalcState {
 /** @desc 通知宿主持久化当前计算态（AI 工具修改后调用） */
 export function notifyCalcUpdate() {
     markTableDirty()
-    if (_onupdate) _onupdate(getCalcState())
+    if (_onupdate) {
+        _updateInFlight = true
+        _onupdate(getCalcState())
+    }
 }
 
 /** @desc 伤害条目被复制/拆分后，按旧 id→新 id 映射重绑 buff 与伤害类型（key 前缀匹配） */
@@ -1209,7 +1265,10 @@ export function remapDuplicatedDamageBuffs(damageMap: Record<string, string>) {
     _damageEntryBuffSetIds = remapTable(_damageEntryBuffSetIds)
     _damageEntryDamageTypes = remapTable(_damageEntryDamageTypes)
     rebindGlobalBuffs()
-    if (_onupdate) _onupdate(getCalcState())
+    if (_onupdate) {
+        _updateInFlight = true
+        _onupdate(getCalcState())
+    }
 }
 
 /** @desc 重建全局 buff 绑定：把每个标记为 global 的 buff 按作用域挂到所有适用条目上。

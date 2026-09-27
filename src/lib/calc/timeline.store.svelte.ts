@@ -59,8 +59,13 @@ function assertUnlocked(): boolean {
 }
 let _onupdate: ((data: TimelineData) => void) | undefined = $state()
 const MAX_HISTORY = 100
-let _undoStack: TimelineData[] = []
-let _redoStack: TimelineData[] = []
+/**
+ * @desc 撤销/重做栈：用 `$state` 承载（每次变更整体替换数组引用），
+ * 这样底部工具栏的禁用态 `canUndo()/canRedo()` 才能实时跟着历史变化走 ——
+ * 历史与锁定态无关：任何排轴修改（拖动/新增/删除/改名/格式化/参考线/伤害块）都会经过 `save()` 压栈。
+ */
+let _undoStack = $state<TimelineData[]>([])
+let _redoStack = $state<TimelineData[]>([])
 let _lastCommitted: TimelineData | null = null
 let _clipboard: {
     refLines: RefLine[]
@@ -204,8 +209,9 @@ function save() {
         JSON.stringify(_lastCommitted) !== JSON.stringify(snap)
     if (changed) {
         if (_lastCommitted) {
-            _undoStack.push(_lastCommitted)
-            if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
+            // 整体替换数组（而非 push），保证 $state 代理的响应式能被 canUndo()/canRedo() 观察到
+            const next = [..._undoStack, _lastCommitted]
+            _undoStack = next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next
             _redoStack = []
         }
         _lastCommitted = snap
@@ -217,12 +223,13 @@ function save() {
 
 export function undo() {
     if (!assertUnlocked()) return
-    const prev = _undoStack.pop()
+    const prev = _undoStack[_undoStack.length - 1]
     if (!prev) {
         addToast('没有可撤销的操作', 'info')
         return
     }
-    _redoStack.push(cloneData())
+    _undoStack = _undoStack.slice(0, -1)
+    _redoStack = [..._redoStack, cloneData()]
     _lastCommitted = prev
     applyData(prev)
     if (_onupdate) _onupdate(prev)
@@ -230,18 +237,19 @@ export function undo() {
 
 export function redo() {
     if (!assertUnlocked()) return
-    const next = _redoStack.pop()
+    const next = _redoStack[_redoStack.length - 1]
     if (!next) {
         addToast('没有可重做的操作', 'info')
         return
     }
-    _undoStack.push(cloneData())
+    _redoStack = _redoStack.slice(0, -1)
+    _undoStack = [..._undoStack, cloneData()]
     _lastCommitted = next
     applyData(next)
     if (_onupdate) _onupdate(next)
 }
 
-/** @desc 是否可撤销 / 可重做（底部工具栏按钮禁用态用） */
+/** @desc 是否可撤销 / 可重做（底部工具栏按钮禁用态用；读 `$state` 栈，历史一变即重算） */
 export function canUndo(): boolean {
     return _undoStack.length > 0
 }

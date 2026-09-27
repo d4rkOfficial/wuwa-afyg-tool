@@ -165,46 +165,8 @@
         resizingSidebar = true
     }
 
-    /** @desc ── 右栏「添加乘区」宽度拖拽调节（同一套三态高亮 + rAF 节流；拖的是左缘分割线） ── */
-    let zoneBarWidth = $state(208)
-    let zoneBarDragging = $state(false)
-    let zoneBarHover = $state(false)
-    let zoneBarStartX = 0
-    let zoneBarStartWidth = 208
-    $effect(() => {
-        if (!zoneBarDragging) return
-        let pending: number | null = null
-        let target = zoneBarWidth
-        const onMove = (e: MouseEvent) => {
-            // 拖的是右侧栏左缘：向左拖 = 变宽
-            target = Math.max(160, Math.min(420, zoneBarStartWidth + (zoneBarStartX - e.clientX)))
-            if (pending !== null) return
-            pending = requestAnimationFrame(() => {
-                pending = null
-                zoneBarWidth = target
-            })
-        }
-        const onUp = () => {
-            if (pending !== null) {
-                cancelAnimationFrame(pending)
-                pending = null
-            }
-            zoneBarWidth = target
-            zoneBarDragging = false
-        }
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', onUp)
-        return () => {
-            window.removeEventListener('mousemove', onMove)
-            window.removeEventListener('mouseup', onUp)
-        }
-    })
-    function zoneBarHandleDown(e: PointerEvent) {
-        e.preventDefault()
-        zoneBarStartX = e.clientX
-        zoneBarStartWidth = zoneBarWidth
-        zoneBarDragging = true
-    }
+    /** @desc ── 右栏「添加乘区」固定宽度（不再支持拖拽调宽）── */
+    const ZONE_BAR_WIDTH = 208
 
     /** @desc 全局 buff 的标签颜色：全队=黄，否则取归属角色元素色 */
     function globalBuffColor(buffSet: { scope: number[] | 'all' }): string {
@@ -1204,12 +1166,24 @@
 
     /**
      * @desc 目录下的全部成员 Buff（数字目录直接取 children；
-     * 「全局 Buff」目录还要并入二级子目录的成员，否则批量操作会漏掉它们）
+     * 「全局 Buff」目录还要并入二级子目录的成员，否则批量操作会漏掉它们；
+     * 二级子目录自身的数字子目录（`children`）也一并并入）
      */
     const folderMembersOf = (folder: GroupedBuffSetItem): BuffSet[] => [
         ...(folder.children ?? []),
-        ...((folder as BuffTreeNode).gateChildren ?? []).flatMap((gate) => gate.children ?? [])
+        ...((folder as BuffTreeNode).gateChildren ?? []).flatMap((gate) => folderMembersOf(gate))
     ]
+    /**
+     * @desc 目录（含**嵌套子目录**）内是否存在收藏条目。
+     * 数字目录只会出现在 `children` 里（界面就地派生，不是独立节点），
+     * 而二级目录走 `gateChildren`，所以这里按节点递归即可覆盖全部层级。
+     */
+    const folderHasStar = (folder: GroupedBuffSetItem): boolean =>
+        (folder.children ?? []).some((c) => c.starred) ||
+        ((folder as BuffTreeNode).gateChildren ?? []).some((g) => folderHasStar(g))
+    /** @desc 普通目录图标配色：内部有收藏条目才标黄，否则灰色（特殊图标目录——链/武器头像——不受影响） */
+    const folderIconClass = (folder: GroupedBuffSetItem, base: string): string =>
+        folderHasStar(folder) ? `${base} text-amber-400` : `${base} opacity-60`
     const teamIconOf = (idx: number): string | undefined => {
         const name = team[idx]?.character
         return name ? charIconMap[name] : undefined
@@ -1238,8 +1212,8 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             data-sf="modal"
-            class="animate-pop-in w-full max-h-[95vh] h-full max-w-6xl rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col my-4"
-            style="border-color: var(--theme-divider-border);"
+            class="animate-pop-in w-full max-h-[95vh] h-full rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col my-4"
+            style="border-color: var(--theme-divider-border); width: min(1180px, calc(100vw - 2rem)); max-width: 100%;"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
         >
@@ -1346,18 +1320,20 @@
                                                         class="size-4 shrink-0 text-(--theme-accent-text)"
                                                     />
                                                 {:else if isGlobalFolder}
-                                                    <Icon icon="mdi:crown" class="size-4 shrink-0 text-amber-400" />
+                                                    <Icon
+                                                        icon="mdi:crown"
+                                                        class={folderIconClass(item, 'size-4 shrink-0')}
+                                                    />
                                                 {:else}
                                                     <!-- 叠层（数字前后缀）目录：可整组拖动 -->
                                                     <Icon
                                                         icon={collapsedFolders.has(item.prefix!)
                                                             ? 'mdi:folder-account-outline'
                                                             : 'mdi:folder-account'}
-                                                        class={`drag-handle touch-none select-none cursor-grab active:cursor-grabbing size-4 shrink-0 ${
-                                                            folderMembers.some((c) => c.starred)
-                                                                ? 'text-amber-400'
-                                                                : 'opacity-60'
-                                                        }`}
+                                                        class={folderIconClass(
+                                                            item,
+                                                            'drag-handle touch-none select-none cursor-grab active:cursor-grabbing size-4 shrink-0'
+                                                        )}
                                                     />
                                                 {/if}
                                                 <span class="truncate flex-1">{item.name}</span>
@@ -2120,26 +2096,9 @@
                                 </div>
                             {/if}
                         </div>
-                        <!-- @desc 右栏乘区清单：点击即**添加**一个乘区条目（同一乘区可添加多次，各自独立配置）；左缘分割线可拖拽调宽 -->
+                        <!-- @desc 右栏乘区清单：点击即**添加**一个乘区条目（同一乘区可添加多次，各自独立配置）；宽度固定 -->
                         {#if selectedBuffSet}
-                            <!-- svelte-ignore a11y_no_static_element_interactions -->
-                            <div
-                                class="shrink-0 w-1 cursor-col-resize"
-                                style="background: {zoneBarDragging
-                                    ? 'var(--theme-accent-bg)'
-                                    : zoneBarHover
-                                      ? 'color-mix(in srgb, var(--theme-accent-bg) 45%, transparent)'
-                                      : 'color-mix(in srgb, var(--theme-divider-border) 80%, transparent)'};{zoneBarDragging
-                                    ? ' box-shadow: 0 0 10px color-mix(in srgb, var(--theme-accent-bg) 55%, transparent);'
-                                    : zoneBarHover
-                                      ? ' box-shadow: 0 0 8px color-mix(in srgb, var(--theme-accent-bg) 30%, transparent);'
-                                      : ''}"
-                                title="拖拽调整宽度"
-                                onmouseenter={() => (zoneBarHover = true)}
-                                onmouseleave={() => (zoneBarHover = false)}
-                                onpointerdown={zoneBarHandleDown}
-                            ></div>
-                            <div class="shrink-0 border-l flex flex-col" style="width: {zoneBarWidth}px;">
+                            <div class="shrink-0 border-l flex flex-col" style="width: {ZONE_BAR_WIDTH}px;">
                                 <div class="shrink-0 px-3 pt-3 pb-1.5">
                                     <div class="flex items-center gap-1.5">
                                         <Icon
@@ -2820,7 +2779,7 @@
                 {:else}
                     <Icon
                         icon={collapsedFolders.has(subKey) ? 'mdi:folder' : 'mdi:folder-open'}
-                        class="size-3.5 shrink-0 text-amber-400/70"
+                        class={folderIconClass(sub, 'size-3.5 shrink-0')}
                     />
                 {/if}
                 <span class="truncate flex-1">{sub.name}</span>
@@ -2899,7 +2858,7 @@
             {:else}
                 <Icon
                     icon={collapsedFolders.has(node.prefix!) ? 'mdi:folder-account-outline' : 'mdi:folder-account'}
-                    class="size-4 shrink-0 text-(--theme-accent-text)/70"
+                    class={folderIconClass(node, 'size-4 shrink-0')}
                 />
             {/if}
             <span class="truncate flex-1">{node.name}</span>

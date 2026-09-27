@@ -77,8 +77,9 @@
     /**
      * @desc 底部撤销/重做：排轴阶段回退时间线，拉表阶段只回退表格（Buff / 绑定 / 乘区条件）。
      * 依赖 store 的响应式 getter，禁用态自动跟随历史栈。
+     * 结果页为只读展示，一律隐藏撤销/重做。
      */
-    const showUndoRedo = $derived(activePhase === 'timeline' || activePhase === 'calculation')
+    const showUndoRedo = $derived(!showResult && (activePhase === 'timeline' || activePhase === 'calculation'))
     const undoDisabled = $derived(activePhase === 'timeline' ? !canUndoTimeline() : !canUndoTable())
     const redoDisabled = $derived(activePhase === 'timeline' ? !canRedoTimeline() : !canRedoTable())
     const undoTitle = $derived(
