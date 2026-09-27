@@ -411,7 +411,9 @@
                 <div class="flex flex-1 flex-wrap items-stretch gap-3">
                     <div
                         class={`${CARD} ${CARD_PAD} min-w-48 flex-1`}
-                        style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, var(--theme-card-bg)), color-mix(in srgb, var(--theme-accent-bg) 8%, var(--theme-card-bg))); border-color: color-mix(in srgb, var(--theme-accent-bg) 24%, transparent);"
+                        data-sf="card"
+                        data-sf-flat
+                        style="--sf-base: color-mix(in srgb, var(--theme-accent-bg) 30%, var(--theme-card-bg)); border-color: color-mix(in srgb, var(--theme-accent-bg) 24%, transparent);"
                     >
                         <div class="text-sm font-black tracking-tight text-(--theme-modal-text)">总伤害</div>
                         <div class={`mt-1.5 ${STAT_VALUE_SM} text-(--theme-accent-text)`}>
@@ -426,8 +428,8 @@
                         <div
                             class={`${CARD} ${CARD_PAD} relative min-w-40 flex-1 overflow-hidden`}
                             style={isOther
-                                ? 'background: color-mix(in srgb, var(--theme-modal-text) 4%, var(--theme-input-bg)); border-color: var(--theme-divider-border);'
-                                : `background: color-mix(in srgb, ${elementColor} 10%, var(--theme-input-bg)); border-color: color-mix(in srgb, ${elementColor} 22%, transparent);`}
+                                ? '--sf-base: color-mix(in srgb, var(--theme-modal-text) 8%, var(--theme-card-bg)); border-color: var(--theme-divider-border);'
+                                : `--sf-base: color-mix(in srgb, ${elementColor} 26%, var(--theme-card-bg)); border-color: color-mix(in srgb, ${elementColor} 22%, transparent);`}
                         >
                             <div class="relative flex min-w-0 items-center gap-1.5">
                                 <span class={SWATCH_DOT} style="background: {elementColor};"></span>
@@ -463,30 +465,67 @@
                         class={`${SECTION_LABEL} text-(--theme-modal-text)/45`}
                         style="border-bottom: 1px solid var(--theme-divider-border);"
                     >
-                        <th class="sticky top-0 z-10 py-2 px-3 text-left" style="background: var(--theme-modal-bg);">
+                        <th
+                            class="sticky top-0 z-10 py-2 px-3 text-left"
+                            data-sf="toolbar"
+                            data-sf-under="card"
+                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                        >
                             来源
                         </th>
-                        <th class="sticky top-0 z-10 py-2 px-3 text-left" style="background: var(--theme-modal-bg);">
+                        <th
+                            class="sticky top-0 z-10 py-2 px-3 text-left"
+                            data-sf="toolbar"
+                            data-sf-under="card"
+                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                        >
                             条目
                         </th>
-                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                        <th
+                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            data-sf="toolbar"
+                            data-sf-under="card"
+                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                        >
                             倍率
                         </th>
-                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                        <th
+                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            data-sf="toolbar"
+                            data-sf-under="card"
+                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                        >
                             单位
                         </th>
-                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                        <th
+                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            data-sf="toolbar"
+                            data-sf-under="card"
+                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                        >
                             暴击
                         </th>
-                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                        <th
+                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            data-sf="toolbar"
+                            data-sf-under="card"
+                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                        >
                             不暴击
                         </th>
-                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                        <th
+                            class="sticky top-0 z-10 py-2 px-3 text-right"
+                            data-sf="toolbar"
+                            data-sf-under="card"
+                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                        >
                             期望
                         </th>
                         <th
                             class="sticky top-0 z-10 py-2 px-3 w-8 text-right"
-                            style="background: var(--theme-modal-bg);"
+                            data-sf="toolbar"
+                            data-sf-under="card"
+                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
                         ></th>
                     </tr>
                 </thead>
