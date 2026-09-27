@@ -438,16 +438,6 @@
                             <div class={`relative mt-1.5 ${STAT_VALUE_SM} text-(--theme-modal-text)`}>
                                 {Math.round(cs.totalDamage).toLocaleString()}
                             </div>
-                            {#if !isOther && charIcons[cs.character]}
-                                <!-- @desc 角色头像叠在顶层（75% 不透明，右下半区，不拦截交互） -->
-                                <img
-                                    src={charIcons[cs.character]}
-                                    alt=""
-                                    aria-hidden="true"
-                                    draggable="false"
-                                    class="pointer-events-none absolute -bottom-3 -right-3 h-28 w-28 object-contain opacity-25"
-                                />
-                            {/if}
                         </div>
                     {/each}
                 </div>
