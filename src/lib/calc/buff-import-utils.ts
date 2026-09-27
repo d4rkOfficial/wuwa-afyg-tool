@@ -36,6 +36,7 @@ export function toImportItem(
         scope: b.scope,
         ownerIdx,
         ...(b.condition ? { condition: b.condition } : {}),
+        // 乘区条目（含乘区级生效条件 condition）原样带入，导入时不丢条件
         zones: b.zones
     }
 }

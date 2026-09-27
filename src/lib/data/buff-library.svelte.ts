@@ -1,8 +1,8 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
-import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { getShareBase } from './workshop.svelte'
-import { ZONE_NO_REF_IDS } from '$lib/calc/calculation.consts'
+import { ZONE_MAP, ZONE_NO_REF_IDS, resolveZoneId } from '$lib/calc/calculation.consts'
+import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$lib/calc/condition'
 import type { BuffCondition } from '$lib/calc/calculation.types'
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
@@ -12,60 +12,42 @@ export type BuffLibraryScope = 'self' | 'self_except' | 'team' | 'effect_only'
 export const CHAIN_MAX = 6
 export const REFINE_MAX = 5
 
-const ELEMENT_SET = new Set<string>(ELEMENTS)
-const DAMAGE_TYPE_SET = new Set<string>(DAMAGE_TYPES)
-
-function normalizeCondition(value: unknown): BuffCondition | undefined {
+/**
+ * @desc 归一化实例级条件（链/阶硬门槛）：
+ * 复用工程侧 `normalizeCondition`（旧 `chain`/`refinement` 单值 → `chains`/`refinements` 数组、
+ * 参考角色取 refCharIdx、链阶互斥由运行时护栏保证），只保留链/阶子句。
+ */
+function normalizeGateCondition(value: unknown): BuffCondition | undefined {
     if (!value || typeof value !== 'object') return undefined
-    const c = value as Record<string, unknown>
-    const out: BuffCondition = {}
-    // 旧格式兼容：{ type, min } / { type, elements } / { type, damageTypes }
-    if (c.type === 'chain' || c.type === 'refinement') {
-        const min = typeof c.min === 'number' && Number.isFinite(c.min) ? Math.floor(c.min) : 0
-        const max = c.type === 'chain' ? CHAIN_MAX : REFINE_MAX
-        const minOk = c.type === 'chain' ? min >= 0 : min >= 1
-        if (minOk && min <= max) out[c.type as 'chain' | 'refinement'] = min
-    } else if (c.type === 'element' && Array.isArray(c.elements)) {
-        const elements = c.elements.filter((e): e is string => typeof e === 'string' && ELEMENT_SET.has(e))
-        if (elements.length > 0) out.elements = [...new Set(elements)]
-    } else if (c.type === 'damageType' && Array.isArray(c.damageTypes)) {
-        const damageTypes = c.damageTypes.filter((d): d is string => typeof d === 'string' && DAMAGE_TYPE_SET.has(d))
-        if (damageTypes.length > 0) out.damageTypes = [...new Set(damageTypes)]
+    const full = normalizeCondition(value as BuffCondition, 'buff', 0)
+    const gate: BuffCondition = {
+        ...(full.chains?.length ? { chains: full.chains } : {}),
+        // 链 / 阶互斥：同时存在时只保留链（与引擎运行时护栏一致）
+        ...(!full.chains?.length && full.refinements?.length ? { refinements: full.refinements } : {})
     }
-    // 新格式：独立字段
-    if (typeof c.chain === 'number' && Number.isFinite(c.chain)) {
-        const min = Math.floor(c.chain)
-        if (min >= 0 && min <= CHAIN_MAX) out.chain = min
-    }
-    if (typeof c.refinement === 'number' && Number.isFinite(c.refinement)) {
-        const min = Math.floor(c.refinement)
-        if (min >= 1 && min <= REFINE_MAX) out.refinement = min
-    }
-    if (Array.isArray(c.elements)) {
-        const elements = c.elements.filter((e): e is string => typeof e === 'string' && ELEMENT_SET.has(e))
-        if (elements.length > 0) out.elements = [...new Set(elements)]
-    }
-    if (Array.isArray(c.damageTypes)) {
-        const damageTypes = c.damageTypes.filter((d): d is string => typeof d === 'string' && DAMAGE_TYPE_SET.has(d))
-        if (damageTypes.length > 0) out.damageTypes = [...new Set(damageTypes)]
-    }
-    return Object.keys(out).length > 0 ? out : undefined
+    return isConditionEmpty(gate) ? undefined : gate
 }
 
 function cloneCondition(cond: BuffCondition): BuffCondition {
     return {
-        ...(cond.chain !== undefined ? { chain: cond.chain } : {}),
-        ...(cond.refinement !== undefined ? { refinement: cond.refinement } : {}),
+        ...(cond.chains ? { chains: cond.chains.map((c) => ({ ...c })) } : {}),
+        ...(cond.refinements ? { refinements: cond.refinements.map((c) => ({ ...c })) } : {}),
         ...(cond.elements ? { elements: [...cond.elements] } : {}),
         ...(cond.damageTypes ? { damageTypes: [...cond.damageTypes] } : {})
     }
 }
 
-// 按实体类型限制条件：角色可设共鸣链、武器可设精炼、声骸/套装均不可
+/**
+ * @desc 按实体类型裁剪条件（工坊预设库口径）：
+ * 链条件只属于角色实体、阶条件只属于武器实体；声骸 / 套装的属性·类型条件由乘区级承载，实例级一律清空。
+ */
 function sanitizeConditionForEntity(entityType: BuffEntityType, cond: BuffCondition): BuffCondition | undefined {
     const out = cloneCondition(cond)
-    if (entityType !== 'character') delete out.chain
-    if (entityType !== 'weapon') delete out.refinement
+    if (entityType !== 'character') delete out.chains
+    if (entityType !== 'weapon') delete out.refinements
+    // 实例级不承载属性/类型条件（它们挂在具体乘区上）
+    delete out.elements
+    delete out.damageTypes
     return Object.keys(out).length > 0 ? out : undefined
 }
 
@@ -81,11 +63,14 @@ export interface BuffLibraryZoneRef {
     refOwner?: 'self' | 'owner'
 }
 
+/** @desc 乘区贡献条目：同一乘区可出现多次，每条各带数值 / 引用 / 覆盖 / 自己的乘区级条件 */
 export interface BuffLibraryZone {
     zoneId: string
     value: number
     ref?: BuffLibraryZoneRef
     override?: boolean
+    /** @desc 乘区级生效条件（伤害类型 / 伤害属性；链阶只能挂在整条 Buff 上） */
+    condition?: BuffCondition
 }
 
 export interface BuffLibraryItem {
@@ -229,7 +214,9 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
                     buffName: name,
                     scope: (bb.scope as BuffLibraryScope) ?? undefined,
                     exclusive: !!bb.exclusive,
-                    ...(normalizeCondition(bb.condition) ? { condition: normalizeCondition(bb.condition) } : {}),
+                    ...(normalizeGateCondition(bb.condition)
+                        ? { condition: normalizeGateCondition(bb.condition) }
+                        : {}),
                     zones
                 })
             }
@@ -274,42 +261,31 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
     return [...map.values()]
 }
 
+/**
+ * @desc 归一化乘区贡献条目列表（历史乘区 id 重映射 + 白名单校验 + 引用 / 覆盖 /
+ * **乘区级生效条件**保留 + 允许同乘区多条）：与工程侧 `migration.normalizeZoneList` 同口径，
+ * 这里保留一份实现以免 `data → calc/migration` 的反向依赖。
+ */
 function normalizeZones(value: unknown): BuffLibraryZone[] {
     if (!Array.isArray(value)) return []
     const zones: BuffLibraryZone[] = []
     for (const z of value) {
         if (!z || typeof z !== 'object') continue
         const zo = z as Record<string, unknown>
-        const zoneId = String(zo.zoneId ?? '')
+        const zoneId = resolveZoneId(String(zo.zoneId ?? ''))
+        if (!ZONE_MAP.has(zoneId)) continue
         const num = Number(zo.value)
-        if (!zoneId || Number.isNaN(num)) continue
-        // 层数类乘区（集谐干涉/同奏增益等）只能填固定层数，不保留引用
-        const ref = ZONE_NO_REF_IDS.has(zoneId) ? undefined : normalizeRef(zo.ref)
+        const ref = ZONE_NO_REF_IDS.has(zoneId) ? undefined : (zo.ref as BuffLibraryZoneRef | undefined)
+        const condition = normalizeZoneCondition(zo.condition as BuffCondition | undefined)
         zones.push({
             zoneId,
-            value: num,
+            value: Number.isNaN(num) ? 0 : num,
             ...(ref ? { ref } : {}),
-            ...(zo.override ? { override: true } : {})
+            ...(zo.override ? { override: true } : {}),
+            ...(condition ? { condition } : {})
         })
     }
     return zones
-}
-
-function normalizeRef(value: unknown): BuffLibraryZoneRef | undefined {
-    if (!value || typeof value !== 'object') return undefined
-    const ro = value as Record<string, unknown>
-    const targetZoneId = String(ro.targetZoneId ?? '')
-    const pct = Number(ro.pct)
-    if (!targetZoneId || Number.isNaN(pct)) return undefined
-    const out: BuffLibraryZoneRef = { targetZoneId, pct }
-    if (Number.isFinite(ro.threshold)) out.threshold = Number(ro.threshold)
-    if (Number.isFinite(ro.lower)) out.lower = Number(ro.lower)
-    if (Number.isFinite(ro.upper)) out.upper = Number(ro.upper)
-    if (ro.discrete) out.discrete = true
-    if (Number.isFinite(ro.divisor)) out.divisor = Number(ro.divisor)
-    if (Number.isFinite(ro.multiplier)) out.multiplier = Number(ro.multiplier)
-    if (ro.refOwner === 'self' || ro.refOwner === 'owner') out.refOwner = ro.refOwner
-    return out
 }
 
 async function persist() {
@@ -330,10 +306,11 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
             exclusive: b.exclusive,
             ...(b.condition ? { condition: cloneCondition(b.condition) } : {}),
             zones: b.zones.map((z) => {
+                const copy: BuffLibraryZone = { ...z }
                 // 层数类乘区（集谐干涉/同奏增益等）只填固定层数，持久化前清除历史遗留引用
-                if (!ZONE_NO_REF_IDS.has(z.zoneId)) return { ...z }
-                const copy = { ...z }
-                delete copy.ref
+                if (ZONE_NO_REF_IDS.has(z.zoneId)) delete copy.ref
+                if (copy.condition) copy.condition = cloneCondition(copy.condition)
+                if (copy.ref) copy.ref = { ...copy.ref }
                 return copy
             })
         })
@@ -406,8 +383,8 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
                 buffName: (r.buff_name ?? '').trim(),
                 scope: r.scope,
                 exclusive: !!r.exclusive,
-                ...(normalizeCondition(r.condition) ? { condition: normalizeCondition(r.condition) } : {}),
-                zones: Array.isArray(r.buff_set) ? r.buff_set : []
+                ...(normalizeGateCondition(r.condition) ? { condition: normalizeGateCondition(r.condition) } : {}),
+                zones: normalizeZones(r.buff_set)
             }))
             .filter((row) => ENTITY_TYPES.includes(row.entityType) && !!row.entityName && !!row.buffName)
         mergeShareRows(rows)

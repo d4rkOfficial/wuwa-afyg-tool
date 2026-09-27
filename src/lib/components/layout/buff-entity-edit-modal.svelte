@@ -1,14 +1,26 @@
 <script lang="ts">
+    /**
+     * @desc 工坊 Buff 预设编辑器（「Buff 集 → 编辑预设」打开）：
+     * 数据模型与工程内「BUFF 配置」完全一致 —— 左侧条目列表 / 中部编辑区（作用域 + 链阶硬门槛 + 乘区贡献条目列表）
+     * / 右侧「添加乘区」清单。
+     *
+     * 乘区是**贡献条目列表**：同一乘区可添加多次，每条各带数值 / 引用 / 覆盖 / **自己的乘区级生效条件**；
+     * 覆盖同一乘区唯一；链条件与阶条件互斥（只能挂在整条 Buff 上）。
+     * 数据在本地草稿上编辑，保存时整体写回本地 Buff 集（`updateEntityBuffs`）。
+     */
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
+    import ZoneConditionPanel from '$lib/components/layout/zone-condition-panel.svelte'
     import {
         ZONE_MAP,
         ZONE_NO_REF_IDS,
+        ZONE_NO_OVERRIDE_IDS,
         ZONE_REF_DEFS,
         ZONE_REF_MAP,
         ZONE_SECTION_VIEWS
     } from '$lib/calc/calculation.consts'
+    import type { BuffCondition } from '$lib/calc/calculation.types'
     import type {
         BuffEntityType,
         BuffLibraryBuff,
@@ -16,7 +28,7 @@
         BuffLibraryZoneRef
     } from '$lib/data/buff-library.svelte'
     import { ENTITY_TYPE_LABELS, updateEntityBuffs, CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
-    import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
+    import { describeCondition, describeZoneConditionBadge, isConditionEmpty } from '$lib/calc/condition'
     import { addToast } from '$lib/data/toast.svelte'
     import { slide } from 'svelte/transition'
 
@@ -55,6 +67,9 @@
     let buffs = $state<BuffLibraryBuff[]>([])
     let activeBuffIdx = $state(0)
     let flash = $state<string | null>(null)
+    /** @desc 展开行内「乘区条件」面板的乘区下标（同一乘区可有多条，故用下标定位） */
+    let expandedZoneIdx = $state<number | null>(null)
+    let condPanelOpen = $state(false)
 
     $effect(() => {
         if (open) {
@@ -66,21 +81,46 @@
                     ? {
                           condition: {
                               ...b.condition,
+                              ...(b.condition.chains ? { chains: b.condition.chains.map((c) => ({ ...c })) } : {}),
+                              ...(b.condition.refinements
+                                  ? { refinements: b.condition.refinements.map((c) => ({ ...c })) }
+                                  : {}),
                               ...(b.condition.elements ? { elements: [...b.condition.elements] } : {}),
                               ...(b.condition.damageTypes ? { damageTypes: [...b.condition.damageTypes] } : {})
                           }
                       }
                     : {}),
-                zones: b.zones.map((z) => ({ ...z }))
+                zones: b.zones.map((z) => ({
+                    ...z,
+                    ...(z.ref ? { ref: { ...z.ref } } : {}),
+                    ...(z.condition
+                        ? {
+                              condition: {
+                                  ...z.condition,
+                                  ...(z.condition.elements ? { elements: [...z.condition.elements] } : {}),
+                                  ...(z.condition.damageTypes ? { damageTypes: [...z.condition.damageTypes] } : {})
+                              }
+                          }
+                        : {})
+                }))
             }))
             activeBuffIdx = 0
+            expandedZoneIdx = null
+            condPanelOpen = false
             flash = null
         }
     })
 
     const activeBuff = $derived(buffs[activeBuffIdx] ?? null)
-    const activeZoneIds = $derived(new Set((activeBuff?.zones ?? []).map((z) => z.zoneId)))
+    const activeZones = $derived(activeBuff?.zones ?? [])
     const canSave = $derived(buffs.some((b) => b.buffName.trim() && b.zones.length > 0))
+
+    /** @desc 各乘区当前条目数（右栏「添加乘区」计数徽标用） */
+    const zoneCounts = $derived.by(() => {
+        const map = new Map<string, number>()
+        for (const z of activeZones) map.set(z.zoneId, (map.get(z.zoneId) ?? 0) + 1)
+        return map
+    })
 
     const SCOPE_TABS: { value: BuffLibraryScope; label: string }[] = [
         { value: 'self', label: '自己' },
@@ -93,10 +133,41 @@
         return ZONE_MAP.get(id as never)?.label ?? id
     }
 
-    let condPanelOpen = $state(false)
+    function zoneUnit(id: string) {
+        return ZONE_MAP.get(id as never)?.unit === '%' ? '%' : ''
+    }
 
-    function toggleCondPanel() {
-        condPanelOpen = !condPanelOpen
+    /** @desc 各实体类型可配置的硬门槛：角色 = 共鸣链、武器 = 精炼（与工坊业务口径一致） */
+    const canChain = $derived(entityType === 'character')
+    const canRefinement = $derived(entityType === 'weapon')
+
+    /**
+     * @desc 设置实例级链门槛（再次点击取消）。
+     * 链条件与阶条件**只能生效其中一个**：设置链会清空全部阶条件。
+     */
+    function setBuffChain(min: number) {
+        const cond = activeBuff?.condition ?? {}
+        const clearing = (cond.chains?.[0]?.min ?? cond.chain) === min
+        const next: BuffCondition = { ...cond }
+        delete next.chain
+        delete next.refinement
+        delete next.refinements
+        if (clearing) delete next.chains
+        else next.chains = [{ charIdx: 0, min }]
+        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: next } : b))
+    }
+
+    /** @desc 设置实例级阶门槛（再次点击取消）；设置阶会清空全部链条件 */
+    function setBuffRefinement(min: number) {
+        const cond = activeBuff?.condition ?? {}
+        const clearing = (cond.refinements?.[0]?.min ?? cond.refinement) === min
+        const next: BuffCondition = { ...cond }
+        delete next.chain
+        delete next.chains
+        delete next.refinement
+        if (clearing) delete next.refinements
+        else next.refinements = [{ charIdx: 0, min }]
+        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: next } : b))
     }
 
     function clearCondition() {
@@ -104,62 +175,33 @@
         condPanelOpen = false
     }
 
-    // 各实体类型可配置的条件：角色可设共鸣链、武器可设精炼、声骸/套装均不可
-    const canChain = $derived(entityType === 'character')
-    const canRefinement = $derived(entityType === 'weapon')
-
+    /** @desc 门槛条件摘要（只描述链/阶硬门槛；属性/类型条件挂在乘区上） */
     const conditionSummary = $derived.by(() => {
         const cond = activeBuff?.condition
         if (!cond) return ''
         const parts: string[] = []
-        if (cond.chain !== undefined && canChain) parts.push(`${entityName} ≥${cond.chain}链`)
-        if (cond.refinement !== undefined && canRefinement) parts.push(`${entityName} ≥${cond.refinement}阶`)
-        if (cond.elements?.length) parts.push(`伤害属性 ${cond.elements.join('/')}`)
-        if (cond.damageTypes?.length)
-            parts.push(`伤害类型 ${cond.damageTypes.map((d) => DAMAGE_TYPE_SHORT[d] ?? d).join('/')}`)
+        const chain = cond.chains?.[0]?.min ?? cond.chain
+        if (chain !== undefined && canChain) parts.push(chain > 0 ? `≥${chain}链` : '角色本体')
+        const refine = cond.refinements?.[0]?.min ?? cond.refinement
+        if (refine !== undefined && canRefinement) parts.push(`武器 ≥${refine}阶`)
         return parts.join('，')
     })
 
-    function setBuffChain(min: number) {
-        const cond = activeBuff?.condition ?? {}
-        const next = cond.chain === min ? { ...cond, chain: undefined } : { ...cond, chain: min }
-        if (next.chain === undefined) delete next.chain
-        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: next } : b))
-    }
-
-    function setBuffRefinement(min: number) {
-        const cond = activeBuff?.condition ?? {}
-        const next = cond.refinement === min ? { ...cond, refinement: undefined } : { ...cond, refinement: min }
-        if (next.refinement === undefined) delete next.refinement
-        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: next } : b))
-    }
-
-    function toggleConditionElement(el: string) {
-        const cond = activeBuff?.condition ?? {}
-        const list = cond.elements ?? []
-        const next = list.includes(el) ? list.filter((e) => e !== el) : [...list, el]
-        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: { ...cond, elements: next } } : b))
-    }
-
-    function toggleConditionDamageType(dt: string) {
-        const cond = activeBuff?.condition ?? {}
-        const list = cond.damageTypes ?? []
-        const next = list.includes(dt) ? list.filter((d) => d !== dt) : [...list, dt]
-        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: { ...cond, damageTypes: next } } : b))
-    }
-
     function selectBuff(idx: number) {
         activeBuffIdx = idx
+        expandedZoneIdx = null
     }
 
     function addBuff() {
         buffs = [...buffs, { buffName: '', scope: 'team', exclusive: false, zones: [] }]
         activeBuffIdx = buffs.length - 1
+        expandedZoneIdx = null
     }
 
     function removeBuff(idx: number) {
         buffs = buffs.filter((_, i) => i !== idx)
         if (activeBuffIdx >= buffs.length) activeBuffIdx = Math.max(0, buffs.length - 1)
+        expandedZoneIdx = null
     }
 
     function renameBuff(idx: number, value: string) {
@@ -170,54 +212,61 @@
         buffs = buffs.map((b, i) => (i === idx ? { ...b, scope, exclusive: scope === 'effect_only' } : b))
     }
 
-    function toggleAddZone(zoneId: string) {
+    /** @desc 添加一条乘区贡献条目（同一乘区可添加多次，各自独立配置） */
+    function addZone(zoneId: string) {
         const idx = activeBuffIdx
         if (idx < 0) return
-        const zs = buffs[idx].zones
-        if (zs.some((z) => z.zoneId === zoneId)) {
-            buffs = buffs.map((b, i) => (i === idx ? { ...b, zones: zs.filter((z) => z.zoneId !== zoneId) } : b))
-        } else {
-            buffs = buffs.map((b, i) => (i === idx ? { ...b, zones: [...zs, { zoneId, value: 0 }] } : b))
-        }
+        buffs = buffs.map((b, i) => (i === idx ? { ...b, zones: [...b.zones, { zoneId, value: 0 }] } : b))
     }
 
-    function setZoneValue(zoneId: string, value: number) {
+    /** @desc 按下标移除某个乘区条目 */
+    function removeZoneAt(zoneIndex: number) {
+        const idx = activeBuffIdx
+        buffs = buffs.map((b, i) => (i === idx ? { ...b, zones: b.zones.filter((_, k) => k !== zoneIndex) } : b))
+        expandedZoneIdx = expandedZoneIdx === zoneIndex ? null : expandedZoneIdx
+    }
+
+    /** @desc 按下标更新某个乘区条目 */
+    function patchZoneAt(zoneIndex: number, patch: Partial<BuffLibraryBuff['zones'][number]>) {
+        const idx = activeBuffIdx
         buffs = buffs.map((b, i) =>
-            i === activeBuffIdx ? { ...b, zones: b.zones.map((z) => (z.zoneId === zoneId ? { ...z, value } : z)) } : b
+            i === idx ? { ...b, zones: b.zones.map((z, k) => (k === zoneIndex ? { ...z, ...patch } : z)) } : b
         )
     }
 
-    function setZoneOverride(zoneId: string, override: boolean) {
-        if (zoneId === 'extraRatio') return
-        buffs = buffs.map((b, i) =>
-            i === activeBuffIdx
-                ? {
-                      ...b,
-                      zones: b.zones.map((z) =>
-                          z.zoneId === zoneId
-                              ? { ...z, ...(override ? { override: true } : { override: undefined }) }
-                              : z
-                      )
-                  }
-                : b
-        )
+    /**
+     * @desc 切换覆盖：extraRatio / 百分比类乘区恒为追加；
+     * 同一乘区只允许一个覆盖条目（开启时清掉同乘区其它条目的覆盖），设覆盖会清掉该条引用。
+     */
+    function setZoneOverride(zoneIndex: number, override: boolean) {
+        const target = activeZones[zoneIndex]
+        if (!target) return
+        const nextOverride = override && !ZONE_NO_OVERRIDE_IDS.has(target.zoneId)
+        const idx = activeBuffIdx
+        buffs = buffs.map((b, i) => {
+            if (i !== idx) return b
+            return {
+                ...b,
+                zones: b.zones.map((z, k) => {
+                    if (k === zoneIndex)
+                        return { ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }
+                    if (nextOverride && z.zoneId === target.zoneId && z.override) return { ...z, override: undefined }
+                    return z
+                })
+            }
+        })
     }
 
-    function setZoneRef(zoneId: string, ref: BuffLibraryZoneRef | null) {
-        buffs = buffs.map((b, i) =>
-            i === activeBuffIdx
-                ? {
-                      ...b,
-                      zones: b.zones.map((z) =>
-                          z.zoneId === zoneId ? { ...z, ...(ref ? { ref } : { ref: undefined }) } : z
-                      )
-                  }
-                : b
-        )
+    const toggleZoneCondition = (index: number) => {
+        expandedZoneIdx = expandedZoneIdx === index ? null : index
+    }
+
+    const handleZoneConditionChange = (index: number, next: BuffCondition | null) => {
+        patchZoneAt(index, { condition: next ?? undefined })
     }
 
     let showRefModal = $state(false)
-    let refZoneId = $state('')
+    let refZoneIndex = $state(-1)
     let refTargetZoneId = $state('baseAtk')
     let refThreshold = $state(0)
     let refLower = $state<number | undefined>(undefined)
@@ -230,6 +279,8 @@
     let refHasUpper = $state(false)
     let refIsDiscrete = $state(false)
 
+    /** @desc 当前编辑乘区的 zoneId（由下标推出，供引用弹窗过滤目标属性） */
+    let refZoneId = $derived(refZoneIndex >= 0 ? (activeZones[refZoneIndex]?.zoneId ?? '') : '')
     let refTargetDef = $derived(ZONE_REF_MAP.get(refTargetZoneId) ?? ZONE_MAP.get(refTargetZoneId as never) ?? null)
     let refTargetDefUnit = $derived(refTargetDef?.unit === '%' ? '%' : '点')
     let currentZoneDef = $derived(ZONE_MAP.get(refZoneId as never) ?? null)
@@ -246,11 +297,13 @@
         return { divisor: 100 / g, multiplier: num / g }
     }
 
-    function openRefModal(zoneId: string) {
-        const zone = activeBuff?.zones.find((z) => z.zoneId === zoneId)
-        refZoneId = zoneId
+    /** @desc 打开引用配置弹窗（按**下标**定位乘区，同一乘区可添加多次） */
+    function openRefModal(zoneIndex: number) {
+        const zone = activeZones[zoneIndex]
+        if (!zone) return
+        refZoneIndex = zoneIndex
         showRefZoneMenu = false
-        if (zone?.ref) {
+        if (zone.ref) {
             refTargetZoneId = zone.ref.targetZoneId
             refThreshold = zone.ref.threshold ?? 0
             refLower = zone.ref.lower
@@ -281,6 +334,7 @@
         showRefModal = true
     }
 
+    /** @desc 确认引用：由 除数/乘数 反算百分比并写入（设引用即清覆盖） */
     function handleConfirmRef() {
         const pct = refDivisor !== 0 ? (refMultiplier / refDivisor) * 100 : 0
         const ref: BuffLibraryZoneRef = {
@@ -294,12 +348,13 @@
             multiplier: refMultiplier,
             refOwner: entityType === 'character' ? 'self' : 'owner'
         }
-        setZoneRef(refZoneId, ref)
+        patchZoneAt(refZoneIndex, { ref, override: undefined })
         showRefModal = false
     }
 
+    /** @desc 清除引用 */
     function handleClearRef() {
-        setZoneRef(refZoneId, null)
+        patchZoneAt(refZoneIndex, { ref: undefined })
         showRefModal = false
     }
 
@@ -366,7 +421,7 @@
         {/if}
 
         <div class="flex min-h-0 flex-1 gap-3">
-            <!-- Left: buff list -->
+            <!-- ① 左：Buff 条目列表 -->
             <div
                 class="flex w-64 shrink-0 flex-col rounded-none border"
                 style="border-color: var(--theme-divider-border);"
@@ -405,7 +460,16 @@
                                     {buff.buffName.trim() || '（未命名）'}
                                 </span>
                                 <span class="block truncate text-[10px] text-(--theme-modal-text)/40">
-                                    {buff.zones.map((z) => `${zoneLabel(z.zoneId)}+${z.value}`).join(' · ') || '无乘区'}
+                                    {buff.zones
+                                        .map(
+                                            (z) =>
+                                                `${zoneLabel(z.zoneId)}+${z.ref ? '引用' : z.value}${
+                                                    describeZoneConditionBadge(z.condition)
+                                                        ? `[${describeZoneConditionBadge(z.condition)}]`
+                                                        : ''
+                                                }`
+                                        )
+                                        .join(' · ') || '无乘区'}
                                 </span>
                             </button>
                         {/each}
@@ -413,7 +477,7 @@
                 </div>
             </div>
 
-            <!-- Middle: selected buff editor -->
+            <!-- ② 中：就地编辑器（作用域 / 链阶硬门槛 / 乘区贡献条目列表） -->
             <div
                 class="flex min-w-0 flex-1 flex-col rounded-none border"
                 style="border-color: var(--theme-divider-border);"
@@ -459,25 +523,28 @@
                             {/each}
                         </div>
                     </div>
+
+                    <!-- 链/阶硬门槛（折叠面板，链阶互斥；属性/类型条件挂在乘区上） -->
                     <div class="shrink-0 border-b" style="border-color: var(--theme-divider-border);">
                         <button
-                            onclick={toggleCondPanel}
+                            onclick={() => (condPanelOpen = !condPanelOpen)}
                             class={[
                                 'flex w-full items-center gap-1.5 px-3 py-2 text-left text-[10px] transition-colors hover:bg-(--theme-modal-text)/5',
                                 conditionSummary ? 'text-(--theme-accent-text)' : 'text-(--theme-modal-text)/60'
                             ].join(' ')}
+                            title="链/阶条件（硬性门槛，链阶互斥）"
                         >
                             <Icon
                                 icon={condPanelOpen ? 'mdi:chevron-down' : 'mdi:chevron-right'}
                                 class="size-3.5 shrink-0 text-(--theme-modal-text)/40"
                             />
-                            <span class="shrink-0">生效条件</span>
+                            <span class="shrink-0">链/阶条件</span>
                             {#if conditionSummary}
                                 <span class="min-w-0 truncate">：{conditionSummary}</span>
                             {/if}
                         </button>
                         {#if condPanelOpen}
-                            {@const cond = activeBuff?.condition ?? {}}
+                            {@const cond = activeBuff.condition ?? {}}
                             <div
                                 transition:slide|local={{ duration: 200 }}
                                 class="flex flex-wrap items-center gap-2 px-3 pb-2.5"
@@ -497,23 +564,18 @@
                                             {#each Array.from({ length: CHAIN_MAX + 1 }, (_, k) => k) as n}
                                                 <button
                                                     onclick={() => setBuffChain(n)}
+                                                    title={n === 0 ? '本体（0链）' : `≥${n}链`}
                                                     class={[
                                                         'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                                        cond.chain === n
+                                                        (cond.chains?.[0]?.min ?? cond.chain) === n
                                                             ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                                             : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                                                     ].join(' ')}
                                                 >
-                                                    {n}
+                                                    {n === 0 ? '本体' : n}
                                                 </button>
                                             {/each}
                                         </div>
-                                        {#if cond.chain !== undefined}
-                                            <span
-                                                class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
-                                                >≥{cond.chain}链</span
-                                            >
-                                        {/if}
                                     </div>
                                 {/if}
                                 {#if canRefinement}
@@ -531,9 +593,10 @@
                                             {#each Array.from({ length: REFINE_MAX }, (_, k) => k + 1) as n}
                                                 <button
                                                     onclick={() => setBuffRefinement(n)}
+                                                    title={`≥${n}阶`}
                                                     class={[
                                                         'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                                        cond.refinement === n
+                                                        (cond.refinements?.[0]?.min ?? cond.refinement) === n
                                                             ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                                             : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                                                     ].join(' ')}
@@ -542,57 +605,13 @@
                                                 </button>
                                             {/each}
                                         </div>
-                                        {#if cond.refinement}
-                                            <span
-                                                class="flex h-6 items-center text-[10px] font-medium text-(--theme-accent-text)"
-                                                >≥{cond.refinement}阶</span
-                                            >
-                                        {/if}
                                     </div>
                                 {/if}
-                                <div
-                                    class="flex flex-wrap items-center gap-1 rounded-none border px-2 py-1"
-                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                >
-                                    <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
-                                        >伤害属性</span
+                                {#if !canChain && !canRefinement}
+                                    <span class="text-[10px] text-(--theme-modal-text)/35"
+                                        >链/阶条件只用于角色（共鸣链）与武器（精炼）实体</span
                                     >
-                                    {#each ELEMENTS as el}
-                                        <button
-                                            onclick={() => toggleConditionElement(el)}
-                                            class={[
-                                                'rounded-none px-1.5 py-0.5 text-[10px] transition-colors',
-                                                (cond.elements ?? []).includes(el)
-                                                    ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
-                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                            ].join(' ')}
-                                        >
-                                            {el}
-                                        </button>
-                                    {/each}
-                                </div>
-                                <div
-                                    class="flex flex-wrap items-center gap-1 rounded-none border px-2 py-1"
-                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                >
-                                    <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70"
-                                        >伤害类型</span
-                                    >
-                                    {#each DAMAGE_TYPES as dt}
-                                        <button
-                                            onclick={() => toggleConditionDamageType(dt)}
-                                            title={dt}
-                                            class={[
-                                                'rounded-none px-1.5 py-0.5 text-[10px] transition-colors',
-                                                (cond.damageTypes ?? []).includes(dt)
-                                                    ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
-                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                            ].join(' ')}
-                                        >
-                                            {DAMAGE_TYPE_SHORT[dt] ?? dt}
-                                        </button>
-                                    {/each}
-                                </div>
+                                {/if}
                                 <button
                                     onclick={clearCondition}
                                     class="flex h-6 items-center gap-1 rounded-none border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
@@ -604,106 +623,153 @@
                             </div>
                         {/if}
                     </div>
+
+                    <!-- 乘区贡献条目列表（同一乘区可多条，各自带数值 / 引用 / 覆盖 / 乘区级条件） -->
                     <div class="theme-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-                        {#if activeBuff.zones.length === 0}
+                        {#if activeZones.length === 0}
                             <div class="py-6 text-center text-xs text-(--theme-modal-text)/30">
-                                暂无乘区，请点击右侧乘区添加
+                                暂无乘区，请点击右侧乘区清单添加
                             </div>
                         {:else}
-                            {#each activeBuff.zones as z}
-                                <div
-                                    class="flex items-center gap-1.5 rounded-none px-3 py-2"
-                                    style="background: var(--theme-input-bg);"
-                                >
-                                    <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
-                                        >{zoneLabel(z.zoneId)}</span
+                            {#each activeZones as z, zoneIndex (zoneIndex)}
+                                {@const badge = describeZoneConditionBadge(z.condition)}
+                                <div class="space-y-1">
+                                    <div
+                                        class="flex items-center gap-1.5 rounded-none px-3 py-2"
+                                        style="background: var(--theme-input-bg);"
                                     >
-                                    {#if z.ref && !ZONE_NO_REF_IDS.has(z.zoneId)}
-                                        {@const refDef =
-                                            ZONE_REF_MAP.get(z.ref.targetZoneId) ??
-                                            ZONE_MAP.get(z.ref.targetZoneId as never)}
-                                        {@const refOp = (z.ref.threshold ?? 0) < 0 ? '+' : '-'}
-                                        {@const refTh = Math.abs(z.ref.threshold ?? 0)}
-                                        {@const refS = simplifyPct(z.ref.pct)}
-                                        {@const hasThreshold = (z.ref.threshold ?? 0) !== 0}
-                                        {@const hasLower = z.ref.lower !== undefined}
-                                        {@const hasUpper = z.ref.upper !== undefined}
-                                        <span
-                                            class="flex-1 text-[10px] text-(--theme-modal-text)/40 truncate min-w-0 text-right"
-                                            title="引用: ({refDef?.label ?? '?'}{hasThreshold
-                                                ? ' ' + refOp + ' ' + refTh + (refDef?.unit === '%' ? '%' : '')
-                                                : ''}) ÷{refS.divisor}×{refS.multiplier}{hasLower || hasUpper
-                                                ? ' clamp(' +
-                                                  (hasLower ? String(z.ref.lower) : '') +
-                                                  ' ~ ' +
-                                                  (hasUpper ? String(z.ref.upper) : '') +
-                                                  ')'
-                                                : ''}"
+                                        <span class="shrink-0 truncate text-xs text-(--theme-modal-text)"
+                                            >{zoneLabel(z.zoneId)}</span
                                         >
-                                            引用: ({refDef?.label ?? '?'}{hasThreshold
-                                                ? refOp + refTh + (refDef?.unit === '%' ? '%' : '')
-                                                : ''}) ÷{refS.divisor}×{refS.multiplier}
-                                            {#if hasLower || hasUpper}
-                                                <span class="text-(--theme-modal-text)/30">
-                                                    ({hasLower ? z.ref.lower : ''}~{hasUpper ? z.ref.upper : ''})
-                                                </span>
-                                            {/if}
-                                        </span>
-                                    {:else}
-                                        <div class="flex flex-1 items-center justify-end gap-1">
-                                            <input
-                                                type="number"
-                                                value={z.value}
-                                                oninput={(e) =>
-                                                    setZoneValue(
-                                                        z.zoneId,
-                                                        Number((e.currentTarget as HTMLInputElement).value)
-                                                    )}
-                                                class="w-14 h-6 rounded-none border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
-                                                style="border-color: var(--theme-divider-border);"
-                                            />
-                                            <span class="w-3 text-[10px] text-(--theme-modal-text)/40">
-                                                {ZONE_MAP.get(z.zoneId as never)?.unit === '%' ? '%' : ''}
+                                        {#if badge}
+                                            <span
+                                                class="shrink-0 max-w-32 truncate rounded-none border px-1.5 py-0.5 text-[10px]"
+                                                style="border-color: transparent; background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text);"
+                                                title={`该乘区条件：${describeCondition(z.condition)}`}>{badge}</span
+                                            >
+                                        {/if}
+                                        {#if z.override}
+                                            <span
+                                                class="shrink-0 px-1 py-0.5 text-[10px] font-black tracking-tight"
+                                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                                title="覆盖优先于一切：该乘区的其它条目都不参与计算">覆盖生效</span
+                                            >
+                                        {/if}
+                                        {#if z.ref && !ZONE_NO_REF_IDS.has(z.zoneId)}
+                                            {@const refDef =
+                                                ZONE_REF_MAP.get(z.ref.targetZoneId) ??
+                                                ZONE_MAP.get(z.ref.targetZoneId as never)}
+                                            {@const refOp = (z.ref.threshold ?? 0) < 0 ? '+' : '-'}
+                                            {@const refTh = Math.abs(z.ref.threshold ?? 0)}
+                                            {@const refS = simplifyPct(z.ref.pct)}
+                                            {@const hasThreshold = (z.ref.threshold ?? 0) !== 0}
+                                            {@const hasLower = z.ref.lower !== undefined}
+                                            {@const hasUpper = z.ref.upper !== undefined}
+                                            <span
+                                                class="min-w-0 flex-1 truncate text-right text-[10px] text-(--theme-modal-text)/40"
+                                                title="引用: ({refDef?.label ?? '?'}{hasThreshold
+                                                    ? ' ' + refOp + ' ' + refTh + (refDef?.unit === '%' ? '%' : '')
+                                                    : ''}) ÷{refS.divisor}×{refS.multiplier}{hasLower || hasUpper
+                                                    ? ' clamp(' +
+                                                      (hasLower ? String(z.ref.lower) : '') +
+                                                      ' ~ ' +
+                                                      (hasUpper ? String(z.ref.upper) : '') +
+                                                      ')'
+                                                    : ''}"
+                                            >
+                                                引用: ({refDef?.label ?? '?'}{hasThreshold
+                                                    ? refOp + refTh + (refDef?.unit === '%' ? '%' : '')
+                                                    : ''}) ÷{refS.divisor}×{refS.multiplier}
+                                                {#if hasLower || hasUpper}
+                                                    <span class="text-(--theme-modal-text)/30">
+                                                        ({hasLower ? z.ref.lower : ''}~{hasUpper ? z.ref.upper : ''})
+                                                    </span>
+                                                {/if}
                                             </span>
-                                        </div>
-                                    {/if}
-                                    {#if z.zoneId !== 'extraRatio'}
+                                        {:else}
+                                            <div class="flex flex-1 items-center justify-end gap-1">
+                                                <input
+                                                    type="number"
+                                                    value={z.value}
+                                                    oninput={(e) =>
+                                                        patchZoneAt(zoneIndex, {
+                                                            value: Number((e.currentTarget as HTMLInputElement).value)
+                                                        })}
+                                                    class="w-14 h-6 rounded-none border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
+                                                    style="border-color: var(--theme-divider-border);"
+                                                />
+                                                <span class="w-3 text-[10px] text-(--theme-modal-text)/40">
+                                                    {zoneUnit(z.zoneId)}
+                                                </span>
+                                            </div>
+                                        {/if}
+                                        {#if !ZONE_NO_OVERRIDE_IDS.has(z.zoneId)}
+                                            <button
+                                                onclick={() => setZoneOverride(zoneIndex, !z.override)}
+                                                class={[
+                                                    'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                                    z.override
+                                                        ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                                                        : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
+                                                ].join(' ')}
+                                            >
+                                                <Icon icon="mdi:swap-horizontal-bold" class="size-3" />
+                                                {z.override ? '覆盖' : '追加'}
+                                            </button>
+                                        {/if}
+                                        {#if !ZONE_NO_REF_IDS.has(z.zoneId)}
+                                            <button
+                                                onclick={() => openRefModal(zoneIndex)}
+                                                class={[
+                                                    'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                                    z.ref
+                                                        ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                                                        : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
+                                                ].join(' ')}
+                                                title={z.ref
+                                                    ? `引${entityType === 'character' ? '自己' : '主人'} ${ZONE_REF_MAP.get(z.ref.targetZoneId)?.label ?? z.ref.targetZoneId} × ${z.ref.pct}%`
+                                                    : '引用某属性（如 当前攻击×N%）'}
+                                            >
+                                                <Icon icon="mdi:link-variant" class="size-3" />
+                                                {z.ref ? '已引用' : '引用'}
+                                            </button>
+                                        {/if}
+                                        <!-- 乘区级生效条件（行内下拉展开）：伤害类型 / 伤害属性 -->
                                         <button
-                                            onclick={() => setZoneOverride(z.zoneId, !z.override)}
+                                            onclick={() => toggleZoneCondition(zoneIndex)}
                                             class={[
                                                 'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
-                                                z.override
+                                                z.condition
                                                     ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
                                                     : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
                                             ].join(' ')}
+                                            title={z.condition
+                                                ? `该乘区条件：${describeCondition(z.condition)}`
+                                                : '为该乘区设置生效条件（伤害类型/属性）'}
                                         >
-                                            <Icon icon="mdi:swap-horizontal-bold" class="size-3" />
-                                            {z.override ? '覆盖' : '追加'}
+                                            <Icon
+                                                icon={expandedZoneIdx === zoneIndex
+                                                    ? 'mdi:chevron-up'
+                                                    : 'mdi:filter-outline'}
+                                                class="size-3"
+                                            />
+                                            条件
                                         </button>
-                                    {/if}
-                                    {#if !ZONE_NO_REF_IDS.has(z.zoneId)}
+                                        <!-- 移除该乘区条目（同名乘区可添加多个，逐个移除） -->
                                         <button
-                                            onclick={() => openRefModal(z.zoneId)}
-                                            class={[
-                                                'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
-                                                z.ref
-                                                    ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
-                                                    : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
-                                            ].join(' ')}
-                                            title={z.ref
-                                                ? `引${entityType === 'character' ? '自己' : '主人'} ${ZONE_REF_MAP.get(z.ref.targetZoneId)?.label ?? z.ref.targetZoneId} × ${z.ref.pct}%`
-                                                : '引用某属性（如 当前攻击×N%）'}
+                                            onclick={() => removeZoneAt(zoneIndex)}
+                                            class="shrink-0 rounded-none border border-transparent px-1 py-0.5 text-[10px] text-(--theme-modal-text)/30 transition-colors hover:border-red-500/40 hover:text-red-500"
+                                            title="移除该乘区条目"
                                         >
-                                            <Icon icon="mdi:link-variant" class="size-3" />
-                                            {z.ref ? '已引用' : '引用'}
+                                            <Icon icon="mdi:close" class="size-3" />
                                         </button>
+                                    </div>
+                                    {#if expandedZoneIdx === zoneIndex}
+                                        <ZoneConditionPanel
+                                            condition={z.condition}
+                                            onchange={(next) => handleZoneConditionChange(zoneIndex, next)}
+                                        />
                                     {/if}
-                                    <button
-                                        onclick={() => toggleAddZone(z.zoneId)}
-                                        class="shrink-0 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-red-500"
-                                    >
-                                        <Icon icon="mdi:close" class="size-3.5" />
-                                    </button>
                                 </div>
                             {/each}
                         {/if}
@@ -715,7 +781,7 @@
                 {/if}
             </div>
 
-            <!-- Right: zone picker -->
+            <!-- ③ 右：乘区清单（点击即添加一条贡献条目；同一乘区可多次添加） -->
             <div
                 class="flex w-52 shrink-0 flex-col rounded-none border"
                 style="border-color: var(--theme-divider-border);"
@@ -724,34 +790,37 @@
                     class="flex shrink-0 items-center gap-1.5 border-b px-3 py-2"
                     style="border-color: var(--theme-divider-border);"
                 >
-                    <span class="text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40">乘区</span>
+                    <Icon icon="mdi:playlist-plus" class="size-3.5 shrink-0" style="color: var(--theme-accent-text);" />
+                    <span class="text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40">添加乘区</span>
                 </div>
                 <div class="theme-scrollbar min-h-0 flex-1 overflow-y-auto p-1.5">
                     {#each ZONE_SECTION_VIEWS as section (section.title)}
-                        {@const usedInSection = section.defs.filter((d) => activeZoneIds.has(d.id)).length}
                         <div class="mb-1.5">
                             <div class="px-1 pb-1 text-[10px] font-black tracking-[0.1em] text-(--theme-modal-text)/35">
-                                {section.title}{#if usedInSection > 0}<span class="ml-1 opacity-70"
-                                        >·{usedInSection}</span
-                                    >{/if}
+                                {section.title}
                             </div>
                             <div class="space-y-0.5">
                                 {#each section.defs as def (def.id)}
-                                    {@const exists = activeZoneIds.has(def.id)}
+                                    {@const count = zoneCounts.get(def.id) ?? 0}
                                     <button
-                                        onclick={() => toggleAddZone(def.id)}
+                                        onclick={() => addZone(def.id)}
+                                        title={`添加「${def.label}」${count > 0 ? `（已有 ${count} 条）` : ''}`}
                                         class={[
                                             'flex w-full items-center gap-1.5 rounded-none px-2 py-1.5 text-left text-xs font-medium transition-colors',
-                                            exists
-                                                ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
+                                            count > 0
+                                                ? 'text-(--theme-accent-text) hover:bg-(--theme-modal-text)/5'
                                                 : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
                                         ].join(' ')}
                                     >
-                                        <Icon
-                                            icon={exists ? 'mdi:check' : 'mdi:circle-outline'}
-                                            class="size-3.5 shrink-0"
-                                        />
-                                        {def.label}
+                                        <Icon icon="mdi:plus" class="size-3.5 shrink-0" />
+                                        <span class="min-w-0 flex-1 truncate">{def.label}</span>
+                                        {#if count > 0}
+                                            <span
+                                                class="shrink-0 px-1 text-[10px] tabular-nums"
+                                                style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text);"
+                                                >{count}</span
+                                            >
+                                        {/if}
                                     </button>
                                 {/each}
                             </div>

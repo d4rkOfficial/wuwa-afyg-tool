@@ -14,10 +14,16 @@ import { NON_DIRECT_ELEMENT } from './timeline.consts'
 import { getSkillCache } from './timeline.store.svelte'
 import { getCharElementMap, ensureCharElements } from '$lib/data/char-elements.svelte'
 import { addToast } from '$lib/data/toast.svelte'
-import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from './calculation.consts'
+import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_NO_OVERRIDE_IDS, ZONE_REF_MAP } from './calculation.consts'
 import type { ZoneId } from './calculation.consts'
 import type { ConditionProfile } from './compute'
-import { isConditionEmpty, normalizeCondition, normalizeConditionForScope, withOwnerBodyGate } from './condition'
+import {
+    isConditionEmpty,
+    normalizeCondition,
+    normalizeConditionForScope,
+    normalizeZoneCondition,
+    withOwnerBodyGate
+} from './condition'
 import { paneEffectSourcesOf, type PaneEffectSource } from './pane-effects'
 
 let _entries = $state<DamageEntry[]>([])
@@ -543,6 +549,8 @@ export interface ImportBuffZone {
     zoneId: string
     value: number
     override?: boolean
+    /** @desc 乘区级生效条件（伤害类型 / 伤害属性；链阶只能挂在整条 Buff 上） */
+    condition?: BuffCondition
     ref?: {
         targetZoneId: string
         pct: number
@@ -612,6 +620,9 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
                 }
             }
             if (z.override) zone.override = true
+            // 乘区级生效条件（伤害类型 / 伤害属性）随条目一起导入；链/阶由实例级统一把关
+            const zoneCondition = normalizeZoneCondition(z.condition)
+            if (zoneCondition) zone.condition = zoneCondition
             zones.push(zone)
         }
         const owner = item.ownerIdx ?? ownerIdx
@@ -769,7 +780,7 @@ export function setZoneOverrideAt(setId: string, zoneIndex: number, override: bo
     if (!assertUnlocked()) return
     const zoneId = _buffSets.find((s) => s.id === setId)?.zones?.[zoneIndex]?.zoneId
     if (!zoneId) return
-    const nextOverride = zoneId === 'extraRatio' ? false : override
+    const nextOverride = ZONE_NO_OVERRIDE_IDS.has(zoneId) ? false : override
     markTableDirty()
     _buffSets = _buffSets.map((s) => {
         if (s.id !== setId) return s
@@ -845,7 +856,7 @@ export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./
  */
 export function setBuffSetZoneOverride(setId: string, zoneId: string, override: boolean) {
     if (!assertUnlocked()) return
-    const nextOverride = zoneId === 'extraRatio' ? false : override
+    const nextOverride = ZONE_NO_OVERRIDE_IDS.has(zoneId) ? false : override
     markTableDirty()
     let assigned = false
     _buffSets = _buffSets.map((s) => {

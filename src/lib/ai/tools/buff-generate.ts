@@ -290,6 +290,7 @@ defineTool('generate_project_buffs', {
                         zoneId: z.zoneId ?? '',
                         value: z.value ?? 0,
                         ...(z.override ? { override: true } : {}),
+                        ...(z.condition ? { condition: z.condition } : {}),
                         ...(z.ref ? { ref: z.ref as never } : {})
                     }))
                 })

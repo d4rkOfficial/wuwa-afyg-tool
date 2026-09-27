@@ -44,7 +44,7 @@ export interface BuffSetRowLike {
     scope?: string
     exclusive?: boolean
     condition?: unknown
-    buff_set?: Array<{ zoneId?: string; value?: number; override?: boolean }>
+    buff_set?: Array<{ zoneId?: string; value?: number; override?: boolean; condition?: unknown }>
 }
 
 export interface GenerateDataSource {
@@ -114,7 +114,8 @@ export function createLibraryDataSource(): GenerateDataSource {
                         buff_set: b.zones.map((z) => ({
                             zoneId: z.zoneId,
                             value: z.value,
-                            ...(z.override ? { override: true } : {})
+                            ...(z.override ? { override: true } : {}),
+                            ...(z.condition ? { condition: z.condition } : {})
                         }))
                     })
                 }
@@ -167,7 +168,8 @@ export function createProjectDataSource(): GenerateDataSource {
                     buff_set: bs.zones.map((z) => ({
                         zoneId: z.zoneId,
                         value: z.value,
-                        ...(z.override ? { override: true } : {})
+                        ...(z.override ? { override: true } : {}),
+                        ...(z.condition ? { condition: z.condition } : {})
                     }))
                 }))
             return { total: buffSets.length, buffSets }

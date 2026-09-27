@@ -85,6 +85,9 @@ export const resolveZoneId = (id: string): string => LEGACY_ZONE_IDS[id] ?? id
 /** @desc 层数类乘区（集谐干涉/同奏增益等）：只支持直接填固定层数，不支持 ref 引用/转模（引擎/UI/AI 共用判定） */
 export const ZONE_NO_REF_IDS = new Set<string>(['tuneStrainLayer', 'unisonBoonLayer'])
 
+/** @desc 不支持「覆盖」语义的乘区：百分比类与额外倍率恒为追加（界面不显示覆盖按钮，store/工坊/导入共用判定） */
+export const ZONE_NO_OVERRIDE_IDS = new Set<string>(['atkPct', 'hpPct', 'defPct', 'extraRatio'])
+
 /** @desc 可被「引用」的属性清单（ZoneRef 的目标）：角色白值/当前面板/充能/谐度/双暴等 */
 export const ZONE_REF_DEFS = [
     { id: 'baseAtk', label: '攻击白值', unit: 'flat' },
