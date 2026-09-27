@@ -419,9 +419,9 @@ function collectCustomParts(buffs: BuffSet[]): TracePart[] {
     const refs: TracePart[] = []
     for (const bs of buffs) {
         for (const z of bs.zones) {
-            const isMul = z.zoneId === 'customFinalDmgMul'
-            if (z.zoneId !== 'customFinalDmg' && !isMul) continue
-            const zoneLabel = isMul ? '特殊终伤(乘算)' : '特殊终伤(加算)'
+            const isMul = z.zoneId === 'specialFinal2'
+            if (z.zoneId !== 'specialFinal1' && !isMul) continue
+            const zoneLabel = isMul ? '特殊终伤(2)·乘算' : '特殊终伤(1)'
             const extra = isMul ? { contribution: 1 + z.value / 100 } : {}
             if (z.ref) {
                 refs.push({

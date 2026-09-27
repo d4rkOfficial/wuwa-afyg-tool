@@ -35,9 +35,10 @@ export interface CharacterComputed {
     unisonBoonLayer: number
     finalDmg: number
     dmgTakenInc: number
-    customMult: number
-    /** @desc 特殊区（连乘）：每个来源独立乘算 (1 + value/100)，最终与 customMult 组合为统一特殊区 **/
-    customFinalDmgMul: number
+    /** @desc 特殊终伤(1)：加算语义（%），与特殊终伤(2) 组合为统一特殊区 */
+    specialFinal1: number
+    /** @desc 特殊终伤(2)（连乘）：每个来源独立乘算 (1 + value/100)，最终与特殊终伤(1) 组合为统一特殊区 **/
+    specialFinal2Mul: number
     dmgRedPen: number
     extraRatio: number
     elementBonus: Record<string, number>
@@ -106,13 +107,13 @@ export const ZONE_OPS: Record<string, ZoneOp> = {
         (a, v) => (a.dmgTakenInc += v),
         (a, v) => (a.dmgTakenInc = v)
     ),
-    customFinalDmg: addOp(
-        (a, v) => (a.customMult += v),
-        (a, v) => (a.customMult = v)
+    specialFinal1: addOp(
+        (a, v) => (a.specialFinal1 += v),
+        (a, v) => (a.specialFinal1 = v)
     ),
-    customFinalDmgMul: addOp(
-        (a, v) => (a.customFinalDmgMul *= 1 + v / 100),
-        (a, v) => (a.customFinalDmgMul = 1 + v / 100)
+    specialFinal2: addOp(
+        (a, v) => (a.specialFinal2Mul *= 1 + v / 100),
+        (a, v) => (a.specialFinal2Mul = 1 + v / 100)
     ),
     dmgRedPen: addOp(
         (a, v) => (a.dmgRedPen += v),

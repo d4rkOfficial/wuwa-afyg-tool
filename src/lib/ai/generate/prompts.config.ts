@@ -43,8 +43,8 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《鸣潮》拉表工具（椰果工
 10. 生效条件 condition（与 buffName/scope 平级，可选，无门槛不输出）：{CONDITION_RULES}
 11. buffName 命名：{NAMING_RULES}
 12. 尤其要注意延奏类 Buff 是全队能吃还是只有队友能吃，这里很容易出错。
-13. 特殊终伤区分：文案明确为"多个来源相乘计算/连乘"的终伤用 customFinalDmgMul（乘算特殊终伤），
-    普通相加语义的终伤/倍率用 customFinalDmg；拿不准时调用 get_naming_rules。
+13. 特殊终伤区分：文案明确为"多个来源相乘计算/连乘"的终伤用 specialFinal2（特殊终伤(2)，乘算），
+    普通相加语义的终伤/倍率用 specialFinal1（特殊终伤(1)，加算）；拿不准时调用 get_naming_rules。
 
 需要黑话词典、命名规则、few-shot 示例、效应表、scope 判定细则、生效条件规则或转模(ref)规则时，调用对应工具获取。`
 
@@ -218,11 +218,11 @@ export const EXAMPLES_TEXT = `—— 示例1（角色固有属性合并）——
 {"buffs":[{"buffName":"共鸣技能增伤(转模)","scope":"self","exclusive":false,"zones":[{"zoneId":"bonusDmg","value":0,"ref":{"targetZoneId":"totalAtk","threshold":1000,"pct":2,"lower":5,"refOwner":"self"},"override":false}]}]}
 说明："超出 1000 的部分的 2%"→threshold=1000 + pct=2（线性）；"至少提升 5%"→lower=5；value 填 0。
 
-—— 示例11（特殊终伤·乘算 customFinalDmgMul）——
+—— 示例11（特殊终伤(2)·乘算 specialFinal2）——
 输入：{"skills":[{"name":"共鸣技能","desc":"施放共鸣技能时，自身造成的伤害提升10%，此效果与其它同类型效果相乘计算。"}]}
 输出：
-{"buffs":[{"buffName":"共鸣技能终伤(乘算)","scope":"self","exclusive":false,"zones":[{"zoneId":"customFinalDmgMul","value":10,"ref":null,"override":false}]}]}
-说明：文案明确"与其它效果相乘/连乘"→ customFinalDmgMul（乘算特殊终伤，各来源独立乘算 1+v/100）；普通相加语义的终伤用 customFinalDmg。`
+{"buffs":[{"buffName":"共鸣技能终伤(乘算)","scope":"self","exclusive":false,"zones":[{"zoneId":"specialFinal2","value":10,"ref":null,"override":false}]}]}
+说明：文案明确"与其它效果相乘/连乘"→ specialFinal2（特殊终伤(2)，各来源独立乘算 1+v/100）；普通相加语义的终伤用 specialFinal1。`
 
 // ── 默认黑话词典（get_slang_dict 工具返回；每行：原叫法=黑话；行尾可用 // 注释）──
 export const DEFAULT_SLANG_DICT = `普攻=A

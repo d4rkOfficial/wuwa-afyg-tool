@@ -34,9 +34,8 @@ export const scopeTouches = (scope: 'all' | number[], charIdx: number, isEffect:
     return scope.includes(charIdx)
 }
 
-/** @desc Buff 实例的全部乘区（variants 优先，兼容单变体 zones 写法） */
-export const zonesOf = (buff: BuffInstance): BuffZoneValue[] =>
-    buff.variants?.length ? buff.variants.flatMap((v) => v.zones ?? []) : (buff.zones ?? [])
+/** @desc Buff 实例的全部乘区条目（同一乘区可多条） */
+export const zonesOf = (buff: BuffInstance): BuffZoneValue[] => buff.zones ?? []
 
 /** @desc 某 Buff 直接改写（add，非引用 / 非覆盖 / 非零）的乘区键集合 */
 export const buffPanelZoneIds = (buff: BuffInstance): Set<string> => {

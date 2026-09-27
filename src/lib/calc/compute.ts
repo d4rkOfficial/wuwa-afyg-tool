@@ -1,4 +1,4 @@
-import type { DamageEntry, BuffInstance, BuffVariant, BuffCondition, ZoneRef } from './calculation.types'
+import type { DamageEntry, BuffInstance, BuffZoneValue, BuffCondition, ZoneRef } from './calculation.types'
 import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone } from './result.types'
@@ -182,8 +182,8 @@ function emptyAccum(): CharacterComputed {
         unisonBoonLayer: 0,
         finalDmg: 0,
         dmgTakenInc: 0,
-        customMult: 0,
-        customFinalDmgMul: 1,
+        specialFinal1: 0,
+        specialFinal2Mul: 1,
         dmgRedPen: 0,
         extraRatio: 0,
         elementBonus: {},
@@ -231,7 +231,7 @@ export interface ConditionProfile {
 
 export const DEFAULT_CONDITION_PROFILE: ConditionProfile = { chains: [0, 0, 0], refinements: [1, 1, 1] }
 
-/** @desc 判定某个 buff / 变体的生效条件（引擎与「隐藏条件不匹配」筛选共用同一口径） */
+/** @desc 判定某个 Buff 的生效条件（引擎与「隐藏条件不匹配」筛选共用同一口径） */
 export function buffConditionMet(
     condition: BuffInstance['condition'],
     profile: ConditionProfile,
@@ -248,21 +248,6 @@ export function buffConditionMet(
         ...(ctx.element !== undefined ? { element: ctx.element } : {}),
         ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
     })
-}
-
-/**
- * @desc 某个 Buff 实例对给定条目实际生效的变体列表（整块条件 + 各变体子条件均满足）。
- * 同名多乘区 buff 的语义在此落地：一个实例的多个变体各自判定子条件，满足者全部叠加。
- */
-export function activeVariants(
-    buff: BuffInstance,
-    profile: ConditionProfile,
-    charIndex: number,
-    ctx: Partial<ConditionContext> = {}
-): BuffVariant[] {
-    if (!buffConditionMet(buff.condition, profile, charIndex, ctx, buff.conditionRefCharIdx)) return []
-    const variants = buff.variants?.length ? buff.variants : [{ id: `${buff.id}-v1`, zones: buff.zones }]
-    return variants.filter((v) => buffConditionMet(v.condition, profile, charIndex, ctx, buff.conditionRefCharIdx))
 }
 
 /**
@@ -295,11 +280,6 @@ export function conditionMet(
     )
 }
 
-interface BoundBuff {
-    buff: BuffInstance
-    variants: BuffVariant[]
-}
-
 /** @desc 条目是否绑定该 Buff（scope 按作用域匹配） */
 const scopeMatches = (buff: BuffInstance, charIndex: number, isEffect: boolean): boolean => {
     if (buff.scope === 'all') return true
@@ -308,7 +288,7 @@ const scopeMatches = (buff: BuffInstance, charIndex: number, isEffect: boolean):
 }
 
 /**
- * @desc 返回某伤害条目实际生效的 Buff 集（按范围 + 整块条件 + 变体子条件过滤），溯源模块复用同一口径。
+ * @desc 返回某伤害条目实际生效的 Buff 集（按范围 + 整块硬性条件过滤），溯源模块复用同一口径。
  * `matchEntry=false` 时忽略条目级的属性/类型条件（用于角色级聚合面板，与旧行为一致）。
  */
 export function getBoundBuffSets(
@@ -332,7 +312,7 @@ export function getBoundBuffSets(
         charInfoMap,
         echoDescByEntry,
         matchEntry
-    ).map((b) => b.buff)
+    )
 }
 
 /** @desc 绑定到该条目的 Buff 候选（只按绑定关系取，不做作用域 / 条件过滤；再按每个角色槽位分别激活） */
@@ -347,8 +327,9 @@ const entryCandidateBuffs = (
 }
 
 /**
- * @desc 某角色槽位在「本条目」下真正生效的 Buff 及变体：作用域匹配 + 整块硬性条件 + 变体子条件。
+ * @desc 某角色槽位在「本条目」下真正生效的 Buff：作用域匹配 + 整块硬性条件（链/阶硬门槛）。
  * 条件里的链/阶以**该角色槽位**为参考（作用域指向谁，就按谁的链阶判定）。
+ * 乘区条目自身的条件不在这里过滤 —— 由 activeZonesOf / refZonesOf / overrideZonesOf 逐条判定。
  */
 const activeBoundForChar = (
     candidates: BuffInstance[],
@@ -356,17 +337,17 @@ const activeBoundForChar = (
     isEffect: boolean,
     profile: ConditionProfile,
     ctx: Partial<ConditionContext>
-): BoundBuff[] => {
-    const out: BoundBuff[] = []
+): BuffInstance[] => {
+    const out: BuffInstance[] = []
     for (const buff of candidates) {
         if (!scopeMatches(buff, charIdx, isEffect)) continue
-        const variants = activeVariants(buff, profile, charIdx, ctx)
-        if (variants.length > 0) out.push({ buff, variants })
+        if (!buffConditionMet(buff.condition, profile, charIdx, ctx, buff.conditionRefCharIdx)) continue
+        out.push(buff)
     }
     return out
 }
 
-/** @desc 生效 Buff 及其生效变体（引擎内部用：逐变体写入乘区） */
+/** @desc 生效 Buff（引擎内部用：逐条乘区条目写入累加器） */
 function boundBuffs(
     entry: DamageEntry,
     charIndex: number,
@@ -377,7 +358,7 @@ function boundBuffs(
     charInfoMap?: Record<string, CharacterInfo>,
     echoDescByEntry?: Record<string, string>,
     matchEntry = true
-): BoundBuff[] {
+): BuffInstance[] {
     const ctx: Partial<ConditionContext> = matchEntry
         ? {
               element: entry.damageElement,
@@ -393,14 +374,14 @@ function boundBuffs(
     )
 }
 
-/** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 变体）。
- *  条件判定（实例级硬性条件 + 变体子条件 + 乘区级条件）均已在此前完成，此处只做乘区写入。 */
+/** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 条目）。
+ *  门槛判定（作用域 + 实例级硬性条件）均已在此前完成，此处只做乘区写入（含每条目自身的乘区条件）。 */
 function computeCharacterStats(
     charInfo: CharacterInfo,
     weaponName: string | null,
     weaponInfo: WeaponInfo | null,
     echoes: EchoSlotConfig[],
-    boundBuffs: BoundBuff[],
+    boundBuffs: BuffInstance[],
     ctx?: ZoneCtx
 ): CharacterComputed {
     const baseAtk = Math.round(charInfo.lv90BaseStats.atk + (weaponInfo?.lv90BaseAtk ?? 0))
@@ -426,7 +407,7 @@ function computeCharacterStats(
     }
     accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, acc)
 
-    // 一切皆 buff：绑定到该角色的 Buff 逐变体写入同一贡献累加器（乘区级条件在此过滤）
+    // 一切皆 buff：绑定到该角色的 Buff 逐条乘区条目写入同一贡献累加器（乘区级条件在此过滤）
     for (const z of activeZonesOf(boundBuffs, ctx)) {
         applyZone(acc, z.zoneId, z.value)
     }
@@ -447,8 +428,8 @@ function computeCharacterStats(
     }
 }
 
-/** @desc 展平「生效 Buff → 生效变体」列表（引擎逐变体写入乘区的唯一出口） */
-const collectVariants = (buffs: BoundBuff[]): BuffVariant[] => buffs.flatMap((b) => b.variants)
+/** @desc 生效 Buff 的全部乘区条目（引擎逐条写入累加器的唯一出口） */
+const collectZones = (buffs: BuffInstance[]): BuffZoneValue[] => buffs.flatMap((b) => b.zones)
 
 /** @desc 乘区级条件求值上下文：伤害段上下文 + 链阶档位 */
 interface ZoneCtx {
@@ -467,31 +448,34 @@ const zoneConditionMet = (zone: { condition?: BuffCondition }, ctx: ZoneCtx): bo
         ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
     })
 
-/** @desc 生效变体提供的直接贡献乘区（跳过引用/覆盖/零值；乘区级条件不满足者剔除） */
-const activeZonesOf = (buffs: BoundBuff[], ctx?: ZoneCtx): { zoneId: string; value: number }[] =>
-    collectVariants(buffs).flatMap((v) =>
-        v.zones
-            .filter((z) => !z.ref && !z.override && z.value !== 0)
-            .filter((z) => !ctx || zoneConditionMet(z, ctx))
-            .map((z) => ({ zoneId: z.zoneId as string, value: z.value }))
+/**
+ * @desc 生效 Buff 提供的直接贡献乘区（跳过引用/覆盖/零值；乘区条件不满足者逐条剔除）。
+ * 同一乘区可有多条：`if (链阶硬门槛满足) { 各条目各自 add if 自身条件满足 }` —— 满足的全部相加。
+ */
+const activeZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string; value: number }[] =>
+    collectZones(buffs).flatMap((z) =>
+        !z.ref && !z.override && z.value !== 0 && (!ctx || zoneConditionMet(z, ctx))
+            ? [{ zoneId: z.zoneId as string, value: z.value }]
+            : []
     )
 
-/** @desc 生效变体里带引用标记的乘区（转模：稍后按面板解析；乘区级条件不满足者剔除） */
-const refZonesOf = (buffs: BoundBuff[], ctx?: ZoneCtx): { zoneId: string; ref: ZoneRef }[] =>
-    collectVariants(buffs).flatMap((v) =>
-        v.zones
-            .filter((z): z is typeof z & { ref: ZoneRef } => Boolean(z.ref) && !ZONE_NO_REF_IDS.has(z.zoneId))
-            .filter((z) => !ctx || zoneConditionMet(z, ctx))
-            .map((z) => ({ zoneId: z.zoneId as string, ref: z.ref }))
+/** @desc 生效 Buff 里带引用标记的乘区（转模：稍后按面板解析；乘区条件不满足者剔除） */
+const refZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string; ref: ZoneRef }[] =>
+    collectZones(buffs).flatMap((z) =>
+        z.ref && !ZONE_NO_REF_IDS.has(z.zoneId) && (!ctx || zoneConditionMet(z, ctx))
+            ? [{ zoneId: z.zoneId as string, ref: z.ref }]
+            : []
     )
 
-/** @desc 生效变体里带覆盖标记的乘区（直接覆盖合计值；乘区级条件不满足者剔除） */
-const overrideZonesOf = (buffs: BoundBuff[], ctx?: ZoneCtx): { zoneId: string; value: number }[] =>
-    collectVariants(buffs).flatMap((v) =>
-        v.zones
-            .filter((z) => Boolean(z.override) && !z.ref && z.value !== 0)
-            .filter((z) => !ctx || zoneConditionMet(z, ctx))
-            .map((z) => ({ zoneId: z.zoneId as string, value: z.value }))
+/**
+ * @desc 生效 Buff 里带覆盖标记的乘区（覆盖优先于一切：在最后直接替换该乘区合计值；乘区条件不满足者剔除）。
+ * 同一乘区跨 Buff 出现多个覆盖时，按 Buff 进入计算的顺序依次写入 —— 后进入者最终生效。
+ */
+const overrideZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string; value: number }[] =>
+    collectZones(buffs).flatMap((z) =>
+        z.override && !z.ref && z.value !== 0 && (!ctx || zoneConditionMet(z, ctx))
+            ? [{ zoneId: z.zoneId as string, value: z.value }]
+            : []
     )
 
 // ── compute a single ResultEntry ──
@@ -564,7 +548,7 @@ function computeResultEntry(
     const bonus = 1 + totalDmgBonus / 100
     const vulnerability = 1 + stats.dmgTakenInc / 100
     const finalDmg = 1 + stats.finalDmg / 100
-    const customMult = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
+    const customMult = (stats.specialFinal1 !== 0 ? 1 + stats.specialFinal1 / 100 : 1) * stats.specialFinal2Mul
     const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * stats.tuneStrainLayer
 
     /** @desc 同奏区：1 + 3% × 同奏增益层数（直伤/效应/处决响应全生效的独立乘区） */
@@ -807,7 +791,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
 
     // final dmg & custom mult
     const finalDmgDec = stats.finalDmg / 100
-    const customMultVal = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
+    const customMultVal = (stats.specialFinal1 !== 0 ? 1 + stats.specialFinal1 / 100 : 1) * stats.specialFinal2Mul
 
     // 同奏区：1 + 3% × 同奏增益层数（全伤害通用乘区）
     const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
@@ -934,8 +918,8 @@ function emptyCharacterStats(): CharacterComputed {
         unisonBoonLayer: 0,
         finalDmg: 0,
         dmgTakenInc: 0,
-        customMult: 0,
-        customFinalDmgMul: 1,
+        specialFinal1: 0,
+        specialFinal2Mul: 1,
         dmgRedPen: 0,
         elementBonus: {},
         typeBonus: {}
@@ -984,7 +968,7 @@ function computeEffectEntry(
 
     /** @desc 终伤区 & 特殊区：1 + 终伤%；自定义倍率（≠0 才生效） */
     const finalDmgDec = stats.finalDmg / 100
-    const customMultVal = (stats.customMult !== 0 ? 1 + stats.customMult / 100 : 1) * stats.customFinalDmgMul
+    const customMultVal = (stats.specialFinal1 !== 0 ? 1 + stats.specialFinal1 / 100 : 1) * stats.specialFinal2Mul
 
     /** @desc 同奏区：1 + 3% × 同奏增益层数（全伤害通用乘区，效应伤害同样生效） */
     const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
@@ -1086,7 +1070,7 @@ function computeEffectEntry(
 function resolveRefsForEntry(
     stats: CharacterComputed,
     panelOf: (charIdx: number) => CharacterComputed,
-    boundBuffs: BoundBuff[],
+    boundBuffs: BuffInstance[],
     ctx?: ZoneCtx
 ): void {
     for (const { zoneId, ref } of refZonesOf(boundBuffs, ctx)) {

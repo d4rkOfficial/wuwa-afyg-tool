@@ -24,7 +24,7 @@ DamageEntry ──┐
 BuffInstance ─┘
 ```
 
-- **贡献键 = 乘区键**（`ZoneId`）：`atkPct` / `bonusDmg` / `defPen` / `finalDmg` / `customFinalDmgMul` … 见 `ZONE_DEFS`。
+- **贡献键 = 乘区键**（`ZoneId`）：`atkPct` / `bonusDmg` / `defPen` / `finalDmg` / `specialFinal2` … 见 `ZONE_DEFS`。
 - 装备（武器/声骸）与内置源也走同一套乘区键，经 `applyEntryStatToAccum` 归一化后写入同一个累加器。
 - `ResultEntry` 与界面数据形状保持不变，结果页 / 乘区溯源 / 副词条分析无需感知引擎内部结构。
 
@@ -32,13 +32,36 @@ BuffInstance ─┘
 
 每个乘区只声明一次它的语义，三条写入路径共用：
 
-| 写入       | 用途                                       |
-| ---------- | ------------------------------------------ |
-| `add`      | 追加累加（`customFinalDmgMul` 为连乘）     |
-| `override` | 覆盖当前合计值（`BuffZoneValue.override`） |
+| 写入       | 用途                                                   |
+| ---------- | ------------------------------------------------------ |
+| `add`      | 追加累加（`specialFinal2` 为连乘）                     |
+| `override` | 覆盖当前合计值（`BuffZoneValue.override`，优先于一切） |
 
 `applyZone(acc, zoneId, value, 'add' | 'override')` 是唯一出口；`recomputeTotals(acc)` 在面板类乘区变化后
 重算攻/生/防三维，保证引用转模读到最新面板。
+
+### 同一个 Buff 里的「同名乘区」
+
+`zones` 是**贡献条目列表**，不是「乘区种类的集合」：同一个乘区可以出现多次，每条是独立贡献单元
+（数值 / 引用 / 覆盖 / **自己的生效条件**）。判定口径：
+
+```
+if (链阶硬门槛满足 && 作用域匹配) {
+    同乘区各条目：各自 add if 自身条件满足      // 满足的全部相加
+    覆盖条目：最后替换该乘区合计               // 覆盖优先于一切
+}
+```
+
+- 例：`暴击率+20 条件=导电` + `暴击率+10 条件=普攻` → 导电普攻 +30、仅导电 +20、仅普攻 +10、都不是 +0。
+- **覆盖唯一**：同一 Buff 内每个乘区只允许一个覆盖条目（编辑器设覆盖时会取消同乘区其它条目的覆盖）；
+  跨 Buff 允许并存，引擎按 Buff 进入计算的顺序依次写入 —— **后进入者最终生效**。
+- 乘区分组见 `ZONE_SECTIONS`（基本固定值 / 基本百分比 / 双暴 / 常见增伤拐 / 特殊增伤拐或倍率提升 /
+  倍率追加或锚定 / 使目标 / 对目标 / 层数相关独立终伤）；旧 id `customFinalDmg` / `customFinalDmgMul`
+  经 `LEGACY_ZONE_IDS` 重映射为 `specialFinal1` / `specialFinal2`（v3 → v4 迁移）。
+
+左侧 Buff 列表的三级归类见 `src/lib/calc/buff-tree.ts`：一级全局 Buff；二级「角色名X链」（**只按链条件归类，
+武器阶条件不再归并** —— 只带阶条件的 Buff 与无门槛的一样留在最外层平铺）；三级「前缀+数字+后缀」相同的
+≥2 条自动归档并按键数字升序。拖拽 Buff/目录时列表自动收起所有文件夹。
 
 ### 内置 Buff 源
 

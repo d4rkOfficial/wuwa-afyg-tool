@@ -348,7 +348,7 @@ defineTool('get_buff_set_detail', {
 
 defineTool('set_buff_zone', {
     description:
-        '设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/finalDmg/dmgTakenInc/customFinalDmg/customFinalDmgMul/extraRatio。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）。',
+        '设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/finalDmg/dmgTakenInc/specialFinal1/specialFinal2/extraRatio。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）。',
     parameters: {
         type: 'object',
         properties: {

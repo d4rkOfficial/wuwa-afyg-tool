@@ -234,8 +234,8 @@
         'dmgRedPen',
         'dmgTakenInc',
         'finalDmg',
-        'customFinalDmg',
-        'customFinalDmgMul',
+        'specialFinal1',
+        'specialFinal2',
         'unisonBoonLayer'
     ])
     const TUNE_RELEVANT_ZONES = new Set([
@@ -248,8 +248,8 @@
         'dmgRedPen',
         'dmgTakenInc',
         'finalDmg',
-        'customFinalDmg',
-        'customFinalDmgMul',
+        'specialFinal1',
+        'specialFinal2',
         'unisonBoonLayer'
     ])
 

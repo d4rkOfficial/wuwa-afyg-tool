@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @desc 乘区级生效条件（行内下拉展开）：直接挂在 BUFF 内部的**具体乘区**上。
+     * @desc 乘区级生效条件（行内下拉展开）：直接挂在 BUFF 内部的**具体乘区条目**上。
      * 可配置：伤害类型、伤害属性 —— 组合口径固定为「类内或、类间与」：
      * 多选的伤害类型内部「或」、多选的伤害属性内部「或」，而类型条件与属性条件之间必须同时满足。
      * 链条件与阶条件不在这里 —— 它们是整个 BUFF 的硬性条件，只在 BUFF 级「生效条件」里配置。
@@ -45,9 +45,6 @@
     <div class="flex items-center gap-1.5">
         <Icon icon="mdi:filter-outline" class="size-3.5 shrink-0" style="color: var(--theme-accent-text);" />
         <span class="text-[11px] font-black tracking-tight">该乘区的生效条件</span>
-        <span class="text-[10px] text-(--theme-modal-text)/40">
-            类型内部「或」、属性内部「或」，两者之间「与」；链/阶是整个 BUFF 的硬性条件
-        </span>
     </div>
 
     <!-- 伤害类型 -->

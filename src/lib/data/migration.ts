@@ -8,8 +8,8 @@
  * - 纯函数：不依赖任何 store / 浏览器 API，可在 Node 环境下直接单测。
  */
 
-import type { BuffCondition, BuffInstance, BuffVariant, BuffZoneValue, CalcState } from '$lib/calc/calculation.types'
-import { ZONE_MAP } from '$lib/calc/calculation.consts'
+import type { BuffCondition, BuffInstance, BuffZoneValue, CalcState } from '$lib/calc/calculation.types'
+import { ZONE_MAP, resolveZoneId } from '$lib/calc/calculation.consts'
 import { isConditionEmpty, normalizeCondition, normalizeConditionForScope } from '$lib/calc/condition'
 import { bindPaneEffectSources, entryOwnersFromTimeline } from '$lib/calc/pane-effects'
 import type { ConfigState } from '$lib/calc/config.types'
@@ -102,16 +102,16 @@ export const conditionProfileFromTeam = (
     refinements: DEFAULT_SLOTS.map((i) => team[i]?.refinement ?? 1)
 })
 
-// ── Buff 归一化：单变体快捷写法 ↔ variants；乘区级条件 ──
+// ── Buff 归一化：乘区条目列表（含旧 variants 拍平）与乘区级条件 ──
 
-/** @desc 归一化乘区数组：保留已知乘区键、引用、覆盖标记与乘区级生效条件 */
+/** @desc 归一化乘区条目列表：历史 id 重映射、保留已知乘区键、引用、覆盖标记与乘区级生效条件 */
 export const normalizeZoneList = (zones: unknown): BuffZoneValue[] => {
     if (!Array.isArray(zones)) return []
     const out: BuffZoneValue[] = []
     for (const raw of zones) {
         const z = asRecord(raw)
-        const zoneId = String(z.zoneId ?? '')
-        if (!ZONE_MAP.has(zoneId as never)) continue
+        const zoneId = resolveZoneId(String(z.zoneId ?? ''))
+        if (!ZONE_MAP.has(zoneId)) continue
         const next: BuffZoneValue = { zoneId: zoneId as BuffZoneValue['zoneId'], value: pickNum(z.value, 0) }
         if (z.ref) next.ref = z.ref as BuffZoneValue['ref']
         if (z.override) next.override = true
@@ -122,61 +122,93 @@ export const normalizeZoneList = (zones: unknown): BuffZoneValue[] => {
     return out
 }
 
+/** @desc 旧结构里可能存在的「同名变体」（已废弃，仅在迁移时读取） */
+interface LegacyVariant {
+    condition?: BuffCondition
+    zones?: unknown
+}
+
+/** @desc 读取旧结构里的 variants（类型上已移除，这里按宽松结构取，便于拍平迁移） */
+const legacyVariantsOf = (buff: Partial<BuffInstance>): LegacyVariant[] => {
+    const raw = (buff as Record<string, unknown>).variants
+    return Array.isArray(raw) ? (raw.filter(isRecord) as LegacyVariant[]) : []
+}
+
 /**
- * @desc 把 zones 快捷写法归一化为 variants（幂等；已有 variants 时保留并补齐 id）。
+ * @desc 归一化某个 Buff 的乘区条目列表。
  *
- * 条件归属归一化（本工具的核心口径）：
- * - 旧版「变体级条件」与「Buff 级伤害属性/类型条件」都**下放到该 Buff 的每一个乘区**
- * - 链条件 / 阶条件保留在 Buff 实例级（它们只能作为整个 Buff 的硬性条件）
- * 因此迁移完成后，属性 / 类型条件一律挂在具体乘区上，`zones` 是条件的唯一真源。
+ * 旧结构 `variants[]`（同名变体）在这里**拍平成同一个 zones 列表**：变体级子条件下放到该变体的每个条目上
+ * （与旧引擎「变体条件满足后其乘区才计入」等价）；Buff 级的属性/类型条件同样下放。
+ * 链条件 / 阶条件保留在 Buff 实例级（它们只能作为整个 Buff 的硬性条件，会被 `pickGateCondition` 单独取出）。
  */
-export const normalizeBuffVariants = (buff: Partial<BuffInstance>): BuffVariant[] => {
-    const zoneCondition = normalizeConditionForScope(normalizeCondition(buff.condition ?? {}, 'zone'), 'zone')
-    if (Array.isArray(buff.variants) && buff.variants.length > 0) {
-        return buff.variants.map((v) => ({
-            ...v,
-            id: v.id || genId('variant'),
-            zones: liftConditionToZones(normalizeZoneList(v.zones), v.condition, zoneCondition),
-            ...(v.condition ? { condition: undefined } : {})
-        }))
+export const normalizeZones = (buff: Partial<BuffInstance>): BuffZoneValue[] => {
+    const buffLevel = normalizeConditionForScope(normalizeCondition(buff.condition ?? {}, 'zone'), 'zone')
+    /** @desc 与一段附加条件合并后写回条目（交集为空 = 永远不满足，返回 null 表示丢弃该条目） */
+    const applyCondition = (zone: BuffZoneValue, extra: BuffCondition): BuffZoneValue | null => {
+        const merged = andZoneConditions(extra, zone.condition ?? {})
+        if (merged === null) return null
+        const next: BuffZoneValue = { ...zone }
+        if (isConditionEmpty(merged)) delete next.condition
+        else next.condition = merged
+        return next
     }
-    return [
-        {
-            id: `${buff.id ?? genId('buff')}-v1`,
-            zones: liftConditionToZones(normalizeZoneList(buff.zones), undefined, zoneCondition)
+
+    const variants = legacyVariantsOf(buff)
+    if (variants.length > 0) {
+        const out: BuffZoneValue[] = []
+        for (const variant of variants) {
+            const variantLevel = normalizeConditionForScope(
+                normalizeCondition(variant?.condition ?? {}, 'zone'),
+                'zone'
+            )
+            const gate = andZoneConditions(buffLevel, variantLevel)
+            if (gate === null) continue
+            for (const zone of normalizeZoneList(variant?.zones)) {
+                const next = applyCondition(zone, gate)
+                if (next) out.push(next)
+            }
         }
-    ]
+        return out
+    }
+
+    const out: BuffZoneValue[] = []
+    for (const zone of normalizeZoneList(buff.zones)) {
+        const next = applyCondition(zone, buffLevel)
+        if (next) out.push(next)
+    }
+    return out
 }
 
-/** @desc 把「变体级条件」与「Buff 级属性/类型条件」下放到各乘区（乘区已有条件时不覆盖） */
-const liftConditionToZones = (
-    zones: BuffZoneValue[],
-    variantCondition: BuffCondition | undefined,
-    buffLevelZoneCondition: BuffCondition
-): BuffZoneValue[] => {
-    const variantZoneCondition = normalizeConditionForScope(normalizeCondition(variantCondition ?? {}, 'zone'), 'zone')
-    const merged = mergeZoneConditions(buffLevelZoneCondition, variantZoneCondition)
-    if (isConditionEmpty(merged)) return zones
-    return zones.map((z) => (z.condition ? z : { ...z, condition: merged }))
-}
-
-/** @desc 合并两个乘区级条件（同为 and 语义；子句来自「Buff 级」与「变体级」时并集） */
-const mergeZoneConditions = (a: BuffCondition, b: BuffCondition): BuffCondition => {
+/**
+ * @desc 合并两个乘区级条件（AND 语义：两段条件必须同时满足）。
+ * - 属性：单值语义，同类取**交集**（element ∈ A 且 element ∈ B ⇔ element ∈ A∩B）
+ * - 伤害类型：多值语义，同类取交集（取「共同的类型」这一最严读法）
+ * - 交集为空 → 永远不满足，返回 null（调用方据此丢弃该条目）
+ */
+const andZoneConditions = (a: BuffCondition, b: BuffCondition): BuffCondition | null => {
     if (isConditionEmpty(a)) return b
     if (isConditionEmpty(b)) return a
+    const elements = intersect(a.elements, b.elements)
+    if (elements === null) return null
+    const damageTypes = intersect(a.damageTypes, b.damageTypes)
+    if (damageTypes === null) return null
     return {
-        ...a,
-        elements: dedupe([...(a.elements ?? []), ...(b.elements ?? [])]),
-        damageTypes: dedupe([...(a.damageTypes ?? []), ...(b.damageTypes ?? [])])
+        ...(elements ? { elements } : {}),
+        ...(damageTypes ? { damageTypes } : {})
     }
 }
 
-const dedupe = (list: string[]): string[] | undefined => (list.length ? [...new Set(list)] : undefined)
+/** @desc 两段同类子句取交集：任一侧未限定则取另一侧；交集为空返回 null（表示永远不满足） */
+const intersect = (a: string[] | undefined, b: string[] | undefined): string[] | undefined | null => {
+    if (!a?.length) return b?.length ? b : undefined
+    if (!b?.length) return a
+    const shared = a.filter((x) => b.includes(x))
+    return shared.length > 0 ? [...new Set(shared)] : null
+}
 
 /**
  * @desc 归一化单个 Buff 实例。
- * Buff 实例级只保留**链条件 / 阶条件**（整个 Buff 的硬性条件）；伤害属性 / 伤害类型条件
- * 由 `normalizeBuffVariants` 统一下放到每个乘区。
+ * Buff 实例级只保留**链条件 / 阶条件**（整个 Buff 的硬性条件）；伤害属性 / 伤害类型条件下放到每个乘区条目。
  */
 export const normalizeBuff = (raw: Partial<BuffInstance>): BuffInstance => {
     const id = typeof raw.id === 'string' && raw.id ? raw.id : genId('buff')
@@ -199,8 +231,7 @@ export const normalizeBuff = (raw: Partial<BuffInstance>): BuffInstance => {
         ...(raw.source ? { source: raw.source } : {}),
         ...(raw.origin ? { origin: raw.origin } : {})
     }
-    const variants = normalizeBuffVariants({ ...raw, id })
-    return { ...(base as BuffInstance), variants, zones: variants[0]?.zones ?? [] }
+    return { ...(base as BuffInstance), zones: normalizeZones({ ...raw, id }) }
 }
 
 /** @desc 只取链/阶子句（Buff 实例级的硬性条件），丢弃属性/类型等乘区级子句 */
@@ -220,7 +251,7 @@ export { normalizeCondition }
 
 /** @desc 判断一个 Buff 实例是否「空」（无任何有效乘区）：迁移时用于清理默认空全局 buff */
 export const isEmptyBuff = (buff: BuffInstance): boolean => {
-    const zones = buff.variants?.flatMap((v) => v.zones ?? []) ?? buff.zones ?? []
+    const zones = buff.zones ?? []
     return !zones.some((z) => z && (z.ref || z.override || (typeof z.value === 'number' && z.value !== 0)))
 }
 
@@ -280,19 +311,13 @@ export const migrateCalcState = (raw: unknown): CalcState => {
         types[entryId] = (list as string[]).map((t) => (t === '视为效应伤害' ? '效应伤害' : t))
     }
 
-    const variantIds: Record<string, Record<string, string[]>> = {}
-    for (const [entryId, map] of Object.entries(asRecord(src.damageEntryBuffVariantIds))) {
-        if (isRecord(map)) variantIds[entryId] = map as Record<string, string[]>
-    }
-
     // 链/阶条件二选一：同一 Buff 同时带链与阶时拆成两个 Buff（各自只保留一个条件）
     const split = splitDualGateBuffs(buffs, remapTable(src.damageEntryBuffSetIds))
 
     return {
         buffSets: split.buffs,
         damageEntryBuffSetIds: split.bindings,
-        damageEntryDamageTypes: types,
-        ...(Object.keys(variantIds).length ? { damageEntryBuffVariantIds: variantIds } : {})
+        damageEntryDamageTypes: types
     }
 }
 
@@ -519,7 +544,31 @@ const migrateV2toV3: Migration = {
     }
 }
 
-const PROJECT_MIGRATIONS: Migration[] = [migrateV0toV1, migrateV1toV2, migrateV2toV3]
+/** @desc 迁移 v3 → v4（当前版本）：乘区改名（历史 id 重映射）+ 「同名变体」拍平为单层乘区条目列表 */
+const migrateV3toV4: Migration = {
+    from: 3,
+    to: 4,
+    migrate(raw) {
+        const encounter = asRecord(raw.encounter)
+        const calcContainer = asRecord(encounter.calculation)
+        // migrateCalcState 内部经 normalizeBuff → normalizeZones 完成：
+        // ① 历史乘区 id（customFinalDmg / customFinalDmgMul）重映射为 specialFinal1 / specialFinal2
+        // ② variants[] 拍平进 zones[]（变体级子条件下放到其每个条目），并丢弃已废弃的 damageEntryBuffVariantIds
+        const calcState = migrateCalcState(calcContainer.data ?? asRecord(raw.calc))
+
+        return {
+            ...raw,
+            version: 4,
+            encounter: {
+                ...encounter,
+                calculation: { ...calcContainer, data: calcState }
+            },
+            buffs: calcState.buffSets
+        }
+    }
+}
+
+const PROJECT_MIGRATIONS: Migration[] = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4]
 
 /** @desc 读取数据的版本号：无版本号（老导出格式 / 老 IndexedDB）视为 0 */
 export const readVersion = (raw: Record<string, unknown>): number => {

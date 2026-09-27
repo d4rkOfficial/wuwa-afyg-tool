@@ -17,10 +17,6 @@
         setBuffSetScope,
         setBuffSetCondition,
         setBuffSetConditionRef,
-        addBuffVariant,
-        removeBuffVariant,
-        setBuffVariantCondition,
-        updateBuffVariant,
         getGlobalBuffSetIds,
         reorderNonGlobalBuffSets,
         toggleBuffSetStarred,
@@ -28,15 +24,16 @@
         setBuffSetsGlobal
     } from '$lib/calc/calculation.store.svelte'
     import {
-        ZONE_DEFS,
         ZONE_MAP,
         ZONE_NO_REF_IDS,
         ZONE_REF_DEFS,
         ZONE_REF_MAP,
+        ZONE_SECTION_VIEWS,
         groupBuffSets,
         LAYERED_BUFF_PATTERN
     } from '$lib/calc/calculation.consts'
     import type { ZoneId, GroupedBuffSetItem } from '$lib/calc/calculation.consts'
+    import { buildBuffTree } from '$lib/calc/buff-tree'
     import type { CharSlot } from '$lib/types/project'
     import type { ZoneRef, BuffSet, BuffCondition } from '$lib/calc/calculation.types'
     import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
@@ -165,6 +162,46 @@
         resizingSidebar = true
     }
 
+    /** @desc ── 右栏「添加乘区」宽度拖拽调节（同一套三态高亮 + rAF 节流；拖的是左缘分割线） ── */
+    let zoneBarWidth = $state(208)
+    let zoneBarDragging = $state(false)
+    let zoneBarStartX = 0
+    let zoneBarStartWidth = 208
+    $effect(() => {
+        if (!zoneBarDragging) return
+        let pending: number | null = null
+        let target = zoneBarWidth
+        const onMove = (e: MouseEvent) => {
+            // 拖的是右侧栏左缘：向左拖 = 变宽
+            target = Math.max(160, Math.min(420, zoneBarStartWidth + (zoneBarStartX - e.clientX)))
+            if (pending !== null) return
+            pending = requestAnimationFrame(() => {
+                pending = null
+                zoneBarWidth = target
+            })
+        }
+        const onUp = () => {
+            if (pending !== null) {
+                cancelAnimationFrame(pending)
+                pending = null
+            }
+            zoneBarWidth = target
+            zoneBarDragging = false
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+        return () => {
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+        }
+    })
+    function zoneBarHandleDown(e: PointerEvent) {
+        e.preventDefault()
+        zoneBarStartX = e.clientX
+        zoneBarStartWidth = zoneBarWidth
+        zoneBarDragging = true
+    }
+
     /** @desc 全局 buff 的标签颜色：全队=黄，否则取归属角色元素色 */
     function globalBuffColor(buffSet: { scope: number[] | 'all' }): string {
         if (!Array.isArray(buffSet.scope) || buffSet.scope.length === 0) return '#eab308'
@@ -236,48 +273,24 @@
         return { divisor: 100 / g, multiplier: num / g }
     }
 
-    // groupBuffSets imported from calculation.consts
-
     let buffSets = $derived(getAllBuffSets())
     let globalBuffSetIds = $derived(getGlobalBuffSetIds())
     let charIconMap = $derived(getCharIconMap())
-    /** @desc 全局 buff 排最前，其余保持原序 */
-    let sortedBuffSets = $derived(
-        [...buffSets].sort((a, b) => {
-            const aG = globalBuffSetIds.includes(a.id) ? 0 : 1
-            const bG = globalBuffSetIds.includes(b.id) ? 0 : 1
-            return aG - bG
-        })
-    )
 
-    /** @desc 分组列表：全局文件夹（皇冠）固定在前，其余按叠层规则 groupBuffSets 分组 */
-    let groupedBuffSets = $derived.by(() => {
-        const globalBuffs = sortedBuffSets.filter((bs) => globalBuffSetIds.includes(bs.id))
-        const globalFolder: GroupedBuffSetItem[] =
-            globalBuffs.length > 0
-                ? [
-                      {
-                          key: 'folder:global',
-                          type: 'folder',
-                          name: '全局生效Buff',
-                          prefix: 'global',
-                          children: globalBuffs
-                      }
-                  ]
-                : []
-        const nonGlobalItems = groupBuffSets(sortedBuffSets.filter((bs) => !globalBuffSetIds.includes(bs.id)))
-        return [...globalFolder, ...nonGlobalItems]
-    })
-    /** @desc 顶层条目展平（用于拖拽插入位置计算与文件夹计数） */
+    /**
+     * @desc 左侧列表的三级归类树：
+     * 一级=全局 Buff；二级=角色名X链 / 角色名的武器X阶（依据 Buff 的链/阶硬性条件，无条件的留在最外层）；
+     * 三级=名字里「前缀+数字+后缀」相同的 ≥2 条自动归档并按键数字升序。
+     * 目录是派生的，因此拖拽只改变同一父容器内的顺序（见 buckets）。
+     */
+    let buffTree = $derived(buildBuffTree(buffSets, globalBuffSetIds, team))
+    let groupedBuffSets = $derived(buffTree.nodes)
+    /** @desc 顶层条目展平（拖拽插入位置计算用）：目录取其 key，散条目取 Buff id */
     let topLevelFlatItems = $derived.by(() => {
         const result: Array<{ key: string; type: 'item' | 'folder' }> = []
-        for (const item of groupedBuffSets) {
-            if (item.type === 'folder') {
-                if (item.prefix === 'global') continue
-                result.push({ key: item.prefix!, type: 'folder' })
-            } else {
-                result.push({ key: item.buffSet!.id, type: 'item' })
-            }
+        for (const item of buffTree.nodes) {
+            if (item.type === 'folder') result.push({ key: item.prefix!, type: 'folder' })
+            else result.push({ key: item.buffSet!.id, type: 'item' })
         }
         return result
     })
@@ -415,40 +428,36 @@
 
     let condPanelOpen = $state(false)
 
-    // ── 同名多乘区：变体（每个变体下的乘区各自带条件）──
-    /** @desc 当前正在编辑乘区的变体 id（null = 首个变体） */
-    let activeVariantId = $state<string | null>(null)
-    const activeVariant = $derived(
-        selectedBuffSet?.variants?.find((v) => v.id === activeVariantId) ?? selectedBuffSet?.variants?.[0] ?? null
+    /** @desc 当前 Buff 的乘区条目列表（同一乘区可多条，各自配数值/引用/覆盖/条件） */
+    const selectedZones = $derived(selectedBuffSet?.zones ?? [])
+
+    /**
+     * @desc 覆盖优先于一切：同一 Buff 内某乘区存在**生效的覆盖条目**（非引用且值 ≠ 0）时，
+     * 该乘区的其它非覆盖条目会被覆盖，界面上置灰提示（不参与计算）。
+     */
+    const overrideZoneIds = $derived(
+        new Set(selectedZones.filter((z) => z.override && !z.ref && z.value !== 0).map((z) => z.zoneId as string))
     )
-    /** @desc 当前变体的乘区列表（无变体时回退到单变体视图 zones） */
-    const activeVariantZones = $derived(activeVariant?.zones ?? selectedBuffSet?.zones ?? [])
 
-    /** @desc 新增同名变体（复制源变体乘区结构） */
-    const handleAddVariant = () => {
-        if (!selectedBuffSetId) return
-        const id = addBuffVariant(selectedBuffSetId, undefined, activeVariant?.id)
-        if (id) {
-            activeVariantId = id
-            addToast('已新增同名变体', 'success')
+    /**
+     * @desc 跨 Buff 的同乘区覆盖：覆盖唯一是指「同一 Buff 内唯一」，跨 Buff 都允许存在，
+     * 引擎按 Buff 进入计算的顺序判定 —— 后进入者最终生效。这里给出提示用的信息。
+     */
+    const externalOverrides = $derived.by(() => {
+        const out: Record<string, { name: string; later: boolean }[]> = {}
+        const list = getAllBuffSets()
+        const selfIdx = list.findIndex((b) => b.id === selectedBuffSetId)
+        for (let i = 0; i < list.length; i++) {
+            const bs = list[i]
+            if (bs.id === selectedBuffSetId) continue
+            for (const z of bs.zones ?? []) {
+                if (!z.override || z.ref || z.value === 0) continue
+                const key = z.zoneId as string
+                if (!out[key]) out[key] = []
+                out[key].push({ name: bs.name, later: selfIdx < 0 ? true : i > selfIdx })
+            }
         }
-    }
-
-    /** @desc 删除当前变体（至少保留一个） */
-    const handleRemoveVariant = () => {
-        if (!selectedBuffSetId || !activeVariant) return
-        if ((selectedBuffSet?.variants?.length ?? 0) <= 1) {
-            addToast('至少保留一个变体', 'info')
-            return
-        }
-        removeBuffVariant(selectedBuffSetId, activeVariant.id)
-        activeVariantId = selectedBuffSet?.variants?.[0]?.id ?? null
-    }
-
-    // 切换所选 Buff 时把变体编辑目标重置为首个变体
-    $effect(() => {
-        selectedBuffSetId
-        activeVariantId = null
+        return out
     })
 
     /** @desc 乘区级条件的行内展开目标（按下标定位，同一乘区可添加多次） */
@@ -458,12 +467,11 @@
     }
     const handleZoneConditionChange = (index: number, next: BuffCondition | null) => {
         if (!selectedBuffSetId) return
-        setZoneConditionAt(selectedBuffSetId, index, next, activeVariant?.id)
+        setZoneConditionAt(selectedBuffSetId, index, next)
     }
-    // 切换 Buff/变体时收起行内条件面板
+    // 切换 Buff 时收起行内条件面板
     $effect(() => {
         selectedBuffSetId
-        activeVariantId
         expandedZoneIndex = null
     })
 
@@ -581,7 +589,7 @@
      * 有现成引用则回填各字段，否则按当前乘区初始化（同目标时自动换一个可引用属性）。
      */
     function openRefModal(zoneIndex: number) {
-        const zone = activeVariantZones[zoneIndex]
+        const zone = selectedZones[zoneIndex]
         if (!zone) return
         refZoneIndex = zoneIndex
         showRefZoneMenu = false
@@ -633,14 +641,14 @@
             divisor: refDivisor,
             multiplier: refMultiplier
         }
-        setZoneRefAt(selectedBuffSetId, refZoneIndex, ref, activeVariant?.id)
+        setZoneRefAt(selectedBuffSetId, refZoneIndex, ref)
         showRefModal = false
     }
 
     /** @desc 清除引用 */
     function handleClearRef() {
         if (!selectedBuffSetId) return
-        setZoneRefAt(selectedBuffSetId, refZoneIndex, null, activeVariant?.id)
+        setZoneRefAt(selectedBuffSetId, refZoneIndex, null)
         showRefModal = false
     }
 
@@ -672,7 +680,8 @@
         const el = e.currentTarget as HTMLElement
         el.setPointerCapture(e.pointerId)
         savedCollapsedState = new Set(collapsedFolders)
-        collapsedFolders = new Set()
+        // 拖动时**收起所有文件夹**：列表变短、目录本身成为清晰的落点
+        collapsedFolders = new Set(buffTree.folderKeys)
 
         let idx = -1
         if (mode === 'child' && folderPrefix) {
@@ -1128,6 +1137,11 @@
     }
 
     let teamNames = $derived(team.map((s) => s.character ?? '?'))
+    /** @desc 队伍槽位头像（二级「角色名X链 / 角色名的武器X阶」目录用） */
+    const teamIconOf = (idx: number): string | undefined => {
+        const name = team[idx]?.character
+        return name ? charIconMap[name] : undefined
+    }
 </script>
 
 <!-- @desc BUFF 配置弹窗根容器：遮罩 + 主卡片（标题栏/左侧列表/右侧编辑器/底部保存） -->
@@ -1188,7 +1202,8 @@
                     >
                         {#each groupedBuffSets as item (item.key)}
                             {#if item.type === 'folder'}
-                                {@const isGlobalFolder = item.prefix === 'global'}
+                                {@const isGlobalFolder = item.folderKind === 'global'}
+                                {@const isAutoFolder = item.folderKind === 'char-gate'}
                                 {@const topIdx = topLevelIdxMap.get(item.prefix!)}
                                 {@const folderHasStar = item.children!.some((c) => c.starred)}
                                 {#if !isGlobalFolder && dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
@@ -1212,11 +1227,15 @@
                                                     ? toggleMultiSelectFolder(item)
                                                     : toggleFolder(item.prefix!)}
                                             oncontextmenu={multiSelect ? undefined : (e) => openFolderMenu(e, item)}
-                                            onpointerdown={isGlobalFolder || multiSelect
+                                            onpointerdown={isGlobalFolder || isAutoFolder || multiSelect
                                                 ? undefined
                                                 : (e) => startDrag(e, item.prefix!, 'folder')}
-                                            onpointermove={isGlobalFolder || multiSelect ? undefined : onDragMove}
-                                            onpointerup={isGlobalFolder || multiSelect ? undefined : onDragEnd}
+                                            onpointermove={isGlobalFolder || isAutoFolder || multiSelect
+                                                ? undefined
+                                                : onDragMove}
+                                            onpointerup={isGlobalFolder || isAutoFolder || multiSelect
+                                                ? undefined
+                                                : onDragEnd}
                                             class={[
                                                 'flex min-w-0 flex-1 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
                                                 multiSelect && !isGlobalFolder && folderAllSelected(item.children ?? [])
@@ -1243,23 +1262,41 @@
                                                     class="size-4 shrink-0 text-(--theme-accent-text)"
                                                 />
                                             {:else}
-                                                <Icon
-                                                    icon={isGlobalFolder
-                                                        ? 'mdi:crown'
-                                                        : collapsedFolders.has(item.prefix!)
-                                                          ? 'mdi:folder'
-                                                          : 'mdi:folder-open'}
-                                                    class={[
-                                                        'size-4 shrink-0',
-                                                        isGlobalFolder
-                                                            ? 'text-amber-400'
-                                                            : `drag-handle touch-none select-none cursor-grab active:cursor-grabbing ${
-                                                                  folderHasStar ? 'text-amber-400' : 'opacity-60'
-                                                              }`
-                                                    ].join(' ')}
-                                                />
+                                                {#if isAutoFolder && item.charIdx !== undefined && teamIconOf(item.charIdx)}
+                                                    <img
+                                                        src={teamIconOf(item.charIdx)}
+                                                        alt=""
+                                                        draggable="false"
+                                                        class="size-4 shrink-0 rounded-full object-cover"
+                                                    />
+                                                {:else}
+                                                    <Icon
+                                                        icon={isGlobalFolder
+                                                            ? 'mdi:crown'
+                                                            : collapsedFolders.has(item.prefix!)
+                                                              ? 'mdi:folder-account-outline'
+                                                              : 'mdi:folder-account'}
+                                                        class={[
+                                                            'size-4 shrink-0',
+                                                            isGlobalFolder
+                                                                ? 'text-amber-400'
+                                                                : isAutoFolder
+                                                                  ? 'text-(--theme-accent-text)/70'
+                                                                  : `drag-handle touch-none select-none cursor-grab active:cursor-grabbing ${
+                                                                        folderHasStar ? 'text-amber-400' : 'opacity-60'
+                                                                    }`
+                                                        ].join(' ')}
+                                                    />
+                                                {/if}
                                             {/if}
                                             <span class="truncate flex-1">{item.name}</span>
+                                            {#if isAutoFolder}
+                                                <span
+                                                    class="shrink-0 text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
+                                                    title="按 Buff 的链/阶硬性条件自动归类（改条件即换目录），因此目录本身不可拖动"
+                                                    >自动</span
+                                                >
+                                            {/if}
                                         </button>
                                         {#if !multiSelect}
                                             <button
@@ -1902,91 +1939,6 @@
                                     {/if}
                                 </div>
 
-                                <!-- @desc ── 同名多乘区：变体列表（每个变体可单独设置子条件与乘区数值）── -->
-                                <div
-                                    class="shrink-0 border-b px-3 py-2.5 space-y-2"
-                                    style="border-bottom: 1px solid var(--theme-divider-border);"
-                                >
-                                    <div class="flex items-center gap-1.5">
-                                        <Icon
-                                            icon="mdi:layers-triple-outline"
-                                            class="size-3.5 shrink-0"
-                                            style="color: var(--theme-accent-text);"
-                                        />
-                                        <span class="text-xs font-black tracking-tight">同名变体</span>
-                                        <span class="text-[10px] text-(--theme-modal-text)/40">
-                                            {selectedBuffSet.variants?.length ?? 0} 个 · 各自子条件，满足者全部叠加
-                                        </span>
-                                        <div class="flex-1"></div>
-                                        <button
-                                            onclick={handleAddVariant}
-                                            class="flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text) transition-colors hover:bg-(--theme-accent-bg)/10"
-                                            style="border-color: var(--theme-divider-border);"
-                                            title="新增同名变体（复制当前变体乘区结构）"
-                                        >
-                                            <Icon icon="mdi:plus" class="size-3" />
-                                            新增变体
-                                        </button>
-                                        {#if (selectedBuffSet.variants?.length ?? 0) > 1}
-                                            <button
-                                                onclick={handleRemoveVariant}
-                                                class="flex items-center gap-1 rounded-none border border-red-500 px-2 py-1 text-[10px] text-red-500 transition-colors hover:bg-red-500/20"
-                                                title="删除当前变体"
-                                            >
-                                                <Icon icon="mdi:minus" class="size-3" />
-                                                删除当前
-                                            </button>
-                                        {/if}
-                                    </div>
-
-                                    {#if (selectedBuffSet.variants?.length ?? 0) === 0}
-                                        <p class="text-[10px] text-(--theme-modal-text)/35">
-                                            尚未创建变体（等价于单乘区
-                                            buff）。点击「新增变体」后可让同名乘区分别按不同子条件生效。
-                                        </p>
-                                    {:else}
-                                        <div class="flex flex-wrap gap-1">
-                                            {#each selectedBuffSet.variants ?? [] as v, i (v.id)}
-                                                <button
-                                                    onclick={() => (activeVariantId = v.id)}
-                                                    class="px-2 py-1 text-[10px] transition-colors"
-                                                    style={v.id === activeVariant?.id
-                                                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);'
-                                                        : 'background: var(--theme-card-bg); color: color-mix(in srgb, var(--theme-modal-text) 60%, transparent);'}
-                                                    title={v.condition ? describeCondition(v.condition) : '无子条件'}
-                                                >
-                                                    {v.label ?? `变体${i + 1}`}
-                                                    {#if v.condition}·条件{/if}
-                                                    <span class="opacity-60">（{v.zones.length} 乘区）</span>
-                                                </button>
-                                            {/each}
-                                        </div>
-
-                                        {#if activeVariant}
-                                            <div
-                                                class="flex items-center gap-1.5 border px-2 py-1.5"
-                                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                                            >
-                                                <span class="text-[10px] text-(--theme-modal-text)/40">变体名称</span>
-                                                <input
-                                                    type="text"
-                                                    value={activeVariant.label ?? ''}
-                                                    onchange={(e) =>
-                                                        updateBuffVariant(selectedBuffSet.id, activeVariant!.id, {
-                                                            label: e.currentTarget.value
-                                                        })}
-                                                    placeholder="变体名称"
-                                                    class="min-w-0 flex-1 border px-1.5 py-0.5 text-[11px] outline-none"
-                                                    style="border-color: var(--theme-divider-border); background: var(--theme-card-bg); color: var(--theme-modal-text);"
-                                                />
-                                                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/35"
-                                                    >条件写在下方每个乘区里</span
-                                                >
-                                            </div>
-                                        {/if}
-                                    {/if}
-                                </div>
-
                                 <!-- @desc 作用域区：角色头像勾选（可吃到的角色）+ 效应专属切换（全局块锁定） -->
                                 <!-- Character scope -->
                                 <div
@@ -2234,16 +2186,48 @@
                                 <!-- @desc 乘区列表：已配置乘区的数值输入/引用展示/追加覆盖切换/引用配置入口 -->
                                 <!-- Zone list -->
                                 <div class="theme-scrollbar flex-1 overflow-y-auto p-3 space-y-1">
-                                    {#each activeVariantZones as zone, zoneIndex (zoneIndex)}
+                                    {#each selectedZones as zone, zoneIndex (zoneIndex)}
                                         {@const def = ZONE_MAP.get(zone.zoneId)}
+                                        {@const zoneKey = zone.zoneId as string}
+                                        {@const overridden = !zone.override && overrideZoneIds.has(zoneKey)}
+                                        {@const external = externalOverrides[zoneKey] ?? []}
                                         {#if def}
+                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
                                             <div
-                                                class="flex items-center gap-1.5 rounded-none border px-3 py-2 transition-colors hover:border-(--theme-accent-bg)"
+                                                class="flex items-center gap-1.5 rounded-none border px-3 py-2 transition-colors {overridden
+                                                    ? 'opacity-40'
+                                                    : 'hover:border-(--theme-accent-bg)'}"
                                                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                                title={overridden
+                                                    ? `同乘区已有覆盖条目：覆盖优先于一切，本条目不参与计算`
+                                                    : ''}
                                             >
                                                 <span class="shrink-0 text-xs text-(--theme-modal-text) truncate"
                                                     >{def.label}</span
                                                 >
+                                                {#if zone.override}
+                                                    <span
+                                                        class="shrink-0 px-1 py-0.5 text-[10px] font-black tracking-tight"
+                                                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                                        title="覆盖优先于一切：该乘区的其它条目都不参与计算"
+                                                        >覆盖生效</span
+                                                    >
+                                                {:else if overridden}
+                                                    <span
+                                                        class="shrink-0 px-1 py-0.5 text-[10px] text-(--theme-modal-text)/50"
+                                                        title="同乘区已有覆盖条目，本条目被覆盖">已被覆盖</span
+                                                    >
+                                                {:else if external.length > 0}
+                                                    <span
+                                                        class="shrink-0 px-1 py-0.5 text-[10px] text-(--theme-modal-text)/50"
+                                                        title={`同乘区在其它 BUFF 上也有覆盖：${external
+                                                            .map(
+                                                                (e) =>
+                                                                    `「${e.name}」${e.later ? '在本 Buff 之后 → 最终生效' : '在本 Buff 之前 → 会被本 Buff 覆盖'}`
+                                                            )
+                                                            .join('；')}`}>跨 Buff 覆盖 ×{external.length}</span
+                                                    >
+                                                {/if}
                                                 {#if zone.ref && !ZONE_NO_REF_IDS.has(zone.zoneId)}
                                                     {@const refDef =
                                                         ZONE_REF_MAP.get(zone.ref.zoneId) ??
@@ -2298,8 +2282,7 @@
                                                                 setZoneValueAt(
                                                                     selectedBuffSet.id,
                                                                     zoneIndex,
-                                                                    isNaN(v) ? 0 : v,
-                                                                    activeVariant?.id
+                                                                    isNaN(v) ? 0 : v
                                                                 )
                                                             }}
                                                             class="w-14 h-6 rounded-none border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
@@ -2316,8 +2299,7 @@
                                                             setZoneOverrideAt(
                                                                 selectedBuffSet.id,
                                                                 zoneIndex,
-                                                                !zone.override,
-                                                                activeVariant?.id
+                                                                !zone.override
                                                             )}
                                                         class={[
                                                             'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
@@ -2361,10 +2343,9 @@
                                                     />
                                                     条件{#if zone.condition}<span class="ml-0.5">•</span>{/if}
                                                 </button>
-                                                <!-- @desc 移除该乘区实例（同名乘区可添加多个，逐个移除） -->
+                                                <!-- @desc 移除该乘区条目（同名乘区可添加多个，逐个移除） -->
                                                 <button
-                                                    onclick={() =>
-                                                        removeZoneAt(selectedBuffSet.id, zoneIndex, activeVariant?.id)}
+                                                    onclick={() => removeZoneAt(selectedBuffSet.id, zoneIndex)}
                                                     class="shrink-0 rounded-none border border-transparent px-1 py-0.5 text-[10px] text-(--theme-modal-text)/30 transition-colors hover:border-red-500/40 hover:text-red-500"
                                                     title="移除该乘区"
                                                 >
@@ -2379,7 +2360,7 @@
                                             {/if}
                                         {/if}
                                     {/each}
-                                    {#if activeVariantZones.length === 0}
+                                    {#if selectedZones.length === 0}
                                         <div class="text-xs text-(--theme-modal-text)/30 py-4 text-center">
                                             暂无乘区
                                         </div>
@@ -2393,12 +2374,20 @@
                                 </div>
                             {/if}
                         </div>
-                        <!-- @desc 右栏乘区清单：点击即**添加**一个乘区实例（同一乘区可添加多次，各自独立配置） -->
+                        <!-- @desc 右栏乘区清单：点击即**添加**一个乘区条目（同一乘区可添加多次，各自独立配置）；左缘分割线可拖拽调宽 -->
                         {#if selectedBuffSet}
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
-                                class="w-52 shrink-0 border-l flex flex-col"
-                                style="border-left: 1px solid var(--theme-divider-border);"
-                            >
+                                class="shrink-0 w-1 cursor-col-resize"
+                                style="background: {zoneBarDragging
+                                    ? 'var(--theme-accent-bg)'
+                                    : 'color-mix(in srgb, var(--theme-divider-border) 80%, transparent)'};{zoneBarDragging
+                                    ? ' box-shadow: 0 0 10px color-mix(in srgb, var(--theme-accent-bg) 55%, transparent);'
+                                    : ''}"
+                                title="拖动调整乘区栏宽度"
+                                onpointerdown={zoneBarHandleDown}
+                            ></div>
+                            <div class="shrink-0 border-l flex flex-col" style="width: {zoneBarWidth}px;">
                                 <div class="shrink-0 px-3 pt-3 pb-1.5">
                                     <div class="flex items-center gap-1.5">
                                         <Icon
@@ -2408,34 +2397,39 @@
                                         />
                                         <span class="text-xs font-black tracking-tight">添加乘区</span>
                                     </div>
-                                    <p class="mt-1 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
-                                        点击即添加一个乘区；同名乘区可添加多次，各自配置数值与生效条件。
-                                    </p>
                                 </div>
-                                <div class="theme-scrollbar flex-1 overflow-y-auto px-3 pb-3">
-                                    <div class="flex flex-col gap-0.5">
-                                        {#each ZONE_DEFS as def}
-                                            {@const count = activeVariantZones.filter(
-                                                (z) => z.zoneId === def.id
-                                            ).length}
-                                            <button
-                                                onclick={() =>
-                                                    addZoneToBuffSet(selectedBuffSet!.id, def.id, activeVariant?.id)}
-                                                class="w-full text-left rounded-none px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5 text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5 hover:text-(--theme-accent-text)"
-                                                title={`添加「${def.label}」${count > 0 ? `（已有 ${count} 个）` : ''}`}
+                                <div class="theme-scrollbar flex-1 overflow-y-auto px-2 pb-3">
+                                    {#each ZONE_SECTION_VIEWS as section (section.title)}
+                                        <div class="mt-2 first:mt-0">
+                                            <div
+                                                class="px-1 pb-1 text-[10px] font-black tracking-[0.1em] text-(--theme-modal-text)/35"
                                             >
-                                                <Icon icon="mdi:plus" class="size-3.5 shrink-0" />
-                                                <span class="min-w-0 flex-1 truncate">{def.label}</span>
-                                                {#if count > 0}
-                                                    <span
-                                                        class="shrink-0 px-1 text-[10px] tabular-nums"
-                                                        style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text);"
-                                                        >{count}</span
+                                                {section.title}
+                                            </div>
+                                            <div class="flex flex-col gap-0.5">
+                                                {#each section.defs as def (def.id)}
+                                                    {@const count = selectedZones.filter(
+                                                        (z) => z.zoneId === def.id
+                                                    ).length}
+                                                    <button
+                                                        onclick={() => addZoneToBuffSet(selectedBuffSet!.id, def.id)}
+                                                        class="w-full text-left rounded-none px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5 text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5 hover:text-(--theme-accent-text)"
+                                                        title={`添加「${def.label}」${count > 0 ? `（已有 ${count} 个）` : ''}`}
                                                     >
-                                                {/if}
-                                            </button>
-                                        {/each}
-                                    </div>
+                                                        <Icon icon="mdi:plus" class="size-3.5 shrink-0" />
+                                                        <span class="min-w-0 flex-1 truncate">{def.label}</span>
+                                                        {#if count > 0}
+                                                            <span
+                                                                class="shrink-0 px-1 text-[10px] tabular-nums"
+                                                                style="background: color-mix(in srgb, var(--theme-accent-bg) 18%, transparent); color: var(--theme-accent-text);"
+                                                                >{count}</span
+                                                            >
+                                                        {/if}
+                                                    </button>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    {/each}
                                 </div>
                             </div>
                         {/if}

@@ -5,8 +5,7 @@ import type {
     CalcState,
     DamageEntry,
     DamageEntryConfig,
-    BuffCondition,
-    BuffVariant
+    BuffCondition
 } from './calculation.types'
 import type { TimelineData } from './timeline.types'
 import type { CharSlot } from '$lib/types/project'
@@ -671,139 +670,100 @@ export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
     )
 }
 
-/** @desc 对某个变体的乘区列表做不可变变换，并保持 zones 单变体兼容视图同步 */
-const withVariantZones = (
-    buff: BuffSet,
-    variantId: string,
-    transform: (zones: BuffZoneValue[]) => BuffZoneValue[]
-): BuffSet => {
-    const variants = (buff.variants?.length ? buff.variants : [{ id: `${buff.id}-v1`, zones: buff.zones }]).map((v) =>
-        v.id === variantId ? { ...v, zones: transform(v.zones ?? []) } : v
-    )
-    return { ...buff, variants, zones: variants[0]?.zones ?? [] }
-}
-
-/** @desc 默认操作的变体 id（单变体 buff 的隐式变体） */
-const defaultVariantId = (buff: BuffSet): string => buff.variants?.[0]?.id ?? `${buff.id}-v1`
+/** @desc 对某个 Buff 的乘区条目列表做不可变变换 */
+const withZones = (buff: BuffSet, transform: (zones: BuffZoneValue[]) => BuffZoneValue[]): BuffSet => ({
+    ...buff,
+    zones: transform(buff.zones ?? [])
+})
 
 /**
- * @desc 按**下标**修改某个乘区（同一乘区可被添加多次，各自独立配置数值/引用/条件）。
+ * @desc 按**下标**修改某个乘区条目（同一乘区可被添加多次，各自独立配置数值/引用/条件）。
  * 右栏「添加乘区」后每个条目就是一个独立实例，因此界面按位置而非 zoneId 定位。
  */
-export function updateZoneAt(
-    setId: string,
-    zoneIndex: number,
-    updater: (zone: BuffZoneValue) => BuffZoneValue,
-    variantId?: string
-): void {
+export function updateZoneAt(setId: string, zoneIndex: number, updater: (zone: BuffZoneValue) => BuffZoneValue): void {
     if (!assertUnlocked()) return
+    markTableDirty()
+    _buffSets = _buffSets.map((s) =>
+        s.id === setId ? withZones(s, (zones) => zones.map((z, i) => (i === zoneIndex ? updater(z) : z))) : s
+    )
+}
+
+/** @desc 按下标移除某个乘区条目 */
+export function removeZoneAt(setId: string, zoneIndex: number): void {
+    if (!assertUnlocked()) return
+    markTableDirty()
+    _buffSets = _buffSets.map((s) =>
+        s.id === setId ? withZones(s, (zones) => zones.filter((_, i) => i !== zoneIndex)) : s
+    )
+}
+
+/** @desc 按下标设置某乘区条目的数值 */
+export function setZoneValueAt(setId: string, zoneIndex: number, value: number): void {
+    updateZoneAt(setId, zoneIndex, (z) => ({ ...z, value }))
+}
+
+/** @desc 按下标设置某乘区条目的生效条件（链/阶会被强制剥离，属整块硬性条件） */
+export function setZoneConditionAt(setId: string, zoneIndex: number, condition: BuffCondition | null): void {
+    const normalized = condition ? normalizeConditionForScope(normalizeCondition(condition, 'zone'), 'zone') : null
+    const isEmpty = !normalized || isConditionEmpty(normalized)
+    updateZoneAt(setId, zoneIndex, (z) => ({
+        ...z,
+        ...(isEmpty ? { condition: undefined } : { condition: normalized })
+    }))
+}
+
+/** @desc 按下标切换某乘区条目的「追加/覆盖」标记（extraRatio 恒为追加；覆盖时清除引用） */
+export function setZoneOverrideAt(setId: string, zoneIndex: number, override: boolean): void {
+    if (!assertUnlocked()) return
+    const zoneId = _buffSets.find((s) => s.id === setId)?.zones?.[zoneIndex]?.zoneId
+    if (!zoneId) return
+    const nextOverride = zoneId === 'extraRatio' ? false : override
     markTableDirty()
     _buffSets = _buffSets.map((s) => {
         if (s.id !== setId) return s
-        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
-            zones.map((z, i) => (i === zoneIndex ? updater(z) : z))
+        return withZones(s, (list) =>
+            list.map((z, i) => {
+                if (i === zoneIndex) {
+                    return { ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }
+                }
+                // 同一 Buff 内每个乘区只允许一个覆盖条目：开启覆盖时清掉同乘区其它条目的覆盖
+                if (nextOverride && z.zoneId === zoneId && z.override) return { ...z, override: undefined }
+                return z
+            })
         )
     })
 }
 
-/** @desc 按下标移除某个乘区 */
-export function removeZoneAt(setId: string, zoneIndex: number, variantId?: string): void {
-    if (!assertUnlocked()) return
-    markTableDirty()
-    _buffSets = _buffSets.map((s) => {
-        if (s.id !== setId) return s
-        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) => zones.filter((_, i) => i !== zoneIndex))
-    })
-}
-
-/** @desc 按下标设置某乘区的数值 */
-export function setZoneValueAt(setId: string, zoneIndex: number, value: number, variantId?: string): void {
-    updateZoneAt(setId, zoneIndex, (z) => ({ ...z, value }), variantId)
-}
-
-/** @desc 按下标设置某乘区的生效条件（链/阶会被强制剥离，属整块硬性条件） */
-export function setZoneConditionAt(
-    setId: string,
-    zoneIndex: number,
-    condition: BuffCondition | null,
-    variantId?: string
-): void {
-    const normalized = condition ? normalizeConditionForScope(normalizeCondition(condition, 'zone'), 'zone') : null
-    const isEmpty = !normalized || isConditionEmpty(normalized)
-    updateZoneAt(
-        setId,
-        zoneIndex,
-        (z) => ({ ...z, ...(isEmpty ? { condition: undefined } : { condition: normalized }) }),
-        variantId
-    )
-}
-
-/** @desc 按下标切换某乘区的「追加/覆盖」标记（extraRatio 恒为追加；覆盖时清除引用） */
-export function setZoneOverrideAt(setId: string, zoneIndex: number, override: boolean, variantId?: string): void {
-    const zoneId = _buffSets.find((s) => s.id === setId)?.zones?.[zoneIndex]?.zoneId
-    const nextOverride = zoneId === 'extraRatio' ? false : override
-    updateZoneAt(
-        setId,
-        zoneIndex,
-        (z) => ({ ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }),
-        variantId
-    )
-}
-
-/** @desc 按下标设置某乘区的引用转模配置（有引用时清除覆盖标记） */
+/** @desc 按下标设置某乘区条目的引用转模配置（有引用时清除覆盖标记） */
 export function setZoneRefAt(
     setId: string,
     zoneIndex: number,
-    ref: import('./calculation.types').ZoneRef | null,
-    variantId?: string
+    ref: import('./calculation.types').ZoneRef | null
 ): void {
-    updateZoneAt(
-        setId,
-        zoneIndex,
-        (z) => ({ ...z, ref: ref ?? undefined, override: ref ? undefined : z.override }),
-        variantId
-    )
+    updateZoneAt(setId, zoneIndex, (z) => ({ ...z, ref: ref ?? undefined, override: ref ? undefined : z.override }))
 }
 
-/** @desc 读取某 Buff 实例的全部同名变体（缺省用隐式单变体补齐） */
-export function getBuffVariants(setId: string): BuffVariant[] {
-    return variantsOf(_buffSets.find((s) => s.id === setId))
-}
+/** @desc ── 乘区级生效条件（条件挂在具体乘区条目上）── */
 
-const variantsOf = (bs: BuffSet | undefined): BuffVariant[] => {
-    if (!bs) return []
-    if (bs.variants?.length) return bs.variants
-    return [{ id: `${bs.id}-v1`, zones: bs.zones }]
-}
-
-/** @desc ── 乘区级生效条件（条件挂在具体乘区上）── */
-
-/** @desc 读取某乘区自身的生效条件 */
-export function getBuffSetZoneCondition(setId: string, zoneId: string, variantId?: string): BuffCondition | undefined {
+/** @desc 读取某乘区条目的生效条件（同一乘区可有多条，取第一条命中的） */
+export function getBuffSetZoneCondition(setId: string, zoneId: string): BuffCondition | undefined {
     const bs = _buffSets.find((s) => s.id === setId)
     if (!bs) return undefined
-    const variants = variantsOf(bs)
-    const variant = variants.find((v) => v.id === (variantId ?? variants[0]?.id))
-    return variant?.zones.find((z) => z.zoneId === (zoneId as ZoneId))?.condition
+    return bs.zones.find((z) => z.zoneId === (zoneId as ZoneId))?.condition
 }
 
 /**
- * @desc 设置某乘区的生效条件（伤害类型 / 伤害属性 / 自定义变量条件）。
+ * @desc 设置某乘区的生效条件（伤害类型 / 伤害属性）。
  * 链条件与阶条件是整个 Buff 的硬性条件，这里会被强制剥离（不允许挂到乘区上）。
  */
-export function setBuffSetZoneCondition(
-    setId: string,
-    zoneId: string,
-    condition: BuffCondition | null,
-    variantId?: string
-): void {
+export function setBuffSetZoneCondition(setId: string, zoneId: string, condition: BuffCondition | null): void {
     if (!assertUnlocked()) return
     const normalized = condition ? normalizeConditionForScope(normalizeCondition(condition, 'zone'), 'zone') : null
     const isEmpty = !normalized || isConditionEmpty(normalized)
     markTableDirty()
     _buffSets = _buffSets.map((s) => {
         if (s.id !== setId) return s
-        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
+        return withZones(s, (zones) =>
             zones.map((z) =>
                 z.zoneId === (zoneId as ZoneId)
                     ? { ...z, ...(isEmpty ? { condition: undefined } : { condition: normalized }) }
@@ -814,17 +774,12 @@ export function setBuffSetZoneCondition(
 }
 
 /** @desc 设置某乘区的引用（存在引用时清除 override 标记） */
-export function setBuffSetZoneRef(
-    setId: string,
-    zoneId: string,
-    ref: import('./calculation.types').ZoneRef | null,
-    variantId?: string
-) {
+export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./calculation.types').ZoneRef | null) {
     if (!assertUnlocked()) return
     markTableDirty()
     _buffSets = _buffSets.map((s) => {
         if (s.id !== setId) return s
-        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
+        return withZones(s, (zones) =>
             zones.map((z) =>
                 z.zoneId === zoneId ? { ...z, ref: ref ?? undefined, override: ref ? undefined : z.override } : z
             )
@@ -832,19 +787,25 @@ export function setBuffSetZoneRef(
     })
 }
 
-/** @desc 切换乘区「追加/覆盖」标记（extraRatio 恒为追加；覆盖时清除引用） */
-export function setBuffSetZoneOverride(setId: string, zoneId: string, override: boolean, variantId?: string) {
+/**
+ * @desc 按乘区 id 切换「追加/覆盖」标记（extraRatio 恒为追加；覆盖时清除引用）。
+ * 覆盖唯一：同一 Buff 内每个乘区只保留一个覆盖条目 —— 开启时落在该乘区的第一条，其余条目取消覆盖。
+ */
+export function setBuffSetZoneOverride(setId: string, zoneId: string, override: boolean) {
     if (!assertUnlocked()) return
     const nextOverride = zoneId === 'extraRatio' ? false : override
     markTableDirty()
+    let assigned = false
     _buffSets = _buffSets.map((s) => {
         if (s.id !== setId) return s
-        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
-            zones.map((z) =>
-                z.zoneId === (zoneId as ZoneId)
-                    ? { ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }
-                    : z
-            )
+        return withZones(s, (zones) =>
+            zones.map((z) => {
+                if (z.zoneId !== (zoneId as ZoneId)) return z
+                if (!nextOverride) return { ...z, override: undefined }
+                if (assigned) return { ...z, override: undefined }
+                assigned = true
+                return { ...z, override: true, ref: undefined }
+            })
         )
     })
 }
@@ -941,39 +902,32 @@ export function renameBuffSet(id: string, name: string) {
     _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, name } : s))
 }
 
-/** @desc 给 Buff 块新增一个乘区（默认值 0） */
-export function addZoneToBuffSet(setId: string, zoneId: string, variantId?: string) {
+/** @desc 给 Buff 块新增一个乘区条目（默认值 0；同一乘区可添加多次） */
+export function addZoneToBuffSet(setId: string, zoneId: string) {
     if (!assertUnlocked()) return
     markTableDirty()
-    _buffSets = _buffSets.map((s) => {
-        if (s.id !== setId) return s
-        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) => [
-            ...zones,
-            { zoneId: zoneId as ZoneId, value: 0 } as BuffZoneValue
-        ])
-    })
+    _buffSets = _buffSets.map((s) =>
+        s.id === setId
+            ? withZones(s, (zones) => [...zones, { zoneId: zoneId as ZoneId, value: 0 } as BuffZoneValue])
+            : s
+    )
 }
 
-/** @desc 从 Buff 块移除一个乘区 */
-export function removeZoneFromBuffSet(setId: string, zoneId: string, variantId?: string) {
+/** @desc 从 Buff 块移除某乘区的全部条目 */
+export function removeZoneFromBuffSet(setId: string, zoneId: string) {
     if (!assertUnlocked()) return
     markTableDirty()
-    _buffSets = _buffSets.map((s) => {
-        if (s.id !== setId) return s
-        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
-            zones.filter((z) => z.zoneId !== (zoneId as ZoneId))
-        )
-    })
+    _buffSets = _buffSets.map((s) =>
+        s.id === setId ? withZones(s, (zones) => zones.filter((z) => z.zoneId !== (zoneId as ZoneId))) : s
+    )
 }
 
-/** @desc 设置某乘区的数值（$state 深代理原地修改，避免整数组替换触发无关重建） */
-export function setBuffSetZoneValue(setId: string, zoneId: string, value: number, variantId?: string) {
+/** @desc 设置某乘区条目的数值（按 zoneId 命中第一条；$state 深代理原地修改，避免整数组替换） */
+export function setBuffSetZoneValue(setId: string, zoneId: string, value: number) {
     if (!assertUnlocked()) return
     const bs = _buffSets.find((s) => s.id === setId)
     if (!bs) return
-    const variants = variantsOf(bs)
-    const variant = variants.find((v) => v.id === (variantId ?? variants[0]?.id))
-    const zone = variant?.zones.find((z) => z.zoneId === (zoneId as ZoneId))
+    const zone = bs.zones.find((z) => z.zoneId === (zoneId as ZoneId))
     if (!zone) return
     markTableDirty()
     zone.value = value
@@ -998,83 +952,6 @@ export function getPaneEffectSources(entryId: string): Record<string, PaneEffect
     const team = _initTeam
     const charIdx = entry.character && team ? team.findIndex((s) => s.character === entry.character) : -1
     return paneEffectSourcesOf(charIdx, entry.isEffect, _damageEntryBuffSetIds[entryId] ?? [], _buffSets)
-}
-
-/** @desc ── 同名多乘区：变体 CRUD（每个变体的乘区各自带条件）── */
-
-/** @desc 新增一个同名变体（复制源变体的乘区结构，便于小幅改条件/数值） */
-export function addBuffVariant(setId: string, label?: string, copyFromVariantId?: string): string | undefined {
-    if (!assertUnlocked()) return
-    const bs = _buffSets.find((s) => s.id === setId)
-    if (!bs) return
-    const variants = variantsOf(bs)
-    const source = variants.find((v) => v.id === copyFromVariantId) ?? variants[variants.length - 1]
-    const id = `${setId}-v${Date.now().toString(36)}`
-    const next: BuffVariant = {
-        id,
-        label: label ?? `变体${variants.length + 1}`,
-        zones: (source?.zones ?? []).map((z) => ({ ...z }))
-    }
-    const merged = [...variants, next]
-    markTableDirty()
-    _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, variants: merged, zones: merged[0]?.zones ?? [] } : s))
-    return id
-}
-
-/** @desc 删除一个同名变体（至少保留一个） */
-export function removeBuffVariant(setId: string, variantId: string) {
-    if (!assertUnlocked()) return
-    const bs = _buffSets.find((s) => s.id === setId)
-    if (!bs) return
-    const variants = variantsOf(bs)
-    if (variants.length <= 1) return
-    const merged = variants.filter((v) => v.id !== variantId)
-    markTableDirty()
-    _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, variants: merged, zones: merged[0]?.zones ?? [] } : s))
-}
-
-/** @desc 修改变体的标签 / 子条件 / 变量写入 */
-export function updateBuffVariant(
-    setId: string,
-    variantId: string,
-    patch: Partial<Pick<BuffVariant, 'label' | 'condition'>>
-) {
-    if (!assertUnlocked()) return
-    markTableDirty()
-    _buffSets = _buffSets.map((s) => {
-        if (s.id !== setId) return s
-        const variants = variantsOf(s).map((v) =>
-            v.id === variantId
-                ? {
-                      ...v,
-                      ...('label' in patch ? { label: patch.label } : {}),
-                      ...('condition' in patch
-                          ? {
-                                condition: patch.condition ? normalizeCondition(patch.condition, 'buff') : undefined
-                            }
-                          : {})
-                  }
-                : v
-        )
-        return { ...s, variants }
-    })
-}
-
-/** @desc 把变体的乘区集合整体写回 */
-export function setBuffVariantZones(setId: string, variantId: string, zones: BuffZoneValue[]) {
-    if (!assertUnlocked()) return
-    markTableDirty()
-    _buffSets = _buffSets.map((s) =>
-        s.id === setId ? withVariantZones(s, variantId, () => zones.map((z) => ({ ...z }))) : s
-    )
-}
-
-/** @desc 设置变体子条件（同名多乘区） */
-export function setBuffVariantCondition(setId: string, variantId: string, condition: BuffCondition | null): boolean {
-    if (!assertUnlocked()) return false
-    if (!_buffSets.some((s) => s.id === setId)) return false
-    updateBuffVariant(setId, variantId, { condition: condition ?? undefined })
-    return true
 }
 
 /** @desc ── Entry-BuffSet 绑定 ── */

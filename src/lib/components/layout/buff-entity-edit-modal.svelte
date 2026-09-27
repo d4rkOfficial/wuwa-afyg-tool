@@ -2,7 +2,13 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import { ZONE_DEFS, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+    import {
+        ZONE_MAP,
+        ZONE_NO_REF_IDS,
+        ZONE_REF_DEFS,
+        ZONE_REF_MAP,
+        ZONE_SECTION_VIEWS
+    } from '$lib/calc/calculation.consts'
     import type {
         BuffEntityType,
         BuffLibraryBuff,
@@ -720,21 +726,36 @@
                 >
                     <span class="text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40">乘区</span>
                 </div>
-                <div class="theme-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
-                    {#each ZONE_DEFS as def}
-                        {@const exists = activeZoneIds.has(def.id)}
-                        <button
-                            onclick={() => toggleAddZone(def.id)}
-                            class={[
-                                'flex w-full items-center gap-1.5 rounded-none px-2 py-1.5 text-left text-xs font-medium transition-colors',
-                                exists
-                                    ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
-                                    : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
-                            ].join(' ')}
-                        >
-                            <Icon icon={exists ? 'mdi:check' : 'mdi:circle-outline'} class="size-3.5 shrink-0" />
-                            {def.label}
-                        </button>
+                <div class="theme-scrollbar min-h-0 flex-1 overflow-y-auto p-1.5">
+                    {#each ZONE_SECTION_VIEWS as section (section.title)}
+                        {@const usedInSection = section.defs.filter((d) => activeZoneIds.has(d.id)).length}
+                        <div class="mb-1.5">
+                            <div class="px-1 pb-1 text-[10px] font-black tracking-[0.1em] text-(--theme-modal-text)/35">
+                                {section.title}{#if usedInSection > 0}<span class="ml-1 opacity-70"
+                                        >·{usedInSection}</span
+                                    >{/if}
+                            </div>
+                            <div class="space-y-0.5">
+                                {#each section.defs as def (def.id)}
+                                    {@const exists = activeZoneIds.has(def.id)}
+                                    <button
+                                        onclick={() => toggleAddZone(def.id)}
+                                        class={[
+                                            'flex w-full items-center gap-1.5 rounded-none px-2 py-1.5 text-left text-xs font-medium transition-colors',
+                                            exists
+                                                ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
+                                                : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
+                                        ].join(' ')}
+                                    >
+                                        <Icon
+                                            icon={exists ? 'mdi:check' : 'mdi:circle-outline'}
+                                            class="size-3.5 shrink-0"
+                                        />
+                                        {def.label}
+                                    </button>
+                                {/each}
+                            </div>
+                        </div>
                     {/each}
                 </div>
             </div>

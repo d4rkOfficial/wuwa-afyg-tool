@@ -140,8 +140,8 @@ export const FORMULA_ZONES: BuiltinBuffSourceDef[] = [
         id: `${BUILTIN_PREFIX}special`,
         label: '特殊区',
         kind: 'formula',
-        zones: ['customFinalDmg', 'customFinalDmgMul'],
-        desc: '1 + 特殊终伤%，多来源连乘'
+        zones: ['specialFinal1', 'specialFinal2'],
+        desc: '(1 + 特殊终伤(1)%) × ∏(1 + 特殊终伤(2)%)'
     },
     {
         id: `${BUILTIN_PREFIX}tuneBreak`,

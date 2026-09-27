@@ -84,35 +84,28 @@ export interface BuffCondition {
     damageTypes?: string[]
 }
 
-/** @desc 同名变体：同一 Buff 实例下可配置多个同名乘区条目，各自带独立子条件与数值 */
-export interface BuffVariant {
-    id: string
-    /** @desc 变体标签（界面区分用，如同名多乘区的「形态A」） */
-    label?: string
-    /** @desc 变体级子条件：不满足时该变体提供的乘区不计入 */
-    condition?: BuffCondition
-    /** @desc 该变体提供的乘区（可含引用转模 / 覆盖） */
-    zones: BuffZoneValue[]
-}
-
 /** @desc Buff 实例来源：user=用户创建/迁移，builtin=引擎内置源（角色/武器/声骸/敌人/公式域） */
 export type BuffSource = 'user' | 'builtin'
 
 /**
- * @desc Buff 类实例（一切皆 buff 的统一载体）：一个实例持有一组同名的「变体」，每个变体提供乘区并带自己的子条件。
+ * @desc Buff 类实例（一切皆 buff 的统一载体）。
+ *
+ * 乘区语义（核心口径）：`zones` 是**贡献条目列表**，不是「乘区种类的集合」——
+ * 同一个乘区可以出现多次，每次是一个独立贡献单元（各带数值 / 引用 / 覆盖 / **自己的生效条件**）。
+ * 判定：`if (链阶硬门槛满足) { 同乘区各条目各自 add if 自身条件满足 }`，满足的全部相加；
+ * 标了覆盖的条目在最后**替换**该乘区合计（覆盖优先于一切；同一 Buff 内每个乘区只允许一个覆盖条目，
+ * 跨 Buff 出现多个覆盖时按 Buff 进入计算的顺序，后进入者最终生效）。
  * `scope` 决定作用范围：'all'=全队 / 角色槽位数组 / 空数组=仅效应伤害。
  */
 export interface BuffInstance {
     id: string
     name: string
-    /** @desc 同名变体列表；兼容期允许直接用 zones 表达单变体 */
-    variants?: BuffVariant[]
-    /** @desc 单变体快捷写法（与 variants 二选一；迁移与导入均归一化为 variants，并同步为首个变体的乘区视图） */
+    /** @desc 乘区贡献条目列表（同一乘区可多条，每条各自带生效条件） */
     zones: BuffZoneValue[]
     scope: 'all' | number[]
     starred?: boolean
     global?: boolean
-    /** @desc 生效条件（整块外部门，满足后才逐变体判定子条件） */
+    /** @desc 生效条件（整块外部门，满足后才逐条目判定各自的乘区条件） */
     condition?: BuffCondition
     /** @desc 兼容旧结构：链/精炼条件的参考角色槽位 */
     conditionRefCharIdx?: number
@@ -131,8 +124,6 @@ export interface CalcState {
     buffSets: BuffInstance[]
     damageEntryBuffSetIds: Record<string, string[]>
     damageEntryDamageTypes: Record<string, string[]>
-    /** @desc 条目↔变体细粒度绑定：entryId → buffSetId → 变体 id 列表（缺省表示全部变体生效） */
-    damageEntryBuffVariantIds?: Record<string, Record<string, string[]>>
 }
 
 /** @desc 兼容别名：Buff 块 == Buff 类实例 */
