@@ -1138,7 +1138,14 @@
     }
 
     let teamNames = $derived(team.map((s) => s.character ?? '?'))
-    /** @desc 队伍槽位头像（二级「角色名X链」目录用） */
+    /** @desc 非全局容器（角色链 / 武器目录）下未被数字归并的散条目（数字目录由上面的 folders 分支渲染） */
+    const looseChildrenOf = (children: BuffSet[] | undefined): BuffSet[] =>
+        groupBuffSets(children ?? [])
+            .filter((x) => x.type !== 'folder')
+            .map((x) => x.buffSet!)
+    /** @desc 非全局容器下的数字目录（含成员），恒排在散条目前面 */
+    const foldersOf = (children: BuffSet[] | undefined): GroupedBuffSetItem[] =>
+        groupBuffSets(children ?? []).filter((x) => x.type === 'folder')
     const teamIconOf = (idx: number): string | undefined => {
         const name = team[idx]?.character
         return name ? charIconMap[name] : undefined
@@ -1509,84 +1516,121 @@
                                                     {/if}
                                                 {/each}
                                             {:else}
-                                                {#each item.children! as child, ci (child.id)}
-                                                    {#if !isGlobalFolder && dragState && dragState.mode === 'child' && dragState.folderPrefix === item.prefix && !dragState.outside && dragState.dropIdx === ci}
-                                                        <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+                                                <!-- @desc 非全局容器（角色链 / 武器目录）：先做一级数字前后缀归并（文件夹排在所有条目上方），再挨个列出散条目 -->
+                                                {#each foldersOf(item.children) as sub (sub.key)}
+                                                    {#if sub.type === 'folder'}
+                                                        {@const subKey = 'sub:' + sub.prefix}
+                                                        <div class="space-y-1">
+                                                            <button
+                                                                class="flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-1.5 text-left text-xs text-(--theme-modal-text)/60 transition-all hover:bg-(--theme-modal-text)/5"
+                                                                onclick={() => toggleFolder(subKey)}
+                                                                oncontextmenu={(e) => openFolderMenu(e, sub)}
+                                                            >
+                                                                <Icon
+                                                                    icon={collapsedFolders.has(subKey)
+                                                                        ? 'mdi:folder'
+                                                                        : 'mdi:folder-open'}
+                                                                    class="size-3.5 shrink-0 text-amber-400/70"
+                                                                />
+                                                                <span class="truncate flex-1">{sub.name}</span>
+                                                                <span
+                                                                    class="shrink-0 text-[10px] text-(--theme-modal-text)/30 tabular-nums"
+                                                                    >{(sub.children ?? []).length}</span
+                                                                >
+                                                            </button>
+                                                            {#if !collapsedFolders.has(subKey)}
+                                                                <div
+                                                                    class="ml-3 space-y-1 border-l pl-2"
+                                                                    style="border-color: var(--theme-divider-border);"
+                                                                >
+                                                                    {#each sub.children ?? [] as sc (sc.id)}
+                                                                        <button
+                                                                            data-buffset-id={sc.id}
+                                                                            data-folder-child={sub.prefix}
+                                                                            onclick={() => {
+                                                                                if (multiSelect)
+                                                                                    !isMultiSelectDisabled(sc.id) &&
+                                                                                        toggleMultiSelectId(sc.id)
+                                                                                else selectedBuffSetId = sc.id
+                                                                            }}
+                                                                            oncontextmenu={(e) =>
+                                                                                openItemMenu(e, sc.id)}
+                                                                            class={[
+                                                                                'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-1.5 text-left text-xs transition-all',
+                                                                                multiSelect &&
+                                                                                isMultiSelectDisabled(sc.id)
+                                                                                    ? 'text-(--theme-modal-text)/30 opacity-50'
+                                                                                    : multiSelectedIds.has(sc.id)
+                                                                                      ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                                                      : selectedBuffSetId === sc.id
+                                                                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                                                        : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
+                                                                            ].join(' ')}
+                                                                        >
+                                                                            {#if multiSelect}
+                                                                                <Icon
+                                                                                    icon={isMultiSelectDisabled(sc.id)
+                                                                                        ? 'mdi:checkbox-blank-off-outline'
+                                                                                        : multiSelectedIds.has(sc.id)
+                                                                                          ? 'mdi:checkbox-marked'
+                                                                                          : 'mdi:checkbox-blank-outline'}
+                                                                                    class="size-4 shrink-0 text-(--theme-accent-text)"
+                                                                                />
+                                                                            {:else}
+                                                                                <Icon
+                                                                                    icon={sc.starred
+                                                                                        ? 'mdi:star'
+                                                                                        : 'mdi:star-outline'}
+                                                                                    class="size-3.5 shrink-0 {sc.starred
+                                                                                        ? 'text-amber-400'
+                                                                                        : 'opacity-30'}"
+                                                                                />
+                                                                            {/if}
+                                                                            <span class="truncate flex-1"
+                                                                                >{sc.name}</span
+                                                                            >
+                                                                        </button>
+                                                                    {/each}
+                                                                </div>
+                                                            {/if}
+                                                        </div>
                                                     {/if}
+                                                {/each}
+                                                {#each looseChildrenOf(item.children) as child (child.id)}
                                                     <button
                                                         data-buffset-id={child.id}
                                                         data-folder-child={item.prefix}
                                                         onclick={() => {
-                                                            if (multiSelect && !isGlobalFolder) {
-                                                                toggleMultiSelectId(child.id)
+                                                            if (multiSelect) {
+                                                                !isMultiSelectDisabled(child.id) &&
+                                                                    toggleMultiSelectId(child.id)
                                                             } else {
                                                                 selectedBuffSetId = child.id
                                                             }
                                                         }}
                                                         oncontextmenu={(e) => openItemMenu(e, child.id)}
-                                                        onpointerdown={isGlobalFolder || multiSelect
-                                                            ? undefined
-                                                            : (e) => startDrag(e, child.id, 'child', item.prefix)}
-                                                        onpointermove={isGlobalFolder || multiSelect
-                                                            ? undefined
-                                                            : onDragMove}
-                                                        onpointerup={isGlobalFolder || multiSelect
-                                                            ? undefined
-                                                            : onDragEnd}
                                                         class={[
                                                             'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-2 text-xs text-left transition-all',
-                                                            multiSelect && !isGlobalFolder
-                                                                ? multiSelectedIds.has(child.id)
+                                                            multiSelect && isMultiSelectDisabled(child.id)
+                                                                ? 'text-(--theme-modal-text)/30 opacity-50'
+                                                                : multiSelect
+                                                                  ? multiSelectedIds.has(child.id)
+                                                                      ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                                                                      : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
+                                                                  : selectedBuffSetId === child.id
                                                                     ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                                     : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                                                : selectedBuffSetId === child.id
-                                                                  ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                                  : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5',
-                                                            !isGlobalFolder &&
-                                                                !multiSelect &&
-                                                                dragState?.id === child.id &&
-                                                                !dragState.outside &&
-                                                                'ring-2 ring-(--theme-accent-bg)',
-                                                            !isGlobalFolder &&
-                                                                !multiSelect &&
-                                                                dragState?.id === child.id &&
-                                                                dragState.outside &&
-                                                                'ring-2 ring-red-500 opacity-50'
                                                         ].join(' ')}
-                                                        transition:slide={{ duration: 200 }}
                                                     >
-                                                        {#if multiSelect && !isGlobalFolder}
-                                                            <Icon
-                                                                icon={multiSelectedIds.has(child.id)
-                                                                    ? 'mdi:checkbox-marked'
-                                                                    : 'mdi:checkbox-blank-outline'}
-                                                                class="size-4 shrink-0 text-(--theme-accent-text)"
-                                                            />
-                                                        {:else}
-                                                            <Icon
-                                                                icon={isGlobalFolder
-                                                                    ? 'mdi:crown'
-                                                                    : child.starred
-                                                                      ? 'mdi:star'
-                                                                      : 'mdi:widgets'}
-                                                                class={[
-                                                                    'size-4 shrink-0',
-                                                                    isGlobalFolder
-                                                                        ? 'text-amber-400'
-                                                                        : `drag-handle touch-none select-none cursor-grab active:cursor-grabbing ${
-                                                                              child.starred
-                                                                                  ? 'text-amber-400'
-                                                                                  : 'opacity-60'
-                                                                          }`
-                                                                ].join(' ')}
-                                                            />
-                                                        {/if}
+                                                        <Icon
+                                                            icon={child.starred ? 'mdi:star' : 'mdi:star-outline'}
+                                                            class="size-3.5 shrink-0 {child.starred
+                                                                ? 'text-amber-400'
+                                                                : 'opacity-30'}"
+                                                        />
                                                         <span class="truncate flex-1">{child.name}</span>
                                                     </button>
                                                 {/each}
-                                            {/if}
-                                            {#if !isGlobalFolder && dragState && dragState.mode === 'child' && dragState.folderPrefix === item.prefix && !dragState.outside && dragState.dropIdx === item.children!.length}
-                                                <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
                                             {/if}
                                         </div>
                                     {/if}
