@@ -457,79 +457,53 @@
             </div>
         </div>
 
-        <!-- Detail table -->
-        <div class="theme-scrollbar snap-scroll-y flex-1 overflow-y-auto pb-48" bind:this={tableContainer}>
-            <table class="w-full text-xs">
+        <!-- Detail table（表头放在滚动容器外，不再吸附） -->
+        <div
+            class="shrink-0 border-b"
+            data-sf="toolbar"
+            data-sf-under="card"
+            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg); border-color: var(--theme-divider-border);"
+        >
+            <table class="w-full table-fixed text-xs">
+                <colgroup>
+                    <col style="width: 19%" />
+                    <col style="width: 28%" />
+                    <col style="width: 12%" />
+                    <col style="width: 8%" />
+                    <col style="width: 10%" />
+                    <col style="width: 10%" />
+                    <col style="width: 10%" />
+                    <col style="width: 3%" />
+                </colgroup>
                 <thead>
                     <tr
-                        data-sf="card"
                         class="text-[11px] font-black tracking-[0.16em] text-(--theme-modal-text)/45"
                         style="border-bottom: 1px solid var(--theme-divider-border); {NUMERIC_FONT_STYLE}"
                     >
-                        <th
-                            class="sticky top-0 z-30 py-2 px-3 text-left"
-                            data-sf="toolbar"
-                            data-sf-under="card"
-                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                        >
-                            来源
-                        </th>
-                        <th
-                            class="sticky top-0 z-30 py-2 px-3 text-left"
-                            data-sf="toolbar"
-                            data-sf-under="card"
-                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                        >
-                            条目
-                        </th>
-                        <th
-                            class="sticky top-0 z-30 py-2 px-3 text-right"
-                            data-sf="toolbar"
-                            data-sf-under="card"
-                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                        >
-                            倍率
-                        </th>
-                        <th
-                            class="sticky top-0 z-30 py-2 px-3 text-right"
-                            data-sf="toolbar"
-                            data-sf-under="card"
-                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                        >
-                            单位
-                        </th>
-                        <th
-                            class="sticky top-0 z-30 py-2 px-3 text-right"
-                            data-sf="toolbar"
-                            data-sf-under="card"
-                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                        >
-                            暴击
-                        </th>
-                        <th
-                            class="sticky top-0 z-30 py-2 px-3 text-right"
-                            data-sf="toolbar"
-                            data-sf-under="card"
-                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                        >
-                            不暴击
-                        </th>
-                        <th
-                            class="sticky top-0 z-30 py-2 px-3 text-right"
-                            data-sf="toolbar"
-                            data-sf-under="card"
-                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                        >
-                            期望
-                        </th>
-                        <th
-                            class="sticky top-0 z-30 py-2 px-3 w-8 text-right"
-                            data-sf="toolbar"
-                            data-sf-under="card"
-                            style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                        ></th>
+                        <th class=" py-2 px-3 text-left"> 来源 </th>
+                        <th class=" py-2 px-3 text-left"> 条目 </th>
+                        <th class=" py-2 px-3 text-right"> 倍率 </th>
+                        <th class=" py-2 px-3 text-right"> 单位 </th>
+                        <th class=" py-2 px-3 text-right"> 暴击 </th>
+                        <th class=" py-2 px-3 text-right"> 不暴击 </th>
+                        <th class=" py-2 px-3 text-right"> 期望 </th>
+                        <th class=" py-2 px-3 w-8 text-right"></th>
                     </tr>
                 </thead>
+            </table>
+        </div>
+        <div class="theme-scrollbar snap-scroll-y flex-1 overflow-y-auto pb-48" bind:this={tableContainer}>
+            <table class="w-full table-fixed text-xs">
+                <colgroup>
+                    <col style="width: 19%" />
+                    <col style="width: 28%" />
+                    <col style="width: 12%" />
+                    <col style="width: 8%" />
+                    <col style="width: 10%" />
+                    <col style="width: 10%" />
+                    <col style="width: 10%" />
+                    <col style="width: 3%" />
+                </colgroup>
                 <tbody data-sf="card" style="--sf-base: var(--theme-modal-bg);">
                     {#each entries as entry, i (entry.id)}
                         {@const isExpanded = multiEntryExpand
