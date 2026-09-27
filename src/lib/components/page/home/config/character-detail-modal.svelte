@@ -248,6 +248,7 @@
         <!-- 角色头 -->
         <div
             data-sf="card"
+            data-sf-flat
             class="mt-4 flex items-center gap-3 rounded-none border p-3"
             style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
         >
@@ -313,6 +314,7 @@
         <!-- 链/阶配置：小按钮分组框（样式参考 设置-配色），框宽适应按钮；点选即写入档位并触发重载，点当前档位不重复写入 -->
         <div
             data-sf="card"
+            data-sf-flat
             class="mt-3 rounded-none border p-3"
             style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
         >
@@ -374,6 +376,7 @@
         <!-- 属性面板 -->
         <div
             data-sf="card"
+            data-sf-flat
             class="mt-3 space-y-1.5 rounded-none border p-3 text-xs"
             style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
         >

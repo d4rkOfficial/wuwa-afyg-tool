@@ -717,6 +717,7 @@
                                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                                         <div
                                             data-sf="card"
+                                            data-sf-flat
                                             class="flex items-center gap-1 h-full rounded-none {getEditingBlockId() ===
                                             block.id
                                                 ? ''

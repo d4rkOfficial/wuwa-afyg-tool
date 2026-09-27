@@ -136,6 +136,7 @@
                         {#each pinnedList as set}
                             <div
                                 data-sf="card"
+                                data-sf-flat
                                 class="flex flex-col gap-2 rounded-none border p-3"
                                 style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
                             >
@@ -189,6 +190,7 @@
                         {#each otherList as set}
                             <div
                                 data-sf="card"
+                                data-sf-flat
                                 class="flex flex-col gap-2 rounded-none border p-3"
                                 style="--sf-base: var(--theme-input-bg); border-color: var(--theme-divider-border);"
                             >

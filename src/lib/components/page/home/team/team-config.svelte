@@ -294,6 +294,7 @@
             {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
                 data-sf="card"
+                data-sf-flat
                 class="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border p-6"
                 style="border-color: var(--theme-divider-border)"
             >
