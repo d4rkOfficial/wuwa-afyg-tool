@@ -41,7 +41,6 @@
         NUMERIC_FONT_STYLE,
         SECTION_LABEL,
         STAT_ROW,
-        STAT_VALUE_LG,
         STAT_VALUE_SM,
         SWATCH_DOT
     } from '$lib/calc/result.styles'
@@ -223,7 +222,14 @@
             cur.count++
             map.set(e.character, cur)
         }
-        return [...map.entries()].map(([character, d]) => ({ character, totalDamage: d.total, entryCount: d.count }))
+        // 卡片顺序：伤害最高的角色 → … → 最低的角色 → 其它（无角色归属的永远排最后）
+        return [...map.entries()]
+            .map(([character, d]) => ({ character, totalDamage: d.total, entryCount: d.count }))
+            .sort((a, b) => {
+                if (!a.character) return 1
+                if (!b.character) return -1
+                return b.totalDamage - a.totalDamage
+            })
     })
 
     let totalDamage = $derived(charSummaries.reduce((s, c) => s + c.totalDamage, 0))
@@ -407,8 +413,8 @@
                         class={`${CARD} ${CARD_PAD} min-w-48 flex-1`}
                         style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 16%, var(--theme-card-bg)), color-mix(in srgb, var(--theme-accent-bg) 8%, var(--theme-card-bg))); border-color: color-mix(in srgb, var(--theme-accent-bg) 24%, transparent);"
                     >
-                        <div class="text-base font-black tracking-tight text-(--theme-modal-text)">总伤害</div>
-                        <div class={`mt-1.5 ${STAT_VALUE_LG} text-(--theme-accent-text)`}>
+                        <div class="text-sm font-black tracking-tight text-(--theme-modal-text)">总伤害</div>
+                        <div class={`mt-1.5 ${STAT_VALUE_SM} text-(--theme-accent-text)`}>
                             {Math.round(totalDamage).toLocaleString()}
                         </div>
                     </div>
@@ -439,7 +445,7 @@
                                     alt=""
                                     aria-hidden="true"
                                     draggable="false"
-                                    class="pointer-events-none absolute -bottom-3 -right-3 h-28 w-28 object-contain opacity-75"
+                                    class="pointer-events-none absolute -bottom-3 -right-3 h-28 w-28 object-contain opacity-25"
                                 />
                             {/if}
                         </div>
@@ -464,17 +470,34 @@
                 <thead>
                     <tr
                         data-sf="card"
-                        class={`${SECTION_LABEL} sticky top-0 text-(--theme-modal-text)/45`}
-                        style="--sf-base: var(--theme-modal-bg); border-bottom: 1px solid var(--theme-divider-border);"
+                        class={`${SECTION_LABEL} text-(--theme-modal-text)/45`}
+                        style="border-bottom: 1px solid var(--theme-divider-border);"
                     >
-                        <th class="py-2 px-3 text-left">来源</th>
-                        <th class="py-2 px-3 text-left">条目</th>
-                        <th class="py-2 px-3 text-right">倍率</th>
-                        <th class="py-2 px-3 text-right">单位</th>
-                        <th class="py-2 px-3 text-right">暴击</th>
-                        <th class="py-2 px-3 text-right">不暴击</th>
-                        <th class="py-2 px-3 text-right">期望</th>
-                        <th class="py-2 px-3 w-8 text-right"></th>
+                        <th class="sticky top-0 z-10 py-2 px-3 text-left" style="background: var(--theme-modal-bg);">
+                            来源
+                        </th>
+                        <th class="sticky top-0 z-10 py-2 px-3 text-left" style="background: var(--theme-modal-bg);">
+                            条目
+                        </th>
+                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                            倍率
+                        </th>
+                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                            单位
+                        </th>
+                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                            暴击
+                        </th>
+                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                            不暴击
+                        </th>
+                        <th class="sticky top-0 z-10 py-2 px-3 text-right" style="background: var(--theme-modal-bg);">
+                            期望
+                        </th>
+                        <th
+                            class="sticky top-0 z-10 py-2 px-3 w-8 text-right"
+                            style="background: var(--theme-modal-bg);"
+                        ></th>
                     </tr>
                 </thead>
                 <tbody data-sf="card" style="--sf-base: var(--theme-modal-bg);">
