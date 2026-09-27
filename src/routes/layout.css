@@ -252,6 +252,13 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
         --sf-opacity: var(--sf-card-opacity);
         --sf-backdrop: var(--sf-card-backdrop);
     }
+    [data-sf='widget'] {
+        --sf-base: var(--theme-card-bg);
+        --sf-depth: var(--sf-widget-depth);
+        --sf-target: var(--sf-widget-target);
+        --sf-opacity: var(--sf-widget-opacity);
+        --sf-backdrop: var(--sf-widget-backdrop);
+    }
     [data-sf='modal'] {
         --sf-base: var(--theme-modal-bg);
         --sf-depth: var(--sf-modal-depth);

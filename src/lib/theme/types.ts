@@ -25,7 +25,7 @@ export interface SurfaceStyle {
 }
 
 /** @desc 可独立配置透明度/毛玻璃/深度的五类区域 */
-export type SurfaceKey = 'card' | 'modal' | 'sidebar' | 'content' | 'toolbar'
+export type SurfaceKey = 'card' | 'modal' | 'sidebar' | 'content' | 'toolbar' | 'widget'
 
 /** @desc 五类区域说明（顺序即设置面板顺序；labels 供 UI 与 AI 工具复用） */
 export const SURFACE_GROUPS: { label: string; items: { key: SurfaceKey; label: string; hint: string }[] }[] = [
@@ -44,7 +44,12 @@ export const SURFACE_GROUPS: { label: string; items: { key: SurfaceKey; label: s
                 label: '主内容区',
                 hint: '欢迎页、队伍配置、排轴、平铺拉表、下拉拉表、词条/环境配置、结果'
             },
-            { key: 'toolbar', label: '工具栏', hint: '顶部工具栏、底部工具栏、底部悬浮工具栏' }
+            { key: 'toolbar', label: '工具栏', hint: '顶部工具栏、底部工具栏、底部悬浮工具栏' },
+            {
+                key: 'widget',
+                label: '小部件',
+                hint: '侧栏列表项、队伍角色/武器/首位声骸/套装卡、词条 4c/3c/1c 与词条卡、怪物属性/抗性/免伤输入框等小控件与其小按钮'
+            }
         ]
     }
 ]

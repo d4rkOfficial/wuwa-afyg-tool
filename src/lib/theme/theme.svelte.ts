@@ -26,7 +26,8 @@ export const DEFAULT_SURFACES: Record<SurfaceKey, SurfaceStyle> = {
     modal: { opacity: 40, blur: 32, depth: 100 },
     sidebar: { opacity: 0, blur: 32, depth: 0 },
     content: { opacity: 0, blur: 0, depth: 0 },
-    toolbar: { opacity: 0, blur: 0, depth: 0 }
+    toolbar: { opacity: 0, blur: 0, depth: 0 },
+    widget: { opacity: 20, blur: 5, depth: 5 }
 }
 
 /** @desc 首次进入时的默认外观（昼夜各一份）：白天更通透、黑夜更沉浸 */
@@ -39,7 +40,8 @@ export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
             modal: { opacity: 40, blur: 32, depth: 0 },
             sidebar: { opacity: 60, blur: 0, depth: 0 },
             content: { opacity: 0, blur: 0, depth: 0 },
-            toolbar: { opacity: 0, blur: 0, depth: 0 }
+            toolbar: { opacity: 0, blur: 0, depth: 0 },
+            widget: { opacity: 20, blur: 5, depth: 5 }
         }
     },
     dark: {
@@ -50,7 +52,8 @@ export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
             modal: { opacity: 40, blur: 32, depth: 100 },
             sidebar: { opacity: 0, blur: 32, depth: 0 },
             content: { opacity: 0, blur: 0, depth: 0 },
-            toolbar: { opacity: 0, blur: 0, depth: 0 }
+            toolbar: { opacity: 0, blur: 0, depth: 0 },
+            widget: { opacity: 20, blur: 5, depth: 5 }
         }
     }
 }
