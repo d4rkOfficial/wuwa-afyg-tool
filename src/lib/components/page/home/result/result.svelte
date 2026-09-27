@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
     import type { CalcState } from '$lib/calc/calculation.types'
     import type { ConfigState } from '$lib/calc/config.types'
@@ -55,7 +55,7 @@
     let entries = $state<ResultEntry[]>([])
     let loading = $state(true)
     let charElements = $derived(getCharElementMap())
-    let resultAnalysis = $derived(getActiveProject()?.resultAnalysis)
+    let resultAnalysis = $derived(getActiveProject()?.analysis)
     let rigCritEntryIds = $state<string[]>([])
     let noCritEntryIds = $state<string[]>([])
     let missEntryIds = $state<string[]>([])
@@ -133,9 +133,9 @@
         } catch {
             /* ignore */
         }
-        rigCritEntryIds = getActiveProject()?.resultAnalysis?.rigCritEntryIds ?? []
-        noCritEntryIds = getActiveProject()?.resultAnalysis?.noCritEntryIds ?? []
-        missEntryIds = getActiveProject()?.resultAnalysis?.missEntryIds ?? []
+        rigCritEntryIds = getActiveProject()?.analysis?.rigCritEntryIds ?? []
+        noCritEntryIds = getActiveProject()?.analysis?.noCritEntryIds ?? []
+        missEntryIds = getActiveProject()?.analysis?.missEntryIds ?? []
         computeAll()
         loading = false
     }
@@ -216,9 +216,7 @@
 
     // ── 链/阶对比：资格判定 + 复算（取期望 totalDamageRaw，不套凹暴/不暴/未命中模式）──
     let showComparison = $state(false)
-    let comparisonPoints = $state<{ chains: number[]; refinements: number[] }[]>(
-        getActiveProject()?.comparisonPoints ?? []
-    )
+    let comparisonPoints = $state<{ chains: number[]; refinements: number[] }[]>(getActiveProject()?.comparison ?? [])
     let comparisonEligibility = $derived(
         getComparisonEligibility(
             getCalcState().buffSets,

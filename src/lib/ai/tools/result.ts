@@ -1,4 +1,4 @@
-// 结果域工具（Phase 4）：读取当前配置下的伤害计算结果、单条目乘区溯源、数据分析
+﻿// 结果域工具（Phase 4）：读取当前配置下的伤害计算结果、单条目乘区溯源、数据分析
 import { defineTool } from './registry'
 import { computeAll } from '$lib/calc/compute'
 import { getAllDamageEntries, getCalcState, getConditionProfile } from '$lib/calc/calculation.store.svelte'
@@ -76,7 +76,7 @@ async function buildComputeContext(): Promise<{
 
 /** @desc 应用凹暴/不暴/未命中模式（与结果页 applyModes 同口径） */
 function applyModes(sourceEntries: ResultEntry[]): ResultEntry[] {
-    const ra = getActiveProject()?.resultAnalysis
+    const ra = getActiveProject()?.analysis
     const rigIds = new Set(ra?.rigCritEntryIds ?? [])
     const noCritIds = new Set(ra?.noCritEntryIds ?? [])
     const missIds = new Set(ra?.missEntryIds ?? [])
@@ -132,7 +132,7 @@ defineTool('get_result_entry_breakdown', {
         const entry = entries.find((e) => e.id === entryId)
         if (!entry) throw new Error(`未找到伤害条目：${entryId}（先用 get_result_summary 查询当前条目 id）`)
 
-        const ra = getActiveProject()?.resultAnalysis
+        const ra = getActiveProject()?.analysis
         const missIds = new Set(ra?.missEntryIds ?? [])
         const missed = missIds.has(entry.id)
         // 暴击口径同样按用户勾选判定（暴击率≥100% 时期望值等于全暴击，不能据此反推成凹暴）
@@ -224,7 +224,7 @@ defineTool('get_data_analysis', {
         }))
 
         // 时间记点 → 总时长 → DPS（与数据分析弹窗同口径：末个有效记点的秒数为总时长）
-        const timings = project.resultAnalysis?.timings ?? []
+        const timings = project.analysis?.timings ?? []
         const refLines = getRefLines()
         const validTimings = [...timings]
             .filter((t) => refLines.some((r) => r.id === t.refLineId) && t.seconds !== null)
@@ -286,9 +286,9 @@ defineTool('get_data_analysis', {
         }
 
         // 三算法词条贡献
-        const rigIds = new Set(project.resultAnalysis?.rigCritEntryIds ?? [])
-        const noCritIds = new Set(project.resultAnalysis?.noCritEntryIds ?? [])
-        const missIds = new Set(project.resultAnalysis?.missEntryIds ?? [])
+        const rigIds = new Set(project.analysis?.rigCritEntryIds ?? [])
+        const noCritIds = new Set(project.analysis?.noCritEntryIds ?? [])
+        const missIds = new Set(project.analysis?.missEntryIds ?? [])
         const calc = getCalcState()
         const config = getConfig()
         const dmgEntries = getAllDamageEntries()

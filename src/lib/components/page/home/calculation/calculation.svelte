@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     /** @desc 计算页入口组件：连接 store（calculation.store.svelte.ts）与页面状态，根据 calcViewMode 切换 铺开表/下拉表 两种拉表视图 */
     import { untrack } from 'svelte'
     import {
@@ -16,12 +16,18 @@
         getGlobalBuffSetIds,
         getBuffDiffMode,
         getConditionProfile,
-        getHideConditionMismatch
+        getHideConditionMismatch,
+        getShowVariableWriteModal,
+        getShowVariableModal,
+        setShowVariableModal,
+        setShowVariableWriteModal
     } from '$lib/calc/calculation.store.svelte'
     import type { CharSlot } from '$lib/types/project'
     import type { TimelineData } from '$lib/calc/timeline.types'
     import type { CalcState } from '$lib/calc/calculation.types'
     import BuffModal from './buff-modal.svelte'
+    import VariableModal from './variable-modal.svelte'
+    import VariableWriteModal from './variable-write-modal.svelte'
     import SpreadTable from './spread-table.svelte'
     import DropdownTable from './dropdown-table.svelte'
     import { getCalcViewMode } from '$lib/data/calc-view.svelte'
@@ -105,11 +111,35 @@
         if (!setBuffSetIdsForEntries(entries)) return
         onupdate(getCalcState())
     }
+
+    /** @desc 变量写入弹窗（底部工具栏入口）与变量管理弹窗（store 控制，两个入口共用） */
+    let showVariableWriteModal = $derived(getShowVariableWriteModal())
+    let showVariableModal = $derived(getShowVariableModal())
+    const handleCloseVariableWrite = () => {
+        setShowVariableWriteModal(false)
+        onupdate(getCalcState())
+    }
 </script>
 
 <div class="flex h-full flex-col {className}" style={styleProp}>
     <!-- @desc Buff 配置弹窗（挂载于页面顶层，open 由 store 控制） -->
     <BuffModal open={showBuffModal} {team} onclose={handleCloseBuffModal} />
+
+    <!-- @desc 变量写入弹窗：逐个倍率配置该段执行时对工程变量的改写 -->
+    <VariableWriteModal
+        open={showVariableWriteModal}
+        {locked}
+        onclose={handleCloseVariableWrite}
+        onopenvars={() => setShowVariableModal(true)}
+    />
+
+    <!-- @desc 变量管理弹窗（变量写入弹窗内的入口也打开它） -->
+    <VariableModal
+        open={showVariableModal}
+        {locked}
+        onclose={() => setShowVariableModal(false)}
+        onpersist={() => onupdate(getCalcState())}
+    />
 
     <!-- @desc 视图切换：spread → 铺开表（传绑定映射/条件配置/回调用）；否则 → 下拉表（多传 buffDiffMode 差异模式） -->
     {#if !viewReady}

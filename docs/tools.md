@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **109** 个工具。
+> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **117** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
@@ -16,12 +16,14 @@ AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注
 - `delete_buff_set`
 - `remove_buff_zone`
 - `remove_substat`
+- `kuro_logout`
 - `archive_project`
 - `delete_project`
 - `save_substat_plan`
 - `delete_substat_plan`
 - `reset_standard_substat_plan`
 - `sync_substat_plans_from_share`
+- `sync_substat_plans_from_kuro`
 - `remove_op_block`
 - `format_timeline`
 - `remove_ref_line`
@@ -414,6 +416,40 @@ _无参数_
 | `element` | **是** | string |      |
 | `value`   | **是** | number |      |
 
+## kuro
+
+### `get_kuro_state`
+
+查看库街区登录态与声骸数据暂存：是否登录、账号、绑定角色、登录有效性、本地暂存的数据时间与可刷新倒计时。
+
+_无参数_
+
+### `check_kuro_login`
+
+让服务端向上游确认一次库街区登录是否仍有效（即设置里的「检验登录有效性」），返回有效性、原因、账号与绑定角色。
+
+_无参数_
+
+### `refresh_kuro_echo_data`
+
+强制从库街区重新拉取当前绑定角色的声骸数据并写入本地暂存（同一份数据 5 分钟只能刷新一次，冷却期内会报错）。
+
+_无参数_
+
+### `open_kuro_sync_preview`
+
+打开「词条集 → 从库街区同步」预览弹窗（会先打开词条集面板，然后载入当前暂存/上游数据），
+
+_无参数_
+
+### `kuro_logout`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+退出库街区登录（同时清除本地声骸数据暂存）。用户要求退出或换账号时使用。
+
+_无参数_
+
 ## 面板
 
 ### `get_panels_state`
@@ -579,13 +615,13 @@ _无参数_
 
 ### `get_settings_state`
 
-读取当前设置状态——覆盖「设置」弹窗全部可配置项：外观主题、按键图标、交互、性能、工坊、连接配置（数据源）、缓存、助手设置。具体子项可用专用工具查询（get_keymap/get_shortcuts/get_ai_profiles/get_cache_counts）。
+读取当前设置状态——覆盖「设置」弹窗全部可配置项：外观主题、按键图标、交互（含锁定水印）、性能、工坊、连接配置（数据源）、缓存、助手设置。具体子项可用专用工具查询（get_keymap/get_shortcuts/get_ai_profiles/get_cache_counts）。
 
 _无参数_
 
 ### `set_setting`
 
-修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_opacity(30-100)、theme_bg_blur(0-32)、theme_bg_dim(0-100)、theme_bg_image_blur(0-32)、theme_bg_image_mask(-100~100: 负值压暗/0原图/正值明亮)、theme_modal_opacity(30-100 弹窗透明度)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/界面快捷键/AI 配置文件请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile。
+修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"\|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card\|modal\|sidebar\|content\|toolbar", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"\|"dark"}，按昼夜分别保存)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_naming_rule(文本或空串=恢复默认)、ai_slang_dict(文本或空串=恢复默认)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project。
 
 | 参数    | 必填   | 类型     | 说明                           |
 | ------- | ------ | -------- | ------------------------------ |
@@ -610,13 +646,14 @@ _无参数_
 
 ### `set_keymap_entry`
 
-修改单个按键图标映射。id 为操作动作 id（如 attack/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseRight/Q/E/R/F/T/SpaceBar）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。
+修改单个按键图标映射。id 为操作动作 id（如 attack/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseRight/Q/E/R/F/T/SpaceBar）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。传 reset=true 可恢复全部按键图标为默认（此时忽略 id 等其它参数）。
 
-| 参数       | 必填   | 类型   | 说明                                    |
-| ---------- | ------ | ------ | --------------------------------------- |
-| `id`       | **是** | string | 操作动作 id（见 get_keymap 返回）       |
-| `blockKey` | 否     | string | 图标 key（如 MouseLeft/Q/SpaceBar）     |
-| `physical` | 否     | string | 物理按键（单个小写字母 a-z 或空格 " "） |
+| 参数       | 必填 | 类型    | 说明                                    |
+| ---------- | ---- | ------- | --------------------------------------- |
+| `id`       | 否   | string  | 操作动作 id（见 get_keymap 返回）       |
+| `blockKey` | 否   | string  | 图标 key（如 MouseLeft/Q/SpaceBar）     |
+| `physical` | 否   | string  | 物理按键（单个小写字母 a-z 或空格 " "） |
+| `reset`    | 否   | boolean | true = 恢复默认按键图标映射             |
 
 ### `get_shortcuts`
 
@@ -626,12 +663,13 @@ _无参数_
 
 ### `set_shortcut`
 
-修改单个界面快捷键绑定。id 为快捷键定义 id（见 get_shortcuts 返回）；key 为新的快捷键组合（如 "ctrl+s"、"shift+enter"、"a"）。修饰键（Ctrl/Shift/Alt）用 + 连接，主键小写。若与同组其他快捷键冲突将报错。
+修改单个界面快捷键绑定。id 为快捷键定义 id（见 get_shortcuts 返回）；key 为新的快捷键组合（如 "ctrl+s"、"shift+enter"、"a"）。修饰键（Ctrl/Shift/Alt）用 + 连接，主键小写。若与同组其他快捷键冲突将报错。传 reset=true 可恢复全部快捷键为默认（此时忽略 id/key）。
 
-| 参数  | 必填   | 类型   | 说明                                      |
-| ----- | ------ | ------ | ----------------------------------------- |
-| `id`  | **是** | string | 快捷键定义 id                             |
-| `key` | **是** | string | 新快捷键组合（如 ctrl+s、a、shift+enter） |
+| 参数    | 必填 | 类型    | 说明                                      |
+| ------- | ---- | ------- | ----------------------------------------- |
+| `id`    | 否   | string  | 快捷键定义 id                             |
+| `key`   | 否   | string  | 新快捷键组合（如 ctrl+s、a、shift+enter） |
+| `reset` | 否   | boolean | true = 恢复默认快捷键绑定                 |
 
 ### `get_ai_profiles`
 
@@ -658,6 +696,22 @@ _无参数_
 读取各类缓存条目数（列表/详情/图像）。可用 set_setting key=clear_cache 清理（值 list/info/image/all）。
 
 _无参数_
+
+## skills
+
+### `list_skills`
+
+列出用户的技能卡（名称 + 一句话描述 + 是否启用）。技能卡是用户预置的操作规范，任务匹配时用 use_skill 激活其正文。
+
+_无参数_
+
+### `use_skill`
+
+激活一张技能卡：返回该技能的完整正文，之后请严格按正文中的规范继续处理当前任务。名称必须来自技能清单。
+
+| 参数   | 必填   | 类型   | 说明                               |
+| ------ | ------ | ------ | ---------------------------------- |
+| `name` | **是** | string | 技能名（来自技能清单，需完全一致） |
 
 ## substat-library
 
@@ -738,6 +792,14 @@ _无参数_
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
 从工坊同步全部角色的标准14词条集（只覆盖工坊来源的方案，本地修改与自定义方案不受影响；工坊已下线的会移除）。
+
+_无参数_
+
+### `sync_substat_plans_from_kuro`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+从库街区同步当前账号下鸣潮角色「正在装配的声骸」，写成本地自定义词条方案（方案名「库街区同步」，同名覆盖、可重复同步）。
 
 _无参数_
 

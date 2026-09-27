@@ -14,6 +14,7 @@
         updateTimeline,
         updateCalculation,
         updateConfig,
+        updateVars,
         setActiveProject,
         getPhaseOrder,
         lockPhase,
@@ -26,7 +27,15 @@
         updateConditionProfile,
         ProjectParseError
     } from '$lib/data/project.svelte'
-    import { checkShare, importFromShareUrl, getShareLink } from '$lib/data/share.svelte'
+    import {
+        checkShare,
+        importFromShareUrl,
+        shareAndCopy,
+        shareState,
+        shareCooldownLabel,
+        refreshShareCooldown
+    } from '$lib/data/share.svelte'
+    import { pushProjectSwitch, pushPhaseChange } from '$lib/ai/change-queue.svelte'
     import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/client-version'
     import { clearCache, getCharacterInfo, getEchoInfo } from '$lib/api/data-cache'
     import { browser } from '$app/environment'
@@ -48,13 +57,15 @@
         getShowDamageTypeModal,
         setConditionProfile,
         setProfileChangeListener,
-        syncGlobalBuffs,
+        rebindGlobalBuffs,
+        setVars as setCalcVars,
         getCalcState,
         createBuffSet,
         setPendingFocusBuffSetId,
         init as initCalculation
     } from '$lib/calc/calculation.store.svelte'
     import { setCalcViewMode } from '$lib/data/calc-view.svelte'
+    import { conditionProfileFromVars } from '$lib/data/migration'
     import { getConfig, init as initConfig } from '$lib/calc/config.store.svelte'
     import { hideSplash } from '$lib/utils/splash'
     import {
@@ -230,15 +241,6 @@
     let deleteId = $state('')
     let deleteName = $state('')
 
-    let exportModal = $state(false)
-    let exportId = $state('')
-    let exportSelections = $state<Record<PhaseKey, boolean>>({
-        team: true,
-        timeline: false,
-        calculation: false,
-        config: false
-    })
-
     let importInput = $state<HTMLInputElement | undefined>()
 
     let activePhase = $state<PhaseKey>('team')
@@ -281,8 +283,7 @@
             ['new-project', '新建工程', () => showNewModal, (v) => (showNewModal = v)],
             ['rename-project', '重命名工程', () => renameModal, (v) => (renameModal = v)],
             ['clone-project', '克隆工程', () => cloneModal, (v) => (cloneModal = v)],
-            ['delete-project', '删除工程', () => deleteModal, (v) => (deleteModal = v)],
-            ['export-project', '导出工程', () => exportModal, (v) => (exportModal = v)]
+            ['delete-project', '删除工程', () => deleteModal, (v) => (deleteModal = v)]
         ]
         for (const [name, label, get, set] of panels) registerPanel(name, label, get, set)
         return () => {
@@ -337,6 +338,8 @@
         }
         loadIcons()
         checkShare()
+        // 分享频率限制：恢复上次分享时间戳并启动倒计时（刷新页面后仍然生效）
+        refreshShareCooldown()
         // 分享导入：#import_project=<url>（一次性，执行后清 hash）
         registerHashAction({
             key: 'import_project',
@@ -469,41 +472,11 @@
         activePhase = 'team'
     }
 
+    /** @desc 导出工程：全阶段一次性导出（含结果页），不再弹勾选框 */
     function openExport(id: string) {
-        exportId = id
-        const order = getPhaseOrder()
-        const selections: Record<PhaseKey, boolean> = {
-            team: false,
-            timeline: false,
-            calculation: false,
-            config: false
-        }
-        for (let i = 0; i < order.length; i++) selections[order[i]] = i <= order.indexOf(activePhase)
-        exportSelections = selections
-        exportModal = true
-    }
-
-    function toggleExportPhase(phase: PhaseKey) {
-        const order = getPhaseOrder()
-        const idx = order.indexOf(phase)
-        const next = !exportSelections[phase]
-        const updated: Record<string, boolean> = {}
-        for (const p of order) {
-            const pidx = order.indexOf(p)
-            if (next && pidx <= idx) updated[p] = true
-            else if (!next && pidx >= idx) updated[p] = false
-            else updated[p] = exportSelections[p]
-        }
-        exportSelections = updated as Record<PhaseKey, boolean>
-    }
-
-    function handleExport() {
-        const p = projects.find((pr) => pr.id === exportId)
+        const p = projects.find((pr) => pr.id === id)
         if (!p) return
-        const selected = (Object.entries(exportSelections) as [PhaseKey, boolean][])
-            .filter(([, v]) => v)
-            .map(([k]) => k)
-        const file = buildExportFile(p, selected, true)
+        const file = buildExportFile(p, getPhaseOrder(), true)
         const blob = new Blob([JSON.stringify(file)], { type: 'application/json' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -511,8 +484,7 @@
         a.download = `${p.name}.json`
         a.click()
         URL.revokeObjectURL(url)
-        exportModal = false
-        addToast(`工程「${p.name}」已导出`, 'success')
+        addToast(`工程「${p.name}」已导出（全阶段）`, 'success')
     }
 
     function handleImport() {
@@ -532,28 +504,50 @@
         if (importInput) importInput.value = ''
     }
 
+    /** @desc 记录工程四阶段 + 队伍 + 变量的变化指纹，变化时推入 AI 变化队列（供 AI 助手感知） */
+    let _lastChangeFp = ''
+    $effect(() => {
+        const p = activeProject
+        if (!p) return
+        const fp = JSON.stringify([
+            p.id,
+            p.team,
+            p.vars,
+            p.encounter.timeline.data ? JSON.stringify(p.encounter.timeline.data).length : 0,
+            p.encounter.calculation.data ? JSON.stringify(p.encounter.calculation.data) : null,
+            p.encounter.config.data ? JSON.stringify(p.encounter.config.data) : null
+        ])
+        if (fp === _lastChangeFp) return
+        const first = _lastChangeFp === ''
+        _lastChangeFp = fp
+        // 首次建立基线时不入队（避免刚打开页面就报一堆「变化」）
+        if (first) return
+        pushPhaseChange('calculation', '工程数据发生变化')
+    })
+
     function handleSelectProject(id: string) {
         setActiveProject(id)
+        const next = projects.find((pr) => pr.id === id)
+        if (next) pushProjectSwitch(next.name, next.id)
         initForActiveProject()
     }
 
     let showWorkshop = $state(false)
 
     async function handleShare(id: string) {
+        if (shareState.cooldownRemaining > 0) {
+            addToast(`分享冷却中，请在 ${shareCooldownLabel()} 后重试`, 'info')
+            return
+        }
         const p = projects.find((pr) => pr.id === id)
         if (!p) return
         addToast('正在生成分享链接...', 'info')
-        const link = await getShareLink(p)
-        if (!link) {
-            addToast('分享失败', 'error')
+        const res = await shareAndCopy(p)
+        if (!res.ok) {
+            addToast(res.error ?? '分享失败', 'error')
             return
         }
-        try {
-            await navigator.clipboard.writeText(link)
-            addToast('已分享(10分钟)，链接已复制到剪贴板', 'success')
-        } catch {
-            addToast('已分享(10分钟)，请在地址栏查看导入链接', 'success')
-        }
+        addToast('已分享(10分钟)，链接已复制到剪贴板', 'success')
     }
 
     async function handleArchive(id: string) {
@@ -589,6 +583,8 @@
             p.team,
             p.phases.timeline?.locked ?? false
         )
+        // 注入工程级变量（布尔/计数）后再重建条目：变量与条件数据严格随工程切换，不跨工程污染
+        setCalcVars(p.vars)
         initCalculation(
             p.team,
             p.phases.timeline.data as TimelineData | null,
@@ -602,8 +598,8 @@
             if (slot.character) void getCharacterInfo(slot.character)
             if (slot.echoes?.[0]?.name) void getEchoInfo(slot.echoes[0].name)
         }
-        // 恢复工程携带的链/阶配置（导入/分享下载的工程；档位改动已由 updateConditionProfile 写回，恒为最新）
-        setConditionProfile(p.conditionProfile ?? undefined)
+        // 恢复工程携带的链/阶配置（链阶真源是工程 team 槽位，此处同步到条件系统的读入口）
+        setConditionProfile(conditionProfileFromVars(p.vars, p.team))
     }
 
     function initForActiveProject() {
@@ -680,7 +676,7 @@
         if (!activeProject) return
         lockPhase(activePhase)
         if (activePhase === 'timeline') {
-            syncGlobalBuffs(activeProject.team.map((s) => s.character))
+            rebindGlobalBuffs()
             updateCalculation(getCalcState())
         }
         if (activePhase === 'config') {
@@ -715,7 +711,7 @@
             if (!wasLocked[i]) continue
             await lockPhase(phase)
             if (phase === 'timeline') {
-                syncGlobalBuffs(activeProject.team.map((s) => s.character))
+                rebindGlobalBuffs()
                 updateCalculation(getCalcState())
             }
             if (phase === 'config') {
@@ -746,7 +742,7 @@
         if (idx > 0 && !activeProject.phases[getPhaseOrder()[idx - 1]]?.locked) return
         lockPhase(phase)
         if (phase === 'timeline') {
-            syncGlobalBuffs(activeProject.team.map((s) => s.character))
+            rebindGlobalBuffs()
             updateCalculation(getCalcState())
         }
         if (phase === 'config') {
@@ -996,6 +992,7 @@
                 {showResult}
                 {phaseLocked}
                 {canLock}
+                team={activeProject.team}
                 onCharDetail={() => (showCharDetail = true)}
                 onRefresh={handleRefreshResult}
                 onLockToggle={() => (phaseLocked ? handleUnlockPhase() : handleLockPhase())}
@@ -1036,6 +1033,7 @@
         configState={activeProject.phases.config.data as ConfigState | null}
         calcState={activeProject.phases.calculation.data as CalcState | null}
         onclose={() => (showCharDetail = false)}
+        onTeamUpdate={(next) => handleUpdateTeam(next)}
         onProfileReload={() => {
             void handleProfileReload()
         }}
@@ -1125,19 +1123,7 @@
     </Modal>
 {/if}
 
-<!-- Export Modal -->
-{#if exportModal}
-    <Modal open={true} onclose={() => (exportModal = false)}>
-        {#snippet title()}
-            导出工程
-        {/snippet}
-        <div class="space-y-4">
-            <p class="mb-2 text-[10px] text-(--theme-modal-text)/40">选择要导出的部分（前置部分将自动勾选）</p>
-            {@render phaseChecklist(exportSelections, toggleExportPhase)}
-            {@render modalFooter(false, '导出', () => (exportModal = false), handleExport)}
-        </div>
-    </Modal>
-{/if}
+<!-- @desc 导出不再弹勾选框：全阶段一次性导出（含结果页） -->
 
 <!-- Clone Modal -->
 {#if cloneModal}

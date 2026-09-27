@@ -136,6 +136,7 @@
     import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
     import AiProfileEditModal from '$lib/components/layout/ai-profile-edit-modal.svelte'
     import AiPromptEditModal from '$lib/components/layout/ai-prompt-edit-modal.svelte'
+    import ConfigSection from '$lib/components/layout/settings/config-section.svelte'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -156,6 +157,7 @@
         | 'archive'
         | 'ai'
         | 'ai-conn'
+        | 'config'
     >('theme')
 
     // ── 库街区（实验性）：登录态管理（接口走应用自身的 /api/kuro-app 服务端路由，无需配置地址）──
@@ -275,6 +277,7 @@
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
         { group: '数据', key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
+        { group: '数据', key: 'config', label: '配置导入导出', icon: 'mdi:cog-sync-outline' },
         { group: 'AI助手', key: 'ai-conn', label: '启用 / 接入配置', icon: 'mdi:connection' },
         { group: 'AI助手', key: 'ai', label: '权限 / 提示词', icon: 'mdi:shield-account-outline' }
     ] as const
@@ -2748,6 +2751,17 @@
                                     </div>
                                 {/each}
                             </div>
+                        </div>
+                    {:else if tab === 'config'}
+                        <!-- 一切皆「配置」：设置偏好整体导出 / 导入（JSON） -->
+                        <div>
+                            <span
+                                class="mb-2 flex items-center gap-2 text-sm font-black tracking-tight text-(--theme-modal-text)"
+                            >
+                                <Icon icon="mdi:cog-sync-outline" class="size-4 shrink-0" />
+                                配置导入导出
+                            </span>
+                            <ConfigSection />
                         </div>
                     {:else if tab === 'ai' || tab === 'ai-conn'}
                         <!-- AI 助手设置（权限 / 提示词 与 接入配置 分页） -->

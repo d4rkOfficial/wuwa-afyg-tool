@@ -1,7 +1,16 @@
 /** @desc 拉表页状态 store：持有伤害条目/Buff 块/条目绑定/生效配置等全局响应式状态，提供 CRUD 与持久化快照接口 */
-import type { BuffSet, BuffZoneValue, CalcState, DamageEntry, BuffCondition } from './calculation.types'
+import type {
+    BuffSet,
+    BuffZoneValue,
+    CalcState,
+    DamageEntry,
+    DamageEntryConfig,
+    BuffCondition,
+    BuffOp,
+    BuffVariant
+} from './calculation.types'
 import type { TimelineData } from './timeline.types'
-import type { CharSlot } from '$lib/types/project'
+import type { CharSlot, CounterVar } from '$lib/types/project'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { NON_DIRECT_ELEMENT } from './timeline.consts'
 import { getSkillCache } from './timeline.store.svelte'
@@ -10,16 +19,28 @@ import { addToast } from '$lib/data/toast.svelte'
 import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from './calculation.consts'
 import type { ZoneId } from './calculation.consts'
 import type { ConditionProfile } from './compute'
+import {
+    applyVarOps,
+    initialVarState,
+    isConditionEmpty,
+    normalizeCondition,
+    normalizeConditionForScope,
+    type VarState
+} from './condition'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffSet[]>([])
 let _damageEntryBuffSetIds = $state<Record<string, string[]>>({})
 let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
+/** @desc 伤害段级变量写入（按排轴顺序流式执行；判定写在 BUFF 乘区条件上） */
+let _damageEntryOps = $state<Record<string, BuffOp[]>>({})
+/** @desc 工程级变量表（布尔/计数）：随拉表阶段持久化，条件与变量写入同源 */
+let _vars = $state<CounterVar[]>([])
 let _showBuffModal = $state(false)
 let _showDamageTypeModal = $state(false)
 let _buffDiffMode = $state(false)
 let _locked = $state(false)
-/** @desc 全局生效配置：各角色共鸣链 / 武器精炼阶数（结果计算与条件过滤共用） */
+/** @desc 全局生效配置：各角色共鸣链 / 武器精炼阶数（由工程变量/队伍槽位派生，结果计算与条件过滤共用） */
 let _conditionProfile: ConditionProfile = $state({ chains: [0, 0, 0], refinements: [1, 1, 1] })
 /** @desc 默认隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff */
 let _hideConditionMismatch = $state(true)
@@ -35,6 +56,111 @@ let _initTeam: [CharSlot, CharSlot, CharSlot] | null = null
 let _initTimelineData: TimelineData | null = null
 let _globalBuffSetIds = $state<string[]>([])
 let _onupdate: ((state: CalcState) => void) | undefined = $state()
+
+/**
+ * @desc ── 拉表撤销/重做：只记录表格变化（Buff 实例与乘区条件 / 绑定 / 条目条件与变量写入 / 变量表）──
+ * 所有表格写操作统一调用 `markTableDirty()`；微任务里与基线比较后压栈，因此连续拖拽数值、
+ * 批量勾选只会留下一条历史，也不会为每一帧压栈。历史栈与 GUI 的 `canUndoTable/canRedoTable`
+ * 通过 `_historyVersion` 计数器保持响应式。
+ */
+const MAX_TABLE_HISTORY = 100
+let _undoStack: CalcState[] = []
+let _redoStack: CalcState[] = []
+/** @desc 上次提交的表格快照（差异判定；避免无变更时压栈） */
+let _historyBase: CalcState | null = null
+/** @desc 历史栈版本号（供界面派生 canUndo/canRedo 的响应式依赖） */
+let _historyVersion = $state(0)
+let _historyDirty = false
+let _historyScheduled = false
+
+/** @desc 表格快照（撤销/重做只覆盖这些数据；条目由时间线派生，不纳入历史） */
+const tableSnapshot = (): CalcState => getCalcState()
+
+/** @desc 标记表格已变更：微任务合并后压入撤销栈（与基线无差异时忽略） */
+export function markTableDirty(): void {
+    _historyDirty = true
+    if (_historyScheduled) return
+    _historyScheduled = true
+    queueMicrotask(() => {
+        _historyScheduled = false
+        if (!_historyDirty) return
+        _historyDirty = false
+        const snap = tableSnapshot()
+        if (_historyBase && JSON.stringify(_historyBase) === JSON.stringify(snap)) return
+        if (_historyBase) {
+            _undoStack = [..._undoStack, _historyBase]
+            if (_undoStack.length > MAX_TABLE_HISTORY) _undoStack = _undoStack.slice(1)
+            _redoStack = []
+        }
+        _historyBase = snap
+        _historyVersion++
+    })
+}
+
+/** @desc 用快照覆盖当前表格状态并通知宿主持久化 */
+const applyTableSnapshot = (snap: CalcState): void => {
+    _buffSets = JSON.parse(JSON.stringify(snap.buffSets ?? []))
+    _damageEntryBuffSetIds = JSON.parse(JSON.stringify(snap.damageEntryBuffSetIds ?? {}))
+    _damageEntryDamageTypes = JSON.parse(JSON.stringify(snap.damageEntryDamageTypes ?? {}))
+    _damageEntryOps = JSON.parse(JSON.stringify(snap.damageEntryOps ?? {}))
+    if (Array.isArray(snap.vars)) _vars = JSON.parse(JSON.stringify(snap.vars))
+    _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
+    if (_onupdate) _onupdate(tableSnapshot())
+}
+
+/** @desc 撤销上一次表格变更（只回退表格，不动排轴/词条） */
+export function undoTable(): boolean {
+    if (!assertUnlocked()) return false
+    const prev = _undoStack[_undoStack.length - 1]
+    if (!prev) {
+        addToast('没有可撤销的表格操作', 'info')
+        return false
+    }
+    _undoStack = _undoStack.slice(0, -1)
+    _redoStack = [..._redoStack, tableSnapshot()]
+    _historyBase = prev
+    applyTableSnapshot(prev)
+    _historyVersion++
+    return true
+}
+
+/** @desc 重做上一次被撤销的表格变更 */
+export function redoTable(): boolean {
+    if (!assertUnlocked()) return false
+    const next = _redoStack[_redoStack.length - 1]
+    if (!next) {
+        addToast('没有可重做的表格操作', 'info')
+        return false
+    }
+    _redoStack = _redoStack.slice(0, -1)
+    _undoStack = [..._undoStack, tableSnapshot()]
+    _historyBase = next
+    applyTableSnapshot(next)
+    _historyVersion++
+    return true
+}
+
+/** @desc 是否可撤销 / 可重做表格变更（底部工具栏按钮禁用态用；读取历史版本号以保持响应式） */
+export function canUndoTable(): boolean {
+    const version = _historyVersion
+    void version
+    return _undoStack.length > 0
+}
+
+export function canRedoTable(): boolean {
+    const version = _historyVersion
+    void version
+    return _redoStack.length > 0
+}
+
+/** @desc 清空表格撤销历史（切换/重载工程时调用，避免跨工程回退） */
+export function resetTableHistory(): void {
+    _undoStack = []
+    _redoStack = []
+    _historyBase = null
+    _historyDirty = false
+    _historyVersion++
+}
 
 /** @desc 初始化/重建整个 store：写入队伍与时间线、加载保存态（过滤[配置]自动块）、重建伤害条目、同步全局 buff；返回前清理孤儿绑定 */
 /** @desc 上次 init 的轻量指纹（数据未变时幂等短路，避免勾选回写触发全量重建） */
@@ -88,7 +214,7 @@ export function init(
     }
     if (savedState) {
         const autoIds = (savedState.buffSets ?? []).filter((bs) => bs.name.startsWith('[配置]')).map((bs) => bs.id)
-        // 一次深拷贝导出三个子集，避免对保存态反复 JSON 序列化
+        // 一次深拷贝导出子集，避免对保存态反复 JSON 序列化
         const saved = JSON.parse(JSON.stringify(savedState)) as CalcState
         _buffSets = (saved.buffSets ?? []).filter((bs) => !bs.name.startsWith('[配置]'))
         _damageEntryBuffSetIds = saved.damageEntryBuffSetIds ?? {}
@@ -101,16 +227,196 @@ export function init(
                 types.map((t) => (t === '视为效应伤害' ? '效应伤害' : t))
             ])
         )
+        _damageEntryOps = saved.damageEntryOps ?? {}
+        // 变量表随拉表阶段持久化：保存态里有就用保存态，否则保留宿主注入的工程变量
+        if (Array.isArray(saved.vars) && saved.vars.length > 0) _vars = saved.vars as CounterVar[]
     } else {
         _buffSets = []
         _damageEntryBuffSetIds = {}
         _damageEntryDamageTypes = {}
+        _damageEntryOps = {}
     }
-    _globalBuffSetIds = _buffSets.filter((bs) => bs.global || bs.id.startsWith('global-')).map((bs) => bs.id)
-    syncGlobalBuffs(team.map((s) => s.character))
+    _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
+    rebindGlobalBuffs()
+    // 重载工程后历史基线重置（避免把上一个工程的表格状态撤销回来）
+    resetTableHistory()
     if (pruneOrphanedBindings()) {
         if (_onupdate) _onupdate(getCalcState())
     }
+}
+
+/** @desc 注入工程级变量表（切换/加载工程时由宿主调用；保证变量与条件数据不跨工程污染） */
+export function setVars(vars: CounterVar[] | null | undefined) {
+    _vars = vars ? JSON.parse(JSON.stringify(vars)) : []
+    resetTableHistory()
+}
+
+export function getVars(): CounterVar[] {
+    return _vars
+}
+
+/**
+ * @desc 用户可编辑的变量（排除内置的角色链/精炼档位变量）。
+ * 链阶由「角色详情配置」驱动，只作为条件系统的 `profile` 来源，不在变量界面展示与编辑。
+ */
+export function getUserVars(): CounterVar[] {
+    return _vars.filter((v) => !v.builtin)
+}
+
+/** @desc 变量表变更回调（由 +page 注入写回工程，覆盖弹窗/AI 工具等全部改动路径） */
+let _varsChangeListener: ((vars: CounterVar[]) => void) | undefined = $state()
+
+export function setVarsChangeListener(fn: ((vars: CounterVar[]) => void) | undefined) {
+    _varsChangeListener = fn
+}
+
+const commitVars = (next: CounterVar[]): CounterVar[] => {
+    markTableDirty()
+    _vars = next
+    _varsChangeListener?.(JSON.parse(JSON.stringify(next)))
+    return _vars
+}
+
+/** @desc 变量名是否可用（非空、不重复） */
+export function isVarNameAvailable(name: string, exceptId?: string): boolean {
+    const trimmed = name.trim()
+    if (!trimmed) return false
+    return !_vars.some((v) => v.id !== exceptId && v.name === trimmed)
+}
+
+/** @desc 新增变量（布尔值 / 计数值），返回新变量 id；名字非法或重名时返回 undefined */
+export function addVar(name: string, type: CounterVar['type'], value: boolean | number): string | undefined {
+    if (!assertUnlocked()) return undefined
+    const trimmed = name.trim()
+    if (!isVarNameAvailable(trimmed)) {
+        addToast('变量名不能为空或与已有变量重复', 'info')
+        return undefined
+    }
+    const id = `var-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    commitVars([..._vars, { id, name: trimmed, type, value }])
+    return id
+}
+
+/** @desc 删除变量（内置链/精炼变量不可删；同时清理条件与变量写入中的引用） */
+export function removeVar(id: string): boolean {
+    if (!assertUnlocked()) return false
+    const target = _vars.find((v) => v.id === id)
+    if (!target) return false
+    if (target.builtin) {
+        addToast('内置链/精炼变量不可删除', 'info')
+        return false
+    }
+    commitVars(_vars.filter((v) => v.id !== id))
+    pruneVarReferences(target.name)
+    return true
+}
+
+/** @desc 修改变量（改名时会同步所有条件/变量写入里的引用） */
+export function updateVar(id: string, patch: Partial<Pick<CounterVar, 'name' | 'type' | 'value'>>): boolean {
+    if (!assertUnlocked()) return false
+    const target = _vars.find((v) => v.id === id)
+    if (!target) return false
+    const nextName = patch.name !== undefined ? patch.name.trim() : target.name
+    if (!nextName || !isVarNameAvailable(nextName, id)) {
+        addToast('变量名不能为空或与已有变量重复', 'info')
+        return false
+    }
+    const renamed = nextName !== target.name
+    commitVars(
+        _vars.map((v) => {
+            if (v.id !== id) return v
+            const merged: CounterVar = { ...v, ...patch, name: nextName }
+            // 切换类型时把值强制为对应类型的合法值
+            if (patch.type === 'boolean') merged.value = Boolean(merged.value)
+            else if (patch.type === 'number') merged.value = typeof merged.value === 'number' ? merged.value : 0
+            return merged
+        })
+    )
+    if (renamed) renameVarReferences(target.name, nextName)
+    return true
+}
+
+/** @desc 改名后同步所有引用（Buff 条件 / 乘区条件 / 条目条件 / 变量写入） */
+const renameVarReferences = (from: string, to: string): void => {
+    const remapOperand = (operand: BuffOp['value']): BuffOp['value'] =>
+        operand && 'var' in operand && operand.var === from ? { ...operand, var: to } : operand
+    const remapCondition = (cond: BuffCondition): BuffCondition => ({
+        ...cond,
+        ...(cond.bools ? { bools: cond.bools.map((c) => (c.var === from ? { ...c, var: to } : c)) } : {}),
+        ...(cond.numbers
+            ? {
+                  numbers: cond.numbers.map((c) => ({
+                      ...c,
+                      var: c.var === from ? to : c.var,
+                      value: remapOperand(c.value) ?? c.value
+                  }))
+              }
+            : {})
+    })
+    const remapOps = (ops: BuffOp[] | undefined): BuffOp[] | undefined =>
+        ops?.map((op) => ({
+            ...op,
+            var: op.var === from ? to : op.var,
+            ...(op.value ? { value: remapOperand(op.value) } : {})
+        }))
+    const remapZone = (z: BuffZoneValue): BuffZoneValue =>
+        z.condition ? { ...z, condition: remapCondition(z.condition) } : z
+
+    _buffSets = _buffSets.map((b) => ({
+        ...b,
+        ...(b.condition ? { condition: remapCondition(b.condition) } : {}),
+        ...(b.ops ? { ops: remapOps(b.ops) } : {}),
+        ...(b.zones ? { zones: b.zones.map(remapZone) } : {}),
+        ...(b.variants
+            ? {
+                  variants: b.variants.map((v) => ({
+                      ...v,
+                      ...(v.condition ? { condition: remapCondition(v.condition) } : {}),
+                      ...(v.ops ? { ops: remapOps(v.ops) } : {}),
+                      zones: v.zones.map(remapZone)
+                  }))
+              }
+            : {})
+    }))
+    _damageEntryOps = Object.fromEntries(Object.entries(_damageEntryOps).map(([k, ops]) => [k, remapOps(ops) ?? []]))
+    markTableDirty()
+}
+
+/** @desc 删除变量后清理引用（该变量的条件子句与写入操作一并移除） */
+const pruneVarReferences = (name: string): void => {
+    const pruneCondition = (cond: BuffCondition): BuffCondition => ({
+        ...cond,
+        bools: (cond.bools ?? []).filter((c) => c.var !== name),
+        numbers: (cond.numbers ?? []).filter((c) => c.var !== name)
+    })
+    const pruneOps = (ops: BuffOp[] | undefined): BuffOp[] | undefined => ops?.filter((op) => op.var !== name)
+    const pruneZone = (z: BuffZoneValue): BuffZoneValue => {
+        if (!z.condition) return z
+        const next = pruneCondition(z.condition)
+        return { ...z, ...(isConditionEmpty(next) ? { condition: undefined } : { condition: next }) }
+    }
+    _buffSets = _buffSets.map((b) => ({
+        ...b,
+        ...(b.condition ? { condition: pruneCondition(b.condition) } : {}),
+        ...(b.ops ? { ops: pruneOps(b.ops) } : {}),
+        ...(b.zones ? { zones: b.zones.map(pruneZone) } : {}),
+        ...(b.variants
+            ? {
+                  variants: b.variants.map((v) => ({
+                      ...v,
+                      ...(v.condition ? { condition: pruneCondition(v.condition) } : {}),
+                      ...(v.ops ? { ops: pruneOps(v.ops) } : {}),
+                      zones: v.zones.map(pruneZone)
+                  }))
+              }
+            : {})
+    }))
+    _damageEntryOps = Object.fromEntries(
+        Object.entries(_damageEntryOps)
+            .map(([k, ops]) => [k, pruneOps(ops) ?? []] as const)
+            .filter(([, ops]) => ops.length > 0)
+    )
+    markTableDirty()
 }
 
 /** @desc 清理绑定表中已不存在条目的孤儿映射（条目被删后残留的 buff 绑定） */
@@ -524,24 +830,31 @@ export function duplicateBuffSet(id: string, customName?: string): string | unde
 export function setBuffSetScope(setId: string, scope: 'all' | number[]) {
     if (!assertUnlocked()) return
     if (_globalBuffSetIds.includes(setId)) return
+    markTableDirty()
     _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, scope } : s))
 }
 
-/** @desc 设置生效条件（默认全局 buff 不允许设链/阶条件） */
+/** @desc 设置 Buff 实例级生效条件（链条件 / 阶条件等硬性条件挂这里） */
 export function setBuffSetCondition(setId: string, condition: BuffCondition | null) {
     if (!assertUnlocked()) return
-    // 默认全局 buff 不允许设置共鸣链/精炼条件
-    if (setId.startsWith('global-')) return
+    const normalized = condition ? normalizeCondition(condition, 'buff') : null
+    markTableDirty()
     _buffSets = _buffSets.map((s) =>
-        s.id === setId ? { ...s, ...(condition ? { condition } : { condition: undefined }) } : s
+        s.id === setId
+            ? {
+                  ...s,
+                  ...(normalized && !isConditionEmpty(normalized)
+                      ? { condition: normalized }
+                      : { condition: undefined })
+              }
+            : s
     )
 }
 
-/** @desc 设置条件参考角色槽位（默认全局 buff 不允许设） */
+/** @desc 设置条件参考角色槽位（链/精炼条件的参考角色） */
 export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
     if (!assertUnlocked()) return
-    // 默认全局 buff 不允许设置共鸣链/精炼条件
-    if (setId.startsWith('global-')) return
+    markTableDirty()
     _buffSets = _buffSets.map((s) =>
         s.id === setId
             ? { ...s, ...(charIdx !== null ? { conditionRefCharIdx: charIdx } : { conditionRefCharIdx: undefined }) }
@@ -549,52 +862,197 @@ export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
     )
 }
 
-/** @desc 设置某乘区的引用（存在引用时清除 override 标记） */
-export function setBuffSetZoneRef(setId: string, zoneId: string, ref: import('./calculation.types').ZoneRef | null) {
+/** @desc 对某个变体的乘区列表做不可变变换，并保持 zones 单变体兼容视图同步 */
+const withVariantZones = (
+    buff: BuffSet,
+    variantId: string,
+    transform: (zones: BuffZoneValue[]) => BuffZoneValue[]
+): BuffSet => {
+    const variants = (buff.variants?.length ? buff.variants : [{ id: `${buff.id}-v1`, zones: buff.zones }]).map((v) =>
+        v.id === variantId ? { ...v, zones: transform(v.zones ?? []) } : v
+    )
+    return { ...buff, variants, zones: variants[0]?.zones ?? [] }
+}
+
+/** @desc 默认操作的变体 id（单变体 buff 的隐式变体） */
+const defaultVariantId = (buff: BuffSet): string => buff.variants?.[0]?.id ?? `${buff.id}-v1`
+
+/**
+ * @desc 按**下标**修改某个乘区（同一乘区可被添加多次，各自独立配置数值/引用/条件）。
+ * 右栏「添加乘区」后每个条目就是一个独立实例，因此界面按位置而非 zoneId 定位。
+ */
+export function updateZoneAt(
+    setId: string,
+    zoneIndex: number,
+    updater: (zone: BuffZoneValue) => BuffZoneValue,
+    variantId?: string
+): void {
     if (!assertUnlocked()) return
-    _buffSets = _buffSets.map((s) =>
-        s.id === setId
-            ? {
-                  ...s,
-                  zones: s.zones.map((z) =>
-                      z.zoneId === zoneId ? { ...z, ref: ref ?? undefined, override: ref ? undefined : z.override } : z
-                  )
-              }
-            : s
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => {
+        if (s.id !== setId) return s
+        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
+            zones.map((z, i) => (i === zoneIndex ? updater(z) : z))
+        )
+    })
+}
+
+/** @desc 按下标移除某个乘区 */
+export function removeZoneAt(setId: string, zoneIndex: number, variantId?: string): void {
+    if (!assertUnlocked()) return
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => {
+        if (s.id !== setId) return s
+        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) => zones.filter((_, i) => i !== zoneIndex))
+    })
+}
+
+/** @desc 按下标设置某乘区的数值 */
+export function setZoneValueAt(setId: string, zoneIndex: number, value: number, variantId?: string): void {
+    updateZoneAt(setId, zoneIndex, (z) => ({ ...z, value }), variantId)
+}
+
+/** @desc 按下标设置某乘区的生效条件（链/阶会被强制剥离，属整块硬性条件） */
+export function setZoneConditionAt(
+    setId: string,
+    zoneIndex: number,
+    condition: BuffCondition | null,
+    variantId?: string
+): void {
+    const normalized = condition ? normalizeConditionForScope(normalizeCondition(condition, 'zone'), 'zone') : null
+    const isEmpty = !normalized || isConditionEmpty(normalized)
+    updateZoneAt(
+        setId,
+        zoneIndex,
+        (z) => ({ ...z, ...(isEmpty ? { condition: undefined } : { condition: normalized }) }),
+        variantId
     )
 }
 
+/** @desc 按下标切换某乘区的「追加/覆盖」标记（extraRatio 恒为追加；覆盖时清除引用） */
+export function setZoneOverrideAt(setId: string, zoneIndex: number, override: boolean, variantId?: string): void {
+    const zoneId = _buffSets.find((s) => s.id === setId)?.zones?.[zoneIndex]?.zoneId
+    const nextOverride = zoneId === 'extraRatio' ? false : override
+    updateZoneAt(
+        setId,
+        zoneIndex,
+        (z) => ({ ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }),
+        variantId
+    )
+}
+
+/** @desc 按下标设置某乘区的引用转模配置（有引用时清除覆盖标记） */
+export function setZoneRefAt(
+    setId: string,
+    zoneIndex: number,
+    ref: import('./calculation.types').ZoneRef | null,
+    variantId?: string
+): void {
+    updateZoneAt(
+        setId,
+        zoneIndex,
+        (z) => ({ ...z, ref: ref ?? undefined, override: ref ? undefined : z.override }),
+        variantId
+    )
+}
+
+/** @desc 读取某 Buff 实例的全部同名变体（缺省用隐式单变体补齐） */
+export function getBuffVariants(setId: string): BuffVariant[] {
+    return variantsOf(_buffSets.find((s) => s.id === setId))
+}
+
+const variantsOf = (bs: BuffSet | undefined): BuffVariant[] => {
+    if (!bs) return []
+    if (bs.variants?.length) return bs.variants
+    return [{ id: `${bs.id}-v1`, zones: bs.zones }]
+}
+
+/** @desc ── 乘区级生效条件（条件挂在具体乘区上）── */
+
+/** @desc 读取某乘区自身的生效条件 */
+export function getBuffSetZoneCondition(setId: string, zoneId: string, variantId?: string): BuffCondition | undefined {
+    const bs = _buffSets.find((s) => s.id === setId)
+    if (!bs) return undefined
+    const variants = variantsOf(bs)
+    const variant = variants.find((v) => v.id === (variantId ?? variants[0]?.id))
+    return variant?.zones.find((z) => z.zoneId === (zoneId as ZoneId))?.condition
+}
+
+/**
+ * @desc 设置某乘区的生效条件（伤害类型 / 伤害属性 / 自定义变量条件）。
+ * 链条件与阶条件是整个 Buff 的硬性条件，这里会被强制剥离（不允许挂到乘区上）。
+ */
+export function setBuffSetZoneCondition(
+    setId: string,
+    zoneId: string,
+    condition: BuffCondition | null,
+    variantId?: string
+): void {
+    if (!assertUnlocked()) return
+    const normalized = condition ? normalizeConditionForScope(normalizeCondition(condition, 'zone'), 'zone') : null
+    const isEmpty = !normalized || isConditionEmpty(normalized)
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => {
+        if (s.id !== setId) return s
+        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
+            zones.map((z) =>
+                z.zoneId === (zoneId as ZoneId)
+                    ? { ...z, ...(isEmpty ? { condition: undefined } : { condition: normalized }) }
+                    : z
+            )
+        )
+    })
+}
+
+/** @desc 设置某乘区的引用（存在引用时清除 override 标记） */
+export function setBuffSetZoneRef(
+    setId: string,
+    zoneId: string,
+    ref: import('./calculation.types').ZoneRef | null,
+    variantId?: string
+) {
+    if (!assertUnlocked()) return
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => {
+        if (s.id !== setId) return s
+        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
+            zones.map((z) =>
+                z.zoneId === zoneId ? { ...z, ref: ref ?? undefined, override: ref ? undefined : z.override } : z
+            )
+        )
+    })
+}
+
 /** @desc 切换乘区「追加/覆盖」标记（extraRatio 恒为追加；覆盖时清除引用） */
-export function setBuffSetZoneOverride(setId: string, zoneId: string, override: boolean) {
+export function setBuffSetZoneOverride(setId: string, zoneId: string, override: boolean, variantId?: string) {
     if (!assertUnlocked()) return
     const nextOverride = zoneId === 'extraRatio' ? false : override
-    _buffSets = _buffSets.map((s) =>
-        s.id === setId
-            ? {
-                  ...s,
-                  zones: s.zones.map((z) =>
-                      z.zoneId === (zoneId as ZoneId)
-                          ? { ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }
-                          : z
-                  )
-              }
-            : s
-    )
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => {
+        if (s.id !== setId) return s
+        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
+            zones.map((z) =>
+                z.zoneId === (zoneId as ZoneId)
+                    ? { ...z, override: nextOverride || undefined, ref: nextOverride ? undefined : z.ref }
+                    : z
+            )
+        )
+    })
 }
 
 /** @desc 切换收藏标记 */
 export function toggleBuffSetStarred(id: string) {
     if (!assertUnlocked()) return
+    markTableDirty()
     _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, starred: !s.starred } : s))
 }
 
-/** @desc 并入/移出全局：并入时清理该 buff 在全部条目上的绑定并加入全局列表，随后重建全局自动绑定 */
+/** @desc 并入/移出全局：并入时清理该 buff 在全部条目上的绑定并加入全局列表，随后重建全局绑定 */
 export function setBuffSetGlobal(id: string, global: boolean): boolean {
     if (!assertUnlocked()) return false
-    // 默认全队/个人全局 buff 不可移出全局
-    if (id.startsWith('global-')) return false
     const bs = _buffSets.find((s) => s.id === id)
     if (!bs) return false
+    markTableDirty()
     _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, global } : s))
     _globalBuffSetIds = global
         ? [..._globalBuffSetIds.filter((sid) => sid !== id), id]
@@ -609,7 +1067,7 @@ export function setBuffSetGlobal(id: string, global: boolean): boolean {
         _damageEntryBuffSetIds = next
     }
 
-    syncGlobalBuffs((_initTeam ?? []).map((s) => s.character))
+    rebindGlobalBuffs()
     if (_onupdate) _onupdate(getCalcState())
     return true
 }
@@ -618,6 +1076,7 @@ export function setBuffSetGlobal(id: string, global: boolean): boolean {
 export function deleteBuffSet(id: string) {
     if (!assertUnlocked()) return
     if (_globalBuffSetIds.includes(id)) return
+    markTableDirty()
     _buffSets = _buffSets.filter((s) => s.id !== id)
     const next: Record<string, string[]> = {}
     for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
@@ -633,6 +1092,7 @@ export function deleteBuffSets(ids: string[]) {
     const targets = ids.filter((id) => !_globalBuffSetIds.includes(id))
     if (targets.length === 0) return
     const idSet = new Set(targets)
+    markTableDirty()
     _buffSets = _buffSets.filter((s) => !idSet.has(s.id))
     const next: Record<string, string[]> = {}
     for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
@@ -660,7 +1120,7 @@ export function setBuffSetsGlobal(ids: string[], global: boolean): boolean {
         }
         _damageEntryBuffSetIds = next
     }
-    syncGlobalBuffs((_initTeam ?? []).map((s) => s.character))
+    rebindGlobalBuffs()
     if (_onupdate) _onupdate(getCalcState())
     return true
 }
@@ -668,32 +1128,254 @@ export function setBuffSetsGlobal(ids: string[], global: boolean): boolean {
 /** @desc 重命名 Buff 块 */
 export function renameBuffSet(id: string, name: string) {
     if (!assertUnlocked()) return
+    markTableDirty()
     _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, name } : s))
 }
 
 /** @desc 给 Buff 块新增一个乘区（默认值 0） */
-export function addZoneToBuffSet(setId: string, zoneId: string) {
+export function addZoneToBuffSet(setId: string, zoneId: string, variantId?: string) {
     if (!assertUnlocked()) return
-    _buffSets = _buffSets.map((s) =>
-        s.id === setId ? { ...s, zones: [...s.zones, { zoneId: zoneId as ZoneId, value: 0 } as BuffZoneValue] } : s
-    )
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => {
+        if (s.id !== setId) return s
+        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) => [
+            ...zones,
+            { zoneId: zoneId as ZoneId, value: 0 } as BuffZoneValue
+        ])
+    })
 }
 
 /** @desc 从 Buff 块移除一个乘区 */
-export function removeZoneFromBuffSet(setId: string, zoneId: string) {
+export function removeZoneFromBuffSet(setId: string, zoneId: string, variantId?: string) {
     if (!assertUnlocked()) return
-    _buffSets = _buffSets.map((s) =>
-        s.id === setId ? { ...s, zones: s.zones.filter((z) => z.zoneId !== (zoneId as ZoneId)) } : s
-    )
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => {
+        if (s.id !== setId) return s
+        return withVariantZones(s, variantId ?? defaultVariantId(s), (zones) =>
+            zones.filter((z) => z.zoneId !== (zoneId as ZoneId))
+        )
+    })
 }
 
 /** @desc 设置某乘区的数值（$state 深代理原地修改，避免整数组替换触发无关重建） */
-export function setBuffSetZoneValue(setId: string, zoneId: string, value: number) {
+export function setBuffSetZoneValue(setId: string, zoneId: string, value: number, variantId?: string) {
     if (!assertUnlocked()) return
     const bs = _buffSets.find((s) => s.id === setId)
     if (!bs) return
-    const zone = bs.zones.find((z) => z.zoneId === (zoneId as ZoneId))
-    if (zone) zone.value = value
+    const variants = variantsOf(bs)
+    const variant = variants.find((v) => v.id === (variantId ?? variants[0]?.id))
+    const zone = variant?.zones.find((z) => z.zoneId === (zoneId as ZoneId))
+    if (!zone) return
+    markTableDirty()
+    zone.value = value
+}
+
+/** @desc ── 跨角色副作用：Buff 引用了别的角色的面板时，列出「影响了该面板乘区」的其它 Buff ── */
+
+export interface PanelDependency {
+    /** @desc 被引用的角色槽位 */
+    charIdx: number
+    /** @desc 被引用的面板属性（ZONE_REF_DEFS 的 id，如 recharge / totalAtk） */
+    refZoneId: string
+    /** @desc 面板属性显示名 */
+    refLabel: string
+    /** @desc 该角色的哪些 Buff 会改写这个面板：{ buffId, buffName, zoneIds } */
+    affecting: { buffId: string; buffName: string; zoneIds: string[] }[]
+}
+
+/** @desc 面板属性 id → 会改写它的乘区键（与 compute 的 applyZone 口径一致） */
+const PANEL_TO_ZONES: Record<string, string[]> = {
+    baseAtk: ['atkFlat', 'atkPct'],
+    totalAtk: ['atkFlat', 'atkPct'],
+    baseHp: ['hpFlat', 'hpPct'],
+    totalHp: ['hpFlat', 'hpPct'],
+    baseDef: ['defFlat', 'defPct'],
+    totalDef: ['defFlat', 'defPct'],
+    recharge: ['recharge'],
+    tuneBreakBoost: ['tuneBreakBoost'],
+    offTuneBuildupRate: ['offTuneBuildupRate'],
+    critRate: ['critRate'],
+    critDmg: ['critDmg']
+}
+
+/** @desc 某 Buff 是否作用于给定角色槽位（scope 判定，与引擎同口径） */
+const buffTouchesChar = (buff: BuffSet, charIdx: number): boolean => {
+    if (buff.scope === 'all') return true
+    if (buff.scope.length === 0) return false
+    return buff.scope.includes(charIdx)
+}
+
+/** @desc 某 Buff 在各变体里出现的乘区键（去重） */
+const buffZoneIds = (buff: BuffSet): Set<string> => {
+    const ids = new Set<string>()
+    for (const variant of variantsOf(buff)) {
+        for (const z of variant.zones) {
+            if (z.ref || z.override || z.value === 0) continue
+            ids.add(z.zoneId)
+        }
+    }
+    return ids
+}
+
+/**
+ * @desc 当前表格里所有「跨角色面板引用」及其副作用来源。
+ * 语义：B 的某个 Buff 引用了 A 的面板属性 X，且 A 上有 Buff 会改写 X —— 那么配置 B 的伤害条目时，
+ * 也需要能够一并配置 A 的这些 Buff（它们通过面板间接影响 B 的伤害）。
+ */
+export function getPanelDependencies(): PanelDependency[] {
+    const out: PanelDependency[] = []
+    for (const buff of _buffSets) {
+        for (const variant of variantsOf(buff)) {
+            for (const z of variant.zones) {
+                const ref = z.ref
+                if (!ref) continue
+                const zoneKeys = PANEL_TO_ZONES[ref.zoneId]
+                if (!zoneKeys?.length) continue
+                const affecting: PanelDependency['affecting'] = []
+                for (const other of _buffSets) {
+                    if (other.id === buff.id) continue
+                    if (!buffTouchesChar(other, ref.characterIdx)) continue
+                    const zones = buffZoneIds(other)
+                    const hits = zoneKeys.filter((k) => zones.has(k))
+                    if (hits.length === 0) continue
+                    affecting.push({ buffId: other.id, buffName: other.name, zoneIds: hits })
+                }
+                if (affecting.length === 0) continue
+                out.push({
+                    charIdx: ref.characterIdx,
+                    refZoneId: ref.zoneId,
+                    refLabel: ZONE_REF_MAP.get(ref.zoneId)?.label ?? ref.zoneId,
+                    affecting
+                })
+            }
+        }
+    }
+    // 合并同一 (角色, 面板) 的重复项，去重 affecting
+    const merged = new Map<string, PanelDependency>()
+    for (const dep of out) {
+        const key = `${dep.charIdx}|${dep.refZoneId}`
+        const existing = merged.get(key)
+        if (!existing) {
+            merged.set(key, dep)
+            continue
+        }
+        for (const a of dep.affecting) {
+            if (!existing.affecting.some((x) => x.buffId === a.buffId)) existing.affecting.push(a)
+        }
+    }
+    return [...merged.values()]
+}
+
+/** @desc 影响「某角色某面板属性」的其它 Buff 列表（配置该角色的 Buff 时提示副作用来源） */
+export function getBuffsAffectingPanel(charIdx: number, refZoneId: string): PanelDependency['affecting'] {
+    const zoneKeys = PANEL_TO_ZONES[refZoneId] ?? []
+    if (zoneKeys.length === 0) return []
+    const out: PanelDependency['affecting'] = []
+    for (const buff of _buffSets) {
+        if (!buffTouchesChar(buff, charIdx)) continue
+        const zones = buffZoneIds(buff)
+        const hits = zoneKeys.filter((k) => zones.has(k))
+        if (hits.length > 0) out.push({ buffId: buff.id, buffName: buff.name, zoneIds: hits })
+    }
+    return out
+}
+
+/** @desc 当前表格是否存在跨角色面板引用（供界面显示提示） */
+export function hasPanelDependencies(): boolean {
+    return getPanelDependencies().length > 0
+}
+
+/** @desc ── 同名多乘区：变体 CRUD（每个变体的乘区各自带条件）── */
+
+/** @desc 新增一个同名变体（复制源变体的乘区结构，便于小幅改条件/数值） */
+export function addBuffVariant(setId: string, label?: string, copyFromVariantId?: string): string | undefined {
+    if (!assertUnlocked()) return
+    const bs = _buffSets.find((s) => s.id === setId)
+    if (!bs) return
+    const variants = variantsOf(bs)
+    const source = variants.find((v) => v.id === copyFromVariantId) ?? variants[variants.length - 1]
+    const id = `${setId}-v${Date.now().toString(36)}`
+    const next: BuffVariant = {
+        id,
+        label: label ?? `变体${variants.length + 1}`,
+        zones: (source?.zones ?? []).map((z) => ({ ...z }))
+    }
+    const merged = [...variants, next]
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, variants: merged, zones: merged[0]?.zones ?? [] } : s))
+    return id
+}
+
+/** @desc 删除一个同名变体（至少保留一个） */
+export function removeBuffVariant(setId: string, variantId: string) {
+    if (!assertUnlocked()) return
+    const bs = _buffSets.find((s) => s.id === setId)
+    if (!bs) return
+    const variants = variantsOf(bs)
+    if (variants.length <= 1) return
+    const merged = variants.filter((v) => v.id !== variantId)
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, variants: merged, zones: merged[0]?.zones ?? [] } : s))
+}
+
+/** @desc 修改变体的标签 / 子条件 / 变量写入 */
+export function updateBuffVariant(
+    setId: string,
+    variantId: string,
+    patch: Partial<Pick<BuffVariant, 'label' | 'condition' | 'ops'>>
+) {
+    if (!assertUnlocked()) return
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => {
+        if (s.id !== setId) return s
+        const variants = variantsOf(s).map((v) =>
+            v.id === variantId
+                ? {
+                      ...v,
+                      ...('label' in patch ? { label: patch.label } : {}),
+                      ...('condition' in patch
+                          ? {
+                                condition: patch.condition ? normalizeCondition(patch.condition, 'buff') : undefined
+                            }
+                          : {}),
+                      ...('ops' in patch ? { ops: patch.ops } : {})
+                  }
+                : v
+        )
+        return { ...s, variants }
+    })
+}
+
+/** @desc 把变体的乘区集合整体写回 */
+export function setBuffVariantZones(setId: string, variantId: string, zones: BuffZoneValue[]) {
+    if (!assertUnlocked()) return
+    markTableDirty()
+    _buffSets = _buffSets.map((s) =>
+        s.id === setId ? withVariantZones(s, variantId, () => zones.map((z) => ({ ...z }))) : s
+    )
+}
+
+/** @desc 设置变体子条件（同名多乘区） */
+export function setBuffVariantCondition(setId: string, variantId: string, condition: BuffCondition | null): boolean {
+    if (!assertUnlocked()) return false
+    if (!_buffSets.some((s) => s.id === setId)) return false
+    updateBuffVariant(setId, variantId, { condition: condition ?? undefined })
+    return true
+}
+
+/** @desc 设置变体的变量写入 */
+export function setBuffVariantOps(setId: string, variantId: string, ops: BuffOp[]): boolean {
+    if (!assertUnlocked()) return false
+    if (!_buffSets.some((s) => s.id === setId)) return false
+    updateBuffVariant(setId, variantId, { ops: ops.length ? ops : undefined })
+    return true
+}
+
+/** @desc 设置整块 buff 的变量写入 */
+export function setBuffSetOps(setId: string, ops: BuffOp[]) {
+    if (!assertUnlocked()) return
+    markTableDirty()
+    _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, ops: ops.length ? ops : undefined } : s))
 }
 
 /** @desc ── Entry-BuffSet 绑定 ── */
@@ -705,6 +1387,7 @@ export function getBuffSetIdsForEntry(entryId: string): string[] {
 /** @desc 覆写条目绑定的 Buff 集合（框选/行列头批量用） */
 export function setBuffSetIdsForEntry(entryId: string, setIds: string[]): boolean {
     if (!assertUnlocked()) return false
+    markTableDirty()
     _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: [...setIds] }
     return true
 }
@@ -717,6 +1400,7 @@ export function setBuffSetIdsForEntries(map: Record<string, string[]>): boolean 
     for (const [entryId, setIds] of Object.entries(map)) {
         next[entryId] = [...setIds]
     }
+    markTableDirty()
     _damageEntryBuffSetIds = next
     return true
 }
@@ -724,6 +1408,7 @@ export function setBuffSetIdsForEntries(map: Record<string, string[]>): boolean 
 /** @desc 切换条目↔Buff 的单条绑定 */
 export function toggleBuffSetForEntry(entryId: string, setId: string) {
     if (!assertUnlocked()) return
+    markTableDirty()
     const current = _damageEntryBuffSetIds[entryId] ?? []
     if (current.includes(setId)) {
         _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: current.filter((id) => id !== setId) }
@@ -741,6 +1426,7 @@ export function getDamageTypesForEntry(entryId: string): string[] {
 /** @desc 切换条目↔伤害类型的绑定 */
 export function toggleDamageTypeForEntry(entryId: string, damageType: string) {
     if (!assertUnlocked()) return
+    markTableDirty()
     const current = _damageEntryDamageTypes[entryId] ?? []
     if (current.includes(damageType)) {
         _damageEntryDamageTypes = { ..._damageEntryDamageTypes, [entryId]: current.filter((t) => t !== damageType) }
@@ -751,6 +1437,7 @@ export function toggleDamageTypeForEntry(entryId: string, damageType: string) {
 
 /** @desc 覆写条目的伤害类型集合（复制到下段直伤等用） */
 export function setDamageTypesForEntry(entryId: string, types: string[]) {
+    markTableDirty()
     _damageEntryDamageTypes = { ..._damageEntryDamageTypes, [entryId]: types }
 }
 
@@ -812,6 +1499,92 @@ export function getShowDamageTypeModal(): boolean {
 }
 export function setShowDamageTypeModal(v: boolean) {
     _showDamageTypeModal = v
+}
+
+/** @desc ── 「变量写入」弹窗（拉表底部工具栏入口，与「编辑伤害类型」同构）── */
+
+let _showVariableWriteModal = $state(false)
+
+export function getShowVariableWriteModal(): boolean {
+    return _showVariableWriteModal
+}
+
+export function setShowVariableWriteModal(v: boolean) {
+    _showVariableWriteModal = v
+}
+
+/** @desc ── 「变量管理」弹窗（BUFF 配置右上角 / 变量写入弹窗内入口）── */
+
+let _showVariableModal = $state(false)
+
+export function getShowVariableModal(): boolean {
+    return _showVariableModal
+}
+
+export function setShowVariableModal(v: boolean) {
+    _showVariableModal = v
+}
+
+/** @desc ── 条目级变量写入（某段伤害执行时改写工程变量；判定写在 BUFF 乘区条件上）── */
+
+export function getDamageEntryConfig(entryId: string): DamageEntryConfig {
+    return {
+        ...(damageTypesOf(entryId).length ? { damageTypes: damageTypesOf(entryId) } : {}),
+        ...(_damageEntryOps[entryId]?.length ? { ops: _damageEntryOps[entryId] } : {})
+    }
+}
+
+const damageTypesOf = (entryId: string): string[] => _damageEntryDamageTypes[entryId] ?? []
+
+export function getDamageEntryOps(entryId: string): BuffOp[] {
+    return _damageEntryOps[entryId] ?? []
+}
+
+/** @desc 设置某段伤害的变量写入（空数组清除） */
+export function setDamageEntryOps(entryId: string, ops: BuffOp[]): boolean {
+    if (!assertUnlocked()) return false
+    const next = { ..._damageEntryOps }
+    if (ops.length > 0) next[entryId] = ops.map((op) => ({ ...op }))
+    else delete next[entryId]
+    markTableDirty()
+    _damageEntryOps = next
+    return true
+}
+
+/** @desc 批量设置多段伤害的变量写入（同名同步用；单次变更单次通知） */
+export function setDamageEntryOpsBatch(map: Record<string, BuffOp[]>): boolean {
+    if (!assertUnlocked()) return false
+    const entryIds = Object.keys(map)
+    if (entryIds.length === 0) return false
+    const next = { ..._damageEntryOps }
+    for (const entryId of entryIds) {
+        const ops = map[entryId]
+        if (ops.length > 0) next[entryId] = ops.map((op) => ({ ...op }))
+        else delete next[entryId]
+    }
+    markTableDirty()
+    _damageEntryOps = next
+    return true
+}
+
+/** @desc ── 运行期变量：按排轴顺序流式执行变量写入 ── */
+
+/** @desc 计算每段伤害执行「前」的变量状态（供变量状态弹窗展示） */
+export function computeRuntimeVars(): Record<string, VarState> {
+    const state: VarState = initialVarState(_vars)
+    const result: Record<string, VarState> = {}
+    for (const entry of _entries) {
+        result[entry.id] = { ...state }
+        applyVarOps(state, _damageEntryOps[entry.id], state)
+    }
+    return result
+}
+
+/** @desc 跑完全部伤害段后的变量最终状态 */
+export function finalRuntimeVars(): VarState {
+    const state: VarState = initialVarState(_vars)
+    for (const entry of _entries) applyVarOps(state, _damageEntryOps[entry.id], state)
+    return state
 }
 
 /** @desc ── Buff 差异模式（拉表页按段展示 新增/移除/不变/全局 的 buff 变化）── */
@@ -890,19 +1663,22 @@ export function getGlobalBuffSetIds(): string[] {
     return _globalBuffSetIds
 }
 
-/** @desc 导出当前计算态深拷贝快照（供工程保存/导出） */
+/** @desc 导出当前计算态深拷贝快照（供工程保存/导出；工程变量表随拉表阶段一起持久化） */
 export function getCalcState(): CalcState {
     return JSON.parse(
         JSON.stringify({
             buffSets: _buffSets,
             damageEntryBuffSetIds: _damageEntryBuffSetIds,
-            damageEntryDamageTypes: _damageEntryDamageTypes
+            damageEntryDamageTypes: _damageEntryDamageTypes,
+            vars: _vars,
+            ...(Object.keys(_damageEntryOps).length ? { damageEntryOps: _damageEntryOps } : {})
         })
     )
 }
 
 /** @desc 通知宿主持久化当前计算态（AI 工具修改后调用） */
 export function notifyCalcUpdate() {
+    markTableDirty()
     if (_onupdate) _onupdate(getCalcState())
 }
 
@@ -911,125 +1687,63 @@ export function remapDuplicatedDamageBuffs(damageMap: Record<string, string>) {
     const pairs = Object.entries(damageMap).filter(([, newId]) => Boolean(newId))
     if (pairs.length === 0) return
 
-    const remapTable = (table: Record<string, string[]>): Record<string, string[]> => {
-        const next: Record<string, string[]> = { ...table }
+    const remapTable = <T>(table: Record<string, T>): Record<string, T> => {
+        const next: Record<string, T> = { ...table }
         for (const [oldId, newId] of pairs) {
             for (const [key, value] of Object.entries(table)) {
                 if (!key.startsWith(oldId + '-')) continue
-                const newKey = newId + key.slice(oldId.length)
-                const existing = next[newKey]
-                next[newKey] = existing ? [...new Set([...existing, ...value])] : [...value]
+                next[newId + key.slice(oldId.length)] = value
             }
         }
         return next
     }
 
+    markTableDirty()
     _damageEntryBuffSetIds = remapTable(_damageEntryBuffSetIds)
     _damageEntryDamageTypes = remapTable(_damageEntryDamageTypes)
-    syncGlobalBuffs((_initTeam ?? []).map((s) => s.character))
+    _damageEntryOps = remapTable(_damageEntryOps)
+    rebindGlobalBuffs()
     if (_onupdate) _onupdate(getCalcState())
 }
 
-/** @desc 同步全局 buff：清除无主角色的 global-{角色名} 孤儿块、按当前队伍补齐每个角色与全队的全局块，并按「角色/全队/效应专属/手动并入」规则重建所有条目上的全局绑定 */
-export function syncGlobalBuffs(charNames: (string | null)[]) {
-    const validCharNames = new Set(charNames.filter(Boolean) as string[])
+/** @desc 重建全局 buff 绑定：把每个标记为 global 的 buff 按作用域挂到所有适用条目上。
+ *  工程不再自动创建「默认全局 buff」（原 global-{角色名} / global-all 空块已由 migration 清除），
+ *  全局 buff 完全由用户按需并入。 */
+export function rebindGlobalBuffs() {
+    if (_globalBuffSetIds.length === 0) return
 
-    const orphanIds = _globalBuffSetIds.filter((id) => {
-        if (id === 'global-all') return false
-        if (!id.startsWith('global-')) return false
-        const charName = id.slice('global-'.length)
-        return !validCharNames.has(charName)
-    })
-    let newBuffSets = _buffSets.slice()
-    let newBindings = { ..._damageEntryBuffSetIds }
-    let newGlobalIds = _globalBuffSetIds.slice()
-
-    if (orphanIds.length > 0) {
-        newBuffSets = newBuffSets.filter((bs) => !orphanIds.includes(bs.id))
-        const nextBindings: Record<string, string[]> = {}
-        for (const [entryId, setIds] of Object.entries(newBindings)) {
-            const filtered = setIds.filter((sid) => !orphanIds.includes(sid))
-            if (filtered.length > 0) nextBindings[entryId] = filtered
-        }
-        newBindings = nextBindings
-        newGlobalIds = newGlobalIds.filter((id) => !orphanIds.includes(id))
+    const globalIdSet = new Set(_globalBuffSetIds)
+    // 先清空所有全局 buff 的旧绑定，再按作用域规则重建（避免残留过期绑定）
+    const newBindings: Record<string, string[]> = {}
+    for (const entryId of Object.keys(_damageEntryBuffSetIds)) {
+        const filtered = (_damageEntryBuffSetIds[entryId] ?? []).filter((sid) => !globalIdSet.has(sid))
+        if (filtered.length > 0) newBindings[entryId] = filtered
     }
 
-    for (let i = 0; i < 3; i++) {
-        const charName = charNames[i]
-        if (!charName) continue
-        const id = `global-${charName}`
-
-        if (newBuffSets.some((bs) => bs.id === id)) {
-            if (!newGlobalIds.includes(id)) {
-                newGlobalIds = [...newGlobalIds, id]
-            }
-            continue
-        }
-
-        newBuffSets = [
-            ...newBuffSets,
-            {
-                id,
-                name: `${charName}·全局`,
-                zones: [],
-                scope: [i],
-                global: true
-            }
-        ]
-        if (!newGlobalIds.includes(id)) {
-            newGlobalIds = [...newGlobalIds, id]
-        }
-    }
-
-    const TEAM_GLOBAL_ID = 'global-all'
-    if (validCharNames.size > 0) {
-        if (!newBuffSets.some((bs) => bs.id === TEAM_GLOBAL_ID)) {
-            newBuffSets = [
-                ...newBuffSets,
-                { id: TEAM_GLOBAL_ID, name: '全队·全局', zones: [], scope: 'all', global: true }
-            ]
-        }
-        if (!newGlobalIds.includes(TEAM_GLOBAL_ID)) {
-            newGlobalIds = [...newGlobalIds, TEAM_GLOBAL_ID]
-        }
-    }
-
-    // 先清空所有全局 buff 的旧绑定，再按适用规则重建
-    const globalIdSet = new Set(newGlobalIds)
-    for (const entryId of Object.keys(newBindings)) {
-        newBindings[entryId] = newBindings[entryId].filter((sid) => !globalIdSet.has(sid))
-    }
     const charIdxByName = new Map<string, number>()
     for (const [i, s] of (_initTeam ?? []).entries()) {
         if (s.character) charIdxByName.set(s.character, i)
     }
-    const mergedGlobalBuffs = _buffSets.filter((bs) => newGlobalIds.includes(bs.id) && !bs.id.startsWith('global-'))
+    const globalBuffs = _buffSets.filter((bs) => globalIdSet.has(bs.id))
+
     for (const entry of _entries) {
         const entryCharIdx = entry.character ? charIdxByName.get(entry.character) : undefined
         const applicable: string[] = []
-        if (entry.character) {
-            if (newGlobalIds.includes(`global-${entry.character}`)) applicable.push(`global-${entry.character}`)
-            if (newGlobalIds.includes(TEAM_GLOBAL_ID)) applicable.push(TEAM_GLOBAL_ID)
-        }
-        for (const mg of mergedGlobalBuffs) {
-            if (mg.scope === 'all') {
-                applicable.push(mg.id)
-            } else if (Array.isArray(mg.scope)) {
-                if (mg.scope.length === 0) {
-                    if (entry.isEffect) applicable.push(mg.id)
-                } else if (entryCharIdx !== undefined && mg.scope.includes(entryCharIdx)) {
-                    applicable.push(mg.id)
+        for (const gb of globalBuffs) {
+            if (gb.scope === 'all') {
+                applicable.push(gb.id)
+            } else if (Array.isArray(gb.scope)) {
+                if (gb.scope.length === 0) {
+                    if (entry.isEffect) applicable.push(gb.id)
+                } else if (entryCharIdx !== undefined && gb.scope.includes(entryCharIdx)) {
+                    applicable.push(gb.id)
                 }
             }
         }
-        for (const gid of applicable) {
-            const current = newBindings[entry.id] ?? []
-            if (!current.includes(gid)) newBindings[entry.id] = [...current, gid]
-        }
+        if (applicable.length === 0) continue
+        const current = newBindings[entry.id] ?? []
+        newBindings[entry.id] = [...new Set([...current, ...applicable])]
     }
 
-    _buffSets = newBuffSets
     _damageEntryBuffSetIds = newBindings
-    _globalBuffSetIds = newGlobalIds
 }

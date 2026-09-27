@@ -552,12 +552,12 @@ defineTool('bind_non_direct_to_block', {
     }
 })
 
-// ── 时间参考线记点（结果分析用，timings 持久在 resultAnalysis）──
+// ── 时间参考线记点（结果分析用，timings 持久在 project.analysis）──
 
-/** @desc 取当前工程的 timings（resultAnalysis.timings，缺省为空数组） */
+/** @desc 取当前工程的 timings（analysis.timings，缺省为空数组） */
 const getTimings = (): { refLineId: string; seconds: number | null }[] => {
     const p = getActiveProject()
-    return p?.resultAnalysis?.timings ? JSON.parse(JSON.stringify(p.resultAnalysis.timings)) : []
+    return p?.analysis?.timings ? JSON.parse(JSON.stringify(p.analysis.timings)) : []
 }
 
 defineTool('get_ref_line_timings', {
@@ -613,7 +613,7 @@ defineTool('enable_ref_line_timing', {
         const seconds = resolveRefLineSeconds(id, refLines as RefLineLike[], timings)
         const next = [...timings, { refLineId: id, seconds }]
         await updateResultAnalysis({
-            ...project.resultAnalysis,
+            ...project.analysis,
             timings: next
         })
         return {
@@ -643,7 +643,7 @@ defineTool('disable_ref_line_timing', {
         }
         const next = timings.filter((t) => t.refLineId !== id)
         await updateResultAnalysis({
-            ...project.resultAnalysis,
+            ...project.analysis,
             timings: next
         })
         return { refLineId: id, disabled: true, timings: next }
@@ -695,7 +695,7 @@ defineTool('set_ref_line_timing_seconds', {
             ? timings.map((t) => (t.refLineId === id ? { ...t, seconds } : t))
             : [...timings, { refLineId: id, seconds }]
         await updateResultAnalysis({
-            ...project.resultAnalysis,
+            ...project.analysis,
             timings: next
         })
         return {

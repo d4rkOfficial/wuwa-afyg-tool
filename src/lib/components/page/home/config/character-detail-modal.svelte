@@ -28,12 +28,15 @@
         onclose?: () => void
         /** @desc 链/阶档位变更后的回调（+page 注入，供「链/阶变动重载数据」使用） */
         onProfileReload?: () => void
+        /** @desc 链/阶写回工程（链阶真源为 team 槽位，随工程持久化） */
+        onTeamUpdate?: (team: [CharSlot, CharSlot, CharSlot]) => void
     }
 
     let {
         open,
         onclose,
         onProfileReload,
+        onTeamUpdate,
         team,
         configState,
         calcState,
@@ -104,13 +107,22 @@
     function pickChain(n: number) {
         if (n === savedChain) return
         setConditionProfileChains(activeTab, n)
+        persistTeamSlot(activeTab, { chain: n })
         onProfileReload?.()
     }
 
     function pickRefine(n: number) {
         if (n === savedRefine) return
         setConditionProfileRefinements(activeTab, n)
+        persistTeamSlot(activeTab, { refinement: n })
         onProfileReload?.()
+    }
+
+    /** @desc 把链/阶写回工程队伍槽位（真源），保证切换工程/重载后不回退 */
+    function persistTeamSlot(idx: number, patch: { chain?: number; refinement?: number }) {
+        if (!onTeamUpdate) return
+        const next = team.map((slot, i) => (i === idx ? { ...slot, ...patch } : slot)) as [CharSlot, CharSlot, CharSlot]
+        onTeamUpdate(next)
     }
 
     /** @desc 链/阶生效条件帮助文案（武器行问号按钮调起全局帮助面板） */

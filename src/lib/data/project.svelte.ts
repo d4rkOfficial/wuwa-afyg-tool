@@ -1,77 +1,89 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { getConditionProfile } from '$lib/calc/calculation.store.svelte'
-import type { Project, CharSlot, EchoSlot, PhaseKey, SelectedSet, ResultAnalysisData } from '$lib/types/project'
+import type { Project, CharSlot, PhaseKey, ResultAnalysisData } from '$lib/types/project'
+import { PROJECT_VERSION } from '$lib/types/project'
 import type { TimelineData } from '$lib/calc/timeline.types'
 import type { CalcState } from '$lib/calc/calculation.types'
 import type { ConfigState } from '$lib/calc/config.types'
+import { conditionProfileFromVars, defaultVars, migrateProject, toPlainProject, PHASE_ORDER } from '$lib/data/migration'
 
 const PROJECTS_KEY = 'projects'
 const ACTIVE_KEY = 'project-active'
 
-const PHASE_ORDER: PhaseKey[] = ['team', 'timeline', 'calculation', 'config']
-
-function emptyEchoSlot(): EchoSlot {
-    return { name: null, cost: 0 }
-}
-
-function emptyCharSlot(): CharSlot {
-    return {
-        character: null,
-        weapon: null,
-        triggerSets: [],
-        echoes: [emptyEchoSlot(), emptyEchoSlot(), emptyEchoSlot(), emptyEchoSlot(), emptyEchoSlot()]
-    }
-}
-
-function emptyPhaseState(): { locked: boolean; data: null } {
-    return { locked: false, data: null }
-}
-
 function deepCloneTeam(team: [CharSlot, CharSlot, CharSlot]): [CharSlot, CharSlot, CharSlot] {
-    return team.map((slot) => ({
-        ...slot,
-        triggerSets: slot.triggerSets.map((s: SelectedSet) => ({ ...s })),
-        echoes: slot.echoes.map((e) => ({ ...e }))
-    })) as [CharSlot, CharSlot, CharSlot]
+    return JSON.parse(JSON.stringify(team)) as [CharSlot, CharSlot, CharSlot]
 }
 
-function deepClonePhaseState(state: { locked: boolean; data: unknown }): { locked: boolean; data: unknown } {
-    return {
-        locked: state.locked,
-        data: state.data ? JSON.parse(JSON.stringify(state.data)) : null
-    }
+/** @desc 深拷贝单个阶段的锁定态与数据到目标工程（team 阶段走 teamLocked，不在此处理） */
+function cloneEncounterPhase(target: Project, source: Project, phase: PhaseKey): void {
+    if (phase === 'team') return
+    const copyOne = <T>(from: { locked: boolean; data: T | null }): { locked: boolean; data: T | null } => ({
+        locked: true,
+        data: from.data ? toPlain(from.data) : null
+    })
+    if (phase === 'timeline') target.encounter.timeline = copyOne(source.encounter.timeline)
+    else if (phase === 'calculation') target.encounter.calculation = copyOne(source.encounter.calculation)
+    else target.encounter.config = copyOne(source.encounter.config)
 }
 
-function normalizeProject(p: Partial<Project>): Project {
-    const phases = Object.assign(
-        {
-            team: emptyPhaseState(),
-            timeline: emptyPhaseState(),
-            calculation: emptyPhaseState(),
-            config: emptyPhaseState()
-        },
-        p.phases || {}
-    )
-    return {
-        id: p.id ?? crypto.randomUUID(),
-        name: p.name ?? '未命名工程',
-        comparisonPoints: p.comparisonPoints,
-        createdAt: p.createdAt ?? Date.now(),
-        team: p.team ?? [emptyCharSlot(), emptyCharSlot(), emptyCharSlot()],
-        customSkillHits: p.customSkillHits ?? {},
-        resultAnalysis: p.resultAnalysis,
-        lockedTeamKey: p.lockedTeamKey,
-        lockedTeamNames: p.lockedTeamNames,
-        archived: p.archived ?? false,
-        conditionProfile: p.conditionProfile,
-        phases: {
-            team: phases.team ?? emptyPhaseState(),
-            timeline: phases.timeline ?? emptyPhaseState(),
-            calculation: phases.calculation ?? emptyPhaseState(),
-            config: phases.config ?? emptyPhaseState()
+/** @desc 兼容期同步：把旧字段视图（phases/conditionProfile/buffSets）写入新结构真源 */
+function syncLegacyIntoNew(p: Project): Project {
+    const { phases, conditionProfile, buffSets } = p
+    if (phases) {
+        p.encounter = {
+            teamLocked: phases.team?.locked ?? p.encounter.teamLocked,
+            timeline: {
+                locked: phases.timeline?.locked ?? false,
+                data: (phases.timeline?.data ?? null) as TimelineData | null
+            },
+            calculation: {
+                locked: phases.calculation?.locked ?? false,
+                data: (phases.calculation?.data ?? null) as CalcState | null
+            },
+            config: {
+                locked: phases.config?.locked ?? false,
+                data: (phases.config?.data ?? null) as ConfigState | null
+            }
         }
     }
+    if (conditionProfile) {
+        p.team = p.team.map((slot, i) => ({
+            ...slot,
+            chain: conditionProfile.chains?.[i] ?? slot.chain ?? 0,
+            refinement: conditionProfile.refinements?.[i] ?? slot.refinement ?? 1
+        })) as [CharSlot, CharSlot, CharSlot]
+    }
+    if (buffSets && !p.buffs?.length) p.buffs = buffSets
+    return p
+}
+
+/** @desc 把角色槽位上的链/精炼档位同步到内置变量（链阶真源是 team，变量是条件系统的读入口） */
+function syncVarsFromTeam(p: Project): void {
+    p.vars = p.vars.map((v) => {
+        const slot = Number(/(\d+)$/.exec(v.name)?.[1] ?? '0') - 1
+        if (slot < 0 || slot > 2) return v
+        if (v.name.startsWith('chain_')) return { ...v, value: p.team[slot]?.chain ?? 0 }
+        if (v.name.startsWith('refine_')) return { ...v, value: p.team[slot]?.refinement ?? 1 }
+        return v
+    })
+}
+
+/** @desc 由新结构真源刷新兼容期视图（buffs→buffSets、team+vars→conditionProfile） */
+function applyDerivedViews(p: Project): Project {
+    syncVarsFromTeam(p)
+    if (!p.buffs) p.buffs = []
+    p.buffSets = p.buffs
+    if (!p.vars?.length) p.vars = defaultVars()
+    p.conditionProfile = conditionProfileFromVars(p.vars, p.team)
+    return p
+}
+
+/** @desc 归一化并迁移工程数据到当前版本（幂等；索引库载入 / 导入 / 分享下载共用） */
+function normalizeProject(p: Partial<Project>): Project {
+    const migrated = syncLegacyIntoNew(migrateProject(p))
+    migrated.vars = migrated.vars ?? defaultVars()
+    return applyDerivedViews(migrated)
 }
 
 function toPlain<T>(value: T): T {
@@ -146,28 +158,33 @@ export async function cloneProject(id: string, newName: string, selectedPhases: 
 
     if (selectedPhases.includes('team')) {
         newProject.team = deepCloneTeam(source.team)
+        newProject.vars = toPlain(source.vars)
         if (source.lockedTeamKey) {
             newProject.lockedTeamKey = source.lockedTeamKey
             newProject.lockedTeamNames = source.lockedTeamNames
         }
-        // 克隆时一并复制链/阶配置
-        newProject.conditionProfile = JSON.parse(JSON.stringify(getConditionProfile()))
     }
 
     for (const phase of PHASE_ORDER) {
+        if (phase === 'team') continue
         if (selectedPhases.includes(phase)) {
-            newProject.phases[phase] = deepClonePhaseState(source.phases[phase])
-            newProject.phases[phase].locked = true
+            cloneEncounterPhase(newProject, source, phase)
         }
+    }
+    newProject.encounter.teamLocked = source.encounter.teamLocked
+
+    // 拉表页数据（Buff 实例 / 绑定 / 条目配置）随 calculation 阶段克隆
+    if (selectedPhases.includes('calculation')) {
+        newProject.buffs = toPlain(source.buffs)
     }
 
     newProject.customSkillHits = JSON.parse(JSON.stringify(source.customSkillHits ?? {}))
     if ((selectedPhases as string[]).includes('result')) {
-        newProject.resultAnalysis = source.resultAnalysis
-            ? JSON.parse(JSON.stringify(source.resultAnalysis))
-            : undefined
+        newProject.analysis = source.analysis ? JSON.parse(JSON.stringify(source.analysis)) : undefined
     }
+    newProject.comparison = source.comparison ? toPlain(source.comparison) : undefined
 
+    applyDerivedViews(newProject)
     projects = [...projects, newProject]
     activeId = newProject.id
     await dbSet(ACTIVE_KEY, activeId)
@@ -216,12 +233,14 @@ export async function updateTeam(team: [CharSlot, CharSlot, CharSlot]) {
         project.lockedTeamKey = undefined
         project.lockedTeamNames = undefined
     }
+    applyDerivedViews(project)
     await persist()
 }
 
 export async function updateTimeline(data: TimelineData) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
+    project.encounter.timeline.data = data
     project.phases.timeline.data = data
     await persist()
 }
@@ -229,15 +248,33 @@ export async function updateTimeline(data: TimelineData) {
 export async function updateCalculation(data: CalcState) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
+    project.encounter.calculation.data = data
     project.phases.calculation.data = data
+    if (data.buffSets) project.buffs = data.buffSets
+    applyDerivedViews(project)
     await persist()
 }
 
-/** @desc 把当前内存中的链/阶配置（getConditionProfile）写回当前工程并持久化，保证 init/重载时 restore 恒为最新值 */
+/** @desc 把当前内存中的链/阶配置（getConditionProfile）写回当前工程：落到角色槽位与内置链/精炼变量 */
 export async function updateConditionProfile() {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
-    project.conditionProfile = JSON.parse(JSON.stringify(getConditionProfile()))
+    const profile = getConditionProfile()
+    project.team = project.team.map((slot, i) => ({
+        ...slot,
+        chain: profile.chains?.[i] ?? slot.chain ?? 0,
+        refinement: profile.refinements?.[i] ?? slot.refinement ?? 1
+    })) as [CharSlot, CharSlot, CharSlot]
+    applyDerivedViews(project)
+    await persist()
+}
+
+/** @desc 持久化工程级变量表（布尔/计数变量） */
+export async function updateVars(vars: import('$lib/types/project').CounterVar[]) {
+    const project = projects.find((p) => p.id === activeId)
+    if (!project) return
+    project.vars = JSON.parse(JSON.stringify(vars))
+    applyDerivedViews(project)
     await persist()
 }
 
@@ -251,6 +288,7 @@ export async function updateCustomSkillHits(hits: Record<string, import('$lib/ty
 export async function updateConfig(data: ConfigState) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
+    project.encounter.config.data = data
     project.phases.config.data = data
     await persist()
 }
@@ -258,7 +296,7 @@ export async function updateConfig(data: ConfigState) {
 export async function updateResultAnalysis(data: ResultAnalysisData) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
-    project.resultAnalysis = data
+    project.analysis = data
     await persist()
 }
 
@@ -266,7 +304,7 @@ export async function updateResultAnalysis(data: ResultAnalysisData) {
 export async function updateComparisonPoints(points: { chains: number[]; refinements: number[] }[]) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
-    project.comparisonPoints = points.length > 0 ? points : undefined
+    project.comparison = points.length > 0 ? points : undefined
     await persist()
 }
 
@@ -275,9 +313,34 @@ export async function unlockPhase(id: string, phase: PhaseKey) {
     if (!project) return
     const idx = PHASE_ORDER.indexOf(phase)
     for (let i = idx; i < PHASE_ORDER.length; i++) {
-        project.phases[PHASE_ORDER[i]].locked = false
+        setPhaseLocked(project, PHASE_ORDER[i], false)
     }
     await persist()
+}
+
+/** @desc 同步写阶段的锁定状态到新结构（team 走 teamLocked）与过渡期视图 */
+function setPhaseLocked(project: Project, phase: PhaseKey, locked: boolean): void {
+    if (phase === 'team') project.encounter.teamLocked = locked
+    else if (phase === 'timeline') project.encounter.timeline.locked = locked
+    else if (phase === 'calculation') project.encounter.calculation.locked = locked
+    else project.encounter.config.locked = locked
+    project.phases[phase].locked = locked
+}
+
+/** @desc 读取某阶段是否锁定（team 走 teamLocked） */
+function readPhaseLocked(project: Project, phase: PhaseKey): boolean {
+    if (phase === 'team') return project.encounter.teamLocked
+    if (phase === 'timeline') return project.encounter.timeline.locked
+    if (phase === 'calculation') return project.encounter.calculation.locked
+    return project.encounter.config.locked
+}
+
+/** @desc 读取某阶段的数据（team 无数据） */
+function readPhaseData(project: Project, phase: PhaseKey): unknown {
+    if (phase === 'team') return null
+    if (phase === 'timeline') return project.encounter.timeline.data
+    if (phase === 'calculation') return project.encounter.calculation.data
+    return project.encounter.config.data
 }
 
 export async function setActiveProject(id: string) {
@@ -293,7 +356,7 @@ export function importProjects(imported: Project[]) {
         if (existingIds.has(item.id)) item.id = crypto.randomUUID()
         const normalized = normalizeProject(item)
         normalized.archived = false
-        if (normalized.phases.team.locked && !normalized.lockedTeamKey) {
+        if (normalized.encounter.teamLocked && !normalized.lockedTeamKey) {
             normalized.lockedTeamKey = getTeamKeyFromTeam(normalized.team)
             normalized.lockedTeamNames = normalized.team
                 .filter((s) => s.character !== null && s.weapon !== null)
@@ -305,32 +368,45 @@ export function importProjects(imported: Project[]) {
     persist()
 }
 
-/** 构建与导出/导入一致的工程文件（{ version, exportedAt, project }） */
+/** @desc 构建与导出/导入一致的工程文件（{ version, exportedAt, project }） */
 export function buildExportFile(
     project: Project,
     selected: PhaseKey[],
     includeResult = false
 ): Record<string, unknown> {
-    const data: Record<string, unknown> = { id: project.id, name: project.name, createdAt: project.createdAt }
+    const data: Record<string, unknown> = {
+        id: project.id,
+        name: project.name,
+        createdAt: project.createdAt,
+        version: PROJECT_VERSION
+    }
     if (selected.includes('team')) {
         data.team = project.team
+        data.vars = project.vars
         if (project.lockedTeamKey) data.lockedTeamKey = project.lockedTeamKey
         if (project.lockedTeamNames) data.lockedTeamNames = project.lockedTeamNames
         // 导出角色的链/阶配置（与队伍配置一起）
-        data.conditionProfile = getConditionProfile()
+        data.conditionProfile = conditionProfileFromVars(project.vars, project.team)
     }
     data.customSkillHits = project.customSkillHits ?? {}
+    // 拉表页 Buff 实例：随 calculation 阶段导出（一切皆 buff 的新结构）
+    if (selected.includes('calculation')) {
+        data.buffs = project.buffs ?? []
+    }
     const phases: Record<string, { locked: boolean; data: unknown }> = {}
     for (const ph of PHASE_ORDER) {
+        if (ph === 'team') continue
         if (selected.includes(ph)) {
-            phases[ph] = { locked: project.phases[ph]?.locked ?? false, data: project.phases[ph]?.data ?? null }
+            phases[ph] = { locked: readPhaseLocked(project, ph), data: readPhaseData(project, ph) }
         }
     }
+    phases.team = { locked: project.encounter.teamLocked, data: null }
     data.phases = phases
     if (includeResult) {
-        data.resultAnalysis = project.resultAnalysis ?? null
+        data.analysis = project.analysis ?? null
     }
-    return { version: 1, exportedAt: Date.now(), project: data }
+    if (project.comparison?.length) data.comparison = project.comparison
+    return { version: PROJECT_VERSION, exportedAt: Date.now(), project: data }
 }
 
 export class ProjectParseError extends Error {
@@ -369,40 +445,15 @@ export function parseProjectFile(text: string): Project[] {
         rawProjects.push(...raw.filter(isRecord))
     }
     if (!rawProjects.length) throw new ProjectParseError('无法识别的工程文件结构')
-    return rawProjects.map((item) => ({
-        id: (item.id as string) || crypto.randomUUID(),
-        name: (item.name as string) || '导入的工程',
-        createdAt: (item.createdAt as number) || Date.now(),
-        team: (item.team as never) || [
-            {
-                character: null,
-                weapon: null,
-                triggerSets: [],
-                echoes: [
-                    { name: null, cost: 0 },
-                    { name: null, cost: 0 },
-                    { name: null, cost: 0 },
-                    { name: null, cost: 0 },
-                    { name: null, cost: 0 }
-                ]
-            }
-        ],
-        phases: {
-            team: (item.phases as Record<string, unknown>)?.team ?? { locked: false, data: null },
-            timeline: (item.phases as Record<string, unknown>)?.timeline ?? { locked: false, data: null },
-            calculation: (item.phases as Record<string, unknown>)?.calculation ?? { locked: false, data: null },
-            config: (item.phases as Record<string, unknown>)?.config ?? { locked: false, data: null }
-        },
-        customSkillHits: (item.customSkillHits as Record<string, unknown[]>) ?? {},
-        conditionProfile: (item.conditionProfile as Project['conditionProfile']) ?? undefined
-    })) as unknown as Project[]
+    // 统一走 migration：任意历史版本的导出文件都会被升级到当前工程结构
+    return rawProjects.map((item) => normalizeProject(item as Partial<Project>))
 }
 
 export async function lockPhase(phase: PhaseKey) {
     const project = projects.find((p) => p.id === activeId)
     if (!project) return
     if (!project.phases[phase]) return
-    project.phases[phase].locked = true
+    setPhaseLocked(project, phase, true)
     if (phase === 'team') {
         project.lockedTeamKey = getTeamKeyFromTeam(project.team)
         project.lockedTeamNames = project.team
@@ -416,11 +467,11 @@ export function canEditPhase(project: Project, phase: PhaseKey): boolean {
     const idx = PHASE_ORDER.indexOf(phase)
     if (idx === 0) return true
     const prevPhase = PHASE_ORDER[idx - 1]
-    return project.phases[prevPhase]?.locked === true
+    return isPhaseReadonly(project, prevPhase)
 }
 
 export function isPhaseReadonly(project: Project, phase: PhaseKey): boolean {
-    return project.phases[phase]?.locked === true
+    return readPhaseLocked(project, phase)
 }
 
 export function getPhaseOrder(): PhaseKey[] {
@@ -431,6 +482,11 @@ export function getPhaseOrder(): PhaseKey[] {
 let _persistPending = false
 let _persistTimer: ReturnType<typeof setTimeout> | null = null
 
+/** @desc 落盘快照：只写新结构真源（不含 phases/conditionProfile 等过渡期视图字段） */
+function snapshotForStorage(): unknown {
+    return JSON.parse(JSON.stringify(projects.map((p) => toPlainProject(p))))
+}
+
 function persist() {
     if (_persistPending) return
     _persistPending = true
@@ -438,7 +494,7 @@ function persist() {
     _persistTimer = setTimeout(() => {
         _persistTimer = null
         _persistPending = false
-        void dbSet(PROJECTS_KEY, toPlain(projects))
+        void dbSet(PROJECTS_KEY, snapshotForStorage())
     }, 100)
 }
 
@@ -447,7 +503,7 @@ function flushPersist() {
     clearTimeout(_persistTimer)
     _persistTimer = null
     _persistPending = false
-    void dbSet(PROJECTS_KEY, toPlain(projects))
+    void dbSet(PROJECTS_KEY, snapshotForStorage())
 }
 
 if (browser) {

@@ -11,7 +11,7 @@
     import { shortName } from '$lib/utils/character'
     import { slide } from 'svelte/transition'
     import favicon from '$lib/assets/favicon.svg'
-    import { getShareState } from '$lib/data/share.svelte'
+    import { getShareState, shareCooldownLabel, refreshShareCooldown } from '$lib/data/share.svelte'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -93,6 +93,10 @@
         ctxMenuOpen = true
     }
 
+    let shareStateRef = $derived(getShareState())
+    /** @desc 分享频率限制：冷却中禁用分享菜单项并显示剩余时间 */
+    let shareCoolingDown = $derived(shareStateRef.cooldownRemaining > 0)
+
     let ctxMenuItems = $derived([
         {
             label: '重命名',
@@ -115,12 +119,14 @@
                 if (ctxTargetId) onexport(ctxTargetId)
             }
         },
-        ...(getShareState().available
+        ...(shareStateRef.available
             ? [
                   {
-                      label: '分享',
+                      label: shareCoolingDown ? `分享（${shareCooldownLabel()}）` : '分享',
                       icon: 'mdi:share-variant',
+                      disabled: shareCoolingDown,
                       action: () => {
+                          if (shareCoolingDown) return
                           if (ctxTargetId) onshare(ctxTargetId)
                       }
                   }
