@@ -38,6 +38,21 @@ export const normalizeConditionForScope = (cond: BuffCondition, scope: Condition
     return next
 }
 
+/**
+ * @desc 给「归属于某个角色、但自身没有任何链/阶硬性条件」的 Buff 补一道**角色本体门**
+ * `chains: [{ charIdx: owner, min: 0 }]`（0 链 = 角色本体 = 未点共鸣链）。
+ *
+ * 为什么是链条件而不是阶条件：「本体」这个概念属于**链行** —— 链 = 角色共鸣链，0 链即角色本体；
+ * 阶 = 武器精炼阶数，武器总有一个精炼档位（默认 1 阶），不存在「本体」档。
+ * 因此导入角色来源的 buff 时补 0 链，既保留「挂在哪个角色身上」的归属（左侧列表归档到「角色名本体」），
+ * 又不会因为档位把本体效果挡掉（`≥ 0 链` 恒成立）。
+ */
+export const withOwnerBodyGate = (cond: BuffCondition, owner: number): BuffCondition => {
+    if (owner < 0) return cond
+    if ((cond.chains?.length ?? 0) > 0 || (cond.refinements?.length ?? 0) > 0) return cond
+    return { ...cond, chains: [{ charIdx: owner, min: 0 }] }
+}
+
 /** @desc 条件求值上下文：除条件自身数据外，还需要条目属性/伤害类型与角色链/精炼档位 */
 export interface ConditionContext {
     /** @desc 伤害属性（条目级条件用；角色级聚合时不传 -> 带属性条件的 buff 不生效） */
@@ -109,10 +124,11 @@ export const describeCondition = (
     if (!cond) return '无条件'
     const groups: string[] = []
     const gate: string[] = []
-    for (const c of cond.chains ?? []) gate.push(`${slotName(c.charIdx)} ≥ ${c.min}链`)
-    // 0 阶表示「本体」（未精炼），显示为「本体」而不是「0阶」
-    for (const c of cond.refinements ?? [])
-        gate.push(c.min > 0 ? `${slotName(c.charIdx)}武器 ≥ ${c.min}阶` : `${slotName(c.charIdx)}武器本体`)
+    // 链 = 角色共鸣链：0 链 = 未点共鸣链的角色本体，因此「本体」只出现在链条件上
+    for (const c of cond.chains ?? [])
+        gate.push(c.min > 0 ? `${slotName(c.charIdx)} ≥ ${c.min}链` : `${slotName(c.charIdx)}本体`)
+    // 阶 = 武器精炼阶数：一律按「≥ N 阶」描述（0 阶即 ≥ 0 阶，无「本体」一说）
+    for (const c of cond.refinements ?? []) gate.push(`${slotName(c.charIdx)}武器 ≥ ${c.min}阶`)
     if (cond.chain !== undefined) gate.push(`共鸣链 ≥ ${cond.chain}`)
     if (cond.refinement !== undefined) gate.push(`武器精炼 ≥ ${cond.refinement}`)
     if (gate.length) groups.push(gate.join(' 且 '))

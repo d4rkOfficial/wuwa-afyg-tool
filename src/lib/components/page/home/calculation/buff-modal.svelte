@@ -31,11 +31,14 @@
         ZONE_REF_MAP,
         ZONE_SECTION_VIEWS,
         groupBuffSets,
+        classifyBuffScope,
         LAYERED_BUFF_PATTERN
     } from '$lib/calc/calculation.consts'
     import type { ZoneId, GroupedBuffSetItem } from '$lib/calc/calculation.consts'
     import { buildBuffTree } from '$lib/calc/buff-tree'
     import type { BuffTreeNode } from '$lib/calc/buff-tree'
+    import { computeDraggedOrder, dragBlockIndex } from '$lib/calc/buff-drag'
+    import type { BuffDragMode } from '$lib/calc/buff-drag'
     import type { CharSlot } from '$lib/types/project'
     import type { ZoneRef, BuffSet, BuffCondition } from '$lib/calc/calculation.types'
     import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
@@ -83,22 +86,39 @@
         }
     })
 
-    /** @desc 拖拽状态：id/源索引/目标索引/是否拖出列表/拖拽模式（条目/文件夹/子项） */
+    /**
+     * @desc 拖拽状态。
+     * 列表是派生的（链/武器目录按条件算、数字目录按名字算），所以只能改同一父容器内的行顺序：
+     * `unitIds` 是本次搬运的 Buff（条目=单个 / 数字目录=整组成员），`parentKey` 是落点所在的父容器，
+     * `dropIdx` 是父容器行序列（去掉被搬运行）里的插入位。
+     */
     type DragState = {
+        /** @desc 拖拽单元 key：item=Buff id；folder=数字目录的分组 key */
         id: string
+        /** @desc 拖拽单元种类 */
+        mode: BuffDragMode
+        /** @desc 目标父容器 key（决定可落点的行序列） */
+        parentKey: string
+        /** @desc 被搬运的 Buff id（按展示顺序） */
+        unitIds: string[]
+        /** @desc 不移动时的落点下标（用于区分「点击」与「拖动」；-1=不在该父容器行序列里） */
         idx: number
+        /** @desc 当前落点下标；-1=没有有效落点（拖出列表 / 原地未移动） */
         dropIdx: number
+        /** @desc 是否已拖出列表（松手即删除） */
         outside: boolean
-        mode: 'item' | 'folder' | 'child'
-        folderPrefix?: string
+        /** @desc 插入指示条位置：显示在 dropBeforeId 这一行上方 / dropAfterId 这一行下方 */
+        dropBeforeId: string | null
+        dropAfterId: string | null
     }
     let dragState = $state<DragState | null>(null)
     let collapsedFolders = $state(new Set<string>())
     let savedCollapsedState: Set<string> | null = null
     let unregisterDragCancel: (() => void) | null = null
     let showDeleteFolderConfirm = $state(false)
-    let deleteFolderPrefix = $state('')
-    let deleteFolderCount = $state(0)
+    /** @desc 将被整目录删除的 Buff id（拖出列表松手后确认删除；按数据算，折叠状态也能删） */
+    let deleteFolderMemberIds = $state<string[]>([])
+    let deleteFolderCount = $derived(deleteFolderMemberIds.length)
     let showCopyOptions = $state(false)
     let copyOptions = $state<string[]>([])
 
@@ -251,17 +271,6 @@
      */
     let buffTree = $derived(buildBuffTree(buffSets, globalBuffSetIds, team))
     let groupedBuffSets = $derived(buffTree.nodes)
-    /** @desc 顶层条目展平（拖拽插入位置计算用）：目录取其 key，散条目取 Buff id */
-    let topLevelFlatItems = $derived.by(() => {
-        const result: Array<{ key: string; type: 'item' | 'folder' }> = []
-        for (const item of buffTree.nodes) {
-            if (item.type === 'folder') result.push({ key: item.prefix!, type: 'folder' })
-            else result.push({ key: item.buffSet!.id, type: 'item' })
-        }
-        return result
-    })
-    let topLevelIdxMap = $derived(new Map(topLevelFlatItems.map((x, i) => [x.key, i])))
-    let topLevelCount = $derived(topLevelFlatItems.length)
 
     /** @desc 当前选中的 Buff 块、其作用域对应角色勾选态、是否效应专属 */
     let selectedBuffSet = $derived(buffSets.find((s) => s.id === selectedBuffSetId) ?? null)
@@ -464,10 +473,9 @@
         const name = team[refIdx]?.character ?? `角色 ${refIdx + 1}`
         const chainMin = cond.chains?.[0]?.min ?? cond.chain
         const refineMin = cond.refinements?.[0]?.min ?? cond.refinement
-        if (chainMin !== undefined) parts.push(`${name} ≥${chainMin}链`)
-        // 0 阶表示「本体」（未精炼武器），与「阶」档位按钮上的短文案保持一致
-        else if (refineMin !== undefined)
-            parts.push(refineMin > 0 ? `${name}的武器 ≥${refineMin}阶` : `${name}的武器本体`)
+        // 链 = 角色共鸣链：0 链 = 未点共鸣链的角色本体；阶 = 武器精炼阶数，一律按 ≥N 阶描述
+        if (chainMin !== undefined) parts.push(chainMin > 0 ? `${name} ≥${chainMin}链` : `${name}本体`)
+        else if (refineMin !== undefined) parts.push(`${name}的武器 ≥${refineMin}阶`)
         return parts.join('，')
     })
 
@@ -523,10 +531,10 @@
 
     /**
      * @desc 链/阶档位按钮提示：当前档位说明「再次点击取消」，另一类已设置时说明「链阶互斥、点击替换」。
-     * 阶的 0 档 = 武器本体（未精炼）。
+     * 链 = 角色共鸣链（0 链 = 角色本体）；阶 = 武器精炼阶数（0-5 一律按数字展示）。
      */
     const gateOptionTitle = (kind: 'chain' | 'refinement', n: number): string => {
-        const label = kind === 'chain' ? `${n}链` : n === 0 ? '武器本体（0阶）' : `${n}阶`
+        const label = kind === 'chain' ? (n === 0 ? '本体（0链）' : `${n}链`) : `${n}阶`
         const selected = kind === 'chain' ? currentChain === n : currentRefine === n
         if (selected) return `≥${label}：再次点击取消`
         const conflict = kind === 'chain' ? currentRefine !== undefined : currentChain !== undefined
@@ -633,6 +641,25 @@
         collapsedFolders = next
     }
 
+    /** @desc 列表滚动容器（拖拽的行序列与落点都从它里面读） */
+    const listContainerOf = (el: EventTarget | null): HTMLElement | null =>
+        (el as HTMLElement | null)?.closest('.buff-list-container') ?? null
+
+    /**
+     * @desc 某个父容器的**直接行**元素（DOM 顺序）。
+     * 行用 `data-drag-parent` 标注自己属于哪个容器，落点只在同一容器内计算 ——
+     * 目录顺序由名字/条件派生，跨容器搬行没有意义（渲染时会被重新归档）。
+     */
+    const parentRowsOf = (container: HTMLElement, parentKey: string): HTMLElement[] => [
+        ...container.querySelectorAll<HTMLElement>(`[data-buffset-id][data-drag-parent="${parentKey}"]`)
+    ]
+
+    /** @desc 父容器行 id 序列（DOM 顺序，可能含正在搬运的行 —— 落点计算内部会剔除它们） */
+    const parentRowIdsOf = (container: HTMLElement, parentKey: string): string[] =>
+        parentRowsOf(container, parentKey)
+            .map((row) => row.dataset.buffsetId ?? '')
+            .filter((id) => id.length > 0)
+
     /** @desc 拖动进入 AI 悬浮窗等"禁区"时取消拖拽（不触发 drop 的删除/重排/确认弹窗） */
     function cancelBuffDrag() {
         if (!dragState) return
@@ -643,35 +670,57 @@
         }
     }
 
-    /** @desc 开始拖拽：仅从拖拽把手开始（.drag-handle），记录源索引并展开全部文件夹（拖拽中便于定位） */
-    function startDrag(e: PointerEvent, id: string, mode: 'item' | 'folder' | 'child', folderPrefix?: string) {
+    /**
+     * @desc 被拖动元素所在**目录链**（自身 + 全部祖先目录）的折叠 key。
+     * 拖动时会收起所有目录，但这条链必须保持展开 —— 否则组内重排的行不在 DOM 里，落点算不出来。
+     */
+    const dragKeepExpanded = (el: HTMLElement, container: HTMLElement): Set<string> => {
+        const keys = new Set<string>()
+        let node: HTMLElement | null = el
+        while (node && node !== container) {
+            const key = node.dataset?.folderCollapseKey
+            if (key) keys.add(key)
+            node = node.parentElement
+        }
+        return keys
+    }
+
+    /**
+     * @desc 开始拖拽（仅从拖拽把手 `.drag-handle` 起手）。
+     * `id` 是拖拽单元：item=Buff id；folder=数字目录的分组 key。`memberIds` 由目录头按**数据**给出
+     * （整组成员），因此目录处于折叠状态时也能整组搬/整组删。
+     */
+    function startDrag(e: PointerEvent, id: string, mode: BuffDragMode, parentKey: string, memberIds?: string[]) {
         if ((e.target as HTMLElement).closest('input')) return
         if (!(e.target as HTMLElement).closest('.drag-handle')) return
         const el = e.currentTarget as HTMLElement
+        const container = listContainerOf(el)
+        if (!container) return
+        const unitIds = mode === 'folder' ? [...(memberIds ?? [])] : [id]
+        if (unitIds.length === 0) return
         el.setPointerCapture(e.pointerId)
         savedCollapsedState = new Set(collapsedFolders)
-        // 拖动时**收起所有文件夹**：列表变短、目录本身成为清晰的落点
-        // （被拖动的目录自身保持展开：否则它的成员不在 DOM 里，整组移动会算不出成员）
-        collapsedFolders = new Set(buffTree.folderKeys.filter((key) => key !== id))
-
-        let idx = -1
-        if (mode === 'child' && folderPrefix) {
-            const container = el.closest('.buff-list-container') as HTMLElement | null
-            if (container) {
-                const items = container.querySelectorAll(`[data-folder-child="${folderPrefix}"]`)
-                const ids = [...items].map((item) => (item as HTMLElement).dataset.buffsetId!)
-                idx = ids.indexOf(id)
-            }
-        } else if (mode === 'item' || mode === 'folder') {
-            idx = topLevelIdxMap.get(id) ?? -1
+        // 拖动时**收起所有目录**：列表变短、落点更清晰；被拖动单元所在目录链保持展开
+        const keep = dragKeepExpanded(el, container)
+        collapsedFolders = new Set(buffTree.folderKeys.filter((key) => !keep.has(key)))
+        const idx = dragBlockIndex(parentRowIdsOf(container, parentKey), unitIds)
+        dragState = {
+            id,
+            mode,
+            parentKey,
+            unitIds,
+            idx,
+            dropIdx: idx,
+            outside: false,
+            dropBeforeId: null,
+            dropAfterId: null
         }
-        dragState = { id, idx, dropIdx: idx, outside: false, mode, folderPrefix }
     }
 
-    /** @desc 拖拽移动：超出容器边缘 30px 判定为「拖出」（删除/删文件夹），否则按元素中心线计算插入位置 */
+    /** @desc 拖拽移动：超出容器边缘 30px 判定为「拖出」（删除/删目录），否则按同一父容器内行的中心线算落点 */
     function onDragMove(e: PointerEvent) {
         if (!dragState) return
-        const container = (e.currentTarget as HTMLElement).closest('.buff-list-container') as HTMLElement | null
+        const container = listContainerOf(e.currentTarget)
         if (!container) return
 
         const cr = container.getBoundingClientRect()
@@ -683,57 +732,63 @@
             e.clientY > cr.bottom + margin
 
         if (outside) {
-            dragState = { ...dragState, outside: true, dropIdx: -1 }
+            dragState = { ...dragState, outside: true, dropIdx: -1, dropBeforeId: null, dropAfterId: null }
             return
         }
 
-        let items: NodeListOf<HTMLElement>
-        if (dragState.mode === 'child' && dragState.folderPrefix) {
-            items = container.querySelectorAll(`[data-folder-child="${dragState.folderPrefix}"]`)
-        } else {
-            items = container.querySelectorAll('[data-buffset-id]:not([data-folder-child]), [data-folder-prefix]')
+        const rows = parentRowsOf(container, dragState.parentKey).filter(
+            (row) => !dragState!.unitIds.includes(row.dataset.buffsetId ?? '')
+        )
+        let dropIdx = rows.length
+        let dropBeforeId: string | null = null
+        for (let i = 0; i < rows.length; i++) {
+            const r = rows[i].getBoundingClientRect()
+            if (e.clientY < r.top + r.height / 2) {
+                dropIdx = i
+                dropBeforeId = rows[i].dataset.buffsetId ?? null
+                break
+            }
         }
-        let dropIdx = items.length
-        items.forEach((item, i) => {
-            const r = item.getBoundingClientRect()
-            if (e.clientY < r.top + r.height / 2 && dropIdx === items.length) dropIdx = i
-        })
-        dragState = { ...dragState, outside: false, dropIdx }
+        // 落在最后一行下方（或容器没有可作锚点的行）时，指示条画在最后一个锚点行下方
+        const dropAfterId =
+            dropBeforeId === null && rows.length > 0 ? (rows[rows.length - 1].dataset.buffsetId ?? null) : null
+        dragState = { ...dragState, outside: false, dropIdx, dropBeforeId, dropAfterId }
     }
 
-    /** @desc 拖拽结束：拖出→删除（文件夹弹确认）；拖入→重排（folder 整组移动/child 组内移动/item 顶层移动）；原地→选中 */
+    /** @desc 拖拽结束：拖出→删除（目录弹确认）；拖入→同父重排；原地未动→选中 */
     function onDragEnd(e: PointerEvent) {
         if (!dragState) return
+        const state = dragState
 
-        if (dragState.outside) {
-            if (dragState.mode === 'folder') {
-                const folder = groupedBuffSets.find((g) => g.type === 'folder' && g.prefix === dragState!.id)
-                if (folder?.children && folder.children.length > 0) {
-                    deleteFolderPrefix = dragState!.id
-                    deleteFolderCount = folder.children.length
+        if (state.outside) {
+            if (state.mode === 'folder') {
+                // 全局 buff 不可删（deleteBuffSets 会跳过），这里先剔除，避免弹出「删除 0 条」的确认框
+                deleteFolderMemberIds = state.unitIds.filter((id) => !globalBuffSetIds.includes(id))
+                if (deleteFolderMemberIds.length > 0) {
                     if (getConfirmDeletes()) {
                         showDeleteFolderConfirm = true
                     } else {
                         confirmDeleteFolder()
                     }
                 }
-                if (savedCollapsedState !== null) {
-                    collapsedFolders = savedCollapsedState
-                    savedCollapsedState = null
-                }
-                dragState = null
-                return
+            } else {
+                deleteBuffSet(state.id)
+                if (selectedBuffSetId === state.id) selectedBuffSetId = null
             }
-            deleteBuffSet(dragState.id)
-            if (selectedBuffSetId === dragState.id) selectedBuffSetId = null
-        } else if (dragState.dropIdx !== dragState.idx || dragState.mode === 'folder') {
-            const container = (e.currentTarget as HTMLElement).closest('.buff-list-container') as HTMLElement | null
-            if (container && (dragState.dropIdx !== dragState.idx || dragState.mode === 'folder')) {
-                const reordered = computeNewOrder(container, dragState)
-                if (reordered) reorderNonGlobalBuffSets(reordered)
+        } else if (state.mode === 'folder' || state.dropIdx !== state.idx) {
+            const container = listContainerOf(e.currentTarget)
+            if (container) {
+                const next = computeDraggedOrder({
+                    // 顺序真源取整份列表（含全局，保证锚点都能找到）；reorderNonGlobalBuffSets 只应用非全局部分
+                    orderedIds: buffSets.map((bs) => bs.id),
+                    parentRowIds: parentRowIdsOf(container, state.parentKey),
+                    unitIds: state.unitIds,
+                    dropIdx: state.dropIdx
+                })
+                if (next) reorderNonGlobalBuffSets(next)
             }
         } else {
-            selectedBuffSetId = dragState.id
+            selectedBuffSetId = state.id
         }
 
         if (savedCollapsedState !== null) {
@@ -743,88 +798,15 @@
         dragState = null
     }
 
-    /** @desc 计算拖拽后的新顺序：folder=整组搬到 dropIdx 位置；child=组内重排；item=顶层重排 */
-    function computeNewOrder(container: HTMLElement, state: DragState): string[] | null {
-        if (state.mode === 'folder') {
-            const prefix = state.id
-            const draggedChildIds = [...container.querySelectorAll(`[data-folder-child="${prefix}"]`)]
-                .map((el) => (el as HTMLElement).dataset.buffsetId!)
-                .filter(Boolean)
-            const allIds = [...container.querySelectorAll('[data-buffset-id]')]
-                .map((el) => (el as HTMLElement).dataset.buffsetId!)
-                .filter(Boolean)
-            const withoutDragged = allIds.filter((id) => !draggedChildIds.includes(id))
-
-            const topLevel = container.querySelectorAll(
-                '[data-buffset-id]:not([data-folder-child]), [data-folder-prefix]'
-            )
-            let insertAt = 0
-            let counted = 0
-            for (const el of topLevel) {
-                const htmlEl = el as HTMLElement
-                if (counted === state.dropIdx) break
-                const p = htmlEl.dataset.folderPrefix
-                if (p) {
-                    if (p !== prefix) {
-                        insertAt += container.querySelectorAll(`[data-folder-child="${p}"]`).length
-                    }
-                } else {
-                    insertAt += 1
-                }
-                counted++
-            }
-
-            withoutDragged.splice(insertAt, 0, ...draggedChildIds)
-            return withoutDragged
-        }
-
-        if (state.mode === 'child' && state.folderPrefix) {
-            const prefix = state.folderPrefix
-            const childIds = [...container.querySelectorAll(`[data-folder-child="${prefix}"]`)]
-                .map((el) => (el as HTMLElement).dataset.buffsetId!)
-                .filter(Boolean)
-            const reorderedChildren = childIds.filter((id) => id !== state.id)
-            reorderedChildren.splice(state.dropIdx, 0, state.id)
-
-            const allIds = [...container.querySelectorAll('[data-buffset-id]')]
-                .map((el) => (el as HTMLElement).dataset.buffsetId!)
-                .filter(Boolean)
-            const result: string[] = []
-            let replaced = false
-            for (const id of allIds) {
-                if (childIds.includes(id)) {
-                    if (!replaced) {
-                        result.push(...reorderedChildren)
-                        replaced = true
-                    }
-                } else {
-                    result.push(id)
-                }
-            }
-            return result
-        }
-
-        const allIds = [...container.querySelectorAll('[data-buffset-id]')]
-            .map((el) => (el as HTMLElement).dataset.buffsetId!)
-            .filter(Boolean)
-        const withoutDragged = allIds.filter((id) => id !== state.id)
-        withoutDragged.splice(state.dropIdx, 0, state.id)
-        return withoutDragged
-    }
-
-    /** @desc 确认删除文件夹：删除其全部子 Buff 并清空选中 */
+    /** @desc 确认删除目录（拖出列表松手触发）：删除其全部子 Buff（全局 buff 由 store 跳过）并清空选中 */
     function confirmDeleteFolder() {
-        const folder = groupedBuffSets.find((g) => g.type === 'folder' && g.prefix === deleteFolderPrefix)
-        const members = folder ? folderMembersOf(folder) : []
-        for (const child of members) {
-            deleteBuffSet(child.id)
-        }
-        if (selectedBuffSetId && members.some((c) => c.id === selectedBuffSetId)) {
-            selectedBuffSetId = null
+        const ids = deleteFolderMemberIds
+        if (ids.length > 0) {
+            deleteBuffSets(ids)
+            if (selectedBuffSetId && ids.includes(selectedBuffSetId)) selectedBuffSetId = null
         }
         showDeleteFolderConfirm = false
-        deleteFolderPrefix = ''
-        deleteFolderCount = 0
+        deleteFolderMemberIds = []
     }
 
     /** @desc 打开文件夹右键菜单（点击⋯按钮或右键文件夹头均走这里） */
@@ -1161,6 +1143,47 @@
             .filter(Boolean)
             .join(' ')
 
+    /** @desc 条目是否在「全局 Buff」目录里（全局 buff 顺序不走非全局重排，因此不参与拖拽） */
+    const isGlobalBuff = (id: string): boolean => globalBuffSetIds.includes(id)
+
+    /**
+     * @desc 条目作用域徽标（名称右侧）：
+     * - 全队 → 只出一个「全队」，主题色实心
+     * - 效应专属（scope 空数组）→ 主题色空心
+     * - 指定角色（1~2 个槽位）→ 逐个出角色名，用该角色属性色做空心 + 半透明底
+     * 三个角色都能吃到时归类为「全队」，不再逐个列角色名（口径见 classifyBuffScope）。
+     */
+    const scopeBadgesOf = (bs: BuffSet): { key: string; label: string; style: string }[] => {
+        const cls = classifyBuffScope(bs.scope, team.length)
+        if (cls.kind === 'all') {
+            return [
+                {
+                    key: 'all',
+                    label: '全队',
+                    style: 'border-color: transparent; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);'
+                }
+            ]
+        }
+        if (cls.kind === 'effect') {
+            return [
+                {
+                    key: 'effect',
+                    label: '效应专属',
+                    style: 'border-color: var(--theme-accent-bg); background: transparent; color: var(--theme-accent-text);'
+                }
+            ]
+        }
+        return cls.idxs.map((idx) => {
+            const name = team[idx]?.character ?? `角色${idx + 1}`
+            const color = elementColor(name)
+            return {
+                key: `char-${idx}`,
+                label: name,
+                style: `border-color: ${color}; background: color-mix(in srgb, ${color} 15%, transparent); color: ${color};`
+            }
+        })
+    }
+
     /** @desc 数字目录（三级）的折叠 key：按所属容器分区，避免不同容器下的同名目录互相影响 */
     const layeredKeyOf = (containerKey: string, prefix: string | undefined): string => `${containerKey}/${prefix}`
 
@@ -1262,15 +1285,10 @@
                                 {@const isGlobalFolder = item.folderKind === 'global'}
                                 {@const isAutoFolder = item.folderKind === 'char-gate'}
                                 {@const folderMembers = folderMembersOf(item)}
-                                {#if !isGlobalFolder}
-                                    {@const topIdx = topLevelIdxMap.get(item.prefix!)}
-                                    {#if dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
-                                        <div class="mx-2 h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-                                    {/if}
-                                {/if}
                                 <!-- 展开的文件夹头在滚动时贴顶吸附（类似表格表头）：实底 + 铺满容器宽度；
-                                    吸附范围 = 整个文件夹块（头 + 子项），子项全部滚出后头随块释放 -->
-                                <div class="px-2">
+                                    吸附范围 = 整个文件夹块（头 + 子项），子项全部滚出后头随块释放。
+                                    data-folder-collapse-key：拖动时按目录链判断哪些目录要保持在展开态 -->
+                                <div class="px-2" data-folder-collapse-key={item.prefix}>
                                     {#if isAutoFolder}
                                         {@render gateFolderHead(item, 'top-0')}
                                     {:else}
@@ -1283,7 +1301,6 @@
                                             ].join(' ')}
                                         >
                                             <button
-                                                data-folder-prefix={item.prefix}
                                                 onclick={() =>
                                                     multiSelect
                                                         ? toggleMultiSelectFolder(folderMembers)
@@ -1291,7 +1308,14 @@
                                                 oncontextmenu={multiSelect ? undefined : (e) => openFolderMenu(e, item)}
                                                 onpointerdown={isGlobalFolder || multiSelect
                                                     ? undefined
-                                                    : (e) => startDrag(e, item.prefix!, 'folder')}
+                                                    : (e) =>
+                                                          startDrag(
+                                                              e,
+                                                              item.prefix!,
+                                                              'folder',
+                                                              item.parentKey,
+                                                              folderMembers.map((c) => c.id)
+                                                          )}
                                                 onpointermove={isGlobalFolder || multiSelect ? undefined : onDragMove}
                                                 onpointerup={isGlobalFolder || multiSelect ? undefined : onDragEnd}
                                                 class={[
@@ -1359,7 +1383,7 @@
                                             {#if isGlobalFolder}
                                                 <!-- @desc 全局 Buff 目录内先按链/阶条件分二级目录（与顶层同一套规则），再在每个二级目录内做数字归并 -->
                                                 {#each item.gateChildren ?? [] as gate (gate.key)}
-                                                    <div class="space-y-1">
+                                                    <div class="space-y-1" data-folder-collapse-key={gate.prefix}>
                                                         {@render gateFolderHead(gate, 'top-10')}
                                                         {#if !collapsedFolders.has(gate.prefix!)}
                                                             <div
@@ -1386,15 +1410,11 @@
                                     {/if}
                                 </div>
                             {:else}
-                                {@const isGlobal = globalBuffSetIds.includes(item.buffSet!.id)}
-                                {#if !isGlobal}
-                                    {@const topIdx = topLevelIdxMap.get(item.buffSet!.id)}
-                                    {#if dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topIdx}
-                                        <div class="mx-2 h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-                                    {/if}
-                                {/if}
+                                {@const isGlobal = isGlobalBuff(item.buffSet!.id)}
+                                {@render dropLine(item.buffSet!.id, 'before', 'mx-2')}
                                 <button
-                                    data-buffset-id={isGlobal ? undefined : item.buffSet!.id}
+                                    data-buffset-id={item.buffSet!.id}
+                                    data-drag-parent={item.parentKey}
                                     onclick={() => {
                                         if (multiSelect) {
                                             if (!isMultiSelectDisabled(item.buffSet!.id))
@@ -1406,7 +1426,7 @@
                                     oncontextmenu={(e) => openItemMenu(e, item.buffSet!.id)}
                                     onpointerdown={isGlobal || multiSelect
                                         ? undefined
-                                        : (e) => startDrag(e, item.buffSet!.id, 'item')}
+                                        : (e) => startDrag(e, item.buffSet!.id, 'item', item.parentKey)}
                                     onpointermove={isGlobal || multiSelect ? undefined : onDragMove}
                                     onpointerup={isGlobal || multiSelect ? undefined : onDragEnd}
                                     class={[
@@ -1449,12 +1469,11 @@
                                         />
                                     {/if}
                                     <span class="truncate flex-1">{item.buffSet!.name}</span>
+                                    {@render scopeBadges(item.buffSet!)}
                                 </button>
+                                {@render dropLine(item.buffSet!.id, 'after', 'mx-2')}
                             {/if}
                         {/each}
-                        {#if dragState && dragState.mode !== 'child' && !dragState.outside && dragState.dropIdx === topLevelCount}
-                            <div class="h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
-                        {/if}
                         {#if buffSets.length === 0}
                             <div class="text-xs text-(--theme-modal-text)/30 text-center py-4">暂无 BUFF 块</div>
                         {/if}
@@ -1865,7 +1884,7 @@
                                                                         : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                                                                 ].join(' ')}
                                                             >
-                                                                {n}
+                                                                {n === 0 ? '本体' : n}
                                                             </button>
                                                         {/each}
                                                     </div>
@@ -1890,7 +1909,7 @@
                                                                         : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
                                                                 ].join(' ')}
                                                             >
-                                                                {n === 0 ? '本体' : n}
+                                                                {n}
                                                             </button>
                                                         {/each}
                                                     </div>
@@ -2721,22 +2740,47 @@
 
 <!-- @desc ── 列表复用部件：最低一层 buff 条目 / 容器内容（数字目录 + 散条目）/ 二级（链·武器）目录头 ── -->
 
-{#snippet buffRow(child: BuffSet, containerKey: string, rowPad: string)}
+<!-- @desc 拖拽插入指示条：只在当前落点锚点行的上/下方出现（锚点由 onDragMove 按同一父容器行序列算出） -->
+{#snippet dropLine(anchorId: string, side: 'before' | 'after', pad: string)}
+    {#if !dragState?.outside && (side === 'before' ? dragState?.dropBeforeId === anchorId : dragState?.dropAfterId === anchorId)}
+        <div class="{pad} h-0.5 rounded-full bg-(--theme-accent-bg)"></div>
+    {/if}
+{/snippet}
+
+<!-- @desc 条目作用域徽标（名称右侧）：全队=主题色实心 / 效应专属=主题色空心 / 指定角色=角色属性色空心+半透明底 -->
+{#snippet scopeBadges(bs: BuffSet)}
+    {#each scopeBadgesOf(bs) as badge (badge.key)}
+        <span
+            class="shrink-0 whitespace-nowrap rounded-none border px-1 py-px text-[10px] leading-none tabular-nums"
+            style={badge.style}
+            title={`作用域：${badge.label}`}>{badge.label}</span
+        >
+    {/each}
+{/snippet}
+
+{#snippet buffRow(child: BuffSet, parentKey: string, rowPad: string)}
+    {@const draggable = !multiSelect && !isGlobalBuff(child.id)}
+    {@render dropLine(child.id, 'before', 'mx-1')}
     <button
         data-buffset-id={child.id}
-        data-folder-child={containerKey}
+        data-drag-parent={parentKey}
         onclick={() => {
             if (multiSelect) !isMultiSelectDisabled(child.id) && toggleMultiSelectId(child.id)
             else selectedBuffSetId = child.id
         }}
         oncontextmenu={(e) => openItemMenu(e, child.id)}
+        onpointerdown={draggable ? (e) => startDrag(e, child.id, 'item', parentKey) : undefined}
+        onpointermove={draggable ? onDragMove : undefined}
+        onpointerup={draggable ? onDragEnd : undefined}
         class={[
             `flex w-full min-w-0 items-center gap-2 rounded-none ${rowPad} text-left text-xs transition-all`,
             multiSelect && isMultiSelectDisabled(child.id)
                 ? 'text-(--theme-modal-text)/30 opacity-50'
                 : (multiSelect ? multiSelectedIds.has(child.id) : selectedBuffSetId === child.id)
                   ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                  : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
+                  : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5',
+            draggable && dragState?.id === child.id && !dragState.outside && 'ring-2 ring-(--theme-accent-bg)',
+            draggable && dragState?.id === child.id && dragState.outside && 'ring-2 ring-red-500 opacity-50'
         ].join(' ')}
     >
         {#if multiSelect}
@@ -2749,25 +2793,36 @@
                 class="size-4 shrink-0 text-(--theme-accent-text)"
             />
         {:else}
-            <Icon icon={buffItemIcon(child.starred)} class={buffItemIconClass(child.starred)} />
+            <Icon icon={buffItemIcon(child.starred)} class={buffItemIconClass(child.starred, draggable)} />
         {/if}
         <span class="truncate flex-1">{child.name}</span>
+        {@render scopeBadges(child)}
     </button>
+    {@render dropLine(child.id, 'after', 'mx-1')}
 {/snippet}
 
 {#snippet buffContainer(children: BuffSet[] | undefined, containerKey: string)}
     {#each foldersOf(children) as sub (sub.key)}
         {@const subKey = layeredKeyOf(containerKey, sub.prefix)}
-        <div class="space-y-1">
+        {@const subMembers = (sub.children ?? []).map((c) => c.id)}
+        {@const subDraggable = !multiSelect && subMembers.some((id) => !isGlobalBuff(id))}
+        <div class="space-y-1" data-folder-collapse-key={subKey}>
             <button
                 class={[
                     'flex w-full min-w-0 items-center gap-2 rounded-none px-3 py-1.5 text-left text-xs transition-all',
                     multiSelect && folderAllSelected(sub.children ?? [])
                         ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                        : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5'
+                        : 'text-(--theme-modal-text)/60 hover:bg-(--theme-modal-text)/5',
+                    subDraggable && dragState?.id === subKey && !dragState.outside && 'ring-2 ring-(--theme-accent-bg)',
+                    subDraggable && dragState?.id === subKey && dragState.outside && 'ring-2 ring-red-500 opacity-50'
                 ].join(' ')}
                 onclick={() => (multiSelect ? toggleMultiSelectFolder(sub.children ?? []) : toggleFolder(subKey))}
                 oncontextmenu={multiSelect ? undefined : (e) => openFolderMenu(e, sub)}
+                onpointerdown={subDraggable
+                    ? (e) => startDrag(e, subKey, 'folder', containerKey, subMembers)
+                    : undefined}
+                onpointermove={subDraggable ? onDragMove : undefined}
+                onpointerup={subDraggable ? onDragEnd : undefined}
             >
                 {#if multiSelect}
                     <Icon
@@ -2779,18 +2834,20 @@
                 {:else}
                     <Icon
                         icon={collapsedFolders.has(subKey) ? 'mdi:folder' : 'mdi:folder-open'}
-                        class={folderIconClass(sub, 'size-3.5 shrink-0')}
+                        class={folderIconClass(
+                            sub,
+                            subDraggable
+                                ? 'size-3.5 shrink-0 drag-handle touch-none select-none cursor-grab active:cursor-grabbing'
+                                : 'size-3.5 shrink-0'
+                        )}
                     />
                 {/if}
                 <span class="truncate flex-1">{sub.name}</span>
-                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/30 tabular-nums"
-                    >{(sub.children ?? []).length}</span
-                >
             </button>
             {#if !collapsedFolders.has(subKey)}
                 <div class="ml-3 space-y-1 border-l pl-2" style="border-color: var(--theme-divider-border);">
                     {#each sub.children ?? [] as sc (sc.id)}
-                        {@render buffRow(sc, containerKey, 'px-3 py-1.5')}
+                        {@render buffRow(sc, subKey, 'px-3 py-1.5')}
                     {/each}
                 </div>
             {/if}
@@ -2811,8 +2868,8 @@
                 : ''
         ].join(' ')}
     >
+        <!-- @desc 二级目录（角色名X链 / 角色名的武器名）由链/阶硬性条件派生，改条件即换目录，因此**不可拖动** -->
         <button
-            data-folder-prefix={node.prefix}
             onclick={() => (multiSelect ? toggleMultiSelectFolder(members) : toggleFolder(node.prefix!))}
             oncontextmenu={multiSelect ? undefined : (e) => openFolderMenu(e, node)}
             class={[
@@ -2862,10 +2919,6 @@
                 />
             {/if}
             <span class="truncate flex-1">{node.name}</span>
-            <span
-                class="shrink-0 text-[10px] text-(--theme-modal-text)/30 whitespace-nowrap"
-                title="按 Buff 的链/阶硬性条件自动归类（改条件即换目录），因此目录本身不可拖动">自动</span
-            >
         </button>
         {#if !multiSelect}
             <button

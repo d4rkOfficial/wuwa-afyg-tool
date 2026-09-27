@@ -129,6 +129,27 @@ export interface GroupedBuffSetItem {
     children?: BuffSet[]
 }
 
+/** @desc Buff 作用域归类：全队=三个角色都能吃到 / 效应专属=仅效应伤害（空数组）/ 指定角色槽位 */
+export interface BuffScopeClass {
+    kind: 'all' | 'effect' | 'chars'
+    /** @desc kind='chars' 时的角色槽位（去重升序） */
+    idxs: number[]
+}
+
+/**
+ * @desc 归类一个 Buff 的作用域（列表作用域徽标共用口径）：
+ * - `'all'` → 全队
+ * - 空数组 → 效应专属（只对效应伤害生效）
+ * - 槽位数组 → 指定角色；**槽位覆盖全部角色时等价于全队**（只显示「全队」，不再逐个列角色名）
+ */
+export const classifyBuffScope = (scope: 'all' | number[] | undefined, teamSize = 3): BuffScopeClass => {
+    if (!Array.isArray(scope)) return { kind: 'all', idxs: [] }
+    const idxs = [...new Set(scope)].filter((i) => Number.isInteger(i) && i >= 0 && i < teamSize).sort((a, b) => a - b)
+    if (idxs.length === 0) return { kind: 'effect', idxs: [] }
+    if (idxs.length >= teamSize) return { kind: 'all', idxs: [] }
+    return { kind: 'chars', idxs }
+}
+
 /** @desc 自然序比较（数字段按数值比较），用于最低一级数字目录排序 */
 const compareNaturalKey = (a: string, b: string): number =>
     a.localeCompare(b, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' })

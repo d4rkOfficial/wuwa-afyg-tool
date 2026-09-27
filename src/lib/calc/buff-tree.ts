@@ -62,12 +62,16 @@ export const gateOf = (buff: BuffInstance): BuffGate | null => {
 
 /**
  * @desc 二级目录 key/标题：
- * - 链条件 → `角色名X链`
+ * - 链条件 → `角色名X链`；**0 链即角色本体（未点共鸣链），显示为 `角色名本体`**
  * - 阶条件（武器精炼）→ `角色名的武器名` —— 按「角色 + 武器」划分，**不按阶数划分**
  */
 export const gateFolderOf = (gate: BuffGate, team: readonly CharSlot[]): { key: string; title: string } => {
     const charName = team[gate.charIdx]?.character ?? `角色${gate.charIdx + 1}`
-    if (gate.kind === 'chain') return { key: `chain:${gate.charIdx}:${gate.min}`, title: `${charName}${gate.min}链` }
+    if (gate.kind === 'chain')
+        return {
+            key: `chain:${gate.charIdx}:${gate.min}`,
+            title: gate.min > 0 ? `${charName}${gate.min}链` : `${charName}本体`
+        }
     const weaponName = team[gate.charIdx]?.weapon ?? ''
     return {
         key: `weapon:${gate.charIdx}:${weaponName}`,
