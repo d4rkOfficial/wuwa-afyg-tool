@@ -51,12 +51,19 @@ export const gateOf = (buff: BuffInstance): BuffGate | null => {
     return null
 }
 
-/** @desc 二级目录 key/标题：`角色名X链` / `角色名的武器X阶` */
+/**
+ * @desc 二级目录 key/标题：
+ * - 链条件 → `角色名X链`
+ * - 阶条件（武器精炼）→ `角色名的武器名` —— 按「角色 + 武器」划分，**不按阶数划分**
+ */
 export const gateFolderOf = (gate: BuffGate, team: readonly CharSlot[]): { key: string; title: string } => {
     const charName = team[gate.charIdx]?.character ?? `角色${gate.charIdx + 1}`
-    return gate.kind === 'chain'
-        ? { key: `chain:${gate.charIdx}:${gate.min}`, title: `${charName}${gate.min}链` }
-        : { key: `refine:${gate.charIdx}:${gate.min}`, title: `${charName}的武器${gate.min}阶` }
+    if (gate.kind === 'chain') return { key: `chain:${gate.charIdx}:${gate.min}`, title: `${charName}${gate.min}链` }
+    const weaponName = team[gate.charIdx]?.weapon ?? ''
+    return {
+        key: `weapon:${gate.charIdx}:${weaponName}`,
+        title: weaponName ? `${charName}的${weaponName}` : `${charName}的武器`
+    }
 }
 
 /**
@@ -85,14 +92,13 @@ export const buildBuffTree = (
             continue
         }
         const gate = gateOf(buff)
-        // 不再归并武器：只带阶条件（武器精炼）的 Buff 与无门槛的一样留在最外层平铺
-        const chainGate = gate?.kind === 'chain' ? gate : null
-        const key = chainGate ? `folder:${gateFolderOf(chainGate, team).key}` : '__top__'
+        // 链条件 → 角色名X链；阶条件 → 角色名的武器名（按角色+武器划分，不按阶数）
+        const key = gate ? `folder:${gateFolderOf(gate, team).key}` : '__top__'
         let bucket = buckets.get(key)
         if (!bucket) {
             bucket = {
-                title: chainGate ? gateFolderOf(chainGate, team).title : '',
-                charIdx: chainGate?.charIdx,
+                title: gate ? gateFolderOf(gate, team).title : '',
+                charIdx: gate?.charIdx,
                 items: []
             }
             buckets.set(key, bucket)
@@ -101,18 +107,23 @@ export const buildBuffTree = (
         bucket.items.push(buff)
     }
 
-    // 二级目录排序：按角色槽位 → 链门槛值升序
-    const gateSortKey = (key: string): [number, number] => {
-        const m = /^folder:chain:(\d+):(\d+)$/.exec(key)
-        if (!m) return [99, 999]
-        return [Number(m[1]), Number(m[2])]
+    // 二级目录排序：按角色槽位 → 同角色内「链目录在前（门槛升序）、武器目录在后（武器名自然序）」
+    const gateSortKey = (key: string): [number, number, string | number] => {
+        const chain = /^folder:chain:(\d+):(\d+)$/.exec(key)
+        if (chain) return [Number(chain[1]), 0, Number(chain[2])]
+        const weapon = /^folder:weapon:(\d+):(.*)$/.exec(key)
+        if (weapon) return [Number(weapon[1]), 1, weapon[2]]
+        return [99, 99, '']
     }
     const orderedKeys = bucketOrder
         .filter((k) => k !== '__top__')
         .sort((a, b) => {
             const ka = gateSortKey(a)
             const kb = gateSortKey(b)
-            return ka[0] - kb[0] || ka[1] - kb[1]
+            if (ka[0] !== kb[0]) return ka[0] - kb[0]
+            if (ka[1] !== kb[1]) return ka[1] - kb[1]
+            if (typeof ka[2] === 'number' && typeof kb[2] === 'number') return ka[2] - kb[2]
+            return String(ka[2]).localeCompare(String(kb[2]))
         })
 
     const nodes: BuffTreeNode[] = []
