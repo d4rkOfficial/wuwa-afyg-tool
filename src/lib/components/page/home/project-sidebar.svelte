@@ -355,6 +355,8 @@
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <div
+                                    data-sf="widget"
+                                    data-sf-flat
                                     onclick={() => selectProject(project.id)}
                                     oncontextmenu={(e) => handleContextMenu(e, project.id)}
                                     class={[

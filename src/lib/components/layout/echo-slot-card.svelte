@@ -125,6 +125,8 @@
         <button
             data-main-stat-trigger={mainStatTriggerKey}
             onclick={onmainstat}
+            data-sf="widget"
+            data-sf-flat
             class="w-full rounded-none border px-3 py-2 transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--theme-input-bg))]"
             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
         >
