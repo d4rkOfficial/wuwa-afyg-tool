@@ -407,7 +407,9 @@
         <!-- Summary：总伤害卡（较实的主题色底）+ 各角色卡（角色属性色 + 头像叠底）+ 数据分析方形按钮 -->
         <div class="shrink-0 border-b pl-3 pr-5 py-4" style="border-color: var(--theme-divider-border);">
             <div class="flex items-stretch gap-3">
-                <div class="flex min-w-0 flex-1 flex-nowrap items-stretch gap-3 overflow-x-auto">
+                <div
+                    class="flex min-w-0 flex-1 flex-nowrap items-stretch gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
                     <div
                         class={`${CARD} ${CARD_PAD} min-w-48 flex-1`}
                         data-sf="card"
