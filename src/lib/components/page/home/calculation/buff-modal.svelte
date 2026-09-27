@@ -19,6 +19,7 @@
         setBuffSetConditionRef,
         getGlobalBuffSetIds,
         reorderNonGlobalBuffSets,
+        compareNatural,
         toggleBuffSetStarred,
         setBuffSetGlobal,
         setBuffSetsGlobal
@@ -1127,6 +1128,35 @@
         }
     }
 
+    /** @desc 多选排序：可排序的已选数量（非全局、且 ≥2 才有意义） */
+    function sortableCount(): number {
+        return [...multiSelectedIds].filter((id) => !globalBuffSetIds.includes(id)).length
+    }
+
+    /**
+     * @desc 按名称排序已选 BUFF：连续数字按数值大小、其它字符按 unicode（`compareNatural`）。
+     * 只重排「已选中的那些位置」，未选项与其位置保持不变。
+     */
+    function sortMultiSelected() {
+        const ids = [...multiSelectedIds].filter((id) => !globalBuffSetIds.includes(id))
+        if (ids.length < 2) return
+        const order = buffSets.filter((b) => !globalBuffSetIds.includes(b.id)).map((b) => b.id)
+        const slots: number[] = []
+        order.forEach((id, i) => {
+            if (multiSelectedIds.has(id)) slots.push(i)
+        })
+        const nameById = new Map(buffSets.map((b) => [b.id, b.name]))
+        const sorted = order
+            .filter((id) => multiSelectedIds.has(id))
+            .sort((a, b) => compareNatural(nameById.get(a) ?? '', nameById.get(b) ?? ''))
+        const next = [...order]
+        slots.forEach((slot, k) => {
+            next[slot] = sorted[k]
+        })
+        reorderNonGlobalBuffSets(next)
+        addToast(`已按名称排序 ${sorted.length} 个 BUFF`, 'success')
+    }
+
     /** @desc 多选批量并入全局 */
     function multiSetGlobal(global: boolean) {
         const ids = [...multiSelectedIds]
@@ -1765,6 +1795,21 @@
                                     {/if}
                                 </button>
                                 {#if multiSelectedIds.size > 0}
+                                    <button
+                                        type="button"
+                                        disabled={sortableCount() < 2}
+                                        onclick={sortMultiSelected}
+                                        class={[
+                                            'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] transition-colors',
+                                            sortableCount() >= 2
+                                                ? 'text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
+                                                : 'text-(--theme-modal-text)/25 cursor-not-allowed'
+                                        ].join(' ')}
+                                        title="按名称排序已选 BUFF（连续数字按数值大小，其它字符按 unicode；只重排已选项，位置不变）"
+                                    >
+                                        <Icon icon="mdi:sort-alphabetical-ascending" class="size-3.5" />
+                                        {#if leftWidth >= 360}<span>按名称排序</span>{/if}
+                                    </button>
                                     <button
                                         type="button"
                                         disabled={!multiSelectionAllNonGlobal()}
