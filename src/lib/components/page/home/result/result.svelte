@@ -404,8 +404,8 @@
             <div class="flex items-stretch gap-3">
                 <div class="flex flex-1 flex-wrap items-stretch gap-3">
                     <div
-                        class={`${CARD} ${CARD_PAD} min-w-48 flex-1 md:max-w-72`}
-                        style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 72%, var(--theme-card-bg)), color-mix(in srgb, var(--theme-accent-bg) 36%, var(--theme-card-bg))); border-color: color-mix(in srgb, var(--theme-accent-bg) 70%, transparent);"
+                        class={`${CARD} ${CARD_PAD} min-w-48 flex-1`}
+                        style="background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 26%, var(--theme-card-bg)), color-mix(in srgb, var(--theme-accent-bg) 14%, var(--theme-card-bg))); border-color: color-mix(in srgb, var(--theme-accent-bg) 34%, transparent);"
                     >
                         <div class="text-base font-black tracking-tight text-(--theme-modal-text)">总伤害</div>
                         <div class={`mt-1.5 ${STAT_VALUE_LG} text-(--theme-accent-text)`}>
@@ -418,10 +418,10 @@
                             ? 'var(--theme-modal-text)'
                             : `var(--theme-element-${charElements[cs.character]}, #888)`}
                         <div
-                            class={`${CARD} ${CARD_PAD} relative min-w-40 flex-1 overflow-hidden md:max-w-56`}
+                            class={`${CARD} ${CARD_PAD} relative min-w-40 flex-1 overflow-hidden`}
                             style={isOther
-                                ? 'background: color-mix(in srgb, var(--theme-modal-text) 20%, var(--theme-input-bg)); border-color: var(--theme-divider-border);'
-                                : `background: color-mix(in srgb, ${elementColor} 40%, var(--theme-input-bg)); border-color: color-mix(in srgb, ${elementColor} 70%, transparent);`}
+                                ? 'background: color-mix(in srgb, var(--theme-modal-text) 8%, var(--theme-input-bg)); border-color: var(--theme-divider-border);'
+                                : `background: color-mix(in srgb, ${elementColor} 16%, var(--theme-input-bg)); border-color: color-mix(in srgb, ${elementColor} 32%, transparent);`}
                         >
                             {#if !isOther && charIcons[cs.character]}
                                 <!-- @desc 角色头像叠底（半透明背景层，不参与点击与阅读） -->
@@ -449,7 +449,7 @@
                 <button
                     onclick={handleOpenAnalysis}
                     class="flex aspect-square shrink-0 self-stretch flex-col items-center justify-center gap-1 rounded-none border transition-colors hover:opacity-80"
-                    style="background: color-mix(in srgb, var(--theme-accent-bg) 26%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
+                    style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent); color: var(--theme-accent-text); border-color: var(--theme-accent-bg);"
                     title="打开数据分析"
                 >
                     <Icon icon="mdi:chart-box-outline" class="size-[42%] min-h-6 shrink-0" />
@@ -467,14 +467,14 @@
                         class={`${SECTION_LABEL} sticky top-0 text-(--theme-modal-text)/45`}
                         style="--sf-base: var(--theme-modal-bg); border-bottom: 1px solid var(--theme-divider-border);"
                     >
-                        <th class="py-2 px-3 text-left font-medium">来源</th>
-                        <th class={`py-2 px-3 text-left ${CARD_TITLE}`}>条目</th>
-                        <th class="py-2 px-3 text-right font-medium">倍率</th>
-                        <th class="py-2 px-3 text-right font-medium">单位</th>
-                        <th class="py-2 px-3 text-right font-medium">暴击</th>
-                        <th class="py-2 px-3 text-right font-medium">不暴击</th>
-                        <th class="py-2 px-3 text-right font-medium">期望</th>
-                        <th class="py-2 px-3 w-8 text-right font-medium"></th>
+                        <th class="py-2 px-3 text-left">来源</th>
+                        <th class="py-2 px-3 text-left">条目</th>
+                        <th class="py-2 px-3 text-right">倍率</th>
+                        <th class="py-2 px-3 text-right">单位</th>
+                        <th class="py-2 px-3 text-right">暴击</th>
+                        <th class="py-2 px-3 text-right">不暴击</th>
+                        <th class="py-2 px-3 text-right">期望</th>
+                        <th class="py-2 px-3 w-8 text-right"></th>
                     </tr>
                 </thead>
                 <tbody data-sf="card" style="--sf-base: var(--theme-modal-bg);">

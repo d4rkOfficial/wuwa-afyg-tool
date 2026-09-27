@@ -42,10 +42,10 @@ export const STAT_ROW: StyleToken = 'tabular-nums'
 // ── 数值强调 ─────────────────────────────────────────────────────────
 /** @desc 数值外发光（与主题 halo 变量配合） */
 export const VALUE_GLOW: StyleToken = '[text-shadow:0_0_3px_var(--theme-halo-color)]'
-/** @desc 主数值：大号黑体 + tabular-nums + 外发光（颜色由使用处给） */
-export const STAT_VALUE_LG: StyleToken = `text-2xl font-black leading-none tabular-nums ${VALUE_GLOW}`
-/** @desc 次数值：中号黑体 + tabular-nums + 外发光 */
-export const STAT_VALUE_MD: StyleToken = `text-xl font-black leading-none tabular-nums ${VALUE_GLOW}`
+/** @desc 主数值：大号黑体 + tabular-nums（不加文字阴影） */
+export const STAT_VALUE_LG: StyleToken = 'text-2xl font-black leading-none tabular-nums'
+/** @desc 次数值：中号黑体 + tabular-nums（不加文字阴影） */
+export const STAT_VALUE_MD: StyleToken = 'text-xl font-black leading-none tabular-nums'
 /** @desc 卡片内常规强调数值：无外发光 */
 export const STAT_VALUE_SM: StyleToken = 'text-lg font-black leading-none tabular-nums'
 /** @desc 强调数值（表格单元格、行内统计） */
