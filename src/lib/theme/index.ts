@@ -1,4 +1,4 @@
-﻿export {
+export {
     loadThemes,
     getThemes,
     getActiveTheme,
@@ -22,6 +22,9 @@
 } from './theme.svelte.js'
 
 export { SURFACE_KEYS, SURFACE_GROUPS, SURFACE_LABELS } from './types.js'
+
+export { BG_MASK_MIN, BG_MASK_MAX, bgMaskOf, bgMaskCss, bgMaskLabel } from './bg-mask.js'
+export type { BgMaskColor } from './bg-mask.js'
 
 export type {
     Theme,

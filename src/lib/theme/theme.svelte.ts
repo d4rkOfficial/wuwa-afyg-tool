@@ -12,6 +12,7 @@ import type {
 } from './types'
 import { SURFACE_KEYS } from './types'
 import { DEFAULT_BACKGROUND_DARK, DEFAULT_BACKGROUND_LIGHT } from './default-backgrounds'
+import { bgMaskCss } from './bg-mask'
 import darkPreset from './preset/dark.json'
 import lightPreset from './preset/light.json'
 
@@ -27,7 +28,7 @@ const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 export const DEFAULT_SURFACES: Record<SurfaceKey, SurfaceStyle> = {
     card: { opacity: 20, blur: 0, depth: 5 },
     modal: { opacity: 40, blur: 32, depth: 100 },
-    sidebar: { opacity: 40, blur: 0, depth: 0 },
+    sidebar: { opacity: 0, blur: 0, depth: 0 },
     content: { opacity: 0, blur: 0, depth: 0 },
     toolbar: { opacity: 0, blur: 0, depth: 0 },
     widget: { opacity: 20, blur: 32, depth: 100 }
@@ -49,11 +50,11 @@ export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
     },
     dark: {
         bgImageBlur: 0,
-        bgImageMask: -100,
+        bgImageMask: -160,
         surfaces: {
             card: { opacity: 20, blur: 0, depth: 5 },
             modal: { opacity: 40, blur: 32, depth: 100 },
-            sidebar: { opacity: 40, blur: 0, depth: 0 },
+            sidebar: { opacity: 0, blur: 0, depth: 0 },
             content: { opacity: 0, blur: 0, depth: 0 },
             toolbar: { opacity: 0, blur: 0, depth: 0 },
             widget: { opacity: 20, blur: 32, depth: 100 }
@@ -329,15 +330,8 @@ function applyBgBlend(root: HTMLElement) {
 
     // ── 背景图效果（按昼夜分别保存）──
     root.style.setProperty('--theme-bg-image-blur', `${clamp(appearance.bgImageBlur, 0, 32)}px`)
-    // 遮罩：负值压暗（黑），正值偏白；上限 200 让遮罩能进一步压成更白
-    const v = clamp(appearance.bgImageMask, -100, 200)
-    const maskValue =
-        v < 0
-            ? `rgba(0, 0, 0, ${((Math.abs(v) / 100) * 0.6).toFixed(3)})`
-            : v > 0
-              ? `rgba(255, 255, 255, ${Math.min(0.8, (v / 100) * 0.35).toFixed(3)})`
-              : 'transparent'
-    root.style.setProperty('--theme-bg-mask', maskValue)
+    // 遮罩：负值压暗（可一路压到全黑），正值偏白；换算口径见 $lib/theme/bg-mask
+    root.style.setProperty('--theme-bg-mask', bgMaskCss(appearance.bgImageMask))
 
     // ── 六类区域：透明度 / 毛玻璃强度 / 背景深度（由 layout.css 的 [data-sf] 规则消费）──
     for (const key of SURFACE_KEYS) {

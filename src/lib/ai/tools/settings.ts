@@ -15,6 +15,8 @@ import {
     defaultSurfaceStyle,
     SURFACE_KEYS,
     SURFACE_LABELS,
+    BG_MASK_MIN,
+    BG_MASK_MAX,
     type SurfaceKey,
     type SurfaceStyle,
     type ThemeMode
@@ -191,8 +193,10 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
             const mode = resolveMode(obj.mode)
             const patch: { bgImageBlur?: number; bgImageMask?: number } = {}
             if (obj.blur !== undefined) patch.bgImageBlur = clampNum(obj.blur, 'theme_bg_image_effect.blur', 0, 32)
-            if (obj.mask !== undefined) patch.bgImageMask = clampNum(obj.mask, 'theme_bg_image_effect.mask', -100, 200)
-            if (!Object.keys(patch).length) throw new Error('须提供 blur（0-32）或 mask（-100 压暗 ~ 200 更白）')
+            if (obj.mask !== undefined)
+                patch.bgImageMask = clampNum(obj.mask, 'theme_bg_image_effect.mask', BG_MASK_MIN, BG_MASK_MAX)
+            if (!Object.keys(patch).length)
+                throw new Error(`须提供 blur（0-32）或 mask（${BG_MASK_MIN} 全黑 ~ 0 原图 ~ ${BG_MASK_MAX} 极白）`)
             await setBgImageEffect(patch, mode)
             const now = getAppearance(mode)
             return { mode: mode === 'light' ? '白天' : '黑夜', blur: now.bgImageBlur, mask: now.bgImageMask }
@@ -551,7 +555,7 @@ defineTool('get_settings_state', {
 
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-100压暗~200更白, mode?:"light"|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存；widget=小部件，覆盖侧栏列表项、配队页角色/武器/首位声骸/触发套装四张 picker 卡、排轴操作块、词条 4c/3c/1c 与词条卡、怪物属性/抗性/免伤输入框等小控件与其小按钮)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-200全黑~0原图~200极白, mode?:"light"|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存；widget=小部件，覆盖侧栏列表项、配队页角色/武器/首位声骸/触发套装四张 picker 卡、排轴操作块、词条 4c/3c/1c 与词条卡、怪物属性/抗性/免伤输入框等小控件与其小按钮)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。',
     parameters: {
         type: 'object',
         properties: {

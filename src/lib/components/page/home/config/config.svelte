@@ -258,7 +258,7 @@
 
 <div
     data-sf="content"
-    class="theme-glass-surface flex h-full flex-col p-5 {className}"
+    class="flex h-full flex-col p-5 {className}"
     style="color: var(--theme-modal-text); {styleProp || ''}"
 >
     <!-- Tabs -->

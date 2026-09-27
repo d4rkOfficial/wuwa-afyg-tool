@@ -585,11 +585,7 @@
     }}
 />
 
-<div
-    data-sf="content"
-    class="theme-glass-surface flex h-full flex-col text-(--theme-timeline-text) {className}"
-    style={styleProp}
->
+<div data-sf="content" class="flex h-full flex-col text-(--theme-timeline-text) {className}" style={styleProp}>
     <div
         class="theme-scrollbar flex-1 overflow-x-auto overflow-y-hidden"
         bind:this={timelineEl}

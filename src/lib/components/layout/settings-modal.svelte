@@ -12,6 +12,10 @@
         setSurfaceStyle,
         updateOverride,
         defaultSurfaceStyle,
+        bgMaskCss,
+        bgMaskLabel,
+        BG_MASK_MIN,
+        BG_MASK_MAX,
         SURFACE_GROUPS,
         type SurfaceKey,
         type SurfaceStyle,
@@ -422,12 +426,7 @@
         void setBgImageEffect(patch, modeKey)
 
     /** @desc 背景图遮罩预览色（与 :root 上 --theme-bg-mask 同口径） */
-    const maskPreview = (v: number) =>
-        v < 0
-            ? `rgba(0,0,0,${(Math.abs(v) / 100) * 0.6})`
-            : v > 0
-              ? `rgba(255,255,255,${Math.min(0.8, (v / 100) * 0.35)})`
-              : 'transparent'
+    const maskPreview = (v: number) => bgMaskCss(v)
 
     function getPresetStyle(hue: number | 'mono' | null): { bg: string; text: string } {
         if (hue === 'mono') {
@@ -1346,22 +1345,14 @@
                                                                 />背景图遮罩</span
                                                             >
                                                             <span class="font-mono text-(--theme-accent-text)"
-                                                                >{appearance.bgImageMask === 0
-                                                                    ? '原图'
-                                                                    : appearance.bgImageMask > 100
-                                                                      ? `更白 ${appearance.bgImageMask - 100}%`
-                                                                      : appearance.bgImageMask > 0
-                                                                        ? `偏白 ${appearance.bgImageMask}%`
-                                                                        : `压暗 ${Math.abs(
-                                                                              appearance.bgImageMask
-                                                                          )}%`}</span
+                                                                >{bgMaskLabel(appearance.bgImageMask)}</span
                                                             >
                                                         </span>
                                                         <input
                                                             aria-label="背景图遮罩"
                                                             type="range"
-                                                            min="-100"
-                                                            max="200"
+                                                            min={BG_MASK_MIN}
+                                                            max={BG_MASK_MAX}
                                                             step="1"
                                                             value={appearance.bgImageMask}
                                                             oninput={(e) =>
@@ -1375,9 +1366,9 @@
                                                         <div
                                                             class="mt-1 flex justify-between text-[9px] text-(--theme-modal-text)/25"
                                                         >
-                                                            <span>压暗</span><span>原图</span><span>偏白</span><span
-                                                                >更白</span
-                                                            >
+                                                            <span>全黑</span><span>压暗</span><span>原图</span><span
+                                                                >偏白</span
+                                                            ><span>极白</span>
                                                         </div>
                                                     </div>
                                                 </div>

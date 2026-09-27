@@ -66,7 +66,7 @@ export const SURFACE_LABELS: Record<SurfaceKey, string> = Object.fromEntries(
 export interface ThemeAppearance {
     /** @desc 背景图自身的模糊半径 px */
     bgImageBlur: number
-    /** @desc 背景图遮罩：-100 压暗 ~ 0 原图 ~ 100 偏白 ~ 200 更白 */
+    /** @desc 背景图遮罩：-200 全黑 ~ -100 压暗 ~ 0 原图 ~ 100 偏白 ~ 200 极白 */
     bgImageMask: number
     /** @desc 各表面的透明度 / 毛玻璃强度 / 背景深度 */
     surfaces: Record<SurfaceKey, SurfaceStyle>
