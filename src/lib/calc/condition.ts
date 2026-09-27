@@ -110,7 +110,9 @@ export const describeCondition = (
     const groups: string[] = []
     const gate: string[] = []
     for (const c of cond.chains ?? []) gate.push(`${slotName(c.charIdx)} ≥ ${c.min}链`)
-    for (const c of cond.refinements ?? []) gate.push(`${slotName(c.charIdx)}武器 ≥ ${c.min}阶`)
+    // 0 阶表示「本体」（未精炼），显示为「本体」而不是「0阶」
+    for (const c of cond.refinements ?? [])
+        gate.push(c.min > 0 ? `${slotName(c.charIdx)}武器 ≥ ${c.min}阶` : `${slotName(c.charIdx)}武器本体`)
     if (cond.chain !== undefined) gate.push(`共鸣链 ≥ ${cond.chain}`)
     if (cond.refinement !== undefined) gate.push(`武器精炼 ≥ ${cond.refinement}`)
     if (gate.length) groups.push(gate.join(' 且 '))
