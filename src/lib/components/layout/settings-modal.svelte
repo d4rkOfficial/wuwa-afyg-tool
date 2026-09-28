@@ -1643,7 +1643,7 @@
                                         >
                                         <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
                                             在侧边栏底部显示「新建工程 / 从本地导入 /
-                                            从工坊下载」操作区；默认开启（关闭后仍可从欢迎页使用）
+                                            从工坊下载」操作区；默认关闭（关闭后仍可从欢迎页使用）
                                         </span>
                                     </div>
                                     <button

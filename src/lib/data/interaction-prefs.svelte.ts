@@ -38,8 +38,8 @@ let _confirmDeletes = $state(true)
 let _toastPosition = $state<ToastPosition>('top-right')
 let _lockWatermark = $state(true)
 let _lockWatermarkText = $state(DEFAULT_LOCK_WATERMARK_TEXT)
-/** @desc 侧边栏底部是否显示「新建 / 从本地导入 / 从工坊下载」操作区（默认开启） */
-let _sidebarActions = $state(true)
+/** @desc 侧边栏底部是否显示「新建 / 从本地导入 / 从工坊下载」操作区（默认关闭，可在设置-交互相关开启） */
+let _sidebarActions = $state(false)
 /** @desc 弹窗关闭按钮位置（默认右上角；B 站 Toy 平台首次进入默认左上角） */
 let _modalClosePosition = $state<ModalClosePosition>('top-right')
 /** @desc 结果页是否允许同时展开多个伤害条目（默认关闭 = 同时只展开一个） */
