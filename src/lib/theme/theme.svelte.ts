@@ -20,8 +20,8 @@ import lightPreset from './preset/light.json'
 const ACTIVE_KEY = 'theme-active'
 const OVERRIDES_KEY = 'theme-overrides'
 
-/** @desc 用户未选过昼夜主题时的默认主题（白天） */
-const DEFAULT_ACTIVE_ID = 'light'
+/** @desc 用户未选过昼夜主题时的默认主题（黑夜：与内置默认外观/背景图配套） */
+const DEFAULT_ACTIVE_ID = 'dark'
 
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
@@ -41,9 +41,9 @@ export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
         bgImageBlur: 0,
         bgImageMask: 200,
         surfaces: {
-            card: { opacity: 0, blur: 0, depth: 0 },
-            modal: { opacity: 40, blur: 32, depth: 100 },
-            sidebar: { opacity: 40, blur: 0, depth: 12 },
+            card: { opacity: 15, blur: 5, depth: 15 },
+            modal: { opacity: 60, blur: 32, depth: 100 },
+            sidebar: { opacity: 0, blur: 0, depth: 10 },
             content: { opacity: 40, blur: 0, depth: 0 },
             toolbar: { opacity: 20, blur: 32, depth: 0 },
             widget: { opacity: 20, blur: 32, depth: 0 }
@@ -51,10 +51,10 @@ export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
     },
     dark: {
         bgImageBlur: 0,
-        bgImageMask: -160,
+        bgImageMask: -130,
         surfaces: {
             card: { opacity: 20, blur: 0, depth: 5 },
-            modal: { opacity: 40, blur: 32, depth: 100 },
+            modal: { opacity: 60, blur: 32, depth: 100 },
             sidebar: { opacity: 0, blur: 0, depth: 0 },
             content: { opacity: 0, blur: 0, depth: 0 },
             toolbar: { opacity: 0, blur: 0, depth: 0 },

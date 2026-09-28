@@ -304,20 +304,7 @@
                     >
                 </div>
 
-                {#if slot.character}
-                    <button
-                        data-sf="widget"
-                        data-sf-flat
-                        class="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-none border text-(--theme-modal-text)/40 opacity-0 backdrop-blur-sm transition-colors hover:text-(--theme-accent-text) group-hover:opacity-100"
-                        style="border-color: var(--theme-divider-border); --sf-base: var(--theme-input-bg);"
-                        onclick={(e) => {
-                            e.stopPropagation()
-                            resetSlot(i)
-                        }}
-                    >
-                        <Icon icon="mdi:restore" class="size-4" />
-                    </button>
-                {/if}
+                <!-- 角色卡片的重置按钮已按要求隐藏（保留 resetSlot / onreset 通路，需要时再挂回） -->
 
                 <div class="relative z-1 flex min-h-0 flex-1 flex-col overflow-y-auto hide-scrollbar px-3 py-2">
                     <!-- 包装层：非滚动 flex 容器，内容按自然高度撑开以触发滚动，min-h-full 保证内容不足时仍均分填满 -->

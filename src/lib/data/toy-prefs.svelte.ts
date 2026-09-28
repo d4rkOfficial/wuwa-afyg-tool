@@ -2,7 +2,7 @@
 import { browser } from '$app/environment'
 
 /** @desc 首次访问标记的 key；改十六进制特征数或版本号都等于「重置首次进入标记」（下次进入按首次处理） */
-const VISITED_KEY = 'wuwa-afyg:visited_62B78000:v4'
+const VISITED_KEY = 'wuwa-afyg:visited_62B78000:v5'
 const MAGNETIC_TOY_KEY = 'wuwa-afyg:magnetic-toy-set_6AA49600'
 
 /** 是否首次访问 tool（无 visited 标记） */
