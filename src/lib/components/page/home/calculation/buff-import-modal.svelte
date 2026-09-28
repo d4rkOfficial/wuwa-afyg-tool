@@ -12,9 +12,14 @@
         setPiecesOf
     } from '$lib/data/buff-library.svelte'
     import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
-    import { importBuffSets } from '$lib/calc/calculation.store.svelte'
+    import {
+        getAllBuffSets,
+        importBuffSetsWithDecisions,
+        type ImportBuffInput
+    } from '$lib/calc/calculation.store.svelte'
     import { ZONE_MAP } from '$lib/calc/calculation.consts'
-    import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
+    import { buildEntityImportItems, detectImportConflicts } from '$lib/calc/buff-import-utils'
+    import BuffImportConflictModal from '$lib/components/layout/buff-import-conflict-modal.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import type { CharSlot } from '$lib/types/project'
 
@@ -119,6 +124,28 @@
             .join(' / ')
     }
 
+    /** @desc 待冲突决策的导入批次（检测到同名冲突/内容一致时暂存，等弹窗决议） */
+    let pending = $state<{
+        items: ImportBuffInput[]
+        total: number
+        /** @desc 下标 → 命中的已有 buff id（重命名用） */
+        identicalById: Record<number, string>
+    } | null>(null)
+    let conflictOpen = $state(false)
+    let conflictList = $state<{ index: number; name: string }[]>([])
+    let identicalList = $state<{ index: number; name: string; existingName: string }[]>([])
+
+    /** @desc 统一的导入执行 + 结果提示 */
+    function runImport(items: ImportBuffInput[], decisions: Parameters<typeof importBuffSetsWithDecisions>[1] = {}) {
+        const report = importBuffSetsWithDecisions(items, decisions, -1, team.length)
+        const parts = [`已导入 ${report.added} 条`]
+        if (report.overwritten > 0) parts.push(`覆盖 ${report.overwritten} 条`)
+        if (report.skipped > 0) parts.push(`跳过 ${report.skipped} 条重名`)
+        if (report.renamed > 0) parts.push(`重命名已有 ${report.renamed} 条`)
+        if (report.reowned > 0) parts.push(`修正归属 ${report.reowned} 条`)
+        addToast(parts.join('，'), report.added > 0 || report.renamed > 0 ? 'success' : 'info')
+    }
+
     function handleImport() {
         const picked = [...recommendedEntities, ...otherEntities].filter((e) => isChecked(e))
         if (!picked.length) {
@@ -126,8 +153,47 @@
             return
         }
         const items = picked.flatMap((e) => buildEntityImportItems(e, team))
-        const count = importBuffSets(items, -1, team.length)
-        if (count > 0) addToast(`已导入 ${count} 条 buff`, 'success')
+        const { report, deduped } = detectImportConflicts(items, getAllBuffSets())
+        if (report.conflicts.length === 0 && report.identical.length === 0) {
+            runImport(deduped)
+            onclose?.()
+            return
+        }
+        // 有需要用户决策的冲突：先弹窗，决议后再落库
+        pending = {
+            items: deduped,
+            total: deduped.length,
+            identicalById: Object.fromEntries(report.identical.map((it) => [it.index, it.existingId]))
+        }
+        conflictList = report.conflicts.map((c) => ({ index: c.index, name: c.name }))
+        identicalList = report.identical.map((it) => ({
+            index: it.index,
+            name: it.name,
+            existingName: it.existingName
+        }))
+        conflictOpen = true
+    }
+
+    /** @desc 冲突弹窗确认：逐条同名决议 + 重命名清单一并交给 store */
+    function confirmConflict(decisions: {
+        sameName: 'skip' | 'overwrite'
+        perIndex: Record<number, 'skip' | 'overwrite'>
+        renameIdentical: boolean
+        renames: { index: number; name: string }[]
+    }) {
+        if (!pending) return
+        const target = pending
+        runImport(target.items, {
+            sameName: decisions.sameName,
+            sameNamePerIndex: decisions.perIndex,
+            renameIdentical: decisions.renameIdentical,
+            // 把「导入名 → 已有 buff id」补齐，store 据此重命名
+            identicalRenames: decisions.renames
+                .map((r) => ({ id: target.identicalById[r.index] ?? '', name: r.name }))
+                .filter((r) => !!r.id)
+        })
+        pending = null
+        conflictOpen = false
         onclose?.()
     }
 </script>
@@ -301,3 +367,16 @@
         {/if}
     </div>
 {/snippet}
+
+<!-- 冲突解决弹窗：同级挂载、DOM 在本弹窗之后，因此叠在上层 -->
+<BuffImportConflictModal
+    open={conflictOpen}
+    conflicts={conflictList}
+    identical={identicalList}
+    total={pending?.total ?? 0}
+    onclose={() => {
+        conflictOpen = false
+        pending = null
+    }}
+    onconfirm={confirmConflict}
+/>

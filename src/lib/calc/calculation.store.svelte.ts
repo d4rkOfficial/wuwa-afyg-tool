@@ -25,6 +25,7 @@ import {
     withOwnerBodyGate
 } from './condition'
 import { paneEffectSourcesOf, type PaneEffectSource } from './pane-effects'
+import { ownerIdxOfItem, rewriteOwnerInCondition } from './buff-owner'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffSet[]>([])
@@ -594,13 +595,60 @@ export function mapImportedScope(
     }
 }
 
-/** @desc 批量导入 Buff 块：校验乘区合法性、转换引用（ZONE_REF_MAP 校验）、按导入自然序排序后并入列表，返回成功条数 */
-export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize = 3) {
-    if (!assertUnlocked()) return 0
+/** @desc 单批导入的冲突决议：同名冲突用 sameName（或逐条 perIndex）；内容一致的重命名询问用 renameIdentical */
+export interface ImportDecisions {
+    /** @desc 同名（内容不同）时：'skip' 跳过 / 'overwrite' 覆盖已有；缺省 'skip' */
+    sameName?: 'skip' | 'overwrite'
+    /** @desc 逐条同名决议（导入批次下标 → 跳过/覆盖）；该下标优先于 sameName */
+    sameNamePerIndex?: Record<number, 'skip' | 'overwrite'>
+    /** @desc 内容完全一致但名字不同时，是否把已有 buff 改成导入的名字；缺省不重命名 */
+    renameIdentical?: boolean
+    /** @desc 重命名清单（仅当 renameIdentical 为 true 时生效） */
+    identicalRenames?: { id: string; name: string }[]
+}
+
+export interface ImportReport {
+    /** @desc 实际写入（新增 + 覆盖）的条数 */
+    added: number
+    /** @desc 被覆盖的已有 buff 条数 */
+    overwritten: number
+    /** @desc 因同名冲突被跳过的条数 */
+    skipped: number
+    /** @desc 按用户要求把已有 buff 改成导入名字的条数 */
+    renamed: number
+    /** @desc 归属槽位重指过的条数（链/阶从 0 号位纠正到真实主人） */
+    reowned: number
+}
+
+/**
+ * @desc 批量导入 Buff。
+ *
+ * **归属重指**：导入项自带 `ownerIdx`（由 `buff-import-utils` 按当前配队判定）。工坊与 AI 产物里的
+ * 链/阶条件 charIdx 一律是 0，这里统一重写成真实归属，否则「谁的链 buff 都进 1 号位」。
+ * 该实体不在配队里（owner < 0）时丢弃链/阶条件，避免显示成某个角色的门槛。
+ *
+ * 冲突决议由调用方（导入弹窗）给出，见 `ImportDecisions`。
+ */
+export function importBuffSetsWithDecisions(
+    items: ImportBuffInput[],
+    decisions: ImportDecisions = {},
+    ownerIdx = -1,
+    teamSize = 3
+): ImportReport {
+    const report: ImportReport = { added: 0, overwritten: 0, skipped: 0, renamed: 0, reowned: 0 }
+    if (!assertUnlocked()) return report
+
+    const toRemove = new Set<string>()
     const fresh: BuffSet[] = []
-    for (const item of items) {
+
+    for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+        const item = items[itemIndex]
         const name = item.name.trim()
         if (!name) continue
+        const owner = ownerIdxOfItem(item, ownerIdx)
+        // 逐条决议优先于批量决议（冲突弹窗里可以单独改某一条）
+        const overwrite = (decisions.sameNamePerIndex?.[itemIndex] ?? decisions.sameName) === 'overwrite'
+
         const zones: BuffZoneValue[] = []
         for (const z of item.zones ?? []) {
             const zoneId = z.zoneId as BuffZoneValue['zoneId']
@@ -608,7 +656,8 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
             const zone: BuffZoneValue = { zoneId, value: z.value }
             if (z.ref && ZONE_REF_MAP.has(z.ref.targetZoneId as never) && !ZONE_NO_REF_IDS.has(zoneId)) {
                 zone.ref = {
-                    characterIdx: item.ownerIdx ?? ownerIdx,
+                    // 引用归属跟随实体主人，而不是工坊/生成结果里写死的 0
+                    characterIdx: owner,
                     zoneId: z.ref.targetZoneId as never,
                     threshold: z.ref.threshold ?? 0,
                     pct: z.ref.pct,
@@ -625,30 +674,73 @@ export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize
             if (zoneCondition) zone.condition = zoneCondition
             zones.push(zone)
         }
-        const owner = item.ownerIdx ?? ownerIdx
+
+        // ① 链/阶条件重指到真实归属（工坊/生成产物是 0 号位）
+        const reowned = rewriteOwnerInCondition(item.condition, owner)
+        if (JSON.stringify(reowned) !== JSON.stringify(item.condition ?? undefined)) {
+            const hadGate =
+                (item.condition?.chains?.length ?? 0) > 0 ||
+                (item.condition?.refinements?.length ?? 0) > 0 ||
+                item.condition?.chain !== undefined ||
+                item.condition?.refinement !== undefined
+            if (hadGate) report.reowned++
+        }
+
+        // ② 同名冲突：跳过 or 覆盖（覆盖 = 删掉旧的同一条，再写入新的）
+        const sameName = _buffSets.filter((s) => s.name === name)
+        if (sameName.length > 0) {
+            if (!overwrite) {
+                report.skipped += sameName.length
+                continue
+            }
+            for (const s of sameName) toRemove.add(s.id)
+            report.overwritten += sameName.length
+        }
+
         /**
          * @desc 来源是某个角色的 buff（有归属角色槽位）且本身没有链/阶条件时，补一道「角色 ≥ 0 链」的
          * **角色本体门**（0 链 = 角色本体，未点共鸣链）：既保留「挂在哪个角色身上」的归属
          * （左侧列表按「角色名本体」归档），又不会因为档位把本体效果挡掉。
-         * 「本体」属于链行（链=共鸣链、阶=武器精炼）—— 详见 withOwnerBodyGate。
          */
-        const condition = withOwnerBodyGate(normalizeCondition(item.condition, 'buff', owner), owner)
-        const buffSet: BuffSet = {
+        const condition = withOwnerBodyGate(normalizeCondition(reowned, 'buff', owner), owner)
+        fresh.push({
             id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name,
             zones,
             scope: mapImportedScope(item.scope, owner, teamSize),
             ...(isConditionEmpty(condition) ? {} : { condition }),
             ...(owner >= 0 && !isConditionEmpty(condition) ? { conditionRefCharIdx: owner } : {})
-        }
-        fresh.push(buffSet)
+        })
     }
-    if (!fresh.length) return 0
-    // 导入前按条目名自然排序：数字段按数值（1层 < 2层 < 10层 < 11层），其余按 unicode 码点
-    fresh.sort((a, b) => compareNatural(a.name, b.name))
-    markTableDirty()
-    _buffSets = [..._buffSets, ...fresh]
-    return fresh.length
+
+    // ③ 内容一致的重命名询问（先改已有 buff 的名字，再走后面的删除/追加）
+    if (decisions.renameIdentical && decisions.identicalRenames?.length) {
+        for (const r of decisions.identicalRenames) {
+            if (_buffSets.some((s) => s.id === r.id && s.name !== r.name)) {
+                renameBuffSet(r.id, r.name)
+                report.renamed++
+            }
+        }
+    }
+
+    if (toRemove.size > 0) {
+        _buffSets = _buffSets.filter((s) => !toRemove.has(s.id))
+    }
+    if (fresh.length > 0) {
+        // 按条目名自然排序：数字段按数值（1层 < 2层 < 10层 < 11层），其余按 unicode 码点
+        fresh.sort((a, b) => compareNatural(a.name, b.name))
+        markTableDirty()
+        _buffSets = [..._buffSets, ...fresh]
+    } else if (toRemove.size > 0) {
+        markTableDirty()
+    }
+    report.added = fresh.length
+    return report
+}
+
+/** @desc 批量导入 Buff 块（无冲突决议的简单入口，保持既有调用方行为）：返回成功条数 */
+export function importBuffSets(items: ImportBuffInput[], ownerIdx = -1, teamSize = 3) {
+    return importBuffSetsWithDecisions(items, {}, ownerIdx, teamSize).added
 }
 
 /** @desc 自然排序：数字段按数值比较（1层 < 2层 < 10层 < 11层），其余按 unicode 码点比较 */

@@ -3,7 +3,7 @@ import { defineTool } from './registry'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { getBuffEntities, updateEntityBuffs, ENTITY_TYPES, loadBuffLibrary } from '$lib/data/buff-library.svelte'
 import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$lib/api/data-cache'
-import { importBuffSets } from '$lib/calc/calculation.store.svelte'
+import { importBuffSetsWithDecisions } from '$lib/calc/calculation.store.svelte'
 import type { ImportBuffInput } from '$lib/calc/calculation.store.svelte'
 import { generateBuffSet } from '../generate'
 import { getEnabledSkillBody, loadSkills, SKILL_IDS, updateSkill } from '$lib/data/ai-skills.svelte'
@@ -296,10 +296,13 @@ defineTool('generate_project_buffs', {
                 })
             }
         }
-        const count = importBuffSets(items, -1, 3)
+        // 同名冲突按「覆盖」处理：AI 生成是显式意图，重跑就该更新已有条目（无 UI 可询问）
+        const report = importBuffSetsWithDecisions(items, { sameName: 'overwrite' }, -1, 3)
         ctx.notifyCalc?.()
         return {
-            generated: count,
+            generated: report.added,
+            overwritten: report.overwritten,
+            reowned: report.reowned,
             totalEntities: entities.length,
             succeededEntities: succeeded.length,
             failedEntities: failed.length,
