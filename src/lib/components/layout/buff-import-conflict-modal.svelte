@@ -1,7 +1,7 @@
 <script lang="ts">
     /**
      * @desc 导入 Buff 冲突解决弹窗：两种需要用户决策的情况
-     * 1. **同名冲突**（与已有 buff 名字相同、内容不同）：逐条选「跳过 / 覆盖」，也可一键「剩余全部跳过 / 剩余全部覆盖」；
+     * 1. **同名冲突**（与已有 buff 名字相同、内容不同）：逐条选「跳过 / 覆盖」，也可一键「全部跳过 / 全部覆盖」；
      * 2. **内容一致**（条件 + 乘区 + 乘区条件完全相同，只是名字不同）：询问是否把已有 buff 改成导入的名字。
      *    同一个名字下内容也一致的，视为无冲突（直接跳过、不打扰）。
      */
@@ -56,10 +56,13 @@
         perIndex = { ...perIndex, [index]: kind }
     }
 
-    /** @desc 把当前批量决议固化成逐条决议，这样后续改批量不影响已定的条目 */
-    const freezeRemaining = (kind: 'skip' | 'overwrite') => {
-        const next = { ...perIndex }
-        for (const c of conflicts) if (next[c.index] === undefined) next[c.index] = kind
+    /**
+     * @desc 一键把**全部**同名冲突都定为跳过/覆盖，并固化成逐条决议。
+     * 固化之后逐条按钮仍可单独改动（改完只影响那一条）。
+     */
+    const applyToAll = (kind: 'skip' | 'overwrite') => {
+        const next: Record<number, 'skip' | 'overwrite'> = {}
+        for (const c of conflicts) next[c.index] = kind
         perIndex = next
         bulk = kind
     }
@@ -103,16 +106,16 @@
                 </span>
                 <span class="flex-1"></span>
                 <button
-                    onclick={() => freezeRemaining('skip')}
+                    onclick={() => applyToAll('skip')}
                     class="rounded-none border px-2 py-1 text-[10px] transition-colors hover:border-(--theme-accent-bg)"
                     style="border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
-                    title="其余未决定的都跳过，保留已有条目">剩余全部跳过</button
+                    title="所有重名条目都跳过，保留已有条目">全部跳过</button
                 >
                 <button
-                    onclick={() => freezeRemaining('overwrite')}
+                    onclick={() => applyToAll('overwrite')}
                     class="rounded-none border px-2 py-1 text-[10px] transition-colors hover:border-(--theme-accent-bg)"
                     style="border-color: var(--theme-divider-border); color: var(--theme-accent-text);"
-                    title="其余未决定的都用导入内容覆盖已有条目">剩余全部覆盖</button
+                    title="所有重名条目都用导入内容覆盖已有条目">全部覆盖</button
                 >
             </div>
 
