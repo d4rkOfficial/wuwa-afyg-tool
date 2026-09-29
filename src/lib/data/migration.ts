@@ -597,9 +597,25 @@ export const migrateProject = (raw: unknown): Project => {
     }
 
     const encounter = asRecord(data.encounter)
+    /**
+     * @desc 四阶段数据源：真源 `encounter.<phase>.data` 优先，缺失时**逐阶段**回落到兼容期视图
+     * `phases[<phase>].data`。
+     *
+     * 为什么必须有这条回落：`buildExportFile` 导出的文件（本地导出 / 分享上传）写的是视图 `phases`
+     * 而不是 `encounter`，而顶层 `version` 已经是当前版本 —— 迁移链一步都不跑，于是 encounter 被读成空，
+     * 导出的工程一导入就只剩队伍配置（排轴 / 拉表 / 词条配置 / buff 列表全空）。
+     * 只看 encounter 的写法还把「老导出文件」一起坑了，回落能同时修好已经导出的存量文件。
+     */
+    const legacyPhases = asRecord(data.phases)
+    const rawPhase = (key: PhaseKey): Record<string, unknown> => asRecord(encounter[key])
+    const viewPhase = (key: PhaseKey): Record<string, unknown> => asRecord(legacyPhases[key])
+    const phaseData = (key: PhaseKey): unknown =>
+        rawPhase(key).data !== undefined ? rawPhase(key).data : (viewPhase(key).data ?? null)
+    const phaseLocked = (key: PhaseKey): boolean => rawPhase(key).locked === true || viewPhase(key).locked === true
+
     const team = normalizeTeam(data.team)
     // 归一化拉表态（清理空全局 buff / [配置] 自动块 / 旧类型名）并落实「链阶条件二选一」拆分
-    const normalizedCalc = migrateCalcState(asRecord(encounter.calculation).data)
+    const normalizedCalc = migrateCalcState(phaseData('calculation'))
     const calcState = normalizeCalcState(normalizedCalc)
 
     const project: ProjectV2 = {
@@ -610,16 +626,11 @@ export const migrateProject = (raw: unknown): Project => {
         ...(data.archived === true ? { archived: true } : {}),
         team,
         encounter: {
-            teamLocked: teamLockedOf(encounter),
-            timeline: {
-                locked: lockedOf(encounter, 'timeline'),
-                data: (asRecord(encounter.timeline).data ?? null) as TimelineData | null
-            },
-            calculation: { locked: lockedOf(encounter, 'calculation'), data: calcState },
-            config: {
-                locked: lockedOf(encounter, 'config'),
-                data: (asRecord(encounter.config).data ?? null) as ConfigState | null
-            }
+            // 视图侧的队伍锁定标记在 `phases.team.locked`（与 migrateV0toV1 同口径），不是 `phases.teamLocked`
+            teamLocked: teamLockedOf(encounter) || teamLockedOf(legacyPhases) || viewPhase('team').locked === true,
+            timeline: { locked: phaseLocked('timeline'), data: phaseData('timeline') as TimelineData | null },
+            calculation: { locked: phaseLocked('calculation'), data: calcState },
+            config: { locked: phaseLocked('config'), data: phaseData('config') as ConfigState | null }
         },
         buffs: calcState.buffSets,
         customSkillHits: isRecord(data.customSkillHits) ? (data.customSkillHits as Record<string, CustomHit[]>) : {},

@@ -33,20 +33,29 @@ function cloneEncounterPhase(target: Project, source: Project, phase: PhaseKey):
 function syncLegacyIntoNew(p: Project): Project {
     const { phases, conditionProfile, buffSets } = p
     if (phases) {
-        p.encounter = {
-            teamLocked: phases.team?.locked ?? p.encounter.teamLocked,
-            timeline: {
-                locked: phases.timeline?.locked ?? false,
-                data: (phases.timeline?.data ?? null) as TimelineData | null
-            },
-            calculation: {
-                locked: phases.calculation?.locked ?? false,
-                data: (phases.calculation?.data ?? null) as CalcState | null
-            },
-            config: {
-                locked: phases.config?.locked ?? false,
-                data: (phases.config?.data ?? null) as ConfigState | null
+        /**
+         * @desc 逐阶段回填真源：**只在该阶段确实出现在 views 里时才覆盖**。
+         *
+         * 旧实现无条件用 `phases` 重建整个 `encounter`，于是「视图里没有这个阶段」会被当成
+         * 「这个阶段是空的」——导出文件按需导出、或迁移器已从 encounter 读到数据而视图尚未派生时，
+         * 真源数据就被清成 null（导入后只剩队伍配置的另一个成因）。
+         */
+        const enc = p.encounter
+        if (phases.team) enc.teamLocked = phases.team.locked ?? enc.teamLocked
+        if (phases.timeline) {
+            enc.timeline = {
+                locked: phases.timeline.locked,
+                data: (phases.timeline.data ?? null) as TimelineData | null
             }
+        }
+        if (phases.calculation) {
+            enc.calculation = {
+                locked: phases.calculation.locked,
+                data: (phases.calculation.data ?? null) as CalcState | null
+            }
+        }
+        if (phases.config) {
+            enc.config = { locked: phases.config.locked, data: (phases.config.data ?? null) as ConfigState | null }
         }
     }
     if (conditionProfile) {
@@ -162,37 +171,41 @@ export async function renameProject(id: string, newName: string) {
     await persist()
 }
 
+/**
+ * @desc 把**当前打开工程**的内存实时状态并回它的 encounter 快照（复制 / 导出共用）。
+ *
+ * 为什么需要：`encounter.<phase>.data` 只在**锁定该环节**时落盘（见 lockPhase → setPhaseLocked 之后
+ * 才 updateTimeline / updateCalculation / updateConfig）。所以刚改完、还没锁定的环节在工程里仍然
+ * 指向旧值（甚至 null）。直接读快照就会得到「除了队伍配置全是空白」——队伍配置一直挂在 project.team 上，
+ * 而排轴 / 拉表 / 词条配置只存在于内存 store。
+ *
+ * 合并口径：快照为底、活状态覆盖。已锁定的环节用活状态（与刚锁定时一致），未锁定的环节同样用活状态
+ * （正是要救的那些）。非活动工程不受影响。
+ */
+function mergeLiveStateIntoEncounter(project: Project): void {
+    if (project.id !== activeId) return
+    const mirrors: { phase: PhaseKey; data: unknown }[] = [
+        { phase: 'timeline', data: getTimelineState() },
+        { phase: 'calculation', data: getCalcState() },
+        { phase: 'config', data: getConfig() }
+    ]
+    for (const { phase, data } of mirrors) {
+        if (data === undefined) continue
+        if (phase === 'timeline') project.encounter.timeline.data = toPlain(data) as TimelineData
+        else if (phase === 'calculation') {
+            const state = toPlain(data) as CalcState
+            project.encounter.calculation.data = state
+            // 与 updateCalculation 同口径：拉表实例也同步到真源（复制 / 导出读的是 project.buffs）
+            if (state.buffSets) project.buffs = state.buffSets
+        } else project.encounter.config.data = toPlain(data) as ConfigState
+    }
+}
+
 export async function cloneProject(id: string, newName: string, selectedPhases: PhaseKey[]) {
     const source = projects.find((p) => p.id === id)
     if (!source) return
 
-    /**
-     * @desc 复制前先把**当前打开工程**的实时状态并回它的 encounter 快照。
-     *
-     * 为什么需要：`encounter.<phase>.data` 只在**锁定该环节**时落盘（见 handleLockPhase：
-     * lockPhase 之后才 updateTimeline / updateCalculation / updateConfig）。所以刚改完、还没锁定的环节
-     * 在工程里仍然指向旧值（甚至 null）。复制若直接读快照，就会出现「除了队伍配置全是空白」——
-     * 队伍配置一直挂在 project.team 上，而排轴 / 拉表 / 词条配置只存在于内存 store。
-     *
-     * 这里按「快照为底、活状态覆盖」合并：已锁定的环节用活状态（与刚锁定时一致），
-     * 未锁定的环节同样用活状态（正是要救的那些）。非活动工程不受影响。
-     */
-    if (id === activeId) {
-        const mirrors: { phase: PhaseKey; data: unknown }[] = [
-            { phase: 'timeline', data: getTimelineState() },
-            { phase: 'calculation', data: getCalcState() },
-            { phase: 'config', data: getConfig() }
-        ]
-        for (const { phase, data } of mirrors) {
-            if (phase === 'timeline') source.encounter.timeline.data = toPlain(data) as TimelineData
-            else if (phase === 'calculation') {
-                const state = toPlain(data) as CalcState
-                source.encounter.calculation.data = state
-                // 与 updateCalculation 同口径：拉表实例也同步到真源（复制读的是 source.buffs）
-                if (state.buffSets) source.buffs = state.buffSets
-            } else source.encounter.config.data = toPlain(data) as ConfigState
-        }
-    }
+    mergeLiveStateIntoEncounter(source)
 
     const newProject = createProjectData(newName)
 
@@ -404,6 +417,8 @@ export function buildExportFile(
     selected: PhaseKey[],
     includeResult = false
 ): Record<string, unknown> {
+    // 导出前先把活动工程的内存态并回真源：未锁定的环节在工程里还是旧值 / null（与复制工程同一个坑）
+    mergeLiveStateIntoEncounter(project)
     const data: Record<string, unknown> = {
         id: project.id,
         name: project.name,
@@ -430,6 +445,13 @@ export function buildExportFile(
         }
     }
     phases.team = { locked: project.encounter.teamLocked, data: null }
+    /**
+     * @desc 导出的四阶段数据载体仍是视图 `phases`（**不要**再额外塞一份真源 `encounter`）。
+     *
+     * 原因：工坊侧的 parse.ts 就是按 `phases` 解析上传文件的，而这个字段本身已经等于四阶段全量数据；
+     * 再写一份 `encounter` 会让文件体积翻倍，直接顶到本端 `safeJsonParse` 的 1MB 导入上限
+     * （工坊侧还有 5MB 原始 / 512KB 压缩上限）。导入端读视图的能力由 `migrateProject` 的逐阶段回落保证。
+     */
     data.phases = phases
     if (includeResult) {
         data.analysis = project.analysis ?? null
