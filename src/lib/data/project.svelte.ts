@@ -1,6 +1,8 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
-import { getConditionProfile } from '$lib/calc/calculation.store.svelte'
+import { getConditionProfile, getCalcState } from '$lib/calc/calculation.store.svelte'
+import { getTimelineState } from '$lib/calc/timeline.store.svelte'
+import { getConfig } from '$lib/calc/config.store.svelte'
 import type { Project, CharSlot, PhaseKey, ResultAnalysisData } from '$lib/types/project'
 import { PROJECT_VERSION } from '$lib/types/project'
 import type { TimelineData } from '$lib/calc/timeline.types'
@@ -58,11 +60,26 @@ function syncLegacyIntoNew(p: Project): Project {
     return p
 }
 
-/** @desc 由新结构真源刷新兼容期视图（buffs→buffSets、team.chain/refinement→conditionProfile） */
+/**
+ * @desc 由新结构真源刷新兼容期视图。
+ *
+ * **三个视图都必须一起刷新**：
+ * - `buffSets ← buffs`
+ * - `conditionProfile ← team[].chain/refinement`
+ * - `phases[].data/locked ← encounter.*` —— 这一条曾经漏掉，症状就是「复制工程后除了队伍配置全是空白」：
+ *   `cloneProject` 把四阶段数据写进了 `encounter`（真源），但页面读的是 `p.phases.<phase>.data`
+ *   （见 reloadActiveProjectStores），视图没同步 → 读到的还是 null。队伍配置读 `project.team`，所以只有它正常。
+ */
 function applyDerivedViews(p: Project): Project {
     if (!p.buffs) p.buffs = []
     p.buffSets = p.buffs
     p.conditionProfile = conditionProfileFromTeam(p.team)
+    p.phases = {
+        team: { locked: p.encounter.teamLocked, data: null },
+        timeline: { locked: p.encounter.timeline.locked, data: p.encounter.timeline.data },
+        calculation: { locked: p.encounter.calculation.locked, data: p.encounter.calculation.data },
+        config: { locked: p.encounter.config.locked, data: p.encounter.config.data }
+    }
     return p
 }
 
@@ -119,6 +136,16 @@ export function getActiveProject() {
     return projects.find((p) => p.id === activeId) ?? null
 }
 
+/**
+ * @desc 仅供测试：直接注入工程列表与活动工程 id。
+ * 生产代码里这两项只由 loadProjects / createProject / setActiveProject 维护；
+ * 测试环境 browser=false，走不到 IndexedDB 载入路径，需要这个入口来搭场景。
+ */
+export function __seedProjectsForTest(list: Project[], active = ''): void {
+    projects = list
+    activeId = active
+}
+
 export async function createProject(name: string) {
     const project = createProjectData(name)
     projects = [...projects, project]
@@ -138,6 +165,34 @@ export async function renameProject(id: string, newName: string) {
 export async function cloneProject(id: string, newName: string, selectedPhases: PhaseKey[]) {
     const source = projects.find((p) => p.id === id)
     if (!source) return
+
+    /**
+     * @desc 复制前先把**当前打开工程**的实时状态并回它的 encounter 快照。
+     *
+     * 为什么需要：`encounter.<phase>.data` 只在**锁定该环节**时落盘（见 handleLockPhase：
+     * lockPhase 之后才 updateTimeline / updateCalculation / updateConfig）。所以刚改完、还没锁定的环节
+     * 在工程里仍然指向旧值（甚至 null）。复制若直接读快照，就会出现「除了队伍配置全是空白」——
+     * 队伍配置一直挂在 project.team 上，而排轴 / 拉表 / 词条配置只存在于内存 store。
+     *
+     * 这里按「快照为底、活状态覆盖」合并：已锁定的环节用活状态（与刚锁定时一致），
+     * 未锁定的环节同样用活状态（正是要救的那些）。非活动工程不受影响。
+     */
+    if (id === activeId) {
+        const mirrors: { phase: PhaseKey; data: unknown }[] = [
+            { phase: 'timeline', data: getTimelineState() },
+            { phase: 'calculation', data: getCalcState() },
+            { phase: 'config', data: getConfig() }
+        ]
+        for (const { phase, data } of mirrors) {
+            if (phase === 'timeline') source.encounter.timeline.data = toPlain(data) as TimelineData
+            else if (phase === 'calculation') {
+                const state = toPlain(data) as CalcState
+                source.encounter.calculation.data = state
+                // 与 updateCalculation 同口径：拉表实例也同步到真源（复制读的是 source.buffs）
+                if (state.buffSets) source.buffs = state.buffSets
+            } else source.encounter.config.data = toPlain(data) as ConfigState
+        }
+    }
 
     const newProject = createProjectData(newName)
 
