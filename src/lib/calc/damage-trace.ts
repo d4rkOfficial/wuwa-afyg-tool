@@ -8,7 +8,7 @@ import { buildEchoDescByEntry } from './skill-infer'
 import { getEchoSkillText } from '$lib/data/char-info.svelte'
 import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
 import type { ZoneRef } from './calculation.types'
-import { WEAPON_SUBSTAT_NAME_MAP } from '$lib/consts/game-terms'
+import { ELEMENT_BONUS_MAP, TYPE_BONUS_MAP, WEAPON_SUBSTAT_NAME_MAP } from '$lib/consts/game-terms'
 
 /** @desc 溯源所需上下文（结果页可直接提供的输入，与 computeAll 同源） */
 export interface DamageTraceCtx {
@@ -146,12 +146,22 @@ function buffZoneParts(buffs: BuffSet[], zoneId: string, label: string, unit: '%
     return overrides.length > 0 ? overrides : [...adds, ...refs]
 }
 
-/** @desc 某伤害类型的类型/元素加成标签命中（Echo 词条 label） */
-function isElementBonusLabel(label: string): boolean {
-    return /伤害加成$/.test(label) && !['普攻', '重击', '共鸣技能', '共鸣解放'].some((t) => label.startsWith(t))
-}
-function isTypeBonusLabel(label: string): boolean {
-    return ['普攻', '重击', '共鸣技能', '共鸣解放'].some((t) => label.startsWith(t)) && label.endsWith('伤害加成')
+/**
+ * @desc 该「元素/类型加成」词条是否真的计入**本条伤害**（与引擎同口径，不能只看 label 是否像加成词条）。
+ *
+ * 引擎口径（compute.ts）：
+ * - 元素加成 `stats.elementBonus[entry.damageElement]` —— 只有词条属性 === 条目属性才计入
+ * - 类型加成 `for (const dt of damageTypes) stats.typeBonus[dt.replace('伤害','')]` —— 只有词条类型在
+ *   该条目的伤害类型集合里才计入
+ *
+ * 旧实现只按 label 正则判断「像不像加成」，于是「共鸣技能伤害加成」也被列进普攻条目的增伤区来源 ——
+ * 引擎根本没算它，属于溯源弹窗「列了不参与结算的来源」的错误来源。
+ * 这里顺带覆盖「引擎完全不认的词条」（两表都没有 → 引擎 applyEntryStatToAccum 落空 → 不计入）。
+ */
+const bonusLabelApplies = (label: string, entry: ResultEntry): boolean => {
+    if (label in ELEMENT_BONUS_MAP) return ELEMENT_BONUS_MAP[label] === entry.element
+    if (label in TYPE_BONUS_MAP) return entry.damageTypes.some((dt) => dt.replace('伤害', '') === TYPE_BONUS_MAP[label])
+    return false
 }
 
 function isBaseStatLabel(kind: BaseKind, label: string): boolean {
@@ -311,19 +321,19 @@ function collectCoeffParts(baseUnit: string, coeff: number, ctx: DamageTraceCtx)
     return []
 }
 
-/** @desc 增伤区：拉表Buff 加成（含引用/覆盖）+ 声骸/武器 元素、类型加成 */
+/** @desc 增伤区：拉表Buff 加成（含引用/覆盖）+ 声骸/武器 元素、类型加成（只列真正计入本条伤害的） */
 function collectBonusParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffSet[]): TracePart[] {
     const parts = buffZoneParts(buffs, 'bonusDmg', '加成', '%')
+    // 元素/类型加成只属于「面板基类（直伤）」的增伤区：系数基类（偏谐系数/效应系数）引擎不给增伤区
+    // （computeTuneEntry / computeEffectEntry 的 dmgBonus 恒为 0），其词条一律不得出现在来源里
+    if (isCoeffBase(entry.baseUnit)) return parts
     const charIdx = ctx.team.findIndex((s) => s.character === entry.character)
     const echoes = charIdx >= 0 ? (ctx.configState.characters[charIdx]?.echoes ?? []) : []
     const weaponName = charIdx >= 0 ? (ctx.team[charIdx]?.weapon ?? null) : null
     const weaponInfo = weaponName ? ctx.weaponInfoMap[weaponName] : null
     const pushElementType = (src: string, sourceType: TracePart['sourceType'], label: string, v: number) => {
-        if (isElementBonusLabel(label)) {
-            parts.push({ sourceType, source: src, label: `${label.replace('伤害加成', '')}加成`, value: v, unit: '%' })
-        } else if (isTypeBonusLabel(label)) {
-            parts.push({ sourceType, source: src, label: `${label.replace('伤害加成', '')}加成`, value: v, unit: '%' })
-        }
+        if (!bonusLabelApplies(label, entry)) return
+        parts.push({ sourceType, source: src, label: `${label.replace('伤害加成', '')}加成`, value: v, unit: '%' })
     }
     if (weaponInfo?.substat) {
         const wv = parseFloat(String(weaponInfo.substat.value)) || 0
@@ -332,9 +342,7 @@ function collectBonusParts(entry: ResultEntry, ctx: DamageTraceCtx, buffs: BuffS
     }
     echoes.forEach((echo, ei) => {
         const src = `声骸${ei + 1}`
-        const push = (label: string, v: number) => {
-            if (isElementBonusLabel(label) || isTypeBonusLabel(label)) pushElementType(src, 'echo', label, v)
-        }
+        const push = (label: string, v: number) => pushElementType(src, 'echo', label, v)
         if (echo.mainStat) push(echo.mainStat.type, echo.mainStat.value)
         if (echo.secondMainStat) push(echo.secondMainStat.type, echo.secondMainStat.value)
         for (const sub of echo.substats) push(sub.type, sub.value)
