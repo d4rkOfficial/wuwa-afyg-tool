@@ -16,7 +16,7 @@
         getPaneEffectSources
     } from '$lib/calc/calculation.store.svelte'
     import { inferDamageTypes } from '$lib/calc/utils'
-    import { conditionMet } from '$lib/calc/compute'
+    import { buffContributesToEntry, resolveDamageTypes } from '$lib/calc/compute'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { addToast } from '$lib/data/toast.svelte'
@@ -98,12 +98,27 @@
     /** @desc buffId → BuffSet 查找索引（替代渲染/差异计算中的线性 find） */
     let buffById = $derived(new Map(buffSets.map((b) => [b.id, b])))
 
-    /** @desc 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff） */
+    /**
+     * @desc 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff）。
+     * 用 `buffContributesToEntry` 而非实例级条件：属性/类型条件挂在**乘区条目**上，
+     * 只看实例级会让「乘区条件不满足」的 buff 仍可勾选（平铺/下拉两个视图共用同一口径）。
+     */
     const buffMatches = (bs: BuffSet | undefined, entry: DamageEntry): boolean => {
         if (!bs) return false
         if (!hideConditionMismatch) return true
         const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
-        return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap, charInfoMap, echoDescByEntry)
+        const isNonDirect = entry.isEffect || entry.isTuneBreak || entry.isTuneResponse
+        return buffContributesToEntry(
+            bs,
+            isNonDirect
+                ? {}
+                : {
+                      element: entry.damageElement,
+                      damageTypes: resolveDamageTypes(entry, entryDamageTypeMap, charInfoMap, echoDescByEntry)
+                  },
+            conditionProfile,
+            charIdx
+        )
     }
 
     /**

@@ -25,7 +25,8 @@ import { inferDamageTypes } from './utils'
 import { buildEchoDescByEntry } from './skill-infer'
 import { getEchoSkillText } from '$lib/data/char-info.svelte'
 
-function resolveDamageTypes(
+/** @desc 解析某个伤害条目最终生效的伤害类型集合（显式配置优先，其次按技能/声骸描述推断） */
+export function resolveDamageTypes(
     entry: DamageEntry,
     damageEntryDamageTypes: Record<string, string[]>,
     charInfoMap?: Record<string, CharacterInfo>,
@@ -466,6 +467,46 @@ const refZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string; ref
             ? [{ zoneId: z.zoneId as string, ref: z.ref }]
             : []
     )
+
+/**
+ * @desc 该 Buff 对某个伤害条目**是否还有任何贡献**（表格「隐藏条件不匹配」筛选用）。
+ *
+ * 为什么不能用实例级条件代替：条件分层之后，**属性/类型条件挂在乘区条目上**（`BuffZoneValue.condition`），
+ * 实例级只剩链/阶硬门槛。表格若只看实例级条件，就会出现「乘区条件不满足、格子却仍可勾选」的 bug。
+ *
+ * 口径与引擎 `activeZonesOf` / `refZonesOf` 完全一致（同一套 zoneConditionMet）：
+ * 只要**存在至少一条**乘区条目「自身条件满足 且 值/引用/覆盖能生效」，就算有贡献。
+ * 因此「一条不匹配 + 一条无条件」仍然算有贡献（引擎确实会把无条件那条计入），不会误判为不可用。
+ *
+ * 注意：`element` 必须一并传入（引擎的 ZoneCtx 也带 element）—— evaluateCondition 对
+ * `damageTypes` 子句要求同时具备条目上下文，只给 damageTypes 会让条件恒判不满足。
+ */
+export const buffContributesToEntry = (
+    buff: BuffInstance,
+    ctx: { element?: string; damageTypes?: string[] },
+    profile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
+    charIndex = -1
+): boolean => {
+    const ctxForCondition: Partial<ConditionContext> = {
+        ...(ctx.element !== undefined ? { element: ctx.element } : {}),
+        ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
+    }
+    if (!buffConditionMet(buff.condition, profile, charIndex, ctxForCondition, buff.conditionRefCharIdx)) {
+        return false
+    }
+    const zoneCtx: ZoneCtx = {
+        chains: profile.chains,
+        refinements: profile.refinements,
+        ...(ctx.element !== undefined ? { element: ctx.element } : {}),
+        ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
+    }
+    return collectZones([buff]).some((z) => {
+        if (!zoneConditionMet(z, zoneCtx)) return false
+        if (ZONE_NO_REF_IDS.has(z.zoneId) && z.ref) return z.value !== 0
+        if (z.ref) return true
+        return z.value !== 0 || !!z.override
+    })
+}
 
 /**
  * @desc 生效 Buff 里带覆盖标记的乘区（覆盖优先于一切：在最后直接替换该乘区合计值；乘区条件不满足者剔除）。

@@ -11,7 +11,7 @@
     import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
     import type { CharSlot } from '$lib/types/project'
     import type { ConditionProfile } from '$lib/calc/compute'
-    import { conditionMet } from '$lib/calc/compute'
+    import { buffContributesToEntry, resolveDamageTypes } from '$lib/calc/compute'
     import { inferDamageTypes } from '$lib/calc/utils'
     import {
         DAMAGE_TYPE_SHORT,
@@ -173,17 +173,34 @@
         }
     })
 
-    /** @desc 非直伤条目对 buff 的可用性判定：scope 匹配 +（隐藏条件不匹配时）条件满足 */
+    /**
+     * @desc 非直伤条目对 buff 的可用性判定：scope 匹配 +（隐藏条件不匹配时）**该 buff 对本条目仍有贡献**。
+     *
+     * 注意不能用实例级条件代替：属性/类型条件挂在**乘区条目**上（条件分层之后实例级只剩链/阶硬门槛），
+     * 只看实例级会出现「乘区条件不满足、格子却仍可勾选」的 bug。
+     * 非直伤条目没有条目级伤害类型上下文，故按引擎口径丢掉乘区条件的 damageTypes 维度。
+     */
     const buffEnabledForEntry = (bs: BuffSet, entry: DamageEntry, charIdx: number): boolean => {
         const scopeOk = entry.isEffect
             ? bs.scope === 'all' || (Array.isArray(bs.scope) && bs.scope.length === 0)
             : charIdx >= 0 && (bs.scope === 'all' || (bs.scope as number[]).includes(charIdx))
         if (!scopeOk) return false
         if (!hideConditionMismatch) return true
-        return conditionMet(bs, conditionProfile, charIdx, entry, entryDamageTypeMap, charInfoMap, echoDescByEntry)
+        const isNonDirect = entry.isEffect || entry.isTuneBreak || entry.isTuneResponse
+        return buffContributesToEntry(
+            bs,
+            isNonDirect
+                ? {}
+                : {
+                      element: entry.damageElement,
+                      damageTypes: resolveDamageTypes(entry, entryDamageTypeMap, charInfoMap, echoDescByEntry)
+                  },
+            conditionProfile,
+            charIdx
+        )
     }
 
-    /** @desc 可用性结果缓存：(entryId, buffId) → enabled；条件配置/隐藏开关/类型映射/角色索引引用未变时复用，避免每次重建全量重跑 conditionMet */
+    /** @desc 可用性结果缓存：(entryId, buffId) → enabled；条件配置/隐藏开关/类型映射/角色索引引用未变时复用，避免每次重建全量重跑贡献判定 */
     let _enabledCache = new Map<string, boolean>()
     let _enabledCacheCtx: {
         hide: boolean
