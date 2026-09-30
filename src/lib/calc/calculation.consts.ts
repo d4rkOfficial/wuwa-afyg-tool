@@ -90,15 +90,18 @@ export const resolveZoneId = (id: string): string => LEGACY_ZONE_IDS[id] ?? id
 /**
  * @desc 不支持 ref 引用/转模的乘区（引擎/UI/AI 共用判定）。
  *
- * **层数类乘区（集谐干涉/同奏增益/自定义层数）现已支持引用**，因此本集合当前为空 ——
- * 保留这道闸门是为了「以后确实需要某个纯固定值乘区」时有统一落点，新增乘区默认即可引用。
+ * 目前**只有集谐干涉层数**在名单里：它只允许直接填固定层数。同奏增益层数与
+ * 自定义层数(1)(2)(3) 都可以引用；新增乘区默认即可引用，只有确实需要「只允许固定值」时才加进来。
  */
-export const ZONE_NO_REF_IDS = new Set<string>()
+export const ZONE_NO_REF_IDS = new Set<string>(['tuneStrainLayer'])
 
 /** @desc 不支持「覆盖」语义的乘区：百分比类与额外倍率恒为追加（界面不显示覆盖按钮，store/工坊/导入共用判定） */
 export const ZONE_NO_OVERRIDE_IDS = new Set<string>(['atkPct', 'hpPct', 'defPct', 'extraRatio'])
 
-/** @desc 可被「引用」的属性清单（ZoneRef 的目标）：角色白值/当前面板/充能/谐度/双暴等 */
+/**
+ * @desc 可被「引用」的来源清单（ZoneRef 的目标）：角色白值/当前面板/充能/谐度/双暴，
+ * 以及**按角色独立**的层数（同奏增益层数、自定义层数(1)(2)(3)）。
+ */
 export const ZONE_REF_DEFS = [
     { id: 'baseAtk', label: '攻击白值', unit: 'flat' },
     { id: 'totalAtk', label: '当前攻击', unit: 'flat' },
@@ -110,7 +113,17 @@ export const ZONE_REF_DEFS = [
     { id: 'tuneBreakBoost', label: '谐度破坏增幅', unit: 'flat' },
     { id: 'offTuneBuildupRate', label: '偏谐值累积效率', unit: '%' },
     { id: 'critRate', label: '暴击率', unit: '%' },
-    { id: 'critDmg', label: '暴击伤害', unit: '%' }
+    { id: 'critDmg', label: '暴击伤害', unit: '%' },
+
+    /**
+     * @desc 层数类来源：读**被引用角色**自己累计的层数（每个角色独立）。
+     * 同奏增益层数与自定义层数属于角色，因此可被其它乘区按角色引用；
+     * 集谐干涉层数不属于角色，故不作为引用来源。
+     */
+    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' },
+    { id: 'customLayer1', label: '自定义层数(1)', unit: 'flat' },
+    { id: 'customLayer2', label: '自定义层数(2)', unit: 'flat' },
+    { id: 'customLayer3', label: '自定义层数(3)', unit: 'flat' }
 ] as const satisfies readonly ZoneDef[]
 
 /** @desc 引用属性的查询 Map（同上，供 ZoneRef 目标查表） */

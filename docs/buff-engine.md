@@ -146,7 +146,10 @@ interface BuffCondition {
 3. 在 `CharacterComputed`（`zone-ops.ts`）加字段，并**补齐两处初值**：`emptyAccum()` 与
    `emptyCharacterStats()`（都在 `compute.ts`，漏一处 `svelte-check` 会报缺字段）
 4. 在 `ZONE_OPS` 注册 `add` / `override` 行为（不注册会被 `applyZone` 静默忽略）
-5. 若是面板类属性，同步补进 `recomputeTotals` 与 `PANEL_TO_ZONES`
+5. 若要让它成为**引用来源**（`ZONE_REF_DEFS`）：在 `compute.ts` 的 `REF_STAT_MAP` 登记
+   「来源 id → `CharacterComputed` 字段」（漏了这一步引用恒读 0，且不会报错），并补进
+   `pane-effects.ts` 的 `PANEL_TO_ZONES`（让「会改这个值的 Buff」能被识别成影响源）；
+   面板类属性还要补进 `recomputeTotals`
 6. 若公式要用它，在 `compute.ts` 对应乘区函数里读取
 7. **同步 share 端**：`wuwa-afyg-share/src/lib/consts/buff-zones.ts` 的 `BUFF_ZONES` 与
    `BUFF_ZONE_SECTIONS`（两端的 zoneId 白名单必须一致，否则工坊存下的数据工具箱认不全）
@@ -154,5 +157,5 @@ interface BuffCondition {
 9. 运行 `pnpm run format && pnpm run lint:eslint && pnpm run check`
 
 > **引用（转模）默认开放**：新乘区不必做任何事即可被引用。只有确实需要「只允许固定值」的乘区
-> 才加进 `ZONE_NO_REF_IDS`（当前为空集）。层数类乘区（集谐干涉层数 / 同奏增益层数 / 自定义层数）
-> 都已支持引用。
+> 才加进 `ZONE_NO_REF_IDS` —— 目前只有 `tuneStrainLayer`（集谐干涉层数）在名单里；
+> 同奏增益层数与自定义层数(1)(2)(3) 都可引用。

@@ -1,16 +1,25 @@
-// 层数类乘区「可被引用」+ 自定义层数回归。
+// 层数类乘区：可引用 / 可作为引用来源 / 自定义层数是纯计数器。
 //
-// 两件事：
-// 1. 集谐干涉层数 / 同奏增益层数 / 自定义层数(1)(2)(3) 都可以配引用（转模），导入时不再被剥掉 ref；
-// 2. 自定义层数是**纯计数器**：会累加进面板，但不进入任何伤害乘区（与共鸣效率同性质）。
+// 三件事：
+// 1. 只有集谐干涉层数禁止配引用；同奏增益层数与自定义层数(1)(2)(3) 都可以配引用（转模）；
+// 2. 同奏增益层数与自定义层数**按角色独立**，且可以作为**引用来源**被其它乘区按角色读取；
+// 3. 自定义层数是**纯计数器**：会累加进面板，但不进入任何伤害乘区（与共鸣效率同性质）。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { ZONE_DEFS, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_SECTION_OF } from './calculation.consts'
+import {
+    ZONE_DEFS,
+    ZONE_MAP,
+    ZONE_NO_REF_IDS,
+    ZONE_REF_DEFS,
+    ZONE_REF_MAP,
+    ZONE_SECTION_OF
+} from './calculation.consts'
 import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from './compute'
+import { paneEffectSourcesOf } from './pane-effects'
 import { detectImportConflicts } from './buff-import-utils'
 import { getAllBuffSets, importBuffSetsWithDecisions } from './calculation.store.svelte'
-import type { DamageEntry } from './calculation.types'
+import type { BuffInstance, DamageEntry } from './calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import type { ConfigState, EchoSlotConfig } from './config.types'
@@ -84,11 +93,12 @@ describe('层数类乘区：新增/可引用', () => {
         assert.equal(ZONE_MAP.get('customLayer2')?.label, '自定义层数(2)')
     })
 
-    it('集谐干涉层数 / 同奏增益层数 / 自定义层数都不在「不可引用」名单里', () => {
-        for (const id of ['tuneStrainLayer', 'unisonBoonLayer', 'customLayer1', 'customLayer2', 'customLayer3']) {
+    it('只有集谐干涉层数被禁止引用；同奏增益层数与三个自定义层数都可以引用', () => {
+        for (const id of ['unisonBoonLayer', 'customLayer1', 'customLayer2', 'customLayer3']) {
             assert.equal(ZONE_NO_REF_IDS.has(id), false, `${id} 应可配引用/转模`)
         }
-        assert.equal(ZONE_NO_REF_IDS.size, 0, '当前没有任何乘区被禁止引用')
+        assert.equal(ZONE_NO_REF_IDS.has('tuneStrainLayer'), true, '集谐干涉层数只允许填固定层数')
+        assert.deepEqual([...ZONE_NO_REF_IDS], ['tuneStrainLayer'], '禁引用名单里只应有集谐干涉层数')
     })
 
     it('ZONE_DEFS 里没有重复 id', () => {
@@ -97,28 +107,44 @@ describe('层数类乘区：新增/可引用', () => {
     })
 })
 
-describe('层数类乘区的引用必须能落库（导入时不被剥掉）', () => {
-    it('tuneStrainLayer / unisonBoonLayer / customLayer1 的 ref 都会被保留', () => {
-        const layers = ['tuneStrainLayer', 'unisonBoonLayer', 'customLayer1']
-        const items = layers.map((zoneId, i) => ({
-            name: `层数引用-${i}`,
-            scope: 'self' as const,
-            ownerIdx: 0,
-            zones: [{ zoneId, value: 0, ref: { targetZoneId: 'totalAtk', pct: 50 } }]
-        }))
+describe('层数类乘区的引用落库口径', () => {
+    /** @desc 造一条带引用的层数条目并走完整导入链路，返回落库后的乘区条目 */
+    const importRefOn = (zoneId: string, name: string) => {
+        const items = [
+            {
+                name,
+                scope: 'self' as const,
+                ownerIdx: 0,
+                zones: [{ zoneId, value: 0, ref: { targetZoneId: 'totalAtk', pct: 50 } }]
+            }
+        ]
         const { deduped } = detectImportConflicts(items, [])
         importBuffSetsWithDecisions(deduped, {}, -1, 3)
+        const stored = getAllBuffSets().find((s) => s.name === name)
+        assert.ok(stored, `${zoneId} 的 buff 应已写入`)
+        return stored.zones.find((z) => z.zoneId === zoneId)
+    }
 
-        for (const [i, zoneId] of layers.entries()) {
-            const stored = getAllBuffSets().find((s) => s.name === `层数引用-${i}`)
-            assert.ok(stored, `${zoneId} 的 buff 应已写入`)
-            const zone = stored.zones.find((z) => z.zoneId === zoneId)
-            assert.ok(zone, `${zoneId} 乘区条目应在`)
-            assert.ok(zone.ref, `${zoneId} 的引用不该被剥掉`)
-            // 落库后是引擎内部的 ZoneRef：来源属性字段名是 zoneId（导入侧的 targetZoneId）
+    it('同奏增益层数的引用会被保留', () => {
+        const zone = importRefOn('unisonBoonLayer', '层数引用-同奏')
+        assert.ok(zone?.ref, '同奏层数应可引用')
+        // 落库后是引擎内部的 ZoneRef：来源属性字段名是 zoneId（导入侧的 targetZoneId）
+        assert.equal(zone.ref?.zoneId, 'totalAtk')
+        assert.equal(zone.ref?.pct, 50)
+    })
+
+    it('三个自定义层数的引用都会被保留', () => {
+        for (const [i, zoneId] of ['customLayer1', 'customLayer2', 'customLayer3'].entries()) {
+            const zone = importRefOn(zoneId, `层数引用-自定义${i}`)
+            assert.ok(zone?.ref, `${zoneId} 应可引用`)
             assert.equal(zone.ref?.zoneId, 'totalAtk')
-            assert.equal(zone.ref?.pct, 50)
         }
+    })
+
+    it('集谐干涉层数的引用会被剥掉（只允许填固定层数）', () => {
+        const zone = importRefOn('tuneStrainLayer', '层数引用-集谐')
+        assert.ok(zone, '乘区条目本身要保留')
+        assert.equal(zone.ref, undefined, '集谐干涉层数不允许引用/转模')
     })
 })
 
@@ -137,5 +163,104 @@ describe('自定义层数：纯计数器，不参与伤害结算', () => {
     it('对照：同奏增益层数（每层 +3%）确实会改变伤害', () => {
         assert.ok(damageWith(buffWith('unisonBoonLayer', 5)) > damageWith([]), '同奏层数应参与结算')
         assert.ok(damageWith(buffWith('specialFinal1', 20)) > damageWith([]), '特殊终伤应参与结算')
+    })
+})
+
+// ── 层数作为「引用来源」：按角色读该角色累计的层数 ──
+
+const CHAR_B = '测试角色乙'
+const CHAR_C = '测试角色丙'
+const TEAM3 = [
+    { character: CHAR, weapon: null },
+    { character: CHAR_B, weapon: null },
+    { character: CHAR_C, weapon: null }
+] as unknown as CharSlot[]
+const charInfoMap3: Record<string, CharacterInfo> = { [CHAR]: charInfo, [CHAR_B]: charInfo, [CHAR_C]: charInfo }
+
+/** @desc 以某角色为条目主人算伤害，传入的 buff 全部绑定到该条目（模拟「勾上这一段」） */
+const damageOf = (character: string, buffs: BuffInstance[]): number => {
+    const e: DamageEntry = { ...entry, id: `e-${character}`, character }
+    return computeOneEntry(
+        e,
+        TEAM3.findIndex((s) => s.character === character),
+        [emptyEcho(), emptyEcho(), emptyEcho(), emptyEcho(), emptyEcho()],
+        buffs,
+        buffs.length > 0 ? { [e.id]: buffs.map((b) => b.id) } : {},
+        {},
+        configState,
+        TEAM3,
+        charInfoMap3,
+        weaponInfoMap,
+        DEFAULT_CONDITION_PROFILE
+    ).totalDamage
+}
+
+/** @desc 产层数的 buff：把 value 层 <zoneId> 加给 scope 指定的角色 */
+const layerBuff = (id: string, zoneId: string, value: number, slots: number[]): BuffInstance =>
+    ({ id, name: `层数源-${id}`, scope: slots, zones: [{ zoneId, value }] }) as unknown as BuffInstance
+
+/** @desc 消费层数的 buff：读「characterIdx 号位」的 <sourceZoneId>，按 pct% 折算写进 specialFinal1 */
+const refBuff = (id: string, sourceZoneId: string, characterIdx: number, pct: number, slots: number[]): BuffInstance =>
+    ({
+        id,
+        name: `引用-${id}`,
+        scope: slots,
+        zones: [{ zoneId: 'specialFinal1', value: 0, ref: { characterIdx, zoneId: sourceZoneId, threshold: 0, pct } }]
+    }) as unknown as BuffInstance
+
+/** @desc 对照组：直接把同一个折算结果填成固定值 */
+const fixedBuff = (id: string, value: number, slots: number[]): BuffInstance =>
+    ({ id, name: `定值-${id}`, scope: slots, zones: [{ zoneId: 'specialFinal1', value }] }) as unknown as BuffInstance
+
+describe('层数作为引用来源：按角色读取、互不串味', () => {
+    it('引用来源清单里有同奏/三个自定义层数，没有集谐干涉层数', () => {
+        for (const id of ['unisonBoonLayer', 'customLayer1', 'customLayer2', 'customLayer3']) {
+            assert.ok(ZONE_REF_MAP.has(id), `${id} 应可作为引用来源`)
+        }
+        assert.equal(ZONE_REF_MAP.has('tuneStrainLayer'), false, '集谐干涉层数不属于角色，不作为引用来源')
+        assert.equal(ZONE_REF_DEFS.length, new Set(ZONE_REF_DEFS.map((d) => d.id)).size, '引用来源 id 不能重复')
+    })
+
+    it('同角色：引用自己的同奏层数（4 层 × 50% = 2%）等价于直接填 2%', () => {
+        const source = layerBuff('s1', 'unisonBoonLayer', 4, [0])
+        const viaRef = damageOf(CHAR, [source, refBuff('r1', 'unisonBoonLayer', 0, 50, [0])])
+        const viaFixed = damageOf(CHAR, [source, fixedBuff('f1', 2, [0])])
+        assert.equal(viaRef, viaFixed, '4 层 ×50% 应折算成 2，与直接填 2 完全一致')
+    })
+
+    it('跨角色：读「1 号位（乙）」的同奏层数，与乙自己的层数一致', () => {
+        const source = layerBuff('s2', 'unisonBoonLayer', 4, [1])
+        const viaRef = damageOf(CHAR, [source, refBuff('r2', 'unisonBoonLayer', 1, 50, [0])])
+        assert.equal(viaRef, damageOf(CHAR, [fixedBuff('f2', 2, [0])]), '应读到乙的 4 层并折算 2%')
+    })
+
+    it('按角色独立：层数加给丙（2 号位）时，引用乙（1 号位）读到 0，不生效', () => {
+        const source = layerBuff('s3', 'unisonBoonLayer', 4, [2])
+        const viaRef = damageOf(CHAR, [source, refBuff('r3', 'unisonBoonLayer', 1, 50, [0])])
+        assert.equal(viaRef, damageOf(CHAR, []), '读错角色 → 层数 0 → 不产生任何加成')
+    })
+
+    it('自定义层数可以驱动真实乘区（它自己是计数器，但能被引用）', () => {
+        const source = layerBuff('s4', 'customLayer1', 10, [1])
+        const viaRef = damageOf(CHAR, [source, refBuff('r4', 'customLayer1', 1, 50, [0])])
+        assert.equal(viaRef, damageOf(CHAR, [fixedBuff('f4', 5, [0])]), '10 层 ×50% = 5%，与直接填 5 一致')
+    })
+
+    it('三个自定义层数各自独立，互不影响', () => {
+        const s1 = layerBuff('s5', 'customLayer1', 10, [0])
+        const s2 = layerBuff('s6', 'customLayer2', 4, [0])
+        const viaRef = damageOf(CHAR, [s1, s2, refBuff('r5', 'customLayer2', 0, 50, [0])])
+        assert.equal(viaRef, damageOf(CHAR, [fixedBuff('f5', 2, [0])]), '只应读到 customLayer2 的 4 层')
+    })
+
+    it('层数引用会被识别成「影响源」（PANEL_TO_ZONES 映射到层数乘区自身）', () => {
+        const consumer = refBuff('r6', 'customLayer1', 1, 50, [0])
+        const producer = layerBuff('s7', 'customLayer1', 3, [1])
+        const src = paneEffectSourcesOf(0, false, [consumer.id], [consumer, producer])
+        assert.deepEqual(
+            src[producer.id],
+            { charIdx: 1, zoneIds: ['customLayer1'] },
+            '改乙的层数的 buff 应是本段影响源'
+        )
     })
 })

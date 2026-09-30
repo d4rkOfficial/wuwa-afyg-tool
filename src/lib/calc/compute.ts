@@ -76,7 +76,12 @@ const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
     tuneBreakBoost: 'totalTuneBreakBoost',
     offTuneBuildupRate: 'offTuneBuildupRate',
     critRate: 'critRate',
-    critDmg: 'critDmg'
+    critDmg: 'critDmg',
+    // 层数类来源：读该角色面板上累计的层数（每个角色独立，互不串味）
+    unisonBoonLayer: 'unisonBoonLayer',
+    customLayer1: 'customLayer1',
+    customLayer2: 'customLayer2',
+    customLayer3: 'customLayer3'
 }
 
 /** @desc 解析引用转模读数：从「本条目可见面板」里取被引用角色的属性（无面板时视为 0） */
