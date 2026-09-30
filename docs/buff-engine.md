@@ -142,8 +142,17 @@ interface BuffCondition {
 ## 4. 新增乘区的步骤
 
 1. 在 `ZONE_DEFS`（`calculation.consts.ts`）加入 `{ id, label, unit }`
-2. 在 `CharacterComputed`（`zone-ops.ts`）加字段与初值
-3. 在 `ZONE_OPS` 注册 `add` / `override` 行为
-4. 若是面板类属性，同步补进 `recomputeTotals` 与 `PANEL_TO_ZONES`
-5. 若公式要用它，在 `compute.ts` 对应乘区函数里读取
-6. 运行 `pnpm run format && pnpm run lint:eslint && pnpm run check`
+2. 在 `ZONE_SECTIONS`（同文件）把它归入某个分区；不归入会兜底落到「其它」
+3. 在 `CharacterComputed`（`zone-ops.ts`）加字段，并**补齐两处初值**：`emptyAccum()` 与
+   `emptyCharacterStats()`（都在 `compute.ts`，漏一处 `svelte-check` 会报缺字段）
+4. 在 `ZONE_OPS` 注册 `add` / `override` 行为（不注册会被 `applyZone` 静默忽略）
+5. 若是面板类属性，同步补进 `recomputeTotals` 与 `PANEL_TO_ZONES`
+6. 若公式要用它，在 `compute.ts` 对应乘区函数里读取
+7. **同步 share 端**：`wuwa-afyg-share/src/lib/consts/buff-zones.ts` 的 `BUFF_ZONES` 与
+   `BUFF_ZONE_SECTIONS`（两端的 zoneId 白名单必须一致，否则工坊存下的数据工具箱认不全）
+8. 若同步给 AI 使用，补 `docs/tools.md` 与 `src/lib/ai/tools/calculation.ts` 的 zoneId 清单
+9. 运行 `pnpm run format && pnpm run lint:eslint && pnpm run check`
+
+> **引用（转模）默认开放**：新乘区不必做任何事即可被引用。只有确实需要「只允许固定值」的乘区
+> 才加进 `ZONE_NO_REF_IDS`（当前为空集）。层数类乘区（集谐干涉层数 / 同奏增益层数 / 自定义层数）
+> 都已支持引用。

@@ -34,7 +34,11 @@ export const ZONE_DEFS = [
     { id: 'dmgRedPen', label: '免伤无视(穿免)', unit: '%' },
 
     { id: 'tuneStrainLayer', label: '集谐干涉层数', unit: 'flat' },
-    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' }
+    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' },
+
+    { id: 'customLayer1', label: '自定义层数(1)', unit: 'flat' },
+    { id: 'customLayer2', label: '自定义层数(2)', unit: 'flat' },
+    { id: 'customLayer3', label: '自定义层数(3)', unit: 'flat' }
 ] as const satisfies readonly ZoneDef[]
 
 /** @desc ZoneId 联合类型与查询 Map（由 ZONE_DEFS 派生，供界面与计算引擎快速查乘区定义） */
@@ -53,7 +57,8 @@ export const ZONE_SECTIONS = [
     { title: '倍率追加或锚定', ids: ['extraRatio'] },
     { title: '使目标', ids: ['defDown', 'resDown'] },
     { title: '对目标', ids: ['resPen', 'defPen', 'dmgRedPen'] },
-    { title: '层数相关独立终伤', ids: ['tuneStrainLayer', 'unisonBoonLayer'] }
+    { title: '层数相关独立终伤', ids: ['tuneStrainLayer', 'unisonBoonLayer'] },
+    { title: '自定义层数', ids: ['customLayer1', 'customLayer2', 'customLayer3'] }
 ] as const satisfies readonly { title: string; ids: readonly ZoneId[] }[]
 
 /** @desc 分区后的乘区清单（每个分区一组定义，顺序与 ZONE_SECTIONS 一致；未列入分区的乘区兜底进「其它」） */
@@ -82,8 +87,13 @@ export const LEGACY_ZONE_IDS: Record<string, string> = {
 /** @desc 把历史乘区 id 归一化为当前 id（已是当前 id 或无法识别的 id 原样返回） */
 export const resolveZoneId = (id: string): string => LEGACY_ZONE_IDS[id] ?? id
 
-/** @desc 层数类乘区（集谐干涉/同奏增益等）：只支持直接填固定层数，不支持 ref 引用/转模（引擎/UI/AI 共用判定） */
-export const ZONE_NO_REF_IDS = new Set<string>(['tuneStrainLayer', 'unisonBoonLayer'])
+/**
+ * @desc 不支持 ref 引用/转模的乘区（引擎/UI/AI 共用判定）。
+ *
+ * **层数类乘区（集谐干涉/同奏增益/自定义层数）现已支持引用**，因此本集合当前为空 ——
+ * 保留这道闸门是为了「以后确实需要某个纯固定值乘区」时有统一落点，新增乘区默认即可引用。
+ */
+export const ZONE_NO_REF_IDS = new Set<string>()
 
 /** @desc 不支持「覆盖」语义的乘区：百分比类与额外倍率恒为追加（界面不显示覆盖按钮，store/工坊/导入共用判定） */
 export const ZONE_NO_OVERRIDE_IDS = new Set<string>(['atkPct', 'hpPct', 'defPct', 'extraRatio'])
