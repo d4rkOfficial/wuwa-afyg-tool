@@ -77,15 +77,16 @@ describe('排轴时间线渲染', () => {
             .filter((l) => l.includes('轨') || l.includes('参考线'))
             .map((l) => l.trim())
         assert.deepEqual(order, [
-            '0.00s 轨1 甲 · 普攻 (op-a)',
-            '1.00s 轨2 乙 · 共鸣技能 (op-b)',
-            '1.50s ── 参考线「1m30s」 (rl-1)',
-            '2.00s 轨3 丙 · 共鸣解放 (op-c)'
+            '0.00s [块1] 轨1 甲 · 普攻',
+            '1.00s [块2] 轨2 乙 · 共鸣技能',
+            '1.50s [线1] ── 参考线「1m30s」',
+            '2.00s [块3] 轨3 丙 · 共鸣解放'
         ])
+        assert.ok(!out.includes('op-a') && !out.includes('rl-1'), '摘要只给序号，不出现内部 id')
         // 伤害缩进挂在各自块下，且顺序正确
-        const a = lines.findIndex((l) => l.includes('op-a'))
+        const a = lines.findIndex((l) => l.includes('[块1]'))
         assert.match(lines[a + 1], /└ 伤害: 普攻\(常态攻击\)/)
-        const b = lines.findIndex((l) => l.includes('op-b'))
+        const b = lines.findIndex((l) => l.includes('[块2]'))
         assert.match(lines[b + 1], /└ 伤害: 共鸣技能\(共鸣技能\)/)
     })
 
@@ -224,7 +225,7 @@ const entry = (id: string, character: string, displayName: string, extra: Partia
 })
 
 describe('拉表渲染', () => {
-    it('按时间顺序逐条列出归属/名称/属性/类型/已绑 Buff 名 + 条目 id', () => {
+    it('按时间顺序逐条列出序号/归属/名称/属性/类型/已绑 Buff 名', () => {
         const out = renderCalculationDigest({
             // 乱序传入，渲染按时间排
             entries: [entry('e2', '乙', '共鸣技能(共鸣技能)'), entry('e1', '甲', '普攻(常态攻击)')],
@@ -236,11 +237,10 @@ describe('拉表渲染', () => {
         })
         const lines = out.split('\n')
         assert.ok(lines[0].includes('拉表（2 条伤害条目'))
-        assert.ok(lines[1].includes('01. 甲 · 普攻(常态攻击) · 冷凝 · 普攻伤害 · Buff: 无 (e1)'))
-        assert.ok(
-            lines[2].includes('02. 乙 · 共鸣技能(共鸣技能) · 冷凝 · 共鸣技能伤害 · Buff(2): 攻击加成、暴击提升 (e2)')
-        )
+        assert.ok(lines[1].includes('[01] 甲 · 普攻(常态攻击) · 冷凝 · 普攻伤害 · Buff: 无'))
+        assert.ok(lines[2].includes('[02] 乙 · 共鸣技能(共鸣技能) · 冷凝 · 共鸣技能伤害 · Buff(2): 攻击加成、暴击提升'))
         assert.ok(lines[1].trimStart().startsWith('0.00s'), '时间前缀在行首')
+        assert.ok(!out.includes('(e1)') && !out.includes('(e2)'), '摘要只给序号，不出现条目 id')
     })
 
     it('非直伤条目带类型标记，未设伤害类型给出提示', () => {
@@ -271,24 +271,16 @@ describe('拉表渲染', () => {
 })
 
 describe('Buff 集清单渲染', () => {
-    it('一行一条，作用域与条件可读', () => {
+    it('一行一条，行首是序号，作用域与条件可读', () => {
         const out = renderBuffSetList([
-            { id: 'b1', name: '攻击加成', scope: 'all', global: true, starred: true, zoneCount: 2 },
-            { id: 'b2', name: '效应专属', scope: [], global: false, starred: false, zoneCount: 1 },
-            {
-                id: 'b3',
-                name: '双人共享',
-                scope: [0, 1],
-                global: false,
-                starred: false,
-                zoneCount: 3,
-                condition: 'chains=1'
-            }
+            { name: '攻击加成', scope: 'all', global: true, starred: true, zoneCount: 2 },
+            { name: '效应专属', scope: [], global: false, starred: false, zoneCount: 1 },
+            { name: '双人共享', scope: [0, 1], global: false, starred: false, zoneCount: 3, condition: 'chains=1' }
         ])
         const lines = out.split('\n')
-        assert.ok(lines[1].includes('- 攻击加成[全局★] · 全队 · 2 乘区 (b1)'))
-        assert.ok(lines[2].includes('效应专属 · 效应专属 · 1 乘区 (b2)'))
-        assert.ok(lines[3].includes('双人共享 · 角色1/2 · 3 乘区 · 条件: chains=1 (b3)'))
+        assert.ok(lines[1].includes('[01] 攻击加成[全局★] · 全队 · 2 乘区'))
+        assert.ok(lines[2].includes('[02] 效应专属 · 效应专属 · 1 乘区'))
+        assert.ok(lines[3].includes('[03] 双人共享 · 角色1/2 · 3 乘区 · 条件: chains=1'))
     })
 
     it('空清单给出明确提示', () => {

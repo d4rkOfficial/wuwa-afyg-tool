@@ -1,7 +1,6 @@
 // 拉表/计算域工具（Phase 2）：伤害条目、Buff 集、绑定、伤害类型、链/阶配置、导入本地 Buff
 import { defineTool } from './registry'
 import {
-    getAllDamageEntries,
     getAllBuffSets,
     createBuffSet,
     renameBuffSet,
@@ -40,6 +39,7 @@ import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
 import { getOpBlocks, getRefLines } from '$lib/calc/timeline.store.svelte'
 import { PPS, SIDE_PAD } from '$lib/calc/timeline.consts'
 import { renderBuffSetList, renderCalculationDigest } from '$lib/ai/phase-digest'
+import { buffSetsInOrder, damageEntriesInOrder, resolveBuffSet, resolveDamageEntry } from '$lib/ai/refs'
 import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import type { ZoneRef } from '$lib/calc/calculation.types'
@@ -86,16 +86,16 @@ function conditionSummary(c: Record<string, unknown> | undefined): string | unde
 
 defineTool('get_damage_entries', {
     description:
-        '获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「归属角色 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名 / 条目 id」。不含倍率与乘区数值——倍率用 get_timeline_damage_list，乘区与引用明细用 get_buff_set_detail / get_damage_entry_buff_sources 按需查。AI 需要看拉表全貌时调用（比原始 JSON 紧凑得多）。',
+        '获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「**序号** / 归属角色 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。行首方括号里的数字就是序号，增删改（bind_buff_to_entry / set_entry_damage_types / toggle_damage_type / get_damage_entry_buff_sources）填它。不含倍率与乘区数值——倍率用 get_timeline_damage_list，乘区与引用明细用 get_buff_set_detail / get_damage_entry_buff_sources 按需查。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const nameById = new Map(getAllBuffSets().map((b) => [b.id, b.name]))
         const buffNamesOf = (entryId: string): string[] =>
             getBuffSetIdsForEntry(entryId).map((id) => nameById.get(id) ?? id)
-        const entries = getAllDamageEntries()
         return {
             calculation: renderCalculationDigest({
-                entries,
+                // 序号真源：与 resolveDamageEntry 用同一套排序
+                entries: damageEntriesInOrder(),
                 buffNamesOf,
                 damageTypesOf: (entryId) => getDamageTypesForEntry(entryId),
                 posOf: (e) => timelinePosOf(e.sourceTimelineBlockId),
@@ -108,13 +108,13 @@ defineTool('get_damage_entries', {
 
 defineTool('get_buff_sets', {
     description:
-        '获取当前工程的 Buff 集清单（一行一条）：名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数、id。**不含各乘区的数值/引用**——那部分用 get_buff_set_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。',
+        '获取当前工程的 Buff 集清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_set_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const globalIds = new Set(getGlobalBuffSetIds())
         return {
             buffSets: renderBuffSetList(
-                getAllBuffSets().map((bs) => ({
+                buffSetsInOrder().map((bs) => ({
                     id: bs.id,
                     name: bs.name,
                     scope: bs.scope,
@@ -129,7 +129,8 @@ defineTool('get_buff_sets', {
 })
 
 defineTool('create_buff_set', {
-    description: '在当前工程创建一个新的空 Buff 集。',
+    description:
+        '在当前工程创建一个新的空 Buff 集。返回新 Buff 集的**序号**（清单里的第几条，见 get_buff_sets），后续操作用这个序号。',
     parameters: {
         type: 'object',
         properties: { name: { type: 'string', description: 'Buff 集名称' } },
@@ -138,139 +139,151 @@ defineTool('create_buff_set', {
     handler: (args, ctx) => {
         const name = str(args.name)
         if (!name) throw new Error('名称不能为空')
-        createBuffSet(name)
+        const id = createBuffSet(name)
         ctx.notifyCalc?.()
-        return { created: name }
+        return { created: name, buffSet: buffSetsInOrder().findIndex((b) => b.id === id) + 1 }
     }
 })
 
 defineTool('rename_buff_set', {
-    description: '重命名指定 Buff 集。',
+    description: '重命名指定 Buff 集（按**序号**）。',
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' }, name: { type: 'string' } },
-        required: ['id', 'name']
+        properties: {
+            buffSet: { type: 'number', description: 'Buff 集序号（见 get_buff_sets 的「[NN]」）' },
+            name: { type: 'string', description: '新名称' }
+        },
+        required: ['buffSet', 'name']
     },
     handler: (args, ctx) => {
-        const id = str(args.id)
+        const set = resolveBuffSet(args.buffSet)
         const name = str(args.name)
-        if (!id || !name) throw new Error('id 与名称不能为空')
-        renameBuffSet(id, name)
+        if (!name) throw new Error('新名称不能为空')
+        renameBuffSet(set.id, name)
         ctx.notifyCalc?.()
-        return { renamed: true }
+        return { renamed: true, from: set.name, to: name }
     }
 })
 
 defineTool('duplicate_buff_set', {
-    description: '复制指定 Buff 集为一个新集，可指定新名称（默认“原名 复制”）。',
+    description: '复制指定 Buff 集为一个新集（按**序号**），可指定新名称（默认“原名 复制”）。返回新集的序号。',
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' }, customName: { type: 'string' } },
-        required: ['id']
+        properties: {
+            buffSet: { type: 'number', description: '要复制的 Buff 集序号' },
+            customName: { type: 'string', description: '新集名称（可空）' }
+        },
+        required: ['buffSet']
     },
     handler: (args, ctx) => {
-        const id = str(args.id)
-        if (!id) throw new Error('缺少 Buff 集 id')
-        const newId = duplicateBuffSet(id, str(args.customName) || undefined)
+        const set = resolveBuffSet(args.buffSet)
+        const newId = duplicateBuffSet(set.id, str(args.customName) || undefined)
         ctx.notifyCalc?.()
-        return { duplicated: newId ?? null }
+        const index = newId ? buffSetsInOrder().findIndex((b) => b.id === newId) + 1 : 0
+        return { duplicated: set.name, buffSet: index }
     }
 })
 
 defineTool('delete_buff_set', {
-    description: '删除指定 Buff 集（同时清理其对所有条目的绑定）。',
+    description: '删除指定 Buff 集（按**序号**，同时清理它对所有条目的绑定）。',
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id']
+        properties: { buffSet: { type: 'number', description: 'Buff 集序号' } },
+        required: ['buffSet']
     },
     handler: (args, ctx) => {
-        const id = str(args.id)
-        if (!id) throw new Error('缺少 Buff 集 id')
-        deleteBuffSet(id)
+        const set = resolveBuffSet(args.buffSet)
+        deleteBuffSet(set.id)
         ctx.notifyCalc?.()
-        return { deleted: id }
+        return { deleted: true, name: set.name }
     }
 })
 
 defineTool('bind_buff_to_entry', {
-    description: '把指定 Buff 集绑定到指定伤害条目（该条目计算时生效）。',
+    description:
+        '把指定 Buff 集绑定到指定伤害条目（该条目计算时生效）。两个参数都填**序号**：条目序号见 get_damage_entries，Buff 集序号见 get_buff_sets。',
     parameters: {
         type: 'object',
         properties: {
-            entryId: { type: 'string', description: '伤害条目 id（get_damage_entries 获取）' },
-            buffSetId: { type: 'string', description: 'Buff 集 id（get_buff_sets 获取）' }
+            entry: { type: 'number', description: '伤害条目序号（见 get_damage_entries 的「[NN]」）' },
+            buffSet: { type: 'number', description: 'Buff 集序号（见 get_buff_sets 的「[NN]」）' }
         },
-        required: ['entryId', 'buffSetId']
+        required: ['entry', 'buffSet']
     },
     handler: (args, ctx) => {
-        const entryId = str(args.entryId)
-        const buffSetId = str(args.buffSetId)
-        if (!entryId || !buffSetId) throw new Error('entryId 与 buffSetId 不能为空')
-        const ids = getBuffSetIdsForEntry(entryId)
-        if (ids.includes(buffSetId)) return { alreadyBound: true }
-        setBuffSetIdsForEntry(entryId, [...ids, buffSetId])
+        const entry = resolveDamageEntry(args.entry)
+        const set = resolveBuffSet(args.buffSet)
+        const ids = getBuffSetIdsForEntry(entry.id)
+        if (ids.includes(set.id)) return { alreadyBound: true, entry: args.entry, buffSet: args.buffSet }
+        setBuffSetIdsForEntry(entry.id, [...ids, set.id])
         ctx.notifyCalc?.()
-        return { bound: true }
+        return { bound: true, entry: args.entry, buffSet: args.buffSet, buffName: set.name }
     }
 })
 
 defineTool('unbind_buff_from_entry', {
-    description: '把指定 Buff 集从指定伤害条目解除绑定。',
+    description: '把指定 Buff 集从指定伤害条目解除绑定（两个参数都填**序号**）。',
     parameters: {
         type: 'object',
-        properties: { entryId: { type: 'string' }, buffSetId: { type: 'string' } },
-        required: ['entryId', 'buffSetId']
+        properties: {
+            entry: { type: 'number', description: '伤害条目序号' },
+            buffSet: { type: 'number', description: 'Buff 集序号' }
+        },
+        required: ['entry', 'buffSet']
     },
     handler: (args, ctx) => {
-        const entryId = str(args.entryId)
-        const buffSetId = str(args.buffSetId)
-        if (!entryId || !buffSetId) throw new Error('entryId 与 buffSetId 不能为空')
+        const entry = resolveDamageEntry(args.entry)
+        const set = resolveBuffSet(args.buffSet)
+        const ids = getBuffSetIdsForEntry(entry.id)
+        if (!ids.includes(set.id)) return { alreadyUnbound: true, entry: args.entry, buffSet: args.buffSet }
         setBuffSetIdsForEntry(
-            entryId,
-            getBuffSetIdsForEntry(entryId).filter((sid) => sid !== buffSetId)
+            entry.id,
+            ids.filter((sid) => sid !== set.id)
         )
         ctx.notifyCalc?.()
-        return { unbound: true }
+        return { unbound: true, entry: args.entry, buffSet: args.buffSet, buffName: set.name }
     }
 })
 
 defineTool('set_entry_damage_types', {
     description:
-        '设置指定伤害条目的伤害类型列表（覆盖）。取值：普攻伤害/重击伤害/共鸣技能伤害/共鸣解放伤害/声骸技能伤害/变奏技能伤害/延奏技能伤害/协同攻击伤害/效应伤害/其它类型伤害。',
+        '设置指定伤害条目的伤害类型列表（覆盖，按**序号**）。取值：普攻伤害/重击伤害/共鸣技能伤害/共鸣解放伤害/声骸技能伤害/变奏技能伤害/延奏技能伤害/协同攻击伤害/效应伤害/其它类型伤害。',
     parameters: {
         type: 'object',
         properties: {
-            entryId: { type: 'string' },
-            damageTypes: { type: 'array', items: { type: 'string' } }
+            entry: { type: 'number', description: '伤害条目序号（见 get_damage_entries 的「[NN]」）' },
+            damageTypes: { type: 'array', items: { type: 'string' }, description: '伤害类型列表（可空 = 清空）' }
         },
-        required: ['entryId', 'damageTypes']
+        required: ['entry', 'damageTypes']
     },
     handler: (args, ctx) => {
-        const entryId = str(args.entryId)
+        const entry = resolveDamageEntry(args.entry)
         const types = (Array.isArray(args.damageTypes) ? args.damageTypes : []).map((t) => str(t)).filter(Boolean)
-        if (!entryId) throw new Error('缺少 entryId')
-        setDamageTypesForEntry(entryId, types)
+        setDamageTypesForEntry(entry.id, types)
         ctx.notifyCalc?.()
-        return { damageTypes: types }
+        return { entry: args.entry, damageTypes: types }
     }
 })
 
 defineTool('toggle_damage_type', {
-    description: '切换指定伤害条目的单个伤害类型（加上或移除）。',
+    description:
+        '切换指定伤害条目的单个伤害类型（加上或移除，按**序号**）。已勾选的会被移除 —— 要「确保勾上」请先用 get_damage_entries 看当前类型。',
     parameters: {
         type: 'object',
-        properties: { entryId: { type: 'string' }, damageType: { type: 'string' } },
-        required: ['entryId', 'damageType']
+        properties: {
+            entry: { type: 'number', description: '伤害条目序号（见 get_damage_entries 的「[NN]」）' },
+            damageType: { type: 'string', description: '伤害类型（如 共鸣技能伤害）' }
+        },
+        required: ['entry', 'damageType']
     },
     handler: (args, ctx) => {
-        const entryId = str(args.entryId)
+        const entry = resolveDamageEntry(args.entry)
         const dt = str(args.damageType)
-        if (!entryId || !dt) throw new Error('entryId 与 damageType 不能为空')
-        toggleDamageTypeForEntry(entryId, dt)
+        if (!dt) throw new Error('缺少 damageType')
+        toggleDamageTypeForEntry(entry.id, dt)
         ctx.notifyCalc?.()
-        return { damageTypes: getDamageTypesForEntry(entryId) }
+        return { entry: args.entry, damageTypes: getDamageTypesForEntry(entry.id) }
     }
 })
 
@@ -366,13 +379,11 @@ defineTool('get_buff_set_detail', {
         '获取指定 Buff 集的完整详情：作用范围、是否全局、生效条件（链/阶硬门槛 + 属性/类型条件）、每个乘区条目（zoneId/数值/是否覆盖/引用/**各自的乘区级条件**）及其生效角色槽位。同一乘区可有多条，每条各自判定条件后相加；覆盖唯一（同一乘区仅一个覆盖条目）。',
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string', description: 'Buff 集 id（get_buff_sets 获取）' } },
-        required: ['id']
+        properties: { buffSet: { type: 'number', description: 'Buff 集序号（见 get_buff_sets 的「[NN]」）' } },
+        required: ['buffSet']
     },
     handler: (args) => {
-        const id = str(args.id)
-        const set = getAllBuffSets().find((s) => s.id === id)
-        if (!set) throw new Error(`未找到 Buff 集：${id}`)
+        const set = resolveBuffSet(args.buffSet)
         // 同一乘区可能有多条贡献条目：按出现顺序全部列出，并标出每条自身的条件
         const zoneEntries = set.zones.map((z, index) => ({
             index,
@@ -389,7 +400,7 @@ defineTool('get_buff_set_detail', {
             id: set.id,
             name: set.name,
             scope: set.scope,
-            global: getGlobalBuffSetIds().includes(id),
+            global: getGlobalBuffSetIds().includes(set.id),
             starred: !!set.starred,
             condition: set.condition ?? null,
             conditionRefCharIdx: set.conditionRefCharIdx ?? null,
@@ -408,27 +419,26 @@ defineTool('set_buff_zone', {
     parameters: {
         type: 'object',
         properties: {
-            setId: { type: 'string', description: 'Buff 集 id' },
+            buffSet: { type: 'number', description: 'Buff 集序号（见 get_buff_sets 的「[NN]」）' },
             zoneId: { type: 'string', description: '乘区 id（接受旧 id，会自动重映射）' },
             value: { type: 'number', description: '数值' },
             override: { type: 'boolean', description: '可选，是否覆盖其它 Buff 的同乘区' }
         },
-        required: ['setId', 'zoneId', 'value']
+        required: ['buffSet', 'zoneId', 'value']
     },
     handler: (args, ctx) => {
-        const setId = str(args.setId)
+        const setId = resolveBuffSet(args.buffSet).id
         const rawZoneId = str(args.zoneId)
         const value = Number(args.value)
-        if (!setId || !rawZoneId) throw new Error('setId 与 zoneId 不能为空')
+        if (!rawZoneId) throw new Error('zoneId 不能为空')
         const { zoneId, remappedFrom } = normalizeZoneId(rawZoneId)
         if (!Number.isFinite(value)) throw new Error('value 须为数字')
-        const set = getAllBuffSets().find((s) => s.id === setId)
-        if (!set) throw new Error(`未找到 Buff 集：${setId}`)
+        const set = resolveBuffSet(args.buffSet)
         if (!set.zones.some((z) => z.zoneId === (zoneId as never))) addZoneToBuffSet(setId, zoneId)
         setBuffSetZoneValue(setId, zoneId, value)
         if (args.override !== undefined) setBuffSetZoneOverride(setId, zoneId, !!args.override)
         ctx.notifyCalc?.()
-        return { setId, zoneId, value, override: args.override, ...remapNote(remappedFrom, zoneId) }
+        return { buffSet: args.buffSet, zoneId, value, override: args.override, ...remapNote(remappedFrom, zoneId) }
     }
 })
 
@@ -438,7 +448,7 @@ defineTool('set_buff_zone_ref', {
     parameters: {
         type: 'object',
         properties: {
-            setId: { type: 'string' },
+            buffSet: { type: 'number', description: 'Buff 集序号' },
             zoneId: { type: 'string', description: '乘区 id（接受旧 id，会自动重映射）' },
             ref: {
                 type: 'object',
@@ -456,15 +466,14 @@ defineTool('set_buff_zone_ref', {
                 }
             }
         },
-        required: ['setId', 'zoneId']
+        required: ['buffSet', 'zoneId']
     },
     handler: (args, ctx) => {
-        const setId = str(args.setId)
+        const setId = resolveBuffSet(args.buffSet).id
         const rawZoneId = str(args.zoneId)
-        if (!setId || !rawZoneId) throw new Error('setId 与 zoneId 不能为空')
+        if (!rawZoneId) throw new Error('zoneId 不能为空')
         const { zoneId, remappedFrom } = normalizeZoneId(rawZoneId)
-        const set = getAllBuffSets().find((s) => s.id === setId)
-        if (!set) throw new Error(`未找到 Buff 集：${setId}`)
+        const set = resolveBuffSet(args.buffSet)
 
         const raw = args.ref
         if (!raw || typeof raw !== 'object') {
@@ -501,7 +510,7 @@ defineTool('set_buff_zone_ref', {
         if (!set.zones.some((z) => z.zoneId === (zoneId as never))) addZoneToBuffSet(setId, zoneId)
         setBuffSetZoneRef(setId, zoneId, ref)
         ctx.notifyCalc?.()
-        return { setId, zoneId, ref, ...remapNote(remappedFrom, zoneId) }
+        return { buffSet: args.buffSet, zoneId, ref, ...remapNote(remappedFrom, zoneId) }
     }
 })
 
@@ -512,18 +521,17 @@ defineTool('remove_buff_zone', {
     parameters: {
         type: 'object',
         properties: {
-            setId: { type: 'string' },
+            buffSet: { type: 'number', description: 'Buff 集序号' },
             zoneId: { type: 'string', description: '乘区 id（接受旧 id，会自动重映射）' }
         },
-        required: ['setId', 'zoneId']
+        required: ['buffSet', 'zoneId']
     },
     handler: (args, ctx) => {
-        const setId = str(args.setId)
+        const setId = resolveBuffSet(args.buffSet).id
         const rawZoneId = str(args.zoneId)
-        if (!setId || !rawZoneId) throw new Error('setId 与 zoneId 不能为空')
+        if (!rawZoneId) throw new Error('zoneId 不能为空')
         const { zoneId, remappedFrom } = normalizeZoneId(rawZoneId)
-        const set = getAllBuffSets().find((s) => s.id === setId)
-        if (!set) throw new Error(`未找到 Buff 集：${setId}`)
+        const set = resolveBuffSet(args.buffSet)
         if (!set.zones.some((z) => z.zoneId === (zoneId as never))) throw new Error(`Buff 集无乘区：${zoneId}`)
         removeZoneFromBuffSet(setId, zoneId)
         ctx.notifyCalc?.()
@@ -537,21 +545,20 @@ defineTool('get_buff_zone_condition', {
     parameters: {
         type: 'object',
         properties: {
-            setId: { type: 'string', description: 'Buff 集 id' },
+            buffSet: { type: 'number', description: 'Buff 集序号（见 get_buff_sets 的「[NN]」）' },
             zoneId: { type: 'string', description: '乘区 id（接受旧 id，会自动重映射）' }
         },
-        required: ['setId', 'zoneId']
+        required: ['buffSet', 'zoneId']
     },
     handler: (args) => {
-        const setId = str(args.setId)
+        const setId = resolveBuffSet(args.buffSet).id
         const rawZoneId = str(args.zoneId)
-        if (!setId || !rawZoneId) throw new Error('setId 与 zoneId 不能为空')
+        if (!rawZoneId) throw new Error('zoneId 不能为空')
         const { zoneId, remappedFrom } = normalizeZoneId(rawZoneId)
-        const set = getAllBuffSets().find((s) => s.id === setId)
-        if (!set) throw new Error(`未找到 Buff 集：${setId}`)
+        const set = resolveBuffSet(args.buffSet)
         if (!set.zones.some((z) => z.zoneId === (zoneId as never))) throw new Error(`Buff 集无乘区：${zoneId}`)
         return {
-            setId,
+            buffSet: args.buffSet,
             zoneId,
             label: ZONE_MAP.get(zoneId)?.label ?? zoneId,
             condition: getBuffSetZoneCondition(setId, zoneId) ?? null,
@@ -567,7 +574,7 @@ defineTool('set_buff_zone_condition', {
     parameters: {
         type: 'object',
         properties: {
-            setId: { type: 'string', description: 'Buff 集 id' },
+            buffSet: { type: 'number', description: 'Buff 集序号（见 get_buff_sets 的「[NN]」）' },
             zoneId: { type: 'string', description: '乘区 id（接受旧 id，会自动重映射）' },
             condition: {
                 type: 'object',
@@ -586,22 +593,21 @@ defineTool('set_buff_zone_condition', {
                 }
             }
         },
-        required: ['setId', 'zoneId']
+        required: ['buffSet', 'zoneId']
     },
     handler: (args, ctx) => {
-        const setId = str(args.setId)
+        const setId = resolveBuffSet(args.buffSet).id
         const rawZoneId = str(args.zoneId)
-        if (!setId || !rawZoneId) throw new Error('setId 与 zoneId 不能为空')
+        if (!rawZoneId) throw new Error('zoneId 不能为空')
         const { zoneId, remappedFrom } = normalizeZoneId(rawZoneId)
-        const set = getAllBuffSets().find((s) => s.id === setId)
-        if (!set) throw new Error(`未找到 Buff 集：${setId}`)
+        const set = resolveBuffSet(args.buffSet)
         if (!set.zones.some((z) => z.zoneId === (zoneId as never))) throw new Error(`Buff 集无乘区：${zoneId}`)
 
         const raw = args.condition
         if (!raw || typeof raw !== 'object') {
             setBuffSetZoneCondition(setId, zoneId, null)
             ctx.notifyCalc?.()
-            return { setId, zoneId, cleared: true }
+            return { buffSet: args.buffSet, zoneId, cleared: true }
         }
         const o = raw as Record<string, unknown>
         const stripped: string[] = []
@@ -629,7 +635,7 @@ defineTool('set_buff_zone_condition', {
         setBuffSetZoneCondition(setId, zoneId, condition as never)
         ctx.notifyCalc?.()
         return {
-            setId,
+            buffSet: args.buffSet,
             zoneId,
             label: ZONE_MAP.get(zoneId)?.label ?? zoneId,
             condition,
@@ -642,28 +648,28 @@ defineTool('set_buff_zone_condition', {
 
 defineTool('get_damage_entry_buff_sources', {
     description:
-        '查询某伤害条目的**跨角色影响源**：本段引用了其它角色的面板（乘区 ref 里 characterIdx 指向他角色）时，作用域指向那个角色、且会改写被引用面板乘区的 Buff —— 这些 Buff 必须用 bind_buff_to_entry 勾到本段才会参与该角色在这一段的面板计算（拉表里它们以「影响源」列/勾选项出现，不是自动生效的）。返回 buffId → { 被引用角色槽位, 被改写的面板乘区 }。',
+        '查询某伤害条目的**跨角色影响源**（按**序号**）：本段引用了其它角色的面板（乘区 ref 里 characterIdx 指向他角色）时，作用域指向那个角色、且会改写被引用面板乘区的 Buff —— 这些 Buff 必须用 bind_buff_to_entry 勾到本段才会参与该角色在这一段的面板计算（拉表里它们以「影响源」列/勾选项出现，不是自动生效的）。返回每条影响源的**Buff 集序号**与名称、被引用角色槽位、被改写的面板乘区。',
     parameters: {
         type: 'object',
-        properties: { entryId: { type: 'string', description: '伤害条目 id（get_damage_entries 获取）' } },
-        required: ['entryId']
+        properties: { entry: { type: 'number', description: '伤害条目序号（见 get_damage_entries 的「[NN]」）' } },
+        required: ['entry']
     },
     handler: (args) => {
-        const entryId = str(args.entryId)
-        if (!entryId) throw new Error('entryId 不能为空')
-        const entry = getAllDamageEntries().find((e) => e.id === entryId)
-        if (!entry) throw new Error(`未找到伤害条目：${entryId}`)
+        const entry = resolveDamageEntry(args.entry)
+        const entryId = entry.id
         const sources = getPaneEffectSources(entryId)
         const boundIds = new Set(getBuffSetIdsForEntry(entryId))
+        const buffSets = buffSetsInOrder()
         return {
-            entryId,
+            entry: args.entry,
             displayName: entry.displayName,
             character: entry.character ?? null,
             boundCount: boundIds.size,
             sources: Object.entries(sources).map(([buffId, src]) => {
-                const buff = getAllBuffSets().find((s) => s.id === buffId)
+                const buffIndex = buffSets.findIndex((s) => s.id === buffId)
+                const buff = buffIndex >= 0 ? buffSets[buffIndex] : undefined
                 return {
-                    buffId,
+                    buffSet: buffIndex >= 0 ? buffIndex + 1 : null,
                     name: buff?.name ?? null,
                     scope: buff?.scope ?? null,
                     /** @desc 被本段引用、且被该 Buff 改写的角色槽位（1 起） */
@@ -684,15 +690,13 @@ defineTool('set_buff_scope', {
     parameters: {
         type: 'object',
         properties: {
-            setId: { type: 'string' },
+            buffSet: { type: 'number', description: 'Buff 集序号' },
             scope: { type: ['string', 'array'], description: 'all 或槽位数组 [1-3]' }
         },
-        required: ['setId', 'scope']
+        required: ['buffSet', 'scope']
     },
     handler: (args, ctx) => {
-        const setId = str(args.setId)
-        const set = getAllBuffSets().find((s) => s.id === setId)
-        if (!set) throw new Error(`未找到 Buff 集：${setId}`)
+        const setId = resolveBuffSet(args.buffSet).id
         if (args.scope === 'all' || str(args.scope) === 'all') {
             setBuffSetScope(setId, 'all')
         } else if (Array.isArray(args.scope)) {
@@ -708,7 +712,7 @@ defineTool('set_buff_scope', {
             throw new Error('scope 须为 all 或槽位数组')
         }
         ctx.notifyCalc?.()
-        return { setId, scope: args.scope }
+        return { buffSet: args.buffSet, scope: args.scope }
     }
 })
 
@@ -718,7 +722,7 @@ defineTool('set_buff_condition', {
     parameters: {
         type: 'object',
         properties: {
-            setId: { type: 'string' },
+            buffSet: { type: 'number', description: 'Buff 集序号' },
             condition: {
                 type: 'object',
                 description: '条件定义或 null 清除',
@@ -730,12 +734,10 @@ defineTool('set_buff_condition', {
                 }
             }
         },
-        required: ['setId']
+        required: ['buffSet']
     },
     handler: (args, ctx) => {
-        const setId = str(args.setId)
-        const set = getAllBuffSets().find((s) => s.id === setId)
-        if (!set) throw new Error(`未找到 Buff 集：${setId}`)
+        const setId = resolveBuffSet(args.buffSet).id
         const raw = args.condition
         if (!raw || typeof raw !== 'object') {
             setBuffSetCondition(setId, null)
@@ -770,7 +772,7 @@ defineTool('set_buff_condition', {
         }
         setBuffSetCondition(setId, condition as never)
         ctx.notifyCalc?.()
-        return { setId, condition }
+        return { buffSet: args.buffSet, condition }
     }
 })
 

@@ -80,7 +80,10 @@ const damageChildrenOf = (block: DamageBlock): string[] => {
 
 /**
  * @desc 渲染排轴：**按 pos 顺序**的一条时间线。
- * 每行给出秒数、轨道与角色、操作内容与 id；紧跟其绑定的伤害（只列命中名，不列倍率）。
+ * 每行给出秒数、**序号**、轨道与角色、操作内容；紧跟其绑定的伤害（只列命中名，不列倍率）。
+ *
+ * 序号与 `$lib/ai/refs` 的定位器完全同源：操作块按 (pos, 轨道) 编号、参考线按 pos 编号，
+ * 因此「块3」「线2」可以直接喂给增删改工具（摘要里不出现内部 id）。
  */
 export const renderTimelineDigest = (input: TimelineDigestInput): string => {
     const { sidePad, pps } = input
@@ -91,16 +94,19 @@ export const renderTimelineDigest = (input: TimelineDigestInput): string => {
         else damageBySource.set(db.sourceId, [db])
     }
     const timingOf = new Map((input.timings ?? []).map((t) => [t.refLineId, t.seconds]))
+    // 序号按时间先后分配（不依赖调用方传入顺序，保证与定位器一致）
+    const orderedOps = [...input.opBlocks].sort((a, b) => a.pos - b.pos || a.trackIndex - b.trackIndex)
+    const orderedRefs = [...input.refLines].sort((a, b) => a.pos - b.pos)
+    const opNo = new Map(orderedOps.map((op, i) => [op.id, i + 1]))
 
     const rows: TimelineRow[] = []
-    for (const op of input.opBlocks) {
+    for (const op of orderedOps) {
         const track = input.trackLabels[op.trackIndex] ?? `轨${op.trackIndex + 1}`
         const flags = [op.intro ? '变奏入场' : '', op.switchback ? '切回' : ''].filter(Boolean)
         const text =
-            `轨${op.trackIndex + 1} ${track} · ${op.key}` +
+            `[块${opNo.get(op.id)}] 轨${op.trackIndex + 1} ${track} · ${op.key}` +
             (op.desc ? `「${op.desc}」` : '') +
-            (flags.length ? `[${flags.join('·')}]` : '') +
-            ` (${op.id})`
+            (flags.length ? `[${flags.join('·')}]` : '')
         rows.push({
             pos: op.pos,
             rank: 1,
@@ -108,7 +114,7 @@ export const renderTimelineDigest = (input: TimelineDigestInput): string => {
             children: (damageBySource.get(op.id) ?? []).flatMap(damageChildrenOf)
         })
     }
-    for (const rl of input.refLines) {
+    orderedRefs.forEach((rl, i) => {
         const seconds = timingOf.get(rl.id)
         const isTiming = timingOf.has(rl.id)
         const timing = isTiming
@@ -117,16 +123,17 @@ export const renderTimelineDigest = (input: TimelineDigestInput): string => {
         rows.push({
             pos: rl.pos,
             rank: 0,
-            text: `── 参考线「${rl.time || '未命名'}」${timing} (${rl.id})`,
+            text: `[线${i + 1}] ── 参考线「${rl.time || '未命名'}」${timing}`,
             children: (damageBySource.get(rl.id) ?? []).flatMap(damageChildrenOf)
         })
-    }
+    })
     rows.sort((a, b) => a.pos - b.pos || a.rank - b.rank)
 
     const damageCount = input.damageBlocks.filter((d) => d.skillHits.length > 0 || d.nonDirectEntries.length > 0).length
     const header =
         `时间线（${input.opBlocks.length} 操作块 / ${damageCount} 伤害块 / ${input.refLines.length} 参考线；` +
-        `${input.locked ? '已锁定' : '未锁定'}）；按时间顺序，倍率用 get_timeline_damage_list 按需查`
+        `${input.locked ? '已锁定' : '未锁定'}）；按时间顺序，方括号里是**序号**（增删改就用它），` +
+        `倍率用 get_timeline_damage_list 按需查`
     if (rows.length === 0) return `${header}\n（时间线为空）`
     return [header, ...rows.flatMap((r) => [`${timePrefix(r.pos, sidePad, pps)} ${r.text}`, ...r.children])].join('\n')
 }
@@ -180,16 +187,16 @@ const entryKind = (e: DamageEntry): string => {
 }
 
 /**
- * @desc 渲染拉表：按条目在时间轴上的顺序逐条给出「归属 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。
+ * @desc 渲染拉表：按条目在时间轴上的顺序逐条给出「**序号** / 归属 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。
  * 不列倍率、不列乘区数值 —— 前者用 `get_timeline_damage_list`，后者用 `get_buff_set_detail`
- * 与 `get_damage_entry_buff_sources` 按需查。
+ * 与 `get_damage_entry_buff_sources` 按需查；序号与 `$lib/ai/refs` 的 `resolveDamageEntry` 同源。
  */
 export const renderCalculationDigest = (input: CalculationDigestInput): string => {
     const rows = input.entries.map((entry, order) => ({ entry, order, pos: input.posOf(entry) }))
     // 按时间轴顺序；无位置的条目排在最后（保持原始相对顺序）
     rows.sort((a, b) => (a.pos ?? Number.POSITIVE_INFINITY) - (b.pos ?? Number.POSITIVE_INFINITY) || a.order - b.order)
     const header =
-        `拉表（${rows.length} 条伤害条目，按时间轴顺序）；条目 id 在行尾括号里，` +
+        `拉表（${rows.length} 条伤害条目，按时间轴顺序，行首就是**序号**，工具参数填这个数字）；` +
         `乘区明细与引用用 get_buff_set_detail / get_damage_entry_buff_sources 按需查`
     if (rows.length === 0) return `${header}\n（还没有任何伤害条目：先到排轴绑定伤害）`
     const lines = rows.map(({ entry, pos }, i) => {
@@ -203,9 +210,7 @@ export const renderCalculationDigest = (input: CalculationDigestInput): string =
             kind ? `[${kind}]` : '',
             buffs.length > 0 ? `Buff(${buffs.length}): ${buffs.join('、')}` : 'Buff: 无'
         ].filter(Boolean)
-        return `${timePrefix(pos, input.sidePad, input.pps)} ${String(i + 1).padStart(2, '0')}. ${parts.join(' · ')} (${
-            entry.id
-        })`
+        return `${timePrefix(pos, input.sidePad, input.pps)} [${String(i + 1).padStart(2, '0')}] ${parts.join(' · ')}`
     })
     return [header, ...lines].join('\n')
 }
@@ -213,7 +218,6 @@ export const renderCalculationDigest = (input: CalculationDigestInput): string =
 // ── Buff 集清单 ──
 
 export interface BuffSetDigestItem {
-    id: string
     name: string
     scope: 'all' | number[]
     global: boolean
@@ -228,16 +232,17 @@ const scopeLabel = (scope: 'all' | number[]): string => {
     return `角色${scope.map((i) => i + 1).join('/')}`
 }
 
-/** @desc 渲染 Buff 集清单：一行一条（不展开乘区，乘区明细用 get_buff_set_detail） */
+/** @desc 渲染 Buff 集清单：一行一条，行首是**序号**（不展开乘区，乘区明细用 get_buff_set_detail） */
 export const renderBuffSetList = (items: readonly BuffSetDigestItem[]): string => {
-    const header = `Buff 集清单（${items.length} 条）；乘区明细用 get_buff_set_detail，绑定关系见 get_damage_entries`
+    const header =
+        `Buff 集清单（${items.length} 条，行首就是**序号**，工具参数填这个数字）；` +
+        `乘区明细用 get_buff_set_detail，绑定关系见 get_damage_entries`
     if (items.length === 0) return `${header}\n（还没有任何 Buff 集）`
-    const lines = items.map((b) => {
+    const lines = items.map((b, i) => {
         const tags = [b.global ? '全局' : '', b.starred ? '★' : ''].filter(Boolean)
         return (
-            `- ${b.name}${tags.length ? `[${tags.join('')}]` : ''} · ${scopeLabel(b.scope)} · ${b.zoneCount} 乘区` +
-            (b.condition ? ` · 条件: ${b.condition}` : '') +
-            ` (${b.id})`
+            `[${String(i + 1).padStart(2, '0')}] ${b.name}${tags.length ? `[${tags.join('')}]` : ''} · ${scopeLabel(b.scope)} · ${b.zoneCount} 乘区` +
+            (b.condition ? ` · 条件: ${b.condition}` : '')
         )
     })
     return [header, ...lines].join('\n')

@@ -30,6 +30,7 @@ import { updateTimeline, updateResultAnalysis, getActiveProject } from '$lib/dat
 import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/calc/timeline.consts'
 import { resolveRefLineSeconds, type RefLineLike } from '$lib/calc/ref-line-timing'
 import { renderDamageRatioList, renderTimelineDigest } from '$lib/ai/phase-digest'
+import { opBlocksInOrder, refLinesInOrder, resolveOpBlock, resolveRefLine } from '$lib/ai/refs'
 import type { SkillHit, NonDirectEntry } from '$lib/calc/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
@@ -75,7 +76,7 @@ function appendPos(): number {
     return maxRight > 0 ? maxRight + BLOCK_W / 2 : 40 + BLOCK_W / 2
 }
 
-// 解析位置参数：{time: 秒} 绝对时间，或 {anchor: 块id, side?: before/after, offset?: 秒} 相对块
+// 解析位置参数：{time: 秒} 绝对时间，或 {anchor: 块序号, side?: before/after, offset?: 秒} 相对块
 function resolvePosition(position: Record<string, unknown>): number {
     if (position.time !== undefined) {
         const t = Number(position.time)
@@ -83,10 +84,10 @@ function resolvePosition(position: Record<string, unknown>): number {
         if (!Number.isFinite(t) || t < 0 || t > maxT) throw new Error(`time 须为 0-${maxT} 秒`)
         return SIDE_PAD + t * PPS
     }
-    const anchorId = str(position.anchor)
-    if (!anchorId) throw new Error('需要 time（秒）或 anchor（目标块 id）')
-    const anchor = getOpBlocks().find((b) => b.id === anchorId)
-    if (!anchor) throw new Error(`未找到目标块：${anchorId}`)
+    const anchorRef = position.anchor
+    if (anchorRef === undefined || anchorRef === null || String(anchorRef).trim() === '')
+        throw new Error('需要 time（秒）或 anchor（目标操作块序号）')
+    const anchor = resolveOpBlock(anchorRef)
     const side = str(position.side) === 'before' ? 'before' : 'after'
     const offset = Number(position.offset ?? 0)
     if (!Number.isFinite(offset) || offset < 0) throw new Error('offset 须为非负数字（秒）')
@@ -125,7 +126,7 @@ defineTool('get_timeline_damage_list', {
 
 defineTool('add_op_block', {
     description:
-        '在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“重击”“变奏入场”）。',
+        '在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“重击”“变奏入场”）。返回新块的**序号**（时间轴上的第几个操作块）。',
     parameters: {
         type: 'object',
         properties: {
@@ -153,7 +154,8 @@ defineTool('add_op_block', {
         const id = addOpBlock(track - 1, appendPos(), key, desc)
         if (!id) throw new Error('排轴已锁定或添加失败')
         await updateTimeline(getTimelineState())
-        return { id, track, key, desc }
+        const index = opBlocksInOrder().findIndex((b) => b.id === id) + 1
+        return { block: index, track, key, desc }
     }
 })
 
@@ -191,7 +193,10 @@ defineTool('bind_damage_to_block', {
     parameters: {
         type: 'object',
         properties: {
-            blockId: { type: 'string', description: '操作块 id（get_timeline_summary 获取）' },
+            block: {
+                type: 'number',
+                description: '操作块**序号**（时间轴上第几个，见 get_timeline_summary 的「[块N]」）'
+            },
             hits: {
                 type: 'array',
                 items: {
@@ -205,11 +210,11 @@ defineTool('bind_damage_to_block', {
                 }
             }
         },
-        required: ['blockId', 'hits']
+        required: ['block', 'hits']
     },
     handler: async (args) => {
-        const blockId = str(args.blockId)
-        if (!blockId) throw new Error('缺少块 id')
+        const block = resolveOpBlock(args.block)
+        const blockId = block.id
         const raw = Array.isArray(args.hits) ? args.hits : []
         if (raw.length === 0) throw new Error('缺少命中列表')
 
@@ -263,54 +268,59 @@ defineTool('bind_damage_to_block', {
 })
 
 defineTool('remove_op_block', {
-    description: '删除指定操作块（按 id）。',
+    description: '删除指定操作块（按**序号**）。删除后其余块的序号会前移，后续操作请重新读 get_timeline_summary。',
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string', description: '操作块 id（get_timeline_summary 获取）' } },
-        required: ['id']
+        properties: { block: { type: 'number', description: '操作块序号（见 get_timeline_summary 的「[块N]」）' } },
+        required: ['block']
     },
     handler: async (args) => {
-        const id = str(args.id)
-        if (!id) throw new Error('缺少块 id')
-        removeBlock(id)
+        const block = resolveOpBlock(args.block)
+        removeBlock(block.id)
         await updateTimeline(getTimelineState())
-        return { removed: id }
+        return { removed: true, key: block.key }
     }
 })
 
 defineTool('set_block_key', {
-    description: '修改指定操作块的按键。',
+    description:
+        '修改指定操作块的按键（按**序号**）。key 可用：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏 或字母。',
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' }, key: { type: 'string' } },
-        required: ['id', 'key']
+        properties: {
+            block: { type: 'number', description: '操作块序号' },
+            key: { type: 'string', description: '新按键名' }
+        },
+        required: ['block', 'key']
     },
     handler: async (args) => {
-        const id = str(args.id)
+        const block = resolveOpBlock(args.block)
         const key = str(args.key)
-        if (!id || !key) throw new Error('id 与 key 不能为空')
-        setBlockKey(id, key)
+        if (!key) throw new Error('缺少 key')
+        setBlockKey(block.id, key)
         await updateTimeline(getTimelineState())
-        return { updated: true }
+        return { updated: true, key }
     }
 })
 
 defineTool('set_block_special', {
-    description: '设置指定操作块的变奏标记：intro=变奏入场、switchback=切回、none=取消。',
+    description: '设置指定操作块的变奏标记（按**序号**）：intro=变奏入场、switchback=切回、none=取消。',
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' }, kind: { type: 'string', enum: ['none', 'intro', 'switchback'] } },
-        required: ['id', 'kind']
+        properties: {
+            block: { type: 'number', description: '操作块序号' },
+            kind: { type: 'string', enum: ['none', 'intro', 'switchback'] }
+        },
+        required: ['block', 'kind']
     },
     handler: async (args) => {
-        const id = str(args.id)
+        const block = resolveOpBlock(args.block)
         const kind = str(args.kind) as 'none' | 'intro' | 'switchback'
-        if (!id) throw new Error('缺少块 id')
         if (!['none', 'intro', 'switchback'].includes(kind)) throw new Error(`无效标记：${kind}`)
-        setBlockSpecial(id, kind)
+        setBlockSpecial(block.id, kind)
         await updateTimeline(getTimelineState())
-        return { id, kind }
+        return { block: args.block, kind }
     }
 })
 
@@ -363,31 +373,28 @@ defineTool('reflow_track', {
 
 defineTool('move_op_block', {
     description:
-        '把已有操作块移动到指定位置：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块 id, side: before/after（默认 after）, offset?: 秒}（相对某块）。移动后自动消除同轨道重叠。',
+        '把已有操作块移动到指定位置（按**序号**）：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块序号, side: before/after（默认 after）, offset?: 秒}（相对某块）。移动后自动消除同轨道重叠。',
     parameters: {
         type: 'object',
         properties: {
-            blockId: { type: 'string', description: '操作块 id（get_timeline_summary 获取）' },
+            block: { type: 'number', description: '要移动的操作块序号' },
             position: {
                 type: 'object',
                 properties: {
                     time: { type: 'number', description: '绝对时间（秒，0 至当前结束线）' },
-                    anchor: { type: 'string', description: '目标块 id' },
+                    anchor: { type: 'number', description: '目标操作块序号（相对它移动）' },
                     side: { type: 'string', enum: ['before', 'after'] },
                     offset: { type: 'number', description: '相对偏移（秒，默认 0）' }
                 }
             }
         },
-        required: ['blockId', 'position']
+        required: ['block', 'position']
     },
     handler: async (args) => {
-        const blockId = str(args.blockId)
-        if (!blockId) throw new Error('缺少块 id')
-        const block = getOpBlocks().find((b) => b.id === blockId)
-        if (!block) throw new Error(`未找到操作块：${blockId}`)
+        const block = resolveOpBlock(args.block)
         const raw = (args.position ?? {}) as Record<string, unknown>
         const pos = resolvePosition(raw)
-        const set = setOpBlockPos(blockId, pos)
+        const set = setOpBlockPos(block.id, pos)
         if (set === null) throw new Error('设置位置失败（排轴已锁定或块不存在）')
         reflowTrack(block.trackIndex)
         await updateTimeline(getTimelineState())
@@ -397,31 +404,28 @@ defineTool('move_op_block', {
 
 defineTool('move_ref_line', {
     description:
-        '把已有参考线移动到指定位置：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块 id, side: before/after, offset?: 秒}（相对某块）。与相邻参考线保持最小间距，过近会报错。',
+        '把已有参考线移动到指定位置（按**序号**）：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块序号, side: before/after, offset?: 秒}（相对某块）。与相邻参考线保持最小间距，过近会报错。',
     parameters: {
         type: 'object',
         properties: {
-            id: { type: 'string', description: '参考线 id（get_timeline_summary 获取）' },
+            line: { type: 'number', description: '参考线序号（见 get_timeline_summary 的「[线N]」）' },
             position: {
                 type: 'object',
                 properties: {
                     time: { type: 'number', description: '绝对时间（秒，0 至当前结束线）' },
-                    anchor: { type: 'string', description: '目标块 id' },
+                    anchor: { type: 'number', description: '目标操作块序号（相对它移动）' },
                     side: { type: 'string', enum: ['before', 'after'] },
                     offset: { type: 'number', description: '相对偏移（秒，默认 0）' }
                 }
             }
         },
-        required: ['id', 'position']
+        required: ['line', 'position']
     },
     handler: async (args) => {
-        const id = str(args.id)
-        if (!id) throw new Error('缺少参考线 id')
-        const ref = getRefLines().find((r) => r.id === id)
-        if (!ref) throw new Error(`未找到参考线：${id}`)
+        const ref = resolveRefLine(args.line)
         const raw = (args.position ?? {}) as Record<string, unknown>
         const pos = resolvePosition(raw)
-        const set = setRefLinePos(id, pos)
+        const set = setRefLinePos(ref.id, pos)
         if (set === null) throw new Error('目标位置与相邻参考线间距不足或超出范围')
         await updateTimeline(getTimelineState())
         return { moved: true, pos: set }
@@ -430,7 +434,7 @@ defineTool('move_ref_line', {
 
 defineTool('add_ref_line', {
     description:
-        '在当前排轴最右空白位置添加参考线（按顺序排轴：参考线落在所有操作块之后），用于标记时间节点（如启动轴/循环轴）。',
+        '在当前排轴最右空白位置添加参考线（按顺序排轴：参考线落在所有操作块之后），用于标记时间节点（如启动轴/循环轴）。返回新参考线的**序号**。',
     parameters: { type: 'object', properties: {} },
     handler: async () => {
         let maxRight = 0
@@ -438,27 +442,29 @@ defineTool('add_ref_line', {
             maxRight = Math.max(maxRight, b.pos + BLOCK_W / 2)
         }
         const x = Math.max(SIDE_PAD, Math.min(getMaxPos(), maxRight > 0 ? maxRight : SIDE_PAD))
+        const before = new Set(getRefLines().map((r) => r.id))
         const ok = addRefLineAt(x)
         if (!ok) throw new Error('空间不足，无法创建参考线（与相邻参考线过近）')
         await updateTimeline(getTimelineState())
-        return { added: true }
+        const ordered = refLinesInOrder()
+        const line = ordered.findIndex((r) => !before.has(r.id)) + 1
+        return { added: true, line }
     }
 })
 
 defineTool('remove_ref_line', {
-    description: '删除指定参考线（按 id）。',
+    description: '删除指定参考线（按**序号**）。删除后其余参考线的序号会前移，后续操作请重新读 get_timeline_summary。',
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string', description: '参考线 id（get_timeline_summary 获取）' } },
-        required: ['id']
+        properties: { line: { type: 'number', description: '参考线序号' } },
+        required: ['line']
     },
     handler: async (args) => {
-        const id = str(args.id)
-        if (!id) throw new Error('缺少参考线 id')
-        removeLine(id)
+        const ref = resolveRefLine(args.line)
+        removeLine(ref.id)
         await updateTimeline(getTimelineState())
-        return { removed: id }
+        return { removed: true, name: ref.time || '未命名' }
     }
 })
 
@@ -485,7 +491,7 @@ defineTool('bind_non_direct_to_block', {
     parameters: {
         type: 'object',
         properties: {
-            blockId: { type: 'string', description: '操作块 id（get_timeline_summary 获取）' },
+            block: { type: 'number', description: '操作块**序号**（见 get_timeline_summary 的「[块N]」）' },
             entries: {
                 type: 'array',
                 items: {
@@ -499,11 +505,11 @@ defineTool('bind_non_direct_to_block', {
                 }
             }
         },
-        required: ['blockId', 'entries']
+        required: ['block', 'entries']
     },
     handler: async (args) => {
-        const blockId = str(args.blockId)
-        if (!blockId) throw new Error('缺少块 id')
+        const block = resolveOpBlock(args.block)
+        const blockId = block.id
         const raw = Array.isArray(args.entries) ? args.entries : []
         if (raw.length === 0) throw new Error('缺少非直伤条目')
         const configMap = new Map<string, (typeof NON_DIRECT_CONFIGS)[number]>(
@@ -558,53 +564,50 @@ const getTimings = (): { refLineId: string; seconds: number | null }[] => {
 
 defineTool('get_ref_line_timings', {
     description:
-        '查询时间参考线记点状态：哪些参考线已启用为时间记点、各自的秒数（null=未填写/未解析，不参与 DPS 分段）。秒数来源：自动推导（从参考线命名解析）或自定义覆盖。结果按参考线在时间轴上的位置排序。',
+        '查询时间参考线记点状态：哪些参考线已启用为时间记点、各自的秒数（null=未填写/未解析，不参与 DPS 分段）。秒数来源：自动推导（从参考线命名解析）或自定义覆盖。结果按参考线在时间轴上的位置排序，并给出**序号**。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const timings = getTimings()
-        const refLines = getRefLines()
-        const sorted = [...timings]
-            .filter((t) => refLines.some((r) => r.id === t.refLineId))
-            .sort((a, b) => {
-                const ap = refLines.find((r) => r.id === a.refLineId)?.pos ?? 0
-                const bp = refLines.find((r) => r.id === b.refLineId)?.pos ?? 0
-                return ap - bp
+        const ordered = refLinesInOrder()
+        const enabled = new Map(timings.map((t) => [t.refLineId, t.seconds]))
+        const rows = ordered
+            .map((rl, i) => ({ rl, line: i + 1 }))
+            .filter(({ rl }) => enabled.has(rl.id))
+            .map(({ rl, line }) => {
+                const seconds = enabled.get(rl.id) ?? null
+                return {
+                    line,
+                    name: rl.time || '未命名',
+                    seconds,
+                    status: seconds === null ? '未填写（不参与分段）' : '已填写'
+                }
             })
         return {
-            timings: sorted.map((t) => {
-                const rl = refLines.find((r) => r.id === t.refLineId)
-                return {
-                    refLineId: t.refLineId,
-                    refLineName: rl?.time ?? '',
-                    seconds: t.seconds,
-                    status: t.seconds === null ? '未填写（不参与分段）' : '已填写'
-                }
-            }),
-            totalEnabled: sorted.length,
-            validCount: sorted.filter((t) => t.seconds !== null).length,
-            hint: 'seconds=null 表示「未填写」（名称无时间片段）；用 enable_ref_line_timing 启用、disable_ref_line_timing 禁用、set_ref_line_timing_seconds 设自定义秒数。'
+            timings: rows,
+            totalEnabled: rows.length,
+            validCount: rows.filter((r) => r.seconds !== null).length,
+            hint: 'seconds=null 表示「未填写」（名称无时间片段）；用 enable_ref_line_timing 启用、disable_ref_line_timing 禁用、set_ref_line_timing_seconds 设自定义秒数；参数里的 line 就是这里的序号。'
         }
     }
 })
 
 defineTool('enable_ref_line_timing', {
     description:
-        '启用某条参考线作为时间记点（加入 timings）。启用时秒数自动推导：按参考线命名解析时间片段（如 "1m30s"→90、"起手"→null 未解析）；结束线（id=right）默认 120s。若该参考线已启用则幂等返回当前状态。',
+        '启用某条参考线作为时间记点（按**序号**）。启用时秒数自动推导：按参考线命名解析时间片段（如 "1m30s"→90、"起手"→null 未解析）；结束线（最后一条）默认 120s。若该参考线已启用则幂等返回当前状态。',
     parameters: {
         type: 'object',
-        properties: { refLineId: { type: 'string', description: '参考线 id（用 get_timeline_summary 查询）' } },
-        required: ['refLineId']
+        properties: { line: { type: 'number', description: '参考线序号（见 get_timeline_summary 的「[线N]」）' } },
+        required: ['line']
     },
     handler: async (args) => {
-        const id = str(args.refLineId)
+        const ref = resolveRefLine(args.line)
+        const id = ref.id
         const refLines = getRefLines()
-        if (!refLines.some((r) => r.id === id))
-            throw new Error(`参考线 ${id} 不存在，可用 get_timeline_summary 查询可用参考线`)
         const project = getActiveProject()
         if (!project) throw new Error('当前没有活动工程')
         const timings = getTimings()
         if (timings.some((t) => t.refLineId === id)) {
-            return { refLineId: id, alreadyEnabled: true, timings }
+            return { line: args.line, alreadyEnabled: true, timings }
         }
         const seconds = resolveRefLineSeconds(id, refLines as RefLineLike[], timings)
         const next = [...timings, { refLineId: id, seconds }]
@@ -613,7 +616,8 @@ defineTool('enable_ref_line_timing', {
             timings: next
         })
         return {
-            refLineId: id,
+            line: args.line,
+            name: ref.time || '未命名',
             enabled: true,
             seconds,
             status: seconds === null ? '未填写（名称无时间片段，需手动设秒数）' : '自动推导',
@@ -623,36 +627,37 @@ defineTool('enable_ref_line_timing', {
 })
 
 defineTool('disable_ref_line_timing', {
-    description: '禁用某条参考线的时间记点（从 timings 移除，不再参与 DPS 分段）。若该参考线未启用则幂等返回。',
+    description:
+        '禁用某条参考线的时间记点（按**序号**，从 timings 移除，不再参与 DPS 分段）。若该参考线未启用则幂等返回。',
     parameters: {
         type: 'object',
-        properties: { refLineId: { type: 'string', description: '参考线 id' } },
-        required: ['refLineId']
+        properties: { line: { type: 'number', description: '参考线序号' } },
+        required: ['line']
     },
     handler: async (args) => {
-        const id = str(args.refLineId)
+        const id = resolveRefLine(args.line).id
         const project = getActiveProject()
         if (!project) throw new Error('当前没有活动工程')
         const timings = getTimings()
         if (!timings.some((t) => t.refLineId === id)) {
-            return { refLineId: id, alreadyDisabled: true, timings }
+            return { line: args.line, alreadyDisabled: true, timings }
         }
         const next = timings.filter((t) => t.refLineId !== id)
         await updateResultAnalysis({
             ...project.analysis,
             timings: next
         })
-        return { refLineId: id, disabled: true, timings: next }
+        return { line: args.line, disabled: true, timings: next }
     }
 })
 
 defineTool('set_ref_line_timing_seconds', {
     description:
-        '设置已启用记点的秒数。mode=auto：按参考线命名自动推导（清空自定义覆盖，回到自动解析值；命名无时间片段则秒数为 null「未填写」）；mode=custom：手动填秒数（须 ≥ 0，负数/空串视为清除→null「未填写」）。若该参考线尚未启用，会先自动启用再设秒数。',
+        '设置已启用记点的秒数（按**序号**）。mode=auto：按参考线命名自动推导（清空自定义覆盖，回到自动解析值；命名无时间片段则秒数为 null「未填写」）；mode=custom：手动填秒数（须 ≥ 0，负数/空串视为清除→null「未填写」）。若该参考线尚未启用，会先自动启用再设秒数。',
     parameters: {
         type: 'object',
         properties: {
-            refLineId: { type: 'string', description: '参考线 id' },
+            line: { type: 'number', description: '参考线序号' },
             mode: {
                 type: 'string',
                 enum: ['auto', 'custom'],
@@ -660,14 +665,12 @@ defineTool('set_ref_line_timing_seconds', {
             },
             seconds: { type: 'number', description: '秒数（mode=custom 时必填，≥0；留空/负数→清除为 null 未填写）' }
         },
-        required: ['refLineId', 'mode']
+        required: ['line', 'mode']
     },
     handler: async (args) => {
-        const id = str(args.refLineId)
+        const id = resolveRefLine(args.line).id
         const mode = str(args.mode)
         const refLines = getRefLines()
-        if (!refLines.some((r) => r.id === id))
-            throw new Error(`参考线 ${id} 不存在，可用 get_timeline_summary 查询可用参考线`)
         const project = getActiveProject()
         if (!project) throw new Error('当前没有活动工程')
         const timings = getTimings()
@@ -695,7 +698,7 @@ defineTool('set_ref_line_timing_seconds', {
             timings: next
         })
         return {
-            refLineId: id,
+            line: args.line,
             mode,
             seconds,
             status: seconds === null ? '未填写（不参与分段）' : '已填写',
