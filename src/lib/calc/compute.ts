@@ -3,7 +3,7 @@ import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone } from './result.types'
 import type { CharSlot } from '$lib/types/project'
-import { ZONE_NO_REF_IDS } from './calculation.consts'
+import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS } from './calculation.consts'
 import { applyZone, recomputeTotals, type CharacterComputed } from './zone-ops'
 import { evaluateCondition, type ConditionContext } from './condition'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
@@ -184,7 +184,6 @@ function emptyAccum(): CharacterComputed {
         defPen: 0,
         defDown: 0,
         resDown: 0,
-        tuneStrainLayer: 0,
         unisonBoonLayer: 0,
         customLayer1: 0,
         customLayer2: 0,
@@ -339,22 +338,30 @@ const entryCandidateBuffs = (
  * @desc 某角色槽位在「本条目」下真正生效的 Buff：作用域匹配 + 整块硬性条件（链/阶硬门槛）。
  * 条件里的链/阶以**该角色槽位**为参考（作用域指向谁，就按谁的链阶判定）。
  * 乘区条目自身的条件不在这里过滤 —— 由 activeZonesOf / refZonesOf / overrideZonesOf 逐条判定。
+ *
+ * `ignoreScope=true` 用于**目标侧乘区**的聚合（见 targetSideZonesOf）：层数挂在目标身上，
+ * 不区分角色槽位，但仍然区分「特效专属」（空作用域只在特效条目上生效）。
  */
 const activeBoundForChar = (
     candidates: BuffInstance[],
     charIdx: number,
     isEffect: boolean,
     profile: ConditionProfile,
-    ctx: Partial<ConditionContext>
+    ctx: Partial<ConditionContext>,
+    ignoreScope = false
 ): BuffInstance[] => {
     const out: BuffInstance[] = []
     for (const buff of candidates) {
-        if (!scopeMatches(buff, charIdx, isEffect)) continue
+        if (ignoreScope ? !scopeMatchesTargetSide(buff, isEffect) : !scopeMatches(buff, charIdx, isEffect)) continue
         if (!buffConditionMet(buff.condition, profile, charIdx, ctx, buff.conditionRefCharIdx)) continue
         out.push(buff)
     }
     return out
 }
+
+/** @desc 目标侧聚合的作用域口径：只区分「特效专属 / 其余」，不区分具体角色槽位 */
+const scopeMatchesTargetSide = (buff: BuffInstance, isEffect: boolean): boolean =>
+    Array.isArray(buff.scope) && buff.scope.length === 0 ? isEffect : true
 
 /** @desc 生效 Buff（引擎内部用：逐条乘区条目写入累加器） */
 function boundBuffs(
@@ -441,7 +448,7 @@ function computeCharacterStats(
 const collectZones = (buffs: BuffInstance[]): BuffZoneValue[] => buffs.flatMap((b) => b.zones)
 
 /** @desc 乘区级条件求值上下文：伤害段上下文 + 链阶档位 */
-interface ZoneCtx {
+export interface ZoneCtx {
     chains: number[]
     refinements: number[]
     element?: string
@@ -475,6 +482,78 @@ const refZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string; ref
             ? [{ zoneId: z.zoneId as string, ref: z.ref }]
             : []
     )
+
+/**
+ * @desc **目标侧乘区**合计（目前只有集谐·干涉层数）：挂在目标/怪物身上，**全队共用一份**。
+ *
+ * 与 `activeZonesOf` 的区别只有作用域：目标侧不看 buff 指向哪个角色槽位 ——
+ * 一条「作用域=角色1」的集谐 buff 也照样给全队提供层数，因此不存在「某某角色的集谐干涉层数」。
+ * 其余口径完全一致：实例级链/阶门槛按条件自带的 charIdx 判定（与攻击者是谁无关）、
+ * 乘区级条件按本条目属性/类型判定；覆盖条目取最后一条覆盖值（同 applyZone 的覆盖语义）。
+ */
+export function targetSideZonesOf(
+    candidates: readonly BuffInstance[],
+    profile: ConditionProfile,
+    zoneCtx: ZoneCtx
+): { zoneId: string; value: number }[] {
+    const sums = new Map<string, number>()
+    const overrides = new Map<string, number>()
+    for (const buff of candidates) {
+        // charIdx 传 -1：目标侧与攻击者无关；legacy chain/refinement 回落到 0 号位（与旧口径一致）
+        if (!buffConditionMet(buff.condition, profile, -1, zoneCtx, buff.conditionRefCharIdx)) continue
+        for (const z of buff.zones) {
+            if (!TARGET_SIDE_ZONE_IDS.has(z.zoneId) || z.ref) continue
+            if (!zoneConditionMet(z, zoneCtx)) continue
+            if (z.override) {
+                if (z.value !== 0) overrides.set(z.zoneId, z.value)
+                continue
+            }
+            if (z.value !== 0) sums.set(z.zoneId, (sums.get(z.zoneId) ?? 0) + z.value)
+        }
+    }
+    const out: { zoneId: string; value: number }[] = []
+    for (const [zoneId, value] of sums) out.push({ zoneId, value: overrides.get(zoneId) ?? value })
+    for (const [zoneId, value] of overrides) if (!sums.has(zoneId)) out.push({ zoneId, value })
+    return out
+}
+
+/** @desc 取目标侧某乘区的合计值（读不到即 0） */
+export const targetSideValueOf = (
+    candidates: readonly BuffInstance[],
+    profile: ConditionProfile,
+    zoneCtx: ZoneCtx,
+    zoneId: string
+): number => targetSideZonesOf(candidates, profile, zoneCtx).find((z) => z.zoneId === zoneId)?.value ?? 0
+
+/**
+ * @desc 目标侧乘区的来源 Buff（溯源用）：不做作用域过滤，其余口径与 `getBoundBuffSets` 一致。
+ * 集谐层数的来源可能挂在别的角色身上，只列「本段所属角色」的 buff 会漏掉它们。
+ */
+export function getTargetSideSourceBuffs(
+    entry: DamageEntry,
+    buffSets: BuffInstance[],
+    damageEntryBuffSetIds: Record<string, string[]>,
+    damageEntryDamageTypes: Record<string, string[]>,
+    profile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
+    charInfoMap?: Record<string, CharacterInfo>,
+    echoDescByEntry?: Record<string, string>,
+    matchEntry = true
+): BuffInstance[] {
+    const ctx: Partial<ConditionContext> = matchEntry
+        ? {
+              element: entry.damageElement,
+              damageTypes: resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
+          }
+        : {}
+    return activeBoundForChar(
+        entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds),
+        -1,
+        entry.isEffect,
+        profile,
+        ctx,
+        true
+    )
+}
 
 /**
  * @desc 该 Buff 对某个伤害条目**是否还有任何贡献**（表格「隐藏条件不匹配」筛选用）。
@@ -529,11 +608,19 @@ const overrideZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string
 
 // ── compute a single ResultEntry ──
 
+/**
+ * @desc 直伤条目结算。
+ *
+ * `targetTuneStrainLayer` 是**目标侧**的集谐·干涉层数（挂在怪物身上、全队一份），由调用方用
+ * `targetSideValueOf()` 算好后传入 —— 不再读 `stats.tuneStrainLayer`（那是按角色累加的，
+ * 会出现「某角色的集谐层数」，与游戏定义不符）。
+ */
 function computeResultEntry(
     entry: DamageEntry,
     stats: CharacterComputed,
     enemy: ConfigState['enemy'],
-    damageTypes: string[]
+    damageTypes: string[],
+    targetTuneStrainLayer: number
 ): ResultEntry {
     const ratioNum = entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue
     const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
@@ -598,7 +685,8 @@ function computeResultEntry(
     const vulnerability = 1 + stats.dmgTakenInc / 100
     const finalDmg = 1 + stats.finalDmg / 100
     const customMult = (stats.specialFinal1 !== 0 ? 1 + stats.specialFinal1 / 100 : 1) * stats.specialFinal2Mul
-    const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * stats.tuneStrainLayer
+    /** @desc 集谐区：1 + 0.12% × 该角色谐度破坏增幅 × 目标侧集谐·干涉层数（层数全队共用一份） */
+    const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * targetTuneStrainLayer
 
     /** @desc 同奏区：1 + 3% × 同奏增益层数（直伤/效应/处决响应全生效的独立乘区） */
     const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
@@ -675,7 +763,7 @@ function computeResultEntry(
             label: '集谐区',
             value: tuneStrainMulti,
             detail:
-                stats.tuneStrainLayer > 0
+                targetTuneStrainLayer > 0
                     ? `(1 + ${((tuneStrainMulti - 1) * 100).toFixed(1)}%)`
                     : tuneStrainMulti.toFixed(4)
         },
@@ -724,7 +812,7 @@ function computeResultEntry(
         resMulti,
         dmgRedMulti,
         finalDmg: stats.finalDmg / 100,
-        finalTuneStrainMulti: stats.tuneStrainLayer > 0 ? tuneStrainMulti - 1 : 0,
+        finalTuneStrainMulti: targetTuneStrainLayer > 0 ? tuneStrainMulti - 1 : 0,
         finalTuneBreakZone: 0,
         finalUnisonMulti: stats.unisonBoonLayer > 0 ? unisonMulti - 1 : 0,
         customMult,
@@ -963,7 +1051,6 @@ function emptyCharacterStats(): CharacterComputed {
         defPen: 0,
         defDown: 0,
         resDown: 0,
-        tuneStrainLayer: 0,
         unisonBoonLayer: 0,
         customLayer1: 0,
         customLayer2: 0,
@@ -1259,7 +1346,13 @@ export function computeAll(
         }
 
         // direct damage
-        return computeResultEntry(entry, stats, enemy, damageTypes)
+        return computeResultEntry(
+            entry,
+            stats,
+            enemy,
+            damageTypes,
+            targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer')
+        )
     })
 }
 
@@ -1339,7 +1432,13 @@ export function computeOneEntry(
     if (entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数') {
         return computeTuneEntry(entry, stats, enemy)
     }
-    return computeResultEntry(entry, stats, enemy, damageTypes)
+    return computeResultEntry(
+        entry,
+        stats,
+        enemy,
+        damageTypes,
+        targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer')
+    )
 }
 
 export function cloneEchoesWithoutAllSubstats(echoes: EchoSlotConfig[]): EchoSlotConfig[] {

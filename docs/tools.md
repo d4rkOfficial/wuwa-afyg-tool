@@ -334,7 +334,7 @@ _无参数_
 
 ### `set_buff_zone`
 
-设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/customLayer1/customLayer2/customLayer3/finalDmg/dmgTakenInc/specialFinal1/specialFinal2/extraRatio。其中 tuneStrainLayer（集谐干涉层数）/unisonBoonLayer（同奏增益层数）/customLayer1-3（自定义层数）是层数类 flat 乘区，填层数本身（如 +2 层 → value=2）；集谐干涉层数只允许固定层数、不可配引用/转模，同奏增益层数与三个自定义层数可以配引用/转模。自定义层数是纯计数器，只做记录不参与伤害结算。旧 id customFinalDmg/customFinalDmgMul 会被自动重映射为 specialFinal1/specialFinal2（返回值里用 remappedFrom/remapNote 标注）。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）；同一 Buff 内每个乘区只允许一个覆盖条目，开启时落在该乘区第一条、其余条目自动取消覆盖。
+设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/customLayer1/customLayer2/customLayer3/finalDmg/dmgTakenInc/specialFinal1/specialFinal2/extraRatio。其中 tuneStrainLayer（集谐干涉层数）/unisonBoonLayer（同奏增益层数）/customLayer1-3（自定义层数）是层数类 flat 乘区，填层数本身（如 +2 层 → value=2）；集谐干涉层数只允许固定层数、不可配引用/转模，也不能作为引用目标 —— 它挂在**目标/怪物**身上、全队共用一份，不存在「某角色的集谐干涉层数」；同奏增益层数与三个自定义层数属于角色，可以配引用/转模。自定义层数是纯计数器，只做记录不参与伤害结算。旧 id customFinalDmg/customFinalDmgMul 会被自动重映射为 specialFinal1/specialFinal2（返回值里用 remappedFrom/remapNote 标注）。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）；同一 Buff 内每个乘区只允许一个覆盖条目，开启时落在该乘区第一条、其余条目自动取消覆盖。
 
 | 参数       | 必填   | 类型    | 说明                               |
 | ---------- | ------ | ------- | ---------------------------------- |

@@ -30,7 +30,11 @@ export interface CharacterComputed {
     defPen: number
     defDown: number
     resDown: number
-    tuneStrainLayer: number
+    /**
+     * @desc 集谐·干涉层数（`tuneStrainLayer`）**故意不在这里**：它挂在目标/怪物身上、全队一份，
+     * 不是角色面板属性。引擎用 `compute.ts` 的 `targetSideZonesOf()` 直接从绑定的 Buff 聚合，
+     * 不会按角色累加，因此也不存在「某某角色的集谐干涉层数」。
+     */
     /** @desc 同奏增益层数（flat 层数）：同奏区 = 1 + 3% × 层数 */
     unisonBoonLayer: number
     /**
@@ -98,10 +102,8 @@ export const ZONE_OPS: Record<string, ZoneOp> = {
         (a, v) => (a.resDown += v),
         (a, v) => (a.resDown = v)
     ),
-    tuneStrainLayer: addOp(
-        (a, v) => (a.tuneStrainLayer += v),
-        (a, v) => (a.tuneStrainLayer = v)
-    ),
+    // 集谐·干涉层数（tuneStrainLayer）不在此表：它是**目标侧**乘区，由 targetSideZonesOf 聚合，
+    // 不做角色累加（见 CharacterComputed 上的说明）。
     unisonBoonLayer: addOp(
         (a, v) => (a.unisonBoonLayer += v),
         (a, v) => (a.unisonBoonLayer = v)

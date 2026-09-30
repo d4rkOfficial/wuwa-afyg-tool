@@ -264,3 +264,64 @@ describe('层数作为引用来源：按角色读取、互不串味', () => {
         )
     })
 })
+
+// ── 集谐·干涉层数：目标侧一份（挂怪物身上，全队共用，不存在「某角色的」） ──
+
+describe('集谐·干涉层数：目标侧一份', () => {
+    /** @desc 谐度破坏增幅是角色属性，必须给该角色才能让集谐区 > 1（集谐区 = 1 + 0.12% × 增幅 × 层数） */
+    const boostFor = (id: string, slot: number) => layerBuff(id, 'tuneBreakBoost', 500, [slot])
+    const layers = (id: string, value: number, slots: number[]) => layerBuff(id, 'tuneStrainLayer', value, slots)
+
+    it('作用域指向哪个角色都不影响：层数是全队共用的那一份', () => {
+        const boost = boostFor('tb1', 0)
+        const onOther = layers('L1', 3, [1]) // 挂在别的角色身上
+        const onSelf = layers('L2', 3, [0])
+        assert.ok(damageOf(CHAR, [boost, onOther]) > damageOf(CHAR, [boost]), '层数应抬高集谐区')
+        assert.equal(damageOf(CHAR, [boost, onOther]), damageOf(CHAR, [boost, onSelf]), '作用域不参与目标侧聚合')
+    })
+
+    it('两个角色读到同一个层数：谐度增幅相同 → 集谐区一致、伤害相等', () => {
+        const shared = layers('L3', 3, [0])
+        assert.equal(
+            damageOf(CHAR, [boostFor('tbA', 0), shared]),
+            damageOf(CHAR_B, [boostFor('tbB', 1), shared]),
+            '同一份目标侧层数 → 两个角色的集谐区相同'
+        )
+    })
+
+    it('不按角色累加：作用域=全队也只有一份，不会算三遍', () => {
+        const boost = boostFor('tb2', 0)
+        assert.equal(
+            damageOf(CHAR, [boost, layers('L4', 3, [0, 1, 2])]),
+            damageOf(CHAR, [boost, layers('L5', 3, [0])]),
+            '全队作用域与单角色作用域的层数完全等价'
+        )
+    })
+
+    it('多来源相加、覆盖取覆盖值（覆盖同样不分角色）', () => {
+        const boost = boostFor('tb3', 0)
+        const a = layers('L6', 2, [1])
+        const b = layers('L7', 3, [0])
+        assert.equal(
+            damageOf(CHAR, [boost, a, b]),
+            damageOf(CHAR, [boost, layers('L8', 5, [0])]),
+            '2 + 3 应等于直接填 5'
+        )
+        const override = {
+            ...layers('L9', 7, [1]),
+            zones: [{ zoneId: 'tuneStrainLayer', value: 7, override: true }]
+        } as BuffInstance
+        assert.equal(
+            damageOf(CHAR, [boost, a, b, override]),
+            damageOf(CHAR, [boost, layers('L10', 7, [0])]),
+            '覆盖条目取覆盖值，与累加值无关'
+        )
+    })
+
+    it('集谐层数不会写进角色面板（CharacterComputed 里没有这个字段）', () => {
+        const boost = boostFor('tb4', 0)
+        // 只有层数、没有谐度增幅 → 集谐区恒为 1，伤害与不带该 buff 完全相同
+        assert.equal(damageOf(CHAR, [layers('L11', 3, [1])]), damageOf(CHAR, []), '层数本身不产生增伤')
+        assert.notEqual(damageOf(CHAR, [boost, layers('L12', 3, [1])]), damageOf(CHAR, [boost]), '配上增幅才生效')
+    })
+})

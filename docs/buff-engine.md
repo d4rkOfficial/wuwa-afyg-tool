@@ -40,6 +40,19 @@ BuffInstance ─┘
 `applyZone(acc, zoneId, value, 'add' | 'override')` 是唯一出口；`recomputeTotals(acc)` 在面板类乘区变化后
 重算攻/生/防三维，保证引用转模读到最新面板。
 
+### 目标侧乘区（挂目标身上，全队一份）
+
+`TARGET_SIDE_ZONE_IDS` 里的乘区**不写角色面板**：目前只有**集谐·干涉层数**（`tuneStrainLayer`）——
+游戏里它挂在目标/怪物身上，由队伍施加，所以：
+
+- 引擎用 `targetSideZonesOf(candidates, profile, zoneCtx)` 从「绑定到本条目的 Buff」直接聚合，
+  **不做作用域过滤**：一条「作用域=角色1」的集谐 buff 照样给全队提供层数；
+- 因为它不分角色，`CharacterComputed` 与 `ZONE_OPS` 里**都没有** `tuneStrainLayer` 字段
+  （写进去也没人读，故意不留）；
+- 它也不能配引用、不能作为引用来源（见 `ZONE_NO_REF_IDS`）；
+- 集谐区 = `1 + 0.12% × 该角色谐度破坏增幅 × 目标侧层数`：增幅仍按角色读，层数全队共用一份；
+- 溯源里集谐层数的来源用 `getTargetSideSourceBuffs()` 取（可能挂在别的角色身上）。
+
 ### 同一个 Buff 里的「同名乘区」
 
 `zones` 是**贡献条目列表**，不是「乘区种类的集合」：同一个乘区可以出现多次，每条是独立贡献单元

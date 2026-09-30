@@ -3,7 +3,7 @@ import type { BuffSet, DamageEntry } from './calculation.types'
 import type { ConfigState } from './config.types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import { getBoundBuffSets, type ConditionProfile } from './compute'
+import { getBoundBuffSets, getTargetSideSourceBuffs, type ConditionProfile } from './compute'
 import { buildEchoDescByEntry } from './skill-infer'
 import { getEchoSkillText } from '$lib/data/char-info.svelte'
 import { ZONE_MAP, ZONE_REF_MAP } from './calculation.consts'
@@ -524,6 +524,7 @@ export function buildDamageSegments(
 
     const charIdx = ctx.team.findIndex((s) => s.character === entry.character)
     const entryLike = toDamageEntryLike(entry)
+    const echoDescByEntry = buildEchoDescByEntry([entryLike], ctx.team, getEchoSkillText())
     const buffs = getBoundBuffSets(
         entryLike,
         charIdx,
@@ -532,7 +533,17 @@ export function buildDamageSegments(
         ctx.damageEntryDamageTypes,
         ctx.conditionProfile,
         ctx.charInfoMap,
-        buildEchoDescByEntry([entryLike], ctx.team, getEchoSkillText())
+        echoDescByEntry
+    )
+    /** @desc 目标侧乘区的来源（集谐·干涉层数）：不做作用域过滤，来源可能挂在别的角色身上 */
+    const targetSideBuffs = getTargetSideSourceBuffs(
+        entryLike,
+        ctx.buffSets,
+        ctx.damageEntryBuffSetIds,
+        ctx.damageEntryDamageTypes,
+        ctx.conditionProfile,
+        ctx.charInfoMap,
+        echoDescByEntry
     )
 
     const segments: DamageSegment[] = []
@@ -580,7 +591,8 @@ export function buildDamageSegments(
     )
     // 集谐（集谐直伤 = 1+干涉层数；偏谐系数 = 谐度破坏增幅；效应系数 = 1）
     const tuneDelta = entry.finalTuneStrainMulti + entry.finalTuneBreakZone
-    const tuneParts = buffZoneParts(buffs, 'tuneStrainLayer', '集谐层数', 'flat')
+    // 集谐·干涉层数挂在目标身上、全队一份：来源可能指向别的角色，按目标侧口径取（不做作用域过滤）
+    const tuneParts = buffZoneParts(targetSideBuffs, 'tuneStrainLayer', '集谐层数', 'flat')
     tuneParts.push(...buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat'))
     segments.push(seg('tune', '集谐区', 1 + tuneDelta, `(1 + ${(tuneDelta * 100).toFixed(2)}%)`, tuneParts))
     // 同奏（同奏区 = 1 + 3%×同奏增益层数，直伤/效应/处决响应全生效）

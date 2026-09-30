@@ -99,6 +99,15 @@ export const ZONE_NO_REF_IDS = new Set<string>(['tuneStrainLayer'])
 export const ZONE_NO_OVERRIDE_IDS = new Set<string>(['atkPct', 'hpPct', 'defPct', 'extraRatio'])
 
 /**
+ * @desc 目标侧乘区：数值挂在**目标/怪物**身上，全队共用一份，没有「某角色的」这一说。
+ *
+ * 目前只有集谐·干涉层数（`tuneStrainLayer`）：由队伍施加在目标身上。
+ * 引擎聚合这些乘区时**不按作用域过滤**（一条「作用域=角色1」的集谐 buff 也照样给全队提供层数），
+ * 因此不存在「某某角色的集谐干涉层数」。它也因此不能配引用、不能作为引用来源。
+ */
+export const TARGET_SIDE_ZONE_IDS = new Set<string>(['tuneStrainLayer'])
+
+/**
  * @desc 可被「引用」的来源清单（ZoneRef 的目标）：角色白值/当前面板/充能/谐度/双暴，
  * 以及**按角色独立**的层数（同奏增益层数、自定义层数(1)(2)(3)）。
  */

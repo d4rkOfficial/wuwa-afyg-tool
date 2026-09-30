@@ -126,7 +126,7 @@ export const FORMULA_ZONES: BuiltinBuffSourceDef[] = [
         label: '集谐区',
         kind: 'formula',
         zones: ['tuneStrainLayer', 'tuneBreakBoost'],
-        desc: '1 + 0.0012 × 谐度破坏增幅 × 集谐干涉层数'
+        desc: '1 + 0.0012 × 谐度破坏增幅 × 集谐·干涉层数（层数挂目标身上、全队一份）'
     },
     {
         id: `${BUILTIN_PREFIX}unison`,
