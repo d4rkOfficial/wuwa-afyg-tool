@@ -29,6 +29,7 @@ import {
 import { updateTimeline, updateResultAnalysis, getActiveProject } from '$lib/data/project.svelte'
 import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/calc/timeline.consts'
 import { resolveRefLineSeconds, type RefLineLike } from '$lib/calc/ref-line-timing'
+import { renderDamageRatioList, renderTimelineDigest } from '$lib/ai/phase-digest'
 import type { SkillHit, NonDirectEntry } from '$lib/calc/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
@@ -95,36 +96,31 @@ function resolvePosition(position: Record<string, unknown>): number {
 
 defineTool('get_timeline_summary', {
     description:
-        '获取当前排轴摘要：每轨（角色）的操作块（id、按键、描述、是否变奏入场/切回）、参考线、伤害条目数、环节是否锁定。',
+        '获取当前排轴：**按时间（pos）顺序**列出所有操作块、参考线与已绑定的伤害。每行给出秒数、轨道与角色、操作内容、id，其下缩进列出该块绑定的伤害命中（只给命中名，**不含倍率**——倍率用 get_timeline_damage_list 按需查）。AI 需要看排轴结构时调用（比原始 JSON 更紧凑、顺序更清楚）。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const team = getTeam()
-        const blocks = getOpBlocks()
         return {
             locked: getLocked(),
-            tracks: team.map((_, i) => {
-                const list = blocks
-                    .filter((b) => b.trackIndex === i)
-                    .sort((a, b) => a.pos - b.pos)
-                    .map((b) => ({
-                        id: b.id,
-                        key: b.key,
-                        desc: b.desc,
-                        intro: b.intro,
-                        switchback: b.switchback
-                    }))
-                return { track: i + 1, character: team[i]?.character ?? null, blocks: list }
-            }),
-            refLines: getRefLines().map((r) => ({ id: r.id, time: r.time })),
-            damageBlockCount: getDamageBlocks().length
+            timeline: renderTimelineDigest({
+                opBlocks: getOpBlocks(),
+                refLines: getRefLines(),
+                damageBlocks: getDamageBlocks(),
+                trackLabels: team.map((s, i) => s?.character ?? `轨${i + 1}`),
+                locked: getLocked(),
+                sidePad: SIDE_PAD,
+                pps: PPS,
+                timings: getTimings()
+            })
         }
     }
 })
 
 defineTool('get_timeline_damage_list', {
-    description: '获取排轴中的伤害条目清单（供了解哪些操作被标记为伤害）。',
+    description:
+        '**按需**查询排轴里每个已绑定伤害的**倍率明细**（命中名、倍率、属性、系数类型；含效应/处决/响应的折算结果），按时间顺序每行一条。只想看排轴结构（哪些块、绑了什么）请用 get_timeline_summary —— 那里不含倍率，避免无谓的 token 开销。',
     parameters: { type: 'object', properties: {} },
-    handler: () => getDamageList()
+    handler: () => ({ ratios: renderDamageRatioList(getDamageList(), SIDE_PAD, PPS) })
 })
 
 defineTool('add_op_block', {

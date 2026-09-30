@@ -37,11 +37,21 @@ import {
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
+import { getOpBlocks, getRefLines } from '$lib/calc/timeline.store.svelte'
+import { PPS, SIDE_PAD } from '$lib/calc/timeline.consts'
+import { renderBuffSetList, renderCalculationDigest } from '$lib/ai/phase-digest'
 import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import type { ZoneRef } from '$lib/calc/calculation.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
+
+/** @desc 条目来源（操作块 / 参考线 id）→ 时间轴像素位置；用于把拉表按时间顺序排 */
+const timelinePosOf = (sourceId: string): number | undefined => {
+    const op = getOpBlocks().find((b) => b.id === sourceId)
+    if (op) return op.pos
+    return getRefLines().find((r) => r.id === sourceId)?.pos
+}
 const CONDITION_KEYS = ['chain', 'refinement', 'elements', 'damageTypes'] as const
 /** @desc 乘区级条件允许的 key（链/阶是 Buff 实例级硬门槛，不允许挂到乘区上） */
 const ZONE_CONDITION_KEYS = ['elements', 'damageTypes'] as const
@@ -75,37 +85,46 @@ function conditionSummary(c: Record<string, unknown> | undefined): string | unde
 }
 
 defineTool('get_damage_entries', {
-    description: '获取当前工程的所有伤害条目（拉表）：条目 id、归属角色、名称、伤害属性、是否效应等。',
+    description:
+        '获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「归属角色 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名 / 条目 id」。不含倍率与乘区数值——倍率用 get_timeline_damage_list，乘区与引用明细用 get_buff_set_detail / get_damage_entry_buff_sources 按需查。AI 需要看拉表全貌时调用（比原始 JSON 紧凑得多）。',
     parameters: { type: 'object', properties: {} },
-    handler: () =>
-        getAllDamageEntries().map((e) => ({
-            id: e.id,
-            character: e.character ?? null,
-            displayName: e.displayName,
-            hitName: e.hitName,
-            damageElement: e.damageElement,
-            isEffect: e.isEffect,
-            damageTypes: getDamageTypesForEntry(e.id)
-        }))
+    handler: () => {
+        const nameById = new Map(getAllBuffSets().map((b) => [b.id, b.name]))
+        const buffNamesOf = (entryId: string): string[] =>
+            getBuffSetIdsForEntry(entryId).map((id) => nameById.get(id) ?? id)
+        const entries = getAllDamageEntries()
+        return {
+            calculation: renderCalculationDigest({
+                entries,
+                buffNamesOf,
+                damageTypesOf: (entryId) => getDamageTypesForEntry(entryId),
+                posOf: (e) => timelinePosOf(e.sourceTimelineBlockId),
+                sidePad: SIDE_PAD,
+                pps: PPS
+            })
+        }
+    }
 })
 
 defineTool('get_buff_sets', {
     description:
-        '获取当前工程的所有 Buff 集：id、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、绑定到哪些伤害条目。',
+        '获取当前工程的 Buff 集清单（一行一条）：名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数、id。**不含各乘区的数值/引用**——那部分用 get_buff_set_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
-        const entries = getAllDamageEntries()
         const globalIds = new Set(getGlobalBuffSetIds())
-        return getAllBuffSets().map((bs) => ({
-            id: bs.id,
-            name: bs.name,
-            scope: bs.scope,
-            global: globalIds.has(bs.id),
-            starred: !!bs.starred,
-            condition: conditionSummary(bs.condition as Record<string, unknown> | undefined),
-            zoneCount: bs.zones.length,
-            boundToEntries: entries.filter((e) => getBuffSetIdsForEntry(e.id).includes(bs.id)).map((e) => e.displayName)
-        }))
+        return {
+            buffSets: renderBuffSetList(
+                getAllBuffSets().map((bs) => ({
+                    id: bs.id,
+                    name: bs.name,
+                    scope: bs.scope,
+                    global: globalIds.has(bs.id),
+                    starred: !!bs.starred,
+                    condition: conditionSummary(bs.condition as Record<string, unknown> | undefined),
+                    zoneCount: bs.zones.length
+                }))
+            )
+        }
     }
 })
 

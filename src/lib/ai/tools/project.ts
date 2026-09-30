@@ -45,7 +45,7 @@ defineTool('list_projects', {
 
 defineTool('get_project_state', {
     description:
-        '获取当前活动工程的状态：工程名、队伍（各槽位角色与武器）、各环节锁定情况。AI 动手前应调用以了解现状。',
+        '获取当前活动工程的状态：工程名、队伍（各槽位角色与武器）、各环节锁定情况。AI 动手前应调用以了解现状。要看某一个环节的**内容**，用按时间顺序渲染的摘要工具（比原始工程 JSON 紧凑）：排轴 get_timeline_summary、拉表 get_damage_entries、配装 get_config_summary。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const p = getActiveProject()
