@@ -132,8 +132,8 @@
         identicalById: Record<number, string>
     } | null>(null)
     let conflictOpen = $state(false)
-    let conflictList = $state<{ index: number; name: string }[]>([])
-    let identicalList = $state<{ index: number; name: string; existingName: string }[]>([])
+    let conflictList = $state<{ index: number; name: string; slot?: number }[]>([])
+    let identicalList = $state<{ index: number; name: string; existingName: string; slot?: number }[]>([])
 
     /** @desc 统一的导入执行 + 结果提示 */
     function runImport(items: ImportBuffInput[], decisions: Parameters<typeof importBuffSetsWithDecisions>[1] = {}) {
@@ -165,11 +165,12 @@
             total: deduped.length,
             identicalById: Object.fromEntries(report.identical.map((it) => [it.index, it.existingId]))
         }
-        conflictList = report.conflicts.map((c) => ({ index: c.index, name: c.name }))
+        conflictList = report.conflicts.map((c) => ({ index: c.index, name: c.name, slot: c.slot }))
         identicalList = report.identical.map((it) => ({
             index: it.index,
             name: it.name,
-            existingName: it.existingName
+            existingName: it.existingName,
+            slot: it.slot
         }))
         conflictOpen = true
     }

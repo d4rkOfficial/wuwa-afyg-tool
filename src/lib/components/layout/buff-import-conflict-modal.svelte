@@ -12,10 +12,10 @@
 
     interface Props extends ComponentsProps {
         open: boolean
-        /** @desc 同名冲突条目（名字 + 已有 buff 名） */
-        conflicts: { index: number; name: string }[]
+        /** @desc 同名冲突条目（名字 + 已有 buff 名 + 归属槽位） */
+        conflicts: { index: number; name: string; slot?: number }[]
         /** @desc 内容一致但名字不同的条目（导入名 → 已有名） */
-        identical: { index: number; name: string; existingName: string }[]
+        identical: { index: number; name: string; existingName: string; slot?: number }[]
         /** @desc 本次导入总条数（用于展示"共 N 条，其中 M 条重名"） */
         total: number
         onclose: () => void
@@ -68,6 +68,16 @@
     }
 
     const activeRenames = $derived(identical.filter((it) => !renameSkipped[it.index]))
+
+    /**
+     * @desc 出现在多条冲突里的名字（同一套装/武器/首位被多名角色装备时会为每个主人各生成一条同名条目）。
+     * 只有这种情况才需要把归属槽位显示出来区分，平时不给界面加噪音。
+     */
+    const dupNames = $derived.by(() => {
+        const count = new Map<string, number>()
+        for (const c of conflicts) count.set(c.name, (count.get(c.name) ?? 0) + 1)
+        return new Set([...count].filter(([, n]) => n > 1).map(([name]) => name))
+    })
 
     const overwriteCount = $derived(conflicts.filter((c) => decisionOf(c.index) === 'overwrite').length)
     const skipCount = $derived(conflicts.length - overwriteCount)
@@ -127,6 +137,16 @@
                         style="border-color: var(--theme-divider-border);"
                     >
                         <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)">{c.name}</span>
+                        {#if dupNames.has(c.name) && c.slot !== undefined && c.slot >= 0}
+                            <!-- 同名多主人：标出这一条要落的角色槽位，否则两行看起来一模一样 -->
+                            <span
+                                class="shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/50"
+                                style="border-color: var(--theme-divider-border);"
+                                title="该条目归属的角色槽位（同一套装/武器/首位被多名角色装备时按主人分条导入）"
+                            >
+                                角色{c.slot + 1}
+                            </span>
+                        {/if}
                         <div
                             class="flex shrink-0 overflow-hidden rounded-none border"
                             style="border-color: var(--theme-divider-border);"

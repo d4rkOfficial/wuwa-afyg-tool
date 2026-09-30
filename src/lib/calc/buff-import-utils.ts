@@ -64,6 +64,8 @@ export interface IdenticalImport {
     /** @desc 命中的已有 buff（内容一致，但名字不同） */
     existingId: string
     existingName: string
+    /** @desc 该导入项要落的归属槽位（-1 = 无归属）；同名多主人时用于区分 */
+    slot: number
 }
 
 /** @desc 同名但内容不同：需要用户选择「跳过 / 覆盖」 */
@@ -71,6 +73,8 @@ export interface ConflictImport {
     index: number
     name: string
     existingId: string
+    /** @desc 该导入项要落的归属槽位（-1 = 无归属）；同名多主人时用于区分 */
+    slot: number
 }
 
 export interface ImportConflictReport {
@@ -157,7 +161,10 @@ export function importItemContentKey(item: ImportBuffInput): string {
  * - `identical`：内容完全一致（乘区/条件全同）但名字不同 → 询问是否把已有 buff 改名成导入的名字
  * - 同名且内容也完全一致的，两边都不报（无意义，直接跳过即可）
  *
- * 批次内部重名也会被收敛成一条（保留首个），避免同一批导入自我冲突。
+ * **批次内去重必须带上归属槽位**（曾经的 bug）：同一套装/武器/首位被多名角色装备时，
+ * `buildEntityImportItems` 会为**每个主人**各生成一条 `self` 条目 —— 它们同名、同内容，
+ * 只有归属槽位不同。旧实现只按名字去重，于是除第一个主人外的条目全被丢掉，
+ * 症状就是「套装/武器/首位一样时，buff 只导入给了一个角色」。
  */
 export function detectImportConflicts(
     items: readonly ImportBuffInput[],
@@ -172,15 +179,19 @@ export function detectImportConflicts(
 
     const conflicts: ConflictImport[] = []
     const identical: IdenticalImport[] = []
-    const seenNames = new Set<string>()
+    /** @desc 批次内已收录的 (名字, 归属槽位) */
+    const seenBatch = new Set<string>()
+    /** @desc 已就「内容一致」问过的已有 buff：同一已有条目只问一次（多主人变体会命中同一个） */
+    const seenIdentical = new Set<string>()
     const deduped: ImportBuffInput[] = []
 
     items.forEach((item) => {
         const name = item.name.trim()
         if (!name) return
-        // 批次内重名：只保留第一条（同名要么内容相同要么冲突，留一条即可）
-        if (seenNames.has(name)) return
-        seenNames.add(name)
+        const slot = ownerIdxOfItem(item)
+        const dedupeKey = `${name}\u0000${slot}`
+        if (seenBatch.has(dedupeKey)) return
+        seenBatch.add(dedupeKey)
         const index = deduped.length
         deduped.push(item)
 
@@ -188,11 +199,14 @@ export function detectImportConflicts(
         const contentKey = importItemContentKey(item)
         if (hit) {
             // 同名：内容也一致 → 视为无冲突（覆盖=跳过，不打扰用户）
-            if (buffContentKey(hit) !== contentKey) conflicts.push({ index, name, existingId: hit.id })
+            if (buffContentKey(hit) !== contentKey) conflicts.push({ index, name, existingId: hit.id, slot })
             return
         }
         const same = byContent.get(contentKey)
-        if (same) identical.push({ index, name, existingId: same.id, existingName: same.name })
+        if (same && !seenIdentical.has(same.id)) {
+            seenIdentical.add(same.id)
+            identical.push({ index, name, existingId: same.id, existingName: same.name, slot })
+        }
     })
 
     return { report: { conflicts, identical }, deduped }
