@@ -33,6 +33,7 @@
         canSkip,
         clampIndex,
         draftOf,
+        enterStep,
         indexAfterSkip,
         isCustomOn,
         isPicked,
@@ -43,6 +44,7 @@
         questionStatus,
         setCustomPick,
         setCustomText,
+        shouldHandleEnter,
         skipQuestion,
         stepIndex,
         submitBlockers,
@@ -131,9 +133,30 @@
     const goNext = () => (index = stepIndex(index, total, 1))
     const jumpTo = (no: number) => (index = clampIndex(no - 1, total))
 
+    /**
+     * @desc Enter 的统一语义：**不是最后一题 → 下一题；已是最后一题 → 提交**。
+     *
+     * 分支判定拆在纯函数 `enterStep`（可单测）；提交仍受 `submitBlockers` 把关 ——
+     * 末题按 Enter 而必答题未作答时不会真的交卷，卡片会显示「第 N 题必答，尚未作答」。
+     */
+    const enterAction = () => {
+        const next = enterStep(index, total)
+        if (next === null) submit()
+        else index = next
+    }
+
+    /** @desc 窗口级 Enter 接管（配合宿主在提问期间隐藏普通输入框，见 ai-assistant.svelte）；放行规则见 `shouldHandleEnter` */
+    const onWindowKeydown = (e: KeyboardEvent) => {
+        if (!shouldHandleEnter(e)) return
+        e.preventDefault()
+        enterAction()
+    }
+
     // 卸载（父组件收起面板 / 清空对话 / 换卡 / 整卡被销毁）一律按「用户放弃」收尾，绝不留悬挂的 Promise
     onDestroy(() => settle(cancelResult()))
 </script>
+
+<svelte:window onkeydown={onWindowKeydown} />
 
 <div
     role="group"
@@ -271,7 +294,8 @@
                                 onkeydown={(e) => {
                                     if (e.key !== 'Enter') return
                                     e.preventDefault()
-                                    submit()
+                                    // 与窗口级 Enter 同一语义：非最后一题先推进，最后一题才提交
+                                    enterAction()
                                 }}
                                 class="w-full rounded-none border px-2 py-1 text-xs outline-none transition-colors"
                                 style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"

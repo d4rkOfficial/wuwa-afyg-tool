@@ -23,6 +23,7 @@ import {
     clampIndex,
     createDraft,
     draftOf,
+    enterStep,
     indexAfterSkip,
     isAnswered,
     isCustomOn,
@@ -37,6 +38,7 @@ import {
     setCustomPick,
     setCustomText,
     settleOnce,
+    shouldHandleEnter,
     skipQuestion,
     stepIndex,
     submitBlockers,
@@ -394,5 +396,51 @@ describe('收尾幂等（Promise 不 double-resolve / 不泄漏）', () => {
         assert.deepEqual(draftOf(draft, 'q3'), { picked: [], customOn: false, customText: '', skipped: false })
         assert.notEqual(draftOf(draft, 'q2'), draftOf(draft, 'q3'))
         assert.deepEqual(g.draft, createDraft(g.questions)) // 入参草稿没被改（不可变）
+    })
+})
+
+// ── Enter 语义：非末题前进、末题提交（配合宿主在提问期间隐藏普通输入框） ──────────
+describe('Enter 语义与接管判定', () => {
+    it('非末题 → 返回下一题下标（逐题推进）', () => {
+        assert.equal(enterStep(0, 3), 1)
+        assert.equal(enterStep(1, 3), 2)
+    })
+
+    it('末题 → 返回 null（表示「提交」）', () => {
+        assert.equal(enterStep(2, 3), null)
+        // 单题问卷：唯一那题就是末题，Enter 直接走提交
+        assert.equal(enterStep(0, 1), null)
+        // 空问卷不崩，也走提交分支（提交会被 submitBlockers/空问卷逻辑兜住）
+        assert.equal(enterStep(0, 0), null)
+    })
+
+    it('末题按 Enter ≠ 无条件交卷：必答未作答时 submitBlockers 仍然拦住', () => {
+        const g = group()
+        // 一题都没答：末题 Enter 的语义是「提交」，但可提交性必须是否
+        assert.equal(enterStep(g.questions.length - 1, g.questions.length), null)
+        assert.equal(canSubmit(g.questions, g.draft), false)
+        assert.ok(submitBlockers(g.questions, g.draft).length > 0, '必答题未作答应阻断提交')
+        assert.match(blockerText(submitBlockers(g.questions, g.draft)), /必答/)
+    })
+
+    it('shouldHandleEnter：Enter 键 + 无修饰键 + 焦点不在输入控件内 才接管', () => {
+        const base = { key: 'Enter', ctrlKey: false, altKey: false, metaKey: false, shiftKey: false }
+        /** @desc 构造假按键事件：只喂被测字段，故一次性断言成 KeyboardEvent */
+        const ev = (over: Record<string, unknown> = {}) => ({ ...base, ...over }) as unknown as KeyboardEvent
+        assert.equal(shouldHandleEnter(ev({ target: { tagName: 'DIV' } })), true)
+        assert.equal(shouldHandleEnter(ev({ target: null })), true)
+        // 非 Enter 一律不接管
+        assert.equal(shouldHandleEnter(ev({ key: 'a', target: { tagName: 'DIV' } })), false)
+        // 修饰键放行（不劫持快捷键）
+        for (const mod of ['ctrlKey', 'altKey', 'metaKey', 'shiftKey'] as const) {
+            assert.equal(shouldHandleEnter(ev({ [mod]: true, target: { tagName: 'DIV' } })), false, `${mod} 应放行`)
+        }
+        // 焦点在输入控件内放行（Shift+Enter 换行、控件自己的 Enter 行为不被劫持）
+        for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) {
+            assert.equal(shouldHandleEnter(ev({ target: { tagName } })), false, `${tagName} 内应放行`)
+        }
+        // 输入法组合中放行（拼音选词的 Enter 是上屏，不能当成推进）
+        assert.equal(shouldHandleEnter(ev({ isComposing: true, target: { tagName: 'DIV' } })), false)
+        assert.equal(shouldHandleEnter(ev({ keyCode: 229, target: { tagName: 'DIV' } })), false)
     })
 })

@@ -350,3 +350,38 @@ export const indexAfterSkip = (index: number, total: number): number =>
 
 /** @desc 进度文案：「第 N / M 题」 */
 export const progressText = (index: number, total: number): string => `第 ${clampIndex(index, total) + 1} / ${total} 题`
+
+/**
+ * @desc Enter 的落点：**非末题 → 前进一题；已是末题 → 提交**。
+ *
+ * 为什么不是「Enter 一律提交」：本卡是**逐题**界面（一屏一题 + 上一题/下一题 + 题号跳题），
+ * Enter 一路推进才符合逐题作答的直觉，到末题自然落到提交。
+ * 返回 `null` 表示「提交」（调用方据此分支），否则返回应跳到的题号下标。
+ *
+ * 注意提交仍受 `submitBlockers` 把关：末题按 Enter 而必答题未作答时不会真的交卷，
+ * 卡片会显示「第 N 题必答，尚未作答」，故 `enterStep` 不必自己判可提交性。
+ */
+export const enterStep = (index: number, total: number): number | null => (canGoNext(index, total) ? index + 1 : null)
+
+/**
+ * @desc 窗口级 Enter 是否应当被本卡接管。
+ *
+ * 三种情况**必须放行**（交回浏览器/控件）：
+ *  ① 焦点在 `input` / `textarea` / `select` 内 —— 那里 Enter 归控件（本卡「其它」输入框有自己的处理）；
+ *  ② 带修饰键（Ctrl/Alt/Meta/Shift）—— 别劫持快捷键；
+ *  ③ 输入法组合中 —— 中文拼音选词的 Enter 是「上屏」，当成推进就会吞掉选词。
+ *
+ * 入参直接吃 `KeyboardEvent`（而不是自定义的结构化子集）：`keyCode` 在 DOM 类型里是必填 `number`、
+ * `target` 是 `EventTarget | null`，写成结构化子类型会与真实事件不兼容
+ * （实测 svelte-check 报「Argument of type 'KeyboardEvent' is not assignable to parameter of type …」）。
+ * 测试里构造假事件时用 `as unknown as KeyboardEvent` 即可。
+ */
+export const shouldHandleEnter = (e: KeyboardEvent): boolean => {
+    if (e.key !== 'Enter') return false
+    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return false
+    // keyCode 229 = IME 组合中（老浏览器路径；`isComposing` 是标准路径，两者都认）
+    if (e.isComposing || e.keyCode === 229) return false
+    const tag = ((e.target ?? null) as { tagName?: string } | null)?.tagName
+    if (tag && /^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return false
+    return true
+}

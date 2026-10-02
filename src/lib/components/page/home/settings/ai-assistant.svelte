@@ -674,10 +674,17 @@
                 >
                     <Icon icon="mdi:layers-triple-outline" class="size-4" />
                 </button>
+                <!-- 前景色必须**显式**给（`textColor`），不能只靠 class 里的 `text-(--theme-modal-text)/40`。
+                     `ui/Button` 的基类无条件发射 `text-(--theme-btn-text)` 作为兜底前景色，而预设里
+                     `btn.textColor` 是**为按钮底色配的对比色**（dark #18181b / light #ffffff），
+                     与 `modal.textColor`（dark #e4e4e7 / light #1e293b）昼夜恰好对调 ——
+                     于是头部两个 `ui/Button` 的明暗观感与左边那个原生 `<button>` 正好相反。
+                     显式传 `currentColor` 后由 class 定色（三个头部按钮同源）。 -->
                 <Button
                     variant="text"
                     bare
                     pad="p-1"
+                    textColor="currentColor"
                     onclick={toggleScale}
                     class="text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
                     title={size === 'small' ? '放大到全尺寸' : '缩小'}
@@ -690,6 +697,7 @@
                     variant="text"
                     bare
                     pad="p-1"
+                    textColor="currentColor"
                     onclick={toggleClick}
                     class="text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
                     title="收起悬浮窗（等同于双击标题栏）"
@@ -890,35 +898,39 @@
                 {/if}
             </div>
 
-            <!-- 输入区 -->
-            <div class="shrink-0 border-t p-2.5" style="border-color: var(--theme-divider-border);">
-                <div class="flex items-end gap-2">
-                    <textarea
-                        bind:value={input}
-                        placeholder="输入指令…（Enter 发送，Shift+Enter 换行）"
-                        rows="2"
-                        onkeydown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault()
-                                send()
-                            }
-                        }}
-                        class="min-h-0 flex-1 resize-none rounded-none border px-2.5 py-2 text-xs leading-relaxed outline-none transition-colors"
-                        style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
-                    ></textarea>
-                    <div class="flex shrink-0 flex-col items-center gap-1">
-                        <button
-                            onclick={() => (busy ? stopGenerating() : send())}
-                            disabled={!busy && !input.trim()}
-                            class="flex size-9 items-center justify-center rounded-none transition-all hover:brightness-115 disabled:opacity-40"
-                            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                            title={busy ? '停止生成' : '发送'}
-                        >
-                            <Icon icon={busy ? 'mdi:stop' : 'mdi:send'} class="size-4" />
-                        </button>
+            <!-- 输入区：`ask_user` 提问卡激活时**整块隐藏** —— 此刻回合正阻塞在工具里等作答，
+                 发送任何文本都不会被处理（只会让用户以为说上了话），且 Enter 已接管为「下一题 / 提交」。
+                 作答与提交全在卡片内完成；卡片消失（提交或放弃）后输入区自动回来。 -->
+            {#if !askCard}
+                <div class="shrink-0 border-t p-2.5" style="border-color: var(--theme-divider-border);">
+                    <div class="flex items-end gap-2">
+                        <textarea
+                            bind:value={input}
+                            placeholder="输入指令…（Enter 发送，Shift+Enter 换行）"
+                            rows="2"
+                            onkeydown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    send()
+                                }
+                            }}
+                            class="min-h-0 flex-1 resize-none rounded-none border px-2.5 py-2 text-xs leading-relaxed outline-none transition-colors"
+                            style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                        ></textarea>
+                        <div class="flex shrink-0 flex-col items-center gap-1">
+                            <button
+                                onclick={() => (busy ? stopGenerating() : send())}
+                                disabled={!busy && !input.trim()}
+                                class="flex size-9 items-center justify-center rounded-none transition-all hover:brightness-115 disabled:opacity-40"
+                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                                title={busy ? '停止生成' : '发送'}
+                            >
+                                <Icon icon={busy ? 'mdi:stop' : 'mdi:send'} class="size-4" />
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            {/if}
         {/if}
     </div>
 {/if}
