@@ -12,6 +12,12 @@
 //      「字重 500 vs 400」的真实视觉差。两者同为 font-weight 工具类，靠产物串序定胜负，
 //      已实测 `.font-medium`(@4538) 在 `.font-normal`(@4652) 之前 → 后者胜出。
 //   ④ 尺寸档是同位置二选一（compact 不得同时出现 `py-1.5`/`text-sm`）。
+//   ⑤ `bare` 档**既不发射前景色兜底 `--theme-btn-text`，也不发射底色兜底 `--theme-btn-bg`**：
+//      两者在预设里都是「为按钮底色配的对比色系」，昼夜恰好与 `modal.*` 对调
+//      （btn.textColor dark #18181b / light #ffffff，btn.backgroundImage dark 浅渐变 / light 深渐变），
+//      而 `bare` 的语义是「长得像原生按钮、外观全由调用方给」——原生 `<button>` 被 preflight
+//      置为透明底 + 继承色，留兜底就会把调用方 class 压掉，实测症状即 AI 助手悬浮窗头部
+//      两个按钮「昼夜与主题相反的实心块」。
 import { describe, it } from 'node:test'
 import { strict as assert } from 'node:assert'
 import { compile } from 'svelte/compiler'
@@ -53,6 +59,12 @@ const tokensOf = (props: Record<string, unknown>): string[] => {
     const html = render(buttonMod, { props: { variant: 'text', label: '确认', ...props } }).body
     const m = /class="([^"]*)"/.exec(html)
     return (m?.[1] ?? '').split(/\s+/).filter(Boolean)
+}
+
+/** @desc 渲染并取回 `<button>` 的 style 属性（底色/前景色兜底都写在这里，不在 class 上） */
+const styleOf = (props: Record<string, unknown>): string => {
+    const html = render(buttonMod, { props: { variant: 'text', label: '确认', ...props } }).body
+    return /style="([^"]*)"/.exec(html)?.[1] ?? ''
 }
 
 /** @desc 状态层类名特征：focus-visible: / disabled: / active: 三个变体前缀 */
@@ -146,8 +158,8 @@ describe('ui/button 的 bare 档契约', () => {
      * `bare` 语义是「长得像原生按钮、样式全由调用方给」，此时该兜底色作为**同权重工具类**会压掉
      * 调用方 class 里的前景色（Tailwind 按字面串序发射，调用方斗不过）——实测症状就是
      * AI 助手悬浮窗头部两个 `ui/Button` 的明暗观感与左侧那个原生 `<button>` 正好相反。
-     * 故 `bare` 档**刻意不发射**它；全项目 38 个 `bare` 按钮里 30 个未显式传 `textColor`，
-     * 但**没有一个**缺少自己的前景色 class，即该兜底色在该档上从无实际消费者。
+     * 故 `bare` 档**刻意不发射**它；AST 实测全项目 70 个 `ui/Button` 调用点（全是 `bare`）里 56 个未显式
+     * 传 `textColor`，但**没有一个**缺少自己的前景色 class，即该兜底色在该档上从无实际消费者。
      */
     it('前景色兜底：默认档发射，bare 档刻意不发射（否则压掉调用方意图）', () => {
         assert.ok(tokensOf({}).includes('text-(--theme-btn-text)'), '默认档应保留 text-(--theme-btn-text) 兜底')
@@ -164,5 +176,27 @@ describe('ui/button 的 bare 档契约', () => {
         // 调用方自带的前景色 class 必须原样保留（基类不得吞掉）
         const withClass = tokensOf({ bare: true, class: 'text-(--theme-modal-text)/40' })
         assert.ok(withClass.includes('text-(--theme-modal-text)/40'), '调用方前景色 class 必须保留')
+    })
+
+    /**
+     * 底色兜底：`--theme-btn-bg` 在预设里是**与主题昼夜相反**的按钮渐变
+     * （dark `linear-gradient(135deg,#e4e4e7,#a1a1aa)` / light `linear-gradient(135deg,#18181b,#3f3f46)`），
+     * 而 `bare` 语义是「长得像原生按钮」——原生 `<button>` 的底色被 Tailwind preflight 置为透明。
+     * 留兜底会使「自带暗淡前景色 class 的图标钮」变成与主题相反的实心块，并把它 class 里的
+     * `hover:bg-*` 盖在渐变之下（实测：AI 助手悬浮窗头部两个按钮昼夜反色）。
+     */
+    it('底色兜底：默认档发射，bare 档不发射；显式 backgroundImage / widget 仍照传', () => {
+        assert.match(styleOf({}), /background:\s*var\(--theme-btn-bg\)/, '默认档应回落 --theme-btn-bg')
+        const bareStyle = styleOf({ bare: true })
+        assert.doesNotMatch(bareStyle, /theme-btn-bg/, `bare 档不得回落按钮底色，实得：${bareStyle}`)
+        assert.equal(bareStyle, '', 'bare 且无显式配色时不该留下任何内联样式')
+        // 调用方显式给底色时原样透传（bare 与默认档都一样）
+        assert.match(styleOf({ bare: true, backgroundImage: 'transparent' }), /background:\s*transparent/)
+        assert.match(styleOf({ backgroundImage: 'var(--theme-accent-bg)' }), /background:\s*var\(--theme-accent-bg\)/)
+        // widget 模式本来就不发射（底色交给「外观主题-背景质感-小部件」）
+        assert.doesNotMatch(styleOf({ surface: 'widget' }), /theme-btn-bg/)
+        // textColor 仍逐字透传（不给就什么都不写，交给 class 定色）
+        assert.match(styleOf({ bare: true, textColor: 'var(--x)' }), /color:\s*var\(--x\)/)
+        assert.doesNotMatch(bareStyle, /color:/, 'bare 且未传 textColor 时不得写死前景色')
     })
 })

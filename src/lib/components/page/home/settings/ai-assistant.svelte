@@ -680,17 +680,17 @@
                 >
                     <Icon icon="mdi:layers-triple-outline" class="size-4" />
                 </button>
-                <!-- 前景色必须**显式**给（`textColor`），不能只靠 class 里的 `text-(--theme-modal-text)/40`。
-                     `ui/Button` 的基类无条件发射 `text-(--theme-btn-text)` 作为兜底前景色，而预设里
-                     `btn.textColor` 是**为按钮底色配的对比色**（dark #18181b / light #ffffff），
-                     与 `modal.textColor`（dark #e4e4e7 / light #1e293b）昼夜恰好对调 ——
-                     于是头部两个 `ui/Button` 的明暗观感与左边那个原生 `<button>` 正好相反。
-                     显式传 `currentColor` 后由 class 定色（三个头部按钮同源）。 -->
+                <!-- 头部两个 `ui/Button` 要与左边那个原生 `<button>` 同源（三者都只靠 class 里的
+                     `text-(--theme-modal-text)/40` 定前景色）。这里有一个实测坑：
+                     **不要传 `textColor="currentColor"`** —— 它落成内联 `color: currentColor`，语义是
+                     「继承父元素颜色」（即全不透明的 `--theme-modal-text`），内联样式会压掉 class 里的 `/40`。
+                     底色同理不必显式给：`bare` 档既不发射 `--theme-btn-text` 前景色兜底，也不发射
+                     `--theme-btn-bg` 底色兜底（后者是**与主题昼夜相反**的按钮渐变，实测症状就是这两个按钮
+                     变成夜主题浅色 / 昼主题深色的实心块）—— 见 `ui/button` 的 bare 契约与 button-contract 测试。 -->
                 <Button
                     variant="text"
                     bare
                     pad="p-1"
-                    textColor="currentColor"
                     onclick={toggleScale}
                     class="text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
                     title={size === 'small' ? '放大到全尺寸' : '缩小'}
@@ -703,7 +703,6 @@
                     variant="text"
                     bare
                     pad="p-1"
-                    textColor="currentColor"
                     onclick={toggleClick}
                     class="text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
                     title="收起悬浮窗（等同于双击标题栏）"

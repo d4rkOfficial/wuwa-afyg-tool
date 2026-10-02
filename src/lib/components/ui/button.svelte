@@ -44,10 +44,12 @@
          */
         size?: 'default' | 'compact' | 'none'
         /**
-         * @desc 关掉本组件自带的**状态层**（`focus-visible:*` / `disabled:*` / `active:brightness-110`），
-         * 只保留布局与排版基类。用于承接「原本完全没有自定义状态样式」的历史按钮：
-         * 直接换过去会凭空多出键盘焦点轮廓与禁用态变暗，属**可见行为变化**。
-         * 实测用例：弹窗 footer 族（`h-7 px-3 text-xs`）全项目 10 处，原本只有 `transition-colors hover:*`。
+         * @desc 关掉本组件自带的**外观层**（`focus-visible:*` / `disabled:*` / `active:brightness-110`
+         * 三个状态层 + `--theme-btn-text` 前景色兜底 + `--theme-btn-bg` 底色兜底），
+         * 只保留布局与排版基类，外观全由调用方给。用于承接「原本完全没有自定义样式」的历史按钮：
+         * 直接换过去会凭空多出键盘焦点轮廓、禁用态变暗、按下提亮，以及**昼夜与主题相反的按钮底色** ——
+         * 属可见行为变化。实测用例：弹窗 footer 族（`h-7 px-3 text-xs`）全项目 10 处，原本只有
+         * `transition-colors hover:*`；以及各处的暗淡图标钮（自带 `text-(--theme-modal-text)/40`）。
          * 注：按压的位移/缩放来自 `layout.css` 的全局 `:where(button:not(:disabled))`，
          * **不受本参数影响**（那是全项目按钮共有的基础反馈，不是本组件的状态层）。
          */
@@ -155,7 +157,19 @@
             // （旧实现无条件先写 `--theme-btn-bg` 再由 backgroundImage 覆盖，会在 style 里留下
             //  两条 `background:` 声明；虽然后者生效、视觉无差，但属噪音且与 props 注释矛盾 —— T34 修。）
             // widget 模式刻意不写：底色交给「背景质感-小部件」管理。
-            backgroundImage ? `background: ${backgroundImage}` : isWidget ? '' : `background: var(--theme-btn-bg)`,
+            // `bare` 档也刻意不写（同前景色兜底的理由）：`--theme-btn-bg` 在预设里是**与主题昼夜相反**的
+            // 按钮渐变（dark 浅色 / light 深色），而 `bare` 语义是「长得像原生按钮」——原生 `<button>` 的底色
+            // 被 Tailwind preflight 置为透明。不关掉它，那些自带暗淡前景色的图标钮（`text-(--theme-modal-text)/40`
+            // 这类）就会变成与主题相反的实心块，且它们 class 里的 `hover:bg-*` 会被不透明渐变盖住、永远看不见
+            // （实测症状：AI 助手悬浮窗头部两个按钮昼夜反色）。AST 实测全项目 70 个 `ui/Button` 调用点
+            // 全是 `bare`，其中只剩 7 处完全不给 `backgroundImage` —— 正是这条兜底色的受害者
+            // （AI 助手头部 2 个 + 各弹窗里的暗淡图标钮 5 个）；另有 1 处按条件传
+            // （`confirm-dialog` 的危险分支传空串，修前同样被这条不透明兜底盖住了 class 里的 `bg-red-500`）。
+            backgroundImage
+                ? `background: ${backgroundImage}`
+                : isWidget || bare
+                  ? ''
+                  : `background: var(--theme-btn-bg)`,
             textColor ? `color: ${textColor}` : '',
             styleProp || ''
         ])
@@ -182,7 +196,8 @@
         // 昼夜恰好对调；而 `bare` 语义是「本按钮长得像原生按钮、样式全由调用方给」，
         // 它作为同权重工具类会**压掉调用方 class 里的前景色**（Tailwind 按字面串序发射，斗不过），
         // 结果是弹窗里的 `bare` 图标钮昼夜观感反过来（实测：AI 助手头部两个 `ui/Button` 与左侧原生按钮不同色）。
-        // 实测依据：全项目 38 个 `bare` 按钮里 30 个未显式传 `textColor`，但**没有一个**缺少自己的前景色 class，
+        // 实测依据：全项目 70 个 `bare` 调用点（AST 实测）里 56 个未显式传 `textColor`，但**没有一个**
+        // 缺少自己的前景色 class（唯一 3 处的 class 走 `{FOOT_BTN}` 变量，其常量里就是 `text-(--theme-modal-text)/60`），
         // 即该兜底色在 `bare` 档上从无实际消费者，去掉零回归。
         bare ? '' : 'text-(--theme-btn-text)',
         // 状态层（`bare` 时整组不发射，用于承接历史上没有任何自定义状态样式的按钮）
