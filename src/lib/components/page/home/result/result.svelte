@@ -27,6 +27,7 @@
     import type { ComponentsProps } from '$lib/types'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { slide } from 'svelte/transition'
+    import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import Icon from '@iconify/svelte'
     import { getComparisonEligibility } from '$lib/calc/comparison'
     import DataAnalysisModal from './data-analysis-modal.svelte'
@@ -492,7 +493,7 @@
                 </thead>
             </table>
         </div>
-        <div class="theme-scrollbar snap-scroll-y flex-1 overflow-y-auto pb-48" bind:this={tableContainer}>
+        <div class="theme-scrollbar flex-1 overflow-y-auto pb-48" bind:this={tableContainer}>
             <table class="w-full table-fixed text-xs">
                 <colgroup>
                     <col style="width: 19%" />
@@ -511,8 +512,9 @@
                             : expandedEntryIds.has(entry.id) && expandedEntryIds.size === 1}
                         <tr
                             onclick={() => toggleExpand(entry.id, i)}
+                            data-press="row"
                             data-entry-id={entry.id}
-                            class="snap-row cursor-pointer border-b transition-colors hover:bg-(--theme-modal-text)/3"
+                            class="cursor-pointer border-b transition-colors hover:bg-(--theme-modal-text)/3"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <td
@@ -527,7 +529,7 @@
                                 style="color: var(--theme-element-{entry.element}, #888)"
                             >
                                 {entry.displayName}
-                                {#each entry.damageTypes as dt}
+                                {#each entry.damageTypes as dt (dt)}
                                     <span
                                         class="ml-1 rounded-none border px-1 text-[9px] font-medium align-middle"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
@@ -564,7 +566,7 @@
                             <tr style="background: var(--theme-input-bg);">
                                 <td colspan="8" class="p-0">
                                     <div
-                                        transition:slide|local={{ duration: 200 }}
+                                        transition:slide|local={slideParams(MOTION_MS.base)}
                                         class="space-y-3 border-b px-6 py-3 text-xs text-(--theme-modal-text)/60"
                                         style="border-color: var(--theme-divider-border);"
                                     >
@@ -721,7 +723,7 @@
         {noCritEntryIds}
         comparisonEligible={comparisonEligibility.eligible}
         comparisonReason={comparisonEligibility.reason}
-        onCompare={() => {
+        oncompare={() => {
             // 兄弟弹窗互斥：从数据分析进入对比时关闭数据分析
             showDataAnalysis = false
             showComparison = true
@@ -740,7 +742,7 @@
         eligibility={comparisonEligibility}
         recompute={recomputeComparison}
         initialPoints={comparisonPoints}
-        onBack={(points) => {
+        onback={(points) => {
             // 返回数据分析弹窗（兄弟互斥）+ 持久化对比配置
             comparisonPoints = points
             void updateComparisonPoints(points)

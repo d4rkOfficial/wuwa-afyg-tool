@@ -18,10 +18,11 @@
     import CharacterPicker from './pickers/character-picker.svelte'
     import WeaponPicker from './pickers/weapon-picker.svelte'
     import EchoPicker from './pickers/echo-picker.svelte'
-    import SetPicker from './set-picker.svelte'
+    import SetPicker from '$lib/components/page/home/team/pickers/set-picker.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { HECATE_ECHO } from '$lib/consts/game-terms'
     import type { ComponentsProps } from '$lib/types'
+    import { mergeClass } from '$lib/utils/component-style'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
@@ -289,7 +290,7 @@
     style="color: var(--theme-modal-text); {styleProp || ''}"
 >
     <div class="flex min-h-0 flex-1 gap-4">
-        {#each localTeam as slot, i}
+        {#each localTeam as slot, i (i)}
             {@const charData = characterMap.get(slot.character ?? '')}
             {@const eColor = charData ? `var(--theme-element-${charData.element})` : ''}
             <div
@@ -314,6 +315,7 @@
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
+                                data-press=""
                                 data-sf="widget"
                                 data-sf-flat
                                 class={[
@@ -326,7 +328,10 @@
                                 style="--sf-base: var(--theme-input-bg)"
                                 onclick={() => openPicker(i, 'character')}
                             >
-                                <span class="picker-badge">角色</span>
+                                <span
+                                    class="absolute right-1.5 top-1.5 z-5 rounded-none bg-(--theme-modal-text) px-[7px] py-[1px] text-[10px] leading-4 font-black tracking-[0.08em] text-(--theme-modal-bg) opacity-75 pointer-events-none"
+                                    >角色</span
+                                >
                                 {#if slot.character && characterIcons[slot.character]}
                                     <img
                                         src={characterIcons[slot.character]}
@@ -338,9 +343,10 @@
                                 {/if}
                                 <div class="flex flex-col min-w-0 flex-1">
                                     <span
-                                        class="truncate text-xs font-black"
+                                        class="truncate text-xs font-black {!slot.character
+                                            ? 'text-(--theme-muted-text)'
+                                            : ''}"
                                         class:opacity-40={!slot.character}
-                                        class:text-[var(--theme-muted-text)]={!slot.character}
                                         style={slot.character && eColor ? `color: ${eColor}` : ''}
                                     >
                                         {slot.character || (locked ? '未设置' : '点击选择')}
@@ -379,21 +385,23 @@
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
+                                data-press=""
                                 data-sf="widget"
                                 data-sf-flat
-                                class={[
+                                class={mergeClass([
                                     'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--sf-mix,var(--theme-input-bg)))]!',
                                     slot.weapon
                                         ? 'border-(--theme-divider-border)'
                                         : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
-                                ]
-                                    .filter(Boolean)
-                                    .join(' ')}
+                                ])}
                                 style="--sf-base: var(--theme-input-bg)"
                                 onclick={() => openPicker(i, 'weapon')}
                             >
-                                <span class="picker-badge">武器</span>
+                                <span
+                                    class="absolute right-1.5 top-1.5 z-5 rounded-none bg-(--theme-modal-text) px-[7px] py-[1px] text-[10px] leading-4 font-black tracking-[0.08em] text-(--theme-modal-bg) opacity-75 pointer-events-none"
+                                    >武器</span
+                                >
                                 {#if slot.weapon && weaponIcons[slot.weapon]}
                                     <img
                                         src={weaponIcons[slot.weapon]}
@@ -407,9 +415,10 @@
                                         <span class="text-xs text-(--theme-modal-text)/40">自动推荐中...</span>
                                     {:else}
                                         <span
-                                            class="truncate text-xs font-black"
+                                            class="truncate text-xs font-black {!slot.weapon
+                                                ? 'text-(--theme-muted-text)'
+                                                : ''}"
                                             class:opacity-40={!slot.weapon}
-                                            class:text-[var(--theme-muted-text)]={!slot.weapon}
                                         >
                                             {slot.weapon ||
                                                 (slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色')}
@@ -432,21 +441,23 @@
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
+                                data-press=""
                                 data-sf="widget"
                                 data-sf-flat
-                                class={[
+                                class={mergeClass([
                                     'relative flex flex-1 cursor-pointer items-center gap-3 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--sf-mix,var(--theme-input-bg)))]!',
                                     slot.echoes[0].name
                                         ? 'border-(--theme-divider-border)'
                                         : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
-                                ]
-                                    .filter(Boolean)
-                                    .join(' ')}
+                                ])}
                                 style="--sf-base: var(--theme-input-bg)"
                                 onclick={() => openPicker(i, 'echo')}
                             >
-                                <span class="picker-badge">首位声骸</span>
+                                <span
+                                    class="absolute right-1.5 top-1.5 z-5 rounded-none bg-(--theme-modal-text) px-[7px] py-[1px] text-[10px] leading-4 font-black tracking-[0.08em] text-(--theme-modal-bg) opacity-75 pointer-events-none"
+                                    >首位声骸</span
+                                >
                                 {#if slot.echoes[0].name && echoIcons[slot.echoes[0].name]}
                                     <img
                                         src={echoIcons[slot.echoes[0].name]}
@@ -456,9 +467,10 @@
                                     />
                                 {/if}
                                 <span
-                                    class="min-w-0 flex-1 truncate text-xs font-black"
+                                    class="min-w-0 flex-1 truncate text-xs font-black {!slot.echoes[0].name
+                                        ? 'text-(--theme-muted-text)'
+                                        : ''}"
                                     class:opacity-40={!slot.echoes[0].name}
-                                    class:text-[var(--theme-muted-text)]={!slot.echoes[0].name}
                                 >
                                     {slot.echoes[0].name
                                         ? `${slot.echoes[0].name} (C${slot.echoes[0].cost})`
@@ -476,24 +488,26 @@
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
+                                data-press=""
                                 data-sf="widget"
                                 data-sf-flat
-                                class={[
+                                class={mergeClass([
                                     'relative flex flex-1 cursor-pointer items-center gap-2 rounded-none border px-4 py-2 text-xs transition-colors hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,var(--sf-mix,var(--theme-input-bg)))]!',
                                     slot.triggerSets.length > 0
                                         ? 'border-(--theme-divider-border)'
                                         : 'border-dashed border-(--theme-card-border)',
                                     !slot.character && !locked ? 'pointer-events-none opacity-40' : ''
-                                ]
-                                    .filter(Boolean)
-                                    .join(' ')}
+                                ])}
                                 style="--sf-base: var(--theme-input-bg)"
                                 onclick={() => openPicker(i, 'sets')}
                             >
-                                <span class="picker-badge">触发套装</span>
+                                <span
+                                    class="absolute right-1.5 top-1.5 z-5 rounded-none bg-(--theme-modal-text) px-[7px] py-[1px] text-[10px] leading-4 font-black tracking-[0.08em] text-(--theme-modal-bg) opacity-75 pointer-events-none"
+                                    >触发套装</span
+                                >
                                 {#if slot.triggerSets.length > 0}
                                     <div class="flex flex-wrap items-center gap-2">
-                                        {#each slot.triggerSets as set}
+                                        {#each slot.triggerSets as set, si (si)}
                                             <span
                                                 class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] font-black"
                                                 style="border-color: var(--theme-divider-border); background: var(--theme-card-bg);"
@@ -513,9 +527,10 @@
                                     </div>
                                 {:else}
                                     <span
-                                        class="min-w-0 flex-1 truncate text-xs"
+                                        class="min-w-0 flex-1 truncate text-xs {slot.triggerSets.length === 0
+                                            ? 'text-(--theme-muted-text)'
+                                            : ''}"
                                         class:opacity-40={slot.triggerSets.length === 0}
-                                        class:text-[var(--theme-muted-text)]={slot.triggerSets.length === 0}
                                     >
                                         {slot.character ? '点击选择' : locked ? '未设置' : '请先选择角色'}
                                     </span>
@@ -568,30 +583,3 @@
         icons={echoSetIcons}
     />
 {/if}
-
-<style>
-    .hide-scrollbar {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-    }
-    .hide-scrollbar::-webkit-scrollbar {
-        display: none;
-    }
-    /* 选择框右上角角标：直角，背景取主题文本色、文字取主题背景色（自然形成 mono 反色：黑夜白底黑字/白天黑底白字） */
-    .picker-badge {
-        position: absolute;
-        right: 0.375rem;
-        top: 0.375rem;
-        z-index: 5;
-        padding: 0.0625rem 0.4375rem;
-        border-radius: 0;
-        font-size: 0.625rem;
-        line-height: 1rem;
-        font-weight: 900;
-        letter-spacing: 0.08em;
-        background: var(--theme-modal-text);
-        color: var(--theme-modal-bg);
-        opacity: 0.75;
-        pointer-events: none;
-    }
-</style>

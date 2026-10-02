@@ -35,7 +35,7 @@ let _showBuffModal = $state(false)
 let _showDamageTypeModal = $state(false)
 let _buffDiffMode = $state(false)
 let _locked = $state(false)
-/** @desc 全局生效配置：各角色共鸣链 / 武器精炼阶数（由工程变量/队伍槽位派生，结果计算与条件过滤共用） */
+/** @desc 全局生效配置：各角色共鸣链 / 武器精炼阶数（结果计算与条件过滤共用） */
 let _conditionProfile: ConditionProfile = $state({ chains: [0, 0, 0], refinements: [1, 1, 1] })
 /** @desc 默认隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff */
 let _hideConditionMismatch = $state(true)
@@ -53,7 +53,7 @@ let _globalBuffSetIds = $state<string[]>([])
 let _onupdate: ((state: CalcState) => void) | undefined = $state()
 
 /**
- * @desc ── 拉表撤销/重做：只记录表格变化（Buff 实例与乘区条件 / 绑定 / 条目条件与变量写入 / 变量表）──
+ * @desc ── 拉表撤销/重做：只记录表格变化（Buff 实例与乘区条件 / 绑定 / 条目条件）──
  * 所有表格写操作统一调用 `markTableDirty()`；微任务里与基线比较后压栈，因此连续拖拽数值、
  * 批量勾选只会留下一条历史，也不会为每一帧压栈。历史栈与 GUI 的 `canUndoTable/canRedoTable`
  * 通过 `_historyVersion` 计数器保持响应式。

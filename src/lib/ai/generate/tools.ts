@@ -220,8 +220,11 @@ export const GENERATE_TOOLS: ToolDefinition[] = [
             parameters: {
                 type: 'object',
                 properties: {
-                    entityType: { type: 'string', enum: ENTITY_TYPES },
-                    entityName: { type: 'string', description: '实体名称（中文）' }
+                    entityType: { type: 'string', enum: ENTITY_TYPES, description: '实体类型' },
+                    entityName: {
+                        type: 'string',
+                        description: '实体名称（中文，用 list_entities / search_entities 定位）'
+                    }
                 },
                 required: ['entityType', 'entityName']
             }

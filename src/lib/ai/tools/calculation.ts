@@ -322,7 +322,10 @@ defineTool('set_refinement', {
     description: '设置指定角色槽位（1-3）的武器精炼阶数（0-5，0=未精炼、不触发专武 1-5 阶 buff）。',
     parameters: {
         type: 'object',
-        properties: { slot: { type: 'number' }, value: { type: 'number', description: '阶数 0-5' } },
+        properties: {
+            slot: { type: 'number', description: '角色槽位（1-3）' },
+            value: { type: 'number', description: '阶数 0-5' }
+        },
         required: ['slot', 'value']
     },
     handler: (args, ctx) => {

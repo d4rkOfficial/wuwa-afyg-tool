@@ -125,7 +125,7 @@
             {globalBuffSetIds}
             conditionProfile={getConditionProfile()}
             hideConditionMismatch={getHideConditionMismatch()}
-            onToggle={handleSpreadToggle}
+            ontoggle={handleSpreadToggle}
             onSetEntryBuffSetIds={handleSpreadSetEntryBuffSetIds}
             onSetEntriesBuffSetIds={handleSpreadSetEntriesBuffSetIds}
         />

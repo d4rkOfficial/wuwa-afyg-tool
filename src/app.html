@@ -10,6 +10,59 @@
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <script>
+            /*
+             * 手机端重定向到横屏壳页 /shell-page。
+             *
+             * 为什么放在 app.html：/ 是 prerender 出来的静态页（见 routes/+page.ts），
+             * 运行时不会进 hooks.server.ts，服务端重定向对它天然失效；
+             * 这里的脚本跑在 SvelteKit 启动之前，跳转发生在首屏渲染前，不动预渲染架构。
+             *
+             * 四条不跳规则（缺一条就会出事）：
+             *   1. 已经在 /shell-page —— 否则自己跳自己无限循环；
+             *   2. 处在 iframe 里 —— 壳页 iframe 加载的正是同一个 /，
+             *      靠 window.self !== window.top 判定（比 document.referrer 可靠：
+             *      严格 referrer-policy 下 referrer 可能为空，空值会导致无限循环）。
+             *      这条同时覆盖 B 站 Toy 容器（它也是用 iframe 引入本工具）；
+             *   3. 已安装的 PWA（standalone）—— 用户刻意装到桌面，不该被塞进浏览器全屏壳页；
+             *   4. 非手机 UA / 不支持全屏方向锁的环境 —— 跳过去也切不了横屏，只会多一层遮罩。
+             */
+            try {
+                var shellCtx = {
+                    pathname: location.pathname,
+                    inIframe: window.self !== window.top,
+                    standalone:
+                        window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
+                    userAgent: navigator.userAgent || '',
+                    viewportWidth: window.innerWidth || 0,
+                    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+                    canLockOrientation:
+                        typeof screen.orientation === 'object' &&
+                        screen.orientation !== null &&
+                        typeof screen.orientation.lock === 'function' &&
+                        typeof document.documentElement.requestFullscreen === 'function'
+                }
+                /*
+                 * 手机判定：UA 命中移动端关键字，且是窄屏 + 粗指针。
+                 * 注意 iOS Safari 默认「请求桌面网站」时 UA 与桌面一致，此路径判不出来（已知取舍）。
+                 */
+                var isMobileDevice = /Android|iPhone|iPod|Windows Phone|HarmonyOS|Mobile Safari/i.test(
+                    shellCtx.userAgent
+                )
+                var shouldShell =
+                    shellCtx.pathname !== '/shell-page' &&
+                    !shellCtx.inIframe &&
+                    !shellCtx.standalone &&
+                    shellCtx.canLockOrientation &&
+                    isMobileDevice &&
+                    shellCtx.coarsePointer &&
+                    shellCtx.viewportWidth > 0 &&
+                    shellCtx.viewportWidth < 900
+                if (shouldShell) location.replace('/shell-page' + location.search + location.hash)
+            } catch (err) {
+                /* 判定失败就正常打开主站，绝不因为跳转逻辑坏了而白屏 */
+            }
+        </script>
+        <script>
             try {
                 if (sessionStorage.getItem('wuwa-afyg:splash')) {
                     document.documentElement.classList.add('splash-skip')

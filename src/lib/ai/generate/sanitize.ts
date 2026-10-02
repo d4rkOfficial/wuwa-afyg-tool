@@ -69,7 +69,9 @@ function sanitizeZones(zones: GeneratedZone[] | undefined): GeneratedZone[] {
     for (const z of Array.isArray(zones) ? zones : []) {
         if (!z) continue
         const zoneId = resolveZoneId(String(z.zoneId ?? ''))
-        if (!ZONE_MAP.has(zoneId) || !Number.isFinite(z.value)) continue
+        if (!ZONE_MAP.has(zoneId)) continue
+        const num = z.value
+        if (num === undefined || !Number.isFinite(num)) continue
         // 层数类乘区（集谐干涉/同奏增益等）只填固定层数，丢弃模型误输出的引用
         const ref = !ZONE_NO_REF_IDS.has(zoneId) ? sanitizeRef(z.ref) : undefined
         const override = !!z.override && !ref && !ZONE_NO_OVERRIDE_IDS.has(zoneId)
@@ -79,7 +81,7 @@ function sanitizeZones(zones: GeneratedZone[] | undefined): GeneratedZone[] {
         seen.add(key)
         out.push({
             zoneId,
-            value: z.value,
+            value: num,
             ...(override ? { override: true } : {}),
             ...(ref ? { ref } : {}),
             ...(condition ? { condition } : {})

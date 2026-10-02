@@ -2,6 +2,7 @@
     /** @desc 下拉表（拉表默认视图）：每条伤害可点击展开，配置伤害类型/增益勾选/叠层文件夹/复制前后段，支持 Buff 差异模式展示 */
     import { tick } from 'svelte'
     import { slide } from 'svelte/transition'
+    import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import {
         getBuffSetIdsForEntry,
         toggleBuffSetForEntry,
@@ -15,19 +16,35 @@
         countSameNameEntries,
         getPaneEffectSources
     } from '$lib/calc/calculation.store.svelte'
-    import { inferDamageTypes } from '$lib/calc/utils'
-    import { buffContributesToEntry, resolveDamageTypes } from '$lib/calc/compute'
+    import {
+        buildCharToIdx,
+        buildDamageTypesByEntry,
+        buildInferredDamageTypeMap,
+        buffMatchesEntry,
+        damageTypeShort,
+        entryCharIdx as entryCharIdxOf,
+        inferredDamageTypeText,
+        isDirectDamage,
+        paneSourceText,
+        toggleAllIds,
+        zoneLabelsOf
+    } from './damage-table.utils'
+    import {
+        buildEntryBuffDiff,
+        findNextDirectEntry,
+        findNextEffectEntry,
+        findPrevDirectEntry,
+        findPrevEffectEntry,
+        layeredChildLabel,
+        visibleBuffSetsOf,
+        type BuffDiffItem
+    } from './dropdown-table.utils'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { addToast } from '$lib/data/toast.svelte'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
-    import {
-        DAMAGE_TYPES,
-        DAMAGE_TYPE_SHORT,
-        groupBuffSets,
-        LAYERED_BUFF_PATTERN,
-        ZONE_REF_MAP
-    } from '$lib/calc/calculation.consts'
+    import { mergeClass } from '$lib/utils/component-style'
+    import { DAMAGE_TYPES, groupBuffSets } from '$lib/calc/calculation.consts'
     import type { GroupedBuffSetItem } from '$lib/calc/calculation.consts'
     import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
     import type { ConditionProfile } from '$lib/calc/compute'
@@ -35,6 +52,9 @@
     import type { CalcState } from '$lib/calc/calculation.types'
     import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
+    import Chip from '$lib/components/ui/chip.svelte'
+    import Tag from '$lib/components/ui/tag.svelte'
+    import EmptyState from '$lib/components/ui/empty-state.svelte'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
@@ -79,47 +99,33 @@
             if (echoName) void ensureEchoSkillText(echoName)
         }
     })
-    let inferredDamageTypeMap = $derived<Record<string, string[]>>(
-        Object.fromEntries(
-            damageEntries.map((e) => [
-                e.id,
-                inferDamageTypes(e, e.character ? charInfoMap[e.character] : undefined, echoDescByEntry[e.id])
-            ])
-        )
-    )
+    let inferredDamageTypeMap = $derived(buildInferredDamageTypeMap(damageEntries, charInfoMap, echoDescByEntry))
 
     /** @desc 当前展开条目及它的 Buff/伤害类型绑定、角色槽位索引 */
     let selectedEntry = $derived(damageEntries.find((e) => e.id === expandedEntryId) ?? null)
     let selectedEntrySetIds = $derived(expandedEntryId ? getBuffSetIdsForEntry(expandedEntryId) : [])
-    let charToIdx = $derived<Record<string, number>>(
-        Object.fromEntries(team.map((s, i) => [s.character ?? '', i]).filter(([name]) => name !== ''))
-    )
-    let entryCharIdx = $derived(selectedEntry?.character ? (charToIdx[selectedEntry.character] ?? -1) : -1)
+    let charToIdx = $derived(buildCharToIdx(team))
+    let entryCharIdx = $derived(selectedEntry ? entryCharIdxOf(selectedEntry, charToIdx) : -1)
     /** @desc buffId → BuffSet 查找索引（替代渲染/差异计算中的线性 find） */
     let buffById = $derived(new Map(buffSets.map((b) => [b.id, b])))
 
+    /** @desc 条目 → 生效伤害类型：只依赖「条目本身」，与具体 buff 无关（两个视图共用同一口径与同一次记忆） */
+    const damageTypesByEntry = $derived(
+        buildDamageTypesByEntry(damageEntries, entryDamageTypeMap, charInfoMap, echoDescByEntry)
+    )
+
     /**
      * @desc 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff）。
-     * 用 `buffContributesToEntry` 而非实例级条件：属性/类型条件挂在**乘区条目**上，
-     * 只看实例级会让「乘区条件不满足」的 buff 仍可勾选（平铺/下拉两个视图共用同一口径）。
+     * 口径在 `damage-table.utils.buffMatchesEntry`：用 `buffContributesToEntry` 而非实例级条件 ——
+     * 属性/类型条件挂在**乘区条目**上，只看实例级会让「乘区条件不满足」的 buff 仍可勾选。
      */
-    const buffMatches = (bs: BuffSet | undefined, entry: DamageEntry): boolean => {
-        if (!bs) return false
-        if (!hideConditionMismatch) return true
-        const charIdx = entry.character ? (charToIdx[entry.character] ?? -1) : -1
-        const isNonDirect = entry.isEffect || entry.isTuneBreak || entry.isTuneResponse
-        return buffContributesToEntry(
-            bs,
-            isNonDirect
-                ? {}
-                : {
-                      element: entry.damageElement,
-                      damageTypes: resolveDamageTypes(entry, entryDamageTypeMap, charInfoMap, echoDescByEntry)
-                  },
+    const buffMatches = (bs: BuffSet | undefined, entry: DamageEntry): boolean =>
+        buffMatchesEntry(bs, entry, {
+            hideConditionMismatch,
             conditionProfile,
-            charIdx
-        )
-    }
+            damageTypes: damageTypesByEntry.get(entry.id),
+            charIdx: entryCharIdxOf(entry, charToIdx)
+        })
 
     /**
      * @desc 当前条目的「影响源」Buff：作用域指向**被本条目的引用所指向的角色**、且会改写该面板乘区的 Buff。
@@ -129,122 +135,40 @@
     const entryPaneSources = $derived.by(() => (selectedEntry ? getPaneEffectSources(selectedEntry.id) : {}))
 
     /** @desc 影响源提示文案（chips tooltip） */
-    const paneSourceText = (buffId: string): string => {
+    const paneSourceTooltip = (buffId: string): string => {
         const src = entryPaneSources[buffId]
         if (!src) return ''
         const charName = team[src.charIdx]?.character ?? `角色${src.charIdx + 1}`
-        const labels = src.zoneIds.map((z) => ZONE_REF_MAP.get(z)?.label ?? z)
-        return `影响源：${charName} 的${labels.join('、')}会被它改写，而本段伤害引用了该面板 —— 勾上后参与该角色在这一段的面板计算`
+        return paneSourceText(charName, zoneLabelsOf(src.zoneIds), '本段伤害')
     }
 
     /** @desc 对当前展开条目可见（非全局、作用域匹配或属于跨角色引用影响源、条件满足）的 Buff，并按叠层规则分组 */
     let visibleBuffSets = $derived(
-        buffSets.filter((b) => {
-            if (globalBuffSetIds.includes(b.id)) return false
-            // 影响源：作用域不含本角色，但会改写「本段引用到的角色面板」，勾上即生效
-            if (entryPaneSources[b.id] !== undefined) {
-                return !selectedEntry || buffMatches(b, selectedEntry)
-            }
-            const scopeOk = selectedEntry?.isEffect
-                ? b.scope === 'all' || (Array.isArray(b.scope) && b.scope.length === 0)
-                : entryCharIdx >= 0 && (b.scope === 'all' || (b.scope as number[]).includes(entryCharIdx))
-            if (!scopeOk) return false
-            if (selectedEntry && !buffMatches(b, selectedEntry)) return false
-            return true
+        visibleBuffSetsOf({
+            buffSets,
+            globalBuffSetIds,
+            entryPaneSources,
+            selectedEntry,
+            entryCharIdx,
+            matches: buffMatches
         })
     )
     let groupedVisibleSets = $derived(groupBuffSets(visibleBuffSets))
     let groupedFolderItems = $derived(groupedVisibleSets.filter((g) => g.type === 'folder'))
     let groupedStandaloneItems = $derived(groupedVisibleSets.filter((g) => g.type !== 'folder'))
 
-    interface BuffDiffItem {
-        setId: string
-        name: string
-        type: 'added' | 'removed' | 'same' | 'global'
-    }
-
     /** @desc Buff 差异模式的数据：逐条目对比上一段（同角色直伤 / 同名效应），标出 新增/移除/不变/全局 */
-    let entryBuffDiff = $derived.by(() => {
-        if (!buffDiffMode) return {} as Record<string, BuffDiffItem[]>
-
-        const result: Record<string, BuffDiffItem[]> = {}
-        for (let i = 0; i < damageEntries.length; i++) {
-            const e = damageEntries[i]
-
-            const match = (sid: string) => buffMatches(buffById.get(sid), e)
-
-            const globalItems = (entryBuffSetIdMap[e.id] ?? [])
-                .filter((sid) => globalBuffSetIds.includes(sid) && match(sid))
-                .map((sid) => ({
-                    setId: sid,
-                    name: buffById.get(sid)?.name ?? '',
-                    type: 'global' as const
-                }))
-
-            const isFirstCharEntry = e.character
-                ? !damageEntries.slice(0, i).some((p) => p.character === e.character)
-                : true
-
-            if (e.isTuneBreak || e.isTuneResponse) {
-                result[e.id] = [
-                    ...(isFirstCharEntry ? globalItems : []),
-                    ...(entryBuffSetIdMap[e.id] ?? [])
-                        .filter((sid) => !globalBuffSetIds.includes(sid) && match(sid))
-                        .map((sid) => ({
-                            setId: sid,
-                            name: buffById.get(sid)?.name ?? '',
-                            type: 'same' as const
-                        }))
-                ]
-                continue
-            }
-
-            let prevId: string | null = null
-            if (e.isEffect) {
-                for (let j = i - 1; j >= 0; j--) {
-                    const p = damageEntries[j]
-                    if (p.isEffect && p.hitName === e.hitName) {
-                        prevId = p.id
-                        break
-                    }
-                }
-            } else {
-                for (let j = i - 1; j >= 0; j--) {
-                    const p = damageEntries[j]
-                    if (!p.isEffect && !p.isTuneBreak && !p.isTuneResponse && p.character === e.character) {
-                        prevId = p.id
-                        break
-                    }
-                }
-            }
-
-            if (!prevId) {
-                result[e.id] = [
-                    ...(isFirstCharEntry ? globalItems : []),
-                    ...(entryBuffSetIdMap[e.id] ?? [])
-                        .filter((sid) => !globalBuffSetIds.includes(sid) && match(sid))
-                        .map((sid) => ({
-                            setId: sid,
-                            name: buffById.get(sid)?.name ?? '',
-                            type: 'added' as const
-                        }))
-                ]
-                continue
-            }
-
-            const curr = new Set(entryBuffSetIdMap[e.id] ?? [])
-            const prev = new Set(entryBuffSetIdMap[prevId] ?? [])
-            const items: BuffDiffItem[] = []
-            for (const id of curr)
-                if (!prev.has(id) && match(id))
-                    items.push({ setId: id, name: buffById.get(id)?.name ?? '', type: 'added' })
-            for (const id of prev)
-                if (!curr.has(id) && match(id))
-                    items.push({ setId: id, name: buffById.get(id)?.name ?? '', type: 'removed' })
-            result[e.id] = items
-        }
-        return result
-    })
+    let entryBuffDiff = $derived(
+        buffDiffMode
+            ? buildEntryBuffDiff({
+                  damageEntries,
+                  entryBuffSetIdMap,
+                  globalBuffSetIds,
+                  buffById,
+                  matches: buffMatches
+              })
+            : ({} as Record<string, BuffDiffItem[]>)
+    )
 
     /** @desc 展开/收起条目（展开后滚动到该行，block: nearest 平滑滚动） */
     function handleToggleExpand(id: string, _index: number) {
@@ -270,14 +194,7 @@
     function handleToggleFolder(folder: GroupedBuffSetItem) {
         if (!expandedEntryId || !folder.children) return
         const childIds = folder.children.map((c) => c.id)
-        const allSelected = childIds.every((id) => selectedEntrySetIds.includes(id))
-        const currentSet = new Set(selectedEntrySetIds)
-        if (allSelected) {
-            for (const id of childIds) currentSet.delete(id)
-        } else {
-            for (const id of childIds) currentSet.add(id)
-        }
-        setBuffSetIdsForEntry(expandedEntryId, [...currentSet])
+        setBuffSetIdsForEntry(expandedEntryId, toggleAllIds(childIds, selectedEntrySetIds))
         onupdate(getCalcState())
     }
 
@@ -285,14 +202,7 @@
     function handleToggleBuffPrefix(folder: GroupedBuffSetItem, index: number) {
         if (!expandedEntryId || !folder.children) return
         const prefixIds = folder.children.slice(0, index + 1).map((c) => c.id)
-        const allSelected = prefixIds.every((id) => selectedEntrySetIds.includes(id))
-        const currentSet = new Set(selectedEntrySetIds)
-        if (allSelected) {
-            for (const id of prefixIds) currentSet.delete(id)
-        } else {
-            for (const id of prefixIds) currentSet.add(id)
-        }
-        setBuffSetIdsForEntry(expandedEntryId, [...currentSet])
+        setBuffSetIdsForEntry(expandedEntryId, toggleAllIds(prefixIds, selectedEntrySetIds))
         onupdate(getCalcState())
     }
 
@@ -308,17 +218,14 @@
         if (!entry || !entry.character) return
         const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
         if (entryIndex < 0) return
-        const char = entry.character
         const currentTypes = getDamageTypesForEntry(entryId)
-        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
-            const next = damageEntries[i]
-            if (next.character === char && isDirectDamage(next)) {
-                setDamageTypesForEntry(next.id, [...currentTypes])
-                onupdate(getCalcState())
-                expandedEntryId = next.id
-                addToast('已复制伤害类型到下一段直伤', 'success')
-                return
-            }
+        const next = findNextDirectEntry(damageEntries, entryIndex, entry.character)
+        if (next) {
+            setDamageTypesForEntry(next.id, [...currentTypes])
+            onupdate(getCalcState())
+            expandedEntryId = next.id
+            addToast('已复制伤害类型到下一段直伤', 'success')
+            return
         }
         addToast('已经是本角色最后一段直伤', 'info')
     }
@@ -341,11 +248,6 @@
         )
     }
 
-    /** @desc 是否为直伤条目（非效应/非处决/非响应） */
-    function isDirectDamage(e: { isEffect: boolean; isTuneBreak: boolean; isTuneResponse: boolean }): boolean {
-        return !e.isEffect && !e.isTuneBreak && !e.isTuneResponse
-    }
-
     /** @desc 从同角色上一段直伤复制增益 */
     function handleCopyFromPrevDirect(entryId: string) {
         const entry = damageEntries.find((e) => e.id === entryId)
@@ -357,15 +259,13 @@
             return
         }
 
-        for (let i = entryIndex - 1; i >= 0; i--) {
-            const prev = damageEntries[i]
-            if (prev.character === entry.character && isDirectDamage(prev)) {
-                const prevSetIds = getBuffSetIdsForEntry(prev.id)
-                if (!setBuffSetIdsForEntry(entryId, prevSetIds)) return
-                onupdate(getCalcState())
-                addToast('已复制前段直伤的增益', 'success')
-                return
-            }
+        const prev = findPrevDirectEntry(damageEntries, entryIndex, entry.character)
+        if (prev) {
+            const prevSetIds = getBuffSetIdsForEntry(prev.id)
+            if (!setBuffSetIdsForEntry(entryId, prevSetIds)) return
+            onupdate(getCalcState())
+            addToast('已复制前段直伤的增益', 'success')
+            return
         }
 
         addToast('未找到本角色的上一个直伤', 'info')
@@ -377,18 +277,14 @@
         if (!entry || !entry.character) return
 
         const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
-        const char = entry.character
         const currentSetIds = getBuffSetIdsForEntry(entryId)
-
-        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
-            const next = damageEntries[i]
-            if (next.character === char && isDirectDamage(next)) {
-                if (!setBuffSetIdsForEntry(next.id, [...currentSetIds])) return
-                onupdate(getCalcState())
-                expandedEntryId = next.id
-                addToast('已复制增益到下一段直伤', 'success')
-                return
-            }
+        const next = findNextDirectEntry(damageEntries, entryIndex, entry.character)
+        if (next) {
+            if (!setBuffSetIdsForEntry(next.id, [...currentSetIds])) return
+            onupdate(getCalcState())
+            expandedEntryId = next.id
+            addToast('已复制增益到下一段直伤', 'success')
+            return
         }
 
         expandedEntryId = null
@@ -406,15 +302,13 @@
             return
         }
 
-        for (let i = entryIndex - 1; i >= 0; i--) {
-            const prev = damageEntries[i]
-            if (prev.isEffect && prev.hitName === entry.hitName) {
-                const prevSetIds = getBuffSetIdsForEntry(prev.id)
-                if (!setBuffSetIdsForEntry(entryId, prevSetIds)) return
-                onupdate(getCalcState())
-                addToast('已复制前段效应的增益', 'success')
-                return
-            }
+        const prev = findPrevEffectEntry(damageEntries, entryIndex, entry.hitName)
+        if (prev) {
+            const prevSetIds = getBuffSetIdsForEntry(prev.id)
+            if (!setBuffSetIdsForEntry(entryId, prevSetIds)) return
+            onupdate(getCalcState())
+            addToast('已复制前段效应的增益', 'success')
+            return
         }
 
         addToast('未找到上一个同名效应', 'info')
@@ -427,16 +321,13 @@
 
         const entryIndex = damageEntries.findIndex((e) => e.id === entryId)
         const currentSetIds = getBuffSetIdsForEntry(entryId)
-
-        for (let i = entryIndex + 1; i < damageEntries.length; i++) {
-            const next = damageEntries[i]
-            if (next.isEffect && next.hitName === entry.hitName) {
-                if (!setBuffSetIdsForEntry(next.id, [...currentSetIds])) return
-                onupdate(getCalcState())
-                expandedEntryId = next.id
-                addToast('已复制增益到下一段效应', 'success')
-                return
-            }
+        const next = findNextEffectEntry(damageEntries, entryIndex, entry.hitName)
+        if (next) {
+            if (!setBuffSetIdsForEntry(next.id, [...currentSetIds])) return
+            onupdate(getCalcState())
+            expandedEntryId = next.id
+            addToast('已复制增益到下一段效应', 'success')
+            return
         }
 
         expandedEntryId = null
@@ -487,7 +378,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     data-sf="content"
-    class="theme-scrollbar snap-scroll-y h-full overflow-auto pb-48 {className}"
+    class="theme-scrollbar h-full overflow-auto pb-48 {className}"
     style={styleProp}
     bind:this={calcContainer}
     onwheel={(e) => {
@@ -523,14 +414,15 @@
         <!-- 表体：每行一个伤害条目（点击展开编辑）；展开行内嵌增益配置面板。
              行底色由「卡片」表面提供（可与表头分别调透明度/毛玻璃/深度） -->
         <tbody data-sf="card" style="--sf-base: var(--theme-modal-bg);">
-            {#each damageEntries as damageEntry, i}
+            {#each damageEntries as damageEntry, i (damageEntry.id)}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <tr
                     onclick={() => handleToggleExpand(damageEntry.id, i)}
+                    data-press="row"
                     data-entry-id={damageEntry.id}
                     class={[
-                        'snap-row cursor-pointer border-b transition-colors',
+                        'cursor-pointer border-b transition-colors',
                         expandedEntryId === damageEntry.id ? '' : 'hover:bg-(--theme-modal-text)/5',
                         expandedEntryId !== null && expandedEntryId !== damageEntry.id ? 'opacity-40' : ''
                     ].join(' ')}
@@ -567,19 +459,13 @@
                         style="border-color: var(--theme-divider-border);"
                     >
                         <div class="flex flex-wrap gap-0.5">
-                            {#each entryDamageTypeMap[damageEntry.id] ?? [] as dt}
-                                <span
-                                    class="text-[10px] px-1 rounded-none text-(--theme-modal-text)/70 leading-tight"
-                                    style="background: var(--theme-input-bg);"
-                                    >{DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}</span
-                                >
+                            {#each entryDamageTypeMap[damageEntry.id] ?? [] as dt (dt)}
+                                <Tag style="background: var(--theme-input-bg);">{damageTypeShort(dt)}</Tag>
                             {:else}
                                 {@const inferred = inferredDamageTypeMap[damageEntry.id] ?? []}
                                 {#if inferred.length > 0}
                                     <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
-                                        >自动推导：{inferred
-                                            .map((t) => DAMAGE_TYPE_SHORT[t as keyof typeof DAMAGE_TYPE_SHORT] ?? t)
-                                            .join('/')}</span
+                                        >{inferredDamageTypeText(inferred)}</span
                                     >
                                 {/if}
                             {/each}
@@ -589,46 +475,42 @@
                     <td class="py-1.5 px-3">
                         <div class="flex flex-wrap gap-1">
                             {#if buffDiffMode}
-                                {#each entryBuffDiff[damageEntry.id] ?? [] as diff}
+                                {#each entryBuffDiff[damageEntry.id] ?? [] as diff (diff.name)}
                                     {#if diff.type === 'global'}
-                                        <span
-                                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
+                                        <Chip
                                             style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
                                         >
                                             <Icon icon="mdi:crown" class="size-3" />{diff.name}
-                                        </span>
+                                        </Chip>
                                     {:else if diff.type === 'added'}
-                                        <span
-                                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
+                                        <Chip
                                             style="background: var(--theme-buff-green-bg); color: var(--theme-buff-green-text);"
                                         >
                                             <Icon icon="mdi:plus" class="size-3" />{diff.name}
-                                        </span>
+                                        </Chip>
                                     {:else if diff.type === 'removed'}
-                                        <span
-                                            class="inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium bg-red-500/15 text-red-500"
-                                        >
+                                        <Chip class="bg-red-500/15 text-red-500">
                                             <Icon icon="mdi:minus" class="size-3" />{diff.name}
-                                        </span>
+                                        </Chip>
                                     {:else}
-                                        <span
-                                            class="inline-flex items-center gap-1 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
+                                        <Chip
+                                            variant="plain"
                                             style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
                                         >
                                             {diff.name}
-                                        </span>
+                                        </Chip>
                                     {/if}
                                 {/each}
                             {:else}
-                                {#each (entryBuffSetIdMap[damageEntry.id] ?? []).filter( (sid) => buffMatches(buffById.get(sid), damageEntry) ) as setId}
+                                {#each (entryBuffSetIdMap[damageEntry.id] ?? []).filter( (sid) => buffMatches(buffById.get(sid), damageEntry) ) as setId (setId)}
                                     {@const buffSet = buffById.get(setId)}
                                     {#if buffSet && !globalBuffSetIds.includes(setId)}
-                                        <span
-                                            class="inline-flex items-center gap-1 rounded-none px-1.5 py-0.5 text-[10px] font-medium"
+                                        <Chip
+                                            variant="plain"
                                             style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
                                         >
                                             {buffSet.name}
-                                        </span>
+                                        </Chip>
                                     {/if}
                                 {/each}
                             {/if}
@@ -640,55 +522,37 @@
                     <tr style="background: var(--theme-input-bg);">
                         <td colspan="4" class="p-0">
                             <div
-                                transition:slide|local={{ duration: 200 }}
+                                transition:slide|local={slideParams(MOTION_MS.base)}
                                 class="border-b px-6 py-3 space-y-3"
                                 style="border-color: var(--theme-divider-border);"
                             >
                                 {#if !damageEntry.isEffect && !damageEntry.isTuneBreak && !damageEntry.isTuneResponse}
                                     <div>
-                                        <div
-                                            class="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40 mb-1.5"
-                                        >
-                                            <Icon
-                                                icon="mdi:swap-horizontal-bold"
-                                                class="size-4 shrink-0"
-                                                style="color: var(--theme-accent-text);"
-                                            />
-                                            伤害类型
-                                        </div>
+                                        {@render panelSectionHead('mdi:swap-horizontal-bold', '伤害类型')}
                                         {#if isDirectDamage(damageEntry) && damageEntry.character}
                                             <div class="mb-1.5 flex flex-wrap gap-1.5">
-                                                <button
-                                                    onclick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleCopyDamageTypeToNext(damageEntry.id)
-                                                    }}
-                                                    title="Shift+Enter"
-                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
-                                                    复制到下段直伤
-                                                </button>
-                                                <button
-                                                    onclick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleSyncDamageTypeToSameName(damageEntry.id)
-                                                    }}
-                                                    disabled={countSameNameEntries(damageEntry.id) <= 1}
-                                                    title="把本条的伤害类型同步到所有同名伤害（同一角色 + 同一技能类型）"
-                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text) disabled:opacity-40"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <Icon icon="mdi:sync" class="size-3 shrink-0" />
-                                                    同步伤害类型到所有同名伤害{countSameNameEntries(damageEntry.id) > 1
-                                                        ? `（${countSameNameEntries(damageEntry.id)}）`
-                                                        : ''}
-                                                </button>
+                                                {@render copyButton(
+                                                    'mdi:content-paste',
+                                                    '复制到下段直伤',
+                                                    'Shift+Enter',
+                                                    () => handleCopyDamageTypeToNext(damageEntry.id)
+                                                )}
+                                                {@render copyButton(
+                                                    'mdi:sync',
+                                                    `同步伤害类型到所有同名伤害${
+                                                        countSameNameEntries(damageEntry.id) > 1
+                                                            ? `（${countSameNameEntries(damageEntry.id)}）`
+                                                            : ''
+                                                    }`,
+                                                    '把本条的伤害类型同步到所有同名伤害（同一角色 + 同一技能类型）',
+                                                    () => handleSyncDamageTypeToSameName(damageEntry.id),
+                                                    countSameNameEntries(damageEntry.id) <= 1,
+                                                    'disabled:opacity-40'
+                                                )}
                                             </div>
                                         {/if}
                                         <div class="flex flex-wrap gap-1">
-                                            {#each DAMAGE_TYPES as dt}
+                                            {#each DAMAGE_TYPES as dt (dt)}
                                                 {@const selected = (entryDamageTypeMap[damageEntry.id] ?? []).includes(
                                                     dt
                                                 )}
@@ -710,90 +574,49 @@
                                                         ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
                                                         : 'background: var(--theme-card-bg); border-color: var(--theme-divider-border);'}
                                                 >
-                                                    {DAMAGE_TYPE_SHORT[dt as keyof typeof DAMAGE_TYPE_SHORT] ?? dt}
+                                                    {damageTypeShort(dt)}
                                                 </button>
                                             {/each}
                                         </div>
                                     </div>
                                 {/if}
                                 <div>
-                                    <div
-                                        class="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40 mb-1.5"
-                                    >
-                                        <Icon
-                                            icon="mdi:layers-triple-outline"
-                                            class="size-4 shrink-0"
-                                            style="color: var(--theme-accent-text);"
-                                        />
-                                        增益选择
-                                    </div>
+                                    {@render panelSectionHead('mdi:layers-triple-outline', '增益选择')}
                                     {#if visibleBuffSets.length > 0}
                                         <div
                                             class="flex flex-wrap items-center gap-1 pb-2 border-b mb-2"
                                             style="border-color: var(--theme-divider-border);"
                                         >
                                             {#if isDirectDamage(damageEntry)}
-                                                <button
-                                                    onclick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleCopyFromPrevDirect(damageEntry.id)
-                                                    }}
-                                                    title="Shift+Z"
-                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
-                                                    复制前段直伤
-                                                </button>
-                                                <button
-                                                    onclick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleCopyToNextDirect(damageEntry.id)
-                                                    }}
-                                                    title="Shift+X"
-                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
-                                                    复制到下段直伤
-                                                </button>
+                                                {@render copyButton('mdi:content-copy', '复制前段直伤', 'Shift+Z', () =>
+                                                    handleCopyFromPrevDirect(damageEntry.id)
+                                                )}
+                                                {@render copyButton(
+                                                    'mdi:content-paste',
+                                                    '复制到下段直伤',
+                                                    'Shift+X',
+                                                    () => handleCopyToNextDirect(damageEntry.id)
+                                                )}
                                             {:else if damageEntry.isEffect}
-                                                <button
-                                                    onclick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleCopyFromPrevEffect(damageEntry.id)
-                                                    }}
-                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <Icon icon="mdi:content-copy" class="size-3 shrink-0" />
-                                                    复制前段效应
-                                                </button>
-                                                <button
-                                                    onclick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleCopyToNextEffect(damageEntry.id)
-                                                    }}
-                                                    class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
-                                                    style="border-color: var(--theme-divider-border);"
-                                                >
-                                                    <Icon icon="mdi:content-paste" class="size-3 shrink-0" />
-                                                    复制到下段效应
-                                                </button>
+                                                {@render copyButton('mdi:content-copy', '复制前段效应', undefined, () =>
+                                                    handleCopyFromPrevEffect(damageEntry.id)
+                                                )}
+                                                {@render copyButton(
+                                                    'mdi:content-paste',
+                                                    '复制到下段效应',
+                                                    undefined,
+                                                    () => handleCopyToNextEffect(damageEntry.id)
+                                                )}
                                             {/if}
-                                            <button
-                                                disabled={selectedEntrySetIds.length === 0}
-                                                onclick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleClearAllBuffs(damageEntry.id)
-                                                }}
-                                                title="Shift+C"
-                                                class="inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:border-red-500/50 hover:text-red-500 disabled:opacity-40 disabled:pointer-events-none"
-                                                style="border-color: var(--theme-divider-border);"
-                                            >
-                                                <Icon icon="mdi:close-circle-outline" class="size-3 shrink-0" />
-                                                清除所有增益
-                                            </button>
+                                            {@render copyButton(
+                                                'mdi:close-circle-outline',
+                                                '清除所有增益',
+                                                'Shift+C',
+                                                () => handleClearAllBuffs(damageEntry.id),
+                                                selectedEntrySetIds.length === 0,
+                                                'disabled:opacity-40 disabled:pointer-events-none',
+                                                'hover:border-red-500/50 hover:text-red-500'
+                                            )}
                                             <div class="flex-1"></div>
                                             <button
                                                 onclick={(e) => {
@@ -844,7 +667,7 @@
                                                             >{item.prefixText}</span
                                                         >
                                                         <div class="flex flex-wrap gap-0.5">
-                                                            {#each item.children! as child, ci}
+                                                            {#each item.children! as child, ci (child.id)}
                                                                 {@const childChecked = selectedEntrySetIds.includes(
                                                                     child.id
                                                                 )}
@@ -864,15 +687,12 @@
                                                                             : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-accent-bg)/10'
                                                                     ].join(' ')}
                                                                 >
-                                                                    {child.name
-                                                                        .match(LAYERED_BUFF_PATTERN)
-                                                                        ?.slice(2)
-                                                                        .join('') ?? child.name}
+                                                                    {layeredChildLabel(child.name)}
                                                                     {#if entryPaneSources[child.id] !== undefined}
                                                                         <!-- @desc 影响源（叠层子项） -->
                                                                         <span
                                                                             class="ml-0.5 inline-flex shrink-0 align-middle"
-                                                                            title={paneSourceText(child.id)}
+                                                                            title={paneSourceTooltip(child.id)}
                                                                             style="color: var(--theme-accent-text);"
                                                                         >
                                                                             <Icon
@@ -917,7 +737,7 @@
                                                             <!-- @desc 影响源：作用于本段引用到的角色面板，勾上即参与该角色在这一段的面板 -->
                                                             <span
                                                                 class="shrink-0"
-                                                                title={paneSourceText(item.buffSet!.id)}
+                                                                title={paneSourceTooltip(item.buffSet!.id)}
                                                                 style="color: var(--theme-accent-text);"
                                                             >
                                                                 <Icon
@@ -945,6 +765,45 @@
     </table>
     <!-- @desc 无条目时的占位提示 -->
     {#if damageEntries.length === 0}
-        <div class="flex items-center justify-center py-12 text-xs text-(--theme-modal-text)/40">暂无伤害数据</div>
+        <EmptyState size="lg" class="flex items-center justify-center">暂无伤害数据</EmptyState>
     {/if}
 </div>
+
+<!-- @desc 展开面板的区块标题（伤害类型 / 增益选择）：同一壳在两处复用 -->
+{#snippet panelSectionHead(icon: string, label: string)}
+    <div class="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40 mb-1.5">
+        <Icon {icon} class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+        {label}
+    </div>
+{/snippet}
+
+<!-- @desc 增益/伤害类型的复制·清除按钮：同一壳共 7 处（差异只有图标·文案·快捷键提示·禁用态·强调色类） -->
+{#snippet copyButton(
+    icon: string,
+    label: string,
+    title: string | undefined,
+    run: () => void,
+    disabled = false,
+    extraClass = '',
+    hoverClass = 'hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
+)}
+    <button
+        onclick={(e) => {
+            e.stopPropagation()
+            run()
+        }}
+        {title}
+        {disabled}
+        class={mergeClass([
+            'inline-flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors',
+            // hover 强调色分两档：默认跟随主题强调色；「清除所有增益」用红色（与 hover 属性同名，故必须二选一而不是叠加，
+            // 否则两条 hover:border/color 工具类会同时存在，谁生效取决于生成样式表里的顺序）
+            hoverClass,
+            extraClass
+        ])}
+        style="border-color: var(--theme-divider-border);"
+    >
+        <Icon {icon} class="size-3 shrink-0" />
+        {label}
+    </button>
+{/snippet}

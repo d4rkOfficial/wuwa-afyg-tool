@@ -24,6 +24,10 @@
     const fmt = (n: number, d = 1) => n.toLocaleString(undefined, { maximumFractionDigits: d })
     const fmtMult = (n: number) => n.toFixed(4)
 
+    // 来源色刻意**不**走主题变量：它们承担「来源类型」的辨识功能（基值/武器/声骸/敌方），
+    // 语义与元素色、伤害类型色同源，昼夜切换时不应改色。
+    // 其中 4 个色值逐字取自 `$lib/calc/utils.ts` 的 `TYPE_COLORS`（base/weapon/echo/enemy
+    // 对应「其它/协同/变奏技能/共鸣解放」）——这是刻意的同一套来源色，改一处要同步另一处。
     const SRC_COLOR: Record<TracePart['sourceType'], string> = {
         base: '#9aa3ad',
         weapon: '#e0a458',
@@ -274,7 +278,7 @@
 <div bind:this={rootEl} class="space-y-2 text-xs {className}" style={styleProp || ''}>
     <!-- 计算过程多项式链：每个单项式可 hover/click 查看来源（hover 预览，click 固定常开） -->
     <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1.5">
-        {#each chips as c, i}
+        {#each chips as c, i (i)}
             {#if i > 0}
                 <span class="select-none opacity-50">×</span>
             {/if}
@@ -336,7 +340,7 @@
             role="tooltip"
             onpointerenter={clearClose}
             onpointerleave={scheduleClose}
-            class="animate-pop-in fixed z-100 w-[36rem] max-w-[85vw] overflow-hidden rounded-none border backdrop-blur-xl"
+            class="animate-pop-in fixed z-(--z-top) w-[36rem] max-w-[85vw] overflow-hidden rounded-none border backdrop-blur-xl"
             style="left: {tipPos.left}px; top: {tipPos.top}px; background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
         >
             <div
@@ -363,7 +367,7 @@
                 </span>
             </div>
             <div class="theme-scrollbar max-h-56 space-y-1 overflow-y-auto px-3 py-2">
-                {#each tip.chip.parts as p}
+                {#each tip.chip.parts as p, pi (pi)}
                     <div class="flex items-center gap-1.5">
                         <span class="size-2 shrink-0 rounded-full" style="background: {SRC_COLOR[p.sourceType]};"
                         ></span>

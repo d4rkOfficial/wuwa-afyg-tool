@@ -67,6 +67,11 @@ export default tseslint.config(
     //   - calc/   计算引擎  - api/   API 层  - utils/  工具函数
     //   - consts/ 常量      - types/ 类型   - ai/generate 生成逻辑
     //   - ai/tools AI 工具
+    // 另加**按文件名约定**的纯逻辑文件（AGENTS §2 的就近放置产物）：
+    //   - src/routes/**/*.{utils,consts,types}.ts       路由级工具/常量/类型
+    //   - src/lib/components/**/*.{utils,consts,types}.ts 组件级工具/常量/类型
+    //   （整改前组件里没有这类文件，Phase 9 起表格/弹窗重构开始产出，实测 3 个，
+    //     均为纯函数、不 import store，符合本层约束 —— 见 .tmp/component-consistency-plan.md）
     // 排除：
     //   - **/*.svelte.ts    Runes 响应式 store（必须保留可变性）
     //   - **/*.test.ts      测试（含 fixture 可变性）
@@ -80,7 +85,9 @@ export default tseslint.config(
             'src/lib/consts/**/*.ts',
             'src/lib/types/**/*.ts',
             'src/lib/ai/generate/**/*.ts',
-            'src/lib/ai/tools/**/*.ts'
+            'src/lib/ai/tools/**/*.ts',
+            'src/routes/**/*.{utils,consts,types}.ts',
+            'src/lib/components/**/*.{utils,consts,types}.ts'
         ],
         ignores: ['**/*.svelte.ts', '**/*.test.ts', '**/__fixtures__/**'],
         rules: {
@@ -98,11 +105,12 @@ export default tseslint.config(
         }
     },
 
-    // ── Svelte 文件：仅解析器（flat/base，0 规则）──────────────
+    // ── Svelte 文件：解析器 + 少量最佳实践（flat/base + 1 条 error）──
     // 理由：用户诉求是「函数式编程风格」，svelte/recommended 的规则
-    //（require-each-key / prefer-svelte-reactivity 等，共 228 处）属
-    // Svelte 最佳实践而非函数式，开启会淹没函数式信号。如需启用，
-    // 将下面的 'flat/base' 换成 'flat/recommended' 即可。
+    //（prefer-svelte-reactivity 等）属 Svelte 最佳实践而非函数式，全量开启会淹没函数式信号。
+    // 故采用渐进棘轮：只逐条引入能量化收敛的规则（当前仅 svelte/require-each-key: error，
+    // 基线 0 处无 key，已清零并升 error）。如需全量启用，将下面的 'flat/base' 换成 'flat/recommended'。
+    // 组件一致性规则见 scripts/check-components.mjs 与 .tmp/component-consistency-plan.md。
     ...svelte.configs['flat/base'],
     {
         files: ['**/*.svelte'],
@@ -110,6 +118,13 @@ export default tseslint.config(
             parserOptions: {
                 parser: tseslint.parser
             }
+        },
+        rules: {
+            // ── Svelte 最佳实践：渐进式棘轮（第一步已完成）────────────
+            // `{#each}` 必须带 key。Phase 0 实测 141 处 → 6.4 清到 50 → T9 清零，
+            // 规则随之由 'warn' 升为 'error'（基线 0 处，无白名单）。
+            // 详见 .tmp/component-consistency-plan.md Phase 0.3 / 6.4
+            'svelte/require-each-key': 'error'
         }
     },
 

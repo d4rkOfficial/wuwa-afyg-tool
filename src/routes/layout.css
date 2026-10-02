@@ -2,11 +2,58 @@
 
 /* 全局可复用动效（Tailwind v4 @theme 注册，任何地方 class="animate-pop-in" 即可用）
    风格：Mac 式干脆——短时长 + Fast-Out-Slow-In + 小位移缩放，无拖沓回弹 */
-@theme {
-    --animate-pop-in: pop-in 0.2s cubic-bezier(0.2, 0, 0, 1) backwards;
-    --animate-fade-in: fade-in 0.15s ease both;
-    --animate-rise-in: rise-in 0.32s cubic-bezier(0.2, 0, 0, 1) backwards;
-    --animate-shrink-in: shrink-in 0.32s cubic-bezier(0.2, 0, 0, 1) backwards;
+@theme static {
+    /* ── 动效 token 阶梯（Phase 8.1）──
+       时长按「用途」分档，缓动按「方向性」分档；组件手写 CSS 里用 var(--motion-*) / var(--ease-*)，
+       下面的 --animate-* 大多数由这些 token 组合而成（改一档即可全局调律）。
+       T18 逐一核对了这两者的关系：**有 4 条刻意保留字面量**（rise-in / shrink-in / icon-pop 的 0.32s、
+       card-pop-in 的 0.42s）。它们与最近的一档 token（--motion-slow 260ms）差 60~160ms，
+       改成 token 是**肉眼可见的加速**，故按「差值 ≤ 30ms 才对齐 token，否则只把注释改对」处理；
+       每条的行尾注释写明了原值、处置与理由。
+
+       `static` 是必需的，不是可选项：Tailwind v4 默认只把「被引用过」的 @theme 变量发射到 :root，
+       未被引用的会被摇树删掉。实测（vite build 产物）：只写普通 @theme 时，
+       --motion-base / --motion-slow 在编译产物里**根本不存在**（--motion-fast 只因为被本文件
+       的按压规则引用才留下）；后续增量若在组件里写 var(--motion-base) 会静默解析为无效值——
+       不报错、不动画，极难排查。加 static 后本块声明的变量一律无条件发射，杜绝这类静默失效。
+       代价：本块所有变量常驻，gzip 前约 +0.5KB，换取「写了就一定生效」的可预测性。
+
+       命名取舍（勿轻易改名）：
+       - `--duration-*` / `--ease-*` 是 Tailwind 的命名空间：凡是在 @theme 里写成 `--ease-xxx` 的键，
+         Tailwind 都会额外生成同名 `.ease-xxx` 工具类。本项目内置的 `ease-out` 关键字工具类正是
+         由 `--ease-out` 生成的，这里刻意把它**覆盖成同一个值**（cubic-bezier(0.2,0,0,1) 比关键字
+         `ease-out` 更「快出慢收」），因此 `.ease-out` 仍然可用、只是曲线与原来不同——这是本次有意的调律。
+       - 时长 token 一律用 `--motion-*` 而**不**用 `--duration-*`：后者会生成 `.duration-fast` 之类
+         的工具类，与 Tailwind 既有的数字型 `duration-150` 混在一起易生歧义；`--motion-*` 不占命名空间，
+         只当普通自定义属性用（组件里用 `var(--motion-fast)` 引用）。 */
+    --motion-fast: 120ms; /* 按压 / 悬停等即时反馈 */
+    --motion-base: 180ms; /* 展开 / 收起 */
+    --motion-slow: 260ms; /* 页面 / 弹窗级过渡 */
+    --ease-out: cubic-bezier(0.2, 0, 0, 1); /* 入场：快出慢收（Mac 式） */
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1); /* 可逆过渡：进出对称 */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 弹入：带一点过冲 */
+
+    /* ① 与最近 token 差值 ≤ 30ms → 对齐 token（观感差异不可辨，见 T18 §--animate-* 处置表）
+       ② 差值 > 30ms → 保留原值 + 注明理由（改 token 属可辨识的加速，且已有组件注释按原值写死） */
+    --animate-pop-in: pop-in var(--motion-base) var(--ease-out) backwards; /* T18: 0.2s→base 180ms（−20ms） */
+    --animate-fade-in: fade-in var(--motion-fast) var(--ease-out) both; /* T18: 0.15s→fast 120ms（−30ms，与按压规则 150→120 同一口径） */
+    --animate-rise-in: rise-in 0.32s var(--ease-out) backwards; /* T18 保留：最近档 slow 260ms 差 60ms；且 ui/tab-panel.svelte:10 的注释按 0.32s 写 */
+    --animate-shrink-in: shrink-in 0.32s var(--ease-out) backwards; /* T18 保留：同 rise-in（差 60ms，去程/入程配对） */
+    /* 通知（toast）：从上方/下方滑入 */
+    --animate-slide-down: slide-down var(--motion-base) var(--ease-out); /* T18: 0.2s→base 180ms（−20ms） */
+    --animate-slide-up: slide-up var(--motion-base) var(--ease-out); /* T18: 同 slide-down（−20ms） */
+    /* 落地页版块：错峰上浮淡入 + 图标弹入（自原 welcome-screen 的 <style> 迁入） */
+    --animate-card-pop-in: card-pop-in 0.42s var(--ease-out) backwards; /* T18 保留：最近档 slow 260ms 差 160ms（首屏整块上浮，改短明显赶） */
+    --animate-icon-pop: icon-pop 0.32s var(--ease-spring) backwards; /* T18 保留：差 60ms；与上面 card-pop-in 的过冲节奏成对 */
+    /* 磁力光标（自 magnetic-pointer.svelte 的 <style> 迁入）：四角旋转 / 吸附晃动 / 准星呼吸。
+       时长与缓动与原 CSS 逐字一致，故后两条沿用关键字 ease-out / ease-in-out，
+       而不是本项目重定义过的 --ease-out（那条曲线更陡，会改变手感）。
+       旋转时长走 var(--mp-spin)：该变量由组件写到 <html> 上（写在被驱动的元素上不生效——
+       自定义属性里的 var() 是在**声明它的元素**上求值的，此处即 :root）。 */
+    --animate-mp-spin: mp-spin var(--mp-spin, 12s) linear infinite;
+    --animate-mp-spin-reverse: mp-spin var(--mp-spin, 12s) linear infinite reverse;
+    --animate-mp-wobble: mp-wobble 0.4s ease-out 1;
+    --animate-mp-breathe: mp-breathe 2.6s ease-in-out infinite;
 
     @keyframes pop-in {
         0% {
@@ -46,13 +93,96 @@
             transform: scale(1) translateY(0);
         }
     }
+    @keyframes slide-down {
+        from {
+            opacity: 0;
+            transform: translateY(-12px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes slide-up {
+        from {
+            opacity: 0;
+            transform: translateY(12px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes card-pop-in {
+        0% {
+            opacity: 0;
+            transform: translateY(18px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes icon-pop {
+        0% {
+            transform: scale(0);
+        }
+        70% {
+            transform: scale(1.12);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+    /* 磁力光标：四角旋转（默认模式）/ 吸附晃动（框选新目标，幅度取自 --mp-wobble-amp）/ 准星呼吸 */
+    @keyframes mp-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    @keyframes mp-wobble {
+        0% {
+            transform: translate(0, 0);
+        }
+        25% {
+            transform: translate(var(--mp-wobble-amp, 0px), 0);
+        }
+        50% {
+            transform: translate(calc(var(--mp-wobble-amp, 0px) * -0.6), 0);
+        }
+        75% {
+            transform: translate(calc(var(--mp-wobble-amp, 0px) * 0.25), 0);
+        }
+        100% {
+            transform: translate(0, 0);
+        }
+    }
+    @keyframes mp-breathe {
+        0%,
+        100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.3);
+        }
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
+    /* T18 复核：本文件一共声明 12 个 --animate-*（8 个通用 + 4 个 mp-*），这里**刻意只列这 8 个**。
+       剩下 4 个 --animate-mp-*（磁力光标的四角旋转 / 吸附晃动 / 准星呼吸）不进本块，依据是实测的：
+       magnetic-pointer.svelte 的根节点带 Tailwind `motion-reduce:hidden`（:193），且 JS 侧另有
+       `active = enabled && !forcedOff && !coarsePointer && !reducedMotion`（:226）——
+       reduce 下整个指针根本不渲染，动画不可能播放；加进来就是永不命中的死规则。
+       若将来有别的组件复用 animate-mp-*，需同时在此登记（或组件自带 motion-reduce:）。 */
     .animate-pop-in,
     .animate-fade-in,
     .animate-rise-in,
-    .animate-shrink-in {
+    .animate-shrink-in,
+    .animate-slide-down,
+    .animate-slide-up,
+    .animate-card-pop-in,
+    .animate-icon-pop {
         animation: none;
     }
 }
@@ -116,6 +246,231 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
 }
 
 @layer base {
+    /* ── z-index 层级阶梯 ──
+       全局层级（弹窗/浮层/菜单）只用这些 token，组件里不要写裸 z-数字。
+       数值刻意与整改前的散落取值一一对应，故替换后渲染结果不变；
+       今后新增层级只在此处加档，并由 scripts/check-components.mjs 第 ⑤ 项守卫。 */
+    :root {
+        --z-sticky: 40; /* 悬浮部件：AI 浮窗、简化工具栏、sticky 表头、锁定水印 */
+        --z-modal: 50; /* 标准弹窗 + 下拉/菜单的透明捕捉层 + 通知 */
+        --z-modal-nested: 60; /* 弹窗内再开的弹窗（1 层） */
+        --z-modal-deep: 70; /* 再深一层（如 buff 弹窗的二级确认、设置里的按键选择） */
+        --z-popover: 80; /* 速查浮层 */
+        --z-top: 100; /* 最顶层气泡（伤害追踪） */
+    }
+
+    /* ── 全局按压反馈（Phase 8.2 立，T18 泛化到任意可显式标记的元素）──
+       全项目实测 415 个 <button>，整改前 `active:` 只有 3 处且都是 cursor/底色，没有任何统一按压反馈。
+       与其逐个迁移，这里用**一条**零特异性的基础规则统一补上，后续增量再按需逐个精修。
+
+       ══ 加入 / 退出契约（T18 定死；T31 引入 `row` 变体，组件侧照此加属性，勿改语义）══
+       · 加入（默认几何按压）：元素上写**裸 `data-press`**（`data-press=""`、`data-press={true}` 等
+         **除 `none` / `row` 之外**的任意值）→ 获得与 <button> **完全相同**的按压反馈
+         （translateY(0.5px) scale(0.985)，--motion-fast 120ms + --ease-out；按钮原有观感未变）。
+       · 加入（**非几何**按压变体，T31）：写 `data-press="row"` → **不做任何 transform**（不位移、不缩放），
+         只把 :active 的亮度抬一档（`filter: brightness(1.35)`）。专供**自带边框的整行 <tr>**：
+         collapse 表格下行边框由表格绘制、不跟随行的 transform，几何按压会让行底色左右内缩而分隔线留在原地
+         （T22 §2 截图实证，1200px 行约 9px/侧）——`row` 变体从根上避开该错位（探针见 T31 §3）。
+       · 退出：写 `data-press="none"`。写在元素自身 = 该元素退出；写在**容器**上 = 其内所有按压目标一并退出
+         （toolbar.svelte:182 用的就是容器级写法）。容器级退出连 `row` 变体一起退出（T31 实测），
+         即 `[data-press='none']` 内不会有任何按压反馈。
+       · T18 之前只有 `:where(button:not(:disabled))`，非按钮可点元素（整行 <tr>、卡片、表头可点格、
+         role="button" 的 div）按压反馈实测 0 处 —— 它们根本吃不到那条规则。
+
+       Svelte 侧渲染语义（svelte 5.56 编译产物 + `set_attribute` 源码实测，勿踩）：
+         · `data-press=""`        → 静态属性 data-press=""           ✅ 加入
+         · `data-press={true}`    → data-press="true"                ✅ 加入
+         · `data-press={false}`   → data-press="false"               ⚠️ **属性照样存在**！svelte 只把
+           null / undefined 当「移除」，所以「按条件加入」必须写 `data-press={cond ? '' : undefined}`，
+           写成 `data-press={someBool}` 会在 false 时**反而加入**。
+         · `data-press={undefined}` / `{null}` → 不渲染该属性      ✅ 不加入（toolbar.svelte:182 即此写法）
+         · 条件退出同理：`data-press={cond ? 'none' : undefined}`。
+         · 三者是**互斥取值**而非「值随便写」：`none` = 无按压；`row` = 非几何按压变体；
+           其余任何值（含空串）= 默认几何按压。写错值不会静默降级成默认按压，见上面的加入规则注释。
+
+       为什么是 :where()：`:where()` 的整段特异性恒为 0，因此组件级 `.foo button:active` 与内联样式
+       都能无痛覆盖本规则，不会造成「改不动」的钉子。
+       （注意：`:where()` 只能压住「特异性」竞争；对 Tailwind 工具类无效，原因见下一条。）
+
+       为什么 transition 必须带 !important：
+       Tailwind 产物里的层序是 @layer theme → base → components → utilities，
+       **级联层的优先级高于特异性**，而本规则在 base 层、`transition-colors`/`transition-all` 在
+       utilities 层。实测对照（同一份 layout.css 去掉 !important 后 vite build 读产物）：
+         @layer base{ :where(button:not(:disabled)){transition:transform …} }
+         @layer utilities{ … .transition-colors{transition-property:color,…} }
+       两者同时命中时 utilities 层无条件胜出 → 125 个带 transition-* 的按钮按压只有颜色在动，
+       位移/缩放会「瞬移」。故这里的 transition 用 !important 是**功能必需**，不是图省事。
+       T18 补齐：对非按钮目标同样必需 —— 整行 <tr> 等元素照样带 transition-colors/transition-all，
+       没有这条 !important 就只有颜色在动。实测（headless Edge，probe 见 .tmp/t18-tr-transform-probe.html）：
+       给 <tr> 挂上本条并集后 computed transition-property = transform, color, background-color,
+       border-color, box-shadow, opacity, filter（7 项都在），transition-duration = 0.12s。
+
+       transition-property 已按实测取「现有用法的严格超集」，不会吃掉任何既有过渡（Phase 8.2 实测）：
+         415 个 <button> 里 125 个带 transition-*：transition-colors ×94、transition-all ×30、
+         transition-opacity ×2（toast.svelte:75、search-box.svelte:61）。
+         transition-all 的 30 个按钮里，状态变体只出现三类属性：
+           · hover:brightness-110/125 ×22 —— 即 `filter`（**不在**最初的 color/shadow 并集里，是实测补上的缺口）
+           · hover:opacity-100、-translate-y-0.5、以及其余颜色类
+         因此并集 = transform + color + background-color + border-color + box-shadow + opacity + filter
+         正好覆盖上述全部用法，无属性遗漏；代价只是「将来若有按钮过渡 height/gap/outline-color 之类会被本规则裁掉」。
+         T18 全项目实测：把 src 下全部 .svelte 的 hover / active / group-hover / focus-visible 变体
+         工具类（共 80 种）逐条归类后，状态变体改动的属性**全部落在上面的并集内**
+         （translate / scale → transform、bg → background-color、text → color、border → border-color、
+         ring → box-shadow、brightness → filter、opacity → opacity）；
+         唯一在并集外的是 outline-color（focus-visible:outline-* 6 + 2 处），而它本来也不在 Tailwind
+         transition-colors 的动画属性表里，即 0 处实际受影响。
+         ⚠️ T18 起 data-press="none" **不再**是这条并集的逃生通道（语义已收窄为只管按压 transform，
+         见下面的退出规则）。真出现「按钮必须过渡并集外属性」时，最小且局部的做法是在退出规则附近补一条
+         显式还原：:where(<该按钮>) { transition-property: <它要保留的属性> !important; }
+         （必须 !important 且同层靠后，才能压过上面这条并集）。
+         ⚠️ T18：这条并集对 [data-press] 目标同样生效，且它的 !important **优先级高于内联 style**
+         （作者 !important 胜内联普通声明）。元素自带 style="transition: width 150ms" 时 width 会掉出
+         并集而**瞬变**（project-sidebar.svelte:232 的宽度补间就是这种写法）。故：**非按钮**元素自带
+         transition 时，加 data-press 前先确认它的过渡属性都在上面的并集里；不在就别加
+         （或写 data-press="none" —— 非按钮写了它就直接被加入规则排除，自身 transition 原样保留）。
+         data-press="none" 对 <button> **没有**这个作用（按钮分支刻意不看 data-press），见上面的还原配方。
+         按钮上没有任何一处自定义 duration（duration-* 在按钮上实测 0 处），故统一为 --motion-fast 120ms
+         （原先带 transition-colors 的按钮是 Tailwind 默认 150ms → 120ms，差 30ms，是刻意的统一）。
+         */
+    :where(button:not(:disabled), [data-press]:not([data-press='none'])) {
+        transition:
+            transform var(--motion-fast) var(--ease-out),
+            color var(--motion-fast) var(--ease-out),
+            background-color var(--motion-fast) var(--ease-out),
+            border-color var(--motion-fast) var(--ease-out),
+            box-shadow var(--motion-fast) var(--ease-out),
+            opacity var(--motion-fast) var(--ease-out),
+            filter var(--motion-fast) var(--ease-out) !important;
+    }
+    :where(button:not(:disabled), [data-press]:not([data-press='none'])):active {
+        transform: translateY(0.5px) scale(0.985);
+    }
+    /* ── 非几何按压变体 `data-press="row"`（T31 立）──
+       用途：**自带 border-t/border-b 的整行 <tr>**。本项目表格默认 `border-collapse: collapse`
+       （Tailwind v4 preflight），collapse 模式下行自身边框由表格绘制、**不参与行的 transform**，
+       所以上面那条几何按压会让行底色左右内缩（0.985 = 行宽 1.5%，1200px 行约 9px/侧）而分隔线原地不动。
+       本变体遂**只做非几何反馈**：不位移、不缩放，只抬亮度。
+       为什么用 `filter: brightness()` 而**不用** `background-color`（层序陷阱，T18 §8 备忘）：
+       行上的 `hover:bg-*` 在 @layer utilities，而本规则在 @layer base —— **级联层优先于特异性**，
+       所以 base 层里写 `:active { background-color }` 会被 utilities 层的 hover 底色压过（且 :hover 与
+       :active 同时命中时更是必然）；`filter` 则不在任何整行类的 hover 变体里，冲突面为 0。
+       ⚠️ `filter` 与 `transform` **同罪：会建立包含块**，会改写其内 `position: fixed` 后代的定位。
+       T31 已把 6 处落点逐个人工核对「后代里没有 fixed 浮层」（右键菜单 / 时间轴菜单 / 弹窗都渲染在
+       表格之外或是兄弟节点）—— 今后若在本变体的行内渲染 fixed 浮层，同样按上面 ① / ② 处理。
+       过渡不需要在这里重复声明：`[data-press='row']` 已被加入规则的 `[data-press]:not([data-press='none'])`
+       分支命中，`:active` 的 filter 值变化自动吃同一套并集补间（--motion-fast 120ms + --ease-out）。
+       ── 亮度幅度 1.35 的标定依据（T31 真机像素实测，探针见 .tmp/reports/T31.md §3.4）──
+       本项目整行类的 hover 反馈是 `hover:bg-(--theme-modal-text)/3`，在真实行底 rgb(17,17,17)
+       （= --theme-modal-bg #111111 + 「卡片」区域 20% 叠色）上实测得到 rgb(23,23,23)，即 **Δ=6/255**。
+       按下反馈的可见强度应当与之一致（同一条「一级反馈」标尺），于是逐档实测：
+         brightness(1.12) → rgb(19,19,19) Δ=2   ← 太弱，深色行底上肉眼几乎不可辨（T31 初值即此，已废弃）
+         brightness(1.25) → rgb(21,21,21) Δ=4   ← 仍弱于 hover
+         brightness(1.35) → rgb(23,23,23) Δ=6   ← **与 hover 底色同强度**（采用）
+         brightness(1.45) → rgb(25,25,25) Δ=8   ← 明显强于 hover，按下会「闪」
+       1.35 也落在项目既有 `hover:brightness-110/115/125` 的相邻档位上，观感同源。 */
+    :where([data-press='row']):active {
+        transform: none;
+        filter: brightness(1.35);
+    }
+    /* 退出开关：**只退出按压的位移/缩放，不退出过渡**（T18 收窄语义）。
+       适用场景：整行可点区域、拖拽把手、卡片级按钮、自带 animate-* 的元素 —— 它们要的是「按下去不缩」，
+       而不是「连 hover 的颜色渐变一起瞬变」。
+       ⚠️ 旧规则体里还带 `transition: none !important`（Phase 8.2 起），它把这个元素的**一切过渡**都杀掉。
+       T21（commit 15ef1e6）刚给 35 处整行/整卡按钮贴上 `data-press="none"`，它们几乎全带
+       `transition-colors` / `transition-all` + `hover:bg-*`：旧规则下这些 hover 过渡直接消失
+       （T18 用 headless Edge + CDP 实测：改前 computed transition = `none / 0s`，hover 底色瞬变；
+       改后 = 与其它按钮一致的 7 项并集 / 0.12s）。故这里把它删掉。
+       删掉后这些**按钮**由加入规则的第一分支 `button:not(:disabled)`（刻意不看 data-press）接管，
+       拿到与全项目其它 415 个按钮完全相同的并集 + --motion-fast —— 是「更一致」，不是新特例。
+       于是 `data-press="none"` 的语义被收窄成专一的「不要按压 transform」，不再兼职一个隐形的
+       「关掉本元素所有过渡」开关（那种副作用没人能预见，且所有闸门都看不见）。 */
+    :where(button[data-press='none']),
+    :where(button[data-press='none']):active,
+    /* 容器级退出：整块交互区自带按压语义时（如简化工具栏的「按下放大」
+       `[&>button:active]:scale-[1.15]`，与全局缩小叠加会变形），在容器上标一次
+       即可关掉其内所有按压目标的全局按压，不必逐个贴标记。
+       T18 泛化：其内的 `[data-press]` 目标一并退出，否则「容器退出」管不住新加的非按钮目标。
+       T31 补齐：`row` 变体的反馈在 `filter` 上（不在 `transform` 上），故它由紧随其后的第二条
+       规则另行归零 —— 两条合起来 = 容器内**没有任何按压反馈**（几何与非几何都没有）。
+       容器**自身**不会被这两条命中（它不是自己的后代）→ 简化工具栏的内联
+       `transform: translate(…) scale(…)` 与 `transition: …` 原样保留（T18 探针实测，回归保护项）。 */
+    :where([data-press='none']) :where(button:not(:disabled), [data-press]:not([data-press='none'])),
+    :where([data-press='none']) :where(button:not(:disabled), [data-press]:not([data-press='none'])):active {
+        transform: none;
+    }
+    /* T31：容器级退出要连 `row` 变体的**非几何**反馈一起关掉 —— 上面那条只清 `transform`，
+       而 `row` 反馈在 `filter` 上，光靠它会让「容器退出」在 row 上变成「退出一半」。
+       这条与上面那条选择器特异性同为 0（`:where()`），靠**排在文档更后**胜出（T31 探针实测：
+       容器内 row 的 :active filter 由 brightness(1.35) 变为 none ✅）。 */
+    :where([data-press='none']) :where([data-press='row']):active {
+        filter: none;
+    }
+    /* T18：第一条退出规则**刻意没有**泛化成 `:where([data-press='none'])`（字面上更「对称」），理由两条：
+       · **没有收益**：非按钮元素写 data-press="none" 本来就被加入规则的 `:not([data-press='none'])` 排除，
+         自身退出天然成立（T18 探针真值表：`div/tr[data-press='none']` 的 computed transition 是默认 `all/0s`，
+         没有被加入规则命中）；加入规则里唯一「不看 data-press」的分支只有 :where(button:not(:disabled))，
+         所以才需要为 <button> 单独写自身退出。
+       · **有实测过的误伤史**：这条规则体在 T18 改版前还带 `transition: none !important`，当时泛化成
+         `:where([data-press='none'])` 会把容器自身的过渡一起杀掉 —— 探针实测：模拟简化工具栏
+         （内联 `transform: translate(50px,0) scale(1.1)` + `transition: width 250ms`）的
+         `transitionProperty` 由 `width / 0.25s` 变成 `none / 0s`。
+       （改版后规则体只剩 `transform: none`（普通声明），而普通声明里「工具类 / 内联 / 未分层组件样式」都排在
+         @layer base 之前，故此时泛化的实际风险小得多 —— 但它仍然换不到任何新能力，所以保持收窄。
+         （真值表：三种写法 × 按钮/非按钮已逐项实测，原始输出见 .tmp/reports/T18.md §1。） */
+
+    /* ── 关于「按压用 transform」的包含块风险（8.2 评估，T18 扩到非按钮目标）──
+       transform（非 none）会让该元素成为**包含块**，其 position: fixed 后代将改为相对该元素定位
+       —— 本项目已被同类坑咬过一次：damage-trace-view.svelte 的浮窗注释明确写着祖先的
+       backdrop-filter 会让 fixed 后代错位，故它才把浮窗 `use:portal` 挂到 document.body。
+       T18 用 headless Edge 实测复现（.tmp/t18-tr-transform-probe.html）：给一个 200×80 的容器加本规则的
+       transform 后，其 position: fixed 子元素的 top 由 0 变成 243.1 —— 包含块确实被改写。
+       本次已实测核查：全项目没有任何 <button> 内部渲染 position: fixed 后代
+       （fixed 浮层要么与按钮同级，要么 portal 到 body）。因此本规则当前不会引发错位。
+       ⚠️ T18 新增的非按钮目标把风险面扩大了：`[data-press]` 会标在**整行 / 整卡片**上，而这类元素内部
+       更容易存在 fixed 浮层（下拉、右键菜单、tooltip）。给它们标 data-press 前先确认其内没有 fixed 后代；
+       有则按下面 ① / ② 处理。这是**隐式契约**：今后若在带 data-press 的元素内部渲染 fixed 浮层，
+       该浮层会改用该元素做包含块 → 位置必错。届时的处理优先级：
+       ① 浮层照 damage-trace-view 的做法 portal 到 body（推荐，同时也是 backdrop-filter 的通用解法）；
+       ② 给该元素加 data-press="none" 退出本条规则。
+       注意「改用 filter: brightness() 就能避开包含块」是**错**的：CSS 里 filter 同样会让元素
+       成为包含块（且本项目已在用 —— 22 个按钮的 hover:brightness-* 就已经在有包含块的状态下悬停）。
+       ⚠️ T31 追加：`data-press="row"` 变体用的正是 `filter`，**同样建立包含块** —— 它替掉的是
+       「行自身的几何压缩」，不是「包含块豁免」。T31 已把该变体的 6 处落点逐个人工核对：其内没有
+       `position: fixed` 后代（右键菜单 / 时间轴菜单 / 弹窗都不在这一行的子树里）。
+       真要既保按压反馈又绝不动包含块，只能用 background-color / box-shadow / outline 这类
+       不影响包含块的属性做按压态（视觉上比位移缩放弱，故本次未采用）。
+       另注：translateY(0.5px) 在亚像素缩放时会引入 0.5px 的取整抖动，属预期内的「按下去一点点」的手感；
+       若某处需要像素级对齐（对齐到 0.5px 网格的图标/边框），同样用 data-press="none" 退出。
+
+       ── T18 实测：哪些元素挂得起这条 transform（headless Edge 140，逐项量 getBoundingClientRect 前后差）──
+       · <tr>（display: table-row）✅ **几何上生效**：transform 的「可变换元素」排除项只有非替换 inline /
+         table-column / table-column-group，**不含 table-row**。T18（headless Edge 140，量 getBoundingClientRect：
+         separate / collapse 两模型下 dTop +0.747 / +0.744、dW −1.101 / −0.764，与 <div> 的 dTop +0.68 同量级）
+         与 T22（Edge 154：399px 的行 scale(.985) → 393.015px、中心保持、行内单元格跟着走）两次独立实测一致。
+         所以「<tr> 挂不起 transform」是**错的** —— 真正的前提是 border-collapse：
+         ⚠️ **本项目表格默认 `border-collapse: collapse`（Tailwind v4 preflight:163-167 给所有 <table> 设的）；
+         collapse 模式下行自身的边框由表格绘制、不参与行的 transform**。于是行自带 border-t/border-b 时，
+         按压瞬间行底色左右各内缩（0.985 = 行宽的 1.5%，1200px 的行约 9px/侧），而分隔线**原地不动、伸进空隙**。
+         截图复核：.tmp/t18-tr-border-probe4.png（3× 放大 + 把变换夸张到 translateY(14px) scale(.75)：
+         蓝底下移收窄，红 border-bottom 留在原位）。本项目只有显式写 border-separate 的两处例外 ——
+         spread-table.svelte:755、comparison-modal.svelte:1103（分离模型下 <tr> 自身边框按 CSS 2.1 §17.6.1
+         本就不绘制，不存在这个错位）。
+         结论：整行可点**可以**用 data-press（不引发布局重排、不挪动兄弟行），但若该行自带 border-b 且较宽，
+         错位肉眼可见 —— 这类行 T31 起**改用 `data-press="row"`**（非几何变体，见上面的规则与注释），
+         不再需要「不加」或改结构。**只有显式 `border-separate` 的表**（行边框本就不绘制）才适合直接上默认几何按压。
+         T31 像素级复核（探针 .tmp/t31-probe/pixel.html，3× 截图自解码，见 .tmp/reports/T31.md §3.2）把机理钉死为：
+         collapse 下给 <tr> 加 scale 时，**行的底色与行内文字都跟着缩**（在表左缘内 5px 的列上，
+         行底色的垂直区段被压缩、且该列不再有任何行底色），**但由表格绘制的行边框一动不动**
+         （亮红 border-bottom 在按下前后都是 y[56.67..60.33]、厚 3.66px，完全一致）——
+         所以「错位」的准确描述是「底色与文字一起缩了约 18px、分隔线钉在原处」，而不是「底色内缩」。
+       · <th> / <td>（display: table-cell）✅ 生效（dTop +0.747，dW −0.535）。
+       · <div> 及其它 block / inline-block / flex 项 ✅ 生效。
+       · ❌ **display: inline 的非替换元素不能变换**：同一个 probe 里给 <span>（inline）加同一条声明，
+         computed transform 有值但 rect 一动不动（dTop / dLeft / dW / dH 全 0 —— CSS Transforms 只作用于
+         「可变换元素」，非替换 inline 除外）。所以 phase-tabs.svelte 那类裸 `role="button"` 的 <span>
+         标了 data-press 也**没有任何反馈**，必须先给 `inline-block` / `inline-flex`。
+       · 几何量级提醒：scale 是相对值 —— <button>（~100px 宽）只缩 1.5px，整行 <tr>（1200px 宽）缩约 18px，
+         观感强得多。本条机制对所有目标一视同仁（未按元素类型分叉），超宽整行是否接受这一量级由父 agent 权衡。 */
     html {
         background: var(--theme-layout-bg, #0e0e10);
         color: var(--theme-layout-text, #e4e4e7);
@@ -153,46 +508,97 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
     .font-mono {
         font-family: 'JetBrains Mono', ui-monospace, monospace;
     }
+    /* ── 滚动条：全局默认即主题化（Phase 10.1）──
+       原先 `*::-webkit-scrollbar*` 用的是硬编码灰（oklch(0.3 0 0) / oklch(0.5 0 0)），只有 .theme-scrollbar
+       才引用 --theme-scrollbar-*；于是「统一」被迫变成给每个容器补 class，漏掉的容器就一直显示硬编码灰。
+       现在默认值直接取 theme.svelte.ts 按昼夜发射的 --theme-scrollbar-thumb，并与 --theme-accent-bg
+       混色（跟随「配色」色相）：任何 scroll 容器都自动跟随昼夜 + 配色，无需再补 class。
+       `.theme-scrollbar`（52 处调用点）因此退化为与全局默认完全等价的显式声明；
+       本轮**刻意保留**调用点与那一段规则，不做大规模删 class 的改动（视觉风险大、收益为零）。
+
+       默认透明 + 滚动/悬停才显形（Phase 10.2，配合 $lib/utils/scrollbar-autohide.ts 打的
+       [data-scrolling]）：拇指静止态透明，未滚动时看不到滚动条，但**仍占位**（不用 display:none /
+       scrollbar-width:none），轨道宽度与命中区不变，内容不会因显隐而位移。
+       显隐是瞬时切换、不挂 transition，故 prefers-reduced-motion 下无差异（无需额外媒体查询）。 */
     * {
         scrollbar-width: thin;
-        scrollbar-color: oklch(0.3 0 0) oklch(0.5 0 0);
+        /* Firefox 静止态：双值属性（拇指 轨道），整条透明即隐藏但保留占位 */
+        scrollbar-color: transparent transparent;
     }
     *::-webkit-scrollbar {
         width: 6px;
         height: 6px;
     }
+    /* 轨道恒透明：滚动条不做成一条「槽」，滚动时才浮出拇指 */
     *::-webkit-scrollbar-track {
-        background: oklch(0.5 0 0);
-    }
-    *::-webkit-scrollbar-thumb {
-        background: oklch(0.3 0 0);
-        border-radius: 4px;
-        border: 1px solid oklch(0.22 0 0);
-    }
-    *::-webkit-scrollbar-thumb:hover {
-        background: oklch(0.45 0.1 260);
+        background: transparent;
     }
     *::-webkit-scrollbar-corner {
-        background: oklch(0.5 0 0);
+        background: transparent;
     }
-    /* 排轴/拉表（平铺+下拉）/结果表格 滚动条：背景跟随主题（白天白/夜间黑），透明度跟随「背景透明度」设置 */
+    /* 静止态：隐藏但仍占位 */
+    *::-webkit-scrollbar-thumb {
+        background-color: transparent;
+        border-radius: 4px;
+        border: 1px solid transparent;
+    }
+    /* 显形（Phase 10.2）：`[data-scrolling]` = 正在滚动（JS 打标记，见 scrollbar-autohide.ts）；
+       `:hover` = 鼠标悬停在可滚容器上，作为「这里能滚」的静态可见提示——
+       自动隐藏最典型的失败模式就是用户以为该区域不能滚，故悬停显形是硬性要求而非点缀。
+       拇指色 = 昼夜拇指色 72% + 「配色」主色 28%：既随昼夜翻黑/白，也随配色换色相。 */
+    *[data-scrolling]::-webkit-scrollbar-thumb,
+    *:hover::-webkit-scrollbar-thumb {
+        background-color: color-mix(
+            in srgb,
+            var(--theme-scrollbar-thumb, rgba(0, 0, 0, 0.5)) 72%,
+            var(--theme-accent-bg, rgba(0, 0, 0, 0.5))
+        );
+    }
+    /* Firefox 同一条显形规则（scrollbar-color 是双值属性，只能整条重写） */
+    *[data-scrolling],
+    *:hover {
+        scrollbar-color: color-mix(
+                in srgb,
+                var(--theme-scrollbar-thumb, rgba(0, 0, 0, 0.5)) 72%,
+                var(--theme-accent-bg, rgba(0, 0, 0, 0.5))
+            )
+            transparent;
+    }
+    /* 悬停拇指本身：进一步偏向主色，给出可抓取的反馈（webkit 路径） */
+    *::-webkit-scrollbar-thumb:hover {
+        background-color: color-mix(
+            in srgb,
+            var(--theme-scrollbar-thumb, rgba(0, 0, 0, 0.5)) 45%,
+            var(--theme-accent-bg, rgba(0, 0, 0, 0.5))
+        );
+    }
+    /* 兼容既有调用点：与全局默认等价（不再需要，保留以维持 52 处调用点不变） */
     .theme-scrollbar {
-        scrollbar-color: var(--theme-scrollbar-thumb, oklch(0.3 0 0)) var(--theme-scrollbar-track, oklch(0.5 0 0));
+        scrollbar-color: transparent transparent;
     }
-    .theme-scrollbar::-webkit-scrollbar-track,
-    .theme-scrollbar::-webkit-scrollbar-corner {
-        background: var(--theme-scrollbar-track, oklch(0.5 0 0));
-    }
-    .theme-scrollbar::-webkit-scrollbar-thumb {
-        background: var(--theme-scrollbar-thumb, oklch(0.3 0 0));
-        border-color: transparent;
-    }
-    .theme-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: color-mix(in srgb, var(--theme-scrollbar-thumb, oklch(0.3 0 0)) 55%, var(--theme-accent-bg));
+    .theme-scrollbar[data-scrolling],
+    .theme-scrollbar:hover {
+        scrollbar-color: color-mix(
+                in srgb,
+                var(--theme-scrollbar-thumb, rgba(0, 0, 0, 0.5)) 72%,
+                var(--theme-accent-bg, rgba(0, 0, 0, 0.5))
+            )
+            transparent;
     }
     .w-icon {
         filter: var(--theme-w-icon-filter, none);
-        transition: filter 0.2s;
+        /* T18：原为字面量 0.2s（T16 §6c 点名的「③ 抓不到的写死时长」）→ --motion-base 180ms（−20ms，≤30ms 故对齐）。
+           缓动维持 CSS 默认的 ease，不改成 --ease-out：本项只对齐时长，避免顺手改手感的额外观感变化。
+           reduce 兜底见文件末尾的归零块。 */
+        transition: filter var(--motion-base);
+    }
+    /* 隐藏滚动条但保留滚动能力（原在 config / team-config / quick-lookup-content 三处各写了一份） */
+    .hide-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none;
     }
 
     /* ── 区域质感（surface）：透明度 / 毛玻璃强度 / 背景深度均可在「设置-外观主题-背景质感」独立配置 ──
@@ -293,5 +699,62 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
     }
     .neon-text svg {
         filter: drop-shadow(0 0 var(--theme-neon-glow, 6px) currentColor) !important;
+    }
+}
+
+/* ── 减弱动态效果（块一）：位移/缩放归零 + 全局 CSS 过渡兜底 —— 未分层 ──
+   为什么这段留在未分层（顺带**修正 Phase 8.2 的旧注释**）：对**普通（非 !important）声明**，未分层优先级
+   高于任何 @layer，于是 `transform: none` 能连同 utilities 层的 `hover:-translate-*` / `active:scale-*`
+   一起压掉（reduce 下这些位移/缩放本就该消失；搬进 @layer base 反而会让它们复活）。
+   ⚠️ 但 **!important 的层序是反的**：未分层的 !important **输给**任何 @layer 里的 !important。
+   所以「压掉按压规则自带的 !important transition」这件事**不能靠这段**，必须写进 @layer base 且排在
+   按压规则之后（见下面的块二）。T18 用 headless Edge + CDP 实测证实：块一写成未分层时，
+   `Emulation.setEmulatedMedia(prefers-reduced-motion:reduce)` 下按压目标的 computed transition 仍是
+   `transform, color, …` × 0.12s —— 即旧注释「未分层优先于任何 @layer，能稳定覆盖带 !important 的 transition」
+   对 !important 恰好说反了，Phase 8.2 起这条归零就从未生效过（按钮也一样）。
+
+   T18 范围：选择器与上面的**加入规则**一一对应（button + [data-press]），T16 §6d 的缺口正是「归零块只认
+   <button>」；再按结构性钩子补掉 T16 §6c/§6d 点名的其余「reduce 下仍播放」站点。
+   与 <button> 的**唯一差异**（刻意）：新纳入的 [data-press] 目标只归零 :active 态，不做常态 transform:none
+   —— 这些元素常把 transform 当功能用（拖拽定位 / 悬浮形变），常态清成 none 会把它们打断；
+   <button> 那条保持 Phase 8.2 原样。
+
+   T31 `row` 变体：它的 `:active { transform: none }` 被上面第二条选择器分支覆盖（本来也没位移）；
+   真正要额外归零的是亮度 —— **块二只把 transition 时长归零，`:active` 的 filter 值仍会瞬变**。
+   本文件里补 `filter: none` 的理由（取舍已写进 T31 报告）：reduce 的既有基准确是「无动画」而非
+   「无状态反馈」（hover/选中底色照旧、块一只清 transform），但亮度闪变是**按下瞬间**的纯视觉刺激、
+   连 1ms 补间都不剩，与「零动效」最不易产生歧义；代价只有 6 处整行少了按下的即时反馈
+   （它们本就另有 hover 底色）。故：reduce 下连瞬时亮度变化也去掉。 */
+@media (prefers-reduced-motion: reduce) {
+    :where(button:not(:disabled)),
+    :where(button:not(:disabled)):active,
+    :where([data-press]:not([data-press='none'])):active {
+        transform: none;
+    }
+    :where([data-press='row']):active {
+        filter: none;
+    }
+    /* T18：这些目标自带的过渡是**普通声明**（`.w-icon` 在基础层）或**内联普通声明**
+       （project-sidebar / 简化工具栏），未分层 !important 足够压住（内联普通声明输给作者 !important，与层无关）。
+       ⚠️ 钩子若在组件侧被改名/删除，本兜底会**静默失效**（没有闸门能发现），故三处都写了来源：
+       · `.w-icon`            → 本文件里 `.w-icon { transition: filter … }` 那条（T16 §6c 点名）
+       · `aside[data-sf='sidebar']` → project-sidebar.svelte:227-233 的宽度补间（全项目 data-sf="sidebar" 仅此一处）
+       · `.simplified-toolbar` → toolbar.svelte:182-201 的位移/缩放/宽度（该 class 只在简化态存在，
+                                 也正是内联过渡存在的那一态；它已是跨模块钩子，见 magnetic-pointer.utils.ts:24） */
+    .w-icon,
+    aside[data-sf='sidebar'],
+    .simplified-toolbar {
+        transition: none !important;
+    }
+}
+
+/* ── 减弱动态效果（块二）：压掉按压规则自带的 !important transition —— 必须**同层且靠后** ──
+   未分层压不住它（见块一的 ⚠️），唯一办法是进 @layer base 并排在按压规则之后：
+   同层 + 同特异性 + 靠后 → 胜出（T18 探针实测：块二存在时按压目标 computed transition 变为 `none / 0s`）。 */
+@layer base {
+    @media (prefers-reduced-motion: reduce) {
+        :where(button:not(:disabled), [data-press]:not([data-press='none'])) {
+            transition: none !important;
+        }
     }
 }

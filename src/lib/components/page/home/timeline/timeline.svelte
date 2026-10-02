@@ -33,10 +33,8 @@
         vx,
         damageBlockLeft,
         getDamageBlocksStacked,
-        setDamageWidths,
         getSegments,
         elementColor,
-        estimateDamageHeight,
         startDrag,
         startBlockDrag,
         onDrag,
@@ -93,7 +91,7 @@
     import { remapDuplicatedDamageBuffs } from '$lib/calc/calculation.store.svelte'
     import { SIDE_PAD, NON_DIRECT_ELEMENT, TRACK_COLORS, GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
     import type { OpBlock, DamageBlock } from '$lib/calc/timeline.types'
-    import ContextMenu from './context-menu.svelte'
+    import ContextMenu from './timeline-menus.svelte'
     import SkillPicker from './skill-picker.svelte'
     import NonDirectPicker from './non-direct-picker.svelte'
     import DamageList from './damage-list.svelte'
@@ -102,6 +100,8 @@
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import { getInputShortcutId, getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { addToast } from '$lib/data/toast.svelte'
+    import { blockStyle as blockStyleOf, refLineLeft as refLineLeftOf } from './timeline-styles.utils'
+    import TimelineDamageOverlay from './timeline-damage-overlay.svelte'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
@@ -132,37 +132,21 @@
     const gpuAccel = $derived(getGpuAccel())
 
     function blockStyle(block: OpBlock, highlighted: boolean, dimmed: boolean, isDragTarget: boolean): string {
-        const visualPos = getDragBlockVisualPositions()[block.id] ?? block.pos
-        const rest = `z-index: ${highlighted ? 20 : 5}; opacity: ${dimmed ? 0.4 : 1}; transition: opacity 150ms ease;`
-        if (gpuAccel) {
-            const dx = visualPos - block.pos
-            return `left: ${block.pos}px; transform: translateX(${dx}px) translateX(-50%) ${
-                highlighted ? 'translateY(-4px)' : ''
-            }; ${rest}${isDragTarget ? ' will-change: transform;' : ''}`
-        }
-        return `left: ${visualPos}px; transform: translateX(-50%) ${highlighted ? 'translateY(-4px)' : ''}; ${rest}`
+        return blockStyleOf(
+            block.pos,
+            getDragBlockVisualPositions()[block.id] ?? block.pos,
+            highlighted,
+            dimmed,
+            isDragTarget,
+            gpuAccel
+        )
     }
 
     function refLineLeft(id: string, pos: number): string {
-        const x = vx(id, pos)
-        if (gpuAccel) return `left: ${pos}px; transform: translateX(${x - pos}px);`
-        return `left: ${x}px;`
+        return refLineLeftOf(vx(id, pos), pos, gpuAccel)
     }
 
-    function damageStackStyle(left: number, top: number, scale: number, dimmed: boolean, dragging: boolean): string {
-        const rest = `opacity: ${dimmed ? 0.4 : 1}; transform-origin: left center; transition: ${
-            dragging ? 'opacity 150ms ease' : 'transform 150ms ease, opacity 150ms ease'
-        };`
-        if (gpuAccel) return `left:0;top:0;transform: translate(${left}px, ${top}px) scale(${scale}); ${rest}`
-        return `left: ${left}px; top: ${top}px; transform: scale(${scale}); ${rest}`
-    }
-    let damageStackHeight = $derived.by(() => {
-        let maxBottom = 0
-        for (const item of damageStack) {
-            maxBottom = Math.max(maxBottom, item.top + estimateDamageHeight(item.block))
-        }
-        return maxBottom + 12
-    })
+    /** @desc 伤害块叠层已抽成 `./timeline-damage-overlay.svelte`，其高度由该组件自行派生 */
 
     $effect(() => {
         data
@@ -264,28 +248,10 @@
         refreshTimelineMetrics()
     }
 
-    const onDamageWheel = (e: WheelEvent) => {
-        if (e.ctrlKey) {
-            e.preventDefault()
-            e.stopPropagation()
-            const el = e.currentTarget as HTMLElement
-            el.scrollTop += e.deltaY
-        }
-    }
-
-    function nonpassiveWheel(node: HTMLElement, handler: (e: WheelEvent) => void) {
-        node.addEventListener('wheel', handler, { passive: false })
-        return {
-            destroy() {
-                node.removeEventListener('wheel', handler)
-            }
-        }
-    }
-
-    // 块宽测量批量提交：首帧 N 个块各自 setBlockWidth/setDamageWidth 会触发 N 次整表重排
-    // （damageStack $derived 随每次写重算）；先入 pending，微任务统一写一次 store
+    // 块宽测量批量提交：首帧 N 个块各自 setBlockWidth 会触发 N 次整表重排
+    // （damageStack $derived 随每次写重算）；先入 pending，微任务统一写一次 store。
+    // 注：伤害块的同类批处理随 `./timeline-damage-overlay.svelte` 一起搬走了（两者读写不同字段）。
     let pendingBlockWidths = new Map<string, number>()
-    let pendingDamageWidths = new Map<string, number>()
     let widthFlushScheduled = false
 
     function scheduleWidthFlush() {
@@ -293,30 +259,15 @@
         widthFlushScheduled = true
         queueMicrotask(() => {
             widthFlushScheduled = false
-            if (pendingBlockWidths.size > 0) {
-                setBlockWidths(Object.fromEntries(pendingBlockWidths))
-                pendingBlockWidths.clear()
-            }
-            if (pendingDamageWidths.size > 0) {
-                setDamageWidths(Object.fromEntries(pendingDamageWidths))
-                pendingDamageWidths.clear()
-            }
+            if (pendingBlockWidths.size === 0) return
+            setBlockWidths(Object.fromEntries(pendingBlockWidths))
+            pendingBlockWidths.clear()
         })
     }
 
     function measureWidth(node: HTMLElement, blockId: string) {
         const set = () => {
             pendingBlockWidths.set(blockId, node.offsetWidth)
-            scheduleWidthFlush()
-        }
-        set()
-        const ro = new ResizeObserver(set)
-        return { destroy: () => ro.disconnect() }
-    }
-
-    function measureDamageWidth(node: HTMLElement, blockId: string) {
-        const set = () => {
-            pendingDamageWidths.set(blockId, node.offsetWidth)
             scheduleWidthFlush()
         }
         set()
@@ -613,7 +564,7 @@
                 </div>
 
                 <!-- Track rows -->
-                {#each getTRACKS() as name, i}
+                {#each getTRACKS() as name, i (i)}
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         class="relative shrink-0 {i < getTRACKS().length - 1 ? 'h-14' : 'flex-1'}"
@@ -773,101 +724,7 @@
                             </div>
                         {:else}
                             <!-- Damage blocks overlay for track 3 -->
-                            <div
-                                class="absolute pointer-events-auto theme-scrollbar overflow-y-auto"
-                                style="left: 5rem; top: 0; right: 0; bottom: 0; z-index: 6;"
-                                use:nonpassiveWheel={onDamageWheel}
-                            >
-                                <div class="relative" style="height: {damageStackHeight}px; width: 100%;">
-                                    {#each damageStack as { block: dmg, top, left } (dmg.id)}
-                                        {@const isGroupDrag = getIsGroupDrag()}
-                                        {@const isParentDragged = isGroupDrag
-                                            ? dmg.sourceType === 'op'
-                                                ? getSelectedBlockIds()[dmg.sourceId]
-                                                : getSelectedRefLineIds()[dmg.sourceId]
-                                            : getDragBlockId() !== null &&
-                                              dmg.sourceType === 'op' &&
-                                              (Object.keys(getSelectedBlockIds()).length > 1
-                                                  ? getSelectedBlockIds()[dmg.sourceId]
-                                                  : getDragBlockId() === dmg.sourceId)}
-                                        {@const isDimmed =
-                                            (getDragBlockId() !== null || isGroupDrag) && !isParentDragged}
-                                        <div
-                                            class="absolute cursor-default"
-                                            style={damageStackStyle(
-                                                left,
-                                                top,
-                                                isParentDragged ? 1.2 : 1,
-                                                isDimmed,
-                                                getDragBlockId() !== null || getDraggingId() !== null
-                                            )}
-                                        >
-                                            <div
-                                                class="flex flex-col items-start gap-0.5 px-1 py-0.5"
-                                                use:measureDamageWidth={dmg.id}
-                                            >
-                                                {#each dmg.skillHits as hit}
-                                                    {@const echoName = teamByChar.get(hit.character)?.echoes?.[0]?.name}
-                                                    {@const srcOp =
-                                                        dmg.sourceType === 'op' ? opBlockById.get(dmg.sourceId) : null}
-                                                    {@const srcChar =
-                                                        dmg.sourceType === 'ref'
-                                                            ? ''
-                                                            : srcOp && srcOp.trackIndex < getTRACKS().length - 1
-                                                              ? (team[srcOp.trackIndex]?.character ?? '')
-                                                              : ''}
-                                                    <span
-                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded-none px-1.5 py-px"
-                                                        style="color: var(--theme-element-{hit.element}, #888); border-color: var(--theme-element-{hit.element}, #888);"
-                                                    >
-                                                        {(dmg.sourceType === 'ref' && hit.character
-                                                            ? `[${hit.character}]`
-                                                            : dmg.sourceType === 'op' &&
-                                                                hit.character &&
-                                                                hit.character !== srcChar
-                                                              ? `[${hit.character}]`
-                                                              : '') +
-                                                            (hit.skillType === '声骸技能' && echoName
-                                                                ? echoName + '·'
-                                                                : '') +
-                                                            hit.hitName.replace('伤害', '') +
-                                                            ((hit.hits ?? 0) > 1 ? '\u00D7' + hit.hits : '')}
-                                                    </span>
-                                                {/each}
-                                                {#each [...dmg.nonDirectEntries].sort((a, b) => {
-                                                    const w = { 处决: 0, 响应: 1, 效应: 2 }
-                                                    return (w[a.category] ?? 3) - (w[b.category] ?? 3)
-                                                }) as nd}
-                                                    {@const c =
-                                                        nd.category === '响应'
-                                                            ? 'var(--theme-accent-bg)'
-                                                            : nd.category === '处决'
-                                                              ? 'var(--theme-accent-text)'
-                                                              : (NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]
-                                                                ? `var(--theme-element-${(NON_DIRECT_ELEMENT as Record<string, string>)[nd.name]}, #888)`
-                                                                : 'var(--theme-accent-bg)'}
-                                                    <span
-                                                        class="text-[11px] font-bold leading-tight border border-dashed rounded-none px-1.5 py-px"
-                                                        style="color: {c}; border-color: {c}; opacity: {nd.category ===
-                                                        '效应'
-                                                            ? 0.75
-                                                            : 1};"
-                                                    >
-                                                        {nd.category === '效应'
-                                                            ? nd.name +
-                                                              nd.layers +
-                                                              '层' +
-                                                              ((nd.hits ?? 1) > 1 ? `×${nd.hits}段` : '')
-                                                            : nd.name}{nd.responders?.length
-                                                            ? '[' + nd.responders.join(',') + ']'
-                                                            : ''}
-                                                    </span>
-                                                {/each}
-                                            </div>
-                                        </div>
-                                    {/each}
-                                </div>
-                            </div>
+                            <TimelineDamageOverlay {damageStack} {team} {teamByChar} {opBlockById} {gpuAccel} />
                         {/if}
                     </div>
                 {/each}
@@ -875,7 +732,7 @@
 
             <!-- Ref line overlay (vertical lines spanning all tracks) -->
             <div class="absolute pointer-events-none" style="left: 5rem; top: 2rem; right: 0; bottom: 0; z-index: 10;">
-                {#each getRefLines() as rl}
+                {#each getRefLines() as rl (rl.id)}
                     <div
                         class="absolute top-0 bottom-0 border-l-2 border-dashed"
                         style="{refLineLeft(rl.id, rl.pos)}border-left-color: {getDraggingId() === rl.id ||
@@ -891,7 +748,7 @@
 
             <!-- Header time label overlay -->
             <div class="absolute pointer-events-none" style="left: 5rem; top: 0; height: 2rem; z-index: 20;">
-                {#each getRefLines() as rl}
+                {#each getRefLines() as rl (rl.id)}
                     <div
                         class="absolute top-0 h-full flex items-center pointer-events-auto"
                         style="{gpuAccel
@@ -951,7 +808,7 @@
             {/if}
             <!-- Drag hot zone overlay -->
             <div class="absolute pointer-events-none" style="top: 2rem; left: 5rem; right: 0; bottom: 0; z-index: 30;">
-                {#each getRefLines() as rl}
+                {#each getRefLines() as rl (rl.id)}
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         class="absolute inset-y-0 pointer-events-auto cursor-col-resize"

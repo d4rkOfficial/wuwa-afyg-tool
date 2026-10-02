@@ -65,5 +65,57 @@ for (const k of keys) {
         console.log(`  ✗ 引擎 key ${k} 缺少 css 规则或变量发射（css=${inCss} engine=${emitted}）`)
     }
 }
+
+// ── 主题组件命名空间一致性：ThemeComponentKey 联合 与 两个 preset JSON 必须完全一致 ──
+// 历史缺陷：titlebar 存在于 dark/light.json 却不在联合类型里，靠 theme.svelte.ts 的动态索引绕过类型检查。
+const typesSrc = readFileSync('src/lib/theme/types.ts', 'utf8')
+const unionBody = (typesSrc.match(/export type ThemeComponentKey =([\s\S]*)$/)?.[1] ?? '')
+    // 联合类型按语义分了组，组间用 // 注释分隔；解析前先去注释
+    .replace(/\/\/[^\n]*/g, '')
+const unionKeys = new Set(
+    unionBody
+        .split('|')
+        .map((s) => s.trim().replace(/'/g, ''))
+        .filter(Boolean)
+)
+const readPresetKeys = (p) => new Set(Object.keys(JSON.parse(readFileSync(p, 'utf8')).components ?? {}))
+const darkKeys = readPresetKeys('src/lib/theme/preset/dark.json')
+const lightKeys = readPresetKeys('src/lib/theme/preset/light.json')
+
+console.log('')
+console.log(`ThemeComponentKey 联合：${[...unionKeys].sort().join(' / ')}`)
+const diff = (a, b) => [...a].filter((k) => !b.has(k)).sort()
+
+for (const [label, missing] of [
+    ['联合有但 dark.json 缺失', diff(unionKeys, darkKeys)],
+    ['dark.json 有但联合缺失', diff(darkKeys, unionKeys)],
+    ['light.json 有但联合缺失', diff(lightKeys, unionKeys)],
+    ['dark/light 不一致', [...diff(darkKeys, lightKeys), ...diff(lightKeys, darkKeys)]]
+]) {
+    if (missing.length) {
+        bad += missing.length
+        console.log(`  ✗ ${label}: ${missing.join(', ')}`)
+    }
+}
+if (bad === 0) console.log('  ✓ 组件命名空间三处一致')
+
+// ── SURFACE_GROUPS 提示文案 ↔ AI 工具描述：必须同步 ──
+// settings.ts 的 set_setting.description 内联了各区域含义（不能拼接：generate-tools-doc.mjs
+// 的 pickString 只取第一个字符串字面量，拼接会让 docs/tools.md 被静默截断）。
+// 故改为断言：每个 SURFACE_GROUPS[*].hint 都必须原样出现在 settings.ts 里。
+const settingsSrc = readFileSync('src/lib/ai/tools/settings.ts', 'utf8')
+const hints = [...typesSrc.matchAll(/hint:\s*'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1])
+const missingHints = hints.filter((h) => !settingsSrc.includes(h))
+console.log('')
+console.log(`区域提示文案 ${hints.length} 条`)
+if (missingHints.length) {
+    bad += missingHints.length
+    for (const h of missingHints) {
+        console.log(`  ✗ AI 工具描述缺少该区域提示（改 SURFACE_GROUPS.hint 后需同步 settings.ts）: ${h.slice(0, 40)}…`)
+    }
+} else {
+    console.log('  ✓ 与 set_setting 的 AI 描述一致')
+}
+
 console.log(bad === 0 ? '[check-surfaces] OK' : `[check-surfaces] ${bad} 处不一致`)
 process.exit(bad === 0 ? 0 : 1)

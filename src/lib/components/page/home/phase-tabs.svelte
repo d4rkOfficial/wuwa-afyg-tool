@@ -139,7 +139,7 @@
     style="--sf-base: var(--theme-tabs-bg); color: var(--theme-tabs-text); border-color: var(--theme-divider-border); {styleProp ||
         ''}"
 >
-    {#each tabs as tab}
+    {#each tabs as tab (tab.key)}
         {@const isActive = !showResult && active === tab.key}
         <button
             onclick={() => !tab.disabled && onchange(tab.key)}
@@ -157,6 +157,7 @@
         >
             {#if tab.locked}
                 <span
+                    data-press=""
                     onclick={(e) => {
                         e.stopPropagation()
                         onunlock?.(tab.key)
@@ -169,7 +170,7 @@
                     }}
                     role="button"
                     tabindex="0"
-                    class="cursor-pointer"
+                    class="inline-block cursor-pointer"
                     title="点击解锁"
                 >
                     <Icon icon="mdi:lock" class="size-3.5 text-(--theme-accent-text)" />
@@ -178,6 +179,7 @@
                 <Icon icon="mdi:lock-outline" class="size-3.5 opacity-30" />
             {:else}
                 <span
+                    data-press=""
                     onclick={(e) => {
                         if (active === tab.key) {
                             e.stopPropagation()
@@ -192,7 +194,7 @@
                     }}
                     role="button"
                     tabindex="0"
-                    class="cursor-pointer"
+                    class="inline-block cursor-pointer"
                     title="点击锁定"
                 >
                     <Icon icon="mdi:lock-open-outline" class="size-3.5 opacity-50" />
@@ -309,7 +311,7 @@
                 >
             </div>
             <div class="rounded-none border px-1" style="border-color: var(--theme-divider-border);">
-                {#each wsRecentTools.slice(0, 10) as t}
+                {#each wsRecentTools.slice(0, 10) as t (t.time)}
                     <div class="flex items-center justify-between gap-3 px-2.5 py-1.5 text-[11px]">
                         <span
                             class="truncate font-mono"

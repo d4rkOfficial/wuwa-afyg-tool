@@ -1,93 +1,62 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
+    import Modal from '$lib/components/layout/modal.svelte'
     import { getShowDamageList, setShowDamageList, getDamageList } from '$lib/calc/timeline.store.svelte'
 </script>
 
-{#if getShowDamageList()}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5));"
-        class="animate-fade-in fixed inset-0 z-60 flex items-center justify-center backdrop-blur-sm"
-        onclick={(e) => {
-            if ((e.target as HTMLElement) === e.currentTarget) setShowDamageList(false)
-        }}
-        onkeydown={(e) => e.key === 'Escape' && setShowDamageList(false)}
-    >
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-            data-sf="modal"
-            class="animate-pop-in w-full max-h-[70vh] max-w-2xl rounded-none border text-(--theme-modal-text) shadow-2xl overflow-hidden flex flex-col"
-            style="border-color: var(--theme-divider-border);"
-            onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.stopPropagation()}
+<Modal
+    open={getShowDamageList()}
+    onclose={() => setShowDamageList(false)}
+    backdropClose
+    layer="nested"
+    class="w-full max-w-2xl"
+>
+    {#snippet title()}
+        <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+        <h2>伤害列表</h2>
+        <span class="ml-auto mr-4 text-[10px] tracking-[0.22em] text-(--theme-modal-text)/40"
+            >{getDamageList().length} 条</span
         >
-            <div
-                class="flex items-center justify-between gap-2 border-b px-4 pb-2.5 pt-3"
+    {/snippet}
+    {#if getDamageList().length === 0}
+        <div class="flex items-center justify-center py-8 text-[10px] text-(--theme-modal-text)/40">暂无伤害数据</div>
+    {:else}
+        <table class="w-full text-xs">
+            <thead>
+                <tr class="text-(--theme-modal-text)/50 border-b" style="border-color: var(--theme-divider-border);">
+                    <th class="text-left font-medium py-1.5 pr-3">角色</th>
+                    <th class="text-left font-medium py-1.5 pr-3">倍率名</th>
+                    <th class="text-left font-medium py-1.5 pr-3">倍率基础</th>
+                    <th class="text-left font-medium py-1.5 pr-3">属性</th>
+                    <th class="text-left font-medium py-1.5">倍率值</th>
+                </tr>
+            </thead>
+            <tbody>
+                {#each getDamageList() as entry, ei (ei)}
+                    <tr class="border-b last:border-0" style="border-color: var(--theme-divider-border);">
+                        <td class="py-1.5 pr-3 text-(--theme-modal-text)">{entry.character}</td>
+                        <td class="py-1.5 pr-3 text-(--theme-modal-text) max-w-48 truncate" title={entry.name}
+                            >{entry.name}</td
+                        >
+                        <td class="py-1.5 pr-3 text-(--theme-modal-text)/60">{entry.baseType}</td>
+                        <td class="py-1.5 pr-3" style="color: var(--theme-element-{entry.element}, #888)"
+                            >{entry.element || '物理'}</td
+                        >
+                        <td class="py-1.5 text-(--theme-modal-text)/60 max-w-36 truncate" title={entry.value}
+                            >{entry.value}</td
+                        >
+                    </tr>
+                {/each}
+            </tbody>
+        </table>
+    {/if}
+    {#snippet footer()}
+        <div class="mt-4 flex items-center justify-end">
+            <button
+                class="inline-flex items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                 style="border-color: var(--theme-divider-border);"
+                onclick={() => setShowDamageList(false)}>关闭</button
             >
-                <span class="flex items-center gap-2">
-                    <Icon
-                        icon="mdi:chart-box-outline"
-                        class="size-4 shrink-0"
-                        style="color: var(--theme-accent-text);"
-                    />
-                    <h2 class="text-base font-black tracking-tight text-(--theme-modal-text)">伤害列表</h2>
-                </span>
-                <span class="text-[10px] tracking-[0.22em] text-(--theme-modal-text)/40"
-                    >{getDamageList().length} 条</span
-                >
-            </div>
-            <div class="theme-scrollbar flex-1 overflow-y-auto p-3">
-                {#if getDamageList().length === 0}
-                    <div class="flex items-center justify-center py-8 text-[10px] text-(--theme-modal-text)/40">
-                        暂无伤害数据
-                    </div>
-                {:else}
-                    <table class="w-full text-xs">
-                        <thead>
-                            <tr
-                                class="text-(--theme-modal-text)/50 border-b"
-                                style="border-color: var(--theme-divider-border);"
-                            >
-                                <th class="text-left font-medium py-1.5 pr-3">角色</th>
-                                <th class="text-left font-medium py-1.5 pr-3">倍率名</th>
-                                <th class="text-left font-medium py-1.5 pr-3">倍率基础</th>
-                                <th class="text-left font-medium py-1.5 pr-3">属性</th>
-                                <th class="text-left font-medium py-1.5">倍率值</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {#each getDamageList() as entry}
-                                <tr class="border-b last:border-0" style="border-color: var(--theme-divider-border);">
-                                    <td class="py-1.5 pr-3 text-(--theme-modal-text)">{entry.character}</td>
-                                    <td
-                                        class="py-1.5 pr-3 text-(--theme-modal-text) max-w-48 truncate"
-                                        title={entry.name}>{entry.name}</td
-                                    >
-                                    <td class="py-1.5 pr-3 text-(--theme-modal-text)/60">{entry.baseType}</td>
-                                    <td class="py-1.5 pr-3" style="color: var(--theme-element-{entry.element}, #888)"
-                                        >{entry.element || '物理'}</td
-                                    >
-                                    <td
-                                        class="py-1.5 text-(--theme-modal-text)/60 max-w-36 truncate"
-                                        title={entry.value}>{entry.value}</td
-                                    >
-                                </tr>
-                            {/each}
-                        </tbody>
-                    </table>
-                {/if}
-            </div>
-            <div
-                class="flex items-center justify-end gap-2 border-t px-4 py-2.5"
-                style="border-color: var(--theme-divider-border);"
-            >
-                <button
-                    class="inline-flex items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                    style="border-color: var(--theme-divider-border);"
-                    onclick={() => setShowDamageList(false)}>关闭</button
-                >
-            </div>
         </div>
-    </div>
-{/if}
+    {/snippet}
+</Modal>

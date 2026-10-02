@@ -1,6 +1,6 @@
 // WS 远程接管客户端：解析 #websocket= 目标 → 连接/自动重连 → 复用 AI 工具注册表（executeTool）执行服务器下发的 exec 指令并回传结果/状态
 import { browser, version } from '$app/environment'
-import { buildTools, executeTool } from '$lib/ai/tools'
+import { availableTools, executeTool } from '$lib/ai/tools'
 import { getPanelsState } from '$lib/ai/panels.svelte'
 import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
 import { getCalcState, notifyCalcUpdate } from '$lib/calc/calculation.store.svelte'
@@ -111,7 +111,9 @@ function openSocket(url: string): void {
                 type: 'hello',
                 app: 'wuwa-afyg',
                 version,
-                tools: buildTools(),
+                // 只上报本上下文**真正可用**的工具：需要交互界面或宿主网络能力的（如 ask_user / web_fetch）
+                // 在远程接管通道里既不该出现在清单里，直接 exec 也会被 executeTool 的能力校验拒掉
+                tools: availableTools(wsCtx()),
                 state: buildState(getView())
             })
         )
@@ -167,7 +169,7 @@ async function drain(): Promise<void> {
     _processing = true
     const job = _queue.shift()!
     try {
-        const out = await executeTool(buildCtx(), job.tool, job.args)
+        const out = await executeTool(wsCtx(), job.tool, job.args)
         let parsed: Record<string, unknown> = { ok: false, error: '工具返回无法解析' }
         try {
             parsed = JSON.parse(out) as Record<string, unknown>
@@ -183,8 +185,11 @@ async function drain(): Promise<void> {
     }
 }
 
-/** @desc 与 AI 同源的工具执行上下文：危险操作无条件放行；视图/计算态回写走宿主桥 */
-function buildCtx() {
+/** @desc 与 AI 同源的工具执行上下文：危险操作无条件放行；视图/计算态回写走宿主桥。
+ *  **刻意不提供 `askUser` 与 `webFetch`** —— 远程接管没有交互界面，也不该借用宿主的网络位置出网抓取，
+ *  故需要这两种能力的工具（`ask_user` / `web_fetch`）在此上下文不可用
+ *  （`availableTools` 不上清单、`executeTool` 直接拒绝）。 */
+function wsCtx() {
     return {
         onConfirm: async () => true,
         requestView: _host.requestView,
@@ -246,4 +251,4 @@ export function getWsRecentTools(): Array<{ tool: string; ok: boolean; time: num
     return _recentTools
 }
 
-export { buildTools }
+export { availableTools }

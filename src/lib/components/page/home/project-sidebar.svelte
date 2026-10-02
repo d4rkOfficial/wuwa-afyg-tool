@@ -2,7 +2,8 @@
     import { untrack } from 'svelte'
     import Icon from '@iconify/svelte'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
-    import QuickLookupContent from '$lib/components/layout/quick-lookup-content.svelte'
+    import Button from '$lib/components/ui/button.svelte'
+    import QuickLookupContent from '$lib/components/page/home/quick-lookup/quick-lookup-content.svelte'
     import type { Project, PhaseKey, CharSlot } from '$lib/types/project'
     import { setActiveTheme, getActiveId as getActiveThemeId, getThemes } from '$lib/theme'
     import { addToast } from '$lib/data/toast.svelte'
@@ -10,6 +11,7 @@
     import { getSidebarActions } from '$lib/data/interaction-prefs.svelte'
     import { shortName } from '$lib/utils/character'
     import { slide } from 'svelte/transition'
+    import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import favicon from '$lib/assets/favicon.svg'
     import { getShareState, shareCooldownLabel, refreshShareCooldown } from '$lib/data/share.svelte'
     import type { ComponentsProps } from '$lib/types'
@@ -228,11 +230,12 @@
     class="theme-glass-surface flex h-full shrink-0 flex-col border-r {className}"
     style="width: {width}px;{dragging
         ? ''
-        : ' transition: width 0.15s ease;'} color: var(--theme-sidebar-text); border-color: color-mix(in srgb, var(--theme-divider-border, rgba(255,255,255,0.1)) var(--sf-content-opacity, 100%), transparent); {styleProp ||
+        : ' transition: width var(--motion-fast) ease;'} color: var(--theme-sidebar-text); border-color: color-mix(in srgb, var(--theme-divider-border, rgba(255,255,255,0.1)) var(--sf-sidebar-opacity, 100%), transparent); {styleProp ||
         ''}"
     oncontextmenu={(e) => e.preventDefault()}
 >
     <div
+        data-press=""
         class="flex items-center gap-2 border-b px-4 py-3 cursor-pointer transition-colors hover:bg-(--theme-sidebar-text)/5"
         style="border-color: var(--theme-divider-border);"
         onclick={onhome}
@@ -307,6 +310,7 @@
                     ].join(' ')}
                 >
                     <div
+                        data-press=""
                         class={[
                             'flex w-full cursor-pointer items-center gap-2 rounded-none px-2 py-1.5 text-xs font-black tracking-tight transition-colors',
                             group.key === activeGroupKey
@@ -338,7 +342,7 @@
                         </svg>
                         {#if !compact}
                             <span class="flex flex-1 items-center gap-0 truncate">
-                                {#each group.displayNames as name, i}
+                                {#each group.displayNames as name, i (i)}
                                     {#if i > 0}<span class="text-(--theme-sidebar-text)/40 shrink-0">/</span>{/if}
                                     <span class="shrink-0">{shortName(name)}</span>
                                 {/each}
@@ -350,11 +354,12 @@
                         {/if}
                     </div>
                     {#if expandedKeys.has(group.key)}
-                        <div transition:slide|local={{ duration: 200 }} class="space-y-1 pb-1">
+                        <div transition:slide|local={slideParams(MOTION_MS.base)} class="space-y-1 pb-1">
                             {#each group.projects as project (project.id)}
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <div
+                                    data-press=""
                                     data-sf="widget"
                                     data-sf-flat
                                     onclick={() => selectProject(project.id)}
@@ -409,6 +414,7 @@
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
+                            data-press=""
                             data-sf="widget"
                             data-sf-flat
                             onclick={() => selectProject(project.id)}
@@ -443,27 +449,39 @@
     {#if !lookupPage && !lookupCompactHidden && getSidebarActions()}
         <div class="shrink-0 border-t px-2 pt-2 pb-3 space-y-0.5" style="border-color: var(--theme-divider-border)">
             {#if compact}
-                <button
+                <Button
+                    variant="text"
+                    size="none"
+                    bare
                     onclick={oncreate}
-                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    backgroundImage="transparent"
+                    class="w-full justify-center py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="新建工程"
                 >
                     <Icon icon="mdi:plus" class="size-4 shrink-0" />
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="text"
+                    size="none"
+                    bare
                     onclick={onimport}
-                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    backgroundImage="transparent"
+                    class="w-full justify-center py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="从本地导入"
                 >
                     <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="text"
+                    size="none"
+                    bare
                     onclick={onworkshop}
-                    class="flex w-full items-center justify-center rounded-none py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                    backgroundImage="transparent"
+                    class="w-full justify-center py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                     title="从工坊下载"
                 >
                     <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
-                </button>
+                </Button>
             {:else}
                 <button
                     onclick={() => (actionsCollapsed = !actionsCollapsed)}
@@ -476,31 +494,43 @@
                     />
                 </button>
                 {#if !actionsCollapsed}
-                    <div transition:slide|local={{ duration: 200 }} class="space-y-0.5">
-                        <button
+                    <div transition:slide|local={slideParams(MOTION_MS.base)} class="space-y-0.5">
+                        <Button
+                            variant="text"
+                            size="none"
+                            bare
                             onclick={oncreate}
-                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            backgroundImage="transparent"
+                            class="w-full gap-2 px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="新建工程"
                         >
                             <Icon icon="mdi:plus" class="size-4 shrink-0" />
                             <span>新建工程</span>
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="text"
+                            size="none"
+                            bare
                             onclick={onimport}
-                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            backgroundImage="transparent"
+                            class="w-full gap-2 px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="从本地导入"
                         >
                             <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
                             <span>从本地导入</span>
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="text"
+                            size="none"
+                            bare
                             onclick={onworkshop}
-                            class="flex w-full items-center gap-2 rounded-none px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
+                            backgroundImage="transparent"
+                            class="w-full gap-2 px-3 py-1.5 text-xs text-(--theme-sidebar-text)/60 transition-colors hover:bg-(--theme-sidebar-text)/5 hover:text-(--theme-sidebar-text)/90"
                             title="从工坊下载"
                         >
                             <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
                             <span>从工坊下载</span>
-                        </button>
+                        </Button>
                     </div>
                 {/if}
             {/if}

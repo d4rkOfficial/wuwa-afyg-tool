@@ -168,12 +168,12 @@ function applyThemeCSS() {
     if (!theme) return
 
     for (const [key, comp] of Object.entries(theme.components)) {
-        setCSSVar(root, key, 'bg', comp.backgroundImage)
-        setCSSVar(root, key, 'bg-focused', comp.backgroundImageFocused)
-        setCSSVar(root, key, 'text', comp.textColor)
-        setCSSVar(root, key, 'text-focused', comp.textColorFocused)
-        setCSSVar(root, key, 'border', comp.borderColor)
-        setCSSVar(root, key, 'border-focused', comp.borderColorFocused)
+        setCSSVar(root, key, 'bg', comp?.backgroundImage)
+        setCSSVar(root, key, 'bg-focused', comp?.backgroundImageFocused)
+        setCSSVar(root, key, 'text', comp?.textColor)
+        setCSSVar(root, key, 'text-focused', comp?.textColorFocused)
+        setCSSVar(root, key, 'border', comp?.borderColor)
+        setCSSVar(root, key, 'border-focused', comp?.borderColorFocused)
     }
 
     if (theme.elementColors) {

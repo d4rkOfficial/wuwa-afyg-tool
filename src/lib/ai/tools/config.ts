@@ -109,8 +109,8 @@ defineTool('add_substat', {
     parameters: {
         type: 'object',
         properties: {
-            char: { type: 'number' },
-            slot: { type: 'number' },
+            char: { type: 'number', description: '角色槽位（1-3）' },
+            slot: { type: 'number', description: '声骸槽位（1-5）' },
             label: { type: 'string', description: '副词条名称' },
             value: { type: 'number', description: '可选，覆盖中档默认值（百分数词条填数值，如 8 表示 8%）' }
         },
@@ -144,7 +144,11 @@ defineTool('remove_substat', {
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { char: { type: 'number' }, slot: { type: 'number' }, idx: { type: 'number' } },
+        properties: {
+            char: { type: 'number', description: '角色槽位（1-3）' },
+            slot: { type: 'number', description: '声骸槽位（1-5）' },
+            idx: { type: 'number', description: '副词条下标（从 0 开始）' }
+        },
         required: ['char', 'slot', 'idx']
     },
     handler: async (args) => {
@@ -166,10 +170,10 @@ defineTool('update_substat_value', {
     parameters: {
         type: 'object',
         properties: {
-            char: { type: 'number' },
-            slot: { type: 'number' },
-            idx: { type: 'number' },
-            value: { type: 'number' }
+            char: { type: 'number', description: '角色槽位（1-3）' },
+            slot: { type: 'number', description: '声骸槽位（1-5）' },
+            idx: { type: 'number', description: '副词条下标（从 0 开始）' },
+            value: { type: 'number', description: '新数值（百分数词条填数值，如 8 表示 8%）' }
         },
         required: ['char', 'slot', 'idx', 'value']
     },
@@ -194,8 +198,12 @@ defineTool('update_enemy', {
     parameters: {
         type: 'object',
         properties: {
-            key: { type: 'string', enum: ['level', 'defense', 'dmgReduction', 'type'] },
-            value: { type: ['number', 'string'] }
+            key: { type: 'string', enum: ['level', 'defense', 'dmgReduction', 'type'], description: '要修改的配置项' },
+            value: {
+                type: ['number', 'string'],
+                description:
+                    '目标值：level/defense 为数值，dmgReduction 为百分比数值（10 表示 10%），type 为 BOSS/精英怪/小怪'
+            }
         },
         required: ['key', 'value']
     },
@@ -219,7 +227,10 @@ defineTool('update_resistance', {
     description: '修改敌人某元素抗性（百分比数值，如 10 表示 10%）。元素：物理/冷凝/热熔/导电/气动/衍射/湮灭。',
     parameters: {
         type: 'object',
-        properties: { element: { type: 'string' }, value: { type: 'number' } },
+        properties: {
+            element: { type: 'string', description: '元素名：物理/冷凝/热熔/导电/气动/衍射/湮灭' },
+            value: { type: 'number', description: '抗性百分比数值（如 10 表示 10%）' }
+        },
         required: ['element', 'value']
     },
     handler: async (args) => {

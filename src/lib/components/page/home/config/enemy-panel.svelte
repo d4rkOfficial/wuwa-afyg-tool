@@ -73,7 +73,7 @@
         </span>
 
         <div class="flex items-center gap-1 min-w-0">
-            {#each ['BOSS', '精英怪', '小怪'] as t}
+            {#each ['BOSS', '精英怪', '小怪'] as t (t)}
                 {@const icon = t === 'BOSS' ? 'mdi:skull' : t === '精英怪' ? 'mdi:sword' : 'mdi:bug'}
                 <button
                     onclick={() => handleTypeChange(t as 'BOSS' | '精英怪' | '小怪')}
@@ -114,7 +114,7 @@
                         />
                     </div>
                     <div class="flex items-center gap-1.5">
-                        {#each LEVEL_PRESETS as lv}
+                        {#each LEVEL_PRESETS as lv (lv)}
                             <button
                                 onclick={() => handleLevelChange(lv)}
                                 disabled={config.enemy.defenseLocked}
@@ -167,7 +167,7 @@
                 class="flex gap-1 rounded-none border p-0.5"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
-                {#each RESISTANCE_PRESETS as p}
+                {#each RESISTANCE_PRESETS as p (p)}
                     <button
                         onclick={() => applyResistancePreset(p)}
                         class={[
@@ -191,11 +191,14 @@
             </div>
         </div>
         <div class="flex flex-wrap justify-center gap-2.5">
-            {#each sortedResistanceKeys as el}
+            {#each sortedResistanceKeys as el (el)}
                 {@const val = config.enemy.resistances[el]}
                 {@const color = elementColor(el)}
+                <!-- @desc reduced-motion 兜底：本卡的过渡/hover 抬升来自 Tailwind 工具类（不是内联 style），
+                     所以 Tailwind 的 motion-reduce: 变体对内联过渡无效这条结论**不适用于此**（同为 utilities 层、变体靠后 → 生效）。
+                     刻意不用 [data-sf="widget"] 当 reduce 钩子：该 key 全项目 49 处，属面杀伤。 -->
                 <div
-                    class="relative w-[calc(25%-7.5px)] min-w-28 overflow-hidden rounded-none border p-2.5 transition-all duration-200 hover:-translate-y-px hover:border-(--card-color)"
+                    class="relative w-[calc(25%-7.5px)] min-w-28 overflow-hidden rounded-none border p-2.5 transition-all duration-(--motion-base) hover:-translate-y-px hover:border-(--card-color) motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                     style="--card-color: {color}; background: linear-gradient(135deg, color-mix(in srgb, {color} 14%, transparent) 0%, transparent 65%), radial-gradient(ellipse at 85% 8%, color-mix(in srgb, {color} 12%, transparent) 0%, transparent 55%); border-color: color-mix(in srgb, {color} 18%, transparent);"
                 >
                     <!-- 顶部高光线（元素色，弱） -->

@@ -1,5 +1,6 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
+    import Button from '$lib/components/ui/button.svelte'
     import type { ComponentsProps } from '$lib/types'
     import { getActiveId, getOverrides } from '$lib/theme/theme.svelte'
 
@@ -7,7 +8,7 @@
         onWorkshopFrame: () => void
         onBuffLibrary: () => void
         onSubstatLibrary: () => void
-        onSettings: () => void
+        onsettings: () => void
         /** @desc 新建工程 */
         oncreate: () => void
         /** @desc 从本地导入工程文件 */
@@ -19,7 +20,7 @@
         onWorkshopFrame,
         onBuffLibrary,
         onSubstatLibrary,
-        onSettings,
+        onsettings,
         oncreate,
         onimport,
         onworkshop,
@@ -72,7 +73,7 @@
             title: '设置',
             desc: '外观（主题 / 背景图）、交互与快捷键、性能；数据源、工坊实例、库街区账号、缓存与归档；AI 助手接入与提示词。',
             icon: 'mdi:cog-outline',
-            action: onSettings,
+            action: onsettings,
             wide: true
         }
     ])
@@ -119,24 +120,30 @@
                         <Icon icon="mdi:plus" class="size-4 shrink-0" />
                         新建工程
                     </button>
-                    <button
+                    <Button
+                        variant="text"
+                        size="none"
+                        bare
                         onclick={onimport}
-                        class="inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-xs font-black tracking-tight text-(--theme-card-text) transition-colors hover:border-(--theme-accent-bg)"
-                        style="border-color: var(--theme-card-border); background: color-mix(in srgb, var(--theme-card-bg) 70%, transparent);"
+                        backgroundImage="color-mix(in srgb, var(--theme-card-bg) 70%, transparent)"
+                        class="gap-1.5 border border-(--theme-card-border) px-3.5 py-2 text-xs font-black tracking-tight text-(--theme-card-text) transition-colors hover:border-(--theme-accent-bg)"
                         title="从本地选择工程文件导入"
                     >
                         <Icon icon="mdi:file-import-outline" class="size-4 shrink-0" />
                         从本地导入
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="text"
+                        size="none"
+                        bare
                         onclick={onworkshop}
-                        class="inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-xs font-black tracking-tight text-(--theme-card-text) transition-colors hover:border-(--theme-accent-bg)"
-                        style="border-color: var(--theme-card-border); background: color-mix(in srgb, var(--theme-card-bg) 70%, transparent);"
+                        backgroundImage="color-mix(in srgb, var(--theme-card-bg) 70%, transparent)"
+                        class="gap-1.5 border border-(--theme-card-border) px-3.5 py-2 text-xs font-black tracking-tight text-(--theme-card-text) transition-colors hover:border-(--theme-accent-bg)"
                         title="浏览椰果工坊的社区工程并下载导入"
                     >
                         <Icon icon="mdi:storefront-outline" class="size-4 shrink-0" />
                         从工坊下载
-                    </button>
+                    </Button>
                 </div>
             </div>
         </header>
@@ -145,10 +152,11 @@
         <section class="grid grid-cols-1 gap-3.5 md:min-h-0 md:flex-1 md:grid-cols-3">
             {#each entries as entry (entry.title)}
                 <button
+                    data-press="none"
                     onclick={entry.action}
                     data-sf="card"
                     class={[
-                        'card-pop-in group relative flex flex-col justify-between gap-4 overflow-hidden border border-(--theme-card-border) p-5 text-left theme-glass-surface shadow-(--theme-card-shadow) transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)',
+                        'animate-card-pop-in group relative flex flex-col justify-between gap-4 overflow-hidden border border-(--theme-card-border) p-5 text-left theme-glass-surface shadow-(--theme-card-shadow) transition-all hover:-translate-y-0.5 hover:bg-(--theme-card-bg-focused)',
                         'min-h-[9.5rem] md:h-full md:min-h-[11rem]',
                         entry.wide ? 'md:col-span-2' : ''
                     ].join(' ')}
@@ -166,7 +174,7 @@
                         </span>
                         <Icon
                             icon={entry.icon}
-                            class="icon-pop size-7 shrink-0 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
+                            class="animate-icon-pop size-7 shrink-0 text-(--theme-accent-text) drop-shadow-[0_0_3px_var(--theme-halo-color)]"
                         />
                     </div>
                     <p class="relative max-w-2xl text-[13px] leading-relaxed text-(--theme-muted-text)">
@@ -191,40 +199,3 @@
         </footer>
     </div>
 </div>
-
-<style>
-    /* 首页版块入场：错峰上浮淡入 */
-    .card-pop-in {
-        animation: card-pop-in 0.42s cubic-bezier(0.2, 0, 0, 1) backwards;
-    }
-    @keyframes card-pop-in {
-        0% {
-            opacity: 0;
-            transform: translateY(18px);
-        }
-        100% {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    :global(.icon-pop) {
-        animation: icon-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
-    }
-    @keyframes icon-pop {
-        0% {
-            transform: scale(0);
-        }
-        70% {
-            transform: scale(1.12);
-        }
-        100% {
-            transform: scale(1);
-        }
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .card-pop-in,
-        :global(.icon-pop) {
-            animation: none;
-        }
-    }
-</style>

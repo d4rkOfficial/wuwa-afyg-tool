@@ -16,6 +16,7 @@
     import MagneticPointer from '$lib/components/layout/magnetic-pointer.svelte'
     import { loadThemes } from '$lib/theme'
     import { registerIcons } from '$lib/utils/icons'
+    import { initScrollbarAutoHide } from '$lib/utils/scrollbar-autohide'
 
     registerIcons()
 
@@ -32,6 +33,10 @@
 
     onMount(() => {
         loadThemes()
+        // 滚动条自动隐藏：一条 window 捕获阶段监听覆盖全站所有滚动容器（详见该模块文件头注释）。
+        // 放在 +layout 而不是 +page：布局是整棵路由树的唯一外壳，弹窗/右键菜单等挂到 body 的
+        // 滚动容器也在这里的 window 上被捕获，且只初始化一次（页面切换不会重复挂监听）。
+        const disposeScrollbarAutoHide = initScrollbarAutoHide()
         let detachHash = () => {}
         if (browser) {
             // WS 远程接管：hash 携带目标则连接，移除则断开（由统一 hash 分发管理）
@@ -48,6 +53,7 @@
         }
         return () => {
             detachHash()
+            disposeScrollbarAutoHide()
             disconnectWs()
         }
     })

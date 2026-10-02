@@ -249,7 +249,14 @@ defineTool('set_team_trigger_sets', {
             slot: { type: 'number', description: '槽位 1-3' },
             sets: {
                 type: 'array',
-                items: { type: 'object', properties: { name: { type: 'string' }, pieces: { type: 'number' } } }
+                description: '触发套装列表（整体覆盖），总有效件数 ≤5',
+                items: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', description: '套装名（用 get_team_catalog 查询）' },
+                        pieces: { type: 'number', description: '生效件数（2 或 5）' }
+                    }
+                }
             }
         },
         required: ['slot', 'sets']

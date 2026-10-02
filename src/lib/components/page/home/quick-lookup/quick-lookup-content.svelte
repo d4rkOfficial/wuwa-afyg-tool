@@ -1,0 +1,999 @@
+<script lang="ts">
+    /** @desc 速查内容主体（角色 tab + 基础属性/武器/声骸/套装/技能/共鸣链 + 右键菜单）：由速查弹窗与侧边栏速查共用，挂载即视为打开 */
+    import { fade } from 'svelte/transition'
+    import { getCharacterInfo, getWeaponInfo, getEchoInfo, getEchoSetInfo } from '$lib/api/data-cache'
+    import {
+        getCharacterIcons,
+        getWeaponIcons,
+        getEchoIcons,
+        getEchoSetIcons,
+        getElementIcons,
+        getWeaponTypeIcons
+    } from '$lib/api/data-cache'
+    import { richTextToHtml, colorizeNumbers } from '$lib/utils/rich-text'
+    import { MOTION_MS, slideParams } from '$lib/utils/motion'
+    import { ELEMENT_COLORS } from '$lib/consts/game-terms'
+    import type { CharacterInfo, CharacterTag, WeaponInfo } from '$lib/api/types'
+    import type { CharSlot } from '$lib/types/project'
+    import Icon from '@iconify/svelte'
+    import Button from '$lib/components/ui/button.svelte'
+    import { fallbackIcon } from '$lib/utils/icons'
+    import type { ComponentsProps } from '$lib/types'
+    import { compareStatAttrs, formatSubstatValue, mergeTriggerSets } from './quick-lookup.utils'
+
+    interface Props extends ComponentsProps {
+        team: [CharSlot, CharSlot, CharSlot]
+        onCreateBuff?: (name: string) => void
+        onCreateCustomHit?: (name: string) => void
+        showBuffOption?: boolean
+        showCustomHitOption?: boolean
+        /** @desc 当前阶段是否锁定（锁定时创建类菜单项禁用） */
+        locked?: boolean
+        tabBarPosition?: 'top' | 'bottom'
+        onclose?: () => void
+    }
+
+    let {
+        team,
+        onCreateBuff,
+        onCreateCustomHit,
+        showBuffOption = true,
+        showCustomHitOption = true,
+        locked = false,
+        tabBarPosition = 'top',
+        onclose,
+        class: className,
+        style: styleProp
+    }: Props = $props()
+
+    let charIndex = $state(0)
+    let charData = $state<CharacterInfo | null>(null)
+    let weaponData = $state<WeaponInfo | null>(null)
+    let echoSkillData = $state<{ desc: string; values: [string, string, string][] } | null>(null)
+    let setBonuses = $state<{ name: string; pieces: number[]; bonuses: Record<string, string> }[] | null>(null)
+    let loading = $state(false)
+    /** @desc 各类图标缓存（角色/武器/声骸/套装/属性/武器类型） */
+    let charIcons = $state<Record<string, string>>({})
+    let weaponIcons = $state<Record<string, string>>({})
+    let echoIcons = $state<Record<string, string>>({})
+    let setIcons = $state<Record<string, string>>({})
+    let elementIcons = $state<Record<string, string>>({})
+    let weaponTypeIcons = $state<Record<string, string>>({})
+    /** @desc 右键菜单（复制/创建BUFF/跳转）状态 */
+    let ctxShow = $state(false)
+    /** @desc 右键时的原始鼠标位置（视口坐标） */
+    let ctxRaw = $state({ x: 0, y: 0 })
+    /** @desc 菜单实测尺寸（用于 clamp） */
+    let ctxSize = $state({ w: 0, h: 0 })
+    /** @desc 是否已完成尺寸测量（未测量前先隐藏，避免"先错位后跳正"的闪烁） */
+    let ctxMeasured = $state(false)
+    let ctxMenuEl = $state<HTMLElement | null>(null)
+    let scrollContainer = $state<HTMLDivElement | null>(null)
+
+    let charNames = $derived(team.map((s) => s.character).filter((c): c is string => c !== null))
+    let currentSlot = $derived(team[charIndex])
+    /** @desc 角色定位标签（v3 角色详情带回；老缓存里没有该字段时兜底为空） */
+    let charTags = $derived(charData?.tags ?? [])
+    /** @desc 标签色：上游缺色时回落到当前文字色，保证边框/底色/图标三处取色一致 */
+    const tagColor = (tag: CharacterTag): string => tag.color || 'currentColor'
+    /** @desc 固有技能（名字不以「提升」结尾）与固有属性（以「提升」结尾，按名称+数值排序） */
+    let inherentSkills = $derived(charData?.statNodes.filter((n) => !n.name.endsWith('提升')) ?? [])
+    let statAttrs = $derived(charData?.statNodes.filter((n) => n.name.endsWith('提升')) ?? [])
+    let sortedStatAttrs = $derived([...statAttrs].sort(compareStatAttrs))
+    /** @desc 普通技能数与技能区卡片总数（普通 + 固有），用于「跳转下一技能」按钮的末项判定 */
+    let skillsLen = $derived(charData?.skills.length ?? 0)
+    let skillCount = $derived(skillsLen + inherentSkills.length)
+
+    /** @desc 第 i 张技能卡片的「下一个技能类型名」（普通技能看完后接固有技能） */
+    function nextSkillTypeName(i: number): string {
+        if (i + 1 < skillsLen) return charData?.skills[i + 1]?.type ?? '下一个技能'
+        return inherentSkills[0]?.name ?? '固有技能'
+    }
+
+    /** @desc 挂载即预加载全部图标（失败项静默忽略） */
+    $effect(() => {
+        loadIcons()
+    })
+
+    /** @desc 当前槽位有角色时拉取角色详情（切角色 tab 时自动触发） */
+    $effect(() => {
+        if (currentSlot.character) fetchData(currentSlot)
+    })
+
+    /** @desc 并行加载六类图标映射 */
+    async function loadIcons() {
+        const results = await Promise.allSettled([
+            getCharacterIcons(),
+            getWeaponIcons(),
+            getEchoIcons(),
+            getEchoSetIcons(),
+            getElementIcons(),
+            getWeaponTypeIcons()
+        ])
+        const [ci, wi, ei, si, eli, wti] = results
+        if (ci.status === 'fulfilled') charIcons = ci.value
+        if (wi.status === 'fulfilled') weaponIcons = wi.value
+        if (ei.status === 'fulfilled') echoIcons = ei.value
+        if (si.status === 'fulfilled') setIcons = si.value
+        if (eli.status === 'fulfilled') elementIcons = eli.value
+        if (wti.status === 'fulfilled') weaponTypeIcons = wti.value
+    }
+
+    /** @desc 拉取角色/武器/声骸技能/套装加成数据（并行，失败静默）；套装按名字合并多件数段 */
+    async function fetchData(slot: CharSlot) {
+        if (!slot.character) return
+        loading = true
+        charData = null
+        weaponData = null
+        echoSkillData = null
+        setBonuses = null
+        try {
+            const ci = await getCharacterInfo(slot.character)
+            charData = ci
+            if (slot.weapon)
+                getWeaponInfo(slot.weapon)
+                    .then((w) => (weaponData = w))
+                    .catch(() => {})
+            const echoName = slot.echoes[0]?.name
+            if (echoName)
+                getEchoInfo(echoName)
+                    .then((e) => (echoSkillData = e.skill))
+                    .catch(() => {})
+            if (slot.triggerSets.length > 0) {
+                const setResults = await Promise.allSettled(slot.triggerSets.map((s) => getEchoSetInfo(s.name)))
+                // 同名多件数合并 + 丢掉无加成的套装（纯逻辑已抽到 `./quick-lookup.utils`）
+                setBonuses = mergeTriggerSets(slot.triggerSets, (i) => {
+                    const r = setResults[i]
+                    return r.status === 'fulfilled' ? r.value.bonuses : {}
+                })
+            }
+        } catch {
+            /* ignore */
+        }
+        loading = false
+    }
+
+    /** @desc 记录右键菜单位置并显示（clientX/Y = 视口坐标，配合 fixed 定位与 clamp） */
+    function handleCtxMenu(e: MouseEvent) {
+        e.preventDefault()
+        ctxRaw = { x: e.clientX, y: e.clientY }
+        ctxMeasured = false
+        ctxShow = true
+    }
+
+    /**
+     * @desc 右键菜单定位：先把菜单挂到 document.body（portal），避免被祖先的 transform/backdrop-filter
+     * 变成"相对祖先定位"而错位；再由 $derived 按实测尺寸 clamp 到视口内（四边各留 8px）。
+     * 注意：测量只写 ctxSize（不读它），clamp 在 $derived 里算——避免 effect 自依赖导致死循环卡顿。
+     */
+    const portal = (node: HTMLElement) => {
+        document.body.appendChild(node)
+        return { destroy: () => node.remove() }
+    }
+
+    $effect(() => {
+        // @desc 关闭时**不复位** ctxMeasured：它只管菜单的 `visibility`，而退场过渡期间必须保持
+        // visible，否则退场元素会在第一帧被擦掉（与 `ui/select.svelte` 里「pos 刻意不在 close() 清空」同因）。
+        // 重新打开时 handleCtxMenu 已先置 false，故测量/定位行为与改动前完全一致。
+        if (!ctxShow) return
+        const el = ctxMenuEl
+        if (!el) return
+        const rect = el.getBoundingClientRect()
+        ctxSize = { w: rect.width, h: rect.height }
+        ctxMeasured = true
+    })
+
+    /** @desc 最终位置 = 原始鼠标位置按菜单实际尺寸夹进视口 */
+    let ctxPos = $derived.by(() => {
+        const margin = 8
+        const maxX = Math.max(margin, window.innerWidth - ctxSize.w - margin)
+        const maxY = Math.max(margin, window.innerHeight - ctxSize.h - margin)
+        return {
+            x: Math.min(Math.max(margin, ctxRaw.x), maxX),
+            y: Math.min(Math.max(margin, ctxRaw.y), maxY)
+        }
+    })
+
+    /** @desc 复制选中文本到剪贴板 */
+    function handleCopy() {
+        const s = window.getSelection()?.toString()
+        if (s) navigator.clipboard.writeText(s).catch(() => {})
+        ctxShow = false
+    }
+
+    /** @desc 用选中文本创建 Buff 块并关闭速查 */
+    function handleCreateBuffFromSel() {
+        const s = window.getSelection()?.toString()
+        if (s) {
+            onCreateBuff?.(s.trim())
+            onclose?.()
+        }
+        ctxShow = false
+    }
+
+    /** @desc 用选中文本创建自定义直伤并关闭速查 */
+    function handleCreateCustomHit() {
+        const s = window.getSelection()?.toString()
+        if (s && onCreateCustomHit) {
+            onCreateCustomHit(s.trim())
+            onclose?.()
+        }
+        ctxShow = false
+    }
+
+    /** @desc 右键菜单快速跳转：滚动到带 data-jump 锚点的分区标题（仅滚动速查内容容器） */
+    function jumpToSection(key: string) {
+        const el = scrollContainer?.querySelector<HTMLElement>(`[data-jump="${key}"]`)
+        if (el && scrollContainer) {
+            const top =
+                el.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop
+            scrollContainer.scrollTo({ top: Math.max(0, top - 8), behavior: 'smooth' })
+        }
+        ctxShow = false
+    }
+
+    /** @desc 滚动容器到顶/到底 */
+    function handleScrollTop() {
+        scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' })
+        ctxShow = false
+    }
+
+    function handleScrollBottom() {
+        if (scrollContainer) scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' })
+        ctxShow = false
+    }
+
+    /** @desc 平滑滚动到下一个技能卡片（仅滚动速查内容容器，避免带动外层页面） */
+    function jumpToSkill(nextIdx: number) {
+        const el = scrollContainer?.querySelector<HTMLElement>(`[data-skill-index="${nextIdx}"]`)
+        if (el && scrollContainer) {
+            const top =
+                el.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop
+            scrollContainer.scrollTo({ top, behavior: 'smooth' })
+        }
+    }
+
+    /** @desc 富文本渲染辅助：空串容错 / 转 HTML 并高亮数字（按描述文本 memo，避免重渲染时整页重复着色） */
+    const img = (p: string) => p || ''
+    const _rdCache = new Map<string, string>()
+    const rd = (s: string) => {
+        const cached = _rdCache.get(s)
+        if (cached !== undefined) return cached
+        const html = colorizeNumbers(richTextToHtml(s))
+        if (_rdCache.size > 500) _rdCache.clear()
+        _rdCache.set(s, html)
+        return html
+    }
+    /** @desc 副属性数值格式化：小数（<1）转百分比（纯函数在 `./quick-lookup.utils`） */
+    const fmtSubVal = formatSubstatValue
+</script>
+
+<!-- @desc 速查内容根容器：填充父级 flex-col（非滚动），内含角色 tab 栏（顶部或底部）+ 滚动正文 -->
+<div class="flex min-h-0 flex-1 flex-col {className}" style={styleProp}>
+    {#if tabBarPosition === 'top'}
+        <!-- @desc 角色 tab 切换栏（带头像图标）：顶部，透明底 + 下边框分隔 -->
+        <div class="flex shrink-0 gap-1 border-b px-5 py-2" style="border-color: var(--theme-divider-border);">
+            {#each charNames as name, i (i)}
+                <button
+                    onclick={() => {
+                        charIndex = i
+                    }}
+                    class={[
+                        'rounded-none px-3 py-1 text-sm font-medium transition-colors',
+                        i === charIndex
+                            ? 'text-(--theme-accent-text)'
+                            : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
+                    ].join(' ')}
+                    style={i === charIndex
+                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent);'
+                        : ''}
+                >
+                    {#if img(charIcons[name])}<img
+                            src={img(charIcons[name])}
+                            alt={name}
+                            use:fallbackIcon={'/icons/placeholder-character.svg'}
+                            class="inline size-4 mr-1 rounded-full object-cover"
+                        />{/if}{name}
+                </button>
+            {/each}
+        </div>
+    {/if}
+    <!-- @desc 滚动正文：角色详情（基础属性/武器/首位声骸/套装加成/技能/固有技能/固有属性/共鸣链）/无角色提示 -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        bind:this={scrollContainer}
+        class="min-h-0 flex-1 overflow-y-auto hide-scrollbar select-text"
+        oncontextmenu={handleCtxMenu}
+    >
+        <div class="px-5 py-4">
+            {#if loading}
+                <div class="flex items-center justify-center py-16 text-sm text-(--theme-modal-text)/50">加载中...</div>
+            {:else if charData}
+                <div class="space-y-5">
+                    <!-- @desc 角色头部：头像 + 名字 + 星级 + 属性 + 武器类型 -->
+                    <div class="flex items-center gap-3">
+                        {#if img(charIcons[currentSlot.character ?? ''])}<img
+                                src={img(charIcons[currentSlot.character ?? ''])}
+                                alt=""
+                                use:fallbackIcon={'/icons/placeholder-character.svg'}
+                                class="size-10 rounded-none object-contain"
+                                style="background: var(--theme-input-bg);"
+                            />{/if}
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-base font-black tracking-tight">{currentSlot.character}</span>
+                            <span class="text-sm text-(--theme-buff-yellow-text)">{'★'.repeat(charData.rarity)}</span>
+                            {#if img(elementIcons[charData.element])}<img
+                                    src={img(elementIcons[charData.element])}
+                                    alt={charData.element}
+                                    class="size-4"
+                                    title={charData.element}
+                                />{:else}
+                                <span
+                                    class="rounded-none px-1.5 py-0.5 text-sm"
+                                    style="background: var(--theme-input-bg);">{charData.element}</span
+                                >{/if}
+                            {#if img(weaponTypeIcons[charData.weaponType])}<img
+                                    src={img(weaponTypeIcons[charData.weaponType])}
+                                    alt={charData.weaponType}
+                                    class="size-4 w-icon"
+                                    title={charData.weaponType}
+                                />{:else}
+                                <span
+                                    class="rounded-none px-1.5 py-0.5 text-sm"
+                                    style="background: var(--theme-input-bg);">{charData.weaponType}</span
+                                >{/if}
+                        </div>
+                    </div>
+                    <!-- @desc 角色标签区：上游定位标签（主力输出/快速协奏…）；图标是白色蒙版，用同一「墨水色」上色 -->
+                    {#if charTags.length > 0}
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:tag-multiple-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">角色标签</h3>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                {#each charTags as tag (tag.id)}
+                                    <span
+                                        class="tag-chip inline-flex items-center gap-1.5 rounded-none border px-2 py-1 text-[11px] font-black"
+                                        style="--tag-color: {tagColor(
+                                            tag
+                                        )}; border-color: color-mix(in srgb, var(--tag-ink) 45%, transparent); background: color-mix(in srgb, var(--tag-ink) 12%, transparent);"
+                                        title={tag.desc || tag.name}
+                                    >
+                                        {#if tag.icon}
+                                            <span
+                                                class="tag-chip-icon size-3.5 shrink-0"
+                                                style="-webkit-mask: url('{tag.icon}') center / contain no-repeat; mask: url('{tag.icon}') center / contain no-repeat;"
+                                            ></span>
+                                        {/if}
+                                        {tag.name}
+                                    </span>
+                                {/each}
+                            </div>
+                        </section>
+                    {/if}
+                    <!-- @desc 基础属性区：Lv90 生命/攻击/防御/谐度破坏增幅 -->
+                    <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                        <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <Icon
+                                icon="mdi:chart-box-outline"
+                                class="size-4 shrink-0"
+                                style="color: var(--theme-accent-text);"
+                            />
+                            <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">
+                                基础属性 (Lv90)
+                            </h3>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2">
+                            <div
+                                class="rounded-none border p-2.5 text-center"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="text-[10px] text-(--theme-modal-text)/40">基础生命</div>
+                                <div class="mt-0.5 text-sm font-black tabular-nums">{charData.lv90BaseStats.hp}</div>
+                            </div>
+                            <div
+                                class="rounded-none border p-2.5 text-center"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="text-[10px] text-(--theme-modal-text)/40">基础攻击</div>
+                                <div class="mt-0.5 text-sm font-black tabular-nums">{charData.lv90BaseStats.atk}</div>
+                            </div>
+                            <div
+                                class="rounded-none border p-2.5 text-center"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="text-[10px] text-(--theme-modal-text)/40">基础防御</div>
+                                <div class="mt-0.5 text-sm font-black tabular-nums">{charData.lv90BaseStats.def}</div>
+                            </div>
+                            <div
+                                class="rounded-none border p-2.5 text-center"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="text-[10px] text-(--theme-modal-text)/40">谐度破坏增幅</div>
+                                <div class="mt-0.5 text-sm font-black tabular-nums">
+                                    {charData.lv90BaseStats.tuneBreakBoost}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <!-- @desc 武器区：图标/名字/星级/基础攻击/副属性 + 武器效果富文本 -->
+                    {#if currentSlot.weapon}
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:sword"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3
+                                    data-jump="weapon"
+                                    class="text-base font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    武器
+                                </h3>
+                            </div>
+                            <div
+                                class="rounded-none border p-3 space-y-2"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="flex items-center gap-2">
+                                    {#if img(weaponIcons[currentSlot.weapon])}<img
+                                            src={img(weaponIcons[currentSlot.weapon])}
+                                            alt=""
+                                            use:fallbackIcon={'/icons/placeholder-weapon.svg'}
+                                            class="size-8 rounded-none object-contain"
+                                            style="background: var(--theme-input-bg);"
+                                        />{/if}
+                                    <div>
+                                        <div class="flex items-center gap-1.5 text-sm font-black tracking-tight">
+                                            <span>{currentSlot.weapon}</span>{#if weaponData}<span
+                                                    class="text-(--theme-buff-yellow-text) text-sm"
+                                                    >{'★'.repeat(weaponData.rarity)}</span
+                                                >{/if}
+                                        </div>
+                                        {#if weaponData}
+                                            <div
+                                                class="text-sm text-(--theme-modal-text)/50 mt-0.5 flex items-center gap-2 flex-wrap"
+                                            >
+                                                <span>基础攻击</span>
+                                                <span class="text-(--theme-accent-text)">{weaponData.lv90BaseAtk}</span>
+                                                <span class="text-(--theme-modal-text)/20">|</span>
+                                                <span>{weaponData.substat.name}</span>
+                                                <span class="text-(--theme-accent-text)"
+                                                    >{fmtSubVal(weaponData.substat.value)}</span
+                                                >
+                                            </div>
+                                        {/if}
+                                    </div>
+                                </div>
+                                {#if weaponData}<div
+                                        class="border-t pt-2 mt-2 text-sm text-(--theme-modal-text)/60 leading-relaxed"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        {@html rd(weaponData.effect.desc)}
+                                    </div>{/if}
+                            </div>
+                        </section>
+                    {/if}
+                    <!-- @desc 首位声骸区：图标/名字/Cost/套装名 + 声骸技能描述 -->
+                    {#if currentSlot.echoes[0]?.name}
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:star-four-points-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3
+                                    data-jump="echo"
+                                    class="text-base font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    首位声骸
+                                </h3>
+                            </div>
+                            <div
+                                class="rounded-none border p-3"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            >
+                                <div class="flex items-center gap-2">
+                                    {#if img(echoIcons[currentSlot.echoes[0].name])}<img
+                                            src={img(echoIcons[currentSlot.echoes[0].name])}
+                                            alt=""
+                                            use:fallbackIcon={'/icons/placeholder-echo.svg'}
+                                            class="size-8 rounded-none object-contain"
+                                            style="background: var(--theme-input-bg);"
+                                        />{/if}
+                                    <div class="text-sm font-black tracking-tight">
+                                        {currentSlot.echoes[0].name}<span class="text-(--theme-modal-text)/50 ml-1"
+                                            >(C{currentSlot.echoes[0].cost})</span
+                                        >{#if currentSlot.triggerSets.length > 0}<span
+                                                class="text-sm text-(--theme-accent-text) ml-1.5"
+                                                >[{currentSlot.triggerSets[0].name}]</span
+                                            >{/if}
+                                    </div>
+                                </div>
+                                {#if echoSkillData}<div
+                                        class="mt-2 text-sm text-(--theme-modal-text)/60 leading-relaxed border-t pt-2"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        {@html rd(echoSkillData.desc)}
+                                    </div>{/if}
+                            </div>
+                        </section>
+                    {/if}
+                    <!-- @desc 套装加成区：逐套装展示已装备件数对应的加成描述 -->
+                    {#if setBonuses}
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:layers-outline"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">套装加成</h3>
+                            </div>
+                            <div class="space-y-3">
+                                {#each setBonuses as set (set.name)}
+                                    <div
+                                        class="rounded-none border p-3"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <div class="flex items-center gap-2 mb-2">
+                                            {#if img(setIcons[set.name])}<img
+                                                    src={img(setIcons[set.name])}
+                                                    alt=""
+                                                    use:fallbackIcon={'/icons/placeholder-echo-set.svg'}
+                                                    class="size-6 rounded-none object-contain"
+                                                    style="background: var(--theme-input-bg);"
+                                                />{/if}
+                                            <span class="text-sm font-black tracking-tight">{set.name}</span>
+                                            <span class="text-sm text-(--theme-modal-text)/50"
+                                                >({set.pieces.join('件 + ')}件)</span
+                                            >
+                                        </div>
+                                        <div class="space-y-0.5">
+                                            {#each Object.entries(set.bonuses).filter( ([pieces]) => set.pieces.includes(Number(pieces)) ) as [pieces, desc] (pieces)}
+                                                <div class="text-sm">
+                                                    <span class="text-(--theme-accent-text) font-medium"
+                                                        >{pieces}件套</span
+                                                    ><span class="text-(--theme-modal-text)/70 ml-1"
+                                                        >{@html rd(desc)}</span
+                                                    >
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        </section>
+                    {/if}
+                    <!-- @desc 技能区：普通技能（含倍率数值/偏谐值/共鸣能量明细）+ 固有技能 -->
+                    <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                        <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <Icon
+                                icon="mdi:gesture-tap"
+                                class="size-4 shrink-0"
+                                style="color: var(--theme-accent-text);"
+                            />
+                            <h3 data-jump="skill" class="text-base font-black tracking-tight text-(--theme-modal-text)">
+                                技能
+                            </h3>
+                        </div>
+                        <div class="space-y-3">
+                            {#each charData.skills as skill, i (skill.name)}
+                                <div
+                                    class="rounded-none border"
+                                    data-skill-index={i}
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div
+                                        class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-(--theme-modal-text)"
+                                    >
+                                        <span
+                                            class="rounded-none px-1.5 py-0.5 text-sm text-(--theme-modal-text)/50"
+                                            style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);"
+                                            >{skill.type}</span
+                                        >
+                                        <span>{skill.name}</span>
+                                        {#if i + 1 < skillCount}
+                                            <button
+                                                onclick={() => jumpToSkill(i + 1)}
+                                                class="ml-auto inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/55 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                style="border-color: var(--theme-divider-border);"
+                                                title="跳转到下一个技能"
+                                            >
+                                                <Icon icon="mdi:arrow-down-bold" class="size-3 shrink-0" />
+                                                跳转到{nextSkillTypeName(i)}
+                                            </button>
+                                        {/if}
+                                    </div>
+                                    <div
+                                        class="border-t px-3 py-2 text-sm text-(--theme-modal-text)/60 leading-relaxed"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        {@html rd(skill.desc)}
+                                    </div>
+                                    {#if skill.values.length > 0}
+                                        <div
+                                            class="border-t px-3 py-2 space-y-0.5"
+                                            style="border-color: var(--theme-divider-border);"
+                                        >
+                                            {#each skill.values as [vname, vvalue, velement, venergy, vtune] (vname)}
+                                                <div
+                                                    class="flex flex-col px-1 py-0.5 text-sm text-(--theme-modal-text)/70 even:bg-[color-mix(in_srgb,var(--theme-modal-text)_5%,transparent)]"
+                                                >
+                                                    <div class="flex items-center justify-between gap-2">
+                                                        <span
+                                                            class="max-w-[50%] break-words text-(--theme-modal-text)/50"
+                                                            >{vname}</span
+                                                        >
+                                                        <span class="flex items-center gap-2 text-[12px] leading-snug">
+                                                            <span class="tabular-nums whitespace-nowrap">{vvalue}</span>
+                                                            {#if velement}
+                                                                <span
+                                                                    class="tabular-nums whitespace-nowrap"
+                                                                    style="color: {ELEMENT_COLORS[velement] ??
+                                                                        'var(--theme-modal-text)'}">{velement}</span
+                                                                >
+                                                            {/if}
+                                                        </span>
+                                                    </div>
+                                                    {#if vtune != null || venergy != null}
+                                                        <div class="mt-1 flex items-center justify-end gap-1.5">
+                                                            {#if vtune != null}
+                                                                <span
+                                                                    class="rounded-none border border-(--theme-accent-bg) px-1.5 py-0.5 text-[11px] tabular-nums whitespace-nowrap text-(--theme-accent-text) opacity-75"
+                                                                    >{vtune} 偏谐值</span
+                                                                >
+                                                            {/if}
+                                                            {#if venergy != null}
+                                                                <span
+                                                                    class="rounded-none border border-(--theme-accent-bg) px-1.5 py-0.5 text-[11px] tabular-nums whitespace-nowrap text-(--theme-accent-text) opacity-75"
+                                                                    >{venergy} 共鸣能量</span
+                                                                >
+                                                            {/if}
+                                                        </div>
+                                                    {/if}
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/each}
+                            {#each inherentSkills as skill, j (skill.name)}
+                                <div
+                                    class="rounded-none border"
+                                    data-skill-index={skillsLen + j}
+                                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                >
+                                    <div
+                                        class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-(--theme-modal-text)"
+                                    >
+                                        <span
+                                            class="rounded-none px-1.5 py-0.5 text-sm text-(--theme-modal-text)/50"
+                                            style="background: color-mix(in srgb, var(--theme-modal-text) 8%, transparent);"
+                                            >固有技能</span
+                                        >
+                                        <span>{skill.name}</span>
+                                        {#if skillsLen + j + 1 < skillCount}
+                                            <button
+                                                onclick={() => jumpToSkill(skillsLen + j + 1)}
+                                                class="ml-auto inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/55 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
+                                                style="border-color: var(--theme-divider-border);"
+                                                title="跳转到下一个技能"
+                                            >
+                                                <Icon icon="mdi:arrow-down-bold" class="size-3 shrink-0" />
+                                                跳转到{inherentSkills[j + 1]?.name ?? '下一个技能'}
+                                            </button>
+                                        {/if}
+                                    </div>
+                                    <div
+                                        class="border-t px-3 py-2 text-sm text-(--theme-modal-text)/60 leading-relaxed"
+                                        style="border-color: var(--theme-divider-border);"
+                                    >
+                                        {@html rd(skill.desc)}
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    </section>
+                    <!-- @desc 固有属性区：双列网格展示「XX提升」数值 -->
+                    {#if statAttrs.length > 0}
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:tune-variant"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3
+                                    data-jump="innate"
+                                    class="text-base font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    固有属性
+                                </h3>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                {#each sortedStatAttrs as attr (attr.name)}
+                                    <div
+                                        class="rounded-none border p-2.5"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <div class="text-[10px] text-(--theme-modal-text)/40">{attr.name}</div>
+                                        {#if attr.desc}
+                                            <div class="mt-0.5 text-sm font-black tabular-nums leading-relaxed">
+                                                {@html rd(attr.desc)}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/each}
+                            </div>
+                        </section>
+                    {/if}
+                    <!-- @desc 共鸣链区：C1~C6 描述 -->
+                    {#if charData.chains.length > 0}
+                        <section class="border-t pt-4" style="border-color: var(--theme-divider-border);">
+                            <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <Icon
+                                    icon="mdi:link-variant"
+                                    class="size-4 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                                <h3
+                                    data-jump="chain"
+                                    class="text-base font-black tracking-tight text-(--theme-modal-text)"
+                                >
+                                    共鸣链
+                                </h3>
+                            </div>
+                            <div class="space-y-3">
+                                {#each charData.chains as chain, i (chain.name)}
+                                    <div
+                                        class="rounded-none border px-3 py-2"
+                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                                    >
+                                        <div class="flex items-center gap-2 text-sm font-black tracking-tight">
+                                            <span class="text-sm text-(--theme-modal-text)/40">C{i + 1}</span><span
+                                                >{chain.name}</span
+                                            >
+                                        </div>
+                                        <div class="mt-1 text-sm text-(--theme-modal-text)/60 leading-relaxed">
+                                            {@html rd(chain.desc)}
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        </section>
+                    {/if}
+                </div>
+            {:else}
+                <div class="flex items-center justify-center py-16 text-sm text-(--theme-modal-text)/40">
+                    选择角色查看详情
+                </div>
+            {/if}
+        </div>
+    </div>
+    {#if tabBarPosition === 'bottom'}
+        <!-- @desc 角色 tab 切换栏（带头像图标）：底部，透明底 + 上边框分隔。
+             容器查询两级收起：容器 = 本行内容盒 = 侧栏宽度 − px-5×2（侧栏可拖动 200~600 → 内容盒 160~560，与视口无关）：
+               ① ≥320px：头像 + 角色名；② <320px：隐藏名字只留头像（顺带把头像的 mr-1 归零）；
+               ③ <200px：纯图标（按钮内边距 px-3 → px-1.5）。
+             阈值依据：3 个「头像 + 4 字名字」按钮 Chromium 实测 280px（头像 16 + mr 4 + px-3 24 + 名字 56），
+             取 320px 留 40px 余量；<200px 只在侧栏拖到 200~239px 时才可达，是「特别紧凑」档。
+             名字一律 whitespace-nowrap：任何宽度都不换行。
+             调阈值：全局替换本行内的 @[320px] / @max-[320px]（名字档，2 处）、@max-[200px]（紧凑档，1 处）即可 -->
+        <div
+            class="@container flex shrink-0 gap-1 border-t px-5 py-2"
+            style="border-color: var(--theme-divider-border);"
+        >
+            {#each charNames as name, i (i)}
+                <button
+                    onclick={() => {
+                        charIndex = i
+                    }}
+                    class={[
+                        'rounded-none px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors @max-[200px]:px-1.5',
+                        i === charIndex
+                            ? 'text-(--theme-accent-text)'
+                            : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
+                    ].join(' ')}
+                    style={i === charIndex
+                        ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent);'
+                        : ''}
+                >
+                    {#if img(charIcons[name])}<img
+                            src={img(charIcons[name])}
+                            alt={name}
+                            use:fallbackIcon={'/icons/placeholder-character.svg'}
+                            class="inline size-4 mr-1 rounded-full object-cover @max-[320px]:mr-0"
+                        />{/if}<span class="whitespace-nowrap {img(charIcons[name]) ? 'hidden @[320px]:inline' : ''}"
+                        >{name}</span
+                    >
+                </button>
+            {/each}
+        </div>
+    {/if}
+</div>
+
+<!-- @desc 右键菜单：复制选中文本 / 创建BUFF / 创建自定义直伤 / 快速跳转（武器/首位声骸/技能/固有属性/共鸣链）（点击遮罩关闭） -->
+{#if ctxShow}
+    <!-- @desc 退场动效：挂在遮罩这一层，菜单面板的进场 `animate-pop-in` 保持原样（同节点再挂过渡会双重动画）；
+         本层淡出即连菜单一起淡出（opacity 分组作用于整棵子树）。--motion-fast 档（120ms）：浮层菜单短促退场，
+         与 layout/modal.svelte 的 130ms 同感；减弱动态效果由 slideParams 压到 1ms。 -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="fixed inset-0 z-(--z-popover)"
+        use:portal
+        onclick={() => (ctxShow = false)}
+        oncontextmenu={(e) => e.preventDefault()}
+        out:fade={slideParams(MOTION_MS.fast)}
+    >
+        <div
+            bind:this={ctxMenuEl}
+            class="animate-pop-in absolute min-w-36 rounded-none border bg-(--theme-modal-bg) py-1 backdrop-blur-lg"
+            style="border-color: var(--theme-divider-border); left: {ctxPos.x}px; top: {ctxPos.y}px; visibility: {ctxMeasured
+                ? 'visible'
+                : 'hidden'};"
+        >
+            <Button
+                data-press="none"
+                variant="text"
+                size="none"
+                bare
+                onclick={handleCopy}
+                backgroundImage="transparent"
+                class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                ><Icon icon="mdi:content-copy" class="size-3.5 shrink-0" /> 复制</Button
+            >
+            {#if showBuffOption || showCustomHitOption}
+                <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            {/if}
+            <!-- @desc 「以此为名创建BUFF」：排轴锁定时禁用（置灰不可点），不隐藏 -->
+            {#if showBuffOption}
+                <Button
+                    data-press="none"
+                    variant="text"
+                    size="none"
+                    bare
+                    disabled={locked}
+                    onclick={handleCreateBuffFromSel}
+                    backgroundImage="transparent"
+                    class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    title={locked ? '已锁定，无法创建 BUFF' : undefined}
+                    ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</Button
+                >
+            {/if}
+            {#if showCustomHitOption}
+                <Button
+                    data-press="none"
+                    variant="text"
+                    size="none"
+                    bare
+                    disabled={locked}
+                    onclick={handleCreateCustomHit}
+                    backgroundImage="transparent"
+                    class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-buff-yellow-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    title={locked ? '已锁定，无法创建自定义直伤' : undefined}
+                    ><Icon icon="mdi:plus-circle-outline" class="size-3.5 shrink-0" /> 创建自定义直伤</Button
+                >
+            {/if}
+            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            <!-- ⛔ TEMP-HIDDEN（临时隐藏）：跳转到顶部/底部按钮，恢复时删掉本段注释标记即可
+            <Button
+                data-press="none"
+                variant="text"
+                size="none"
+                bare
+                onclick={handleScrollTop}
+                backgroundImage="transparent"
+                class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                ><Icon icon="mdi:arrow-up-bold-outline" class="size-3.5 shrink-0" /> 跳转到顶部</Button
+            >
+            <Button
+                data-press="none"
+                variant="text"
+                size="none"
+                bare
+                onclick={handleScrollBottom}
+                backgroundImage="transparent"
+                class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                ><Icon icon="mdi:arrow-down-bold-outline" class="size-3.5 shrink-0" /> 跳转到底部</Button
+            >
+            ⛔ TEMP-HIDDEN-END -->
+            <!-- ⛔ TEMP-HIDDEN（临时隐藏）：跳转到底部下方那条分割线（上方已有分割线，避免重复）
+            <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
+            ⛔ TEMP-HIDDEN-END -->
+            <!-- @desc 快速跳转：武器 / 首位声骸 / 技能 / 固有属性 / 共鸣链 -->
+            {#each [{ key: 'weapon', label: '跳转到武器', icon: 'mdi:sword' }, { key: 'echo', label: '跳转到首位声骸', icon: 'mdi:circle-double' }, { key: 'skill', label: '跳转到技能', icon: 'mdi:flash-outline' }, { key: 'innate', label: '跳转到固有属性', icon: 'mdi:star-four-points-outline' }, { key: 'chain', label: '跳转到共鸣链', icon: 'mdi:link-variant' }] as item (item.key)}
+                <button
+                    data-press="none"
+                    onclick={() => jumpToSection(item.key)}
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                    ><Icon icon={item.icon} class="size-3.5 shrink-0" /> {item.label}</button
+                >
+            {/each}
+        </div>
+    </div>
+{/if}
+
+<!-- @desc 富文本着色样式：属性标题/高亮/元素色/数字/上下标等全局样式 -->
+
+<style>
+    /* 角色标签「墨水色」：上游只给一个为深色底挑的亮色，白天近白底上直接当文字色会糊（1.25~3.47:1）。
+       色相法：保留上游色相/彩度，只按昼夜挪 OKLCh 明度 —— 白天 --theme-tag-ink-l 存在 → 压到 42%；
+       黑夜主题清掉该变量 → var(..., l) 落到 l 关键字 = 上游原色（观感不变）。
+       不支持相对颜色语法的浏览器退回上游原色（文字偏淡，但不至于看不见）。 */
+    .tag-chip {
+        --tag-ink: var(--tag-color);
+        color: var(--tag-ink);
+    }
+    .tag-chip-icon {
+        background-color: var(--tag-ink);
+    }
+    @supports (color: oklch(from red l c h)) {
+        .tag-chip {
+            --tag-ink: oklch(from var(--tag-color) var(--theme-tag-ink-l, l) c h);
+        }
+    }
+    :global(.select-text) ::selection {
+        background: color-mix(in srgb, var(--theme-modal-text) 25%, transparent);
+    }
+    :global(.rich-color-title) {
+        color: var(--theme-layout-text);
+        font-weight: 700;
+    }
+    :global(.rich-color-highlight) {
+        color: var(--theme-accent-bg, #818cf8);
+        font-weight: 600;
+    }
+    :global(.rich-color-ice) {
+        color: var(--theme-element-冷凝, #888);
+    }
+    :global(.rich-color-fire) {
+        color: var(--theme-element-热熔, #888);
+    }
+    :global(.rich-color-thunder) {
+        color: var(--theme-element-导电, #888);
+    }
+    :global(.rich-color-wind) {
+        color: var(--theme-element-气动, #888);
+    }
+    :global(.rich-color-light) {
+        color: var(--theme-element-衍射, #888);
+    }
+    :global(.rich-color-dark) {
+        color: var(--theme-element-湮灭, #888);
+    }
+    :global(.rich-size-xl) {
+        font-size: 1.125rem;
+    }
+    :global(.rich-size-xs) {
+        font-size: 0.625rem;
+        opacity: 0.3;
+    }
+    :global(.rich-te) {
+        color: var(--theme-accent-bg, #818cf8);
+        border-bottom: 1px dashed var(--theme-accent-bg, #818cf8);
+    }
+    :global(.rich-highlight) {
+        background: color-mix(in srgb, var(--theme-accent-bg, #818cf8) 25%, transparent);
+        padding: 0 0.25em;
+        border-radius: 2px;
+    }
+    :global(.rich-num) {
+        color: var(--theme-num, #ca8a04);
+    }
+    :global(.hide-scrollbar) {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    :global(.hide-scrollbar::-webkit-scrollbar) {
+        display: none;
+    }
+</style>

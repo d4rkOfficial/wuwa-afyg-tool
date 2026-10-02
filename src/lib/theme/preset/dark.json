@@ -52,10 +52,6 @@
             "backgroundImage": "rgba(26,26,31,0.85)",
             "textColor": "#e4e4e7"
         },
-        "toast-top": {
-            "backgroundImage": "#1a1a1f",
-            "textColor": "#e4e4e7"
-        },
         "timeline": {
             "backgroundImage": "#09090b",
             "textColor": "#e4e4e7"
@@ -92,10 +88,6 @@
         },
         "muted": {
             "textColor": "#8f8f9c"
-        },
-        "watermark": {
-            "backgroundImage": "rgba(0,0,0,0.15)",
-            "textColor": "rgba(255,255,255,0.08)"
         },
         "titlebar": {
             "backgroundImage": "#18181b",

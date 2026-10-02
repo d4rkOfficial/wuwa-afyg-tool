@@ -3,6 +3,7 @@
     import type { EchoStat } from '$lib/types/game-data'
     import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
+    import Modal from '$lib/components/layout/modal.svelte'
 
     interface Props extends ComponentsProps {
         existingTypes: string[]
@@ -37,83 +38,59 @@
     }
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<div
-    style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
-    class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
-    onclick={() => !running && onclose()}
->
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
+<Modal open={true} {onclose} backdropClose class={className} style={styleProp}>
+    {#snippet title()}
+        <Icon icon="mdi:dice-5" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+        <span>随机强化目标</span>
+    {/snippet}
+    <div class="mb-2 text-[10px] text-(--theme-modal-text)/40">选择希望出现的副词条（最多 5 个）</div>
     <div
-        data-sf="modal"
-        class="animate-pop-in w-72 rounded-none border p-4 shadow-2xl"
+        class="theme-scrollbar mb-3 max-h-56 space-y-0.5 overflow-y-auto border-b pb-3"
         style="border-color: var(--theme-divider-border);"
-        onclick={(e) => e.stopPropagation()}
     >
-        <div class="mb-3 flex items-center gap-2 border-b pb-2.5" style="border-color: var(--theme-divider-border);">
-            <Icon icon="mdi:dice-5" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
-            <span class="text-sm font-black tracking-tight text-(--theme-modal-text)">随机强化目标</span>
+        {#each available as type (type)}
+            {@const isSelected = selected.includes(type)}
             <button
-                onclick={onclose}
+                onclick={() => toggleType(type)}
                 disabled={running}
                 data-sf="widget"
                 data-sf-flat
-                class="ml-auto rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
-                style="--sf-base: var(--theme-input-bg)"
+                class={[
+                    'flex w-full items-center gap-2 rounded-none border px-3 py-2 text-xs text-left transition-colors',
+                    isSelected
+                        ? 'border-(--theme-accent-bg) font-black text-(--theme-modal-text)'
+                        : 'border-(--theme-divider-border) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
+                ].join(' ')}
+                style="--sf-base: var(--theme-input-bg);{isSelected
+                    ? ' background: color-mix(in srgb, var(--theme-accent-bg) 12%, var(--sf-mix, transparent));'
+                    : ''}"
             >
-                <Icon icon="mdi:close" class="size-4" />
+                <span class="flex-1">{type}</span>
+                {#if isSelected}
+                    <Icon icon="mdi:check" class="size-3 shrink-0" />
+                {/if}
             </button>
-        </div>
-        <div class="mb-2 text-[10px] text-(--theme-modal-text)/40">选择希望出现的副词条（最多 5 个）</div>
-        <div
-            class="theme-scrollbar mb-3 max-h-56 space-y-0.5 overflow-y-auto border-b pb-3"
-            style="border-color: var(--theme-divider-border);"
-        >
-            {#each available as type}
-                {@const isSelected = selected.includes(type)}
-                <button
-                    onclick={() => toggleType(type)}
-                    disabled={running}
-                    data-sf="widget"
-                    data-sf-flat
-                    class={[
-                        'flex w-full items-center gap-2 rounded-none border px-3 py-2 text-xs text-left transition-colors',
-                        isSelected
-                            ? 'border-(--theme-accent-bg) font-black text-(--theme-modal-text)'
-                            : 'border-(--theme-divider-border) text-(--theme-modal-text)/60 hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)'
-                    ].join(' ')}
-                    style="--sf-base: var(--theme-input-bg);{isSelected
-                        ? ' background: color-mix(in srgb, var(--theme-accent-bg) 12%, var(--sf-mix, transparent));'
-                        : ''}"
-                >
-                    <span class="flex-1">{type}</span>
-                    {#if isSelected}
-                        <Icon icon="mdi:check" class="size-3 shrink-0" />
-                    {/if}
-                </button>
-            {/each}
-        </div>
-        <button
-            onclick={handleStart}
-            disabled={selected.length === 0 || running}
-            class={[
-                'w-full rounded-none px-3 py-2 text-xs font-black tracking-tight transition-colors flex items-center justify-center gap-1.5',
-                selected.length > 0 && !running
-                    ? 'hover:opacity-80'
-                    : 'bg-(--theme-input-bg) text-(--theme-modal-text)/30 cursor-not-allowed'
-            ].join(' ')}
-            style={selected.length > 0 && !running
-                ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
-                : ''}
-        >
-            {#if running}
-                <Icon icon="mdi:loading" class="size-3.5 animate-spin" />
-                强化中…
-            {:else}
-                <Icon icon="mdi:dice-5" class="size-3.5" />
-                开始强化
-            {/if}
-        </button>
+        {/each}
     </div>
-</div>
+    <button
+        onclick={handleStart}
+        disabled={selected.length === 0 || running}
+        class={[
+            'w-full rounded-none px-3 py-2 text-xs font-black tracking-tight transition-colors flex items-center justify-center gap-1.5',
+            selected.length > 0 && !running
+                ? 'hover:opacity-80'
+                : 'bg-(--theme-input-bg) text-(--theme-modal-text)/30 cursor-not-allowed'
+        ].join(' ')}
+        style={selected.length > 0 && !running
+            ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
+            : ''}
+    >
+        {#if running}
+            <Icon icon="mdi:loading" class="size-3.5 animate-spin" />
+            强化中…
+        {:else}
+            <Icon icon="mdi:dice-5" class="size-3.5" />
+            开始强化
+        {/if}
+    </button>
+</Modal>

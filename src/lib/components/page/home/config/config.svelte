@@ -20,8 +20,8 @@
     import { getCharIconMap, elementColor } from '$lib/calc/timeline.store.svelte'
     import EnemyPanel from './enemy-panel.svelte'
     import RandomEnhanceModal from './random-enhance-modal.svelte'
-    import EchoSlotCard from '$lib/components/layout/echo-slot-card.svelte'
-    import SubstatPickerModal from '$lib/components/layout/substat-picker-modal.svelte'
+    import EchoSlotCard from './echo-slot-card.svelte'
+    import SubstatPickerModal from './substat-picker-modal.svelte'
     import { slide } from 'svelte/transition'
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
@@ -263,7 +263,7 @@
 >
     <!-- Tabs -->
     <div class="mb-4 flex gap-2 border-b pb-2.5" style="border-color: var(--theme-divider-border);">
-        {#each TAB_LABELS as label, i}
+        {#each TAB_LABELS as label, i (i)}
             {@const isActive = i < 3 ? activeTab === `char${i}` : activeTab === 'enemy'}
             <button
                 onclick={() => {
@@ -324,7 +324,7 @@
                     class="flex flex-wrap content-start gap-4 overflow-y-auto pb-2 hide-scrollbar absolute inset-0"
                     onscroll={closeMainStatMenu}
                 >
-                    {#each config.characters[ci].echoes as slot, si}
+                    {#each config.characters[ci].echoes as slot, si (si)}
                         <EchoSlotCard
                             class="w-72 shrink-0"
                             {slot}
@@ -363,7 +363,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             bind:this={mainStatOverlayEl}
-            class="fixed inset-0 z-50"
+            class="fixed inset-0 z-(--z-modal)"
             role="presentation"
             onclick={closeMainStatMenu}
             onkeydown={(e) => e.key === 'Escape' && closeMainStatMenu()}
@@ -381,7 +381,7 @@
                     class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-input-bg)"
                     >未选择</button
                 >
-                {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt}
+                {#each (MAIN_STAT_POOL as Record<string, { label: string; maxValue: number; unit: string }[]>)[slot.cost] || [] as opt (opt.label)}
                     <button
                         onclick={() =>
                             handleSetMainStat(menu.ci, menu.si, {
@@ -427,13 +427,3 @@
         />
     {/if}
 </div>
-
-<style>
-    .hide-scrollbar {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-    }
-    .hide-scrollbar::-webkit-scrollbar {
-        display: none;
-    }
-</style>

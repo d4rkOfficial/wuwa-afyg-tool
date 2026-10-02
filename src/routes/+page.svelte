@@ -2,7 +2,6 @@
     import { onMount, tick } from 'svelte'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import {
-        loadProjects,
         getProjects,
         getActiveId,
         getActiveProject,
@@ -19,87 +18,53 @@
         lockPhase,
         unlockPhase,
         importProjects,
-        createProjectData,
         buildExportFile,
         parseProjectFile,
         archiveProject,
         updateConditionProfile,
         ProjectParseError
     } from '$lib/data/project.svelte'
-    import {
-        checkShare,
-        importFromShareUrl,
-        shareAndCopy,
-        shareState,
-        shareCooldownLabel,
-        refreshShareCooldown
-    } from '$lib/data/share.svelte'
+    import { importFromShareUrl, shareAndCopy, shareState, shareCooldownLabel } from '$lib/data/share.svelte'
     import { pushProjectSwitch, pushPhaseChange } from '$lib/ai/change-queue.svelte'
-    import { getWWVersion, ensureVersion, resetVersionPromise } from '$lib/api/client-version'
-    import { clearCache, getCharacterInfo, getEchoInfo } from '$lib/api/data-cache'
-    import { browser } from '$app/environment'
-    import type { PhaseKey, CharSlot } from '$lib/types/project'
+    import type { PhaseKey } from '$lib/types/project'
     import type { TimelineData } from '$lib/calc/timeline.types'
     import type { CalcState } from '$lib/calc/calculation.types'
     import type { ConfigState } from '$lib/calc/config.types'
     import { PHASE_LABELS } from '$lib/consts/game-terms'
     import { addToast } from '$lib/data/toast.svelte'
     import { preloadCharElements } from '$lib/data/char-elements.svelte'
-    import { loadIcons, loadCustomHits, init as initTimeline } from '$lib/calc/timeline.store.svelte'
-    import { loadKeyMap } from '$lib/data/keymap.svelte'
-    import { loadShortcuts } from '$lib/data/shortcuts.svelte'
-    import { loadWorkshop } from '$lib/data/workshop.svelte'
-    import { initToyProfileBridge } from '$lib/bilibili-toy/profile.svelte'
+    import { loadCustomHits } from '$lib/calc/timeline.store.svelte'
     import {
         setShowBuffModal,
         setShowDamageTypeModal,
         getShowDamageTypeModal,
-        setConditionProfile,
         setProfileChangeListener,
-        rebindGlobalBuffs,
         getCalcState,
         createBuffSet,
-        setPendingFocusBuffSetId,
-        init as initCalculation
+        setPendingFocusBuffSetId
     } from '$lib/calc/calculation.store.svelte'
-    import { setCalcViewMode } from '$lib/data/calc-view.svelte'
-    import { conditionProfileFromTeam } from '$lib/data/migration'
-    import { getConfig, init as initConfig } from '$lib/calc/config.store.svelte'
-    import { hideSplash } from '$lib/utils/splash'
-    import {
-        getReloadOnResultRefresh,
-        getReloadOnProfileChange,
-        setMagneticPointer
-    } from '$lib/data/render-prefs.svelte'
-    import { loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
-    import { initToyEnvironmentBridge, onToyEnter, isToyMobile } from '$lib/bilibili-toy/environment.svelte'
-    import { isFirstVisit, markVisited, isMagneticToySet, markMagneticToySet } from '$lib/data/toy-prefs.svelte'
-    import { applyFirstRunAppearance } from '$lib/theme'
+    import { getReloadOnResultRefresh, getReloadOnProfileChange } from '$lib/data/render-prefs.svelte'
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
     import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'
     import { getSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import {
         getConfirmDeletes,
         getLockWatermark,
-        getEffectiveLockWatermarkText,
-        setModalClosePosition
+        getEffectiveLockWatermarkText
     } from '$lib/data/interaction-prefs.svelte'
     import ProjectSidebar from '$lib/components/page/home/project-sidebar.svelte'
-    import WorkshopModal from '$lib/components/layout/workshop-modal.svelte'
-    import SubstatLibraryModal from '$lib/components/layout/substat-library-modal.svelte'
+    import WorkshopModal from '$lib/components/page/home/workshop/workshop-modal.svelte'
+    import SubstatLibraryModal from '$lib/components/page/home/config/substat-library-modal.svelte'
     import DamageTypeModal from '$lib/components/page/home/calculation/damage-type-modal.svelte'
     import {
         getSubstatLibraryOpen,
         openSubstatLibrary,
         setSubstatLibraryOpen
     } from '$lib/data/substat-library-ui.svelte'
-    import { loadKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
-    import { loadKuroPrefs, restoreKuroSession } from '$lib/kuro-app/kuro.svelte'
-    import { fetchSubstatPlansFromShare } from '$lib/data/substat-library.svelte'
-    import BuffLibraryModal from '$lib/components/layout/buff-library-modal.svelte'
-    import SettingsModal from '$lib/components/layout/settings-modal.svelte'
+    import BuffLibraryModal from '$lib/components/page/home/calculation/buff-library-modal.svelte'
+    import SettingsModal from '$lib/components/page/home/settings/settings-modal.svelte'
     import CharacterDetailModal from '$lib/components/page/home/config/character-detail-modal.svelte'
-    import AiAssistant from '$lib/components/layout/ai-assistant.svelte'
+    import AiAssistant from '$lib/components/page/home/settings/ai-assistant.svelte'
     import TeamConfig from '$lib/components/page/home/team/team-config.svelte'
     import Timeline from '$lib/components/page/home/timeline/timeline.svelte'
     import Calculation from '$lib/components/page/home/calculation/calculation.svelte'
@@ -107,11 +72,26 @@
     import Result from '$lib/components/page/home/result/result.svelte'
     import PhaseTabs from '$lib/components/page/home/phase-tabs.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
-    import ConfirmDeleteModal from '$lib/components/layout/confirm-delete-modal.svelte'
+    import ConfirmDeleteModal from '$lib/components/ui/confirm-delete-modal.svelte'
     import Icon from '@iconify/svelte'
     import WelcomeScreen from '$lib/components/page/home/welcome-screen.svelte'
     import Toolbar from '$lib/components/page/home/toolbar.svelte'
-    import WorkshopFrameModal from '$lib/components/layout/workshop-frame-modal.svelte'
+    import WorkshopFrameModal from '$lib/components/page/home/workshop/workshop-frame-modal.svelte'
+    import { CLONE_SELECTION_DEFAULTS, SIDEBAR_MAX_EXPANDED, SIDEBAR_SHORT_EXPANDED } from './consts'
+    import {
+        bootstrapRouteStores,
+        reloadActiveProjectStores,
+        relockAllPhases,
+        syncPhaseLockSideEffects
+    } from './store.svelte'
+    import type { PhaseSelectionMap, TeamSlots } from './types'
+    import {
+        cloneSelectionsUpTo,
+        collectTeamCharacterNames,
+        isTeamComplete,
+        projectDataFingerprint,
+        selectedPhaseKeys
+    } from './utils'
 
     let showNewModal = $state(false)
     let newName = $state('')
@@ -188,12 +168,9 @@
     // ── 简化底部工具栏：fixed 圆角矩形，仅水平拖动，磁吸侧栏右缘 / 屏幕右缘（拖拽状态机见 toolbar.svelte）──
     const simplifyToolbar = $derived(getSimplifyToolbar())
 
-    // 侧栏展开宽度档位：较短（常规工程目录）与最长（600，速查舒适浏览；侧边栏速查默认开启无需设置）
-    const sidebarShortExpanded = 240
-    const sidebarMaxExpanded = 600
-    const sidebarWide = $derived(sidebarWidth >= sidebarMaxExpanded - 1)
+    const sidebarWide = $derived(sidebarWidth >= SIDEBAR_MAX_EXPANDED - 1)
     function toggleSidebarWidth() {
-        sidebarWidth = sidebarWide ? sidebarShortExpanded : sidebarMaxExpanded
+        sidebarWidth = sidebarWide ? SIDEBAR_SHORT_EXPANDED : SIDEBAR_MAX_EXPANDED
     }
 
     let sidebarLookupOpen = $state(false)
@@ -210,10 +187,10 @@
         if (nowOpen === prevSidebarLookupOpen) return
         if (nowOpen) {
             // 开启速查：侧栏未至最长档则延展
-            if (sidebarWidth < sidebarMaxExpanded - 1) sidebarWidth = sidebarMaxExpanded
+            if (sidebarWidth < SIDEBAR_MAX_EXPANDED - 1) sidebarWidth = SIDEBAR_MAX_EXPANDED
         } else {
             // 关闭速查：侧栏几乎最宽（容差 24px）则收窄回较短档
-            if (sidebarWidth >= sidebarMaxExpanded - 24) sidebarWidth = sidebarShortExpanded
+            if (sidebarWidth >= SIDEBAR_MAX_EXPANDED - 24) sidebarWidth = SIDEBAR_SHORT_EXPANDED
         }
         prevSidebarLookupOpen = nowOpen
     })
@@ -226,12 +203,7 @@
     let cloneModal = $state(false)
     let cloneId = $state('')
     let cloneName = $state('')
-    let cloneSelections = $state<Record<PhaseKey, boolean>>({
-        team: true,
-        timeline: false,
-        calculation: false,
-        config: false
-    })
+    let cloneSelections = $state<PhaseSelectionMap>({ ...CLONE_SELECTION_DEFAULTS })
     let cloneResult = $state(false)
 
     let deleteModal = $state(false)
@@ -289,57 +261,7 @@
     })
 
     onMount(async () => {
-        hideSplash()
-        initToyProfileBridge()
-        initToyEnvironmentBridge()
-        // 首次进入（任意端）：拉表默认平铺模式；禁用磁力光标；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
-        // 静默从工坊同步「标准词条集」（不再弹「同步工坊数据」弹窗；Buff 集不自动同步，由用户自行同步）
-        if (isFirstVisit()) {
-            setCalcViewMode('spread')
-            setMagneticPointer(false)
-            // AI 助手默认隐藏（**持久化**保存：用户可在设置里重新开启）
-            void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
-            // B 站 Toy 平台首次进入：弹窗关闭按钮默认放左上角（其它平台保持右上角）
-            if (isToyMobile()) setModalClosePosition('top-left')
-            void applyFirstRunAppearance()
-            // 同步失败静默忽略（工坊不可达等）：用户可在「词条方案」面板随时手动同步
-            void fetchSubstatPlansFromShare()
-            markVisited()
-        }
-        // 进入 Toy 环境（消息异步到达，每会话首次触发）：
-        // - 关闭 AI 助手（会话级，不持久化）
-        // - 首次在 Toy 手机环境进入 → 关闭磁力光标（一次性持久设定）
-        onToyEnter(() => {
-            void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
-            if (isToyMobile() && !isMagneticToySet()) {
-                setMagneticPointer(false)
-                markMagneticToySet()
-            }
-        })
-        // 本地数据不等待上游版本检查：版本端点是网络请求（实测可能十几秒），
-        // 一旦放在 await 之后，刷新后会先长时间空列表 —— 工程/按键/快捷键/工坊都先在本地恢复
-        loadProjects()
-        loadKeyMap()
-        loadShortcuts()
-        loadWorkshop()
-        loadKuroPrefs()
-        // 库街区：读一次本地暂存的声骸数据（有缓存就不必再打上游）
-        loadKuroEchoCache()
-        // 库街区：本地有登录标记就自动恢复登录态（token 在 httpOnly cookie 里，前端只能问服务端）。
-        // 只读会话：不主动做任何会写游戏数据的操作。
-        void restoreKuroSession()
-        await ensureVersion()
-        if (browser) {
-            const prev = localStorage.getItem('wuwa-afyg:version')
-            if (prev && prev !== getWWVersion()) {
-                clearCache()
-            }
-            localStorage.setItem('wuwa-afyg:version', getWWVersion())
-        }
-        loadIcons()
-        checkShare()
-        // 分享频率限制：恢复上次分享时间戳并启动倒计时（刷新页面后仍然生效）
-        refreshShareCooldown()
+        await bootstrapRouteStores()
         // 分享导入：#import_project=<url>（一次性，执行后清 hash）
         registerHashAction({
             key: 'import_project',
@@ -368,17 +290,9 @@
     })
 
     $effect(() => {
-        const names = new Set<string>()
-        for (const p of projects) {
-            for (const s of p.team) {
-                if (s.character) names.add(s.character)
-            }
-            if (p.lockedTeamNames) {
-                for (const n of p.lockedTeamNames) names.add(n)
-            }
-        }
-        if (names.size > 0) {
-            preloadCharElements([...names])
+        const names = collectTeamCharacterNames(projects)
+        if (names.length > 0) {
+            preloadCharElements(names)
         }
     })
 
@@ -411,27 +325,14 @@
         if (!p) return
         cloneId = id
         cloneName = `${p.name} (副本)`
-
-        const order = getPhaseOrder()
-        const atIdx = order.indexOf(activePhase)
-        const selections: Record<PhaseKey, boolean> = {
-            team: false,
-            timeline: false,
-            calculation: false,
-            config: false
-        }
-        for (let i = 0; i < order.length; i++) {
-            selections[order[i]] = i <= atIdx
-        }
-        cloneSelections = selections
-
+        cloneSelections = cloneSelectionsUpTo(getPhaseOrder(), activePhase)
         cloneResult = false
         cloneModal = true
     }
 
     async function handleClone() {
         if (!cloneName.trim()) return
-        const selected = (Object.entries(cloneSelections) as [PhaseKey, boolean][]).filter(([, v]) => v).map(([k]) => k)
+        const selected = selectedPhaseKeys(cloneSelections)
         if (cloneResult) selected.push('result' as never)
         const p = await cloneProject(cloneId, cloneName.trim(), selected)
         if (p) {
@@ -565,35 +466,6 @@
         void updateCalculation(getCalcState())
     }
 
-    /** @desc 重载当前工程全部阶段数据（不改变视图状态）；initForActiveProject 与「链/阶变动重载数据」共用 */
-    function reloadActiveProjectStores() {
-        setShowBuffModal(false)
-        const p = getActiveProject()
-        if (!p) return
-        initTimeline(
-            p.phases.timeline.data as TimelineData | null,
-            () => {},
-            p.team,
-            p.phases.timeline?.locked ?? false
-        )
-        // 重建伤害条目（条目由队伍与时间线派生，条件数据随后由 setConditionProfile 注入）
-        initCalculation(
-            p.team,
-            p.phases.timeline.data as TimelineData | null,
-            p.phases.calculation.data as CalcState | null,
-            p.phases.calculation?.locked ?? false,
-            (state) => updateCalculation(state)
-        )
-        initConfig(p.phases.config.data as ConfigState | null, p.phases.config?.locked ?? false)
-        // 预热角色与声骸数据（IndexedDB 缓存）：减少排轴/拉表等阶段首次挂载的异步等待
-        for (const slot of p.team) {
-            if (slot.character) void getCharacterInfo(slot.character)
-            if (slot.echoes?.[0]?.name) void getEchoInfo(slot.echoes[0].name)
-        }
-        // 恢复工程携带的链/阶配置（链阶真源是工程 team 槽位，此处同步到条件系统的读入口）
-        setConditionProfile(conditionProfileFromTeam(p.team))
-    }
-
     function initForActiveProject() {
         reloadActiveProjectStores()
         const p = getActiveProject()
@@ -619,9 +491,6 @@
     }
 
     let teamPhaseLocked = $derived(activeProject?.phases.team?.locked ?? false)
-    let allPhasesLocked = $derived(
-        activeProject ? getPhaseOrder().every((p) => activeProject!.phases[p]?.locked === true) : false
-    )
 
     function toggleClonePhase(phase: PhaseKey) {
         const order = getPhaseOrder()
@@ -651,11 +520,7 @@
         return activeProject?.phases[getPhaseOrder()[idx - 1]]?.locked === true
     })
 
-    function isTeamComplete(team: [CharSlot, CharSlot, CharSlot]): boolean {
-        return team.some((s) => s.character !== null && s.weapon !== null)
-    }
-
-    function handleUpdateTeam(team: [CharSlot, CharSlot, CharSlot]) {
+    function handleUpdateTeam(team: TeamSlots) {
         updateTeam(team)
     }
 
@@ -667,13 +532,7 @@
     function handleLockPhase() {
         if (!activeProject) return
         lockPhase(activePhase)
-        if (activePhase === 'timeline') {
-            rebindGlobalBuffs()
-            updateCalculation(getCalcState())
-        }
-        if (activePhase === 'config') {
-            updateConfig(getConfig())
-        }
+        syncPhaseLockSideEffects(activePhase)
         addToast(`${PHASE_LABELS[activePhase]} 已锁定`, 'success')
     }
 
@@ -691,31 +550,10 @@
         addToast(`${PHASE_LABELS[phase]} 已解锁`, 'info')
     }
 
-    // 刷新结果（开启重载数据）时：先重解锁全部环节，再按原锁定状态逐个重锁——
-    // 重锁 timeline/config 会重新同步全局 buff 并把当前内存态写回工程，修复换工程后残留旧数据的问题
-    async function handleRelockAll() {
-        if (!activeProject) return
-        const order = getPhaseOrder()
-        const wasLocked = order.map((p) => activeProject!.phases[p]?.locked === true)
-        for (const phase of order) await unlockPhase(activeProject.id, phase)
-        for (let i = 0; i < order.length; i++) {
-            const phase = order[i]
-            if (!wasLocked[i]) continue
-            await lockPhase(phase)
-            if (phase === 'timeline') {
-                rebindGlobalBuffs()
-                updateCalculation(getCalcState())
-            }
-            if (phase === 'config') {
-                updateConfig(getConfig())
-            }
-        }
-    }
-
     /** @desc 重载数据并重新锁定全部环节（「刷新结果」与「链/阶变动」共用） */
     async function handleReloadAllPhases() {
         initForActiveProject()
-        await handleRelockAll()
+        await relockAllPhases()
         addToast('已重载数据并重新锁定全部环节', 'info')
     }
 
@@ -723,7 +561,7 @@
     async function handleProfileReload() {
         if (!getReloadOnProfileChange()) return
         reloadActiveProjectStores()
-        await handleRelockAll()
+        await relockAllPhases()
         addToast('链/阶变动，已重载数据并重新锁定全部环节', 'info')
     }
 
@@ -733,42 +571,19 @@
         if (idx === 0 && !isTeamComplete(activeProject.team)) return
         if (idx > 0 && !activeProject.phases[getPhaseOrder()[idx - 1]]?.locked) return
         lockPhase(phase)
-        if (phase === 'timeline') {
-            rebindGlobalBuffs()
-            updateCalculation(getCalcState())
-        }
-        if (phase === 'config') {
-            updateConfig(getConfig())
-        }
+        syncPhaseLockSideEffects(phase)
         addToast(`${PHASE_LABELS[phase]} 已锁定`, 'success')
     }
 
     // 上次刷新时的工程数据指纹：数据未变时跳过逐阶段重挂（init 幂等短路，重挂只是重渲染+重测量）
     let _lastRefreshFp = ''
 
-    function projectDataFingerprint(): string {
-        const p = getActiveProject()
-        if (!p) return 'null'
-        const tl = p.phases.timeline.data as TimelineData | null
-        const tlFp = tl
-            ? `${tl.refLines.length}:${tl.opBlocks.length}:${tl.damageBlocks.length}:${tl.damageBlocks[0]?.id ?? ''}:${
-                  tl.damageBlocks[tl.damageBlocks.length - 1]?.id ?? ''
-              }`
-            : 'null'
-        return JSON.stringify([
-            p.team,
-            tlFp,
-            JSON.stringify(p.phases.calculation.data ?? null),
-            JSON.stringify(p.phases.config.data ?? null)
-        ])
-    }
-
     // 刷新结果（开启重载数据时先重解锁全部环节再按原锁定状态重锁）：数据有变才逐阶段重挂载，随后刷新结果页
     async function handleRefreshResult() {
         if (getReloadOnResultRefresh()) {
             await handleReloadAllPhases()
         }
-        const fp = projectDataFingerprint()
+        const fp = projectDataFingerprint(getActiveProject())
         const dataUnchanged = fp === _lastRefreshFp
         _lastRefreshFp = fp
         showResult = false
@@ -823,6 +638,7 @@
         onselect={handleSelectProject}
     />
     <button
+        data-press="none"
         aria-label="调整侧栏宽度"
         class="shrink-0 w-1 cursor-col-resize"
         style="background: {sidebarDragging
@@ -863,7 +679,7 @@
                 }}
                 onBuffLibrary={() => (showBuffLibrary = true)}
                 onSubstatLibrary={() => openSubstatLibrary(null, 'home')}
-                onSettings={() => (showSettings = true)}
+                onsettings={() => (showSettings = true)}
                 oncreate={() => {
                     newName = ''
                     showNewModal = true
@@ -948,7 +764,7 @@
                 {#if !showResult && phaseLocked && getLockWatermark()}
                     <!-- 已锁定遮罩：纯透明背景 + SVG pattern 平铺小字（文案可在 设置-交互相关-锁定水印 自定义）。
                          整层 opacity-10 封顶，文字取 currentColor（主题文本色），保证任何主题/任何变量解析下都只弱显示、不遮挡内容 -->
-                    <div class="absolute inset-0 z-40 pointer-events-none select-none opacity-10">
+                    <div class="absolute inset-0 z-(--z-sticky) pointer-events-none select-none opacity-10">
                         <svg
                             class="absolute inset-0 size-full"
                             aria-hidden="true"
@@ -986,7 +802,7 @@
                 {canLock}
                 team={activeProject.team}
                 onCharDetail={() => (showCharDetail = true)}
-                onRefresh={handleRefreshResult}
+                onrefresh={handleRefreshResult}
                 onLockToggle={() => (phaseLocked ? handleUnlockPhase() : handleLockPhase())}
             />
         {/if}
@@ -1186,7 +1002,7 @@
 
 {#snippet phaseChecklist(selections: Record<PhaseKey, boolean>, onToggle: (phase: PhaseKey) => void)}
     <div class="space-y-1.5">
-        {#each getPhaseOrder() as phase}
+        {#each getPhaseOrder() as phase (phase)}
             <label
                 class="flex cursor-pointer items-center gap-2.5 rounded-none px-3 py-2 text-sm transition-colors hover:bg-(--theme-modal-text)/5"
             >

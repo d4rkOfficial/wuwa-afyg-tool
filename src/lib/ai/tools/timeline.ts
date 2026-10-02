@@ -199,12 +199,13 @@ defineTool('bind_damage_to_block', {
             },
             hits: {
                 type: 'array',
+                description: '要绑定到该操作块的伤害条目列表',
                 items: {
                     type: 'object',
                     properties: {
-                        character: { type: 'string' },
-                        hitName: { type: 'string' },
-                        hits: { type: 'number' }
+                        character: { type: 'string', description: '伤害来源角色名' },
+                        hitName: { type: 'string', description: '倍率名（用 get_skill_options 查询）' },
+                        hits: { type: 'number', description: '段数（默认 1）' }
                     },
                     required: ['character', 'hitName']
                 }
@@ -310,7 +311,11 @@ defineTool('set_block_special', {
         type: 'object',
         properties: {
             block: { type: 'number', description: '操作块序号' },
-            kind: { type: 'string', enum: ['none', 'intro', 'switchback'] }
+            kind: {
+                type: 'string',
+                enum: ['none', 'intro', 'switchback'],
+                description: '特殊标记：none=无，intro=变奏（入场），switchback=切回'
+            }
         },
         required: ['block', 'kind']
     },
@@ -359,7 +364,7 @@ defineTool('reflow_track', {
     description: '重新排布指定轨道（1-3）的操作块，消除重叠。',
     parameters: {
         type: 'object',
-        properties: { track: { type: 'number' } },
+        properties: { track: { type: 'number', description: '要重排的轨道（1-3）' } },
         required: ['track']
     },
     handler: async (args) => {
@@ -380,6 +385,8 @@ defineTool('move_op_block', {
             block: { type: 'number', description: '要移动的操作块序号' },
             position: {
                 type: 'object',
+                description:
+                    '把操作块移动到哪个时间位置：{time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块序号, side, offset}（相对某块）',
                 properties: {
                     time: { type: 'number', description: '绝对时间（秒，0 至当前结束线）' },
                     anchor: { type: 'number', description: '目标操作块序号（相对它移动）' },
@@ -411,6 +418,8 @@ defineTool('move_ref_line', {
             line: { type: 'number', description: '参考线序号（见 get_timeline_summary 的「[线N]」）' },
             position: {
                 type: 'object',
+                description:
+                    '把参考线移动到哪个时间位置：{time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块序号, side, offset}（相对某块）',
                 properties: {
                     time: { type: 'number', description: '绝对时间（秒，0 至当前结束线）' },
                     anchor: { type: 'number', description: '目标操作块序号（相对它移动）' },
@@ -494,12 +503,13 @@ defineTool('bind_non_direct_to_block', {
             block: { type: 'number', description: '操作块**序号**（见 get_timeline_summary 的「[块N]」）' },
             entries: {
                 type: 'array',
+                description: '非直伤条目列表（整体覆盖该块）：处决/响应/效应',
                 items: {
                     type: 'object',
                     properties: {
-                        name: { type: 'string' },
-                        layers: { type: 'number' },
-                        responders: { type: 'array', items: { type: 'string' } }
+                        name: { type: 'string', description: '条目名（用 get_non_direct_options 查询）' },
+                        layers: { type: 'number', description: '层数（效应类用，默认 1）' },
+                        responders: { type: 'array', items: { type: 'string' }, description: '响应者角色名列表' }
                     },
                     required: ['name']
                 }

@@ -1,22 +1,17 @@
 <script lang="ts">
+    import { fade } from 'svelte/transition'
     import { getToasts, removeToast } from '$lib/data/toast.svelte'
     import { getToastPosition } from '$lib/data/interaction-prefs.svelte'
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
+    import { mergeComponentsStyle } from '$lib/utils/component-style'
+    import { MOTION_MS, slideParams } from '$lib/utils/motion'
 
     interface Props extends ComponentsProps {}
 
     let { backgroundImage, textColor, class: className, style: styleProp }: Props = $props()
 
-    let mergedStyle = $derived(
-        [
-            backgroundImage ? `background: ${backgroundImage}` : '',
-            textColor ? `color: ${textColor}` : '',
-            styleProp || ''
-        ]
-            .filter(Boolean)
-            .join(';')
-    )
+    let mergedStyle = $derived(mergeComponentsStyle({ backgroundImage, textColor, style: styleProp }))
 
     let toasts = $derived(getToasts())
     let position = $derived(getToastPosition())
@@ -51,7 +46,9 @@
 
 {#if position !== 'none' && toasts.length > 0}
     <div
-        class={['pointer-events-none fixed z-50 flex flex-col gap-2', positionClass, className || ''].join(' ')}
+        class={['pointer-events-none fixed z-(--z-modal) flex flex-col gap-2', positionClass, className || ''].join(
+            ' '
+        )}
         style={styleProp}
     >
         {#each toasts as toast (toast.id)}
@@ -66,6 +63,7 @@
                 ].join(' ')}
                 style={mergedStyle}
                 role="alert"
+                out:fade={slideParams(MOTION_MS.fast)}
             >
                 {#if toast.type === 'success'}
                     <Icon icon="mdi:check-circle" class="shrink-0 size-5" />
@@ -86,32 +84,3 @@
         {/each}
     </div>
 {/if}
-
-<style>
-    @keyframes slide-down {
-        from {
-            opacity: 0;
-            transform: translateY(-12px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    @keyframes slide-up {
-        from {
-            opacity: 0;
-            transform: translateY(12px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    :global(.animate-slide-down) {
-        animation: slide-down 0.2s ease-out;
-    }
-    :global(.animate-slide-up) {
-        animation: slide-up 0.2s ease-out;
-    }
-</style>

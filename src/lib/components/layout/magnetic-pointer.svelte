@@ -2,54 +2,204 @@
     import { browser } from '$app/environment'
     import { getMagneticForcedOff, getMagneticPointer } from '$lib/data/render-prefs.svelte'
     import { getActiveId, getOverrides } from '$lib/theme'
+    import {
+        BORDER_W,
+        DRAG_MODES,
+        EXCLUDE_SELECTOR,
+        FOLLOW_MS,
+        SENSITIVITY,
+        SPIN_S,
+        WOBBLE,
+        cursorToken,
+        findDragMode,
+        findMagneticTarget,
+        modeForCursor,
+        type PointerMode
+    } from './magnetic-pointer.utils'
 
-    // 磁力光标参数已固定（不可在设置/工具中调整）
-    const FOLLOW_MS = 50 // 跟手性：固定跟手
-    const SENSITIVITY = 0.05 // 灵敏度：磁吸最强
-    const SPIN_S = 4 // 旋转速度：最快
-    const WOBBLE = 10 // 吸附晃动：最强
-    const BORDER_W = 3 // 描边粗细：3px
+    /* ── Tailwind 类名（整改前这里是 514 行手写 `<style>`，逐条搬迁）──
+       搬迁口径：
+         · 根元素挂 `group` 当状态锚点，后代状态写 `group-data-[mode=…]:`（旧 `.magnetic-pointer[data-mode='…'] .mp-x`）；
+         · 后代里的拖动态写 `group-[.mp-dragging]:`，根元素自身的拖动态写 `[&.mp-dragging]:`；
+         · `:nth-child(n)` / `:nth-child(n)::before` 逐个 unroll 到对应子元素（见 CORNER_AT）；
+         · 状态类（`mp-wobble` / `mp-dot-hidden` / `mp-dragging`）沿用组件已有的 class 标记，
+           DOM 结构不变，故新旧可逐元素对照计算样式。 */
+
+    /**
+     * 旧 `.magnetic-pointer`（`--mp-w/--mp-h` 由 JS 覆盖，这里只是首帧默认值）+ 旧 `.magnetic-pointer.mp-dragging`。
+     * `group` 是后代状态选择器的锚点（旧 `.magnetic-pointer[data-mode='…'] .mp-x` 的等价物）。
+     * 层级刻意保留原值（999 / 1000）而**不**收进 `--z-*` token：光标必须压过包括最顶层气泡在内的
+     * 全部界面，不属于「弹窗层级阶梯」，且 layout.css 的 token 说明里写明数列是与整改前逐一对齐的。
+     */
+    const ROOT_CLASS = [
+        'group fixed top-[calc(var(--mp-h)/-2)] left-[calc(var(--mp-w)/-2)] h-(--mp-h) w-(--mp-w) z-[999]',
+        'pointer-events-none [--mp-w:28px] [--mp-h:28px] [--mp-follow:0.2s]',
+        'transition-[width,height,transform] duration-[var(--mp-follow,0.2s)] ease-[ease-out]',
+        // 拖动中：固定 28px 圆环 + 主题亮化描边 + accent 发光，不随吸附目标/容器放大
+        '[&.mp-dragging]:top-[-14px] [&.mp-dragging]:left-[-14px] [&.mp-dragging]:h-[28px] [&.mp-dragging]:w-[28px]',
+        '[&.mp-dragging]:rounded-[9999px] [&.mp-dragging]:border-2 [&.mp-dragging]:border-(--mp-border,#ffffff)',
+        '[&.mp-dragging]:bg-transparent [&.mp-dragging]:animate-none',
+        '[&.mp-dragging]:shadow-[0_0_10px_color-mix(in_srgb,var(--theme-accent-bg)_45%,transparent)]'
+    ].join(' ')
+
+    /** 旧 `.mp-corners` + `[data-mode='default']` 正/反向旋转 + `[data-mode='pointer'] .mp-wobble` 晃动 */
+    const CORNERS_CLASS = [
+        'absolute inset-0',
+        // 平时（default）四角缓慢旋转；时长来自 `--mp-spin`（JS 写入 SPIN_S），见 layout.css 的 --animate-mp-spin
+        'group-data-[mode=default]:animate-mp-spin',
+        // 按住拖动时按位移主轴反向：右/下 → 逆时针
+        'group-data-[mode=default]:group-[.mp-spin-ccw]:animate-mp-spin-reverse',
+        // 吸附晃动：`mp-wobble` 本身只在 pointer 模式挂上（class:mp-wobble 已含该条件），故无需再判 mode
+        '[&.mp-wobble]:animate-mp-wobble',
+        // 旧 `.magnetic-pointer.mp-dragging .mp-corners { display: none !important }`
+        'group-[.mp-dragging]:hidden!'
+    ].join(' ')
+
+    /** 四角位置即身份（1 左上 / 2 右上 / 3 左下 / 4 右下） */
+    type CornerIndex = 1 | 2 | 3 | 4
+
+    /**
+     * 旧 `.mp-corner`（10×10 L 形边框）+ 旧 `.mp-corner::before`（1px 昼夜/黑白描边）+ 显示开关。
+     * 边框用 `border-width: 2px 0 0 2px` 这类四值简写表达「只亮两条边」——与整改前的
+     * `border-top-width/border-left-width` 两条声明等价（其余两侧保持 0）。
+     */
+    const CORNER_BASE = [
+        'mp-corner absolute hidden h-[10px] w-[10px] border-0 border-(--theme-accent-bg,#6366f1)',
+        'drop-shadow-[0_0_3px_color-mix(in_srgb,var(--theme-accent-bg,#6366f1)_45%,transparent)]',
+        // 旧 `[data-mode='default'] .mp-corner, [data-mode='pointer'] .mp-corner { display: block }`
+        // 与旧 `:not([data-mode='default']):not([data-mode='pointer']) .mp-corner { display: none }` 互补
+        'group-data-[mode=default]:block group-data-[mode=pointer]:block',
+        // 旧 `.magnetic-pointer.mp-dragging .mp-corner { display: none !important }`
+        'group-[.mp-dragging]:hidden!',
+        // 旧 `.mp-corner::before`：复刻 L 形描边，避免 outline 画成矩形
+        "[&::before]:absolute [&::before]:inset-0 [&::before]:border-0 [&::before]:border-(--mp-border,#ffffff) [&::before]:content-['']"
+    ].join(' ')
+
+    /** 旧 `.mp-corner:nth-child(n)` + `.mp-corner:nth-child(n)::before`（逐个 unroll，位置即身份） */
+    const CORNER_AT: Record<CornerIndex, string> = {
+        1: '[&:nth-child(1)]:top-0 [&:nth-child(1)]:left-0 [&:nth-child(1)]:rounded-tl-[3px] [&:nth-child(1)]:[border-width:2px_0_0_2px] [&:nth-child(1)::before]:[border-width:1px_0_0_1px]',
+        2: '[&:nth-child(2)]:top-0 [&:nth-child(2)]:right-0 [&:nth-child(2)]:rounded-tr-[3px] [&:nth-child(2)]:[border-width:2px_2px_0_0] [&:nth-child(2)::before]:[border-width:1px_1px_0_0]',
+        3: '[&:nth-child(3)]:bottom-0 [&:nth-child(3)]:left-0 [&:nth-child(3)]:rounded-bl-[3px] [&:nth-child(3)]:[border-width:0_0_2px_2px] [&:nth-child(3)::before]:[border-width:0_0_1px_1px]',
+        4: '[&:nth-child(4)]:bottom-0 [&:nth-child(4)]:right-0 [&:nth-child(4)]:rounded-br-[3px] [&:nth-child(4)]:[border-width:0_2px_2px_0] [&:nth-child(4)::before]:[border-width:0_1px_1px_0]'
+    }
+
+    /** 旧 `.mp-glyph`：8 个动作模式（default/pointer 之外的全体）显示字形并居中，颜色取主题主色 */
+    const GLYPH_CLASS = [
+        'absolute inset-0 hidden items-center justify-center text-(--theme-accent-bg,#6366f1)',
+        'group-data-[mode=text]:flex group-data-[mode=grab]:flex group-data-[mode=move]:flex',
+        'group-data-[mode=resize-h]:flex group-data-[mode=resize-v]:flex group-data-[mode=resize-diag]:flex',
+        'group-data-[mode=crosshair]:flex group-data-[mode=range]:flex',
+        // 旧 `.magnetic-pointer.mp-dragging .mp-glyph { display: none !important }`
+        'group-[.mp-dragging]:hidden!'
+    ].join(' ')
+
+    /** 旧 `.mp-glyph-text, .mp-glyph-cross i, .mp-glyph-h/v/diag .line, .mp-glyph-grab i { outline: 1px solid … }` */
+    const GLYPH_OUTLINE = 'outline-1 outline-solid outline-(--mp-border,#ffffff)'
+
+    /** 旧 `.mp-glyph-text`：文本 I-beam（`::before`/`::after` 是上下两条 8×2 的横杠） */
+    const GLYPH_TEXT_CLASS = [
+        'relative hidden h-[14px] w-(--mp-border-w,1px) rounded-[1px] bg-current',
+        'group-data-[mode=text]:block',
+        GLYPH_OUTLINE,
+        '[&::before]:absolute [&::after]:absolute [&::before]:left-1/2 [&::after]:left-1/2',
+        '[&::before]:-translate-x-1/2 [&::after]:-translate-x-1/2 [&::before]:h-[2px] [&::after]:h-[2px]',
+        '[&::before]:w-[8px] [&::after]:w-[8px] [&::before]:rounded-[1px] [&::after]:rounded-[1px]',
+        '[&::before]:bg-current [&::after]:bg-current',
+        "[&::before]:-top-[2px] [&::after]:-bottom-[2px] [&::before]:content-[''] [&::after]:content-['']"
+    ].join(' ')
+
+    /** 旧 `.mp-glyph-grab`：2×2 圆点抓手 */
+    const GLYPH_GRAB_CLASS = 'hidden h-[13px] w-[13px] flex-wrap gap-[3px] group-data-[mode=grab]:flex'
+    /** 旧 `.mp-glyph-grab i` */
+    const GRAB_DOT_CLASS = `h-[4px] w-[4px] rounded-[50%] bg-current shadow-[0_0_4px_color-mix(in_srgb,currentColor_50%,transparent)] ${GLYPH_OUTLINE}`
+
+    /** 旧 `.mp-glyph-h/-v/-diag` 的公共部分（显示开关 + 居中 + 1px 间距） */
+    const ARROW_BASE = 'hidden items-center justify-center gap-[1px]'
+    /** 旧 `.mp-glyph-h` */
+    const GLYPH_H_CLASS = `${ARROW_BASE} group-data-[mode=resize-h]:flex`
+    /** 旧 `.mp-glyph-v`（多一条 flex-direction: column） */
+    const GLYPH_V_CLASS = `${ARROW_BASE} flex-col group-data-[mode=resize-v]:flex`
+    /** 旧 `.mp-glyph-diag`（多一条 transform: rotate(45deg)，改为 Tailwind 的 rotate 独立属性，几何等价） */
+    const GLYPH_DIAG_CLASS = `${ARROW_BASE} rotate-45 group-data-[mode=resize-diag]:flex`
+
+    /** 旧 `.mp-glyph-h/v/diag .line { background: currentColor; border-radius: 1px }` */
+    const ARROW_LINE_BASE = `bg-current rounded-[1px] ${GLYPH_OUTLINE}`
+    /** 旧 `.mp-glyph-h .line` */
+    const ARROW_H_LINE_CLASS = `${ARROW_LINE_BASE} h-[14px] w-(--mp-border-w,1px)`
+    /** 旧 `.mp-glyph-v .line` */
+    const ARROW_V_LINE_CLASS = `${ARROW_LINE_BASE} h-[12px] w-(--mp-border-w,1px)`
+    /** 旧 `.mp-glyph-diag .line` */
+    const ARROW_DIAG_LINE_CLASS = `${ARROW_LINE_BASE} h-(--mp-border-w,1px) w-[12px]`
+
+    /* 双向箭头：本质是「宽高为 0 + 四条 border」的三角形（边框宽随 --mp-border-w 成比例，故用 calc 乘法）。
+       旧 CSS 对每个三角形各写 3 条 border-* 声明，这里对应的工具类逐条照搬。 */
+    /** 旧 `.mp-glyph-h .tri-l/.tri-r` 的公共部分 */
+    const TRI_H_BASE = 'h-0 w-0 border-y-[calc(var(--mp-border-w,1px)*3)] border-y-transparent'
+    /** 旧 `.mp-glyph-h .tri-l` */
+    const TRI_H_L = `${TRI_H_BASE} border-r-[calc(var(--mp-border-w,1px)*4)] border-r-current`
+    /** 旧 `.mp-glyph-h .tri-r` */
+    const TRI_H_R = `${TRI_H_BASE} border-l-[calc(var(--mp-border-w,1px)*4)] border-l-current`
+    /** 旧 `.mp-glyph-v .tri-u` */
+    const TRI_V_U = `h-0 w-0 border-x-[calc(var(--mp-border-w,1px)*3)] border-x-transparent border-b-[calc(var(--mp-border-w,1px)*4)] border-b-current`
+    /** 旧 `.mp-glyph-v .tri-d` */
+    const TRI_V_D = `h-0 w-0 border-x-[calc(var(--mp-border-w,1px)*3)] border-x-transparent border-t-[calc(var(--mp-border-w,1px)*4)] border-t-current`
+    /** 旧 `.mp-glyph-diag .tri-ul/.tri-dr` 的公共部分 */
+    const TRI_DIAG_BASE = 'h-0 w-0 border-y-[calc(var(--mp-border-w,1px)*2.5)] border-y-transparent'
+    /** 旧 `.mp-glyph-diag .tri-ul` */
+    const TRI_DIAG_UL = `${TRI_DIAG_BASE} border-r-[calc(var(--mp-border-w,1px)*3.5)] border-r-current`
+    /** 旧 `.mp-glyph-diag .tri-dr` */
+    const TRI_DIAG_DR = `${TRI_DIAG_BASE} border-l-[calc(var(--mp-border-w,1px)*3.5)] border-l-current`
+
+    /** 旧 `.mp-glyph-move`：四向箭头（20×20 容器 + 四个绝对定位三角形） */
+    const GLYPH_MOVE_CLASS = 'relative hidden h-[20px] w-[20px] group-data-[mode=move]:block'
+    /** 旧 `.mp-glyph-move .tri-u/-d/-l/-r` 的公共部分 */
+    const MOVE_TRI_BASE = 'absolute h-0 w-0'
+    /** 旧 `.mp-glyph-move .tri-u` */
+    const MOVE_TRI_U = `${MOVE_TRI_BASE} top-0 left-1/2 -translate-x-1/2 border-x-[calc(var(--mp-border-w,1px)*2.5)] border-x-transparent border-b-[calc(var(--mp-border-w,1px)*3.5)] border-b-current`
+    /** 旧 `.mp-glyph-move .tri-d` */
+    const MOVE_TRI_D = `${MOVE_TRI_BASE} bottom-0 left-1/2 -translate-x-1/2 border-x-[calc(var(--mp-border-w,1px)*2.5)] border-x-transparent border-t-[calc(var(--mp-border-w,1px)*3.5)] border-t-current`
+    /** 旧 `.mp-glyph-move .tri-l` */
+    const MOVE_TRI_L = `${MOVE_TRI_BASE} top-1/2 left-0 -translate-y-1/2 border-y-[calc(var(--mp-border-w,1px)*2.5)] border-y-transparent border-r-[calc(var(--mp-border-w,1px)*3.5)] border-r-current`
+    /** 旧 `.mp-glyph-move .tri-r` */
+    const MOVE_TRI_R = `${MOVE_TRI_BASE} top-1/2 right-0 -translate-y-1/2 border-y-[calc(var(--mp-border-w,1px)*2.5)] border-y-transparent border-l-[calc(var(--mp-border-w,1px)*3.5)] border-l-current`
+
+    /** 旧 `.mp-glyph-cross`：空心十字准星（crosshair/range 显示，且整体跟着 --mp-spin 旋转） */
+    const GLYPH_CROSS_CLASS = [
+        'relative hidden h-[20px] w-[20px]',
+        'group-data-[mode=crosshair]:block group-data-[mode=range]:block',
+        'group-data-[mode=crosshair]:animate-mp-spin group-data-[mode=range]:animate-mp-spin',
+        'group-data-[mode=crosshair]:group-[.mp-spin-ccw]:animate-mp-spin-reverse',
+        'group-data-[mode=range]:group-[.mp-spin-ccw]:animate-mp-spin-reverse'
+    ].join(' ')
+
+    /** 旧 `.mp-cross-inner`：呼吸（内层缩放，与旋转分离） */
+    const CROSS_INNER_CLASS = 'absolute inset-0 animate-mp-breathe'
+    /** 旧 `.mp-glyph-cross i`：4 段短线，中心镂空 8px */
+    const CROSS_BAR_BASE = `absolute rounded-[1px] bg-current ${GLYPH_OUTLINE}`
+    /** 旧 `.mp-glyph-cross i:nth-child(1..4)` */
+    const CROSS_AT: Record<1 | 2 | 3 | 4, string> = {
+        1: '[&:nth-child(1)]:top-0 [&:nth-child(1)]:left-1/2 [&:nth-child(1)]:-translate-x-1/2 [&:nth-child(1)]:h-[6px] [&:nth-child(1)]:w-(--mp-border-w,1px)',
+        2: '[&:nth-child(2)]:bottom-0 [&:nth-child(2)]:left-1/2 [&:nth-child(2)]:-translate-x-1/2 [&:nth-child(2)]:h-[6px] [&:nth-child(2)]:w-(--mp-border-w,1px)',
+        3: '[&:nth-child(3)]:top-1/2 [&:nth-child(3)]:left-0 [&:nth-child(3)]:-translate-y-1/2 [&:nth-child(3)]:h-(--mp-border-w,1px) [&:nth-child(3)]:w-[6px]',
+        4: '[&:nth-child(4)]:top-1/2 [&:nth-child(4)]:right-0 [&:nth-child(4)]:-translate-y-1/2 [&:nth-child(4)]:h-(--mp-border-w,1px) [&:nth-child(4)]:w-[6px]'
+    }
+
+    /** 旧 `.mp-dot`（中心点：钉在鼠标实时位置）+ `.mp-dot-hidden` + `.mp-dot.mp-dragging` */
+    const DOT_CLASS = [
+        'pointer-events-none fixed top-[-2px] left-[-2px] z-[1000] h-[4px] w-[4px]',
+        'rounded-[9999px] bg-(--theme-accent-bg,#6366f1)',
+        'outline-1 outline-solid outline-(--mp-border,#ffffff)',
+        'shadow-[0_0_6px_color-mix(in_srgb,var(--theme-accent-bg,#6366f1)_60%,transparent)]',
+        'motion-reduce:hidden',
+        // 十字/拖动条/文本/横向拖拽模式隐藏（保证空心准星视觉）
+        '[&.mp-dot-hidden]:hidden',
+        // 旧 `.mp-dot.mp-dragging { display: block !important }`：拖动中恒显示，压过上面的隐藏
+        '[&.mp-dragging]:block!'
+    ].join(' ')
 
     let enabled = $derived(getMagneticPointer())
     // 瞬时抑制（工坊 iframe 弹窗等）：强制恢复系统光标
     let forcedOff = $derived(getMagneticForcedOff())
-
-    // 磁力目标：按钮类 = 有点击事件的元素（a/button/select/role=button/summary + 显式 cursor:pointer 的元素），
-    // 动态渲染的元素由事件委托覆盖。注意：Svelte 5 的 onclick={} 编译为 addEventListener，
-    // DOM 上不产生 onclick 属性，因此选择器不含 [onclick]；非标准交互元素用 [data-magnetic] 手动标记。
-    const TARGET_SELECTOR = 'a, button, select, [role="button"], summary, [data-magnetic]'
-    // 磁力光标自身除外（文本编辑类由 text 模式接管，不再整体豁免）。
-    // 底部工具栏悬浮窗 / AI 悬浮窗整体豁免：它们是拖拽型浮层，hover 时保持默认
-    // 四角+点（不显示 grab/move 字形），按住拖动时由 dragging 圆环接管。
-    const EXCLUDE_SELECTOR = '.magnetic-pointer, .simplified-toolbar, .ai-assistant'
-    // 拖拽/滑动类光标 → 展示对应光标样式，不框选不磁吸
-    const RESIZE_H = new Set(['col-resize', 'ew-resize'])
-    const RESIZE_V = new Set(['row-resize', 'ns-resize'])
-    const RESIZE_DIAG = new Set(['nesw-resize', 'nwse-resize'])
-
-    type PointerMode =
-        | 'default'
-        | 'pointer'
-        | 'text'
-        | 'grab'
-        | 'move'
-        | 'resize-h'
-        | 'resize-v'
-        | 'resize-diag'
-        | 'crosshair'
-        | 'range'
-
-    // 拖动/滑动/文本输入类模式：过渡 0ms，光标实时贴手；按下时精确对准（text 不记录偏移，避免 I-beam 脱节）
-    const DRAG_MODES: ReadonlySet<PointerMode> = new Set([
-        'grab',
-        'move',
-        'resize-h',
-        'resize-v',
-        'resize-diag',
-        'crosshair',
-        'range',
-        'text'
-    ])
 
     // 触摸主指针设备（手机/平板）：磁力光标对触摸无意义，自动禁用（含运行中切换检测）
     let coarsePointer = $state(false)
@@ -97,58 +247,6 @@
     // rAF 节流：高频 pointermove 合并到每帧一次，避免磁吸时每事件强制 reflow
     let moveRaf: number | null = null
     let follow = $derived(DRAG_MODES.has(mode) || pressed ? 0 : FOLLOW_MS)
-
-    function modeForCursor(cursor: string): PointerMode {
-        if (cursor === 'text') return 'text'
-        if (cursor === 'grab' || cursor === 'grabbing') return 'grab'
-        if (cursor === 'move' || cursor === 'all-scroll') return 'move'
-        if (cursor === 'crosshair') return 'crosshair'
-        if (RESIZE_H.has(cursor)) return 'resize-h'
-        if (RESIZE_V.has(cursor)) return 'resize-v'
-        if (RESIZE_DIAG.has(cursor)) return 'resize-diag'
-        return 'default'
-    }
-
-    /**
-     * 解析元素声明的光标 token（如 col-resize / grab / pointer）。
-     * 注意：磁力光标开启时 layout.css 会对全 DOM 施加 `cursor: none !important`，
-     * getComputedStyle().cursor 恒为 none，无法用于光标语义检测——必须从
-     * Tailwind cursor-* 类名或内联 style 解析，才能识别拖拽线/拖拽手柄等元素。
-     */
-    function cursorToken(el: Element): string {
-        const cls = typeof el.className === 'string' ? el.className : ''
-        const m = cls.match(/(?:^|\s)cursor-([a-z-]+)/)
-        if (m) return m[1]
-        const styleAttr = el.getAttribute('style') || ''
-        const sm = styleAttr.match(/cursor\s*:\s*([a-z-]+)/i)
-        return sm ? sm[1].toLowerCase() : ''
-    }
-
-    /**
-     * 向上查找磁力目标：
-     * - 命中标签/属性选择器 → 框选该元素
-     * - cursor:pointer 仅认显式声明（Tailwind cursor-pointer 类或内联样式），排除继承（子元素穿透到父元素时框选父元素）
-     * - 命中拖拽/滑动类光标 → 整条路径不磁吸
-     * - disabled / aria-disabled / cursor:not-allowed → 不可交互，不磁吸
-     */
-    function findMagneticTarget(el: Element | null): HTMLElement | null {
-        let cur: Element | null = el
-        while (cur && cur !== document.body) {
-            const token = cursorToken(cur)
-            if (token === 'not-allowed') return null
-            if (modeForCursor(token) !== 'default' && modeForCursor(token) !== 'pointer') return null
-            if (cur.matches(TARGET_SELECTOR)) {
-                if (cur.matches(':disabled, [aria-disabled="true"]')) return null
-                return cur as HTMLElement
-            }
-            if (token === 'pointer') {
-                if (cur.matches(':disabled, [aria-disabled="true"]')) return null
-                return cur as HTMLElement
-            }
-            cur = cur.parentElement
-        }
-        return null
-    }
 
     function setSize(rect: DOMRect) {
         const pad = Math.max(8, innerWidth / 100)
@@ -271,20 +369,6 @@
         }
     }
 
-    /**
-     * 向上查找拖拽/滑动类光标：能点又能拖时优先显示拖的样式。
-     * 返回非 default/pointer 的光标模式，找不到返回 null。
-     */
-    function findDragMode(el: Element | null): PointerMode | null {
-        let cur: Element | null = el
-        while (cur && cur !== document.body) {
-            const m = modeForCursor(cursorToken(cur))
-            if (m !== 'default' && m !== 'pointer') return m
-            cur = cur.parentElement
-        }
-        return null
-    }
-
     function onOver(e: MouseEvent) {
         const target = e.target as Element | null
         if (!target) {
@@ -344,7 +428,10 @@
     $effect(() => {
         if (!pointerEl) return
         pointerEl.style.setProperty('--mp-follow', `${follow}ms`)
-        pointerEl.style.setProperty('--mp-spin', `${SPIN_S}s`)
+        // 旋转时长写在 <html> 上而不是本元素上：`--animate-mp-spin` 里的 `var(--mp-spin)` 是在
+        // **声明该变量的元素**（:root，见 layout.css 的 @theme）上求值的，写在本元素上不会生效
+        // （实测会永远停在兜底值 12s）。详见报告与 layout.css 该变量的注释。
+        document.documentElement.style.setProperty('--mp-spin', `${SPIN_S}s`)
         pointerEl.style.setProperty('--mp-wobble-amp', `${WOBBLE * 0.6}px`)
         pointerEl.style.setProperty('--mp-border-w', `${BORDER_W}px`)
         // 边框色：非黑白配色 = 亮化的主题色（混白 55%）；黑白（mono）配色 昼白夜黑（反色）
@@ -445,560 +532,59 @@
     <!-- 拖动中切换为圆形闭合边框样式（mp-dragging），中心点保持显示 -->
     <div
         bind:this={pointerEl}
-        class="magnetic-pointer"
+        class="magnetic-pointer {ROOT_CLASS}"
         class:mp-dragging={dragging}
-        data-mode={mode}
         class:mp-spin-ccw={spinCcw}
+        data-mode={mode}
         aria-hidden="true"
     >
-        <span class="mp-corners" class:mp-wobble={mode === 'pointer' && WOBBLE > 0}>
+        <span class="mp-corners {CORNERS_CLASS}" class:mp-wobble={mode === 'pointer' && WOBBLE > 0}>
             {#key attachKey}
-                <span class="mp-corner"></span><span class="mp-corner"></span><span class="mp-corner"></span><span
-                    class="mp-corner"
-                ></span>
+                {@render corner(1)}{@render corner(2)}{@render corner(3)}{@render corner(4)}
             {/key}
         </span>
         <!-- 动作样式字形（非框选模式显示） -->
-        <span class="mp-glyph">
-            <span class="mp-glyph-text"></span>
-            <span class="mp-glyph-grab"><i></i><i></i><i></i><i></i></span>
-            <span class="mp-glyph-h">
-                <i class="tri-l"></i><i class="line"></i><i class="tri-r"></i>
+        <span class="mp-glyph {GLYPH_CLASS}">
+            <span class="mp-glyph-text {GLYPH_TEXT_CLASS}"></span>
+            <span class="mp-glyph-grab {GLYPH_GRAB_CLASS}"
+                ><i class={GRAB_DOT_CLASS}></i><i class={GRAB_DOT_CLASS}></i><i class={GRAB_DOT_CLASS}></i><i
+                    class={GRAB_DOT_CLASS}
+                ></i></span
+            >
+            <span class="mp-glyph-h {GLYPH_H_CLASS}">
+                <i class="tri-l {TRI_H_L}"></i><i class="line {ARROW_H_LINE_CLASS}"></i><i class="tri-r {TRI_H_R}"></i>
             </span>
-            <span class="mp-glyph-v">
-                <i class="tri-u"></i><i class="line"></i><i class="tri-d"></i>
+            <span class="mp-glyph-v {GLYPH_V_CLASS}">
+                <i class="tri-u {TRI_V_U}"></i><i class="line {ARROW_V_LINE_CLASS}"></i><i class="tri-d {TRI_V_D}"></i>
             </span>
-            <span class="mp-glyph-diag">
-                <i class="tri-ul"></i><i class="line"></i><i class="tri-dr"></i>
+            <span class="mp-glyph-diag {GLYPH_DIAG_CLASS}">
+                <i class="tri-ul {TRI_DIAG_UL}"></i><i class="line {ARROW_DIAG_LINE_CLASS}"></i><i
+                    class="tri-dr {TRI_DIAG_DR}"
+                ></i>
             </span>
-            <span class="mp-glyph-move">
-                <i class="tri-u"></i><i class="tri-d"></i><i class="tri-l"></i><i class="tri-r"></i>
+            <span class="mp-glyph-move {GLYPH_MOVE_CLASS}">
+                <i class="tri-u {MOVE_TRI_U}"></i><i class="tri-d {MOVE_TRI_D}"></i><i class="tri-l {MOVE_TRI_L}"></i><i
+                    class="tri-r {MOVE_TRI_R}"
+                ></i>
             </span>
-            <span class="mp-glyph-cross"><span class="mp-cross-inner"><i></i><i></i><i></i><i></i></span></span>
+            <span class="mp-glyph-cross {GLYPH_CROSS_CLASS}">
+                <span class="mp-cross-inner {CROSS_INNER_CLASS}"
+                    ><i class={CROSS_BAR_BASE + ' ' + CROSS_AT[1]}></i><i class={CROSS_BAR_BASE + ' ' + CROSS_AT[2]}
+                    ></i><i class={CROSS_BAR_BASE + ' ' + CROSS_AT[3]}></i><i class={CROSS_BAR_BASE + ' ' + CROSS_AT[4]}
+                    ></i></span
+                >
+            </span>
         </span>
     </div>
     <div
         bind:this={dotEl}
-        class="mp-dot"
+        class="mp-dot {DOT_CLASS}"
         class:mp-dot-hidden={mode === 'crosshair' || mode === 'range' || mode === 'text' || mode === 'resize-h'}
         class:mp-dragging={dragging}
         aria-hidden="true"
     ></div>
 {/if}
 
-<style>
-    .magnetic-pointer {
-        --mp-w: 28px;
-        --mp-h: 28px;
-        --mp-follow: 0.2s;
-        position: fixed;
-        top: calc(var(--mp-h) / -2);
-        left: calc(var(--mp-w) / -2);
-        width: var(--mp-w);
-        height: var(--mp-h);
-        z-index: 999;
-        pointer-events: none;
-        transition:
-            width var(--mp-follow, 0.2s) ease-out,
-            height var(--mp-follow, 0.2s) ease-out,
-            transform var(--mp-follow, 0.2s) ease-out;
-    }
-
-    /* 拖动中：外框变为固定 28px 圆形闭合边框（不随吸附目标/容器放大），
-       颜色与磁力光标一致（主题亮化描边 + accent 发光），中心点由 mp-dot 呈现 */
-    .magnetic-pointer.mp-dragging {
-        width: 28px !important;
-        height: 28px !important;
-        top: -14px !important;
-        left: -14px !important;
-        border-radius: 9999px;
-        border: 2px solid var(--mp-border, #ffffff);
-        box-shadow: 0 0 10px color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);
-        background: transparent;
-        animation: none;
-    }
-
-    .magnetic-pointer.mp-dragging .mp-corners,
-    .magnetic-pointer.mp-dragging .mp-corner,
-    .magnetic-pointer.mp-dragging .mp-glyph {
-        display: none !important;
-    }
-
-    /* 拖动中中心点始终显示（覆盖 crosshair/range 的隐藏规则） */
-    .mp-dot.mp-dragging {
-        display: block !important;
-    }
-
-    /* 中心点：钉在鼠标实时位置（无过渡）；十字/拖动条模式隐藏（保证空心准星视觉） */
-    .mp-dot {
-        position: fixed;
-        top: -2px;
-        left: -2px;
-        width: 4px;
-        height: 4px;
-        border-radius: 9999px;
-        background: var(--theme-accent-bg, #6366f1);
-        outline: 1px solid var(--mp-border, #ffffff);
-        box-shadow: 0 0 6px color-mix(in srgb, var(--theme-accent-bg, #6366f1) 60%, transparent);
-        z-index: 1000;
-        pointer-events: none;
-    }
-
-    .mp-dot.mp-dot-hidden {
-        display: none;
-    }
-
-    .mp-corners {
-        position: absolute;
-        inset: 0;
-    }
-
-    /* 平时（default 模式）四角缓慢旋转（速度可调）；选中/其它模式不旋转；
-       按住拖动按位移方向切换旋转方向：右/下→逆时针，左/上→顺时针 */
-    .magnetic-pointer[data-mode='default'] .mp-corners {
-        animation: mp-spin var(--mp-spin, 12s) linear infinite;
-    }
-
-    .magnetic-pointer.mp-spin-ccw[data-mode='default'] .mp-corners {
-        animation: mp-spin var(--mp-spin, 12s) linear infinite reverse;
-    }
-
-    @keyframes mp-spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-
-    /* 吸附晃动：框选新目标时四角小幅衰减晃动（幅度可调，0 关闭） */
-    .magnetic-pointer[data-mode='pointer'] .mp-corners.mp-wobble {
-        animation: mp-wobble 0.4s ease-out 1;
-    }
-
-    @keyframes mp-wobble {
-        0% {
-            transform: translate(0, 0);
-        }
-
-        25% {
-            transform: translate(var(--mp-wobble-amp, 0px), 0);
-        }
-
-        50% {
-            transform: translate(calc(var(--mp-wobble-amp, 0px) * -0.6), 0);
-        }
-
-        75% {
-            transform: translate(calc(var(--mp-wobble-amp, 0px) * 0.25), 0);
-        }
-
-        100% {
-            transform: translate(0, 0);
-        }
-    }
-
-    /* 四角边框：主体主题主色，黑白描边沿 L 形走（::before 复刻 L 边框，避免 outline 画成矩形） */
-    .mp-corner {
-        position: absolute;
-        width: 10px;
-        height: 10px;
-        border: 0 solid var(--theme-accent-bg, #6366f1);
-        filter: drop-shadow(0 0 3px color-mix(in srgb, var(--theme-accent-bg, #6366f1) 45%, transparent));
-    }
-
-    .mp-corner::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border: 0 solid var(--mp-border, #ffffff);
-    }
-
-    .mp-corner:nth-child(1)::before {
-        border-top-width: 1px;
-        border-left-width: 1px;
-    }
-
-    .mp-corner:nth-child(2)::before {
-        border-top-width: 1px;
-        border-right-width: 1px;
-    }
-
-    .mp-corner:nth-child(3)::before {
-        border-bottom-width: 1px;
-        border-left-width: 1px;
-    }
-
-    .mp-corner:nth-child(4)::before {
-        border-bottom-width: 1px;
-        border-right-width: 1px;
-    }
-
-    .magnetic-pointer[data-mode='default'] .mp-corner,
-    .magnetic-pointer[data-mode='pointer'] .mp-corner {
-        display: block;
-    }
-
-    /* input/拖动条等字形模式：不显示四角边框 */
-    .magnetic-pointer:not([data-mode='default']):not([data-mode='pointer']) .mp-corner {
-        display: none;
-    }
-
-    .mp-corner:nth-child(1) {
-        top: 0;
-        left: 0;
-        border-top-width: 2px;
-        border-left-width: 2px;
-        border-top-left-radius: 3px;
-    }
-
-    .mp-corner:nth-child(2) {
-        top: 0;
-        right: 0;
-        border-top-width: 2px;
-        border-right-width: 2px;
-        border-top-right-radius: 3px;
-    }
-
-    .mp-corner:nth-child(3) {
-        bottom: 0;
-        left: 0;
-        border-bottom-width: 2px;
-        border-left-width: 2px;
-        border-bottom-left-radius: 3px;
-    }
-
-    .mp-corner:nth-child(4) {
-        bottom: 0;
-        right: 0;
-        border-bottom-width: 2px;
-        border-right-width: 2px;
-        border-bottom-right-radius: 3px;
-    }
-
-    /* ── 动作样式字形（text/grab/move/resize/crosshair 模式）── */
-    .mp-glyph {
-        position: absolute;
-        inset: 0;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        color: var(--theme-accent-bg, #6366f1);
-    }
-
-    .magnetic-pointer[data-mode='text'] .mp-glyph,
-    .magnetic-pointer[data-mode='grab'] .mp-glyph,
-    .magnetic-pointer[data-mode='move'] .mp-glyph,
-    .magnetic-pointer[data-mode='resize-h'] .mp-glyph,
-    .magnetic-pointer[data-mode='resize-v'] .mp-glyph,
-    .magnetic-pointer[data-mode='resize-diag'] .mp-glyph,
-    .magnetic-pointer[data-mode='crosshair'] .mp-glyph,
-    .magnetic-pointer[data-mode='range'] .mp-glyph {
-        display: flex;
-    }
-
-    /* 内部元素：主体主题色；描边走昼夜/黑白规则（非黑白：昼黑夜白；黑白：昼白夜黑） */
-    .mp-glyph-text,
-    .mp-glyph-cross i,
-    .mp-glyph-h .line,
-    .mp-glyph-v .line,
-    .mp-glyph-diag .line,
-    .mp-glyph-grab i {
-        outline: 1px solid var(--mp-border, #ffffff);
-    }
-
-    /* 文本 I-beam */
-    .mp-glyph-text {
-        display: none;
-        position: relative;
-        width: var(--mp-border-w, 1px);
-        height: 14px;
-        background: currentColor;
-        border-radius: 1px;
-    }
-
-    .mp-glyph-text::before,
-    .mp-glyph-text::after {
-        content: '';
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 8px;
-        height: 2px;
-        background: currentColor;
-        border-radius: 1px;
-    }
-
-    .mp-glyph-text::before {
-        top: -2px;
-    }
-
-    .mp-glyph-text::after {
-        bottom: -2px;
-    }
-
-    .magnetic-pointer[data-mode='text'] .mp-glyph-text {
-        display: block;
-    }
-
-    /* 抓手（grab）：2×2 圆点 */
-    .mp-glyph-grab {
-        display: none;
-        flex-wrap: wrap;
-        gap: 3px;
-        width: 13px;
-        height: 13px;
-    }
-
-    .mp-glyph-grab i {
-        width: 4px;
-        height: 4px;
-        border-radius: 50%;
-        background: currentColor;
-        box-shadow: 0 0 4px color-mix(in srgb, currentColor 50%, transparent);
-    }
-
-    .magnetic-pointer[data-mode='grab'] .mp-glyph-grab {
-        display: flex;
-    }
-
-    /* 水平/垂直/斜向 双向箭头 */
-    .mp-glyph-h,
-    .mp-glyph-v,
-    .mp-glyph-diag {
-        display: none;
-        align-items: center;
-        justify-content: center;
-        gap: 1px;
-    }
-
-    .mp-glyph-h .line,
-    .mp-glyph-v .line,
-    .mp-glyph-diag .line {
-        background: currentColor;
-        border-radius: 1px;
-    }
-
-    /* 水平双向箭头（类似系统 col-resize：中间竖线 + 左右实心箭头） */
-    .mp-glyph-h .line {
-        width: var(--mp-border-w, 1px);
-        height: 14px;
-    }
-
-    .mp-glyph-h .tri-l,
-    .mp-glyph-h .tri-r {
-        width: 0;
-        height: 0;
-        border-top: calc(var(--mp-border-w, 1px) * 3) solid transparent;
-        border-bottom: calc(var(--mp-border-w, 1px) * 3) solid transparent;
-    }
-
-    .mp-glyph-h .tri-l {
-        border-right: calc(var(--mp-border-w, 1px) * 4) solid currentColor;
-    }
-
-    .mp-glyph-h .tri-r {
-        border-left: calc(var(--mp-border-w, 1px) * 4) solid currentColor;
-    }
-
-    .magnetic-pointer[data-mode='resize-h'] .mp-glyph-h {
-        display: flex;
-    }
-
-    /* 垂直双向箭头 */
-    .mp-glyph-v {
-        flex-direction: column;
-    }
-
-    .mp-glyph-v .line {
-        width: var(--mp-border-w, 1px);
-        height: 12px;
-    }
-
-    .mp-glyph-v .tri-u {
-        width: 0;
-        height: 0;
-        border-left: calc(var(--mp-border-w, 1px) * 3) solid transparent;
-        border-right: calc(var(--mp-border-w, 1px) * 3) solid transparent;
-        border-bottom: calc(var(--mp-border-w, 1px) * 4) solid currentColor;
-    }
-
-    .mp-glyph-v .tri-d {
-        width: 0;
-        height: 0;
-        border-left: calc(var(--mp-border-w, 1px) * 3) solid transparent;
-        border-right: calc(var(--mp-border-w, 1px) * 3) solid transparent;
-        border-top: calc(var(--mp-border-w, 1px) * 4) solid currentColor;
-    }
-
-    .magnetic-pointer[data-mode='resize-v'] .mp-glyph-v {
-        display: flex;
-    }
-
-    /* 斜向双向箭头 */
-    .mp-glyph-diag {
-        transform: rotate(45deg);
-    }
-
-    .mp-glyph-diag .line {
-        width: 12px;
-        height: var(--mp-border-w, 1px);
-    }
-
-    .mp-glyph-diag .tri-ul,
-    .mp-glyph-diag .tri-dr {
-        width: 0;
-        height: 0;
-        border-top: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-bottom: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-    }
-
-    .mp-glyph-diag .tri-ul {
-        border-right: calc(var(--mp-border-w, 1px) * 3.5) solid currentColor;
-    }
-
-    .mp-glyph-diag .tri-dr {
-        border-left: calc(var(--mp-border-w, 1px) * 3.5) solid currentColor;
-    }
-
-    .magnetic-pointer[data-mode='resize-diag'] .mp-glyph-diag {
-        display: flex;
-    }
-
-    /* 移动：四向箭头 */
-    .mp-glyph-move {
-        display: none;
-        position: relative;
-        width: 20px;
-        height: 20px;
-    }
-
-    .mp-glyph-move .tri-u,
-    .mp-glyph-move .tri-d,
-    .mp-glyph-move .tri-l,
-    .mp-glyph-move .tri-r {
-        position: absolute;
-        width: 0;
-        height: 0;
-    }
-
-    .mp-glyph-move .tri-u {
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        border-left: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-right: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-bottom: calc(var(--mp-border-w, 1px) * 3.5) solid currentColor;
-    }
-
-    .mp-glyph-move .tri-d {
-        bottom: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        border-left: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-right: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-top: calc(var(--mp-border-w, 1px) * 3.5) solid currentColor;
-    }
-
-    .mp-glyph-move .tri-l {
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        border-top: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-bottom: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-right: calc(var(--mp-border-w, 1px) * 3.5) solid currentColor;
-    }
-
-    .mp-glyph-move .tri-r {
-        right: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        border-top: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-bottom: calc(var(--mp-border-w, 1px) * 2.5) solid transparent;
-        border-left: calc(var(--mp-border-w, 1px) * 3.5) solid currentColor;
-    }
-
-    .magnetic-pointer[data-mode='move'] .mp-glyph-move {
-        display: block;
-    }
-
-    /* 空心十字准星（拖动条/十字光标）：4 段短线，中心镂空 8px（保证空心视觉） */
-    .mp-glyph-cross {
-        display: none;
-        position: relative;
-        width: 20px;
-        height: 20px;
-    }
-
-    /* 呼吸：内层整体缩放，四个横杠离中心时近时远（与旋转分离，互不干扰） */
-    .mp-cross-inner {
-        position: absolute;
-        inset: 0;
-        animation: mp-breathe 2.6s ease-in-out infinite;
-    }
-
-    @keyframes mp-breathe {
-        0%,
-        100% {
-            transform: scale(1);
-        }
-
-        50% {
-            transform: scale(1.3);
-        }
-    }
-
-    .mp-glyph-cross i {
-        position: absolute;
-        background: currentColor;
-        border-radius: 1px;
-    }
-
-    .mp-glyph-cross i:nth-child(1) {
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: var(--mp-border-w, 1px);
-        height: 6px;
-    }
-
-    .mp-glyph-cross i:nth-child(2) {
-        bottom: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: var(--mp-border-w, 1px);
-        height: 6px;
-    }
-
-    .mp-glyph-cross i:nth-child(3) {
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 6px;
-        height: var(--mp-border-w, 1px);
-    }
-
-    .mp-glyph-cross i:nth-child(4) {
-        right: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 6px;
-        height: var(--mp-border-w, 1px);
-    }
-
-    .magnetic-pointer[data-mode='crosshair'] .mp-glyph-cross,
-    .magnetic-pointer[data-mode='range'] .mp-glyph-cross {
-        display: block;
-        animation: mp-spin var(--mp-spin, 12s) linear infinite;
-    }
-
-    .magnetic-pointer.mp-spin-ccw[data-mode='crosshair'] .mp-glyph-cross,
-    .magnetic-pointer.mp-spin-ccw[data-mode='range'] .mp-glyph-cross {
-        animation: mp-spin var(--mp-spin, 12s) linear infinite reverse;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .magnetic-pointer,
-        .mp-dot {
-            display: none;
-        }
-    }
-</style>
+{#snippet corner(i: CornerIndex)}
+    <span class="mp-corner {CORNER_BASE} {CORNER_AT[i]}"></span>
+{/snippet}

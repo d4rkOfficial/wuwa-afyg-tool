@@ -19,9 +19,10 @@
     } from '$lib/calc/calculation.store.svelte'
     import { ZONE_MAP } from '$lib/calc/calculation.consts'
     import { buildEntityImportItems, detectImportConflicts } from '$lib/calc/buff-import-utils'
-    import BuffImportConflictModal from '$lib/components/layout/buff-import-conflict-modal.svelte'
+    import BuffImportConflictModal from './buff-import-conflict-modal.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import type { CharSlot } from '$lib/types/project'
+    import { mergeComponentsStyle } from '$lib/utils/component-style'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -31,15 +32,7 @@
 
     let { open, onclose, team, backgroundImage, textColor, class: className, style: styleProp }: Props = $props()
 
-    let mergedStyle = $derived(
-        [
-            backgroundImage ? `background: ${backgroundImage}` : '',
-            textColor ? `color: ${textColor}` : '',
-            styleProp || ''
-        ]
-            .filter(Boolean)
-            .join(';')
-    )
+    let mergedStyle = $derived(mergeComponentsStyle({ backgroundImage, textColor, style: styleProp }))
 
     let allEntities = $derived(getBuffEntities())
 
@@ -308,7 +301,7 @@
 </Modal>
 
 {#snippet CategoryGroup(list: BuffLibraryEntity[])}
-    {#each BUFF_CATEGORY_ORDER as cat}
+    {#each BUFF_CATEGORY_ORDER as cat (cat)}
         {@const group = list
             .filter((e) => categoryOfType(e.entityType) === cat)
             .sort((a, b) => setPiecesOf(a.entityType) - setPiecesOf(b.entityType))}

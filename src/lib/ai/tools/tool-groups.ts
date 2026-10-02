@@ -6,6 +6,12 @@ import type { ToolDefinition } from '$lib/ai/tools/registry'
 
 /** @desc 分组规则：按顺序匹配，先命中者胜（越具体的放越前面） */
 const GROUP_RULES: { label: string; test: RegExp }[] = [
+    // 交互式提问（ask_user）：唯一「直接与用户对话」的工具，不属于任何业务域，
+    // 故单列一组，比塞进「面板与视图」「其它工具」更便于用户在工具清单里辨认。
+    // 规则用整名锚定（^ask_user$）而非 /ask_user/，避免日后出现 ask_user_* 变体时被一锅端。
+    { label: 'AI 助手 · 交互', test: /^ask_user$/ },
+    // 联网抓取（web_fetch）：同样只属于内置 AI 助手（WS 无此能力），单列一组便于在工具清单里辨认
+    { label: 'AI 助手 · 联网', test: /^web_fetch$/ },
     { label: '库街区 · 词条集同步', test: /_kuro_|^kuro_|^check_kuro_login$|^refresh_kuro_echo_data$|_from_kuro$/ },
     { label: '词条集（方案）', test: /_substat_plan/ },
     { label: 'Buff 生成', test: /^generate_|_naming_rule$|^get_entity_info$|^list_entities$|^search_entities$/ },

@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { ComponentsProps } from '$lib/types'
+    import { joinStyle, mergeClass } from '$lib/utils/component-style'
 
     interface Props extends ComponentsProps {
         src?: string
@@ -14,26 +15,22 @@
     )
 
     let mergedStyle = $derived(
-        [
+        joinStyle([
             src ? `background-image: url(${src})` : backgroundImage ? `background: ${backgroundImage}` : '',
             textColor ? `color: ${textColor}` : '',
             styleProp || ''
-        ]
-            .filter(Boolean)
-            .join(';')
+        ])
     )
 </script>
 
 <div
-    class={[
+    class={mergeClass([
         'theme-glass-surface inline-flex shrink-0 items-center justify-center rounded-full bg-cover bg-center font-black tracking-tight',
         'bg-(--theme-avatar-bg) text-(--theme-avatar-text)',
         'focus-visible:bg-(--theme-avatar-bg-focused) focus-visible:text-(--theme-avatar-text-focused)',
         sizeClass,
         className || ''
-    ]
-        .filter(Boolean)
-        .join(' ')}
+    ])}
     style={mergedStyle}
     role="img"
     aria-label={alt}

@@ -1,5 +1,6 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
+    import Button from '$lib/components/ui/button.svelte'
     import type { ComponentsProps } from '$lib/types'
     import type { PhaseKey, CharSlot } from '$lib/types/project'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
@@ -40,7 +41,7 @@
         /** @desc 当前队伍（用于角色详情按钮展示链阶档位） */
         team?: [CharSlot, CharSlot, CharSlot]
         onCharDetail: () => void
-        onRefresh: () => void
+        onrefresh: () => void
         onLockToggle: () => void
     }
     let {
@@ -51,7 +52,7 @@
         canLock,
         team,
         onCharDetail,
-        onRefresh,
+        onrefresh,
         onLockToggle,
         class: className,
         style: styleProp
@@ -160,6 +161,13 @@
     })
 </script>
 
+<!-- @desc 完整态工具栏按钮文字的两级收起：容器查询（@container 挂在根节点，仅非简化态），阈值取「实测内容宽度」而非视口宽度
+     （工具栏宽度 = 主区宽度，抽屉侧栏变宽 / 窗口变窄都会压缩它）：
+       ① ≥700px：图标 + 文字（最宽一组是拉表-非铺开态 6 个按钮，Chromium 实测 670px，留 30px 余量）
+       ② 400~700px：隐藏文字，保留图标；角色详情配置按钮仍显示链阶数字（= 短形态）
+       ③ <400px：纯图标（连链阶数字也隐藏，按钮内边距收到 px-1.5）
+     文字一律 truncate，按钮一律 whitespace-nowrap：任何宽度都不换行、不撑破行
+     调阈值：全局替换本文件里的 @[700px]（文字档，13 处）与 @[400px] / @max-[400px]（数字档，2 处）即可 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     data-sf="toolbar"
@@ -172,10 +180,11 @@
     onpointerenter={() => (toolbarHover = true)}
     onpointerleave={() => (toolbarHover = false)}
     onclickcapture={toolbarClickCapture}
+    data-press={simplifyToolbar ? 'none' : undefined}
     class={`${
         simplifyToolbar
-            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-40 flex cursor-grab touch-none select-none items-center gap-1.5 rounded-none border p-2 active:cursor-grabbing'
-            : 'flex shrink-0 items-center gap-2 border-t px-4 py-2.5'
+            ? 'simplified-toolbar theme-glass-surface fixed bottom-5 z-(--z-sticky) flex cursor-grab touch-none select-none items-center gap-1.5 rounded-none border p-2 active:cursor-grabbing [&>button]:transition-[transform,color,background-color,border-color] [&>button]:duration-(--motion-fast) [&>button]:ease-out [&>button:active:not(:disabled)]:scale-[1.15]'
+            : '@container flex shrink-0 items-center gap-2 border-t px-4 py-2.5 [&_button]:whitespace-nowrap @max-[400px]:[&_button]:px-1.5'
     } ${className || ''}`}
     style={simplifyToolbar
         ? `interpolate-size: allow-keywords; border-color: var(--theme-divider-border); --sf-base: color-mix(in srgb, var(--theme-modal-bg) 78%, transparent); color: var(--theme-modal-text);${
@@ -188,22 +197,30 @@
                   : ''
           }transition: ${
               toolbarDrag
-                  ? 'left 150ms ease'
-                  : 'transform 150ms ease, box-shadow 150ms ease, left 150ms ease, width 250ms ease'
+                  ? 'left var(--motion-fast) ease'
+                  : 'transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease, left var(--motion-fast) ease, width var(--motion-slow) ease'
           };${toolbarDrag ? (gpuAccel ? ' will-change: transform;' : ' will-change: left;') : ''}${styleProp ? '; ' + styleProp : ''}`
         : `color: var(--theme-sidebar-text); border-color: var(--theme-divider-border);${styleProp ? ' ' + styleProp : ''}`}
 >
-    <button
+    <Button
+        variant="text"
+        size="none"
+        bare
         onclick={onCharDetail}
-        class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-            ? 'rounded-none px-3 py-2'
-            : 'rounded-none px-3 py-1.5'}"
+        backgroundImage="transparent"
+        class="border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+            ? 'px-3 py-2'
+            : 'px-3 py-1.5'}"
         title="角色详情配置（链阶：链1链2链3 阶1阶2阶3 = {chainLabel}）"
+        aria-label="角色详情配置（链阶：链1链2链3 阶1阶2阶3 = {chainLabel}）"
     >
         <Icon icon="mdi:account-details" class="size-4 shrink-0" />
-        <span class="truncate">角色详情配置</span>
-        <span class="shrink-0 font-black tabular-nums" style="color: var(--theme-accent-text);">{chainLabel}</span>
-    </button>
+        {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">角色详情配置</span>{/if}
+        <span
+            class="shrink-0 font-black tabular-nums {simplifyToolbar ? '' : 'hidden @[400px]:inline'}"
+            style="color: var(--theme-accent-text);">{chainLabel}</span
+        >
+    </Button>
     {#if !showResult}
         {#if activePhase === 'timeline'}
             <!-- ⛔ TEMP-HIDDEN（临时隐藏）：「查看所有伤害」入口按钮，恢复时删除本段包裹的注释即可
@@ -218,16 +235,20 @@
                 {#if !simplifyToolbar}<span>查看所有伤害</span>{/if}
             </button>
             ⛔ TEMP-HIDDEN-END -->
-            <button
+            <Button
+                variant="text"
+                size="none"
+                bare
                 onclick={formatTimeline}
-                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                    ? 'rounded-none px-3 py-2'
-                    : 'rounded-none px-3 py-1.5'}"
+                backgroundImage="transparent"
+                class="border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                    ? 'px-3 py-2'
+                    : 'px-3 py-1.5'}"
                 title="自动格式化：每个操作块右边界对齐下一个块（可跨角色）的左边界，参考线跟随其左右块"
             >
                 <Icon icon="mdi:auto-fix" class="size-4 shrink-0" />
-                {#if !simplifyToolbar}<span>格式化</span>{/if}
-            </button>
+                {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">格式化</span>{/if}
+            </Button>
             <div class="relative group">
                 <button
                     onclick={toggleQuickMode}
@@ -241,7 +262,7 @@
                 >
                     <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" />
                     {#if !simplifyToolbar}
-                        <span
+                        <span class="hidden truncate @[700px]:inline"
                             >{getQuickMode()
                                 ? '快速排轴(已开启' +
                                   (getQuickSpecial() !== 'none'
@@ -264,7 +285,7 @@
                 title="打开快速词条方案：一键套用标准14词条，或管理/套用自定义声骸词条方案"
             >
                 <Icon icon="mdi:clipboard-text-outline" class="size-4 shrink-0" />
-                {#if !simplifyToolbar}<span>快速词条方案</span>{/if}
+                {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">快速词条方案</span>{/if}
             </button>
         {/if}
         {#if activePhase === 'calculation'}
@@ -276,7 +297,7 @@
                 title="BUFF配置"
             >
                 <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
-                {#if !simplifyToolbar}<span>BUFF配置</span>{/if}
+                {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">BUFF配置</span>{/if}
             </button>
             {#if getCalcViewMode() !== 'spread'}
                 <button
@@ -294,7 +315,9 @@
                         class="size-4 shrink-0"
                     />
                     {#if !simplifyToolbar}
-                        <span>{getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}</span>
+                        <span class="hidden truncate @[700px]:inline"
+                            >{getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}</span
+                        >
                     {/if}
                 </button>
             {/if}
@@ -308,7 +331,7 @@
                 >
                     <Icon icon="mdi:playlist-edit" class="size-4 shrink-0" />
                     {#if !simplifyToolbar}
-                        <span>编辑伤害类型</span>
+                        <span class="hidden truncate @[700px]:inline">编辑伤害类型</span>
                     {/if}
                 </button>
                 <button
@@ -337,7 +360,9 @@
                         class="size-4 shrink-0"
                     />
                     {#if !simplifyToolbar}
-                        <span>{getScrollAxisDefault() === 'horizontal' ? '默认横向滚动' : '默认纵向滚动'}</span>
+                        <span class="hidden truncate @[700px]:inline"
+                            >{getScrollAxisDefault() === 'horizontal' ? '默认横向滚动' : '默认纵向滚动'}</span
+                        >
                     {/if}
                 </button>
             {/if}
@@ -359,7 +384,9 @@
                         class="size-4 shrink-0"
                     />
                     {#if !simplifyToolbar}
-                        <span>{getHideConditionMismatch() ? '可用Buff' : '全部Buff'}</span>
+                        <span class="hidden truncate @[700px]:inline"
+                            >{getHideConditionMismatch() ? '可用Buff' : '全部Buff'}</span
+                        >
                     {/if}
                 </button>
             {/if}
@@ -374,39 +401,49 @@
         <div class="flex-1"></div>
     {/if}
     {#if showUndoRedo}
-        <button
+        <Button
+            variant="text"
+            size="none"
+            bare
+            keepDisabled
             onclick={handleUndo}
             disabled={undoDisabled}
-            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
-                ? 'rounded-none px-3 py-2'
-                : 'rounded-none px-3 py-1.5'}"
+            backgroundImage="transparent"
+            class="border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                ? 'px-3 py-2'
+                : 'px-3 py-1.5'}"
             title={undoTitle}
         >
             <Icon icon="mdi:undo-variant" class="size-4 shrink-0" />
-            {#if !simplifyToolbar}<span>撤销</span>{/if}
-        </button>
-        <button
+            {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">撤销</span>{/if}
+        </Button>
+        <Button
+            variant="text"
+            size="none"
+            bare
+            keepDisabled
             onclick={handleRedo}
             disabled={redoDisabled}
-            class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 disabled:pointer-events-none disabled:opacity-40 {simplifyToolbar
-                ? 'rounded-none px-3 py-2'
-                : 'rounded-none px-3 py-1.5'}"
+            backgroundImage="transparent"
+            class="border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                ? 'px-3 py-2'
+                : 'px-3 py-1.5'}"
             title={activePhase === 'timeline' ? '重做排轴操作' : '重做表格操作'}
         >
             <Icon icon="mdi:redo-variant" class="size-4 shrink-0" />
-            {#if !simplifyToolbar}<span>重做</span>{/if}
-        </button>
+            {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">重做</span>{/if}
+        </Button>
     {/if}
     {#if showResult}
         <button
-            onclick={onRefresh}
+            onclick={onrefresh}
             class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
                 ? 'rounded-none px-3 py-2'
                 : 'rounded-none px-3 py-1.5'}"
             title="刷新结果"
         >
             <Icon icon="mdi:refresh" class="size-4 shrink-0" />
-            {#if !simplifyToolbar}<span>刷新结果</span>{/if}
+            {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">刷新结果</span>{/if}
         </button>
     {/if}
     {#if !showResult}
@@ -419,22 +456,8 @@
             title={phaseLocked ? '解锁' : '锁定'}
         >
             <Icon icon={phaseLocked ? 'mdi:lock-open-variant-outline' : 'mdi:lock-outline'} class="size-4 shrink-0" />
-            {#if !simplifyToolbar}<span>{phaseLocked ? '解锁' : '锁定'}</span>{/if}
+            {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">{phaseLocked ? '解锁' : '锁定'}</span
+                >{/if}
         </button>
     {/if}
 </div>
-
-<style>
-    /* ── 简化底部工具栏（悬浮模式）── */
-    /* 按钮点击/按住时按钮自身放大（hover 不放大）；保留原有颜色过渡 */
-    .simplified-toolbar > button {
-        transition:
-            transform 150ms ease,
-            color 150ms ease,
-            background-color 150ms ease,
-            border-color 150ms ease;
-    }
-    .simplified-toolbar > button:active:not(:disabled) {
-        transform: scale(1.15);
-    }
-</style>

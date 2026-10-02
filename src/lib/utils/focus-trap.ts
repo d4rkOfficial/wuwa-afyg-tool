@@ -39,16 +39,18 @@ export const focusTrap = (node: HTMLElement, options?: FocusTrapOptions) => {
         }
     }
 
+    // `preventScroll: true`：聚焦时不把元素滚入视口。弹窗下的页面可能极重（如拉表页的
+    // 大表格），默认的「聚焦即滚动」会连带触发滚动 + 整页重排，开关弹窗时肉眼可见地卡。
     const initial = options?.initial ? node.querySelector<HTMLElement>(options.initial) : null
-    if (initial instanceof HTMLElement) initial.focus()
-    else (getFocusables(node)[0] ?? node).focus()
+    if (initial instanceof HTMLElement) initial.focus({ preventScroll: true })
+    else (getFocusables(node)[0] ?? node).focus({ preventScroll: true })
 
     node.addEventListener('keydown', onKeydown)
 
     return {
         destroy() {
             node.removeEventListener('keydown', onKeydown)
-            if (restoreTarget && document.contains(restoreTarget)) restoreTarget.focus()
+            if (restoreTarget && document.contains(restoreTarget)) restoreTarget.focus({ preventScroll: true })
         }
     }
 }

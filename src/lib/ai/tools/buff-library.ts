@@ -52,8 +52,8 @@ defineTool('get_entity_buffs', {
     parameters: {
         type: 'object',
         properties: {
-            entityType: { type: 'string' },
-            entityName: { type: 'string' }
+            entityType: { type: 'string', description: '实体类型：character/weapon/echo/1set-5set' },
+            entityName: { type: 'string', description: '实体名称（中文，用 list_entities 定位）' }
         },
         required: ['entityType', 'entityName']
     },
@@ -84,9 +84,13 @@ defineTool('update_entity_buffs', {
     parameters: {
         type: 'object',
         properties: {
-            entityType: { type: 'string' },
-            entityName: { type: 'string' },
-            buffs: { type: 'array', items: { type: 'object' } }
+            entityType: { type: 'string', description: '实体类型：character/weapon/echo/1set-5set' },
+            entityName: { type: 'string', description: '实体名称（中文）' },
+            buffs: {
+                type: 'array',
+                items: { type: 'object' },
+                description: '完整 Buff 列表（整体覆写，格式见工具描述）'
+            }
         },
         required: ['entityType', 'entityName', 'buffs']
     },
@@ -133,7 +137,10 @@ defineTool('delete_buff_entity', {
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { entityType: { type: 'string' }, entityName: { type: 'string' } },
+        properties: {
+            entityType: { type: 'string', description: '实体类型：character/weapon/echo/1set-5set' },
+            entityName: { type: 'string', description: '要删除的实体名称（中文）' }
+        },
         required: ['entityType', 'entityName']
     },
     handler: async (args) => {

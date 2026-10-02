@@ -2,6 +2,8 @@
     import type { Snippet } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
+    import { mergeClass } from '$lib/utils/component-style'
+    import { popOut } from '$lib/utils/motion'
 
     export interface SelectOption {
         value: string
@@ -37,6 +39,24 @@
     let overlayEl: HTMLDivElement | undefined = $state()
     let menuEl: HTMLDivElement | undefined = $state()
 
+    /**
+     * @desc 减弱动态效果跟随系统设置。
+     * `layout.css` 的 `prefers-reduced-motion` 只关 CSS 动画/keyframes，管不到 JS 过渡，
+     * 故按仓库既有做法（`magnetic-pointer.svelte` / `ai-context-panel.svelte`）在这里自行判定。
+     */
+    let reducedMotion = $state(false)
+
+    $effect(() => {
+        const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+        reducedMotion = motion.matches
+        const onMotion = (e: MediaQueryListEvent) => (reducedMotion = e.matches)
+        motion.addEventListener('change', onMotion)
+        return () => motion.removeEventListener('change', onMotion)
+    })
+
+    /** @desc 关场动效参数：减弱动态效果时压到 1ms（保留过渡钩子，避免结构分支变化） */
+    let outParams = $derived(reducedMotion ? { duration: 1 } : undefined)
+
     let current = $derived(options.find((o) => o.value === value))
 
     function toggle() {
@@ -58,7 +78,8 @@
 
     function close() {
         open = false
-        pos = null
+        // 注：`pos` 刻意**不在这里**清空——菜单的退场过渡（out:popOut）需要它继续提供定位，
+        // 待过渡结束的回调里再清（见模板的 onoutroend），否则退场元素一帧就被擦掉。
     }
 
     $effect(() => {
@@ -89,13 +110,12 @@
     onclick={toggle}
     {disabled}
     type="button"
-    class={[
+    class={mergeClass([
         'flex w-full items-center justify-between gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-input-bg) px-2 py-1.5 text-sm outline-none transition-colors focus:border-(--theme-accent-bg)',
+        'hover:brightness-110 active:brightness-95 disabled:active:brightness-100',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         className || ''
-    ]
-        .filter(Boolean)
-        .join(' ')}
+    ])}
     style={styleProp}
 >
     <span class="min-w-0 flex-1 truncate text-left">
@@ -114,7 +134,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         bind:this={overlayEl}
-        class="fixed inset-0 z-50 outline-none"
+        class="fixed inset-0 z-(--z-modal) outline-none"
         role="presentation"
         tabindex="-1"
         onclick={close}
@@ -125,8 +145,10 @@
             class="animate-pop-in theme-scrollbar absolute max-h-64 overflow-y-auto rounded-none border py-1 backdrop-blur-lg"
             style="left: {pos.left}px; top: {pos.top}px; width: {pos.width}px; background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent); border-color: var(--theme-divider-border);"
             onclick={(e) => e.stopPropagation()}
+            out:popOut={outParams}
+            onoutroend={() => (pos = null)}
         >
-            {#each options as opt}
+            {#each options as opt (opt.value)}
                 <button
                     onclick={() => select(opt.value)}
                     type="button"

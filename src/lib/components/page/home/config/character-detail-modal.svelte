@@ -13,6 +13,7 @@
     } from '$lib/calc/calculation.store.svelte'
     import { computeCharStats, charElementColorOf, formatWeaponSubstat, type CharStats } from './character-detail-utils'
     import Modal from '$lib/components/layout/modal.svelte'
+    import Tabs from '$lib/components/ui/tabs.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import Icon from '@iconify/svelte'
     import { openHelp } from '$lib/data/help.svelte'
@@ -104,17 +105,29 @@
     const savedChain = $derived(conditionProfile.chains[activeTab] ?? 0)
     const savedRefine = $derived(conditionProfile.refinements[activeTab] ?? 1)
 
-    function pickChain(n: number) {
-        if (n === savedChain) return
-        setConditionProfileChains(activeTab, n)
-        persistTeamSlot(activeTab, { chain: n })
-        onProfileReload?.()
-    }
+    /** @desc 链/阶分段清单（`value` 为档位字符串，语义与改造前逐字一致：链 0-6 / 阶 0-5，0 阶显示「无专」） */
+    const chainItems = [0, 1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `${n}链` }))
+    const refineItems = [0, 1, 2, 3, 4, 5].map((n) => ({
+        value: String(n),
+        label: n === 0 ? '无专' : `${n}阶`,
+        title: n === 0 ? '无专武精炼（不触发专武精炼 buff）' : undefined
+    }))
 
-    function pickRefine(n: number) {
-        if (n === savedRefine) return
-        setConditionProfileRefinements(activeTab, n)
-        persistTeamSlot(activeTab, { refinement: n })
+    /**
+     * @desc 链/阶点选（`chain`=共鸣链走 chains+chain，否则精炼走 refinements+refinement）：
+     * 档位未变则不重复写入（避免无谓重载），写入后回写工程槽位并触发重载回调。
+     */
+    function pickProfile(kind: 'chain' | 'refine', value: string) {
+        const n = Number(value)
+        const prev = kind === 'chain' ? savedChain : savedRefine
+        if (n === prev) return
+        if (kind === 'chain') {
+            setConditionProfileChains(activeTab, n)
+            persistTeamSlot(activeTab, { chain: n })
+        } else {
+            setConditionProfileRefinements(activeTab, n)
+            persistTeamSlot(activeTab, { refinement: n })
+        }
         onProfileReload?.()
     }
 
@@ -178,7 +191,7 @@
     {/snippet}
 
     <div class="flex gap-2">
-        {#each [0, 1, 2] as i}
+        {#each [0, 1, 2] as i (i)}
             {@const name = team[i].character}
             <button
                 onclick={() => (activeTab = i)}
@@ -311,7 +324,26 @@
             </div>
         </div>
 
-        <!-- 链/阶配置：小按钮分组框（样式参考 设置-配色），框宽适应按钮；点选即写入档位并触发重载，点当前档位不重复写入 -->
+        <!-- 链/阶配置：小按钮分组框（样式参考 设置-配色）；点选即写入档位并触发重载，点当前档位不重复写入。
+             两组分段共用 `ui/tabs`（等宽分段 + 单一滑动指示块），选中强调色由 backgroundImage/textColor 传入，
+             指示块整块从旧档位滑到新档位。
+
+             为什么必须传 `min-w-[336px] whitespace-nowrap`（两个类缺一不可，改动前请先读这段）：
+             `ui/tabs` 的分段是 `flex: 1 1 0%` 且**不写** `whitespace-nowrap`，`min-width` 默认 `auto`，
+             而 CJK 可以逐字断行 —— 于是 `min-width:auto` 的 min-content 只有**一个字**，
+             宽标签既不会撑宽轨道、也不会溢出，而是**被折成两行**（`无专` 实测折成 2 行，段高 28 → 48px）。
+             实测（FangXinShu，14px，`px-3` 即左右各 12px）：
+               · `无专` = 两个汉字 = 28.0px；`1阶`…`5阶` = 23.05px
+               · 只传 `w-fit`：轨道被等分后每段内容盒 = 293.234/6 − 24 = 24.87px < 28px → `无专` 折行
+               · 只传 `w-fit whitespace-nowrap`：不折行了，但宽标签的 `min-width:auto` 变成 max-content（52px），
+                 `flex:1 1 0%` 分不到份额就**不再收缩** → 各段**不再等宽**（52 vs 47），指示块又对不齐（实测左差 4.14px）
+               · 只给定宽：`min-width:auto` 仍按「一个字」算，标签照折（`w-[340px]` 下链组 0链…6链 全部折 2 行）
+             故「等宽 + 不折行 + 指示块对齐」要求**每段内容盒 ≥ 最宽标签**，即
+               `车道内宽 / N ≥ 最宽标签 + 左右内边距` → `W − 4px ≥ N × (28 + 24)`
+               → 阶组（N=6）`W ≥ 6 × 52 + 4 = 316px`；链组（N=7）`W ≥ 7 × (23.05 + 24) + 4 ≈ 333.4px`
+             取两者较大值向上取整到 4 的倍数 → **336px**。实测该值下：各段高一律 28px（单行，文本 rect 数=1）、
+             各段宽全等、指示块与分段最差左差 0.02 / 0.08px、轨道距行右边界仍有 86px 余量。
+             ⚠️ 换字体、换文案或改 `ui/tabs` 的内边距/字号后必须按上式**重新推导**，否则会退回折行或错位。 -->
         <div
             data-sf="widget"
             data-sf-flat
@@ -320,52 +352,25 @@
         >
             <div class="flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">角色</span>
-                <div
-                    data-sf="widget"
-                    data-sf-flat
-                    class="flex w-fit gap-1 rounded-none border p-1"
-                    style="border-color: var(--theme-divider-border); --sf-base: var(--theme-card-bg);"
-                >
-                    {#each [0, 1, 2, 3, 4, 5, 6] as n}
-                        {@const active = savedChain === n}
-                        <button
-                            onclick={() => pickChain(n)}
-                            class="rounded-none px-2 py-1 text-[11px] font-black transition-colors {active
-                                ? ''
-                                : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
-                            style={active
-                                ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
-                                : ''}
-                        >
-                            {n}链
-                        </button>
-                    {/each}
-                </div>
+                <Tabs
+                    items={chainItems}
+                    value={String(savedChain)}
+                    onchange={(v) => pickProfile('chain', v)}
+                    backgroundImage="var(--theme-accent-bg)"
+                    textColor="var(--theme-accent-text-on-bg, #ffffff)"
+                    class="min-w-[336px] whitespace-nowrap"
+                />
             </div>
             <div class="mt-2 flex items-center gap-2">
                 <span class="w-8 shrink-0 text-[10px] text-(--theme-modal-text)/40">武器</span>
-                <div
-                    data-sf="widget"
-                    data-sf-flat
-                    class="flex w-fit gap-1 rounded-none border p-1"
-                    style="border-color: var(--theme-divider-border); --sf-base: var(--theme-card-bg);"
-                >
-                    {#each [0, 1, 2, 3, 4, 5] as n}
-                        {@const active = savedRefine === n}
-                        <button
-                            onclick={() => pickRefine(n)}
-                            class="rounded-none px-2 py-1 text-[11px] font-black transition-colors {active
-                                ? ''
-                                : 'text-(--theme-modal-text)/60 hover:text-(--theme-modal-text)'}"
-                            style={active
-                                ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);'
-                                : ''}
-                            title={n === 0 ? '无专武精炼（不触发专武精炼 buff）' : undefined}
-                        >
-                            {n === 0 ? '无专' : `${n}阶`}
-                        </button>
-                    {/each}
-                </div>
+                <Tabs
+                    items={refineItems}
+                    value={String(savedRefine)}
+                    onchange={(v) => pickProfile('refine', v)}
+                    backgroundImage="var(--theme-accent-bg)"
+                    textColor="var(--theme-accent-text-on-bg, #ffffff)"
+                    class="min-w-[336px] whitespace-nowrap"
+                />
                 <button
                     onclick={() => openHelp('链/阶生效条件说明', refineHelpItems)}
                     data-sf="widget"
@@ -444,7 +449,7 @@
             {#if hasBonus}
                 <div class="my-2 border-t" style="border-color: var(--theme-divider-border);"></div>
             {/if}
-            {#each ELEMENT_ORDER as el}
+            {#each ELEMENT_ORDER as el (el)}
                 {@const v = stat.elementDmg[el]}
                 {#if v && v > 0}
                     <div class="flex items-center justify-between">
@@ -453,7 +458,7 @@
                     </div>
                 {/if}
             {/each}
-            {#each TYPE_DMG_ORDER as dt}
+            {#each TYPE_DMG_ORDER as dt (dt)}
                 {@const type = dt.replace('伤害', '')}
                 {@const v = stat.typeDmg[type]}
                 {#if v && v > 0}

@@ -8,7 +8,7 @@ import {
     type ResponseWebSearchCallItem,
     type ResponsesItem
 } from './responses'
-import { buildTools, executeTool, summarizeToolOutput, type ToolContext } from './tools'
+import { availableTools, executeTool, summarizeToolOutput, type ToolContext } from './tools'
 import { getAiConfig } from './config.svelte'
 import { getGenPrefs, loadGenPrefs } from '$lib/data/ai-prefs.svelte'
 import { drainChanges, renderChangesForPrompt } from './change-queue.svelte'
@@ -49,6 +49,16 @@ export interface RunTurnOptions {
     context?: string
     onEvent?: (evt: SessionEvent) => void
     onConfirm?: ToolContext['onConfirm']
+    /**
+     * @desc 向用户交互式提问（问题组）。**只有内置 AI 助手会传它**；
+     *  WS 远程接管不传 → `ask_user` 既不上工具清单、直接调用也会被拒。
+     */
+    onAskUser?: ToolContext['askUser']
+    /**
+     * @desc 抓取网页正文（`web_fetch`）。**只有内置 AI 助手会传它**（经同源代理 `/api/ai/fetch`）；
+     *  WS 远程接管不传 → `web_fetch` 既不上工具清单、直接调用也会被拒。
+     */
+    onWebFetch?: ToolContext['webFetch']
     // AI 请求切换视图（由宿主实现）
     requestView?: (phase: string) => void
     // 修改计算态后通知宿主持久化
@@ -208,8 +218,8 @@ async function runResponsesRound(
 export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult> {
     const cfg = getAiConfig()
     const emit = options.onEvent ?? (() => {})
-    const tools = buildTools()
     const confirmHandler = options.onConfirm
+    const askHandler = options.onAskUser
     const toolContext: ToolContext = {
         // 危险操作确认期间属于「等待工具结果」
         onConfirm: confirmHandler
@@ -222,14 +232,29 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
                   }
               }
             : undefined,
+        // 交互式提问期间同样属于「等待工具结果」（面板会显示「等待用户回答」）
+        askUser: askHandler
+            ? async (request) => {
+                  markToolWaiting('等待用户回答', 'ask_user')
+                  try {
+                      return await askHandler(request)
+                  } finally {
+                      setTurnPhase('tool', { toolName: 'ask_user' })
+                  }
+              }
+            : undefined,
         requestView: options.requestView,
         notifyCalc: options.onCalcUpdate,
+        // 抓取网页：宿主直连（同源代理内部已做 SSRF 校验），不需要额外的阶段包装
+        webFetch: options.onWebFetch,
         // 长任务进度：仍是等待工具结果
         onGenerateProgress: (text) => {
             markToolWaiting(text || '生成中…')
             options.onGenerateProgress?.(text)
         }
     }
+    // 工具清单按**宿主能力**过滤：缺 askUser / webFetch 时对应工具不出现在清单里（WS 远程接管即此情形）
+    const tools = availableTools(toolContext)
 
     if (!cfg.apiKey.trim()) {
         emit({ type: 'error', message: '请先在 设置 → 助手设置 中填写 API Key' })

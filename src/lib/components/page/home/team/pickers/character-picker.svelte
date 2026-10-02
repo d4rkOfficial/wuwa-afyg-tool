@@ -4,6 +4,12 @@
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { ELEMENT_ORDER } from '$lib/consts/game-terms'
+    import EmptyState from '$lib/components/ui/empty-state.svelte'
+    import Modal from '$lib/components/layout/modal.svelte'
+    import PickerSearch from './picker-search.svelte'
+    import PickerFooter from './picker-footer.svelte'
+    import { mergeClass } from '$lib/utils/component-style'
+    import { pickerCardClass } from '$lib/utils/picker-card-class'
 
     interface GroupData {
         rover: Character[]
@@ -87,74 +93,83 @@
     function isSelected(c: Character): boolean {
         return localSelected?.name === c.name
     }
-
-    function itemClass(c: Character): string {
-        const base =
-            'flex w-[100px] flex-col items-center gap-1.5 rounded-none border border-(--theme-divider-border) p-3 transition-colors cursor-pointer'
-        if (isSelected(c)) {
-            return (
-                base +
-                ' border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_10%,var(--theme-input-bg))]'
-            )
-        }
-        return (
-            base +
-            ' hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_6%,var(--theme-input-bg))]'
-        )
-    }
 </script>
 
-{#if open}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
-        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
-        onkeydown={(e) => {
-            if (e.key === 'Escape') onclose()
-        }}
-    >
-        <div
-            data-sf="modal"
-            class="animate-pop-in relative flex max-h-[75vh] min-h-[50vh] w-170 max-w-[90vw] flex-col rounded-none text-(--theme-modal-text) shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-        >
-            <div
-                class="flex items-center gap-2 border-b px-4 pb-2.5 pt-3"
-                style="border-color: var(--theme-divider-border)"
-            >
-                <Icon icon="mdi:magnify" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
-                <input
-                    bind:value={query}
-                    placeholder="搜索角色..."
-                    class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
-                />
-                {#if query}
-                    <button
-                        onclick={() => (query = '')}
-                        data-sf="widget"
-                        data-sf-flat
-                        class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
-                        style="--sf-base: var(--theme-input-bg)"
-                        aria-label="Clear search"
-                    >
-                        <Icon icon="mdi:close" class="size-4" />
-                    </button>
-                {/if}
-            </div>
+<Modal {open} {onclose} class={mergeClass(['w-170 max-w-[90vw] min-h-[50vh]', className])} style={styleProp}>
+    {#snippet title()}
+        <PickerSearch bind:value={query} placeholder="搜索角色..." />
+    {/snippet}
 
-            <div class="flex flex-1 overflow-hidden">
-                <!-- Content area (left) -->
-                <div class="theme-scrollbar flex-1 overflow-y-auto p-4">
-                    {#if showSearchResults}
-                        {#if searchResults.length === 0}
-                            <div class="py-12 text-center text-xs text-(--theme-modal-text)/40">无匹配角色</div>
-                        {:else}
+    <div class="flex h-full min-h-0 overflow-hidden">
+        <!-- Content area (left) -->
+        <div class="theme-scrollbar flex-1 overflow-y-auto p-4">
+            {#if showSearchResults}
+                {#if searchResults.length === 0}
+                    <EmptyState size="lg">无匹配角色</EmptyState>
+                {:else}
+                    <div class="flex flex-wrap gap-2">
+                        {#each searchResults as c (c.name)}
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <div
+                                data-press=""
+                                onclick={() => toggleSelect(c)}
+                                onkeydown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault()
+                                        toggleSelect(c)
+                                    }
+                                }}
+                                role="button"
+                                tabindex="0"
+                                data-sf="widget"
+                                data-sf-flat
+                                style="--sf-base: var(--theme-input-bg)"
+                                class={pickerCardClass(isSelected(c), 'w-[100px]')}
+                            >
+                                <div class="size-14 overflow-hidden rounded-full bg-(--theme-modal-text)/10">
+                                    {#if icons[c.name]}
+                                        <img
+                                            src={icons[c.name]}
+                                            alt={c.name}
+                                            use:fallbackIcon={'/icons/placeholder-character.svg'}
+                                            class="size-full object-cover"
+                                        />
+                                    {:else}
+                                        <div
+                                            class="flex size-full items-center justify-center text-xs text-(--theme-modal-text)/40"
+                                        >
+                                            {c.name.charAt(0)}
+                                        </div>
+                                    {/if}
+                                </div>
+                                <span class="truncate text-[11px] font-black leading-tight text-(--theme-modal-text)"
+                                    >{c.name}</span
+                                >
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            {:else}
+                {#each ELEMENT_ORDER as el (el)}
+                    {@const group = groupedCharacters.get(el)}
+                    {#if group && (group.rover.length > 0 || group.fiveStar.length > 0 || group.fourStar.length > 0)}
+                        <div bind:this={groupRefs[el]} class="mb-4">
+                            <div
+                                class="mb-2 flex items-center gap-1.5 border-t pt-3 text-xs font-black tracking-tight text-(--theme-modal-text)/80"
+                                style="border-color: var(--theme-divider-border);"
+                            >
+                                {#if elementIcons[el]}
+                                    <img src={elementIcons[el]} alt={el} class="size-4 object-contain" />
+                                {/if}
+                                {el}
+                            </div>
                             <div class="flex flex-wrap gap-2">
-                                {#each searchResults as c}
+                                {#each ([] as Character[]).concat(group.rover, group.fiveStar, group.fourStar) as c (c.name)}
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <div
+                                        data-press=""
                                         onclick={() => toggleSelect(c)}
                                         onkeydown={(e) => {
                                             if (e.key === 'Enter' || e.key === ' ') {
@@ -167,7 +182,7 @@
                                         data-sf="widget"
                                         data-sf-flat
                                         style="--sf-base: var(--theme-input-bg)"
-                                        class={itemClass(c)}
+                                        class={pickerCardClass(isSelected(c), 'w-[100px]')}
                                     >
                                         <div class="size-14 overflow-hidden rounded-full bg-(--theme-modal-text)/10">
                                             {#if icons[c.name]}
@@ -192,107 +207,39 @@
                                     </div>
                                 {/each}
                             </div>
-                        {/if}
-                    {:else}
-                        {#each ELEMENT_ORDER as el}
-                            {@const group = groupedCharacters.get(el)}
-                            {#if group && (group.rover.length > 0 || group.fiveStar.length > 0 || group.fourStar.length > 0)}
-                                <div bind:this={groupRefs[el]} class="mb-4">
-                                    <div
-                                        class="mb-2 flex items-center gap-1.5 border-t pt-3 text-xs font-black tracking-tight text-(--theme-modal-text)/80"
-                                        style="border-color: var(--theme-divider-border);"
-                                    >
-                                        {#if elementIcons[el]}
-                                            <img src={elementIcons[el]} alt={el} class="size-4 object-contain" />
-                                        {/if}
-                                        {el}
-                                    </div>
-                                    <div class="flex flex-wrap gap-2">
-                                        {#each ([] as Character[]).concat(group.rover, group.fiveStar, group.fourStar) as c}
-                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                            <div
-                                                onclick={() => toggleSelect(c)}
-                                                onkeydown={(e) => {
-                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                        e.preventDefault()
-                                                        toggleSelect(c)
-                                                    }
-                                                }}
-                                                role="button"
-                                                tabindex="0"
-                                                data-sf="widget"
-                                                data-sf-flat
-                                                style="--sf-base: var(--theme-input-bg)"
-                                                class={itemClass(c)}
-                                            >
-                                                <div
-                                                    class="size-14 overflow-hidden rounded-full bg-(--theme-modal-text)/10"
-                                                >
-                                                    {#if icons[c.name]}
-                                                        <img
-                                                            src={icons[c.name]}
-                                                            alt={c.name}
-                                                            use:fallbackIcon={'/icons/placeholder-character.svg'}
-                                                            class="size-full object-cover"
-                                                        />
-                                                    {:else}
-                                                        <div
-                                                            class="flex size-full items-center justify-center text-xs text-(--theme-modal-text)/40"
-                                                        >
-                                                            {c.name.charAt(0)}
-                                                        </div>
-                                                    {/if}
-                                                </div>
-                                                <span
-                                                    class="truncate text-[11px] font-black leading-tight text-(--theme-modal-text)"
-                                                    >{c.name}</span
-                                                >
-                                            </div>
-                                        {/each}
-                                    </div>
-                                </div>
-                            {/if}
-                        {/each}
+                        </div>
                     {/if}
-                </div>
-
-                <!-- Element nav sidebar (right) -->
-                {#if !showSearchResults}
-                    <div
-                        class="flex w-10 shrink-0 flex-col items-center gap-2 border-l py-3"
-                        style="border-color: var(--theme-divider-border)"
-                    >
-                        {#each ELEMENT_ORDER as el}
-                            <button
-                                onclick={() => scrollToElement(el)}
-                                data-sf="widget"
-                                data-sf-flat
-                                class="flex size-7 items-center justify-center rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-(--theme-modal-text)"
-                                style="--sf-base: var(--theme-input-bg)"
-                                title={el}
-                            >
-                                {#if elementIcons[el]}
-                                    <img src={elementIcons[el]} alt={el} class="size-full object-contain" />
-                                {:else}
-                                    <Icon icon="mdi:circle" class="size-3.5" />
-                                {/if}
-                            </button>
-                        {/each}
-                    </div>
-                {/if}
-            </div>
-
-            <div class="flex justify-end border-t px-4 py-2.5" style="border-color: var(--theme-divider-border)">
-                <button
-                    onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-xs font-black tracking-tight transition-all hover:brightness-125"
-                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
-                >
-                    <Icon icon="mdi:check" class="size-4" />
-                    确认
-                </button>
-            </div>
+                {/each}
+            {/if}
         </div>
+
+        <!-- Element nav sidebar (right) -->
+        {#if !showSearchResults}
+            <div
+                class="flex w-10 shrink-0 flex-col items-center gap-2 border-l py-3"
+                style="border-color: var(--theme-divider-border)"
+            >
+                {#each ELEMENT_ORDER as el (el)}
+                    <button
+                        onclick={() => scrollToElement(el)}
+                        data-sf="widget"
+                        data-sf-flat
+                        class="flex size-7 items-center justify-center rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-(--theme-modal-text)"
+                        style="--sf-base: var(--theme-input-bg)"
+                        title={el}
+                    >
+                        {#if elementIcons[el]}
+                            <img src={elementIcons[el]} alt={el} class="size-full object-contain" />
+                        {:else}
+                            <Icon icon="mdi:circle" class="size-3.5" />
+                        {/if}
+                    </button>
+                {/each}
+            </div>
+        {/if}
     </div>
-{/if}
+
+    {#snippet footer()}
+        <PickerFooter onconfirm={handleConfirm} />
+    {/snippet}
+</Modal>

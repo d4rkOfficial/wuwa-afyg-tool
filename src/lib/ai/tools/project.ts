@@ -99,7 +99,10 @@ defineTool('rename_project', {
     description: '重命名指定工程。',
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' }, name: { type: 'string' } },
+        properties: {
+            id: { type: 'string', description: '工程 id（用 list_projects 获取）' },
+            name: { type: 'string', description: '新名称' }
+        },
         required: ['id', 'name']
     },
     handler: async (args) => {
@@ -131,7 +134,7 @@ defineTool('archive_project', {
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' } },
+        properties: { id: { type: 'string', description: '工程 id（用 list_projects 获取）' } },
         required: ['id']
     },
     handler: async (args) => {
@@ -146,7 +149,7 @@ defineTool('unarchive_project', {
     description: '将已归档工程恢复显示。',
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' } },
+        properties: { id: { type: 'string', description: '要恢复的已归档工程 id' } },
         required: ['id']
     },
     handler: async (args) => {
@@ -162,7 +165,7 @@ defineTool('delete_project', {
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' } },
+        properties: { id: { type: 'string', description: '要永久删除的工程 id' } },
         required: ['id']
     },
     handler: async (args) => {
@@ -177,7 +180,10 @@ defineTool('clone_project', {
     description: '克隆指定工程（全部环节）为新工程，新工程名可指定。',
     parameters: {
         type: 'object',
-        properties: { id: { type: 'string' }, newName: { type: 'string' } },
+        properties: {
+            id: { type: 'string', description: '要克隆的源工程 id' },
+            newName: { type: 'string', description: '新工程名称' }
+        },
         required: ['id', 'newName']
     },
     handler: async (args) => {
@@ -194,7 +200,9 @@ defineTool('lock_phase', {
     description: '锁定当前活动工程的指定环节（team/timeline/calculation/config）。',
     parameters: {
         type: 'object',
-        properties: { phase: { type: 'string', enum: phaseKeys } },
+        properties: {
+            phase: { type: 'string', enum: phaseKeys, description: '要锁定的环节（锁后其内容不可修改）' }
+        },
         required: ['phase']
     },
     handler: async (args) => {
@@ -208,7 +216,9 @@ defineTool('unlock_phase', {
     description: '解锁当前活动工程的指定环节及后续所有环节。',
     parameters: {
         type: 'object',
-        properties: { phase: { type: 'string', enum: phaseKeys } },
+        properties: {
+            phase: { type: 'string', enum: phaseKeys, description: '要解锁的环节（其后的环节会一并解锁）' }
+        },
         required: ['phase']
     },
     handler: async (args) => {

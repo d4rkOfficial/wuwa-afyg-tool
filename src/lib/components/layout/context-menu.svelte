@@ -1,6 +1,9 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
+    import { fade } from 'svelte/transition'
     import type { ComponentsProps } from '$lib/types'
+    import { mergeClass, mergeComponentsStyle } from '$lib/utils/component-style'
+    import { MOTION_MS, slideParams } from '$lib/utils/motion'
 
     interface MenuItem {
         label: string
@@ -19,15 +22,7 @@
 
     let { x, y, items, open, onclose, backgroundImage, textColor, class: className, style: styleProp }: Props = $props()
 
-    let mergedStyle = $derived(
-        [
-            backgroundImage ? `background: ${backgroundImage}` : '',
-            textColor ? `color: ${textColor}` : '',
-            styleProp || ''
-        ]
-            .filter(Boolean)
-            .join(';')
-    )
+    let mergedStyle = $derived(mergeComponentsStyle({ backgroundImage, textColor, style: styleProp }))
 
     function handleItemClick(item: MenuItem) {
         item.action()
@@ -49,24 +44,31 @@
 </script>
 
 {#if open}
+    <!-- @desc 退场动效：挂在遮罩这一层而不是里面那块菜单面板上——面板负责进场（`animate-pop-in`），
+         同一节点再挂过渡就会与它叠成双重动画；本层没有 animate-* 类，淡出它即连菜单一起淡出
+         （opacity 分组作用于整棵子树）。时长取 --motion-fast 档：浮层菜单要短促，与 modal 外壳
+         130ms 的退场同感；减弱动态效果由 slideParams 压到 1ms。 -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="fixed inset-0 z-50" onclick={onclose} oncontextmenu={(e) => e.preventDefault()}>
+    <div
+        class="fixed inset-0 z-(--z-modal)"
+        onclick={onclose}
+        oncontextmenu={(e) => e.preventDefault()}
+        out:fade={slideParams(MOTION_MS.fast)}
+    >
         <div
-            class={[
+            class={mergeClass([
                 'animate-pop-in theme-glass-surface absolute min-w-36 rounded-none border border-(--theme-divider-border) py-1',
                 'bg-(--theme-context-menu-bg) text-(--theme-context-menu-text)',
                 className || ''
-            ]
-                .filter(Boolean)
-                .join(' ')}
+            ])}
             bind:this={menuEl}
             style="left: {x}px; top: {y}px; {mergedStyle}"
             onclick={(e) => e.stopPropagation()}
             role="menu"
             tabindex="-1"
         >
-            {#each items as item}
+            {#each items as item (item.label)}
                 <button
                     role="menuitem"
                     disabled={item.disabled}

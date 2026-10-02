@@ -5,6 +5,7 @@
      */
     import Icon from '@iconify/svelte'
     import { fade, slide } from 'svelte/transition'
+    import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import { DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
@@ -189,7 +190,8 @@
     <div class="flex flex-col gap-3">
         {#if helpOpen}
             <section
-                in:slide={{ duration: 160 }}
+                in:slide={slideParams(MOTION_MS.base)}
+                out:slide={slideParams(MOTION_MS.base)}
                 class="shrink-0 space-y-1.5 rounded-none border px-3 py-2.5 text-xs leading-relaxed"
                 style="border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent); color: var(--theme-modal-text)/85;"
             >
@@ -239,7 +241,8 @@
                             sameNameIds.every((id) => isSameTypeSet(effectiveTypesOf(entry.id), effectiveTypesOf(id)))}
                         {@const editable = isEditable(entry)}
                         <div
-                            in:fade={{ duration: 100 }}
+                            in:fade={slideParams(MOTION_MS.fast)}
+                            out:fade={slideParams(MOTION_MS.fast)}
                             class="flex items-center gap-3 rounded-none border px-2 py-1.5 transition-colors hover:border-(--theme-accent-bg)"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         >

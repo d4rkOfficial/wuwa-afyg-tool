@@ -1,8 +1,13 @@
 <script lang="ts">
     import type { Weapon } from '$lib/api/types'
     import type { ComponentsProps } from '$lib/types'
-    import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
+    import EmptyState from '$lib/components/ui/empty-state.svelte'
+    import Modal from '$lib/components/layout/modal.svelte'
+    import PickerSearch from './picker-search.svelte'
+    import PickerFooter from './picker-footer.svelte'
+    import { mergeClass } from '$lib/utils/component-style'
+    import { pickerCardClass } from '$lib/utils/picker-card-class'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -57,180 +62,116 @@
     function isSelected(w: Weapon): boolean {
         return localSelected?.name === w.name
     }
-
-    function itemClass(w: Weapon): string {
-        const base =
-            'flex w-[110px] flex-col items-center gap-1.5 rounded-none border border-(--theme-divider-border) p-3 transition-colors cursor-pointer'
-        if (isSelected(w)) {
-            return (
-                base +
-                ' border-(--theme-accent-bg) bg-[color-mix(in_srgb,var(--theme-accent-bg)_10%,var(--theme-input-bg))]'
-            )
-        }
-        return (
-            base +
-            ' hover:border-(--theme-accent-bg) hover:bg-[color-mix(in_srgb,var(--theme-modal-text)_6%,var(--theme-input-bg))]'
-        )
-    }
 </script>
 
-{#if open}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-        style="background: var(--theme-overlay-bg, rgba(0,0,0,0.5)); {styleProp || ''}"
-        class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm {className}"
-        onkeydown={(e) => {
-            if (e.key === 'Escape') onclose()
-        }}
-    >
-        <div
-            data-sf="modal"
-            class="animate-pop-in relative flex max-h-[70vh] min-h-[40vh] w-160 max-w-[90vw] flex-col rounded-none text-(--theme-modal-text) shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-        >
-            <div
-                class="flex items-center gap-2 border-b px-4 pb-2.5 pt-3"
-                style="border-color: var(--theme-divider-border)"
-            >
-                <Icon icon="mdi:magnify" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
-                <input
-                    bind:value={query}
-                    placeholder="搜索武器..."
-                    class="min-w-0 flex-1 bg-transparent text-sm outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30"
-                />
-                {#if query}
-                    <button
-                        onclick={() => (query = '')}
+<Modal {open} {onclose} class={mergeClass(['w-160 max-w-[90vw] min-h-[40vh]', className])} style={styleProp}>
+    {#snippet title()}
+        <PickerSearch bind:value={query} placeholder="搜索武器..." />
+    {/snippet}
+    {#if query}
+        {#if filtered.length === 0}
+            <EmptyState size="lg">无匹配武器</EmptyState>
+        {:else}
+            <div class="flex flex-wrap gap-2">
+                {#each filtered as w (w.name)}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <div
+                        data-press=""
+                        onclick={() => toggleSelect(w)}
+                        onkeydown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                toggleSelect(w)
+                            }
+                        }}
+                        role="button"
+                        tabindex="0"
                         data-sf="widget"
                         data-sf-flat
-                        class="rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70"
                         style="--sf-base: var(--theme-input-bg)"
-                        aria-label="Clear search"
+                        class={pickerCardClass(isSelected(w), 'w-[110px]')}
                     >
-                        <Icon icon="mdi:close" class="size-4" />
-                    </button>
-                {/if}
-            </div>
-
-            <div class="theme-scrollbar flex-1 overflow-y-auto p-4">
-                {#if query}
-                    {#if filtered.length === 0}
-                        <div class="py-12 text-center text-xs text-(--theme-modal-text)/40">无匹配武器</div>
-                    {:else}
-                        <div class="flex flex-wrap gap-2">
-                            {#each filtered as w}
-                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <div class="size-14 overflow-hidden rounded-none bg-(--theme-modal-text)/10 p-1">
+                            {#if icons[w.name]}
+                                <img
+                                    src={icons[w.name]}
+                                    alt={w.name}
+                                    use:fallbackIcon={'/icons/placeholder-weapon.svg'}
+                                    class="size-full object-contain"
+                                />
+                            {:else}
                                 <div
-                                    onclick={() => toggleSelect(w)}
-                                    onkeydown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault()
-                                            toggleSelect(w)
-                                        }
-                                    }}
-                                    role="button"
-                                    tabindex="0"
-                                    data-sf="widget"
-                                    data-sf-flat
-                                    style="--sf-base: var(--theme-input-bg)"
-                                    class={itemClass(w)}
+                                    class="flex size-full items-center justify-center text-xs text-(--theme-modal-text)/40"
                                 >
-                                    <div class="size-14 overflow-hidden rounded-none bg-(--theme-modal-text)/10 p-1">
-                                        {#if icons[w.name]}
-                                            <img
-                                                src={icons[w.name]}
-                                                alt={w.name}
-                                                use:fallbackIcon={'/icons/placeholder-weapon.svg'}
-                                                class="size-full object-contain"
-                                            />
-                                        {:else}
-                                            <div
-                                                class="flex size-full items-center justify-center text-xs text-(--theme-modal-text)/40"
-                                            >
-                                                {w.name.charAt(0)}
-                                            </div>
-                                        {/if}
-                                    </div>
-                                    <span
-                                        class="truncate text-[11px] font-black leading-tight text-(--theme-modal-text)"
-                                        >{w.name}</span
-                                    >
-                                    <span class="text-[10px] font-black text-amber-600">{'★'.repeat(w.star)}</span>
+                                    {w.name.charAt(0)}
                                 </div>
-                            {/each}
+                            {/if}
                         </div>
-                    {/if}
-                {:else}
-                    {#each groupedByStar as [star, list]}
-                        <div class="mb-4">
-                            <div
-                                class="mb-2 flex items-center gap-1.5 border-t pt-3 text-xs font-black tracking-tight text-(--theme-modal-text)/80"
-                                style="border-color: var(--theme-divider-border);"
-                            >
-                                {star}★
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                {#each list as w}
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <span class="truncate text-[11px] font-black leading-tight text-(--theme-modal-text)"
+                            >{w.name}</span
+                        >
+                        <span class="text-[10px] font-black text-amber-600">{'★'.repeat(w.star)}</span>
+                    </div>
+                {/each}
+            </div>
+        {/if}
+    {:else}
+        {#each groupedByStar as [star, list] (star)}
+            <div class="mb-4">
+                <div
+                    class="mb-2 flex items-center gap-1.5 border-t pt-3 text-xs font-black tracking-tight text-(--theme-modal-text)/80"
+                    style="border-color: var(--theme-divider-border);"
+                >
+                    {star}★
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    {#each list as w (w.name)}
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <div
+                            data-press=""
+                            onclick={() => toggleSelect(w)}
+                            onkeydown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    toggleSelect(w)
+                                }
+                            }}
+                            role="button"
+                            tabindex="0"
+                            data-sf="widget"
+                            data-sf-flat
+                            style="--sf-base: var(--theme-input-bg)"
+                            class={pickerCardClass(isSelected(w), 'w-[110px]')}
+                        >
+                            <div class="size-14 overflow-hidden rounded-none bg-(--theme-modal-text)/10 p-1">
+                                {#if icons[w.name]}
+                                    <img
+                                        src={icons[w.name]}
+                                        alt={w.name}
+                                        use:fallbackIcon={'/icons/placeholder-weapon.svg'}
+                                        class="size-full object-contain"
+                                    />
+                                {:else}
                                     <div
-                                        onclick={() => toggleSelect(w)}
-                                        onkeydown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault()
-                                                toggleSelect(w)
-                                            }
-                                        }}
-                                        role="button"
-                                        tabindex="0"
-                                        data-sf="widget"
-                                        data-sf-flat
-                                        style="--sf-base: var(--theme-input-bg)"
-                                        class={itemClass(w)}
+                                        class="flex size-full items-center justify-center text-xs text-(--theme-modal-text)/40"
                                     >
-                                        <div
-                                            class="size-14 overflow-hidden rounded-none bg-(--theme-modal-text)/10 p-1"
-                                        >
-                                            {#if icons[w.name]}
-                                                <img
-                                                    src={icons[w.name]}
-                                                    alt={w.name}
-                                                    use:fallbackIcon={'/icons/placeholder-weapon.svg'}
-                                                    class="size-full object-contain"
-                                                />
-                                            {:else}
-                                                <div
-                                                    class="flex size-full items-center justify-center text-xs text-(--theme-modal-text)/40"
-                                                >
-                                                    {w.name.charAt(0)}
-                                                </div>
-                                            {/if}
-                                        </div>
-                                        <span
-                                            class="truncate text-[11px] font-black leading-tight text-(--theme-modal-text)"
-                                            >{w.name}</span
-                                        >
-                                        <span class="text-[10px] font-black text-amber-600">{'★'.repeat(w.star)}</span>
+                                        {w.name.charAt(0)}
                                     </div>
-                                {/each}
+                                {/if}
                             </div>
+                            <span class="truncate text-[11px] font-black leading-tight text-(--theme-modal-text)"
+                                >{w.name}</span
+                            >
+                            <span class="text-[10px] font-black text-amber-600">{'★'.repeat(w.star)}</span>
                         </div>
                     {/each}
-                {/if}
+                </div>
             </div>
-
-            <div class="flex justify-end border-t px-4 py-2.5" style="border-color: var(--theme-divider-border)">
-                <button
-                    onclick={handleConfirm}
-                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-xs font-black tracking-tight transition-all hover:brightness-125"
-                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
-                >
-                    <Icon icon="mdi:check" class="size-4" />
-                    确认
-                </button>
-            </div>
-        </div>
-    </div>
-{/if}
+        {/each}
+    {/if}
+    {#snippet footer()}
+        <PickerFooter onconfirm={handleConfirm} />
+    {/snippet}
+</Modal>

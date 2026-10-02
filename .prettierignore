@@ -7,3 +7,14 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# 构建 / 部署产物
+# `.vercel/output/functions/![-]/catchall.func/...` 在 OS 层被 ACL 拒绝（EPERM）。
+# 注意：**这里忽略没用** —— `prettier --write .` 是先展开目录再套 ignore，
+# 展开阶段就会 `Unable to expand directory "."` 直接失败（实测 EPERM）。
+# 真正的修复在 `package.json`：format/lint 改成显式路径
+# （`src` `docs` `scripts` + 根级文件），绕开对 `.` 的递归展开。
+# 下面几条是给「显式路径误指到产物目录」时的兜底。
+.vercel/
+.svelte-kit/
+build/

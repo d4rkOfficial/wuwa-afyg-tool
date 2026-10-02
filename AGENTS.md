@@ -6,6 +6,9 @@
 - 优先使用箭头函数（`const fn = () => { ... }`），非 `function` 声明
     - 例外：事件处理函数（`onWindowMouseDown` 等）、SvelteKit 要求的 `load`/`actions` 函数可以保留 `function` 声明
 - 优先flex布局
+- **CSS 注释里不要写 glob、不要出现 `*/`**：`**/*.svelte` 里的 `*/` 会**提前终止注释**，后半段变成 CSS 垃圾 token；
+  prettier 只按自己的格式重排（不报错），`check-scrollbar`/`check-components` 等静态检查器也全都看不见（实测踩过：
+  `layout.css` 从 700 行被"格式化"到 773 行）。改完 CSS 后建议用浏览器把整文件解析回来核对规则条数。
 - 后端注释使用/** @desc [markdown] */形式，前端则不用遵守
 
 ## 2. 页面逻辑分离
@@ -23,11 +26,39 @@
 - 大的布局结构 → 独立组件
 - 所有独立组件的 props 必须使用 `interface Props extends ComponentsProps {}` 声明（`ComponentsProps` 在 `$lib/types`）
 - 所有独立组件必须暴露 `style` 和 `class` prop，支持外部定制，参考`src/lib/types/component-props.ts`
+    - **例外：store 驱动单例**。全局只实例化一次、可见性与位置全部来自 store、调用处一律不传 props 的组件（如 `MagneticPointer`、`EnemyPanel`、`timeline-menus`、`SkillPicker`、`NonDirectPicker`、`DamageList`），加 `class`/`style` 只会造出无人使用的死 API，故豁免。新增豁免须在 `scripts/check-components.mjs` 的 `EXEMPT.noProps` 登记并注明理由
+- 事件 handler prop 的命名约定（实测：单词型全小写 98 处 vs camelCase 23 处）：
+    - **单词 → 全小写**：`onclose`、`onchange`、`onpick`、`onsaved`、`refresh`→`onrefresh`
+    - **多词 → camelCase**：`onCreateBuff`、`onCharDetail`、`onToggleSidebarWidth`
+    - 即 `onclose` ✅ / `onClose` ❌、`onCreateBuff` ✅ / `oncreatebuff` ❌
+    - 注：`src/lib/ai/**` 的 `RunTurnOptions` / `ToolContext`（`onEvent`/`onMessages`/`onConfirm`）是对齐 AI 会话接口的独立命名，不属组件 prop 约定
 - 尽量使用 TailwindCSS 而不是 `<style>` 样式
 - 不依赖外部 UI 库，所有控件使用原生 HTML + TailwindCSS 实现
     - 允许的例外：`@iconify/svelte`（图标渲染）
-- Snippet 通过闭包访问父作用域的响应式状态（`$state`/`$derived`），避免使用带类型的 snippet 参数
-- 主题托管在 `$lib/theme`，通过 CSS 自定义属性（`--theme-{key}-{prop}`）驱动；组件中使用 `bg-[var(--theme-{key}-bg)]` / `text-[var(--theme-{key}-text)]`，不要直接 import theme store
+- Snippet 通过闭包访问**父作用域已有的**响应式状态（`$state`/`$derived`），不要为了省事把它们当参数传进去
+    - **按循环项传入的参数是必要的，不在此列**：如 `{#snippet buffRow(child, parentKey, rowPad)}` 被 12 处用不同实参渲染，改成闭包只能把 snippet 复制到每个调用点（更差）。实测现有 13 个带类型参数的 snippet 全属此类，属正确写法
+- 主题托管在 `$lib/theme`，通过 CSS 自定义属性（`--theme-{key}-{prop}`）驱动；组件中使用 Tailwind v4 简写形式 `bg-(--theme-{key}-bg)` / `text-(--theme-{key}-text)`，不要直接 import theme store
+    - 注意**不要**写 `bg-[var(--theme-{key}-bg)]`：实测全项目 `(--theme-*)` 简写 3512 处、方括号形式仅 4 处，简写是既定约定
+- 区域质感由 `data-sf` 驱动，不要手写表面底色/毛玻璃。给元素加 `data-sf="<key>"` 即在「设置-外观主题-背景质感」中可调：
+    - `key` ∈ `card` / `modal` / `sidebar` / `content` / `toolbar` / `widget`（`SurfaceKey`，见 `$lib/theme/types`）
+    - 叠加 `data-sf-flat` = 只取该区域底色、不做毛玻璃（用于大量逐行/逐格元素，避免每个元素重算一次背景模糊）
+    - 叠加 `data-sf-under="<key>"` = 在本区域底色之下再垫一层其它区域底色
+    - 需要指定基色时用内联 `style="--sf-base: var(--theme-xxx-bg)"` 覆盖
+    - 规则与变量发射见 `src/routes/layout.css` 的 `[data-sf]` 段与 `theme.svelte.ts`；`pnpm run check:surfaces` 会校验取值合法性
+- 优先复用 `src/lib/components/ui/` 的既有元件，不要手搓。新增重复控件前先检查该目录；`ui/` 缺失的元件应补在 `ui/` 而不是就地内联
+- `class` / `style` 的合并统一走 `$lib/utils/component-style.ts`，不要各组件重写派生块：
+    - 主题配色三件套 → `mergeComponentsStyle({ backgroundImage, textColor, style: styleProp })`
+    - 需要自定义片段（如头像的 `background-image`）→ `joinStyle([...])`
+    - 类名片段 → `mergeClass([...])`
+    - 该文件在 `utils/` 下，与 `types/component-props.ts`（`ComponentsProps` 类型定义）**不是同一个文件**，勿混
+
+- 弹窗一律用 `layout/modal.svelte`（唯一实现），不要手写 backdrop / `fixed inset-0` / Escape / 焦点陷阱 / 背景滚动锁定；层级用 `layer`（`modal` / `nested` / `deep` → `--z-*` token），不要写裸 `z-\d+`
+    - `class` / `style` 落在**面板**上（不是 backdrop）。外壳提供毛玻璃底、内边距、圆角、阴影、进出场动画、关闭按钮与标题行样式；**内容驱动的尺寸上限**（如宽表格的 `max-w-2xl`）经 `class` 透传
+    - 标题用 `{#snippet title()}`（只传图标 + 文案，样式交给外壳）；底部操作栏用 `{#snippet footer()}`
+    - 宿主自行处理 Esc 时传 `escapable={false}`（如时间轴上「Esc = 保存并关闭」）；需要拦住宿主页面级快捷键（Ctrl+Z / Delete）时传 `blockPageShortcuts`
+    - 外壳在**自己**处理 Esc 时会 `stopPropagation()`，避免同一次 Esc 又被页面级 `window` 监听当成一次「保存并关闭」
+    - `scripts/check-components.mjs` ③ 已清零为**硬闸门**：新增手搓 backdrop 立即失败（检测同时覆盖 `class="…"` 与 `class={…}` 两种写法）
+- z-index 只用 `layout.css` 中的 `--z-*` token 阶梯
 
 ## 4. 文件组织
 
@@ -47,10 +78,50 @@
 
 无需运行 test。
 
+> **环境说明（本机既有，无法修复）**：`.vercel\output\functions\![-]\catchall.func\...` 在 OS 层被 ACL 拒绝（EPERM），
+> 本机用户亦无权限删除它。应对方式已固化，**不要**为绕开它去改部署配置：
+>
+> - `pnpm run format` / `pnpm run lint` 已改成**显式路径**（`"src" "docs" "scripts" "*.{js,mjs,cjs,ts,json,md}"`）。
+>   根因：`prettier .` 会**先递归展开目录再套 ignore**，展开阶段就 `Unable to expand directory "."` 失败 ——
+>   `.prettierignore` 里加 `.vercel/` **实测无效**。故**不要**把脚本改回 `prettier .`。
+> - `pnpm run build` 在仓库根**必然失败**（adapter-vercel 的 `rimraf` 打不进被拒目录）。
+>   构建验收改用 `.tmp/build-verify.ps1`：复制源码到无 `.vercel` 的隔离副本、junction 复用 `node_modules`、
+>   构建后核对依赖文件数并对**产物 CSS** 做探针复核（专职抓「写了个不生成 CSS 的类名」这类静态检查器盲区）。
+>   它已实测通过（`adapter-vercel ✔ done`、PWA precache 119、`node_modules` 17779 → 17779）。
+> - **测试文件在 import 期抛错 = 用例静默消失，不是报错**：`pnpm test` 走单进程聚合入口
+>   （`scripts/test/run-provider-tests.ts` 逐个 `import`），若某个测试文件在**模块加载阶段**抛错，
+>   它的 `describe/it` 一个都不会注册，而 `node:test` 的汇总里**看不到任何 fail** ——
+>   唯一症状是 `tests` 计数变少（实测踩过：266 → 262）。
+>   根因是那次测试把编译产物写到 `.tmp/button-contract-test/` 又在 `after()` 里 `rmSync`，
+>   而 sandbox 在目录被删后会把它列入**永久拒绝**名单，下次 `mkdirSync` 同路径直接 EPERM。
+>   → **测试脚手架不要「建专用子目录 + 结束后删目录」**，改用 `.tmp/` 下的单文件覆盖写入；
+>   → **改过测试脚手架后要对比 `tests` 计数**，别只看 `fail=0`；
+>   → 另：不能用 `mem:` 这类自定义 scheme 走 module hook 做纯内存加载（Node 报 `Invalid URL`）。
+> - **统计行数不要用 Windows PowerShell 的 `Get-Content`**：本仓库文件全是 CJK，
+>   PS 5.1 的 `Get-Content` 会**少算行**（实测 `result.svelte` 报 743、真实 753；
+>   `theme.svelte` 报 610、真实 631；`segment-dps.svelte` 报 330、真实 335）。
+>   用 `node -e "…split('\n').length"`、read 工具或 ripgrep 统计；`Get-ChildItem | Measure-Object -Line` 同样不可信。
+> - 同理，**判断 CJK 文件内容不要读 `Get-Content` / `Select-String` 的输出**（会乱码或漏行），用 read 工具。
+> - **不只 `>` 会写 UTF-16LE**：PS 5.1 下 `>` / `Out-File` / `Tee-Object -FilePath` **默认都是 UTF-16LE**。
+>   用它们落盘的「证据」文件里会隔字节插 `\0`，Node 读出来是乱码。落盘证据统一用 Node
+>   `writeFileSync(p, s, 'utf8')`，或先用 PS 落盘、再用 Node 转码成 UTF-8。
+> - **用工具（编辑器）改过 `.ps1` 之后必须重新加回 UTF-8 BOM**：PS 5.1 会把无 BOM 的脚本按 ANSI 解读，
+>   脚本里的 CJK 注释被读坏后报 `MissingParameterExpressionAfterToken` / `MissingExpressionAfterToken`
+>   （实测踩过两次）。加回方式：
+>   `[System.IO.File]::WriteAllText($p, [System.IO.File]::ReadAllText($p, [System.Text.UTF8Encoding]::new($false)), [System.Text.UTF8Encoding]::new($true))`
+
 ### 5.1 ESLint 函数式约束
 
 - 配置文件：`eslint.config.js`（flat config）
 - **纯逻辑层**（`src/lib` 下 `calc/` `api/` `utils/` `consts/` `types/` `ai/generate/` `ai/tools/` 的 `.ts`，排除 `*.svelte.ts` / `*.test.ts`）强制函数式偏好：`prefer-const` `prefer-arrow-callback` `prefer-template` `object-shorthand` `arrow-body-style` `no-var` `no-param-reassign`
-- **UI / store 层**（`*.svelte`、`*.svelte.ts`）仅基础解析，不做函数式约束（Runes 响应式状态保留可变性）
+- **UI / store 层**（`*.svelte`、`*.svelte.ts`）仅基础解析 + 少量最佳实践规则，不做函数式约束（Runes 响应式状态保留可变性）
 - 新增纯逻辑函数时遵守：入参不可重赋值（`no-param-reassign`）、优先 `const`、优先箭头函数
-- Svelte 最佳实践规则（`svelte/recommended`）默认未启用（避免淹没函数式信号）；如需启用，将 `eslint.config.js` 中 `'flat/base'` 换成 `'flat/recommended'`
+- Svelte 最佳实践采用**渐进棘轮**：不全量启用 `svelte/recommended`（会淹没函数式信号），只逐条引入能量化收敛的规则
+    - `svelte/require-each-key` 已**清零并升为 `error`**（T9）：基线 **0 处**，无白名单。历史轨迹：Phase 0 实测 141 处 → 6.4 四批清到 50 → T9 清掉最后 47 处。此后新增无 key 的 `{#each}` 直接报 error
+    - 补 key 时**必须**保证 key 唯一——重复 key 是 Svelte 运行时错误。值列表用值作 key（先确认无重复）；对象列表用稳定 id 字段；位置即身份（定长元组）用索引变量
+        - **「看起来唯一」不等于唯一**：T9 实测踩到三处反例 —— ① `getSkillPickerGroups()` 的 `group.type` 来自逐 `skill_trees` 节点 push 的 `buildSkillGroups`，**同一 type 可出现多次**；② `slot.triggerSets` 的 `name` 会**刻意重复**（`set-picker` 选 5 件套时写入 `{name,5}` + `{name,2}` 两条，见 `togglePiece`）；③ 持久化的 `comparison` 配置可能来自旧版本/导入，无法证明组合不重复。这三处最终都改用索引（位置即身份），而不是硬塞值作 key
+        - 判定顺序：先用一次性 Node 脚本对**真实数据源**采样去重（不是读代码猜），证不出唯一就用索引并在报告里写明理由
+    - 组件一致性另由 `scripts/check-components.mjs` + `scripts/check-surfaces.mjs` 把关（已接入 `pnpm run check`）
+        - `scripts/check-components.mjs` ⑧ 校验「`ui/` 元件必须被至少一个消费方引用」（防「假组件化」：文件存在 ≠ 已接线；判定覆盖 `$lib`/相对路径 import、`<X>` 渲染与 barrel re-export，**注释里的路径提及不算引用**）。设计系统里**暂时零引用**的元件作为债务登记在该脚本 `BASELINE.uiNoRef`，**只减不增、且不删除**（保留为通用控件，接线时直接复用）；新增零引用 `ui/` 元件立即失败，基线内已恢复引用则提示「可回收」但不失败
+    - 动效三不变量由 `scripts/check-motion.mjs` 把关（同样接入 `pnpm run check`，可单独跑 `pnpm run check:motion`）：① `layout.css` 的 `--motion-*` 与 `motion.ts` 的 `MOTION_MS` **逐项相等**（Svelte 过渡只吃 JS 数字，靠脚本对齐而非记忆，不一致时报出不匹配的 key 与两侧数值）；② `transition:` / `in:` / `out:` / `animate:` **只能挂元素**，挂组件是编译期 `component_invalid_directive`（脚本按标签归属判定，不做整行文本匹配，避免误报）；③ 指令内联手写时长（`{{ duration: 200 }}`）走**棘轮**：基线已清零为 **0 处**（T17 把最后 14 处迁到 `slideParams(MOTION_MS.*)`），新增即失败；时长一律走 `$lib/utils/motion.ts` 的 `MOTION_MS` / `motionDuration` / `slideParams`。③ 已无永久豁免项（T26 把最后的 `layout/modal.svelte` 遮罩 130ms 改成 `motionDuration(130)`：正常模式仍是 130ms、reduce 下与面板同步归零；脚本 `EXEMPT` 现为空 Map，仍无条件打印清单以免后人误以为还有豁免）
+    - `.tmp/components.md`（`ui/` 元件目录与 props 表）是**生成物**：改 `ui/` 组件后须运行 `pnpm run generate-components-doc` 重新生成；`pnpm run check` 会用 `--check` 比对，不同步即报错并指出首个差异行。该文件与整改计划同放 `.tmp/`（已被 `.gitignore` 忽略），不进 `docs/`——`docs/` 只放随仓库分发的项目文档
