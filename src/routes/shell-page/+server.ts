@@ -17,13 +17,30 @@ export const prerender = true
 const CACHE_CONTROL = 'public, max-age=0, must-revalidate'
 
 /**
+ * @desc 预渲染落盘时的 content-type。
+ *
+ * ⚠️ 必须是**不带参数的裸 `text/html`**，否则部署后手机访问 /shell-page 会变成下载文件。
+ * SvelteKit 预渲染器判定「这条响应是不是 HTML」用的是**严格相等**
+ * （`@sveltejs/kit/src/core/postbuild/prerender.js` 的 `save()`：
+ * `const is_html = response_type === REDIRECT || type === 'text/html'`），
+ * 而 `is_html` 决定产物文件名（`output_filename()`：`is_html` 为真才补 `.html`）。
+ * 写成 `text/html; charset=utf-8` 时 `is_html` 为假，产物落盘为**无扩展名的 `shell-page`**；
+ * Vercel 的 `{"handle":"filesystem"}` 只按扩展名推断 MIME，无扩展名 → `application/octet-stream`
+ * → 浏览器下载。本地 `dev`/`preview` 由 SvelteKit 自己发响应头，看不出这个差异。
+ *
+ * 少掉的 `charset` 不影响编码：产物即 `.html`，HTML 文档的编码由文档内的
+ * `<meta charset="utf-8">` 决定，静态主机也会对 `.html` 自带 `text/html`。
+ */
+const CONTENT_TYPE = 'text/html'
+
+/**
  * @desc 壳页路由：返回原生 HTML 文档。
  * @returns 壳页 HTML 响应
  */
 export function GET() {
     return new Response(SHELL_HTML, {
         headers: {
-            'content-type': 'text/html; charset=utf-8',
+            'content-type': CONTENT_TYPE,
             'cache-control': CACHE_CONTROL
         }
     })
