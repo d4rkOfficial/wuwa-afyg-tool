@@ -177,7 +177,14 @@
         // 靠产物串序定胜负（实测 `.font-medium` 在 `.font-normal` 之前 → 后者胜出，见 .tmp/t5-font-order.mjs）。
         bare ? 'font-normal' : '',
         SIZE_CLASS[size ?? (compact ? 'compact' : 'default')],
-        'text-(--theme-btn-text)',
+        // 前景色兜底：**`bare` 档刻意不发射**。`--theme-btn-text` 是主题里**为按钮底色配的对比色**
+        // （预设 dark #18181b / light #ffffff），与 `modal.textColor`（dark #e4e4e7 / light #1e293b）
+        // 昼夜恰好对调；而 `bare` 语义是「本按钮长得像原生按钮、样式全由调用方给」，
+        // 它作为同权重工具类会**压掉调用方 class 里的前景色**（Tailwind 按字面串序发射，斗不过），
+        // 结果是弹窗里的 `bare` 图标钮昼夜观感反过来（实测：AI 助手头部两个 `ui/Button` 与左侧原生按钮不同色）。
+        // 实测依据：全项目 38 个 `bare` 按钮里 30 个未显式传 `textColor`，但**没有一个**缺少自己的前景色 class，
+        // 即该兜底色在 `bare` 档上从无实际消费者，去掉零回归。
+        bare ? '' : 'text-(--theme-btn-text)',
         // 状态层（`bare` 时整组不发射，用于承接历史上没有任何自定义状态样式的按钮）
         bare ? '' : 'focus-visible:bg-(--theme-btn-bg-focused) focus-visible:text-(--theme-btn-text-focused)',
         bare ? '' : 'focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-(--theme-btn-text)',

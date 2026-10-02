@@ -139,4 +139,30 @@ describe('ui/button 的 bare 档契约', () => {
         // none：不发射任何内边距
         assert.deepEqual(padOf(tokensOf({ variant: 'icon', pad: 'none' })), [])
     })
+
+    /**
+     * 前景色兜底：`--theme-btn-text` 是主题里**为按钮底色配的对比色**（预设 dark #18181b / light #ffffff），
+     * 与 `modal.textColor`（dark #e4e4e7 / light #1e293b）昼夜恰好对调。
+     * `bare` 语义是「长得像原生按钮、样式全由调用方给」，此时该兜底色作为**同权重工具类**会压掉
+     * 调用方 class 里的前景色（Tailwind 按字面串序发射，调用方斗不过）——实测症状就是
+     * AI 助手悬浮窗头部两个 `ui/Button` 的明暗观感与左侧那个原生 `<button>` 正好相反。
+     * 故 `bare` 档**刻意不发射**它；全项目 38 个 `bare` 按钮里 30 个未显式传 `textColor`，
+     * 但**没有一个**缺少自己的前景色 class，即该兜底色在该档上从无实际消费者。
+     */
+    it('前景色兜底：默认档发射，bare 档刻意不发射（否则压掉调用方意图）', () => {
+        assert.ok(tokensOf({}).includes('text-(--theme-btn-text)'), '默认档应保留 text-(--theme-btn-text) 兜底')
+        const bare = tokensOf({ bare: true })
+        assert.ok(
+            !bare.includes('text-(--theme-btn-text)'),
+            `bare 档不得发射 text-(--theme-btn-text)（会昼夜对调地压掉调用方 class），实得：${bare.join(' ')}`
+        )
+        // 状态层里的 focus-visible 前景色也属同一组，bare 档一并关掉
+        assert.ok(
+            !bare.some((t) => t.includes('theme-btn-text')),
+            `bare 档不该出现任何 theme-btn-text 类：${bare.join(' ')}`
+        )
+        // 调用方自带的前景色 class 必须原样保留（基类不得吞掉）
+        const withClass = tokensOf({ bare: true, class: 'text-(--theme-modal-text)/40' })
+        assert.ok(withClass.includes('text-(--theme-modal-text)/40'), '调用方前景色 class 必须保留')
+    })
 })
