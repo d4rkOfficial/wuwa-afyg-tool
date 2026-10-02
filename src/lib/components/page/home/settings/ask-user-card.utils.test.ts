@@ -7,6 +7,7 @@
 //   node --import ./scripts/test/preload-runes.mjs --import ./scripts/test/preload.mjs src/lib/components/page/home/settings/ask-user-card.utils.test.ts
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 import {
     BOOLEAN_TABS,
@@ -27,6 +28,7 @@ import {
     indexAfterSkip,
     isAnswered,
     isCustomOn,
+    isOtherOption,
     isPicked,
     normalizeGroup,
     normalizeOptions,
@@ -154,7 +156,116 @@ describe('归一：问题组 / 题号 / 选项 / allowCustom / required', () => 
         assert.equal(progressText(0, 0), '第 1 / 0 题')
         assert.equal(clampIndex(3, 0), 0)
         assert.equal(EMPTY_QUESTION.allowCustom, false)
+        assert.equal(EMPTY_QUESTION.customOption, null)
         assert.equal(EMPTY_QUESTION.type, 'boolean')
+    })
+})
+
+// ── 「其它」唯一化：AI 自带「其它」时，那一项自己就是输入槽（界面不再补第二行）──────────
+describe('「其它」唯一化', () => {
+    it('识别「其它」型选项：中英文变体、括号补充、大小写与空白都认', () => {
+        const yes = [
+            { value: 'other', label: '其它' },
+            { value: 'o', label: '其他' },
+            { value: 'o', label: '其它（请说明）' },
+            { value: 'o', label: 'Other' },
+            { value: 'o', label: ' Custom (please specify) ' },
+            { value: 'other', label: '随便写点' },
+            { value: 'custom', label: '自定义' },
+            { value: 'x', label: '自定义输入' }
+        ]
+        for (const opt of yes) assert.equal(isOtherOption(opt), true, `${opt.label} 应认成「其它」`)
+        const no = [
+            { value: 'a', label: '口径A' },
+            { value: 'a', label: '其它口径（面板值/期望值）' },
+            { value: 'axis', label: '排轴' }
+        ]
+        for (const opt of no) assert.equal(isOtherOption(opt), false, `${opt.label} 不该认成「其它」`)
+    })
+
+    it('AI 自带「其它」→ customOption 指向它；没自带 / boolean / 显式 allowCustom:false → null', () => {
+        const g = normalizeGroup({
+            questions: [
+                {
+                    type: 'single',
+                    question: 'A',
+                    options: [
+                        { value: 'a', label: '甲' },
+                        { value: 'other', label: '其它（请说明）' }
+                    ]
+                },
+                { type: 'multi', question: 'B', options: [{ value: 'x', label: '排轴' }] },
+                { type: 'boolean', question: 'C' },
+                {
+                    type: 'single',
+                    question: 'D',
+                    allowCustom: false,
+                    options: [
+                        { value: 'a', label: '甲' },
+                        { value: 'other', label: '其它' }
+                    ]
+                }
+            ]
+        })
+        assert.equal(g.questions[0].allowCustom, true)
+        assert.equal(g.questions[0].customOption, 'other')
+        // 没自带 → null，模板据此补一行 CUSTOM_LABEL
+        assert.equal(g.questions[1].customOption, null)
+        // boolean 恒无自定义槽
+        assert.equal(g.questions[2].customOption, null)
+        // 显式关掉自定义 → 「其它」退化成一条普通选项（不展开输入框）
+        assert.equal(g.questions[3].allowCustom, false)
+        assert.equal(g.questions[3].customOption, null)
+    })
+
+    it('同题出现多个「其它」写法：只认第一个当输入槽（否则两行会抢同一个 customOn）', () => {
+        const g = normalizeGroup({
+            questions: [
+                {
+                    type: 'single',
+                    question: 'A',
+                    options: [
+                        { value: 'other', label: '其它' },
+                        { value: 'custom', label: '自定义' }
+                    ]
+                }
+            ]
+        })
+        assert.equal(g.questions[0].customOption, 'other')
+    })
+
+    it('选中 AI 自带的「其它」再输入：values 为输入原文，预设 value 不混进作答', () => {
+        const g = normalizeGroup({
+            questions: [
+                {
+                    type: 'single',
+                    question: '用哪套口径？',
+                    required: true,
+                    options: [
+                        { value: 'a', label: '甲' },
+                        { value: 'other', label: '其它' }
+                    ]
+                }
+            ]
+        })
+        const question = g.questions[0]
+        // 单选语义：勾「其它」清掉预设项；光勾不输入不算作答（必答题会挡住提交）
+        const on = setCustomPick(pickRadio(g.draft, question.id, 'a'), question, true)
+        assert.deepEqual(draftOf(on, question.id).picked, [])
+        assert.equal(isCustomOn(on, question.id), true)
+        assert.equal(isAnswered(question, draftOf(on, question.id)), false)
+        assert.equal(canSubmit(g.questions, on), false)
+
+        const typed = setCustomText(on, question, '  按期望值算 ')
+        assert.deepEqual(answerValues(question, draftOf(typed, question.id)), ['按期望值算'])
+        assert.deepEqual(toAnswer(question, draftOf(typed, question.id)), {
+            id: 'q1',
+            type: 'single',
+            skipped: false,
+            values: ['按期望值算'],
+            custom: '按期望值算'
+        })
+        assert.equal(canSubmit(g.questions, typed), true)
     })
 })
 
@@ -442,5 +553,37 @@ describe('Enter 语义与接管判定', () => {
         // 输入法组合中放行（拼音选词的 Enter 是上屏，不能当成推进）
         assert.equal(shouldHandleEnter(ev({ isComposing: true, target: { tagName: 'DIV' } })), false)
         assert.equal(shouldHandleEnter(ev({ keyCode: 229, target: { tagName: 'DIV' } })), false)
+    })
+})
+
+// ── 宿主接线契约：`askCard` 必须用 `$state.raw`（否则收尾时按身份清状态恒失效）──────────
+// 症状（线上实测）：用户点「提交」后，`ask_user` 的 Promise 正常 resolve、AI 继续跑，
+// 但卡片与「提问期间被隐藏的输入区」一起卡死在界面上 —— 因为宿主靠 `askCard === card` 判断
+// 「自己还是不是当前那张卡」，而 `$state` 会把赋进去的对象**深度代理**成 Proxy，
+// 读回来的引用与原始对象恒不相等，于是 `askCard = null` 那一行永远执行不到。
+describe('宿主接线契约：askCard 用 $state.raw 存对象', () => {
+    it('$state 存对象会被深度代理 → 读回引用 ≠ 原始对象（用真实 svelte 运行时复现）', async () => {
+        // 走变量 specifier：`svelte/internal/client` 是内部子路径（svelte 未随包提供它的类型声明），
+        // 写成字面量会让 svelte-check 报「Could not find a declaration file」（实测）。
+        const specifier: string = 'svelte/internal/client'
+        const $ = (await import(specifier)) as {
+            state: (value: unknown) => unknown
+            get: (source: unknown) => unknown
+            set: (source: unknown, value: unknown, shouldProxy?: boolean) => void
+        }
+        const card = { request: {}, resolve: () => {} }
+        const store = $.state(null)
+        // `$state` 变量的赋值编译成 `$.set(x, v, true)`（第三参 = should_proxy），`$state.raw` 则不带该参
+        $.set(store, card, true)
+        assert.notEqual($.get(store), card)
+        const raw = $.state(null)
+        $.set(raw, card)
+        assert.equal($.get(raw), card)
+    })
+
+    it('ai-assistant.svelte 的 askCard 声明为 $state.raw，且收尾仍按身份判定当前卡', () => {
+        const src = readFileSync('src/lib/components/page/home/settings/ai-assistant.svelte', 'utf8')
+        assert.match(src, /\$state\.raw<AskCardState \| null>\(null\)/, 'askCard 必须用 $state.raw 声明')
+        assert.match(src, /if \(askCard === card\) askCard = null/, '收尾仍应只清掉「自己这张卡」')
     })
 })

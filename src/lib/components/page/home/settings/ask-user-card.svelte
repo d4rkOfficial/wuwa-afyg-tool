@@ -25,6 +25,7 @@
     import {
         BOOLEAN_TABS,
         CUSTOM_LABEL,
+        CUSTOM_ROW_VALUE,
         EMPTY_QUESTION,
         blockerText,
         cancelResult,
@@ -215,32 +216,58 @@
         <div class="mt-0.5 text-[10px] leading-relaxed text-(--theme-modal-text)/50">{current.description}</div>
     {/if}
 
-    <!-- 作答区：是否型 = 两段等宽文字 tab；单选/多选 = 原生控件行（可带次行说明） -->
-    {#snippet optionRow(opt: AskCardOption, control: 'radio' | 'checkbox')}
-        <label
-            class="flex cursor-pointer items-start gap-2 rounded-none border px-2.5 py-2 transition-colors hover:border-(--theme-accent-bg)"
+    <!-- 作答区：是否型 = 两段等宽文字 tab；单选/多选 = 原生控件行（可带次行说明）
+         `custom=true` 的行就是**自定义输入槽**：它既可能是 AI 自带的「其它」选项（`current.customOption`），
+         也可能是界面自补的那一行（见下方渲染）；选中即展开输入框，勾选态与文本都存在 `customOn` / `customText` 上。 -->
+    {#snippet optionRow(opt: AskCardOption, control: 'radio' | 'checkbox', custom: boolean)}
+        {@const on = custom ? isCustomOn(draft, current.id) : isPicked(draft, current.id, opt.value)}
+        <div
+            class="rounded-none border transition-colors hover:border-(--theme-accent-bg)"
             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
         >
-            <input
-                type={control}
-                name={radioName}
-                class="mt-0.5 size-3.5 shrink-0"
-                style="accent-color: var(--theme-accent-bg, #6366f1);"
-                checked={isPicked(draft, current.id, opt.value)}
-                onchange={() =>
-                    (edits = pickable
-                        ? pickRadio(draft, current.id, opt.value)
-                        : toggleCheck(draft, current.id, opt.value))}
-            />
-            <span class="min-w-0 flex-1">
-                <span class="block text-xs leading-snug">{opt.label}</span>
-                {#if opt.description}
-                    <span class="mt-0.5 block text-[10px] leading-relaxed text-(--theme-modal-text)/45">
-                        {opt.description}
-                    </span>
-                {/if}
-            </span>
-        </label>
+            <label class="flex cursor-pointer items-start gap-2 px-2.5 py-2">
+                <input
+                    type={control}
+                    name={radioName}
+                    class="mt-0.5 size-3.5 shrink-0"
+                    style="accent-color: var(--theme-accent-bg, #6366f1);"
+                    checked={on}
+                    onchange={() =>
+                        (edits = custom
+                            ? setCustomPick(draft, current, !on)
+                            : pickable
+                              ? pickRadio(draft, current.id, opt.value)
+                              : toggleCheck(draft, current.id, opt.value))}
+                />
+                <span class="min-w-0 flex-1">
+                    <span class="block text-xs leading-snug">{opt.label}</span>
+                    {#if opt.description}
+                        <span class="mt-0.5 block text-[10px] leading-relaxed text-(--theme-modal-text)/45">
+                            {opt.description}
+                        </span>
+                    {/if}
+                </span>
+            </label>
+            {#if custom && on}
+                <div class="border-t px-2.5 py-2" style="border-color: var(--theme-divider-border);">
+                    <input
+                        type="text"
+                        value={item.customText}
+                        placeholder={current.customPlaceholder}
+                        aria-label={`${CUSTOM_LABEL}输入`}
+                        oninput={(e) => (edits = setCustomText(draft, current, e.currentTarget.value))}
+                        onkeydown={(e) => {
+                            if (e.key !== 'Enter') return
+                            e.preventDefault()
+                            // 与窗口级 Enter 同一语义：非最后一题先推进，最后一题才提交
+                            enterAction()
+                        }}
+                        class="w-full rounded-none border px-2 py-1 text-xs outline-none transition-colors"
+                        style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                    />
+                </div>
+            {/if}
+        </div>
     {/snippet}
 
     {#if current.type === 'boolean'}
@@ -261,48 +288,17 @@
             class="mt-2 flex flex-col gap-1"
         >
             {#each current.options as opt (opt.value)}
-                {@render optionRow(opt, pickable ? 'radio' : 'checkbox')}
+                <!-- 只有**被归一选中的那一项**是自定义槽（同题出现多个写法相近的「其它」时不会有两行抢同一个 customOn） -->
+                {@render optionRow(opt, pickable ? 'radio' : 'checkbox', current.customOption === opt.value)}
             {/each}
 
-            {#if current.allowCustom}
-                <!-- 「其它」是**选项本身**：单选型里是一个 radio，多选型里是一个 checkbox；选中才展开输入框 -->
-                <div
-                    class="rounded-none border"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                >
-                    <label class="flex cursor-pointer items-start gap-2 px-2.5 py-2">
-                        <input
-                            type={pickable ? 'radio' : 'checkbox'}
-                            name={radioName}
-                            class="mt-0.5 size-3.5 shrink-0"
-                            style="accent-color: var(--theme-accent-bg, #6366f1);"
-                            checked={isCustomOn(draft, current.id)}
-                            onchange={() => (edits = setCustomPick(draft, current, !isCustomOn(draft, current.id)))}
-                        />
-                        <span class="min-w-0 flex-1">
-                            <span class="block text-xs leading-snug">{CUSTOM_LABEL}</span>
-                        </span>
-                    </label>
-                    {#if item.customOn}
-                        <div class="border-t px-2.5 py-2" style="border-color: var(--theme-divider-border);">
-                            <input
-                                type="text"
-                                value={item.customText}
-                                placeholder={current.customPlaceholder}
-                                aria-label={`${CUSTOM_LABEL}输入`}
-                                oninput={(e) => (edits = setCustomText(draft, current, e.currentTarget.value))}
-                                onkeydown={(e) => {
-                                    if (e.key !== 'Enter') return
-                                    e.preventDefault()
-                                    // 与窗口级 Enter 同一语义：非最后一题先推进，最后一题才提交
-                                    enterAction()
-                                }}
-                                class="w-full rounded-none border px-2 py-1 text-xs outline-none transition-colors"
-                                style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
-                            />
-                        </div>
-                    {/if}
-                </div>
+            {#if current.allowCustom && !current.customOption}
+                <!-- AI 没自带「其它」→ 界面自补一行（文案固定），行为与 AI 自带的「其它」逐字一致 -->
+                {@render optionRow(
+                    { value: CUSTOM_ROW_VALUE, label: CUSTOM_LABEL },
+                    pickable ? 'radio' : 'checkbox',
+                    true
+                )}
             {/if}
         </div>
     {/if}
