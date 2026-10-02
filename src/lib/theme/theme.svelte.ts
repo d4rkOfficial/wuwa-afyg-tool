@@ -11,7 +11,6 @@ import type {
     SurfaceStyle
 } from './types'
 import { SURFACE_KEYS } from './types'
-import { DEFAULT_BACKGROUND_DARK, DEFAULT_BACKGROUND_LIGHT } from './default-backgrounds'
 import { bgMaskCss } from './bg-mask'
 import { TAG_INK_LIGHT_L } from './tag-ink'
 import darkPreset from './preset/dark.json'
@@ -74,8 +73,17 @@ const DEFAULT_OVERRIDES: ThemeOverrides = {
 /**
  * @desc 首次进入：把外观恢复为默认（昼夜两套默认质感 + 内置默认背景图），并落盘。
  * 默认背景图为 base64 内联，用户可在设置里替换或清空。
+ *
+ * ⚠️ 内置背景图（./default-backgrounds）必须**动态 import**，不能写成顶层静态 import。
+ * 那两个常量合计约 280KB base64，而全项目只有本函数用它们、且本函数只在首次进入时被调用
+ * （见 `$routes/store.svelte.ts` 的 `isFirstVisit()` 分支）。写成静态 import 会把
+ * `default-backgrounds` 拉进模块图，被**根 layout（nodes/0）**静态引用而在首屏关键路径上整体下载
+ * —— 每个用户、每次进入都付这 280KB，而它只在「首次进入」才用得上。
+ * 动态 import 后它成为独立 chunk，只有走到这里才请求。改动后请用构建产物复核：
+ * `nodes/0` 不再静态 import 该 chunk（.tmp 下有现成的可达性分析脚本思路）。
  */
 export async function applyFirstRunAppearance() {
+    const { DEFAULT_BACKGROUND_DARK, DEFAULT_BACKGROUND_LIGHT } = await import('./default-backgrounds')
     overrides = {
         ...structuredClone(DEFAULT_OVERRIDES),
         appearance: structuredClone(DEFAULT_APPEARANCE),
