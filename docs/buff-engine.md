@@ -170,5 +170,4 @@ interface BuffCondition {
 9. 运行 `pnpm run format && pnpm run lint:eslint && pnpm run check`
 
 > **引用（转模）默认开放**：新乘区不必做任何事即可被引用。只有确实需要「只允许固定值」的乘区
-> 才加进 `ZONE_NO_REF_IDS` —— 目前只有 `tuneStrainLayer`（集谐干涉层数）在名单里；
-> 同奏增益层数与自定义层数(1)(2)(3) 都可引用。
+> 才加进 `ZONE_NO_REF_IDS` —— 目前只有 `tuneStrainLayer`（集谐干涉层数）在名单里；同奏增益层数可引用。

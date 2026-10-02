@@ -34,11 +34,7 @@ export const ZONE_DEFS = [
     { id: 'dmgRedPen', label: '免伤无视(穿免)', unit: '%' },
 
     { id: 'tuneStrainLayer', label: '集谐干涉层数', unit: 'flat' },
-    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' },
-
-    { id: 'customLayer1', label: '自定义层数(1)', unit: 'flat' },
-    { id: 'customLayer2', label: '自定义层数(2)', unit: 'flat' },
-    { id: 'customLayer3', label: '自定义层数(3)', unit: 'flat' }
+    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' }
 ] as const satisfies readonly ZoneDef[]
 
 /** @desc ZoneId 联合类型与查询 Map（由 ZONE_DEFS 派生，供界面与计算引擎快速查乘区定义） */
@@ -57,8 +53,7 @@ export const ZONE_SECTIONS = [
     { title: '倍率追加或锚定', ids: ['extraRatio'] },
     { title: '使目标', ids: ['defDown', 'resDown'] },
     { title: '对目标', ids: ['resPen', 'defPen', 'dmgRedPen'] },
-    { title: '层数相关独立终伤', ids: ['tuneStrainLayer', 'unisonBoonLayer'] },
-    { title: '自定义层数', ids: ['customLayer1', 'customLayer2', 'customLayer3'] }
+    { title: '层数相关独立终伤', ids: ['tuneStrainLayer', 'unisonBoonLayer'] }
 ] as const satisfies readonly { title: string; ids: readonly ZoneId[] }[]
 
 /** @desc 分区后的乘区清单（每个分区一组定义，顺序与 ZONE_SECTIONS 一致；未列入分区的乘区兜底进「其它」） */
@@ -90,8 +85,8 @@ export const resolveZoneId = (id: string): string => LEGACY_ZONE_IDS[id] ?? id
 /**
  * @desc 不支持 ref 引用/转模的乘区（引擎/UI/AI 共用判定）。
  *
- * 目前**只有集谐干涉层数**在名单里：它只允许直接填固定层数。同奏增益层数与
- * 自定义层数(1)(2)(3) 都可以引用；新增乘区默认即可引用，只有确实需要「只允许固定值」时才加进来。
+ * 目前**只有集谐干涉层数**在名单里：它只允许直接填固定层数。同奏增益层数可以引用；
+ * 新增乘区默认即可引用，只有确实需要「只允许固定值」时才加进来。
  */
 export const ZONE_NO_REF_IDS = new Set<string>(['tuneStrainLayer'])
 
@@ -109,7 +104,7 @@ export const TARGET_SIDE_ZONE_IDS = new Set<string>(['tuneStrainLayer'])
 
 /**
  * @desc 可被「引用」的来源清单（ZoneRef 的目标）：角色白值/当前面板/充能/谐度/双暴，
- * 以及**按角色独立**的层数（同奏增益层数、自定义层数(1)(2)(3)）。
+ * 以及**按角色独立**的同奏增益层数。
  */
 export const ZONE_REF_DEFS = [
     { id: 'baseAtk', label: '攻击白值', unit: 'flat' },
@@ -125,14 +120,10 @@ export const ZONE_REF_DEFS = [
     { id: 'critDmg', label: '暴击伤害', unit: '%' },
 
     /**
-     * @desc 层数类来源：读**被引用角色**自己累计的层数（每个角色独立）。
-     * 同奏增益层数与自定义层数属于角色，因此可被其它乘区按角色引用；
-     * 集谐干涉层数不属于角色，故不作为引用来源。
+     * @desc 层数类来源：读**被引用角色**自己累计的同奏增益层数（每个角色独立）。
+     * 集谐干涉层数挂在目标身上、不属于角色，故不作为引用来源。
      */
-    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' },
-    { id: 'customLayer1', label: '自定义层数(1)', unit: 'flat' },
-    { id: 'customLayer2', label: '自定义层数(2)', unit: 'flat' },
-    { id: 'customLayer3', label: '自定义层数(3)', unit: 'flat' }
+    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' }
 ] as const satisfies readonly ZoneDef[]
 
 /** @desc 引用属性的查询 Map（同上，供 ZoneRef 目标查表） */

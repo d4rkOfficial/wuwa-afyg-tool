@@ -77,11 +77,8 @@ const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
     offTuneBuildupRate: 'offTuneBuildupRate',
     critRate: 'critRate',
     critDmg: 'critDmg',
-    // 层数类来源：读该角色面板上累计的层数（每个角色独立，互不串味）
-    unisonBoonLayer: 'unisonBoonLayer',
-    customLayer1: 'customLayer1',
-    customLayer2: 'customLayer2',
-    customLayer3: 'customLayer3'
+    // 层数类来源：读该角色面板上累计的同奏层数（每个角色独立，互不串味）
+    unisonBoonLayer: 'unisonBoonLayer'
 }
 
 /** @desc 解析引用转模读数：从「本条目可见面板」里取被引用角色的属性（无面板时视为 0） */
@@ -185,9 +182,6 @@ function emptyAccum(): CharacterComputed {
         defDown: 0,
         resDown: 0,
         unisonBoonLayer: 0,
-        customLayer1: 0,
-        customLayer2: 0,
-        customLayer3: 0,
         finalDmg: 0,
         dmgTakenInc: 0,
         specialFinal1: 0,
@@ -1052,9 +1046,6 @@ function emptyCharacterStats(): CharacterComputed {
         defDown: 0,
         resDown: 0,
         unisonBoonLayer: 0,
-        customLayer1: 0,
-        customLayer2: 0,
-        customLayer3: 0,
         finalDmg: 0,
         dmgTakenInc: 0,
         specialFinal1: 0,

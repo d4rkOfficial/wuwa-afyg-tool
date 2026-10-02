@@ -37,13 +37,6 @@ export interface CharacterComputed {
      */
     /** @desc 同奏增益层数（flat 层数）：同奏区 = 1 + 3% × 层数 */
     unisonBoonLayer: number
-    /**
-     * @desc 自定义层数(1)/(2)/(3)：**纯计数器**，与 `recharge` 同性质 —— 会随 Buff 累加进面板、
-     * 可手填也可用引用/转模写入、可用于展示，但不进入任何伤害乘区（引擎不读它们）。
-     */
-    customLayer1: number
-    customLayer2: number
-    customLayer3: number
     finalDmg: number
     dmgTakenInc: number
     /** @desc 特殊终伤(1)：加算语义（%），与特殊终伤(2) 组合为统一特殊区 */
@@ -107,19 +100,6 @@ export const ZONE_OPS: Record<string, ZoneOp> = {
     unisonBoonLayer: addOp(
         (a, v) => (a.unisonBoonLayer += v),
         (a, v) => (a.unisonBoonLayer = v)
-    ),
-    // 自定义层数：纯计数器（不参与伤害公式），覆盖语义与其它层数一致
-    customLayer1: addOp(
-        (a, v) => (a.customLayer1 += v),
-        (a, v) => (a.customLayer1 = v)
-    ),
-    customLayer2: addOp(
-        (a, v) => (a.customLayer2 += v),
-        (a, v) => (a.customLayer2 = v)
-    ),
-    customLayer3: addOp(
-        (a, v) => (a.customLayer3 += v),
-        (a, v) => (a.customLayer3 = v)
     ),
     finalDmg: addOp(
         (a, v) => (a.finalDmg += v),

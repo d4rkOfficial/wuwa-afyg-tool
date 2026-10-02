@@ -27,10 +27,7 @@ export const PANEL_TO_ZONES: Record<string, string[]> = {
     critDmg: ['critDmg'],
     // 层数类来源（角色独立）：改写它的乘区就是它自己 —— 让「会改该角色层数」的 Buff
     // 能被识别成引用方这一段的影响源（否则层数引用会被当成没有影响源）
-    unisonBoonLayer: ['unisonBoonLayer'],
-    customLayer1: ['customLayer1'],
-    customLayer2: ['customLayer2'],
-    customLayer3: ['customLayer3']
+    unisonBoonLayer: ['unisonBoonLayer']
 }
 
 /** @desc 作用域是否作用于给定角色槽位（与引擎 scopeMatches 同口径；charIdx < 0 表示非角色条目/效应伤害） */
