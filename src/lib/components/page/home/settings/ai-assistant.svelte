@@ -40,6 +40,11 @@
      * 当前待作答的提问卡（`ask_user` 工具）。与「危险操作确认卡」同一处渲染：都不遮罩弹窗。
      * `resolve` 是**每张卡独立**的幂等收尾函数 —— 卡片卸载时会回调它，
      * 若共用同一个函数，旧卡卸载时会把新卡误判成「放弃」（见 T24 报告）。
+     *
+     * 注：持有它的 `askCard` 必须是 `$state.raw`（**不能用 `$state`**）。
+     * `resolve` 要按身份判断「自己还是不是当前那张卡」（`askCard === card`），
+     * 而 `$state` 会把赋进来的对象**深度代理**成 Proxy，读回来的引用与原始对象恒不相等 ——
+     * 于是收尾时清不掉 `askCard`：用户提交后卡片与「提问期间隐藏的输入区」一起卡死在界面上。
      */
     interface AskCardState {
         request: AskUserRequest
@@ -90,7 +95,8 @@
     // 危险操作确认卡片（显示在聊天框中，不遮罩弹窗）
     let confirmCard = $state<{ toolName: string; summary: string; resolve: (v: boolean) => void } | null>(null)
     // 「向用户提问」卡片（同样显示在聊天框中；一次只可能有一张 —— ask_user 会阻塞整个回合）
-    let askCard = $state<AskCardState | null>(null)
+    // `$state.raw`：本状态只整体替换、从不改内部字段，且 `resolve` 要按对象身份判定当前卡（见 AskCardState 注释）
+    let askCard = $state.raw<AskCardState | null>(null)
     // 批量信任：一次指令回合内已批准过危险操作 → 后续危险操作直接放行（dangerMode=ask_once）
     let turnDangerApproved = $state(false)
     let abortCtrl = $state<AbortController | null>(null)
