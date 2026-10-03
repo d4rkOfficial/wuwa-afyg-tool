@@ -1,6 +1,7 @@
 import type { CharacterInfo } from '$lib/api/types'
 import type { DamageEntry } from './calculation.types'
 import type { CharSlot } from '$lib/types/project'
+import { richTagRe } from '$lib/utils/rich-text'
 
 /**
  * @desc 规则1：技能倍率名里的类型前缀 → 对应伤害类型
@@ -37,10 +38,15 @@ const CN_DIGITS: Record<string, number> = {
     九: 9
 }
 
-/** @desc 去标签纯文本：先剥标签（`<te href=1>共鸣技能</te>` 会把词拆开），再压缩空白 */
+/**
+ * @desc 去标签纯文本：先剥标签（`<te href=1>共鸣技能</te>` 会把词拆开），再压缩空白。
+ * 标签词法走 `$lib/utils/rich-text` 的 `richTagRe`（要求字母开头的名字），
+ * 别在这里写「`<` 到下一个 `>`」——上游正文里的 `<` 是数学符号
+ * （琳奈「普攻·灵感碰撞」：`当前【流光】<50%`），那样会把整行正文当标签吃掉。
+ */
 export function stripRichTags(text: string): string {
     return String(text ?? '')
-        .replace(/<[^>]*>/g, '')
+        .replace(richTagRe(), '')
         .replace(/\s+/g, '')
 }
 

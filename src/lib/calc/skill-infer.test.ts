@@ -3,6 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { inferDamageTypes } from './utils'
+import { stripRichTags } from './skill-infer'
 import type { DamageEntry } from './calculation.types'
 import type { CharacterInfo } from '$lib/api/types'
 
@@ -261,6 +262,13 @@ test('标题名与正文粘连时，标题里的类型词不算本行的徽标�
     assert.equal(typeOf('常态攻击', '绮彩巡游·普攻第一段伤害', skills), '普攻伤害')
     assert.equal(typeOf('常态攻击', '绮彩巡游·闪避反击', skills), '普攻伤害')
     assert.equal(typeOf('常态攻击', '绮彩巡游·地面重击伤害', skills), '普攻伤害')
+})
+
+test('去标签时不吃正文里的数学符号 `<`（琳奈·当前【流光】<50%）', () => {
+    assert.equal(
+        stripRichTags('当前<color=Highlight>【<te href=150906>流光</te>】</color><50%\n普攻·灵感碰撞·2级'),
+        '当前【流光】<50%普攻·灵感碰撞·2级'
+    )
 })
 
 test('更短的同族行名套在本行名字里时，不抢走本行的结论（灯灯·强光穿射）', () => {
