@@ -19,7 +19,13 @@
     import Button from '$lib/components/ui/button.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import type { ComponentsProps } from '$lib/types'
-    import { compareStatAttrs, formatSubstatValue, mergeTriggerSets } from './quick-lookup.utils'
+    import {
+        compareStatAttrs,
+        dedupeStatNodes,
+        formatSubstatValue,
+        mergeTriggerSets,
+        statNodeKey
+    } from './quick-lookup.utils'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
@@ -76,9 +82,21 @@
     let charTags = $derived(charData?.tags ?? [])
     /** @desc 标签色：上游缺色时回落到当前文字色，保证边框/底色/图标三处取色一致 */
     const tagColor = (tag: CharacterTag): string => tag.color || 'currentColor'
+    /**
+     * @desc 角色固有节点（固有技能 / 固有属性）：上游同一节点会成对重复，先按 name+desc 去重（见 `./quick-lookup.utils`）。
+     *
+     * 顺带记下本页各 `{#each}` 的 key 依据（**上游真源采样**：nanoka `ww/3.7`，全部 64 个角色）：
+     *  - `charTags` → `tag.id`（上游对象键，天然唯一）；`charNames` / 右键菜单项 → 索引 / 常量自身唯一；
+     *  - `setBonuses` → `name`（`mergeTriggerSets` 已用 Map 按名合并，唯一）；
+     *  - `charData.skills[].name`、`skill.values[][0]`、`charData.chains[].name` → 64/64 角色均无重复，故保留值作 key；
+     *  - 固有技能 / 固有属性 → **采样发现成对重复**（每个角色都有），故先 `dedupeStatNodes` 再用
+     *    `statNodeKey`（name+desc）作 key。
+     *  改这些 key 前请重新采样真源，别凭「看起来唯一」判断（T9 教训：重复 key 是运行时报错，不是警告）。
+     */
+    let statNodes = $derived(dedupeStatNodes(charData?.statNodes ?? []))
     /** @desc 固有技能（名字不以「提升」结尾）与固有属性（以「提升」结尾，按名称+数值排序） */
-    let inherentSkills = $derived(charData?.statNodes.filter((n) => !n.name.endsWith('提升')) ?? [])
-    let statAttrs = $derived(charData?.statNodes.filter((n) => n.name.endsWith('提升')) ?? [])
+    let inherentSkills = $derived(statNodes.filter((n) => !n.name.endsWith('提升')))
+    let statAttrs = $derived(statNodes.filter((n) => n.name.endsWith('提升')))
     let sortedStatAttrs = $derived([...statAttrs].sort(compareStatAttrs))
     /** @desc 普通技能数与技能区卡片总数（普通 + 固有），用于「跳转下一技能」按钮的末项判定 */
     let skillsLen = $derived(charData?.skills.length ?? 0)
@@ -665,7 +683,7 @@
                                     {/if}
                                 </div>
                             {/each}
-                            {#each inherentSkills as skill, j (skill.name)}
+                            {#each inherentSkills as skill, j (statNodeKey(skill))}
                                 <div
                                     class="rounded-none border"
                                     data-skill-index={skillsLen + j}
@@ -719,7 +737,7 @@
                                 </h3>
                             </div>
                             <div class="grid grid-cols-2 gap-2">
-                                {#each sortedStatAttrs as attr (attr.name)}
+                                {#each sortedStatAttrs as attr (statNodeKey(attr))}
                                     <div
                                         class="rounded-none border p-2.5"
                                         style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"

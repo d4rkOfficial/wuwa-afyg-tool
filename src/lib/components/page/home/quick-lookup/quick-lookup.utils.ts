@@ -42,6 +42,38 @@ export const mergeTriggerSets = (
 }
 
 /**
+ * @desc 固有属性/固有技能节点的**渲染键**：`name` + `desc` 的组合（去重后组内唯一）。
+ *
+ * 为什么不能只用 `name`（**实测踩过，速查页卡在「加载中...」的真因**）：
+ * `compareStatAttrs` 的注释早就写明「同名时按 desc 里的首个数字排序」，即这些节点**天然会同名**。
+ * 拿上游真源采样（nanoka `ww/3.7`，全部 64 个角色）：每个角色的 `node_type=4` 节点都成对重复 ——
+ * 如散华 4× 「攻击提升」（1.80% ×2 + 4.20% ×2）+ 4× 「冷凝伤害加成提升」（同）；
+ * 于是 `{#each sortedStatAttrs as attr (attr.name)}` 一进详情就抛 `each_key_duplicate`，
+ * 整个渲染更新被中断，DOM 停在上一帧的「加载中...」。
+ * 注意 `name+desc` 在**未去重**时同样会重复（那两对是完全相同的节点），故必须先过 `dedupeStatNodes`。
+ */
+export const statNodeKey = (node: { name: string; desc?: string }): string => `${node.name}\u0000${node.desc ?? ''}`
+
+/**
+ * @desc 丢掉 `name + desc` **完全相同**的节点（保留首次出现）。
+ *
+ * 依据（上游真源采样，nanoka `ww/3.7` 全部 64 角色）：`node_type=4` 的固有属性节点成对重复，
+ * 不去重会把同数值的卡片渲染两遍；去重后 `statNodeKey` 必然唯一 —— 这正是它能作 `{#each}` key 的前提。
+ * 同名的**不同数值**节点（1.80% / 4.20%）会全部保留。
+ */
+export const dedupeStatNodes = <T extends { name: string; desc?: string }>(nodes: readonly T[]): T[] => {
+    const seen = new Set<string>()
+    const out: T[] = []
+    for (const node of nodes) {
+        const key = statNodeKey(node)
+        if (seen.has(key)) continue
+        seen.add(key)
+        out.push(node)
+    }
+    return out
+}
+
+/**
  * @desc 固有属性的排序：先按名称字典序，同名时按描述里的**首个数字**升序。
  *
  * 抽因：这是模板里 `sortedStatAttrs` 的比较器，含两处非平凡点 ——
