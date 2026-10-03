@@ -131,6 +131,10 @@ interface BuffCondition {
   `共技·冷凝加成`，文案与乘区徽标 `describeZoneConditionBadge` 完全一致，伤害类型简称在前、属性在后），
   且**条件不满足的乘区不列为来源** —— 判据与引擎共用 `zoneConditionMet`，保证「来源之和 = 该乘区数值」。
   系数基类条目（处决/响应/效应）的 `ResultEntry.damageTypes` 为空，溯源必须用 `resolveDamageTypes` 现解析后再判。
+- **拉表「可用Buff」过滤同口径**：`buffMatchesEntry` 的上下文就是引擎的 `zoneCtx`（`element` + **解析后**的
+  伤害类型），**非直伤条目一样要传**（效应 → `效应伤害`；处决/响应 → 推断类型，由 `buildDamageTypesByEntry` 提供）。
+  曾经对非直伤传空上下文，于是「需要条目上下文的子句视为不满足」把带属性/类型条件的乘区全判成不匹配 ——
+  实测症状：效应条目上带「导电/效应」条件的加深 buff 挂不上（引擎其实吃它）。
 
 ### 分层裁剪
 

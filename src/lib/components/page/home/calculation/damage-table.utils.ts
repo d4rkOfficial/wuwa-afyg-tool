@@ -20,7 +20,13 @@ import type { CharSlot } from '$lib/types/project'
 /** @desc 直伤判定的最小入参（两个表的入参都是 `DamageEntry`，此处放宽便于共用） */
 type DamageKind = Pick<DamageEntry, 'isEffect' | 'isTuneBreak' | 'isTuneResponse'>
 
-/** @desc 非直伤条目（效应 / 处决 / 响应）：三者一律不吃条目级伤害类型上下文 */
+/**
+ * @desc 非直伤条目（效应 / 处决 / 响应）的判定。
+ *
+ * 注：它们**不是**「没有伤害类型上下文」—— 引擎给它们判乘区条件时用的是解析后的伤害类型
+ * （效应 → `效应伤害`；处决/响应 → 推断类型），拉表的条件过滤也必须照传（见 `buffMatchesEntry`）。
+ * 这里只表示「走系数基类公式」这一归属，供分组、可用性与双暴口径使用。
+ */
 export const isNonDirectDamage = (e: DamageKind): boolean => e.isEffect || e.isTuneBreak || e.isTuneResponse
 
 /** @desc 是否为直伤条目（非效应/非处决/非响应） */
@@ -42,6 +48,12 @@ type CharInfoMap = ResolveArgs[2]
 /**
  * @desc 条目 → 生效伤害类型：`resolveDamageTypes()` 只依赖条目与角色/声骸信息，与具体 buff 无关，
  * 不该按「条目 × buff」重算。两个视图共用同一口径与同一次记忆。
+ *
+ * **非直伤条目（处决/响应/效应）也要收进来**：引擎给它们的乘区条件判定传的就是解析后的伤害类型
+ * （效应 → `效应伤害`、处决/响应 → 推断类型），拉表若在这里跳过它们，条件过滤就失去了上下文，
+ * 会把「带属性/类型条件的乘区」一律判成不匹配（实测：效应条目上带「导电/效应」条件的加深 buff
+ * 被默认开启的「可用Buff」过滤挡掉、挂不上）。本 Map 只服务于条件判定，**不用于展示** ——
+ * 展示仍走 `entryDamageTypeMap`（用户显式）与 `inferredDamageTypeMap`（自动推导）。
  */
 export const buildDamageTypesByEntry = (
     damageEntries: readonly DamageEntry[],
@@ -51,7 +63,6 @@ export const buildDamageTypesByEntry = (
 ): Map<string, string[]> => {
     const m = new Map<string, string[]>()
     for (const e of damageEntries) {
-        if (isNonDirectDamage(e)) continue
         m.set(e.id, resolveDamageTypes(e, entryDamageTypeMap, charInfoMap, echoDescByEntry))
     }
     return m
@@ -168,8 +179,13 @@ export const buffUsableByEntry = (bs: BuffSet, entry: DamageEntry): boolean =>
  * @desc 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff）。
  *
  * 用 `buffContributesToEntry` 而非实例级条件：属性/类型条件挂在**乘区条目**上，
- * 只看实例级会让「乘区条件不满足」的 buff 仍可勾选。非直伤条目没有条目级伤害类型上下文，
- * 故按引擎口径丢掉乘区条件的 damageTypes 维度。
+ * 只看实例级会让「乘区条件不满足」的 buff 仍可勾选。
+ *
+ * **上下文与引擎同口径**（属性 + 解析后的伤害类型，`computeAll` 的 `zoneCtx` 也是这两项，非直伤条目一样传）：
+ * 曾经对非直伤条目传空上下文（`{}`），于是一律触发 `evaluateCondition` 的「需要条目上下文的子句视为不满足」，
+ * 把「带属性/类型条件的乘区」全部判成不匹配 —— 实测症状：效应条目上带「导电/效应」条件的加深 buff
+ * 被默认开启的「可用Buff」过滤挡掉、挂不上（引擎其实是吃的）。非直伤的伤害类型由
+ * `buildDamageTypesByEntry` 提供（效应 → `效应伤害`；处决/响应 → 推断类型）。
  */
 export const buffMatchesEntry = (
     bs: BuffSet | undefined,
@@ -185,12 +201,7 @@ export const buffMatchesEntry = (
     if (!ctx.hideConditionMismatch) return true
     return buffContributesToEntry(
         bs,
-        isNonDirectDamage(entry)
-            ? {}
-            : {
-                  element: entry.damageElement,
-                  damageTypes: ctx.damageTypes ?? []
-              },
+        { element: entry.damageElement, damageTypes: ctx.damageTypes ?? [] },
         ctx.conditionProfile,
         ctx.charIdx
     )
