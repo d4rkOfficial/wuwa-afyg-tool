@@ -866,7 +866,7 @@
                 bare
                 onclick={handleCopy}
                 backgroundImage="transparent"
-                class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                class="w-full justify-start gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                 ><Icon icon="mdi:content-copy" class="size-3.5 shrink-0" /> 复制</Button
             >
             {#if showBuffOption || showCustomHitOption}
@@ -882,7 +882,7 @@
                     disabled={locked}
                     onclick={handleCreateBuffFromSel}
                     backgroundImage="transparent"
-                    class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    class="w-full justify-start gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                     title={locked ? '已锁定，无法创建 BUFF' : undefined}
                     ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</Button
                 >
@@ -896,7 +896,7 @@
                     disabled={locked}
                     onclick={handleCreateCustomHit}
                     backgroundImage="transparent"
-                    class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-buff-yellow-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    class="w-full justify-start gap-2 px-3 py-1.5 text-sm text-left text-(--theme-buff-yellow-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                     title={locked ? '已锁定，无法创建自定义直伤' : undefined}
                     ><Icon icon="mdi:plus-circle-outline" class="size-3.5 shrink-0" /> 创建自定义直伤</Button
                 >
@@ -910,7 +910,7 @@
                 bare
                 onclick={handleScrollTop}
                 backgroundImage="transparent"
-                class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                class="w-full justify-start gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                 ><Icon icon="mdi:arrow-up-bold-outline" class="size-3.5 shrink-0" /> 跳转到顶部</Button
             >
             <Button
@@ -920,7 +920,7 @@
                 bare
                 onclick={handleScrollBottom}
                 backgroundImage="transparent"
-                class="w-full gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                class="w-full justify-start gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                 ><Icon icon="mdi:arrow-down-bold-outline" class="size-3.5 shrink-0" /> 跳转到底部</Button
             >
             ⛔ TEMP-HIDDEN-END -->
