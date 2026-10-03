@@ -100,9 +100,13 @@
         <PickerSearch bind:value={query} placeholder="搜索角色..." />
     {/snippet}
 
-    <div class="flex h-full min-h-0 overflow-hidden">
+    <!-- @desc 单列滚动 + 右侧固定锚点列：**只由弹窗外壳滚动**（外壳的 body 已是 `overflow-y-auto`），
+         所以这里不再自己开滚动容器、也不锁高度 —— 原先的 `flex h-full min-h-0 overflow-hidden`
+         + 左列 `overflow-y-auto` 依赖 `h-full` 能解析到 body 高度，实测解析不出来时整块内容
+         由外壳滚动，右侧那列六属性按钮就跟着列表一起滚走了。 -->
+    <div class="flex">
         <!-- Content area (left) -->
-        <div class="theme-scrollbar flex-1 overflow-y-auto p-4">
+        <div class="min-w-0 flex-1 p-4">
             {#if showSearchResults}
                 {#if searchResults.length === 0}
                     <EmptyState size="lg">无匹配角色</EmptyState>
@@ -213,28 +217,31 @@
             {/if}
         </div>
 
-        <!-- Element nav sidebar (right) -->
+        <!-- Element nav sidebar (right)：整列铺满分隔线，按钮组 `sticky` 钉在弹窗右侧内顶部，
+             列表（外壳 body）怎么滚都不会带走它 -->
         {#if !showSearchResults}
             <div
-                class="flex w-10 shrink-0 flex-col items-center gap-2 border-l py-3"
+                class="flex w-10 shrink-0 flex-col items-center border-l"
                 style="border-color: var(--theme-divider-border)"
             >
-                {#each ELEMENT_ORDER as el (el)}
-                    <button
-                        onclick={() => scrollToElement(el)}
-                        data-sf="widget"
-                        data-sf-flat
-                        class="flex size-7 items-center justify-center rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-(--theme-modal-text)"
-                        style="--sf-base: var(--theme-input-bg)"
-                        title={el}
-                    >
-                        {#if elementIcons[el]}
-                            <img src={elementIcons[el]} alt={el} class="size-full object-contain" />
-                        {:else}
-                            <Icon icon="mdi:circle" class="size-3.5" />
-                        {/if}
-                    </button>
-                {/each}
+                <div class="sticky top-3 flex flex-col items-center gap-2">
+                    {#each ELEMENT_ORDER as el (el)}
+                        <button
+                            onclick={() => scrollToElement(el)}
+                            data-sf="widget"
+                            data-sf-flat
+                            class="flex size-7 items-center justify-center rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:bg-(--theme-modal-text)/5 hover:text-(--theme-modal-text)"
+                            style="--sf-base: var(--theme-input-bg)"
+                            title={el}
+                        >
+                            {#if elementIcons[el]}
+                                <img src={elementIcons[el]} alt={el} class="size-full object-contain" />
+                            {:else}
+                                <Icon icon="mdi:circle" class="size-3.5" />
+                            {/if}
+                        </button>
+                    {/each}
+                </div>
             </div>
         {/if}
     </div>

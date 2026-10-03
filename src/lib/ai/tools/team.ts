@@ -11,6 +11,8 @@ import {
 import type { Character, Weapon } from '$lib/api/types'
 import type { CharSlot, EchoSlot, SelectedSet } from '$lib/types/project'
 import { HECATE_ECHO } from '$lib/consts/game-terms'
+// 有效套装总件数（同名取最大件数后求和）与 UI 共用 `$lib/utils/set-selection` 的同一口径
+import { totalPiecesOf as effectiveTotal } from '$lib/utils/set-selection'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -27,16 +29,6 @@ function editableProject() {
     if (!p) throw new Error('当前没有活动工程')
     if (isPhaseReadonly(p, 'team')) throw new Error('队伍阶段已锁定，请先解锁')
     return p
-}
-
-// 有效套装总件数：同名取最大件数后求和（与 UI getEffectiveTotal 一致）
-function effectiveTotal(sets: SelectedSet[]): number {
-    const byName = new Map<string, number>()
-    for (const s of sets) {
-        const cur = byName.get(s.name) ?? 0
-        if (s.pieces > cur) byName.set(s.name, s.pieces)
-    }
-    return [...byName.values()].reduce((a, b) => a + b, 0)
 }
 
 function cloneTeam(team: [CharSlot, CharSlot, CharSlot]): [CharSlot, CharSlot, CharSlot] {

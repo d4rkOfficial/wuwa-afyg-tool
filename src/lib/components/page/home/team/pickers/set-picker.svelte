@@ -5,6 +5,13 @@
     import Icon from '@iconify/svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { mergeClass } from '$lib/utils/component-style'
+    import {
+        MAX_SET_PIECES,
+        canPickPiece,
+        formatSetSelection,
+        togglePieceSelection,
+        totalPiecesOf
+    } from '$lib/utils/set-selection'
     import EmptyState from '$lib/components/ui/empty-state.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
     import PickerFooter from './picker-footer.svelte'
@@ -37,15 +44,8 @@
         if (open) selected = initialSets.map((s) => ({ ...s }))
     })
 
-    let totalPieces = $derived.by(() => {
-        const byName = new Map<string, number>()
-        for (const s of selected) {
-            const cur = byName.get(s.name) ?? 0
-            if (s.pieces > cur) byName.set(s.name, s.pieces)
-        }
-        return [...byName.values()].reduce((a, b) => a + b, 0)
-    })
-    let remaining = $derived(5 - totalPieces)
+    /** @desc 有效件数 / 剩余部位 / 可点判定 / 切换 / 文案全部走 `$lib/utils/set-selection`（与 AI 工具同一口径） */
+    let totalPieces = $derived(totalPiecesOf(selected))
 
     let pinnedList = $derived(
         pinnedSets.map((name) => echoSets.find((s) => s.name === name)).filter((s): s is EchoSetItem => s !== undefined)
@@ -60,35 +60,12 @@
         return selected.some((s) => s.name === name && s.pieces === pieces)
     }
 
-    function isPieceAvailable(_name: string, pieces: number): boolean {
-        const sel = isSelected(_name)
-        if (sel) return true
-        if (pieces === 5) return true
-        return pieces <= remaining
+    function isPieceAvailable(name: string, pieces: number): boolean {
+        return canPickPiece(selected, name, pieces)
     }
 
     function togglePiece(name: string, pieces: number) {
-        const existing = selected.find((s) => s.name === name)
-        if (existing) {
-            if (existing.pieces === pieces) {
-                selected = selected.filter((s) => s.name !== name)
-            } else {
-                const rest = selected.filter((s) => s.name !== name)
-                selected =
-                    pieces === 5 ? [...rest, { name, pieces: 5 }, { name, pieces: 2 }] : [...rest, { name, pieces }]
-            }
-            return
-        }
-        if (pieces === 5) {
-            selected = [
-                { name, pieces: 5 },
-                { name, pieces: 2 }
-            ]
-            return
-        }
-        if (pieces <= remaining) {
-            selected = [...selected, { name, pieces }]
-        }
+        selected = togglePieceSelection(selected, name, pieces)
     }
 
     function handleConfirm() {
@@ -96,15 +73,7 @@
         onclose()
     }
 
-    function formatSets(sets: SelectedSet[]): string {
-        if (sets.length === 0) return '无'
-        const byName = new Map<string, number>()
-        for (const s of sets) {
-            const cur = byName.get(s.name) ?? 0
-            if (s.pieces > cur) byName.set(s.name, s.pieces)
-        }
-        return [...byName.entries()].map(([name, pieces]) => `${name}(${pieces})`).join(' + ')
-    }
+    const formatSets = formatSetSelection
 </script>
 
 <Modal {open} {onclose} backdropClose class={mergeClass(['w-150 max-w-[90vw]', className])} style={styleProp}>
@@ -217,7 +186,7 @@
     {/if}
     {#snippet footer()}
         <PickerFooter onconfirm={handleConfirm} center>
-            {#snippet label()}确认 ({formatSets(selected)} = {totalPieces}/5){/snippet}
+            {#snippet label()}确认 ({formatSets(selected)} = {totalPieces}/{MAX_SET_PIECES}){/snippet}
         </PickerFooter>
     {/snippet}
 </Modal>

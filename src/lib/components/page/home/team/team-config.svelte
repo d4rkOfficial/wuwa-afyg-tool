@@ -23,6 +23,7 @@
     import { HECATE_ECHO } from '$lib/consts/game-terms'
     import type { ComponentsProps } from '$lib/types'
     import { mergeClass } from '$lib/utils/component-style'
+    import { totalPiecesOf, formatSetSelection } from '$lib/utils/set-selection'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
@@ -241,18 +242,14 @@
         onupdate(localTeam)
     }
 
+    /** @desc 触发套装摘要（同名取最大件数，避免把 5 件套附带的 2 件套重复显示成 `A(5) + A(2)`） */
     function getTriggerSetSummary(slot: CharSlot): string {
         if (slot.triggerSets.length === 0) return ''
-        return slot.triggerSets.map((s) => `${s.name}(${s.pieces})`).join(' + ')
+        return formatSetSelection(slot.triggerSets)
     }
 
     function getEffectiveTotal(sets: SelectedSet[]): number {
-        const byName = new Map<string, number>()
-        for (const s of sets) {
-            const cur = byName.get(s.name) ?? 0
-            if (s.pieces > cur) byName.set(s.name, s.pieces)
-        }
-        return [...byName.values()].reduce((a, b) => a + b, 0)
+        return totalPiecesOf(sets)
     }
 
     let filteredWeapons = $derived.by(() => {
