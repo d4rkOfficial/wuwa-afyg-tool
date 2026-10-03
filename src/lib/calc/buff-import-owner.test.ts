@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 
 import { buildEntityImportItems, detectImportConflicts } from './buff-import-utils'
 import { getAllBuffSets, importBuffSetsWithDecisions, mapImportedScope } from './calculation.store.svelte'
+import { classifyBuffScope } from './calculation.consts'
 import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
 import type { CharSlot } from '$lib/types/project'
 
@@ -114,5 +115,26 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
     it('mapImportedScope：self 跟随主人，self_except 排除主人', () => {
         assert.deepEqual(mapImportedScope('self', 1, 3), [1])
         assert.deepEqual(mapImportedScope('self_except', 1, 3), [0, 2])
+    })
+
+    // 回归：工坊 / 本地 Buff 库里的「效应专属」导入工程后变成「全队共享」。
+    // 根因是 mapImportedScope 把 effect_only 和 team 一起落到了 'all' —— 不只是显示错，
+    // 而是这条 buff 真的会对全部角色的条目生效。
+    it('mapImportedScope：effect_only（效应专属）必须落成空数组，不能变全队', () => {
+        assert.deepEqual(mapImportedScope('effect_only', -1, 3), [], '无归属时同样是效应专属')
+        assert.deepEqual(mapImportedScope('effect_only', 0, 3), [], '归属槽位不影响效应专属')
+        assert.deepEqual(mapImportedScope('team', 0, 3), 'all', 'team 才是全队')
+    })
+
+    it('端到端：效应专属条目落库后 scope 为空数组（不再变成全队）', () => {
+        const entity = entityWith('echo', '声骸X', '效应专属加深E2E', 'effect_only')
+        const items = buildEntityImportItems(entity, TEAM)
+        const { deduped } = detectImportConflicts(items, [])
+        importBuffSetsWithDecisions(deduped, {}, -1, TEAM.length)
+
+        const written = getAllBuffSets().filter((s) => s.name === '效应专属加深E2E')
+        assert.equal(written.length, 1)
+        assert.deepEqual(written[0].scope, [], '导入后必须仍是「效应专属」（scope 空数组）')
+        assert.equal(classifyBuffScope(written[0].scope).kind, 'effect', '徽标也应显示「效应专属」')
     })
 })

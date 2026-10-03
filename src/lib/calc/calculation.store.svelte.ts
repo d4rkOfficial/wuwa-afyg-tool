@@ -573,7 +573,15 @@ export interface ImportBuffInput {
     zones: ImportBuffZone[]
 }
 
-/** @desc share 的 scope 语义 → 工具 BuffSet.scope（'all' | number[]）：由导入方传入 ownerIdx（该实体归属的角色槽位，无则 -1），self_except 需要队伍总槽位数 */
+/**
+ * @desc share 的 scope 语义 → 工具 `BuffSet.scope`（`'all' | number[]`）：由导入方传入 ownerIdx
+ * （该实体归属的角色槽位，无则 -1），`self_except` 需要队伍总槽位数。
+ *
+ * **`effect_only` 必须映射成空数组**（工具侧「效应专属」就是 `scope: []`，见 `classifyBuffScope`）：
+ * 曾经把它和 `team` 一起落到 `'all'`，症状是「工坊 / 本地 Buff 库里明明是效应专属，导入工程后变成全队共享」
+ * —— 而且不只是显示：`scope: 'all'` 会让这条 buff 对**所有**角色的条目都生效。AI 生成的
+ * `effect_only` buff（`ai/generate/sanitize.ts` 会把效应专属标成它）走的也是本函数，同样受此影响。
+ */
 export function mapImportedScope(
     scope: ImportBuffInput['scope'],
     ownerIdx: number,
@@ -589,6 +597,7 @@ export function mapImportedScope(
             return idxs.length ? idxs : []
         }
         case 'effect_only':
+            return []
         case 'team':
         default:
             return 'all'
