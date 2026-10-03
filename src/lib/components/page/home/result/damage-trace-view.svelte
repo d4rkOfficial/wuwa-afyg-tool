@@ -373,21 +373,11 @@
                         ></span>
                         <span class="truncate" style="color: var(--theme-modal-text);">{p.source}</span>
                         <span class="shrink-0" style="opacity: 0.5;">{p.label}</span>
-                        {#if p.note}
-                            <span
-                                class="ml-auto max-w-[9rem] truncate text-right text-[10px]"
-                                style="color: var(--theme-accent-text); opacity: 0.85;"
-                                title={p.note}
-                            >
-                                {p.note}
-                            </span>
-                        {:else}
-                            <span class="ml-auto shrink-0 tabular-nums" style="color: var(--theme-accent-text);">
-                                {partValue(p)}{#if p.contribution !== undefined && p.unit === 'mult'}
-                                    <span style="opacity: 0.5;">（× {p.contribution.toFixed(3)}）</span>
-                                {/if}
-                            </span>
-                        {/if}
+                        <span class="ml-auto shrink-0 tabular-nums" style="color: var(--theme-accent-text);">
+                            {partValue(p)}{#if p.contribution !== undefined && p.unit === 'mult'}
+                                <span style="opacity: 0.5;">（× {p.contribution.toFixed(3)}）</span>
+                            {/if}
+                        </span>
                     </div>
                 {/each}
                 {#if !tip.chip.parts.length}

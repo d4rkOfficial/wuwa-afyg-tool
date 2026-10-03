@@ -155,10 +155,19 @@ export const columnSepClass = (
 /** @desc 伤害源标识：直伤/处决/响应取引起它的角色；效应类非直伤条目不带 character（视为非角色引起） */
 export const entrySourceOf = (e: DamageEntry): string => e.character ?? ''
 
-/** @desc 效应/处决/响应伤害实际读取的乘区（computeEffectEntry / computeTuneEntry）：效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；都不吃攻击/暴击/增伤/面板类 */
+/**
+ * @desc 效应/处决/响应伤害实际读取的乘区（computeEffectEntry / computeTuneEntry）：
+ * 效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；都不吃攻击/增伤/面板类。
+ *
+ * **双暴是「初始 0」而不是「不吃」**：这两类条目的双暴基准为 0% / 100%（`compute.ts` 的 `critBase`），
+ * 面板双暴不计入，但**绑定到该条目的双暴 buff 会真正参与**暴击区（暴击率 0 时结果页仍显示占位符），
+ * 故 `critRate` / `critDmg` 必须列在可吃乘区里，否则拉表勾不到、功能不可达。
+ */
 export const EFFECT_RELEVANT_ZONES: ReadonlySet<string> = new Set([
     'extraRatio',
     'deepenDmg',
+    'critRate',
+    'critDmg',
     'resPen',
     'resDown',
     'defPen',
@@ -174,6 +183,8 @@ export const EFFECT_RELEVANT_ZONES: ReadonlySet<string> = new Set([
 export const TUNE_RELEVANT_ZONES: ReadonlySet<string> = new Set([
     'extraRatio',
     'tuneBreakBoost',
+    'critRate',
+    'critDmg',
     'resPen',
     'resDown',
     'defPen',

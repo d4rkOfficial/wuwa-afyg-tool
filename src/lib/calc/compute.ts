@@ -111,8 +111,20 @@ function isTypeBonus(label: string): boolean {
     return label in TYPE_BONUS_MAP
 }
 
-/** @desc 把装备/词条上的属性词条（元素加成 / 类型加成 / 面板词条）写入角色贡献累加器 */
-function applyEntryStatToAccum(label: string, value: number, acc: CharacterComputed) {
+/**
+ * @desc 双暴基准：面板口径 5% / 150%；**系数基类**（处决 / 响应 / 效应 / 偏谐系数直伤）口径 0% / 100%
+ * —— 后者「额外暴击伤害 = 0%」，即 `1 + 暴击率 × (暴击伤害 - 1)` 在只有暴击率 buff 时恒为 1，不会掉伤害。
+ */
+const critBase = (fromPanel: boolean): { rate: number; dmg: number } =>
+    fromPanel ? { rate: 5, dmg: 150 } : { rate: 0, dmg: 100 }
+
+/**
+ * @desc 把装备/词条上的属性词条（元素加成 / 类型加成 / 面板词条）写入角色贡献累加器。
+ *
+ * `critFromPanel=false`（系数基类条目）时丢弃装备双暴：处决/响应/效应不吃角色面板双暴，
+ * 双暴只能由**绑定到该条目**的 buff（直接乘区 / 引用 / 覆盖）提供。
+ */
+function applyEntryStatToAccum(label: string, value: number, acc: CharacterComputed, critFromPanel = true) {
     if (isElementBonus(label)) {
         const el = ELEMENT_BONUS_MAP[label]
         acc.elementBonus[el] = (acc.elementBonus[el] ?? 0) + value
@@ -143,10 +155,10 @@ function applyEntryStatToAccum(label: string, value: number, acc: CharacterCompu
             applyZone(acc, 'defPct', value)
             break
         case '暴击率':
-            applyZone(acc, 'critRate', value)
+            if (critFromPanel) applyZone(acc, 'critRate', value)
             break
         case '暴击伤害':
-            applyZone(acc, 'critDmg', value)
+            if (critFromPanel) applyZone(acc, 'critDmg', value)
             break
         case '共鸣效率':
             applyZone(acc, 'recharge', value)
@@ -156,7 +168,8 @@ function applyEntryStatToAccum(label: string, value: number, acc: CharacterCompu
     }
 }
 
-function emptyAccum(): CharacterComputed {
+function emptyAccum(critFromPanel = true): CharacterComputed {
+    const crit = critBase(critFromPanel)
     return {
         baseAtk: 0,
         baseHp: 0,
@@ -173,8 +186,8 @@ function emptyAccum(): CharacterComputed {
         hpFlatSum: 0,
         defPctSum: 0,
         defFlatSum: 0,
-        critRate: 5,
-        critDmg: 150,
+        critRate: crit.rate,
+        critDmg: crit.dmg,
         bonusDmg: 0,
         deepenDmg: 0,
         resPen: 0,
@@ -199,14 +212,15 @@ function accumulateEchoes(
     echoes: EchoSlotConfig[],
     weaponSubstatValue: number,
     weaponSubstatLabel: string | undefined,
-    acc: CharacterComputed
+    acc: CharacterComputed,
+    critFromPanel = true
 ) {
     if (weaponSubstatLabel) {
-        applyEntryStatToAccum(weaponSubstatLabel, weaponSubstatValue, acc)
+        applyEntryStatToAccum(weaponSubstatLabel, weaponSubstatValue, acc, critFromPanel)
     }
     for (const echo of echoes) {
         if (echo.mainStat) {
-            applyEntryStatToAccum(echo.mainStat.type, echo.mainStat.value, acc)
+            applyEntryStatToAccum(echo.mainStat.type, echo.mainStat.value, acc, critFromPanel)
         }
         if (echo.secondMainStat) {
             if (echo.secondMainStat.type === '攻击') applyZone(acc, 'atkFlat', echo.secondMainStat.value)
@@ -219,7 +233,7 @@ function accumulateEchoes(
             }
         }
         for (const sub of echo.substats) {
-            applyEntryStatToAccum(sub.type, sub.value, acc)
+            applyEntryStatToAccum(sub.type, sub.value, acc, critFromPanel)
         }
     }
 }
@@ -385,21 +399,25 @@ function boundBuffs(
 }
 
 /** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 条目）。
- *  门槛判定（作用域 + 实例级硬性条件）均已在此前完成，此处只做乘区写入（含每条目自身的乘区条件）。 */
+ *  门槛判定（作用域 + 实例级硬性条件）均已在此前完成，此处只做乘区写入（含每条目自身的乘区条件）。
+ *
+ *  `critFromPanel=false` 用于**系数基类条目**（处决/响应/效应/偏谐系数直伤）：基础双暴与装备双暴都不计入
+ *  （基准改 0% / 100%），双暴只能由绑定到该条目的 buff 通道（直接乘区 / 引用 / 覆盖）提供。 */
 function computeCharacterStats(
     charInfo: CharacterInfo,
     weaponName: string | null,
     weaponInfo: WeaponInfo | null,
     echoes: EchoSlotConfig[],
     boundBuffs: BuffInstance[],
-    ctx?: ZoneCtx
+    ctx?: ZoneCtx,
+    critFromPanel = true
 ): CharacterComputed {
     const baseAtk = Math.round(charInfo.lv90BaseStats.atk + (weaponInfo?.lv90BaseAtk ?? 0))
     const baseHp = Math.round(charInfo.lv90BaseStats.hp)
     const baseDef = Math.round(charInfo.lv90BaseStats.def)
     const baseTuneBreakBoost = Math.round(charInfo.lv90BaseStats.tuneBreakBoost)
 
-    const acc = emptyAccum()
+    const acc = emptyAccum(critFromPanel)
     acc.baseAtk = baseAtk
     acc.baseHp = baseHp
     acc.baseDef = baseDef
@@ -415,7 +433,7 @@ function computeCharacterStats(
             wSubCanonicalValue = wSubValue * 100
         }
     }
-    accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, acc)
+    accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, acc, critFromPanel)
 
     // 一切皆 buff：绑定到该角色的 Buff 逐条乘区条目写入同一贡献累加器（乘区级条件在此过滤）
     for (const z of activeZonesOf(boundBuffs, ctx)) {
@@ -449,8 +467,12 @@ export interface ZoneCtx {
     damageTypes?: string[]
 }
 
-/** @desc 乘区自身条件是否满足（乘区级只允许 伤害类型/属性；链阶由实例级把关） */
-const zoneConditionMet = (zone: { condition?: BuffCondition }, ctx: ZoneCtx): boolean =>
+/**
+ * @desc 乘区自身条件是否满足（乘区级只允许 伤害类型/属性；链阶由实例级把关）。
+ * 除引擎逐条写入外，**溯源**（`damage-trace` 的来源列表）也复用同一判据：条件不满足的乘区既不计入数值，
+ * 也不得列为来源（否则「来源之和 = 乘区数值」这条不变式会被破坏）。
+ */
+export const zoneConditionMet = (zone: { condition?: BuffCondition }, ctx: ZoneCtx): boolean =>
     evaluateCondition(zone.condition, {
         chains: ctx.chains,
         refinements: ctx.refinements,
@@ -892,6 +914,15 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
 
 // ── tune (处决/响应) computation ──
 
+/**
+ * @desc 条目是否走**系数基类公式**（`computeTuneEntry` / `computeEffectEntry`）。
+ *
+ * 与 `computeAll` / `computeOneEntry` 的分派判据逐字一致：处决 / 响应 / 效应 / 偏谐系数直伤。
+ * 这些条目不吃角色面板双暴（基准 0% / 100%），双暴只能由绑定到该条目的 buff 提供。
+ */
+const usesCoefficientFormula = (entry: DamageEntry): boolean =>
+    entry.isEffect || entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数'
+
 const TUNE_COEFF_MAP: Record<string, number> = {
     BOSS: 10027,
     精英怪: 2149,
@@ -930,7 +961,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
     // vulnerability zone (易伤区)
     const vulnerability = 1 + stats.dmgTakenInc / 100
 
-    const totalPerHit =
+    const preCritPerHit =
         baseValue *
         vulnerability *
         defMulti *
@@ -940,7 +971,23 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         unisonMulti *
         (1 + finalDmgDec) *
         customMultVal
-    const expectedPerHit = Math.round(totalPerHit)
+
+    /**
+     * ── 暴击区 ──
+     * 双暴基准 0% / 100%（`stats` 由系数基类口径构建：面板与装备双暴都不计入，见 `critBase`），
+     * 因此只有绑定到该条目的双暴 buff 会抬高它：
+     * - 暴击率 0 ⇒ 期望 = 不暴击，`canCrit: false`（结果页「暴击 / 不暴击」两列显示占位符，与改前一致）；
+     * - 暴击率 > 0 ⇒ 期望 = 不暴击 × (1 + 暴击率 × 额外暴伤)。
+     */
+    const critDecimal = Math.min(stats.critRate, 100) / 100
+    const critDmgDecimal = stats.critDmg / 100
+    const critAvg = 1 + critDecimal * (critDmgDecimal - 1)
+    const canCrit = critDecimal > 0
+
+    const nonCritValue = Math.round(preCritPerHit)
+    const expectedRaw = preCritPerHit * critAvg
+    const expectedPerHit = Math.round(expectedRaw)
+    const critValue = Math.round(preCritPerHit * critDmgDecimal)
 
     const multZones: MultiplierZone[] = [
         { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
@@ -979,7 +1026,8 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
             tuneBreakZone *
             unisonMulti *
             (1 + finalDmgDec) *
-            customMultVal,
+            customMultVal *
+            critAvg,
         baseAtk: tuneCoeff,
         totalAtk: 0,
         atkPctSum: 0,
@@ -995,8 +1043,8 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         totalTuneBreakBoost: stats.totalTuneBreakBoost,
         dmgBonus: 0,
         deepen: 0,
-        critRate: 0,
-        critDmg: 0,
+        critRate: critDecimal,
+        critDmg: critDmgDecimal,
         defMulti,
         resMulti,
         dmgRedMulti,
@@ -1007,19 +1055,22 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         customMult: customMultVal,
         extraRatio: stats.extraRatio,
         vulnerability: stats.dmgTakenInc / 100,
-        totalDamageRaw: totalPerHit,
-        rawPerHit: expectedPerHit,
+        totalDamageRaw: expectedRaw,
+        rawPerHit: nonCritValue,
         expectedPerHit,
         totalDamage: expectedPerHit,
-        nonCritPerHit: expectedPerHit,
-        critPerHit: expectedPerHit,
-        canCrit: false,
+        // 暴击率为 0（canCrit: false）时两列保持与期望同值，避免下游「凹暴/不暴」旧勾选把该段算成 0
+        nonCritPerHit: canCrit ? nonCritValue : expectedPerHit,
+        critPerHit: canCrit ? critValue : expectedPerHit,
+        canCrit,
         multiplierZones: multZones,
         damageTypes: []
     }
 }
 
-function emptyCharacterStats(): CharacterComputed {
+/** @desc 无角色面板的兜底面板（效应条目 / 引用目标缺失）：`critFromPanel=false` 时双暴取系数基类基准 0% / 100% */
+function emptyCharacterStats(critFromPanel = true): CharacterComputed {
+    const crit = critBase(critFromPanel)
     return {
         baseAtk: 0,
         baseHp: 0,
@@ -1037,8 +1088,8 @@ function emptyCharacterStats(): CharacterComputed {
         hpFlatSum: 0,
         defPctSum: 0,
         defFlatSum: 0,
-        critRate: 5,
-        critDmg: 150,
+        critRate: crit.rate,
+        critDmg: crit.dmg,
         bonusDmg: 0,
         deepenDmg: 0,
         resPen: 0,
@@ -1103,10 +1154,24 @@ function computeEffectEntry(
     /** @desc 同奏区：1 + 3% × 同奏增益层数（全伤害通用乘区，效应伤害同样生效） */
     const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
 
-    /** @desc ── 汇总：基础值 × 各乘区乘积 = 单段期望伤害（无易伤区，效应伤害不吃易伤）── */
-    const totalPerHit =
+    /** @desc ── 单段不含暴击的原始伤害：基础值 × 各乘区乘积（无易伤区，效应伤害不吃易伤）── */
+    const preCritPerHit =
         baseValue * defMulti * resMulti * dmgRedMulti * deepen * (1 + finalDmgDec) * customMultVal * unisonMulti
-    const expectedPerHit = Math.round(totalPerHit)
+
+    /**
+     * ── 暴击区 ──
+     * 双暴基准 0% / 100%（系数基类口径：效应不吃角色面板双暴，见 `critBase`），
+     * 只有绑定到本条目、且作用域覆盖它的双暴 buff 会抬高它。暴击率 0 ⇒ `canCrit: false`（结果页两列显示占位符，与改前一致）。
+     */
+    const critDecimal = Math.min(stats.critRate, 100) / 100
+    const critDmgDecimal = stats.critDmg / 100
+    const critAvg = 1 + critDecimal * (critDmgDecimal - 1)
+    const canCrit = critDecimal > 0
+
+    const nonCritValue = Math.round(preCritPerHit)
+    const expectedRaw = preCritPerHit * critAvg
+    const expectedPerHit = Math.round(expectedRaw)
+    const critValue = Math.round(preCritPerHit * critDmgDecimal)
 
     /** @desc 乘区明细（供结果页展示乘区分解） */
     const multZones: MultiplierZone[] = [
@@ -1125,8 +1190,9 @@ function computeEffectEntry(
     ]
 
     /** @desc
-     * ── 输出 ResultEntry：效应伤害不能暴击（canCrit: false）、伤害类型为推导/显式结果（damageTypes: ['效应伤害'] 等）、
-     * 面板类字段（攻击/双暴等）恒为 0，基础值来自独立常量 EFFECT_BASE_VALUE ──
+     * ── 输出 ResultEntry：伤害类型为推导/显式结果（damageTypes: ['效应伤害'] 等）、
+     * 面板类字段（攻击等）恒为 0，双暴走系数基类口径（基准 0% / 100%，只有绑定 buff 能加）、
+     * 基础值来自独立常量 EFFECT_BASE_VALUE ──
      */
     return {
         id: entry.id,
@@ -1148,7 +1214,8 @@ function computeEffectEntry(
             deepen *
             (1 + finalDmgDec) *
             customMultVal *
-            unisonMulti,
+            unisonMulti *
+            critAvg,
         baseAtk: EFFECT_BASE_VALUE,
         totalAtk: 0,
         atkPctSum: 0,
@@ -1164,8 +1231,8 @@ function computeEffectEntry(
         totalTuneBreakBoost: stats.totalTuneBreakBoost,
         dmgBonus: 0,
         deepen: stats.deepenDmg / 100,
-        critRate: 0,
-        critDmg: 0,
+        critRate: critDecimal,
+        critDmg: critDmgDecimal,
         defMulti,
         resMulti,
         dmgRedMulti,
@@ -1176,13 +1243,14 @@ function computeEffectEntry(
         customMult: customMultVal,
         extraRatio: stats.extraRatio,
         vulnerability: 0,
-        totalDamageRaw: totalPerHit,
-        rawPerHit: expectedPerHit,
+        totalDamageRaw: expectedRaw,
+        rawPerHit: nonCritValue,
         expectedPerHit,
         totalDamage: expectedPerHit,
-        nonCritPerHit: expectedPerHit,
-        critPerHit: expectedPerHit,
-        canCrit: false,
+        // 暴击率为 0（canCrit: false）时两列保持与期望同值，避免下游「凹暴/不暴」旧勾选把该段算成 0
+        nonCritPerHit: canCrit ? nonCritValue : expectedPerHit,
+        critPerHit: canCrit ? critValue : expectedPerHit,
+        canCrit,
         multiplierZones: multZones,
         damageTypes
     }
@@ -1214,6 +1282,9 @@ function resolveRefsForEntry(
 /**
  * @desc 构建「本条目可见」的某角色槽位面板：装备/词条 + 绑定到本条目的、作用域指向该角色的 Buff。
  * 与角色槽位级面板（把该角色全部条目上的绑定取并集）的区别：这里严格只看这一段伤害勾了什么。
+ *
+ * `critFromPanel=false`（系数基类条目）时，被引用角色的面板同样不带双暴 —— 「面板双暴不计入」对
+ * 本角色与跨角色引用保持同一口径（系数基类条目的双暴只能来自双暴 buff 本身，不能靠转模引用面板双暴）。
  */
 function buildEntryPanel(
     refIdx: number,
@@ -1226,11 +1297,12 @@ function buildEntryPanel(
     team: CharSlot[],
     configState: ConfigState,
     charInfoMap: Record<string, CharacterInfo>,
-    weaponInfoMap: Record<string, WeaponInfo>
+    weaponInfoMap: Record<string, WeaponInfo>,
+    critFromPanel = true
 ): CharacterComputed {
     if (refIdx === charIndex) return ownStats
     const slot = team[refIdx]
-    if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats()
+    if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats(critFromPanel)
     const bound = activeBoundForChar(candidates, refIdx, entry.isEffect, profile, ctx)
     const panel = computeCharacterStats(
         charInfoMap[slot.character],
@@ -1238,7 +1310,8 @@ function buildEntryPanel(
         weaponInfoMap[slot.weapon ?? ''] ?? null,
         configState.characters[refIdx]?.echoes ?? [],
         bound,
-        ctx
+        ctx,
+        critFromPanel
     )
     for (const z of overrideZonesOf(bound, ctx)) applyZone(panel, z.zoneId, z.value, 'override')
     recomputeTotals(panel)
@@ -1280,13 +1353,23 @@ export function computeAll(
         const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
         const entryBound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx)
         const charInfo = charName ? charInfoMap[charName] : undefined
+        /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴，双暴基准 0% / 100% */
+        const critFromPanel = !usesCoefficientFormula(entry)
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
         let partialStats: CharacterComputed
         if (charInfo) {
-            partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, entryBound, zoneCtx)
+            partialStats = computeCharacterStats(
+                charInfo,
+                weaponName,
+                weaponInfo,
+                echoes,
+                entryBound,
+                zoneCtx,
+                critFromPanel
+            )
         } else {
-            partialStats = emptyCharacterStats()
+            partialStats = emptyCharacterStats(critFromPanel)
             for (const z of activeZonesOf(entryBound, zoneCtx)) {
                 applyZone(partialStats, z.zoneId, z.value)
             }
@@ -1310,7 +1393,8 @@ export function computeAll(
                 team,
                 configState,
                 charInfoMap,
-                weaponInfoMap
+                weaponInfoMap,
+                critFromPanel
             )
             panelCache.set(refIdx, built)
             return built
@@ -1380,11 +1464,13 @@ export function computeOneEntry(
     }
     const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
     const bound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx)
+    /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴，双暴基准 0% / 100% */
+    const critFromPanel = !usesCoefficientFormula(entry)
 
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo
-        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, bound, zoneCtx)
-        : emptyCharacterStats()
+        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, bound, zoneCtx, critFromPanel)
+        : emptyCharacterStats(critFromPanel)
 
     // 被引用角色面板：按需现算（同一槽位只算一次）
     const panelCache = new Map<number, CharacterComputed>()
@@ -1403,7 +1489,8 @@ export function computeOneEntry(
             team,
             configState,
             charInfoMap,
-            weaponInfoMap
+            weaponInfoMap,
+            critFromPanel
         )
         panelCache.set(refIdx, built)
         return built
@@ -1430,6 +1517,97 @@ export function computeOneEntry(
         damageTypes,
         targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer')
     )
+}
+
+/** @desc 引用（转模）解析所需的入口上下文：与 `computeAll` 的入参同源（溯源的 `DamageTraceCtx` 结构上等价） */
+export interface RefResolveContext {
+    buffSets: BuffInstance[]
+    damageEntryBuffSetIds: Record<string, string[]>
+    damageEntryDamageTypes: Record<string, string[]>
+    configState: ConfigState
+    team: CharSlot[]
+    charInfoMap: Record<string, CharacterInfo>
+    weaponInfoMap: Record<string, WeaponInfo>
+    conditionProfile: ConditionProfile
+}
+
+/**
+ * @desc 某条目上「引用（转模）乘区」的**实际数值**：键为 `${buffId}#${zoneIndex}`（`BuffInstance.zones` 下标）。
+ *
+ * 溯源只展示**结果**，不展示转模过程（「攻击白值 超出2000 每100→5 ≤30」这类规则文案已移除），
+ * 但结果必须与引擎逐条目结算写进乘区的数值完全相同 —— 因此这里刻意复用引擎同一条链路
+ * （`entryBound` → 本条目可见面板 → `resolveRefValue`），而不是在溯源里另算一遍公式。
+ */
+export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext): Map<string, number> => {
+    const out = new Map<string, number>()
+    const charName = entry.character
+    const charIndex = ctx.team.findIndex((s) => s.character === charName)
+    const weaponName = charIndex >= 0 ? (ctx.team[charIndex]?.weapon ?? null) : null
+    const weaponInfo = ctx.weaponInfoMap[weaponName ?? ''] ?? null
+    const echoes = charIndex >= 0 ? (ctx.configState.characters[charIndex]?.echoes ?? []) : []
+    const echoDescByEntry = buildEchoDescByEntry([entry], ctx.team, getEchoSkillText())
+    const damageTypes = resolveDamageTypes(entry, ctx.damageEntryDamageTypes, ctx.charInfoMap, echoDescByEntry)
+    const zoneCtx: ZoneCtx = {
+        chains: ctx.conditionProfile.chains,
+        refinements: ctx.conditionProfile.refinements,
+        element: entry.damageElement,
+        damageTypes
+    }
+    const candidates = entryCandidateBuffs(entry, ctx.buffSets, ctx.damageEntryBuffSetIds)
+    const entryBound = activeBoundForChar(candidates, charIndex, entry.isEffect, ctx.conditionProfile, zoneCtx)
+    const charInfo = charName ? ctx.charInfoMap[charName] : undefined
+    const critFromPanel = !usesCoefficientFormula(entry)
+
+    let partialStats: CharacterComputed
+    if (charInfo) {
+        partialStats = computeCharacterStats(
+            charInfo,
+            weaponName,
+            weaponInfo,
+            echoes,
+            entryBound,
+            zoneCtx,
+            critFromPanel
+        )
+    } else {
+        partialStats = emptyCharacterStats(critFromPanel)
+        for (const z of activeZonesOf(entryBound, zoneCtx)) {
+            applyZone(partialStats, z.zoneId, z.value)
+        }
+        recomputeTotals(partialStats)
+    }
+
+    // 被引用角色面板：与 computeAll 同一套「按需现算 + 缓存」；引用一律读**回写前**的面板
+    const panelCache = new Map<number, CharacterComputed>()
+    const panelOf = (refIdx: number): CharacterComputed => {
+        if (refIdx === charIndex) return partialStats
+        const cached = panelCache.get(refIdx)
+        if (cached) return cached
+        const built = buildEntryPanel(
+            refIdx,
+            partialStats,
+            charIndex,
+            entry,
+            candidates,
+            ctx.conditionProfile,
+            zoneCtx,
+            ctx.team,
+            ctx.configState,
+            ctx.charInfoMap,
+            ctx.weaponInfoMap,
+            critFromPanel
+        )
+        panelCache.set(refIdx, built)
+        return built
+    }
+
+    for (const bs of entryBound) {
+        bs.zones.forEach((z, zi) => {
+            if (!z.ref || ZONE_NO_REF_IDS.has(z.zoneId) || !zoneConditionMet(z, zoneCtx)) return
+            out.set(`${bs.id}#${zi}`, resolveRefValue(z.ref, panelOf(z.ref.characterIdx)))
+        })
+    }
+    return out
 }
 
 export function cloneEchoesWithoutAllSubstats(echoes: EchoSlotConfig[]): EchoSlotConfig[] {
