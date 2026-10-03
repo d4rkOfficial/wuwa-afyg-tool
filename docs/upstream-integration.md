@@ -33,12 +33,12 @@
 
 2. **实现并注册**：在 `src/lib/api/provider/index.ts` 的 `REGISTRY` 追加 `{ id, label, create }`。
 
-3. **编写测试**：
-    - `{id}/utils.test.ts` — 纯转换函数单测；
-    - `{id}.provider.test.ts` — mock fetch 驱动适配器方法 + `runContractTests(provider)` 共享契约套件（`contract-test.ts`）；
-    - 追加到 `scripts/test/run-provider-tests.ts` 聚合入口。
+3. **编写测试**（一律放仓库根 `test/` 下、镜像源码路径，见 AGENTS §4 / §5.2）：
+    - `test/src/lib/api/provider/{id}/utils.test.ts` — 纯转换函数单测；
+    - `test/src/lib/api/provider/{id}.provider.test.ts` — mock fetch 驱动适配器方法 + `runContractTests(provider)` 共享契约套件（夹具 `test/src/lib/api/provider/contract-test.ts`）；
+    - **不需要登记**：`pnpm test` 的入口 `test/run-tests.ts` 自动发现 `test/**/*.test.ts`（想要目标路径就调 `test/paths.ts` 的 `testPathOf()`）。
 
-4. **运行检查**：`pnpm test`（node:test 单进程聚合）、`pnpm run format`、`pnpm run check`。
+4. **运行检查**：`pnpm test`（node:test 单进程聚合、自动发现）、`pnpm run format`、`pnpm run check`。
 
 ## 数据质量验收标准（重要）
 

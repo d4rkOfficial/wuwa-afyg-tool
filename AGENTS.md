@@ -67,6 +67,14 @@
     - `src/lib/components/layout/` — 布局元件（弹窗、右键菜单、通知提示等）
     - `src/lib/components/page/{路由名}/` — 页面级组件
 - 不要用一级以上相对路径，如果涉及多级相对路径的导入，那么重构代码，把路由级的类型、常量、工具函数移动到`lib/`下
+- **测试文件一律放仓库根 `test/` 下，并镜像源码路径**：`src/lib/a.ts` → `test/src/lib/a.test.ts`（含夹具/测试替身，
+  如 `src/lib/api/provider/x/__fixtures__.ts` → `test/src/lib/api/provider/x/__fixtures__.ts`）。
+    - 路径映射口径只此一处：`test/paths.ts`（`testPathOf` / `sourcePathOf` / `discoverTestFiles` / `selectTestFiles`）
+    - 测试**不留**在 `src/` 下：`src/` 只放会被打进产物的代码，测试与替身（`test/__mocks__/`）不进产物
+    - 测试里 import 源码用 `$lib/...`（`src/lib`）或 `$src/...`（`src` 根，路由模块用）；别名两处必须同步改：
+      `svelte.config.js` 的 `kit.alias`（喂 Vite 与 svelte-check）与 `test/preload.mjs` 的 `aliasMap`（喂 node:test）
+    - 需要读源码做静态断言的测试，一律用**仓库根相对路径**（`readFileSync('src/lib/...')`；cwd 恒为仓库根）；
+      **不要**用 `import.meta.url` 取同目录读「旁边的源码」—— 测试树与源码树已分家
 
 ## 5. 完成检查
 
@@ -76,24 +84,25 @@
 2. `pnpm run lint:eslint`（ESLint 必须零错误通过）
 3. `pnpm run check`
 
-无需运行 test。
+测试不是必跑项，但**改动纯逻辑（`calc/` `utils/` `data/` 等）时应跑 `pnpm test`**：入口会自动发现全部测试，
+无需登记（详见 §5.2）。
 
 > **环境说明（本机既有，无法修复）**：`.vercel\output\functions\![-]\catchall.func\...` 在 OS 层被 ACL 拒绝（EPERM），
 > 本机用户亦无权限删除它。应对方式已固化，**不要**为绕开它去改部署配置：
 >
-> - `pnpm run format` / `pnpm run lint` 已改成**显式路径**（`"src" "docs" "scripts" "*.{js,mjs,cjs,ts,json,md}"`）。
+> - `pnpm run format` / `pnpm run lint` 已改成**显式路径**（`"src" "test" "docs" "scripts" "*.{js,mjs,cjs,ts,json,md}"`）。
 >   根因：`prettier .` 会**先递归展开目录再套 ignore**，展开阶段就 `Unable to expand directory "."` 失败 ——
 >   `.prettierignore` 里加 `.vercel/` **实测无效**。故**不要**把脚本改回 `prettier .`。
 > - `pnpm run build` 在仓库根**必然失败**（adapter-vercel 的 `rimraf` 打不进被拒目录）。
 >   构建验收改用 `.tmp/build-verify.ps1`：复制源码到无 `.vercel` 的隔离副本、junction 复用 `node_modules`、
 >   构建后核对依赖文件数并对**产物 CSS** 做探针复核（专职抓「写了个不生成 CSS 的类名」这类静态检查器盲区）。
 >   它已实测通过（`adapter-vercel ✔ done`、PWA precache 119、`node_modules` 17779 → 17779）。
-> - **测试文件在 import 期抛错 = 用例静默消失，不是报错**：`pnpm test` 走单进程聚合入口
->   （`scripts/test/run-provider-tests.ts` 逐个 `import`），若某个测试文件在**模块加载阶段**抛错，
->   它的 `describe/it` 一个都不会注册，而 `node:test` 的汇总里**看不到任何 fail** ——
->   唯一症状是 `tests` 计数变少（实测踩过：266 → 262）。
->   根因是那次测试把编译产物写到 `.tmp/button-contract-test/` 又在 `after()` 里 `rmSync`，
->   而 sandbox 在目录被删后会把它列入**永久拒绝**名单，下次 `mkdirSync` 同路径直接 EPERM。
+> - **测试加载失败必须是响的**：聚合入口 `test/run-tests.ts` 对每个测试文件单独 `try/catch`，
+>   加载期抛错会打印 `[test] ✖ 加载失败：<文件>` 并让退出码变 1（见 §5.2）。历史上两种「静默消失」：
+>   ① 手写 import 清单漏登记（实测漏 3 个文件、41 条用例，`pnpm test` 毫无提示，现已改为自动发现）；
+>   ② 文件在**模块加载阶段**抛错 ⇒ `describe/it` 一个都不注册，`node:test` 汇总里**看不到任何 fail**，
+>   唯一症状是 `tests` 计数变少（实测踩过：266 → 262；根因是测试把编译产物写到 `.tmp/xxx/` 又在 `after()` 里
+>   `rmSync`，sandbox 在目录被删后把它列入**永久拒绝**名单，下次 `mkdirSync` 同路径直接 EPERM）。
 >   → **测试脚手架不要「建专用子目录 + 结束后删目录」**，改用 `.tmp/` 下的单文件覆盖写入；
 >   → **改过测试脚手架后要对比 `tests` 计数**，别只看 `fail=0`；
 >   → 另：不能用 `mem:` 这类自定义 scheme 走 module hook 做纯内存加载（Node 报 `Invalid URL`）。
@@ -125,3 +134,23 @@
         - `scripts/check-components.mjs` ⑧ 校验「`ui/` 元件必须被至少一个消费方引用」（防「假组件化」：文件存在 ≠ 已接线；判定覆盖 `$lib`/相对路径 import、`<X>` 渲染与 barrel re-export，**注释里的路径提及不算引用**）。设计系统里**暂时零引用**的元件作为债务登记在该脚本 `BASELINE.uiNoRef`，**只减不增、且不删除**（保留为通用控件，接线时直接复用）；新增零引用 `ui/` 元件立即失败，基线内已恢复引用则提示「可回收」但不失败
     - 动效三不变量由 `scripts/check-motion.mjs` 把关（同样接入 `pnpm run check`，可单独跑 `pnpm run check:motion`）：① `layout.css` 的 `--motion-*` 与 `motion.ts` 的 `MOTION_MS` **逐项相等**（Svelte 过渡只吃 JS 数字，靠脚本对齐而非记忆，不一致时报出不匹配的 key 与两侧数值）；② `transition:` / `in:` / `out:` / `animate:` **只能挂元素**，挂组件是编译期 `component_invalid_directive`（脚本按标签归属判定，不做整行文本匹配，避免误报）；③ 指令内联手写时长（`{{ duration: 200 }}`）走**棘轮**：基线已清零为 **0 处**（T17 把最后 14 处迁到 `slideParams(MOTION_MS.*)`），新增即失败；时长一律走 `$lib/utils/motion.ts` 的 `MOTION_MS` / `motionDuration` / `slideParams`。③ 已无永久豁免项（T26 把最后的 `layout/modal.svelte` 遮罩 130ms 改成 `motionDuration(130)`：正常模式仍是 130ms、reduce 下与面板同步归零；脚本 `EXEMPT` 现为空 Map，仍无条件打印清单以免后人误以为还有豁免）
     - `.tmp/components.md`（`ui/` 元件目录与 props 表）是**生成物**：改 `ui/` 组件后须运行 `pnpm run generate-components-doc` 重新生成；`pnpm run check` 会用 `--check` 比对，不同步即报错并指出首个差异行。该文件与整改计划同放 `.tmp/`（已被 `.gitignore` 忽略），不进 `docs/`——`docs/` 只放随仓库分发的项目文档
+
+### 5.2 测试组织与运行
+
+- **布局**：测试与测试替身全在仓库根 `test/` 下，镜像源码路径（`src/lib/a.ts` → `test/src/lib/a.test.ts`）；
+  测试替身放 `test/__mocks__/`（如 `$app/environment` 的替身 `test/__mocks__/app/environment.ts`）。
+  路径映射口径的唯一实现是 `test/paths.ts`（`testPathOf` / `sourcePathOf` / `discoverTestFiles` / `selectTestFiles`）——
+  想知道「某模块的测试该放哪」就调 `testPathOf()`，不要再靠记忆或手写清单
+- **入口**：`test/run-tests.ts` **自动发现** `test/**/*.test.ts` 并**逐个隔离 `import`**
+  （本环境禁止子进程，故不能用 `node --test`）。新增测试只要按镜像规则放对位置就会被跑到
+- **加载失败必须响**：入口对每个文件单独 `try/catch`，抛错会打 `[test] ✖ 加载失败：<文件>` 并让退出码为 1
+  （历史坑：手写清单漏登记 ⇒ 用例永远不跑；加载期抛错 ⇒ 用例静默消失，只有 `tests` 计数变小）
+- **命令**：`pnpm test`（全部）· `pnpm test:one calc`（只跑路径含 `calc` 的文件）· `pnpm test:list`（只列文件）·
+  `pnpm test:watch` · 单文件 `node --import ./test/preload-runes.mjs --import ./test/preload.mjs <test 文件>`
+- **别名**：`$lib` → `src/lib`（SvelteKit 自带）· `$src` → `src`（测试 import 路由模块用，避免 7 层相对路径）。
+  `$src` 由 `svelte.config.js` 的 `kit.alias` 定义（喂 Vite 与 `.svelte-kit/tsconfig.json`），
+  node:test 侧要在 `test/preload.mjs` 的 `aliasMap` 里同步登记 —— **两处必须一起改**
+- **不进 `pnpm test` 的测试**：联网 / 依赖上游文案的用 `.ts` 命名（非 `*.test.ts`），例如
+  `test/damage-type-infer.<角色>.ts`（跑 `pnpm test:infer`）；自动发现只认 `*.test.ts`，故它们不会被误跑
+- **`test/` 也吃 `pnpm run format` / `lint:eslint` / `svelte-check`**：`.svelte-kit/tsconfig.json` 已包含 `../test/**/*.ts`，
+  所以测试里的类型错误会像源码一样报出来

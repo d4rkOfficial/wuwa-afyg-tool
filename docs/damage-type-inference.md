@@ -93,11 +93,11 @@
 
 1. **查行名**：`await listRatios('长离', '重击')`（或直接看游戏面板），拿到精确行名；
 2. **写期望（先红）**：复制空白模板
-   [`scripts/test/damage-type-infer.example.ts`](../scripts/test/damage-type-infer.example.ts) 为你的用例脚本，
+   [`test/damage-type-infer.example.ts`](../test/damage-type-infer.example.ts) 为你的用例脚本，
    把「角色 + 行名 + 期望伤害类型」填进 `CASES`。期望值只能来自**游戏内伤害类型判定**或**文案明写**，不许凭空猜；
 3. **跑**：
     ```bash
-    node --import ./scripts/test/preload.mjs scripts/test/damage-type-infer.example.ts
+    node --import ./test/preload.mjs test/damage-type-infer.example.ts
     ```
     失败会打印 `期望 X，实际 Y（命中节点：…）`，并以非 0 退出码结束；
 4. **定位**：先确认期望值本身没错，再看算法。需要看原文时：
@@ -108,9 +108,9 @@
 5. **改算法**：只改 `src/lib/calc/skill-infer.ts`（规则2）或 `src/lib/calc/utils.ts`（兜底），不要为了让用例变绿改期望值；
 6. **跑绿**：重跑第 3 步；
 7. **固化**：
-    - 依赖网络/上游文案的用例留在 `scripts/test/` 下（不进 `pnpm test` 聚合入口）；
-    - 结构性行为补进**离线夹具** `src/lib/calc/skill-infer.test.ts`（自带文案 fixture，不联网），
-      一条护栏至少一条离线用例；
+    - 依赖网络/上游文案的用例留在 `test/` 下、用 `.ts` 命名（**不叫** `*.test.ts`，因此不被自动发现）→ 不进 `pnpm test`；
+    - 结构性行为补进**离线夹具** `test/src/lib/calc/skill-infer.test.ts`（自带文案 fixture，不联网），
+      一条护栏至少一条离线用例 —— 它是 `*.test.ts`，`pnpm test` 会自动跑到，**无需登记**（入口自动发现，见 AGENTS §5.2）；
 8. **收尾**：`pnpm run format && pnpm run lint:eslint && pnpm run check`。
 
 ### 4.1 离线夹具长什么样
@@ -141,19 +141,19 @@ assert.equal(typeOf('常态攻击', '重击', skills), '重击伤害')
 角色：<角色名>
 
 要求：
-1. 以 scripts/test/damage-type-infer.example.ts 为模板，用例文件写到 scripts/test/damage-type-infer.<角色>.ts；
+1. 以 test/damage-type-infer.example.ts 为模板，用例文件写到 test/damage-type-infer.<角色>.ts；
 2. 覆盖该角色全部技能节点的伤害行：先调用 listRatios('<角色名>') 拿精确行名，不要凭印象写行名；
 3. expectedDamageType 只能来自「游戏内伤害类型判定」或文案明写的「此次伤害为 XX 伤害」；
    两者都没有时按判定链兜底（规则1 前缀 → 技能类型），并在 note 里写明依据；
 4. 行名在多个技能节点里重名时必须带 skillType；
 5. 每条用例写 note，注明依据（哪句话 / 哪条规则）；
-6. 交付物：用例脚本 + `node --import ./scripts/test/preload.mjs <文件>` 的真实输出（红/绿）+ 失败项分析
+6. 交付物：用例脚本 + `node --import ./test/preload.mjs <文件>` 的真实输出（红/绿）+ 失败项分析
    （区分「期望值写错」与「算法缺护栏」）。
 ```
 
 ### 5.2 验收标准（AI 交付必须满足）
 
-- 脚本能直接跑：`node --import ./scripts/test/preload.mjs scripts/test/<文件>.ts`（**必须带 preload**，它解析 `$lib` 别名与无扩展名导入）；
+- 脚本能直接跑：`node --import ./test/preload.mjs test/<文件>.ts`（**必须带 preload**，它解析 `$lib` 别名与无扩展名导入）；
 - 行名全部来自 `listRatios`，无「按印象猜」的行名；重名行都带了 `skillType`；
 - 期望值可追溯：要么是游戏内判定，要么能在文案里指出原句；
 - 若需改算法：说明改的是哪条护栏、为什么不会误伤别的小节，并给出全角色普查的前后对比结论（见第六节）；
@@ -189,24 +189,24 @@ await sweepDamageTypeInfer(names)
 
 ## 八、相关文件与命令
 
-| 文件                                        | 作用                                                               |
-| ------------------------------------------- | ------------------------------------------------------------------ |
-| `src/lib/calc/skill-infer.ts`               | 规则2 全部实现（节点定位、小节定位、两轮匹配、归属兜底）           |
-| `src/lib/calc/utils.ts`                     | 判定链入口 `inferDamageTypes`、规则1 与技能类型兜底                |
-| `src/lib/calc/skill-infer.test.ts`          | 离线夹具回归测试（不联网）                                         |
-| `scripts/test/damage-type-infer.ts`         | 在线 TDD 夹具：`assertCorrectDamageTypeInfer` / 排查工具           |
-| `scripts/test/damage-type-infer.example.ts` | 空白用例模板（复制后填写）                                         |
-| `scripts/test/preload.mjs`                  | `$lib` 别名 + 无扩展名导入解析钩子（跑脚本时必须带上）             |
-| `src/lib/consts/game-terms.ts`              | `DAMAGE_TYPES` 权威清单                                            |
-| `src/lib/api/provider/nanoka/utils.ts`      | 上游转换与**行名规范化**（`makeSkillValues` / `preprocessSkills`） |
+| 文件                                    | 作用                                                               |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| `src/lib/calc/skill-infer.ts`           | 规则2 全部实现（节点定位、小节定位、两轮匹配、归属兜底）           |
+| `src/lib/calc/utils.ts`                 | 判定链入口 `inferDamageTypes`、规则1 与技能类型兜底                |
+| `test/src/lib/calc/skill-infer.test.ts` | 离线夹具回归测试（不联网）                                         |
+| `test/damage-type-infer.ts`             | 在线 TDD 夹具：`assertCorrectDamageTypeInfer` / 排查工具           |
+| `test/damage-type-infer.example.ts`     | 空白用例模板（复制后填写）                                         |
+| `test/preload.mjs`                      | `$lib` 别名 + 无扩展名导入解析钩子（跑脚本时必须带上）             |
+| `src/lib/consts/game-terms.ts`          | `DAMAGE_TYPES` 权威清单                                            |
+| `src/lib/api/provider/nanoka/utils.ts`  | 上游转换与**行名规范化**（`makeSkillValues` / `preprocessSkills`） |
 
 ```bash
 # 在线用例（填好 CASES 后即为该角色的推导用例集）
 pnpm run test:infer
-node --import ./scripts/test/preload.mjs scripts/test/<你的用例文件>.ts
+node --import ./test/preload.mjs test/<你的用例文件>.ts
 
 # 离线夹具
-node --import ./scripts/test/preload.mjs src/lib/calc/skill-infer.test.ts
+node --import ./test/preload.mjs test/src/lib/calc/skill-infer.test.ts
 
 # 收尾检查
 pnpm run format && pnpm run lint:eslint && pnpm run check

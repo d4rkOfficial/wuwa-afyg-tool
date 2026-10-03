@@ -84,6 +84,25 @@
 
 部署与构建见 [docs/deployment.md](docs/deployment.md)；上游数据接入见 [docs/upstream-integration.md](docs/upstream-integration.md)。
 
+## 测试
+
+测试**全部放仓库根目录 `test/` 下，并镜像源码路径** —— `src/lib/a.ts` 的测试就放 `test/src/lib/a.test.ts`
+（映射口径的唯一实现在 [test/paths.ts](test/paths.ts)：`testPathOf` / `sourcePathOf` / `discoverTestFiles`）。
+
+聚合入口 [test/run-tests.ts](test/run-tests.ts) **自动发现** `test/**/*.test.ts` 并逐个隔离加载，**不需要维护 import 清单**：
+过去手写清单漏登记过 3 个文件、41 条用例（`pnpm test` 毫无提示），且有文件在 import 期抛错时整批静默消失；
+现在加载失败会显式报错并让退出码变 1。
+
+```bash
+pnpm test                 # 跑全部（同进程内逐个 import；本环境禁止子进程，故不用 node --test）
+pnpm test:one calc        # 只跑路径含 "calc" 的测试文件
+pnpm test:list            # 列出会被跑到的文件
+pnpm test:watch           # 监视重跑
+pnpm test:infer           # 联网的伤害类型推导 TDD 夹具（默认不在 pnpm test 内）
+```
+
+单个文件也可以直接跑：`node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/src/lib/calc/coeff-crit.test.ts`。
+
 ## API
 
 工具箱自身提供只读数据接口（供 AI 助手、外部脚本与自建站点使用），基于上游数据精简提纯并随游戏版本自动更新；上游以 `DataProvider` 适配器模式接入（`src/lib/api/provider/`），新增上游的流程与验收标准见 [docs/upstream-integration.md](docs/upstream-integration.md)。

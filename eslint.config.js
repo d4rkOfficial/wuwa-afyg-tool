@@ -76,6 +76,8 @@ export default tseslint.config(
     //   - **/*.svelte.ts    Runes 响应式 store（必须保留可变性）
     //   - **/*.test.ts      测试（含 fixture 可变性）
     //   - **/__fixtures__/** 测试夹具
+    // 注：测试自 T-测试重构起统一放仓库根 `test/` 下（镜像源码路径，见 AGENTS §4/§5.2），
+    //     已不在下列 files 通配范围内；这两条 ignores 只是「万一有测试落回 src/」的安全网。
     {
         name: 'functional-preference / pure-logic layer',
         files: [

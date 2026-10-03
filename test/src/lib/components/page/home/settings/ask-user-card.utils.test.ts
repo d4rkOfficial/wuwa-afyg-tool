@@ -1,0 +1,589 @@
+// T24 纯逻辑回归：ask-user-card.utils.ts（「向用户提问」卡片的全部规则）
+//
+// 运行方式（与仓库 `pnpm test` 同一套 preload + node:test 单进程聚合：
+// package.json 的 test 脚本 = node --import ./test/preload-runes.mjs
+//   --import ./test/preload.mjs test/run-provider-tests.ts
+// 本文件已登记在 test/run-provider-tests.ts 的 import 列表里）：
+//   node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/src/lib/components/page/home/settings/ask-user-card.utils.test.ts
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+import {
+    BOOLEAN_TABS,
+    EMPTY_QUESTION,
+    NO_VALUE,
+    YES_VALUE,
+    answerValues,
+    blockerText,
+    canGoNext,
+    canGoPrev,
+    canSkip,
+    canSubmit,
+    cancelResult,
+    clampIndex,
+    createDraft,
+    draftOf,
+    enterStep,
+    indexAfterSkip,
+    isAnswered,
+    isCustomOn,
+    isOtherOption,
+    isPicked,
+    normalizeGroup,
+    normalizeOptions,
+    normalizeQuestions,
+    pickRadio,
+    progressText,
+    questionBadges,
+    questionStatus,
+    setCustomPick,
+    setCustomText,
+    settleOnce,
+    shouldHandleEnter,
+    skipQuestion,
+    stepIndex,
+    submitBlockers,
+    toAnswer,
+    toResult,
+    toggleCheck
+} from '$lib/components/page/home/settings/ask-user-card.utils'
+import type { AskUserRequest } from '$lib/ai/tools/ask-user.types'
+
+/** @desc 构造一次提问（默认三题：boolean / single / multi，第二题必答） */
+const request = (over: Partial<AskUserRequest> = {}): AskUserRequest => ({
+    title: ' 需要你确认两件事 ',
+    description: ' 问完就开工 ',
+    questions: [
+        { id: 'b1', type: 'boolean', question: '是否继续？' },
+        {
+            type: 'single',
+            question: '用哪套口径？',
+            options: [
+                { value: 'a', label: '口径A', description: '按面板值' },
+                { value: 'b', label: '口径B' }
+            ],
+            required: true
+        },
+        {
+            type: 'multi',
+            question: '要跑哪些环节？',
+            options: [
+                { value: 'x', label: '排轴' },
+                { value: 'y', label: '拉表' }
+            ],
+            customPlaceholder: '其它环节'
+        }
+    ],
+    ...over
+})
+
+const group = () => normalizeGroup(request())
+const q = (g: ReturnType<typeof group>, i: number) => g.questions[i]
+
+describe('归一：问题组 / 题号 / 选项 / allowCustom / required', () => {
+    it('补 id（q{序号}）、trim 标题说明、题号 1 起、是否型忽略 options、默认 allowCustom=true', () => {
+        const g = group()
+        assert.deepEqual(
+            g.questions.map((x) => x.id),
+            ['b1', 'q2', 'q3']
+        )
+        assert.deepEqual(
+            g.questions.map((x) => x.no),
+            [1, 2, 3]
+        )
+        assert.equal(g.title, '需要你确认两件事')
+        assert.equal(g.description, '问完就开工')
+        // 是否型：options 恒空、自带 allowCustom=false（契约：boolean 不支持自定义）
+        assert.deepEqual(q(g, 0).options, [])
+        assert.equal(q(g, 0).allowCustom, false)
+        assert.equal(q(g, 0).required, false)
+        // single/multi：默认允许自定义、默认非必答
+        assert.equal(q(g, 1).allowCustom, true)
+        assert.equal(q(g, 1).required, true)
+        assert.equal(q(g, 2).required, false)
+        assert.equal(q(g, 2).customPlaceholder, '其它环节')
+        // 每个 id 都有初始草稿
+        for (const question of g.questions)
+            assert.deepEqual(draftOf(g.draft, question.id), {
+                picked: [],
+                customOn: false,
+                customText: '',
+                skipped: false
+            })
+    })
+
+    it('重复 id 被改写、空 options / 重复 value / 缺 label 被安全处理（保证 {#each} key 唯一）', () => {
+        const qs = normalizeQuestions([
+            { id: 'dup', type: 'boolean', question: 'A' },
+            { id: 'dup', type: 'boolean', question: 'B' },
+            { id: 'dup', type: 'boolean', question: 'C' },
+            {
+                type: 'single',
+                question: 'D',
+                options: [
+                    { value: 'v', label: 'V' },
+                    { value: 'v', label: 'V重复' },
+                    { value: '', label: '空值' },
+                    { value: 'w', label: '' }
+                ]
+            }
+        ])
+        assert.deepEqual(
+            qs.map((x) => x.id),
+            ['dup', 'dup-2', 'dup-3', 'q4']
+        )
+        // 组内 id 唯一（`{#each (q.id)}` 的 key 前提）
+        assert.equal(new Set(qs.map((x) => x.id)).size, qs.length)
+        // 选项：去重 + 丢空 value + 缺 label 回落 value
+        assert.deepEqual(qs[3].options, [
+            { value: 'v', label: 'V' },
+            { value: 'w', label: 'w' }
+        ])
+        assert.equal(new Set(qs[3].options.map((o) => o.value)).size, qs[3].options.length)
+        assert.deepEqual(normalizeOptions(undefined), [])
+    })
+
+    it('normalizeQuestions 不修改调用方传入的 used 集合（无副作用）', () => {
+        const used = new Set<string>()
+        normalizeQuestions([{ id: 'k', type: 'boolean', question: 'x' }])
+        assert.equal(used.size, 0)
+    })
+
+    it('空问题组不崩：questions=[]、progressText 不越界、EMPTY_QUESTION 可渲染', () => {
+        const g = normalizeGroup({ questions: [] })
+        assert.deepEqual(g.questions, [])
+        assert.equal(progressText(0, 0), '第 1 / 0 题')
+        assert.equal(clampIndex(3, 0), 0)
+        assert.equal(EMPTY_QUESTION.allowCustom, false)
+        assert.equal(EMPTY_QUESTION.customOption, null)
+        assert.equal(EMPTY_QUESTION.type, 'boolean')
+    })
+})
+
+// ── 「其它」唯一化：AI 自带「其它」时，那一项自己就是输入槽（界面不再补第二行）──────────
+describe('「其它」唯一化', () => {
+    it('识别「其它」型选项：中英文变体、括号补充、大小写与空白都认', () => {
+        const yes = [
+            { value: 'other', label: '其它' },
+            { value: 'o', label: '其他' },
+            { value: 'o', label: '其它（请说明）' },
+            { value: 'o', label: 'Other' },
+            { value: 'o', label: ' Custom (please specify) ' },
+            { value: 'other', label: '随便写点' },
+            { value: 'custom', label: '自定义' },
+            { value: 'x', label: '自定义输入' }
+        ]
+        for (const opt of yes) assert.equal(isOtherOption(opt), true, `${opt.label} 应认成「其它」`)
+        const no = [
+            { value: 'a', label: '口径A' },
+            { value: 'a', label: '其它口径（面板值/期望值）' },
+            { value: 'axis', label: '排轴' }
+        ]
+        for (const opt of no) assert.equal(isOtherOption(opt), false, `${opt.label} 不该认成「其它」`)
+    })
+
+    it('AI 自带「其它」→ customOption 指向它；没自带 / boolean / 显式 allowCustom:false → null', () => {
+        const g = normalizeGroup({
+            questions: [
+                {
+                    type: 'single',
+                    question: 'A',
+                    options: [
+                        { value: 'a', label: '甲' },
+                        { value: 'other', label: '其它（请说明）' }
+                    ]
+                },
+                { type: 'multi', question: 'B', options: [{ value: 'x', label: '排轴' }] },
+                { type: 'boolean', question: 'C' },
+                {
+                    type: 'single',
+                    question: 'D',
+                    allowCustom: false,
+                    options: [
+                        { value: 'a', label: '甲' },
+                        { value: 'other', label: '其它' }
+                    ]
+                }
+            ]
+        })
+        assert.equal(g.questions[0].allowCustom, true)
+        assert.equal(g.questions[0].customOption, 'other')
+        // 没自带 → null，模板据此补一行 CUSTOM_LABEL
+        assert.equal(g.questions[1].customOption, null)
+        // boolean 恒无自定义槽
+        assert.equal(g.questions[2].customOption, null)
+        // 显式关掉自定义 → 「其它」退化成一条普通选项（不展开输入框）
+        assert.equal(g.questions[3].allowCustom, false)
+        assert.equal(g.questions[3].customOption, null)
+    })
+
+    it('同题出现多个「其它」写法：只认第一个当输入槽（否则两行会抢同一个 customOn）', () => {
+        const g = normalizeGroup({
+            questions: [
+                {
+                    type: 'single',
+                    question: 'A',
+                    options: [
+                        { value: 'other', label: '其它' },
+                        { value: 'custom', label: '自定义' }
+                    ]
+                }
+            ]
+        })
+        assert.equal(g.questions[0].customOption, 'other')
+    })
+
+    it('选中 AI 自带的「其它」再输入：values 为输入原文，预设 value 不混进作答', () => {
+        const g = normalizeGroup({
+            questions: [
+                {
+                    type: 'single',
+                    question: '用哪套口径？',
+                    required: true,
+                    options: [
+                        { value: 'a', label: '甲' },
+                        { value: 'other', label: '其它' }
+                    ]
+                }
+            ]
+        })
+        const question = g.questions[0]
+        // 单选语义：勾「其它」清掉预设项；光勾不输入不算作答（必答题会挡住提交）
+        const on = setCustomPick(pickRadio(g.draft, question.id, 'a'), question, true)
+        assert.deepEqual(draftOf(on, question.id).picked, [])
+        assert.equal(isCustomOn(on, question.id), true)
+        assert.equal(isAnswered(question, draftOf(on, question.id)), false)
+        assert.equal(canSubmit(g.questions, on), false)
+
+        const typed = setCustomText(on, question, '  按期望值算 ')
+        assert.deepEqual(answerValues(question, draftOf(typed, question.id)), ['按期望值算'])
+        assert.deepEqual(toAnswer(question, draftOf(typed, question.id)), {
+            id: 'q1',
+            type: 'single',
+            skipped: false,
+            values: ['按期望值算'],
+            custom: '按期望值算'
+        })
+        assert.equal(canSubmit(g.questions, typed), true)
+    })
+})
+
+describe('是否型：两段 tab 取值 → values yes/no', () => {
+    it('选「是」/「否」分别得到 [yes] / [no]', () => {
+        const g = group()
+        const yes = pickRadio(g.draft, 'b1', YES_VALUE)
+        assert.deepEqual(answerValues(q(g, 0), draftOf(yes, 'b1')), ['yes'])
+        const no = pickRadio(g.draft, 'b1', NO_VALUE)
+        assert.deepEqual(answerValues(q(g, 0), draftOf(no, 'b1')), ['no'])
+        assert.deepEqual(
+            BOOLEAN_TABS.map((t) => t.label),
+            ['是', '否']
+        )
+    })
+
+    it('是否型选项重选即互斥（不会同时留下 yes 与 no）', () => {
+        const g = group()
+        const draft = pickRadio(pickRadio(g.draft, 'b1', YES_VALUE), 'b1', NO_VALUE)
+        assert.deepEqual(draftOf(draft, 'b1').picked, ['no'])
+    })
+})
+
+describe('单选型：预设项 / 「其它」/ 自定义输入', () => {
+    it('选预设项 → values 为该项 value，且未勾「其它」时 custom 不参与', () => {
+        const g = group()
+        const draft = pickRadio(g.draft, 'q2', 'a')
+        const item = draftOf(draft, 'q2')
+        assert.equal(isPicked(draft, 'q2', 'a'), true)
+        assert.deepEqual(answerValues(q(g, 1), item), ['a'])
+        assert.equal(isAnswered(q(g, 1), item), true)
+        assert.equal(toAnswer(q(g, 1), item).custom, undefined)
+    })
+
+    it('勾「其它」清掉预设项（radio 互斥）；输入文本 → values 为自定义原文并写进 custom', () => {
+        const g = group()
+        const picked = pickRadio(g.draft, 'q2', 'a')
+        const onCustom = setCustomPick(picked, q(g, 1), true)
+        assert.deepEqual(draftOf(onCustom, 'q2').picked, [])
+        assert.equal(isCustomOn(onCustom, 'q2'), true)
+        // 勾了「其它」但没输入 → 仍未作答（required 题会挡住提交）
+        assert.equal(isAnswered(q(g, 1), draftOf(onCustom, 'q2')), false)
+
+        const typed = setCustomText(onCustom, q(g, 1), '  按期望值算  ')
+        const item = draftOf(typed, 'q2')
+        assert.deepEqual(answerValues(q(g, 1), item), ['按期望值算'])
+        const answer = toAnswer(q(g, 1), item)
+        assert.deepEqual(answer, {
+            id: 'q2',
+            type: 'single',
+            skipped: false,
+            values: ['按期望值算'],
+            custom: '按期望值算'
+        })
+    })
+
+    it('直接输入文本即视为选中「其它」，且与预设项互斥（有内容却不选中是不可能状态）', () => {
+        const g = group()
+        const picked = pickRadio(g.draft, 'q2', 'b')
+        const typed = setCustomText(picked, q(g, 1), '自定义')
+        const item = draftOf(typed, 'q2')
+        assert.equal(item.customOn, true)
+        assert.deepEqual(item.picked, [])
+        assert.deepEqual(answerValues(q(g, 1), item), ['自定义'])
+    })
+
+    it('取消「其它」后自定义原文不进 values（也不写 custom）', () => {
+        const g = group()
+        const typed = setCustomText(g.draft, q(g, 1), 'x')
+        const off = setCustomPick(typed, q(g, 1), false)
+        const item = draftOf(off, 'q2')
+        assert.equal(isAnswered(q(g, 1), item), false)
+        assert.deepEqual(toAnswer(q(g, 1), item), { id: 'q2', type: 'single', skipped: true, values: [] })
+    })
+})
+
+describe('多选型：勾选顺序 / 取消 / 自定义追加末尾', () => {
+    it('多选可同时勾选、保持勾选先后、可取消', () => {
+        const g = group()
+        const two = toggleCheck(toggleCheck(g.draft, 'q3', 'y'), 'q3', 'x')
+        assert.deepEqual(draftOf(two, 'q3').picked, ['y', 'x'])
+        assert.deepEqual(answerValues(q(g, 2), draftOf(two, 'q3')), ['y', 'x'])
+        const one = toggleCheck(two, 'q3', 'y')
+        assert.deepEqual(draftOf(one, 'q3').picked, ['x'])
+        assert.deepEqual(draftOf(toggleCheck(one, 'q3', 'x'), 'q3').picked, [])
+    })
+
+    it('自定义输入在 values 中**追加在末尾**，并同时写进 custom', () => {
+        const g = group()
+        const picked = toggleCheck(toggleCheck(g.draft, 'q3', 'x'), 'q3', 'y')
+        const typed = setCustomText(setCustomPick(picked, q(g, 2), true), q(g, 2), '深塔')
+        const item = draftOf(typed, 'q3')
+        assert.deepEqual(item.picked, ['x', 'y'])
+        assert.deepEqual(answerValues(q(g, 2), item), ['x', 'y', '深塔'])
+        assert.deepEqual(toAnswer(q(g, 2), item), {
+            id: 'q3',
+            type: 'multi',
+            skipped: false,
+            values: ['x', 'y', '深塔'],
+            custom: '深塔'
+        })
+    })
+
+    it('多选下「其它」与预设项独立（互不清除）', () => {
+        const g = group()
+        const off = setCustomPick(toggleCheck(g.draft, 'q3', 'x'), q(g, 2), true)
+        assert.deepEqual(draftOf(off, 'q3').picked, ['x'])
+        const stillOn = setCustomPick(off, q(g, 2), false)
+        assert.deepEqual(draftOf(stillOn, 'q3').picked, ['x'])
+        assert.equal(isCustomOn(stillOn, 'q3'), false)
+    })
+})
+
+describe('忽略本题 / 必答校验', () => {
+    it('忽略本题：清空作答并标记 skipped，values 为空；isAnswered=false', () => {
+        const g = group()
+        const picked = pickRadio(g.draft, 'q2', 'a')
+        // q2 是必答题 → 忽略是 no-op（组件层按钮也已禁用）
+        assert.equal(canSkip(q(g, 1)), false)
+        assert.deepEqual(skipQuestion(picked, q(g, 1)), picked)
+        // 非必答的 q3 可忽略
+        const skipped = skipQuestion(toggleCheck(picked, 'q3', 'x'), q(g, 2))
+        const item = draftOf(skipped, 'q3')
+        assert.equal(item.skipped, true)
+        assert.deepEqual(item.picked, [])
+        assert.deepEqual(answerValues(q(g, 2), item), [])
+        assert.equal(questionStatus(q(g, 2), item), 'skipped')
+    })
+
+    it('必答题未作答 → 禁止提交并指出是第几题', () => {
+        const g = group()
+        assert.equal(canSubmit(g.questions, g.draft), false)
+        const blockers = submitBlockers(g.questions, g.draft)
+        assert.deepEqual(
+            blockers.map((b) => b.no),
+            [2]
+        )
+        assert.equal(blockerText(blockers), '第 2 题必答，尚未作答')
+        // 作答后即可提交
+        const answered = pickRadio(g.draft, 'q2', 'a')
+        assert.equal(canSubmit(g.questions, answered), true)
+        assert.deepEqual(submitBlockers(g.questions, answered), [])
+        assert.equal(blockerText([]), '')
+    })
+
+    it('多题同时未答时逐一列出（顿号连接）', () => {
+        const g = normalizeGroup({
+            questions: [
+                { type: 'boolean', question: 'A', required: true },
+                { type: 'boolean', question: 'B' },
+                { type: 'boolean', question: 'C', required: true }
+            ]
+        })
+        assert.equal(blockerText(submitBlockers(g.questions, g.draft)), '第 1、3 题必答，尚未作答')
+        assert.equal(questionStatus(g.questions[0], draftOf(g.draft, 'q1')), 'unanswered')
+        assert.deepEqual(questionBadges(g.questions[0]), ['是否', '必答'])
+        assert.deepEqual(questionBadges(g.questions[1]), ['是否'])
+    })
+})
+
+describe('导航边界', () => {
+    it('上一题 / 下一题 / 点题号的边界与钳制', () => {
+        assert.equal(canGoPrev(0), false)
+        assert.equal(canGoPrev(1), true)
+        assert.equal(canGoNext(0, 3), true)
+        assert.equal(canGoNext(2, 3), false)
+        assert.equal(canGoNext(0, 0), false)
+        assert.equal(stepIndex(1, 3, -1), 0)
+        assert.equal(stepIndex(2, 3, 1), 2) // 末题不再前进
+        assert.equal(stepIndex(0, 3, -1), 0) // 首题不再后退
+        assert.equal(clampIndex(99, 3), 2)
+        assert.equal(clampIndex(-5, 3), 0)
+        assert.equal(progressText(0, 3), '第 1 / 3 题')
+        assert.equal(progressText(2, 3), '第 3 / 3 题')
+    })
+
+    it('忽略本题：非末题自动前进一题，末题原地不动', () => {
+        assert.equal(indexAfterSkip(0, 3), 1)
+        assert.equal(indexAfterSkip(1, 3), 2)
+        assert.equal(indexAfterSkip(2, 3), 2)
+        assert.equal(indexAfterSkip(0, 1), 0)
+        assert.equal(indexAfterSkip(0, 0), 0)
+    })
+})
+
+describe('提交归一（AskUserResult）', () => {
+    it('逐题按顺序归一：已答→skipped:false，未作答的非必答题→skipped:true + values:[]', () => {
+        const g = group()
+        // 第 1 题不答（非必答）、第 2 题答 a（必答）、第 3 题多选 x + 自定义
+        const draft = setCustomText(setCustomPick(toggleCheck(g.draft, 'q3', 'x'), q(g, 2), true), q(g, 2), '深塔')
+        const result = toResult(g.questions, pickRadio(draft, 'q2', 'a'))
+        assert.equal(result.submitted, true)
+        assert.deepEqual(result.answers, [
+            { id: 'b1', type: 'boolean', skipped: true, values: [] },
+            { id: 'q2', type: 'single', skipped: false, values: ['a'] },
+            { id: 'q3', type: 'multi', skipped: false, values: ['x', '深塔'], custom: '深塔' }
+        ])
+        // answers 覆盖全部题目（顺序 = 题目顺序），契约要求 AI 能逐题看到「未作答」
+        assert.deepEqual(
+            result.answers.map((a) => a.id),
+            g.questions.map((x) => x.id)
+        )
+    })
+
+    it('显式忽略的题在提交结果里是 skipped:true + 空 values', () => {
+        const g = group()
+        const draft = skipQuestion(pickRadio(g.draft, 'q2', 'a'), q(g, 2))
+        const result = toResult(g.questions, draft)
+        assert.deepEqual(result.answers[2], { id: 'q3', type: 'multi', skipped: true, values: [] })
+    })
+
+    it('放弃结果固定为 { submitted:false, answers: [] }', () => {
+        assert.deepEqual(cancelResult(), { submitted: false, answers: [] })
+    })
+})
+
+describe('收尾幂等（Promise 不 double-resolve / 不泄漏）', () => {
+    it('settleOnce：重复调用只生效一次，副作用只发生一次', () => {
+        const seen: string[] = []
+        const settle = settleOnce<string>((v) => seen.push(v))
+        settle('提交')
+        settle('放弃')
+        settle('放弃')
+        assert.deepEqual(seen, ['提交'])
+    })
+
+    it('两条收尾路径（提交 → 卸载回调）叠加时，Promise 只会 resolve 一次', async () => {
+        let resolveFn: ((v: string) => void) | null = null
+        const promise = new Promise<string>((r) => (resolveFn = r))
+        const settle = settleOnce<string>((v) => resolveFn?.(v))
+        settle('submitted') // 用户点提交
+        settle('cancelled') // 卡片随后卸载，再收尾一次
+        assert.equal(await promise, 'submitted')
+    })
+
+    it('createDraft 每题一份独立草稿（改一题不串题）', () => {
+        const g = group()
+        const draft = pickRadio(g.draft, 'q2', 'a')
+        assert.deepEqual(draftOf(draft, 'q3'), { picked: [], customOn: false, customText: '', skipped: false })
+        assert.notEqual(draftOf(draft, 'q2'), draftOf(draft, 'q3'))
+        assert.deepEqual(g.draft, createDraft(g.questions)) // 入参草稿没被改（不可变）
+    })
+})
+
+// ── Enter 语义：非末题前进、末题提交（配合宿主在提问期间隐藏普通输入框） ──────────
+describe('Enter 语义与接管判定', () => {
+    it('非末题 → 返回下一题下标（逐题推进）', () => {
+        assert.equal(enterStep(0, 3), 1)
+        assert.equal(enterStep(1, 3), 2)
+    })
+
+    it('末题 → 返回 null（表示「提交」）', () => {
+        assert.equal(enterStep(2, 3), null)
+        // 单题问卷：唯一那题就是末题，Enter 直接走提交
+        assert.equal(enterStep(0, 1), null)
+        // 空问卷不崩，也走提交分支（提交会被 submitBlockers/空问卷逻辑兜住）
+        assert.equal(enterStep(0, 0), null)
+    })
+
+    it('末题按 Enter ≠ 无条件交卷：必答未作答时 submitBlockers 仍然拦住', () => {
+        const g = group()
+        // 一题都没答：末题 Enter 的语义是「提交」，但可提交性必须是否
+        assert.equal(enterStep(g.questions.length - 1, g.questions.length), null)
+        assert.equal(canSubmit(g.questions, g.draft), false)
+        assert.ok(submitBlockers(g.questions, g.draft).length > 0, '必答题未作答应阻断提交')
+        assert.match(blockerText(submitBlockers(g.questions, g.draft)), /必答/)
+    })
+
+    it('shouldHandleEnter：Enter 键 + 无修饰键 + 焦点不在输入控件内 才接管', () => {
+        const base = { key: 'Enter', ctrlKey: false, altKey: false, metaKey: false, shiftKey: false }
+        /** @desc 构造假按键事件：只喂被测字段，故一次性断言成 KeyboardEvent */
+        const ev = (over: Record<string, unknown> = {}) => ({ ...base, ...over }) as unknown as KeyboardEvent
+        assert.equal(shouldHandleEnter(ev({ target: { tagName: 'DIV' } })), true)
+        assert.equal(shouldHandleEnter(ev({ target: null })), true)
+        // 非 Enter 一律不接管
+        assert.equal(shouldHandleEnter(ev({ key: 'a', target: { tagName: 'DIV' } })), false)
+        // 修饰键放行（不劫持快捷键）
+        for (const mod of ['ctrlKey', 'altKey', 'metaKey', 'shiftKey'] as const) {
+            assert.equal(shouldHandleEnter(ev({ [mod]: true, target: { tagName: 'DIV' } })), false, `${mod} 应放行`)
+        }
+        // 焦点在输入控件内放行（Shift+Enter 换行、控件自己的 Enter 行为不被劫持）
+        for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) {
+            assert.equal(shouldHandleEnter(ev({ target: { tagName } })), false, `${tagName} 内应放行`)
+        }
+        // 输入法组合中放行（拼音选词的 Enter 是上屏，不能当成推进）
+        assert.equal(shouldHandleEnter(ev({ isComposing: true, target: { tagName: 'DIV' } })), false)
+        assert.equal(shouldHandleEnter(ev({ keyCode: 229, target: { tagName: 'DIV' } })), false)
+    })
+})
+
+// ── 宿主接线契约：`askCard` 必须用 `$state.raw`（否则收尾时按身份清状态恒失效）──────────
+// 症状（线上实测）：用户点「提交」后，`ask_user` 的 Promise 正常 resolve、AI 继续跑，
+// 但卡片与「提问期间被隐藏的输入区」一起卡死在界面上 —— 因为宿主靠 `askCard === card` 判断
+// 「自己还是不是当前那张卡」，而 `$state` 会把赋进去的对象**深度代理**成 Proxy，
+// 读回来的引用与原始对象恒不相等，于是 `askCard = null` 那一行永远执行不到。
+describe('宿主接线契约：askCard 用 $state.raw 存对象', () => {
+    it('$state 存对象会被深度代理 → 读回引用 ≠ 原始对象（用真实 svelte 运行时复现）', async () => {
+        // 走变量 specifier：`svelte/internal/client` 是内部子路径（svelte 未随包提供它的类型声明），
+        // 写成字面量会让 svelte-check 报「Could not find a declaration file」（实测）。
+        const specifier: string = 'svelte/internal/client'
+        const $ = (await import(specifier)) as {
+            state: (value: unknown) => unknown
+            get: (source: unknown) => unknown
+            set: (source: unknown, value: unknown, shouldProxy?: boolean) => void
+        }
+        const card = { request: {}, resolve: () => {} }
+        const store = $.state(null)
+        // `$state` 变量的赋值编译成 `$.set(x, v, true)`（第三参 = should_proxy），`$state.raw` 则不带该参
+        $.set(store, card, true)
+        assert.notEqual($.get(store), card)
+        const raw = $.state(null)
+        $.set(raw, card)
+        assert.equal($.get(raw), card)
+    })
+
+    it('ai-assistant.svelte 的 askCard 声明为 $state.raw，且收尾仍按身份判定当前卡', () => {
+        const src = readFileSync('src/lib/components/page/home/settings/ai-assistant.svelte', 'utf8')
+        assert.match(src, /\$state\.raw<AskCardState \| null>\(null\)/, 'askCard 必须用 $state.raw 声明')
+        assert.match(src, /if \(askCard === card\) askCard = null/, '收尾仍应只清掉「自己这张卡」')
+    })
+})
