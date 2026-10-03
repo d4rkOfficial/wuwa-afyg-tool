@@ -19,6 +19,7 @@
         buildInferredDamageTypeMap,
         buffMatchesEntry,
         buffScopeOk,
+        buffUsableByEntry,
         damageTypeShort,
         inferredDamageTypeText,
         paneSourceText
@@ -128,14 +129,19 @@
     })
 
     /**
-     * @desc 非直伤条目对 buff 的可用性判定：scope 匹配 +（隐藏条件不匹配时）**该 buff 对本条目仍有贡献**。
+     * @desc 非直伤条目对 buff 的可用性判定：scope 匹配 + 乘区可吃（`buffUsableByEntry`）+
+     * （隐藏条件不匹配时）**该 buff 对本条目仍有贡献**。
      *
      * 注意不能用实例级条件代替：属性/类型条件挂在**乘区条目**上（条件分层之后实例级只剩链/阶硬门槛），
      * 只看实例级会出现「乘区条件不满足、格子却仍可勾选」的 bug。
      * 判定口径（含非直伤丢掉 damageTypes 维度）与下拉表共用 `damage-table.utils`。
+     *
+     * `buffUsableByEntry` 是**乘区级硬门槛**：处决/响应/效应的双暴只有「覆盖」写入生效，
+     * 因此「追加型暴击率/暴击伤害」buff 在这些行上不可勾（勾了也不参与计算）。
      */
     const buffEnabledForEntry = (bs: BuffSet, entry: DamageEntry, charIdx: number): boolean =>
         buffScopeOk(bs, entry.isEffect, charIdx) &&
+        buffUsableByEntry(bs, entry) &&
         buffMatchesEntry(bs, entry, {
             hideConditionMismatch,
             conditionProfile,

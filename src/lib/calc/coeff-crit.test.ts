@@ -103,13 +103,27 @@ const directEntry: DamageEntry = {
     hits: 1
 }
 
-/** @desc 双暴 buff：`scope` 决定它能绑到哪类条目（'all' = 全队/效应，[0] = 角色 1） */
+/** @desc 双暴 buff（**追加**型：`scope` 决定它能绑到哪类条目，'all' = 全队/效应，[0] = 角色 1） */
 const critBuff = (scope: 'all' | number[], rate: number, dmg: number): BuffInstance => ({
     id: 'crit',
     name: '双暴',
     zones: [
         { zoneId: 'critRate', value: rate },
         { zoneId: 'critDmg', value: dmg }
+    ],
+    scope
+})
+
+/**
+ * @desc 双暴 buff（**覆盖**型）：绝对值写入，是系数基类条目上唯一生效的双暴来源。
+ * 只覆盖某一项时另一项仍按基准（暴击率 0% / 暴击伤害 100%）。
+ */
+const critOverrideBuff = (scope: 'all' | number[], rate?: number, dmg?: number): BuffInstance => ({
+    id: 'critOv',
+    name: '双暴覆盖',
+    zones: [
+        ...(rate !== undefined ? [{ zoneId: 'critRate' as const, value: rate, override: true }] : []),
+        ...(dmg !== undefined ? [{ zoneId: 'critDmg' as const, value: dmg, override: true }] : [])
     ],
     scope
 })
@@ -155,23 +169,49 @@ describe('系数基类（效应）：无 buff 时暴击率为 0，结果页两�
         assert.equal(critSegment, undefined, 'canCrit=false 时溯源不应出现暴击区段')
     })
 
-    it('绑了全队双暴 buff 后暴击区生效：期望 = 不暴击 ×(1 + 暴击率×额外暴伤)', () => {
+    it('追加型双暴 buff 不生效：暴击率仍为 0，期望 = 不暴击，溯源也不列它', () => {
         const { result, critSegment } = run(effectEntry, [critBuff('all', 50, 50)])
+        assert.equal(result.canCrit, false, '追加不是「覆盖」⇒ 不生效，仍走占位符')
+        assert.equal(result.critRate, 0)
+        assert.equal(result.critDmg, 1, '追加的暴伤也不得进入')
+        assert.equal(result.nonCritPerHit, result.expectedPerHit)
+        assert.equal(critSegment, undefined, '既然不生效，溯源不得把这条 buff 列成暴击区来源')
+    })
+
+    it('只有「覆盖」型双暴才生效：暴击率 100% / 暴伤 200% → 每段 = 不暴击 ×2', () => {
+        const { result, critSegment } = run(effectEntry, [critOverrideBuff('all', 100, 200)])
         assert.equal(result.canCrit, true)
-        assert.equal(result.critRate, 0.5)
-        assert.equal(result.critDmg, 1.5, '50% 额外暴伤 → 总暴伤 150%')
-        near(result.critPerHit, result.nonCritPerHit * 1.5)
-        near(result.expectedPerHit, result.nonCritPerHit * (1 + 0.5 * 0.5))
-        assert.ok(critSegment, '可暴击时溯源必须给出暴击区段')
+        assert.equal(result.critRate, 1)
+        assert.equal(result.critDmg, 2)
+        near(result.critPerHit, result.nonCritPerHit * 2)
+        near(result.expectedPerHit, result.nonCritPerHit * 2)
         assert.deepEqual(
-            critSegment.parts.map((p) => `${p.source}·${p.label}`),
-            ['系数基类·暴击率基准', '系数基类·暴击伤害基准', '双暴·暴击率', '双暴·暴击伤害'],
-            '系数基类的暴击区来源只能是「基准 + 绑定 buff」，不得出现角色面板/声骸/武器双暴'
+            critSegment?.parts.map((p) => `${p.source}·${p.label}`),
+            ['系数基类·暴击率基准', '系数基类·暴击伤害基准', '双暴覆盖·暴击率(覆盖)', '双暴覆盖·暴击伤害(覆盖)'],
+            '系数基类的暴击区来源只能是「基准 + 覆盖型 buff」'
         )
+    })
+
+    it('带引用的「覆盖」按引用处理 ⇒ 同样不生效（双暴只认纯覆盖写入）', () => {
+        const refOverride: BuffInstance = {
+            id: 'critOvRef',
+            name: '覆盖+引用',
+            zones: [
+                {
+                    zoneId: 'critDmg',
+                    value: 0,
+                    override: true,
+                    ref: { characterIdx: 0, zoneId: 'totalAtk', threshold: 0, pct: 10 }
+                }
+            ],
+            scope: 'all'
+        }
+        const { result } = run(effectEntry, [refOverride])
+        assert.equal(result.critDmg, 1, '带引用的覆盖不是「纯覆盖」，系数基类条目上不生效')
     })
 })
 
-describe('系数基类（处决/响应）：装备双暴不计入，只有绑定 buff 能加', () => {
+describe('系数基类（处决/响应）：装备双暴不计入，双暴只有覆盖能定值', () => {
     it('声骸副词条带双暴也不影响：暴击率仍为 0、canCrit=false', () => {
         const { result } = run(tuneEntry, [])
         assert.equal(result.critRate, 0, '声骸副词条的双暴不得进入系数基类条目')
@@ -179,8 +219,16 @@ describe('系数基类（处决/响应）：装备双暴不计入，只有绑定
         assert.equal(result.canCrit, false)
     })
 
-    it('绑同角色作用域的双暴 buff 后参与暴击区', () => {
+    it('追加型（同角色作用域）双暴 buff 同样不生效', () => {
         const { result, critSegment } = run(tuneEntry, [critBuff([0], 30, 60)])
+        assert.equal(result.canCrit, false)
+        assert.equal(result.critRate, 0)
+        assert.equal(result.critDmg, 1)
+        assert.equal(critSegment, undefined)
+    })
+
+    it('覆盖型双暴生效', () => {
+        const { result, critSegment } = run(tuneEntry, [critOverrideBuff([0], 30, 160)])
         assert.equal(result.canCrit, true)
         assert.equal(result.critRate, 0.3)
         assert.equal(result.critDmg, 1.6)
@@ -188,12 +236,12 @@ describe('系数基类（处决/响应）：装备双暴不计入，只有绑定
         near(result.critPerHit, result.nonCritPerHit * 1.6)
         assert.deepEqual(
             critSegment?.parts.map((p) => `${p.source}·${p.label}`),
-            ['系数基类·暴击率基准', '系数基类·暴击伤害基准', '双暴·暴击率', '双暴·暴击伤害']
+            ['系数基类·暴击率基准', '系数基类·暴击伤害基准', '双暴覆盖·暴击率(覆盖)', '双暴覆盖·暴击伤害(覆盖)']
         )
     })
 })
 
-describe('直伤口径不受影响（面板基类仍以 5%/150% 为基准）', () => {
+describe('直伤口径不受影响（面板基类仍以 5%/150% 为基准，追加型双暴照常生效）', () => {
     it('直伤条目照常吃角色基础双暴与声骸副词条双暴', () => {
         const { result, critSegment } = run(directEntry, [])
         assert.equal(result.canCrit, true)
@@ -203,5 +251,12 @@ describe('直伤口径不受影响（面板基类仍以 5%/150% 为基准）', (
             critSegment?.parts.map((p) => `${p.source}·${p.label}`),
             ['角色·暴击率基础', '角色·暴击伤害基础', '声骸1·暴击率', '声骸1·暴击伤害']
         )
+    })
+
+    it('直伤条目上「追加型双暴 buff」照常生效（新规则只针对系数基类条目）', () => {
+        const { result } = run(directEntry, [critBuff('all', 50, 50)])
+        assert.equal(result.canCrit, true)
+        assert.equal(result.critRate, 0.65, '基础 5% + 声骸 10% + 追加 50%')
+        assert.equal(result.critDmg, 2.2, '基础 150% + 声骸 20% + 追加 50%')
     })
 })

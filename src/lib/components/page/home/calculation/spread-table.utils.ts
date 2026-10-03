@@ -13,7 +13,7 @@ import { LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$lib/calc/calculation.co
 import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
 import type { PaneEffectSource } from '$lib/calc/pane-effects'
 import type { CharSlot } from '$lib/types/project'
-import { entryCharIdx, isNonDirectDamage, zoneLabelsOf } from './damage-table.utils'
+import { buffRelevantForNonDirect, entryCharIdx, isNonDirectDamage, zoneLabelsOf } from './damage-table.utils'
 
 /** @desc 叠层分组：同「前缀+后缀」≥2 条成组；仅用于表头分组展示与分隔线，列本身仍每层一列 */
 export interface FolderGroup {
@@ -156,52 +156,9 @@ export const columnSepClass = (
 export const entrySourceOf = (e: DamageEntry): string => e.character ?? ''
 
 /**
- * @desc 效应/处决/响应伤害实际读取的乘区（computeEffectEntry / computeTuneEntry）：
- * 效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；都不吃攻击/增伤/面板类。
- *
- * **双暴是「初始 0」而不是「不吃」**：这两类条目的双暴基准为 0% / 100%（`compute.ts` 的 `critBase`），
- * 面板双暴不计入，但**绑定到该条目的双暴 buff 会真正参与**暴击区（暴击率 0 时结果页仍显示占位符），
- * 故 `critRate` / `critDmg` 必须列在可吃乘区里，否则拉表勾不到、功能不可达。
+ * @desc 效应/处决/响应伤害实际读取的乘区、以及「该 buff 能不能勾到这个条目上」的判定，
+ * 都搬到两表共用的 `damage-table.utils`（同一领域判定不重复维护）。
  */
-export const EFFECT_RELEVANT_ZONES: ReadonlySet<string> = new Set([
-    'extraRatio',
-    'deepenDmg',
-    'critRate',
-    'critDmg',
-    'resPen',
-    'resDown',
-    'defPen',
-    'defDown',
-    'dmgRedPen',
-    'dmgTakenInc',
-    'finalDmg',
-    'specialFinal1',
-    'specialFinal2',
-    'unisonBoonLayer'
-])
-
-export const TUNE_RELEVANT_ZONES: ReadonlySet<string> = new Set([
-    'extraRatio',
-    'tuneBreakBoost',
-    'critRate',
-    'critDmg',
-    'resPen',
-    'resDown',
-    'defPen',
-    'defDown',
-    'dmgRedPen',
-    'dmgTakenInc',
-    'finalDmg',
-    'specialFinal1',
-    'specialFinal2',
-    'unisonBoonLayer'
-])
-
-/** @desc 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff） */
-export const buffRelevantForNonDirect = (bs: BuffSet, entry: DamageEntry): boolean => {
-    const zones = entry.isTuneBreak || entry.isTuneResponse ? TUNE_RELEVANT_ZONES : EFFECT_RELEVANT_ZONES
-    return bs.zones.some((z) => zones.has(z.zoneId))
-}
 
 /** @desc 整表结构构建的依赖（store 侧能力一律注入，见文件头注释） */
 export interface SpreadTableDeps {

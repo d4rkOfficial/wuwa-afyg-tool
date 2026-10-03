@@ -13,8 +13,8 @@
  */
 import { buffContributesToEntry, resolveDamageTypes, type ConditionProfile } from '$lib/calc/compute'
 import { inferDamageTypes } from '$lib/calc/utils'
-import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
-import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP, zoneAppliesToCoeffEntry } from '$lib/calc/calculation.consts'
+import type { BuffSet, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
 /** @desc 直伤判定的最小入参（两个表的入参都是 `DamageEntry`，此处放宽便于共用） */
@@ -100,6 +100,69 @@ export const buffScopeOk = (bs: BuffSet, isEffect: boolean | undefined, charIdx:
     if (isEffect) return bs.scope === 'all' || (Array.isArray(bs.scope) && bs.scope.length === 0)
     return charIdx >= 0 && (bs.scope === 'all' || (bs.scope as number[]).includes(charIdx))
 }
+
+/**
+ * @desc 效应/处决/响应伤害实际读取的乘区（`computeEffectEntry` / `computeTuneEntry`）：
+ * 效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；都不吃攻击/增伤/面板类。
+ *
+ * **双暴是「初始 0」而不是「不吃」**：这类条目的双暴基准为 0% / 100%（`compute.ts` 的 `critBase`），
+ * 面板双暴不计入，且**双暴只有「覆盖」写入生效** —— 追加/引用一律不生效
+ * （见 `COEFF_OVERRIDE_ONLY_ZONE_IDS`），所以「可吃」还要再过一道 `zoneAppliesToCoeffEntry`。
+ */
+export const EFFECT_RELEVANT_ZONES: ReadonlySet<string> = new Set([
+    'extraRatio',
+    'deepenDmg',
+    'critRate',
+    'critDmg',
+    'resPen',
+    'resDown',
+    'defPen',
+    'defDown',
+    'dmgRedPen',
+    'dmgTakenInc',
+    'finalDmg',
+    'specialFinal1',
+    'specialFinal2',
+    'unisonBoonLayer'
+])
+
+export const TUNE_RELEVANT_ZONES: ReadonlySet<string> = new Set([
+    'extraRatio',
+    'tuneBreakBoost',
+    'critRate',
+    'critDmg',
+    'resPen',
+    'resDown',
+    'defPen',
+    'defDown',
+    'dmgRedPen',
+    'dmgTakenInc',
+    'finalDmg',
+    'specialFinal1',
+    'specialFinal2',
+    'unisonBoonLayer'
+])
+
+/** @desc 单条乘区是否被当前非直伤条目真正读取（白名单 + 双暴「只有覆盖生效」） */
+export const zoneUsableByNonDirect = (zone: BuffZoneValue, entry: DamageEntry): boolean => {
+    const zones = entry.isTuneBreak || entry.isTuneResponse ? TUNE_RELEVANT_ZONES : EFFECT_RELEVANT_ZONES
+    return zones.has(zone.zoneId) && zoneAppliesToCoeffEntry(zone)
+}
+
+/** @desc 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff） */
+export const buffRelevantForNonDirect = (bs: BuffSet, entry: DamageEntry): boolean =>
+    bs.zones.some((z) => zoneUsableByNonDirect(z, entry))
+
+/**
+ * @desc 该 buff 是否**允许勾到**这个条目上（拉表两视图共用的可用性硬门槛）：
+ * 直伤一律允许；非直伤要求至少有一条能真正生效的乘区 —— 由此挡住
+ * 「给处决/响应/效应条目加**追加型**暴击率/暴击伤害 buff」（那些写入对这类条目不生效，勾了也白勾）。
+ *
+ * 影响源（改写被引用角色面板的 buff）不走本判据：它们改的是**别人的面板**，与本条自己吃不吃双暴无关，
+ * 由调用方单独放行（铺开表的 `|| pane`、下拉表的影响源分支都排在它前面）。
+ */
+export const buffUsableByEntry = (bs: BuffSet, entry: DamageEntry): boolean =>
+    isDirectDamage(entry) || buffRelevantForNonDirect(bs, entry)
 
 /**
  * @desc 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff）。

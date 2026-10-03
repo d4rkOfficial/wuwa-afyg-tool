@@ -1,5 +1,5 @@
 import type { ResultEntry } from './result.types'
-import type { BuffCondition, BuffSet, DamageEntry } from './calculation.types'
+import type { BuffCondition, BuffSet, BuffZoneValue, DamageEntry } from './calculation.types'
 import type { ConfigState } from './config.types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
@@ -8,11 +8,13 @@ import {
     getTargetSideSourceBuffs,
     resolveDamageTypes,
     resolveRefZoneValues,
+    usesCoefficientFormula,
     zoneConditionMet,
     type ConditionProfile,
     type ZoneCtx
 } from './compute'
 import { describeZoneConditionBadge } from './condition'
+import { zoneAppliesToCoeffEntry } from './calculation.consts'
 import { buildEchoDescByEntry } from './skill-infer'
 import { getEchoSkillText } from '$lib/data/char-info.svelte'
 import { ELEMENT_BONUS_MAP, TYPE_BONUS_MAP, WEAPON_SUBSTAT_NAME_MAP } from '$lib/consts/game-terms'
@@ -142,11 +144,17 @@ const refKeyOf = (buffId: string, zoneIndex: number): string => `${buffId}#${zon
  * @desc 乘区来源的判定上下文：
  * - `zoneCtx`：乘区级条件判据（与引擎同一个 `zoneConditionMet`）
  * - `refValues`：引用（转模）的解算结果（`buffId#zoneIndex` → 数值）—— 溯源只展示结果，不展示转模过程
+ * - `coeffEntry`：本条是否系数基类条目（处决/响应/效应/偏谐系数直伤）—— 这些条目上双暴只有「覆盖」生效，
+ *   追加/引用的双暴乘区既不算数值、也不得列为来源（判据与引擎同一个 `zoneAppliesToCoeffEntry`）
  */
 interface ZoneTraceCtx {
     zoneCtx: ZoneCtx
     refValues: Map<string, number>
+    coeffEntry: boolean
 }
+
+/** @desc 该乘区在本条上是否生效（系数基类条目的双暴只有覆盖生效） */
+const zoneApplies = (zone: BuffZoneValue, coeffEntry: boolean): boolean => !coeffEntry || zoneAppliesToCoeffEntry(zone)
 
 /**
  * @desc 拉表Buff 指定乘区的来源（普通加值 / 覆盖 / 引用）；存在生效覆盖时只列覆盖来源，加算值不再显示（与引擎一致）。
@@ -159,7 +167,7 @@ function buffZoneParts(
     zoneId: string,
     label: string,
     unit: '%' | 'flat',
-    { zoneCtx, refValues }: ZoneTraceCtx
+    { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx
 ): TracePart[] {
     const adds: TracePart[] = []
     const overrides: TracePart[] = []
@@ -169,6 +177,7 @@ function buffZoneParts(
             if (z.zoneId !== zoneId) return
             // 乘区条件不满足 ⇒ 引擎没算它，来源也不得列出（判据与引擎同一个 `zoneConditionMet`）
             if (!zoneConditionMet(z, zoneCtx)) return
+            if (!zoneApplies(z, coeffEntry)) return
             const zoneLabel = zoneLabelWithCondition(label, z.condition)
             if (z.ref) {
                 refs.push({
@@ -226,7 +235,7 @@ function collectBaseParts(
     entry: ResultEntry,
     ctx: DamageTraceCtx,
     buffs: BuffSet[],
-    { zoneCtx, refValues }: ZoneTraceCtx
+    { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx
 ): TracePart[] {
     const parts: TracePart[] = []
     const charName = entry.character || ''
@@ -312,6 +321,7 @@ function collectBaseParts(
         bs.zones.forEach((z, zi) => {
             if (z.zoneId !== zoneFlat && z.zoneId !== zonePct) return
             if (!zoneConditionMet(z, zoneCtx)) return
+            if (!zoneApplies(z, coeffEntry)) return
             const value = z.ref ? (refValues.get(refKeyOf(bs.id, zi)) ?? 0) : z.value
             if (!z.ref && value === 0) return
             const pct = z.zoneId === zonePct
@@ -505,7 +515,7 @@ function collectCritParts(
 }
 
 /** @desc 特殊区：拉表Buff 特殊终伤（加算）与特殊终伤·乘算（连乘因子），含引用/覆盖来源（引用只给结果） */
-function collectCustomParts(buffs: BuffSet[], { zoneCtx, refValues }: ZoneTraceCtx): TracePart[] {
+function collectCustomParts(buffs: BuffSet[], { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx): TracePart[] {
     const adds: TracePart[] = []
     const overrides: TracePart[] = []
     const refs: TracePart[] = []
@@ -514,6 +524,7 @@ function collectCustomParts(buffs: BuffSet[], { zoneCtx, refValues }: ZoneTraceC
             const isMul = z.zoneId === 'specialFinal2'
             if (z.zoneId !== 'specialFinal1' && !isMul) return
             if (!zoneConditionMet(z, zoneCtx)) return
+            if (!zoneApplies(z, coeffEntry)) return
             const zoneLabel = zoneLabelWithCondition(isMul ? '特殊终伤(2)·乘算' : '特殊终伤(1)', z.condition)
             const extra = isMul ? { contribution: 1 + z.value / 100 } : {}
             if (z.ref) {
@@ -632,14 +643,16 @@ export function buildDamageSegments(
         echoDescByEntry
     )
     /**
-     * @desc 乘区来源的判定上下文：条件判据（与引擎同口径）+ 引用的解算结果（`resolveRefZoneValues`）。
+     * @desc 乘区来源的判定上下文：条件判据（与引擎同口径）+ 引用的解算结果（`resolveRefZoneValues`）
+     * + 是否系数基类条目（双暴只有「覆盖」生效）。
      * 引用一次算好、各区共用 —— 解算与「引擎写进乘区的数值」逐值一致，溯源因此可以直接展示结果值。
      * 没有引用乘区时跳过解算（解算要重建一次本条目可见面板，展开行时才做，能省则省）。
      */
     const hasRefZones = buffs.some((bs) => bs.zones.some((z) => z.ref))
     const zoneTrace: ZoneTraceCtx = {
         zoneCtx: zoneCtxOf(entryLike, ctx, echoDescByEntry),
-        refValues: hasRefZones ? resolveRefZoneValues(entryLike, ctx) : new Map<string, number>()
+        refValues: hasRefZones ? resolveRefZoneValues(entryLike, ctx) : new Map<string, number>(),
+        coeffEntry: usesCoefficientFormula(entryLike)
     }
 
     const segments: DamageSegment[] = []

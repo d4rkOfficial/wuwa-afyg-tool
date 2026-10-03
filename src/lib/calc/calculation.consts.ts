@@ -94,6 +94,23 @@ export const ZONE_NO_REF_IDS = new Set<string>(['tuneStrainLayer'])
 export const ZONE_NO_OVERRIDE_IDS = new Set<string>(['atkPct', 'hpPct', 'defPct', 'extraRatio'])
 
 /**
+ * @desc **系数基类条目**（处决 / 响应 / 效应 / 偏谐系数直伤）上「只有覆盖写入才生效」的乘区：双暴。
+ *
+ * 这些条目不吃角色面板双暴（基准 0% / 100%，见 `compute.ts` 的 `critBase`），
+ * 面板式累加对它们没有意义，所以**追加（含引用/转模）一律不生效** —— 想把双暴定到某个值，
+ * 必须由一条明确写「覆盖」的 buff 来做（覆盖是绝对值写入：`critRate = 50` 即 50%）。
+ * 带引用的「覆盖」按引用处理，同样不生效（引用属追加语义，见 `zoneAppliesToCoeffEntry`）。
+ *
+ * 引擎（`compute.ts` 的 `activeZonesOf` / `refZonesOf`）与拉表可用性判定
+ * （`spread-table.utils.ts` 的 `buffUsableByEntry`）**共用本表**，避免两边口径漂移。
+ */
+export const COEFF_OVERRIDE_ONLY_ZONE_IDS = new Set<string>(['critRate', 'critDmg'])
+
+/** @desc 系数基类条目上该乘区是否生效：双暴只认**纯覆盖**写入（带引用的覆盖按引用处理），其余乘区照旧追加 */
+export const zoneAppliesToCoeffEntry = (zone: { zoneId: string; override?: boolean; ref?: unknown }): boolean =>
+    !COEFF_OVERRIDE_ONLY_ZONE_IDS.has(zone.zoneId) || (zone.override === true && !zone.ref)
+
+/**
  * @desc 目标侧乘区：数值挂在**目标/怪物**身上，全队共用一份，没有「某角色的」这一说。
  *
  * 目前只有集谐·干涉层数（`tuneStrainLayer`）：由队伍施加在目标身上。

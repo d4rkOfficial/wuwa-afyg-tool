@@ -56,14 +56,18 @@ BuffInstance ─┘
 ### 系数基类条目（处决 / 响应 / 效应）的双暴
 
 处决 / 响应 / 效应 / 偏谐系数直伤走 `computeTuneEntry` / `computeEffectEntry`（判据 `usesCoefficientFormula`），
-它们的**双暴基准是 0% / 100%**（`critBase(fromPanel=false)`，即「额外暴击伤害 +0%」）：
+它们的**双暴基准是 0% / 100%**（`critBase(coeffEntry=true)`，即「额外暴击伤害 +0%」）：
 
 - **面板双暴不计入**：基础 5% / 150%、声骸与武器副词条、以及转模引用到的面板双暴都不参与
   （本角色槽位与跨角色引用同一口径，`buildEntryPanel` 一并不带双暴）；
-- **绑定到该条目的双暴 buff 参与**：直接乘区 / 引用 / 覆盖三条通道照常，暴击区 = `1 + 暴击率 × (暴击伤害 - 1)`；
+- **双暴只有「覆盖」写入生效**（`COEFF_OVERRIDE_ONLY_ZONE_IDS`）：追加与引用一律不生效 ——
+  这些条目不参与面板式累加，想给它们定一个双暴值，必须写一条明确的**覆盖**乘区
+  （带引用的「覆盖」按引用处理，同样不生效）。暴击区仍是 `1 + 暴击率 × (暴击伤害 - 1)`；
 - **暴击率为 0 时** `canCrit=false`：结果页「暴击 / 不暴击」两列显示占位符、溯源不出「暴击区」段、
   期望 = 不暴击 —— 与引入该能力之前的数值逐项一致；
-- 拉表的「可吃乘区」白名单（`spread-table.utils.ts` 的 `EFFECT/TUNE_RELEVANT_ZONES`）把双暴列为可吃，否则勾不到。
+- **拉表同步挡勾**：可用性判定 `buffUsableByEntry`（铺开表 / 下拉表共用，见 `damage-table.utils.ts`）
+  把「对该条目不生效的乘区」算作不可用，因此**追加型暴击率 / 暴击伤害 buff 在这些条目上不可勾**
+  （覆盖型可勾）；`EFFECT/TUNE_RELEVANT_ZONES` 仍列出双暴，是否可勾由 `zoneAppliesToCoeffEntry` 终判。
 
 ### 同一个 Buff 里的「同名乘区」
 

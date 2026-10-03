@@ -8,7 +8,7 @@
 import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
 import type { PaneEffectSource } from '$lib/calc/pane-effects'
 import { LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
-import { buffScopeOk, isDirectDamage } from './damage-table.utils'
+import { buffScopeOk, buffUsableByEntry, isDirectDamage } from './damage-table.utils'
 
 /** @desc 叠层子项的显示名：只取「数字 + 后缀」（前缀已由文件夹行显示）；不匹配叠层命名时回落原名 */
 export const layeredChildLabel = (name: string): string => name.match(LAYERED_BUFF_PATTERN)?.slice(2).join('') ?? name
@@ -73,8 +73,12 @@ export const findPrevEffectEntry = (
 }
 
 /**
- * @desc 对当前展开条目可见的 Buff：非全局、（作用域匹配 或 属于跨角色引用影响源）、条件满足。
- * 影响源优先判定：它作用域不含本角色，但会改写「本段引用到的角色面板」，勾上即生效。
+ * @desc 对当前展开条目可见的 Buff：非全局、（作用域匹配 或 属于跨角色引用影响源）、乘区可吃、条件满足。
+ * 影响源优先判定：它作用域不含本角色，但会改写「本段引用到的角色面板」，勾上即生效
+ * —— 影响源改的是**别的角色面板**，与本条自己吃不吃双暴无关，故不受 `buffUsableByEntry` 约束。
+ *
+ * `buffUsableByEntry` 是乘区级硬门槛：处决/响应/效应的双暴只有「覆盖」写入生效，
+ * 「追加型暴击率/暴击伤害」buff 在这些条目上不可勾（勾了也不参与计算），与铺开表同一口径。
  */
 export const visibleBuffSetsOf = (args: {
     buffSets: readonly BuffSet[]
@@ -90,6 +94,7 @@ export const visibleBuffSetsOf = (args: {
             return !args.selectedEntry || args.matches(b, args.selectedEntry)
         }
         if (!buffScopeOk(b, args.selectedEntry?.isEffect, args.entryCharIdx)) return false
+        if (args.selectedEntry && !buffUsableByEntry(b, args.selectedEntry)) return false
         if (args.selectedEntry && !args.matches(b, args.selectedEntry)) return false
         return true
     })

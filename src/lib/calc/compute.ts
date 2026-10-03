@@ -3,7 +3,7 @@ import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone } from './result.types'
 import type { CharSlot } from '$lib/types/project'
-import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS } from './calculation.consts'
+import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS, zoneAppliesToCoeffEntry } from './calculation.consts'
 import { applyZone, recomputeTotals, type CharacterComputed } from './zone-ops'
 import { evaluateCondition, type ConditionContext } from './condition'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
@@ -113,18 +113,19 @@ function isTypeBonus(label: string): boolean {
 
 /**
  * @desc 双暴基准：面板口径 5% / 150%；**系数基类**（处决 / 响应 / 效应 / 偏谐系数直伤）口径 0% / 100%
- * —— 后者「额外暴击伤害 = 0%」，即 `1 + 暴击率 × (暴击伤害 - 1)` 在只有暴击率 buff 时恒为 1，不会掉伤害。
+ * —— 后者「额外暴击伤害 = 0%」，即 `1 + 暴击率 × (暴击伤害 - 1)` 在只有暴击率时恒为 1，不会掉伤害。
  */
-const critBase = (fromPanel: boolean): { rate: number; dmg: number } =>
-    fromPanel ? { rate: 5, dmg: 150 } : { rate: 0, dmg: 100 }
+const critBase = (coeffEntry: boolean): { rate: number; dmg: number } =>
+    coeffEntry ? { rate: 0, dmg: 100 } : { rate: 5, dmg: 150 }
 
 /**
  * @desc 把装备/词条上的属性词条（元素加成 / 类型加成 / 面板词条）写入角色贡献累加器。
  *
- * `critFromPanel=false`（系数基类条目）时丢弃装备双暴：处决/响应/效应不吃角色面板双暴，
- * 双暴只能由**绑定到该条目**的 buff（直接乘区 / 引用 / 覆盖）提供。
+ * `coeffEntry=true`（系数基类条目）时丢弃装备双暴：处决/响应/效应不吃角色面板双暴，
+ * 双暴只能由**绑定到该条目**的「覆盖」型 buff 提供（追加/引用对它们不生效，见
+ * `calculation.consts.ts` 的 `COEFF_OVERRIDE_ONLY_ZONE_IDS`）。
  */
-function applyEntryStatToAccum(label: string, value: number, acc: CharacterComputed, critFromPanel = true) {
+function applyEntryStatToAccum(label: string, value: number, acc: CharacterComputed, coeffEntry = false) {
     if (isElementBonus(label)) {
         const el = ELEMENT_BONUS_MAP[label]
         acc.elementBonus[el] = (acc.elementBonus[el] ?? 0) + value
@@ -155,10 +156,10 @@ function applyEntryStatToAccum(label: string, value: number, acc: CharacterCompu
             applyZone(acc, 'defPct', value)
             break
         case '暴击率':
-            if (critFromPanel) applyZone(acc, 'critRate', value)
+            if (!coeffEntry) applyZone(acc, 'critRate', value)
             break
         case '暴击伤害':
-            if (critFromPanel) applyZone(acc, 'critDmg', value)
+            if (!coeffEntry) applyZone(acc, 'critDmg', value)
             break
         case '共鸣效率':
             applyZone(acc, 'recharge', value)
@@ -168,8 +169,8 @@ function applyEntryStatToAccum(label: string, value: number, acc: CharacterCompu
     }
 }
 
-function emptyAccum(critFromPanel = true): CharacterComputed {
-    const crit = critBase(critFromPanel)
+function emptyAccum(coeffEntry = false): CharacterComputed {
+    const crit = critBase(coeffEntry)
     return {
         baseAtk: 0,
         baseHp: 0,
@@ -213,14 +214,14 @@ function accumulateEchoes(
     weaponSubstatValue: number,
     weaponSubstatLabel: string | undefined,
     acc: CharacterComputed,
-    critFromPanel = true
+    coeffEntry = false
 ) {
     if (weaponSubstatLabel) {
-        applyEntryStatToAccum(weaponSubstatLabel, weaponSubstatValue, acc, critFromPanel)
+        applyEntryStatToAccum(weaponSubstatLabel, weaponSubstatValue, acc, coeffEntry)
     }
     for (const echo of echoes) {
         if (echo.mainStat) {
-            applyEntryStatToAccum(echo.mainStat.type, echo.mainStat.value, acc, critFromPanel)
+            applyEntryStatToAccum(echo.mainStat.type, echo.mainStat.value, acc, coeffEntry)
         }
         if (echo.secondMainStat) {
             if (echo.secondMainStat.type === '攻击') applyZone(acc, 'atkFlat', echo.secondMainStat.value)
@@ -233,7 +234,7 @@ function accumulateEchoes(
             }
         }
         for (const sub of echo.substats) {
-            applyEntryStatToAccum(sub.type, sub.value, acc, critFromPanel)
+            applyEntryStatToAccum(sub.type, sub.value, acc, coeffEntry)
         }
     }
 }
@@ -401,8 +402,9 @@ function boundBuffs(
 /** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 条目）。
  *  门槛判定（作用域 + 实例级硬性条件）均已在此前完成，此处只做乘区写入（含每条目自身的乘区条件）。
  *
- *  `critFromPanel=false` 用于**系数基类条目**（处决/响应/效应/偏谐系数直伤）：基础双暴与装备双暴都不计入
- *  （基准改 0% / 100%），双暴只能由绑定到该条目的 buff 通道（直接乘区 / 引用 / 覆盖）提供。 */
+ *  `coeffEntry=true` 用于**系数基类条目**（处决/响应/效应/偏谐系数直伤）：
+ *  基础双暴与装备双暴都不计入（基准改 0% / 100%），且**双暴只有「覆盖」写入生效**
+ *  （追加/引用对它们没有意义，见 `COEFF_OVERRIDE_ONLY_ZONE_IDS`）。 */
 function computeCharacterStats(
     charInfo: CharacterInfo,
     weaponName: string | null,
@@ -410,14 +412,14 @@ function computeCharacterStats(
     echoes: EchoSlotConfig[],
     boundBuffs: BuffInstance[],
     ctx?: ZoneCtx,
-    critFromPanel = true
+    coeffEntry = false
 ): CharacterComputed {
     const baseAtk = Math.round(charInfo.lv90BaseStats.atk + (weaponInfo?.lv90BaseAtk ?? 0))
     const baseHp = Math.round(charInfo.lv90BaseStats.hp)
     const baseDef = Math.round(charInfo.lv90BaseStats.def)
     const baseTuneBreakBoost = Math.round(charInfo.lv90BaseStats.tuneBreakBoost)
 
-    const acc = emptyAccum(critFromPanel)
+    const acc = emptyAccum(coeffEntry)
     acc.baseAtk = baseAtk
     acc.baseHp = baseHp
     acc.baseDef = baseDef
@@ -433,10 +435,10 @@ function computeCharacterStats(
             wSubCanonicalValue = wSubValue * 100
         }
     }
-    accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, acc, critFromPanel)
+    accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, acc, coeffEntry)
 
     // 一切皆 buff：绑定到该角色的 Buff 逐条乘区条目写入同一贡献累加器（乘区级条件在此过滤）
-    for (const z of activeZonesOf(boundBuffs, ctx)) {
+    for (const z of activeZonesOf(boundBuffs, ctx, coeffEntry)) {
         applyZone(acc, z.zoneId, z.value)
     }
 
@@ -483,18 +485,31 @@ export const zoneConditionMet = (zone: { condition?: BuffCondition }, ctx: ZoneC
 /**
  * @desc 生效 Buff 提供的直接贡献乘区（跳过引用/覆盖/零值；乘区条件不满足者逐条剔除）。
  * 同一乘区可有多条：`if (链阶硬门槛满足) { 各条目各自 add if 自身条件满足 }` —— 满足的全部相加。
+ *
+ * `coeffEntry=true`（系数基类条目）时再剔一道：**双暴的追加写入不生效**，只有「覆盖」能定值
+ * （见 `COEFF_OVERRIDE_ONLY_ZONE_IDS`）—— 这些条目不吃面板式双暴累加。
  */
-const activeZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string; value: number }[] =>
+const activeZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx, coeffEntry = false): { zoneId: string; value: number }[] =>
     collectZones(buffs).flatMap((z) =>
-        !z.ref && !z.override && z.value !== 0 && (!ctx || zoneConditionMet(z, ctx))
+        !z.ref &&
+        !z.override &&
+        z.value !== 0 &&
+        (!ctx || zoneConditionMet(z, ctx)) &&
+        (!coeffEntry || zoneAppliesToCoeffEntry(z))
             ? [{ zoneId: z.zoneId as string, value: z.value }]
             : []
     )
 
-/** @desc 生效 Buff 里带引用标记的乘区（转模：稍后按面板解析；乘区条件不满足者剔除） */
-const refZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string; ref: ZoneRef }[] =>
+/**
+ * @desc 生效 Buff 里带引用标记的乘区（转模：稍后按面板解析；乘区条件不满足者剔除）。
+ * `coeffEntry=true` 时双暴引用同样不生效：引用属于「追加」语义，不是「覆盖」。
+ */
+const refZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx, coeffEntry = false): { zoneId: string; ref: ZoneRef }[] =>
     collectZones(buffs).flatMap((z) =>
-        z.ref && !ZONE_NO_REF_IDS.has(z.zoneId) && (!ctx || zoneConditionMet(z, ctx))
+        z.ref &&
+        !ZONE_NO_REF_IDS.has(z.zoneId) &&
+        (!ctx || zoneConditionMet(z, ctx)) &&
+        (!coeffEntry || zoneAppliesToCoeffEntry(z))
             ? [{ zoneId: z.zoneId as string, ref: z.ref }]
             : []
     )
@@ -918,9 +933,11 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
  * @desc 条目是否走**系数基类公式**（`computeTuneEntry` / `computeEffectEntry`）。
  *
  * 与 `computeAll` / `computeOneEntry` 的分派判据逐字一致：处决 / 响应 / 效应 / 偏谐系数直伤。
- * 这些条目不吃角色面板双暴（基准 0% / 100%），双暴只能由绑定到该条目的 buff 提供。
+ * 这些条目不参与角色面板式双暴累加（基准 0% / 100%），且**双暴只有「覆盖」写入生效** ——
+ * 追加/引用一律不生效（见 `COEFF_OVERRIDE_ONLY_ZONE_IDS`）。
+ * 溯源（`damage-trace`）与拉表可用性判定（`spread-table.utils`）也复用本判据。
  */
-const usesCoefficientFormula = (entry: DamageEntry): boolean =>
+export const usesCoefficientFormula = (entry: DamageEntry): boolean =>
     entry.isEffect || entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数'
 
 const TUNE_COEFF_MAP: Record<string, number> = {
@@ -1068,9 +1085,9 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
     }
 }
 
-/** @desc 无角色面板的兜底面板（效应条目 / 引用目标缺失）：`critFromPanel=false` 时双暴取系数基类基准 0% / 100% */
-function emptyCharacterStats(critFromPanel = true): CharacterComputed {
-    const crit = critBase(critFromPanel)
+/** @desc 无角色面板的兜底面板（效应条目 / 引用目标缺失）：`coeffEntry=true` 时双暴取系数基类基准 0% / 100% */
+function emptyCharacterStats(coeffEntry = false): CharacterComputed {
+    const crit = critBase(coeffEntry)
     return {
         baseAtk: 0,
         baseHp: 0,
@@ -1264,14 +1281,17 @@ function computeEffectEntry(
  * 口径：**伤害是当下的，buff 也是当下的** —— 被引用角色的面板只由**绑定到本条目**的 Buff 组成
  * （作用域指向被引用角色的 Buff 被勾到本条目上，就参与该角色在这一段的面板；未勾选的其它条目绑定不参与）。
  * 本角色槽位直接用本条目面板 `partialStats`；其它角色槽位按需现算（`panelOf` 内部带缓存）。
+ *
+ * `coeffEntry=true` 时双暴引用被 `refZonesOf` 剔除（双暴只有「覆盖」生效）。
  */
 function resolveRefsForEntry(
     stats: CharacterComputed,
     panelOf: (charIdx: number) => CharacterComputed,
     boundBuffs: BuffInstance[],
-    ctx?: ZoneCtx
+    ctx?: ZoneCtx,
+    coeffEntry = false
 ): void {
-    for (const { zoneId, ref } of refZonesOf(boundBuffs, ctx)) {
+    for (const { zoneId, ref } of refZonesOf(boundBuffs, ctx, coeffEntry)) {
         const resolved = resolveRefValue(ref, panelOf(ref.characterIdx))
         if (resolved === 0) continue
         applyZone(stats, zoneId, resolved)
@@ -1283,8 +1303,8 @@ function resolveRefsForEntry(
  * @desc 构建「本条目可见」的某角色槽位面板：装备/词条 + 绑定到本条目的、作用域指向该角色的 Buff。
  * 与角色槽位级面板（把该角色全部条目上的绑定取并集）的区别：这里严格只看这一段伤害勾了什么。
  *
- * `critFromPanel=false`（系数基类条目）时，被引用角色的面板同样不带双暴 —— 「面板双暴不计入」对
- * 本角色与跨角色引用保持同一口径（系数基类条目的双暴只能来自双暴 buff 本身，不能靠转模引用面板双暴）。
+ * `coeffEntry=true`（系数基类条目）时，被引用角色的面板同样不带双暴 —— 「面板双暴不计入」对
+ * 本角色与跨角色引用保持同一口径（系数基类条目的双暴只能来自「覆盖」型 buff，不能靠转模引用面板双暴）。
  */
 function buildEntryPanel(
     refIdx: number,
@@ -1298,11 +1318,11 @@ function buildEntryPanel(
     configState: ConfigState,
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
-    critFromPanel = true
+    coeffEntry = false
 ): CharacterComputed {
     if (refIdx === charIndex) return ownStats
     const slot = team[refIdx]
-    if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats(critFromPanel)
+    if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats(coeffEntry)
     const bound = activeBoundForChar(candidates, refIdx, entry.isEffect, profile, ctx)
     const panel = computeCharacterStats(
         charInfoMap[slot.character],
@@ -1311,7 +1331,7 @@ function buildEntryPanel(
         configState.characters[refIdx]?.echoes ?? [],
         bound,
         ctx,
-        critFromPanel
+        coeffEntry
     )
     for (const z of overrideZonesOf(bound, ctx)) applyZone(panel, z.zoneId, z.value, 'override')
     recomputeTotals(panel)
@@ -1353,8 +1373,8 @@ export function computeAll(
         const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
         const entryBound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx)
         const charInfo = charName ? charInfoMap[charName] : undefined
-        /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴，双暴基准 0% / 100% */
-        const critFromPanel = !usesCoefficientFormula(entry)
+        /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴（基准 0% / 100%），双暴只有覆盖生效 */
+        const coeffEntry = usesCoefficientFormula(entry)
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
         let partialStats: CharacterComputed
@@ -1366,11 +1386,11 @@ export function computeAll(
                 echoes,
                 entryBound,
                 zoneCtx,
-                critFromPanel
+                coeffEntry
             )
         } else {
-            partialStats = emptyCharacterStats(critFromPanel)
-            for (const z of activeZonesOf(entryBound, zoneCtx)) {
+            partialStats = emptyCharacterStats(coeffEntry)
+            for (const z of activeZonesOf(entryBound, zoneCtx, coeffEntry)) {
                 applyZone(partialStats, z.zoneId, z.value)
             }
             recomputeTotals(partialStats)
@@ -1394,7 +1414,7 @@ export function computeAll(
                 configState,
                 charInfoMap,
                 weaponInfoMap,
-                critFromPanel
+                coeffEntry
             )
             panelCache.set(refIdx, built)
             return built
@@ -1402,7 +1422,7 @@ export function computeAll(
 
         // Resolve ref zones and apply to stats
         const stats = { ...partialStats }
-        resolveRefsForEntry(stats, panelOf, entryBound, zoneCtx)
+        resolveRefsForEntry(stats, panelOf, entryBound, zoneCtx, coeffEntry)
 
         // Apply override zones (set value directly, takes precedence over everything)
         for (const z of overrideZonesOf(entryBound, zoneCtx)) {
@@ -1464,13 +1484,13 @@ export function computeOneEntry(
     }
     const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
     const bound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx)
-    /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴，双暴基准 0% / 100% */
-    const critFromPanel = !usesCoefficientFormula(entry)
+    /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴（基准 0% / 100%），双暴只有覆盖生效 */
+    const coeffEntry = usesCoefficientFormula(entry)
 
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo
-        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, bound, zoneCtx, critFromPanel)
-        : emptyCharacterStats(critFromPanel)
+        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, bound, zoneCtx, coeffEntry)
+        : emptyCharacterStats(coeffEntry)
 
     // 被引用角色面板：按需现算（同一槽位只算一次）
     const panelCache = new Map<number, CharacterComputed>()
@@ -1490,7 +1510,7 @@ export function computeOneEntry(
             configState,
             charInfoMap,
             weaponInfoMap,
-            critFromPanel
+            coeffEntry
         )
         panelCache.set(refIdx, built)
         return built
@@ -1498,7 +1518,7 @@ export function computeOneEntry(
 
     // resolve ref zones
     const stats = { ...partialStats }
-    resolveRefsForEntry(stats, panelOf, bound, zoneCtx)
+    resolveRefsForEntry(stats, panelOf, bound, zoneCtx, coeffEntry)
     for (const z of overrideZonesOf(bound, zoneCtx)) {
         applyZone(stats, z.zoneId, z.value, 'override')
     }
@@ -1556,22 +1576,14 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
     const candidates = entryCandidateBuffs(entry, ctx.buffSets, ctx.damageEntryBuffSetIds)
     const entryBound = activeBoundForChar(candidates, charIndex, entry.isEffect, ctx.conditionProfile, zoneCtx)
     const charInfo = charName ? ctx.charInfoMap[charName] : undefined
-    const critFromPanel = !usesCoefficientFormula(entry)
+    const coeffEntry = usesCoefficientFormula(entry)
 
     let partialStats: CharacterComputed
     if (charInfo) {
-        partialStats = computeCharacterStats(
-            charInfo,
-            weaponName,
-            weaponInfo,
-            echoes,
-            entryBound,
-            zoneCtx,
-            critFromPanel
-        )
+        partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, entryBound, zoneCtx, coeffEntry)
     } else {
-        partialStats = emptyCharacterStats(critFromPanel)
-        for (const z of activeZonesOf(entryBound, zoneCtx)) {
+        partialStats = emptyCharacterStats(coeffEntry)
+        for (const z of activeZonesOf(entryBound, zoneCtx, coeffEntry)) {
             applyZone(partialStats, z.zoneId, z.value)
         }
         recomputeTotals(partialStats)
@@ -1595,7 +1607,7 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
             ctx.configState,
             ctx.charInfoMap,
             ctx.weaponInfoMap,
-            critFromPanel
+            coeffEntry
         )
         panelCache.set(refIdx, built)
         return built
@@ -1604,6 +1616,8 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
     for (const bs of entryBound) {
         bs.zones.forEach((z, zi) => {
             if (!z.ref || ZONE_NO_REF_IDS.has(z.zoneId) || !zoneConditionMet(z, zoneCtx)) return
+            // 系数基类条目上双暴引用不生效（双暴只有「覆盖」生效），连解算都不做，溯源才不会列出幻影来源
+            if (coeffEntry && !zoneAppliesToCoeffEntry(z)) return
             out.set(`${bs.id}#${zi}`, resolveRefValue(z.ref, panelOf(z.ref.characterIdx)))
         })
     }
