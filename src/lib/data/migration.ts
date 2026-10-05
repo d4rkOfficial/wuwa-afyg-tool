@@ -29,6 +29,23 @@ import { PROJECT_VERSION } from '$lib/types/project'
 
 const PHASE_ORDER: PhaseKey[] = ['team', 'timeline', 'calculation', 'config']
 
+/**
+ * @desc 缺 `project.version` 时的兜底判定门槛（毫秒）：**2026-10-01 00:00 伦敦时间**。
+ *
+ * 背景：工坊（分享中转站）历史上用逐字段白名单重建工程对象，把 `project.version` 一并抹掉了。
+ * 于是「上传工坊再下载」拿回的文件没有版本号，`readVersion` 按老规矩当成 0，整条迁移链重跑
+ * —— 其中 `migrateV2toV3` 的 `bindPaneEffectSources` 会把「影响源」Buff 补勾到伤害段上（只加不减），
+ * 症状就是「本来没勾的同奏层数被挂到守岸人全部倍率 + 处决倍率」。
+ *
+ * 工具自身导出的文件**一直带 `project.version`**，所以「没有版本号」在现代分享件里不是
+ * 「老工程」而是「中转站吃掉了版本号」。这个日期远晚于 v4（2026-09-27 引入 v2→v3/v3→v4）
+ * 与 v3，因此晚于它的无版本文件可以直接断言为当前最新版。
+ *
+ * 注意：工具早年确实存在过无版本号的导出文件，所以门槛之前仍按 0 处理（迁移链照跑），
+ * 不能用「无版本号 = 最新版」一刀切。
+ */
+export const VERSIONLESS_ASSUME_CURRENT_AFTER = Date.UTC(2026, 9, 1, 0, 0, 0, 0)
+
 /** @desc 一个原子迁移步骤：把 from 版本的数据升级到 to 版本 */
 export interface Migration {
     from: number
@@ -570,10 +587,26 @@ const migrateV3toV4: Migration = {
 
 const PROJECT_MIGRATIONS: Migration[] = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4]
 
-/** @desc 读取数据的版本号：无版本号（老导出格式 / 老 IndexedDB）视为 0 */
+/**
+ * @desc 读取数据的版本号：无版本号（老导出格式 / 老 IndexedDB）视为 0。
+ *
+ * `exportedAt` = 「这份数据是什么时候产出的」：工具导出时写 `Date.now()`，工坊落库时写**上传时刻**。
+ * 缺版本号但产出时间晚于 {@link VERSIONLESS_ASSUME_CURRENT_AFTER} 的，按「中转站吃掉了版本号」处理，
+ * 断言为当前最新版 —— 否则会被误判成 v0 而重跑 `bindPaneEffectSources`（见该常量的注释）。
+ * 缺版本号**且**没有可信 `exportedAt`（或早于门槛）时，仍按 0 走完整迁移链。
+ */
 export const readVersion = (raw: Record<string, unknown>): number => {
     const version = raw.version
-    return typeof version === 'number' && Number.isFinite(version) ? version : 0
+    if (typeof version === 'number' && Number.isFinite(version)) return version
+    const exportedAt = raw.exportedAt
+    if (
+        typeof exportedAt === 'number' &&
+        Number.isFinite(exportedAt) &&
+        exportedAt >= VERSIONLESS_ASSUME_CURRENT_AFTER
+    ) {
+        return PROJECT_VERSION
+    }
+    return 0
 }
 
 /**

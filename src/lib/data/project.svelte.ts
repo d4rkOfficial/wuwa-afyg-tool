@@ -486,9 +486,17 @@ export function safeJsonParse(text: string): unknown {
 export function parseProjectFile(text: string): Project[] {
     const raw = safeJsonParse(text)
     const rawProjects: Record<string, unknown>[] = []
+    /**
+     * @desc 外层信封的产出时间（工具导出写 `Date.now()`，工坊落库写**上传时刻**）。
+     * 工坊历史上会把 `project.version` 抹掉，此时只能靠它判定「这不是老工程、而是被吃掉了版本号」，
+     * 见 migration 的 `readVersion` / `VERSIONLESS_ASSUME_CURRENT_AFTER`。故这里显式下传。
+     */
+    let envelopeExportedAt: number | undefined
     if (isRecord(raw)) {
         if (isRecord(raw.project) || Array.isArray(raw.project)) {
             rawProjects.push(...(Array.isArray(raw.project) ? raw.project.filter(isRecord) : [raw.project]))
+            if (typeof raw.exportedAt === 'number' && Number.isFinite(raw.exportedAt))
+                envelopeExportedAt = raw.exportedAt
         } else if ('team' in raw || 'name' in raw) {
             rawProjects.push(raw)
         }
@@ -497,7 +505,14 @@ export function parseProjectFile(text: string): Project[] {
     }
     if (!rawProjects.length) throw new ProjectParseError('无法识别的工程文件结构')
     // 统一走 migration：任意历史版本的导出文件都会被升级到当前工程结构
-    return rawProjects.map((item) => normalizeProject(item as Partial<Project>))
+    return rawProjects.map((item) => {
+        // 自身不带产出时间时才用信封的，避免覆盖工程自己的 `exportedAt`
+        const withStamp =
+            envelopeExportedAt !== undefined && typeof item.exportedAt !== 'number'
+                ? { ...item, exportedAt: envelopeExportedAt }
+                : item
+        return normalizeProject(withStamp as Partial<Project>)
+    })
 }
 
 export async function lockPhase(phase: PhaseKey) {
