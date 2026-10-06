@@ -3,7 +3,7 @@
     import { untrack } from 'svelte'
     import {
         getAllDamageEntries,
-        getAllBuffSets,
+        getAllBuffConfs,
         getBuffSetIdsForEntry,
         toggleBuffSetForEntry,
         setBuffSetIdsForEntry,
@@ -56,7 +56,7 @@
 
     /** @desc 从 store 派生：全部伤害条目 / Buff 块列表 / Buff 弹窗开关 / 全局 Buff 列表 */
     let damageEntries = $derived(getAllDamageEntries())
-    let buffSets = $derived(getAllBuffSets())
+    let buffSets = $derived(getAllBuffConfs())
     let showBuffModal = $derived(getShowBuffModal())
     let globalBuffSetIds = $derived(getGlobalBuffSetIds())
     /** @desc 条目→已选伤害类型 / 条目→已绑定 Buff 的映射（供表格展示） */

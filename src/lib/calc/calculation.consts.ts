@@ -1,4 +1,4 @@
-import type { ZoneDef, BuffSet } from './calculation.types'
+import type { ZoneDef, BuffConf } from './calculation.types'
 
 /** @desc 全部乘区定义（拉表页可配置的 Buff 乘区清单）：按「基本固定值 → 基本百分比 → 双暴 → 增伤拐 → 特殊终伤 → 倍率 → 使目标 → 对目标 → 层数」分区排列（见 ZONE_SECTIONS） */
 export const ZONE_DEFS = [
@@ -161,15 +161,15 @@ export const LAYERED_BUFF_PATTERN = /^(.+?)(\d+)([^\d]*)$/
 export const LAYERED_BUFF_VAR = '?'
 
 /** @desc 分组条目：folder=叠层文件夹（同前缀 ≥2 条自动归组），item=普通 Buff 条目 */
-export interface GroupedBuffSetItem {
+export interface GroupedBuffConfItem {
     key: string
     type: 'item' | 'folder'
-    buffSet?: BuffSet
+    buffSet?: BuffConf
     prefix?: string
     name?: string
     prefixText?: string
     suffixText?: string
-    children?: BuffSet[]
+    children?: BuffConf[]
 }
 
 /** @desc Buff 作用域归类：全队=三个角色都能吃到 / 效应专属=仅效应伤害（空数组）/ 指定角色槽位 */
@@ -198,10 +198,10 @@ const compareNaturalKey = (a: string, b: string): number =>
     a.localeCompare(b, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' })
 
 /** @desc 按叠层命名规则把 Buff 列表分组：同「前缀+后缀」且 ≥2 条归入一个 folder（folder 内按数字升序），其余保持 item */
-export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
-    const result: GroupedBuffSetItem[] = []
+export function groupBuffSets(buffSets: BuffConf[]): GroupedBuffConfItem[] {
+    const result: GroupedBuffConfItem[] = []
     const pattern = LAYERED_BUFF_PATTERN
-    const prefixGroups = new Map<string, { suffix: string; items: BuffSet[] }>()
+    const prefixGroups = new Map<string, { suffix: string; items: BuffConf[] }>()
     /** @desc 名字里的数字（用于目录内自动排序），无数字按 0 */
     const numOf = (name: string): number => {
         const m = name.match(pattern)
@@ -228,8 +228,8 @@ export function groupBuffSets(buffSets: BuffSet[]): GroupedBuffSetItem[] {
     }
 
     const seenFolders = new Set<string>()
-    const folders: GroupedBuffSetItem[] = []
-    const items: GroupedBuffSetItem[] = []
+    const folders: GroupedBuffConfItem[] = []
+    const items: GroupedBuffConfItem[] = []
     for (const bs of buffSets) {
         const m = bs.name.match(pattern)
         if (m) {

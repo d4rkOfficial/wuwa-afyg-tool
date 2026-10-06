@@ -78,7 +78,7 @@ export const BUILTIN_SKILLS: AiSkill[] = [
     {
         id: SKILL_IDS.buffNaming,
         name: 'Buff 命名规则',
-        description: '生成 / 命名 Buff 集时遵循的命名规范（归属者·触发·效果词条），含叠层与精炼拆分硬性要求',
+        description: '生成 / 命名 Buff时遵循的命名规范（归属者·触发·效果词条），含叠层与精炼拆分硬性要求',
         enabled: true,
         mode: 'active',
         builtin: true,

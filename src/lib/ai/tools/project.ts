@@ -15,7 +15,7 @@ import {
     unlockPhase,
     getPhaseOrder
 } from '$lib/data/project.svelte'
-import { getBuffEntities, getBuffLibraryLoading } from '$lib/data/buff-library.svelte'
+import { getBuffEntities, getBuffLibraryLoading as getBuffSetLoading } from '$lib/data/buff-library.svelte'
 
 type PhaseKey = 'team' | 'timeline' | 'calculation' | 'config'
 
@@ -100,7 +100,7 @@ defineTool('rename_project', {
     parameters: {
         type: 'object',
         properties: {
-            id: { type: 'string', description: '工程 id（用 list_projects 获取）' },
+            id: { type: 'string', description: '工程 id（用 list_projects 获取）；空字符串表示返回主页' },
             name: { type: 'string', description: '新名称' }
         },
         required: ['id', 'name']
@@ -115,7 +115,7 @@ defineTool('rename_project', {
 })
 
 defineTool('set_active_project', {
-    description: '切换当前活动工程（后续操作都作用于该工程）。',
+    description: '切换当前活动工程（后续操作都作用于该工程）；id 传空字符串返回主页。',
     parameters: {
         type: 'object',
         properties: { id: { type: 'string', description: '工程 id（用 list_projects 获取）' } },
@@ -123,7 +123,8 @@ defineTool('set_active_project', {
     },
     handler: async (args) => {
         const id = str(args.id)
-        if (!id) throw new Error('缺少工程 id')
+        if (typeof args.id !== 'string') throw new Error('缺少工程 id')
+        if (id && !getProjects().some((p) => p.id === id)) throw new Error(`未找到工程：${id}`)
         await setActiveProject(id)
         return { active: id }
     }
@@ -230,8 +231,9 @@ defineTool('unlock_phase', {
     }
 })
 
-defineTool('get_buff_library_summary', {
-    description: '获取本地 Buff 集概览：实体数量、按类型分布、数据来源（工坊同步/自定义）。',
+defineTool('get_buff_set_summary', {
+    description:
+        '获取主页的本地 Buff 集概览（不读取工程 Buff 配置）：实体数量、按类型分布、数据来源（工坊同步/自定义）。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const entities = getBuffEntities()
@@ -244,7 +246,7 @@ defineTool('get_buff_library_summary', {
             else custom++
         }
         return {
-            loading: getBuffLibraryLoading(),
+            loading: getBuffSetLoading(),
             entityCount: entities.length,
             byType,
             share,

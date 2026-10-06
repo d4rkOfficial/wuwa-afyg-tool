@@ -12,14 +12,14 @@
      */
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
-    import type { GroupedBuffSetItem } from '$lib/calc/calculation.consts'
+    import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
     import Modal from '$lib/components/layout/modal.svelte'
     import Button from '$lib/components/ui/button.svelte'
     import { folderMembersOf } from './buff-modal.utils'
 
     interface Props extends ComponentsProps {
         /** @desc 待重命名的目录（含全部子 Buff，用于预览与数量提示） */
-        folder: GroupedBuffSetItem
+        folder: GroupedBuffConfItem
         /** @desc 父组件关闭本弹窗（取消 / Esc / 右上角关闭） */
         onclose: () => void
         /** @desc 确认重命名：回传已 trim 的新前缀 / 新后缀 */

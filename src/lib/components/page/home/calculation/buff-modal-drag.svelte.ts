@@ -27,7 +27,7 @@ import {
     deleteBuffSets,
     reorderNonGlobalBuffSets,
     getGlobalBuffSetIds,
-    getAllBuffSets
+    getAllBuffConfs
 } from '$lib/calc/calculation.store.svelte'
 import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
 
@@ -189,7 +189,7 @@ export const createBuffDrag = (deps: BuffDragDeps) => {
             if (container) {
                 const next = computeDraggedOrder({
                     // 顺序真源取整份列表（含全局，保证锚点都能找到）；reorderNonGlobalBuffSets 只应用非全局部分
-                    orderedIds: getAllBuffSets().map((bs) => bs.id),
+                    orderedIds: getAllBuffConfs().map((bs) => bs.id),
                     parentRowIds: parentRowIdsOf(container, state.parentKey),
                     unitIds: state.unitIds,
                     dropIdx: state.dropIdx

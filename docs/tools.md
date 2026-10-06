@@ -9,14 +9,14 @@ AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注
 
 ## 危险工具
 
-- `generate_entity_buffs`
-- `generate_project_buffs`
-- `sync_buff_library_from_share`
-- `update_entity_buffs`
-- `delete_buff_entity`
-- `clear_buff_library`
-- `delete_buff_set`
-- `remove_buff_zone`
+- `generate_buff_set_entity_buffs`
+- `generate_project_buff_confs`
+- `sync_buff_set_from_share`
+- `update_buff_set_entity_buffs`
+- `delete_buff_set_entity`
+- `clear_buff_set`
+- `delete_buff_conf`
+- `remove_buff_conf_zone`
 - `remove_substat`
 - `kuro_logout`
 - `archive_project`
@@ -81,7 +81,7 @@ _无参数_
 
 ### `ask_user`
 
-向用户提出一个或多个结构化问题，并阻塞当前回合直到用户作答完毕。界面是**逐题问答**：每题可「上一题 / 下一题 / 忽略本题」，最后一题或任意时刻可「提交」；用户提交或放弃后你才会拿回控制权，期间不要假设用户已经看到或已经作答。 题型与结果里 values 的取值约定： - boolean（是否型）：界面显示「是 / 否」，values 为 ["yes"] 或 ["no"]，请不要给它 options。 - single（单选型）：values 为 [某个选项 value] 或 [用户自定义输入原文]；默认允许自定义输入。 - multi（多选型）：values 为 [选项 value, …]（可能为空），用户的自定义输入原文追加在末尾；默认允许自定义输入。 - 「其它」由界面保证只出现一次：你在 options 里已经写了「其它」（label 或 value 命中「其它 / 其他 / other / custom / 自定义」）时，界面**不会再补一行**，而是让那一项自己展开输入框（此时 answers[].values 里是用户输入的原文）；你没写时界面才补一行「其它」。 什么时候该用： - 缺少只有用户知道的关键信息（目标、偏好、业务含义、外部约束），且不打算为了猜而做无用功； - 存在多个都合理的实现方向，需要用户拍板（例如「改哪一套 Buff 集」「用哪种出图口径」）； - 需求内部有冲突/歧义，必须先澄清再动手。 什么时候不该用： - 能自己查到的（工具清单/工程状态/文档里已有的），先自己查，不要把查询工作推给用户； - 不要拿它当「危险操作二次确认」——危险操作有专门的确认机制（工具的 dangerous 标记），用它只会无谓地打断用户一次。 结果约定： - answers 是逐题作答数组，含补全后的 id、type、skipped、values、custom（用户自定义输入原文）。 - 用户可以「忽略本题」（或提交时未答非必答题）：必须逐题检查 skipped，skipped=true 时 values 为空数组——不要臆造被跳过的答案，也不要把「没答」当成「默认值」。 - submitted=false 表示用户中途放弃、面板被关闭或本轮被取消：此时应当停止当前方案并直接询问用户下一步，不要自动重试同一个问题组。 - 额外字段 notes 记录了入参被改写过什么（补 id / 改写重复 id / 忽略 boolean 的 options / 截断超长文本），有内容时请据此修正下次调用。
+向用户提出一个或多个结构化问题，并阻塞当前回合直到用户作答完毕。界面是**逐题问答**：每题可「上一题 / 下一题 / 忽略本题」，最后一题或任意时刻可「提交」；用户提交或放弃后你才会拿回控制权，期间不要假设用户已经看到或已经作答。 题型与结果里 values 的取值约定： - boolean（是否型）：界面显示「是 / 否」，values 为 ["yes"] 或 ["no"]，请不要给它 options。 - single（单选型）：values 为 [某个选项 value] 或 [用户自定义输入原文]；默认允许自定义输入。 - multi（多选型）：values 为 [选项 value, …]（可能为空），用户的自定义输入原文追加在末尾；默认允许自定义输入。 - 「其它」由界面保证只出现一次：你在 options 里已经写了「其它」（label 或 value 命中「其它 / 其他 / other / custom / 自定义」）时，界面**不会再补一行**，而是让那一项自己展开输入框（此时 answers[].values 里是用户输入的原文）；你没写时界面才补一行「其它」。 什么时候该用： - 缺少只有用户知道的关键信息（目标、偏好、业务含义、外部约束），且不打算为了猜而做无用功； - 存在多个都合理的实现方向，需要用户拍板（例如「要配置工程 Buff，还是管理主页 Buff 集」「用哪种出图口径」）； - 需求内部有冲突/歧义，必须先澄清再动手。 什么时候不该用： - 能自己查到的（工具清单/工程状态/文档里已有的），先自己查，不要把查询工作推给用户； - 不要拿它当「危险操作二次确认」——危险操作有专门的确认机制（工具的 dangerous 标记），用它只会无谓地打断用户一次。 结果约定： - answers 是逐题作答数组，含补全后的 id、type、skipped、values、custom（用户自定义输入原文）。 - 用户可以「忽略本题」（或提交时未答非必答题）：必须逐题检查 skipped，skipped=true 时 values 为空数组——不要臆造被跳过的答案，也不要把「没答」当成「默认值」。 - submitted=false 表示用户中途放弃、面板被关闭或本轮被取消：此时应当停止当前方案并直接询问用户下一步，不要自动重试同一个问题组。 - 额外字段 notes 记录了入参被改写过什么（补 id / 改写重复 id / 忽略 boolean 的 options / 截断超长文本），有内容时请据此修正下次调用。
 
 | 参数          | 必填   | 类型   | 说明                                                                                                         |
 | ------------- | ------ | ------ | ------------------------------------------------------------------------------------------------------------ |
@@ -131,11 +131,11 @@ _无参数_
 | ------ | ------ | ------ | -------------------------- |
 | `rule` | **是** | string | 用户给出的完整命名规则描述 |
 
-### `generate_entity_buffs`
+### `generate_buff_set_entity_buffs`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地集（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。
+为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 并写入主页的本地 Buff 集；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。
 
 | 参数         | 必填   | 类型   | 说明                                                            |
 | ------------ | ------ | ------ | --------------------------------------------------------------- |
@@ -143,11 +143,11 @@ _无参数_
 | `entityName` | **是** | string | 实体名称（中文）                                                |
 | `namingRule` | 否     | string | 可选：用户新定义的命名规则（会写入内置技能卡「Buff 命名规则」） |
 
-### `generate_project_buffs`
+### `generate_project_buff_confs`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-为当前工程队伍中的实体（角色/武器/首位声骸/触发套装）逐个生成 Buff 集并导入当前工程拉表（含归属绑定）。该工具会自动查询各实体官方详情并提取 Buff，无需先调用其它查询工具。默认遍历全队，可用 slot（1-3）或 entityType 过滤。生成前若未定义命名规则会先询问用户。
+为当前工程队伍中的实体（角色/武器/首位声骸/触发套装）逐个生成工程 Buff 配置并导入当前工程拉表（含归属绑定）。该工具会自动查询各实体官方详情并提取 Buff，无需先调用其它查询工具。默认遍历全队，可用 slot（1-3）或 entityType 过滤。生成前若未定义命名规则会先询问用户。
 
 | 参数         | 必填 | 类型   | 说明                                                            |
 | ------------ | ---- | ------ | --------------------------------------------------------------- |
@@ -157,36 +157,36 @@ _无参数_
 
 ## Buff 集
 
-### `sync_buff_library_from_share`
+### `sync_buff_set_from_share`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-从工坊同步最新 Buff 集到本地集。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。
+从工坊同步最新 Buff 集到主页的本地 Buff 集。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。
 
 _无参数_
 
-### `list_buff_entities`
+### `list_buff_set_entities`
 
-列出本地 Buff 集的实体（可按类型过滤）：实体名、类型、来源（share/custom）、Buff 数量。
+列出本地 Buff 集的实体（仅管理主页数据，不修改工程 Buff 配置；可按类型过滤）：实体名、类型、来源（share/custom）、Buff 数量。
 
 | 参数         | 必填 | 类型   | 说明                                  |
 | ------------ | ---- | ------ | ------------------------------------- |
 | `entityType` | 否   | string | 可选：character/weapon/echo/1set-5set |
 
-### `get_entity_buffs`
+### `get_buff_set_entity_buffs`
 
-查看本地 Buff 集中指定实体的全部 Buff 详情（名称、作用范围、生效条件、乘区与数值、引用）。
+查看本地 Buff 集中指定实体的全部 Buff 详情（不读取工程 Buff 配置；名称、作用范围、生效条件、乘区与数值、引用）。
 
-| 参数         | 必填   | 类型   | 说明                                      |
-| ------------ | ------ | ------ | ----------------------------------------- |
-| `entityType` | **是** | string | 实体类型：character/weapon/echo/1set-5set |
-| `entityName` | **是** | string | 实体名称（中文，用 list_entities 定位）   |
+| 参数         | 必填   | 类型   | 说明                                             |
+| ------------ | ------ | ------ | ------------------------------------------------ |
+| `entityType` | **是** | string | 实体类型：character/weapon/echo/1set-5set        |
+| `entityName` | **是** | string | 实体名称（中文，用 list_buff_set_entities 定位） |
 
-### `update_entity_buffs`
+### `update_buff_set_entity_buffs`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-整体覆写本地 Buff 集中指定实体的 Buff 列表（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self\|self_except\|team\|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。
+整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self\|self_except\|team\|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。
 
 | 参数         | 必填   | 类型   | 说明                                       |
 | ------------ | ------ | ------ | ------------------------------------------ |
@@ -194,7 +194,7 @@ _无参数_
 | `entityName` | **是** | string | 实体名称（中文）                           |
 | `buffs`      | **是** | array  | 完整 Buff 列表（整体覆写，格式见工具描述） |
 
-### `delete_buff_entity`
+### `delete_buff_set_entity`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
@@ -205,7 +205,7 @@ _无参数_
 | `entityType` | **是** | string | 实体类型：character/weapon/echo/1set-5set |
 | `entityName` | **是** | string | 要删除的实体名称（中文）                  |
 
-### `clear_buff_library`
+### `clear_buff_set`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
@@ -217,69 +217,69 @@ _无参数_
 
 ### `get_damage_entries`
 
-获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「**序号** / 归属角色 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。行首方括号里的数字就是序号，增删改（bind_buff_to_entry / set_entry_damage_types / toggle_damage_type / get_damage_entry_buff_sources）填它。不含倍率与乘区数值——倍率用 get_timeline_damage_list，乘区与引用明细用 get_buff_set_detail / get_damage_entry_buff_sources 按需查。
+获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「**序号** / 归属角色 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。行首方括号里的数字就是序号，增删改（bind_buff_conf_to_entry / set_entry_damage_types / toggle_damage_type / get_damage_entry_buff_sources）填它。不含倍率与乘区数值——倍率用 get_timeline_damage_list，乘区与引用明细用 get_buff_conf_detail / get_damage_entry_buff_sources 按需查。
 
 _无参数_
 
-### `get_buff_sets`
+### `get_buff_confs`
 
-获取当前工程的 Buff 集清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_set_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。
+获取工程 Buff 配置清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_conf_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。
 
 _无参数_
 
-### `create_buff_set`
+### `create_buff_conf`
 
-在当前工程创建一个新的空 Buff 集。返回新 Buff 集的**序号**（清单里的第几条，见 get_buff_sets），后续操作用这个序号。
+创建一条空的工程 Buff 配置。返回新配置的**序号**（清单里的第几条，见 get_buff_confs），后续操作用这个序号。
 
-| 参数   | 必填   | 类型   | 说明        |
-| ------ | ------ | ------ | ----------- |
-| `name` | **是** | string | Buff 集名称 |
+| 参数   | 必填   | 类型   | 说明               |
+| ------ | ------ | ------ | ------------------ |
+| `name` | **是** | string | 工程 Buff 配置名称 |
 
-### `rename_buff_set`
+### `rename_buff_conf`
 
-重命名指定 Buff 集（按**序号**）。
+重命名指定工程 Buff 配置（按**序号**）。
 
-| 参数      | 必填   | 类型   | 说明                                       |
-| --------- | ------ | ------ | ------------------------------------------ |
-| `buffSet` | **是** | number | Buff 集序号（见 get_buff_sets 的「[NN]」） |
-| `name`    | **是** | string | 新名称                                     |
+| 参数       | 必填   | 类型   | 说明                                               |
+| ---------- | ------ | ------ | -------------------------------------------------- |
+| `buffConf` | **是** | number | 工程 Buff 配置序号（见 get_buff_confs 的「[NN]」） |
+| `name`     | **是** | string | 新名称                                             |
 
-### `duplicate_buff_set`
+### `duplicate_buff_conf`
 
-复制指定 Buff 集为一个新集（按**序号**），可指定新名称（默认“原名 复制”）。返回新集的序号。
+复制指定工程 Buff 配置为一条新配置（按**序号**），可指定新名称（默认“原名 复制”）。返回新配置的序号。
 
-| 参数         | 必填   | 类型   | 说明                 |
-| ------------ | ------ | ------ | -------------------- |
-| `buffSet`    | **是** | number | 要复制的 Buff 集序号 |
-| `customName` | 否     | string | 新集名称（可空）     |
+| 参数         | 必填   | 类型   | 说明                        |
+| ------------ | ------ | ------ | --------------------------- |
+| `buffConf`   | **是** | number | 要复制的 工程 Buff 配置序号 |
+| `customName` | 否     | string | 新集名称（可空）            |
 
-### `delete_buff_set`
+### `delete_buff_conf`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-删除指定 Buff 集（按**序号**，同时清理它对所有条目的绑定）。
+删除指定工程 Buff 配置（按**序号**，同时清理它对所有条目的绑定）。
 
-| 参数      | 必填   | 类型   | 说明        |
-| --------- | ------ | ------ | ----------- |
-| `buffSet` | **是** | number | Buff 集序号 |
+| 参数       | 必填   | 类型   | 说明               |
+| ---------- | ------ | ------ | ------------------ |
+| `buffConf` | **是** | number | 工程 Buff 配置序号 |
 
-### `bind_buff_to_entry`
+### `bind_buff_conf_to_entry`
 
-把指定 Buff 集绑定到指定伤害条目（该条目计算时生效）。两个参数都填**序号**：条目序号见 get_damage_entries，Buff 集序号见 get_buff_sets。
+把指定工程 Buff 配置绑定到指定伤害条目（该条目计算时生效）。两个参数都填**序号**：条目序号见 get_damage_entries，工程 Buff 配置序号见 get_buff_confs。
 
-| 参数      | 必填   | 类型   | 说明                                             |
-| --------- | ------ | ------ | ------------------------------------------------ |
-| `entry`   | **是** | number | 伤害条目序号（见 get_damage_entries 的「[NN]」） |
-| `buffSet` | **是** | number | Buff 集序号（见 get_buff_sets 的「[NN]」）       |
+| 参数       | 必填   | 类型   | 说明                                               |
+| ---------- | ------ | ------ | -------------------------------------------------- |
+| `entry`    | **是** | number | 伤害条目序号（见 get_damage_entries 的「[NN]」）   |
+| `buffConf` | **是** | number | 工程 Buff 配置序号（见 get_buff_confs 的「[NN]」） |
 
-### `unbind_buff_from_entry`
+### `unbind_buff_conf_from_entry`
 
-把指定 Buff 集从指定伤害条目解除绑定（两个参数都填**序号**）。
+把指定工程 Buff 配置从指定伤害条目解除绑定（两个参数都填**序号**）。
 
-| 参数      | 必填   | 类型   | 说明         |
-| --------- | ------ | ------ | ------------ |
-| `entry`   | **是** | number | 伤害条目序号 |
-| `buffSet` | **是** | number | Buff 集序号  |
+| 参数       | 必填   | 类型   | 说明               |
+| ---------- | ------ | ------ | ------------------ |
+| `entry`    | **是** | number | 伤害条目序号       |
+| `buffConf` | **是** | number | 工程 Buff 配置序号 |
 
 ### `set_entry_damage_types`
 
@@ -329,98 +329,98 @@ _无参数_
 
 _无参数_
 
-### `import_entity_buffs`
+### `import_buff_set_entity_to_project`
 
-把本地 Buff 集中指定实体（角色/武器/首位声骸/套装）的全部 Buff 导入当前工程（导入后可再绑定到条目）。entityType 取值：character/weapon/echo/1set/2set/3set/4set/5set。
+把主页 Buff 集中指定实体（角色/武器/首位声骸/套装）的全部 Buff 导入当前工程 Buff 配置（保留实体归属，导入后可再绑定到伤害条目）。entityType 取值：character/weapon/echo/1set/2set/3set/4set/5set。
 
 | 参数         | 必填   | 类型   | 说明     |
 | ------------ | ------ | ------ | -------- |
 | `entityType` | **是** | string | 实体类型 |
 | `entityName` | **是** | string | 实体名称 |
 
-### `get_buff_set_detail`
+### `get_buff_conf_detail`
 
-获取指定 Buff 集的完整详情：作用范围、是否全局、生效条件（链/阶硬门槛 + 属性/类型条件）、每个乘区条目（zoneId/数值/是否覆盖/引用/**各自的乘区级条件**）及其生效角色槽位。同一乘区可有多条，每条各自判定条件后相加；覆盖唯一（同一乘区仅一个覆盖条目）。
+获取指定工程 Buff 配置的完整详情：作用范围、是否全局、生效条件（链/阶硬门槛 + 属性/类型条件）、每个乘区条目（zoneId/数值/是否覆盖/引用/**各自的乘区级条件**）及其生效角色槽位。同一乘区可有多条，每条各自判定条件后相加；覆盖唯一（同一乘区仅一个覆盖条目）。
 
-| 参数      | 必填   | 类型   | 说明                                       |
-| --------- | ------ | ------ | ------------------------------------------ |
-| `buffSet` | **是** | number | Buff 集序号（见 get_buff_sets 的「[NN]」） |
+| 参数       | 必填   | 类型   | 说明                                               |
+| ---------- | ------ | ------ | -------------------------------------------------- |
+| `buffConf` | **是** | number | 工程 Buff 配置序号（见 get_buff_confs 的「[NN]」） |
 
-### `set_buff_zone`
+### `set_buff_conf_zone`
 
-设置 Buff 集内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/finalDmg/dmgTakenInc/specialFinal1/specialFinal2/extraRatio。其中 tuneStrainLayer（集谐干涉层数）与 unisonBoonLayer（同奏增益层数）是层数类 flat 乘区，填层数本身（如 +2 层 → value=2）；集谐干涉层数只允许固定层数、不可配引用/转模，也不能作为引用目标 —— 它挂在**目标/怪物**身上、全队共用一份，不存在「某角色的集谐干涉层数」；同奏增益层数属于角色，可以配引用/转模、也可以作为引用来源。旧 id customFinalDmg/customFinalDmgMul 会被自动重映射为 specialFinal1/specialFinal2（返回值里用 remappedFrom/remapNote 标注）。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）；同一 Buff 内每个乘区只允许一个覆盖条目，开启时落在该乘区第一条、其余条目自动取消覆盖。
+设置工程 Buff 配置内指定乘区的数值（百分数乘区填数值，如 15 表示 15%）。zoneId 不存在时自动创建。zoneId 可选：atkFlat/atkPct/hpFlat/hpPct/defFlat/defPct/critRate/critDmg/recharge/tuneBreakBoost/offTuneBuildupRate/bonusDmg/deepenDmg/resPen/defPen/defDown/dmgRedPen/resDown/tuneStrainLayer/unisonBoonLayer/finalDmg/dmgTakenInc/specialFinal1/specialFinal2/extraRatio。其中 tuneStrainLayer（集谐干涉层数）与 unisonBoonLayer（同奏增益层数）是层数类 flat 乘区，填层数本身（如 +2 层 → value=2）；集谐干涉层数只允许固定层数、不可配引用/转模，也不能作为引用目标 —— 它挂在**目标/怪物**身上、全队共用一份，不存在「某角色的集谐干涉层数」；同奏增益层数属于角色，可以配引用/转模、也可以作为引用来源。旧 id customFinalDmg/customFinalDmgMul 会被自动重映射为 specialFinal1/specialFinal2（返回值里用 remappedFrom/remapNote 标注）。override 为 true 时该乘区覆盖其它 Buff 的同乘区（extraRatio 不支持覆盖）；同一 Buff 内每个乘区只允许一个覆盖条目，开启时落在该乘区第一条、其余条目自动取消覆盖。
 
-| 参数       | 必填   | 类型    | 说明                                       |
-| ---------- | ------ | ------- | ------------------------------------------ |
-| `buffSet`  | **是** | number  | Buff 集序号（见 get_buff_sets 的「[NN]」） |
-| `zoneId`   | **是** | string  | 乘区 id（接受旧 id，会自动重映射）         |
-| `value`    | **是** | number  | 数值                                       |
-| `override` | 否     | boolean | 可选，是否覆盖其它 Buff 的同乘区           |
+| 参数       | 必填   | 类型    | 说明                                               |
+| ---------- | ------ | ------- | -------------------------------------------------- |
+| `buffConf` | **是** | number  | 工程 Buff 配置序号（见 get_buff_confs 的「[NN]」） |
+| `zoneId`   | **是** | string  | 乘区 id（接受旧 id，会自动重映射）                 |
+| `value`    | **是** | number  | 数值                                               |
+| `override` | 否     | boolean | 可选，是否覆盖其它 Buff 的同乘区                   |
 
-### `set_buff_zone_ref`
+### `set_buff_conf_zone_ref`
 
-设置 Buff 集内指定乘区的引用（跟随某角色的属性按百分比折算），ref 为 null 时清除引用。ref 结构：{"targetZoneId":"引用目标","pct":百分比,"characterIdx":槽位 1-3,"threshold":阈值,"lower"/"upper"/"discrete"/"divisor"/"multiplier"可选}。targetZoneId 可选：baseAtk/totalAtk/baseHp/totalHp/baseDef/totalDef/recharge/tuneBreakBoost/offTuneBuildupRate/critRate/critDmg/unisonBoonLayer（最后一项是**按角色独立**的同奏增益层数：读该角色自己累计的层数，可用于「按层数折算」的转模；集谐干涉层数不属于角色，不能作为引用目标）。乘区 id 接受旧 id（customFinalDmg/customFinalDmgMul 会自动重映射）。**跨角色影响源**：引用他角色面板（characterIdx 与目标角色不同）后，作用域指向该角色的 Buff 必须用 bind_buff_to_entry 勾到本段才会参与面板计算，可用 get_buff_set_detail 或 get_damage_entry_buff_sources 查影响源清单。
+设置工程 Buff 配置内指定乘区的引用（跟随某角色的属性按百分比折算），ref 为 null 时清除引用。ref 结构：{"targetZoneId":"引用目标","pct":百分比,"characterIdx":槽位 1-3,"threshold":阈值,"lower"/"upper"/"discrete"/"divisor"/"multiplier"可选}。targetZoneId 可选：baseAtk/totalAtk/baseHp/totalHp/baseDef/totalDef/recharge/tuneBreakBoost/offTuneBuildupRate/critRate/critDmg/unisonBoonLayer（最后一项是**按角色独立**的同奏增益层数：读该角色自己累计的层数，可用于「按层数折算」的转模；集谐干涉层数不属于角色，不能作为引用目标）。乘区 id 接受旧 id（customFinalDmg/customFinalDmgMul 会自动重映射）。**跨角色影响源**：引用他角色面板（characterIdx 与目标角色不同）后，作用域指向该角色的 Buff 必须用 bind_buff_conf_to_entry 勾到本段才会参与面板计算，可用 get_buff_conf_detail 或 get_damage_entry_buff_sources 查影响源清单。
 
-| 参数      | 必填   | 类型   | 说明                               |
-| --------- | ------ | ------ | ---------------------------------- |
-| `buffSet` | **是** | number | Buff 集序号                        |
-| `zoneId`  | **是** | string | 乘区 id（接受旧 id，会自动重映射） |
-| `ref`     | 否     | object | 引用定义或 null 清除               |
+| 参数       | 必填   | 类型   | 说明                               |
+| ---------- | ------ | ------ | ---------------------------------- |
+| `buffConf` | **是** | number | 工程 Buff 配置序号                 |
+| `zoneId`   | **是** | string | 乘区 id（接受旧 id，会自动重映射） |
+| `ref`      | 否     | object | 引用定义或 null 清除               |
 
-### `remove_buff_zone`
+### `remove_buff_conf_zone`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-从 Buff 集中删除指定乘区（不可恢复；同一乘区的多条贡献条目会全部删除）。乘区 id 接受旧 id（customFinalDmg/customFinalDmgMul 会自动重映射）。
+从工程 Buff 配置中删除指定乘区（不可恢复；同一乘区的多条贡献条目会全部删除）。乘区 id 接受旧 id（customFinalDmg/customFinalDmgMul 会自动重映射）。
 
-| 参数      | 必填   | 类型   | 说明                               |
-| --------- | ------ | ------ | ---------------------------------- |
-| `buffSet` | **是** | number | Buff 集序号                        |
-| `zoneId`  | **是** | string | 乘区 id（接受旧 id，会自动重映射） |
+| 参数       | 必填   | 类型   | 说明                               |
+| ---------- | ------ | ------ | ---------------------------------- |
+| `buffConf` | **是** | number | 工程 Buff 配置序号                 |
+| `zoneId`   | **是** | string | 乘区 id（接受旧 id，会自动重映射） |
 
-### `get_buff_zone_condition`
+### `get_buff_conf_zone_condition`
 
-读取某 Buff 集内指定乘区的**乘区级生效条件**（伤害属性 / 伤害类型；类内「或」）。只读取，不修改。同一乘区有多条贡献条目时返回第一条的条件，完整逐条清单请用 get_buff_set_detail。
+读取某条工程 Buff 配置内指定乘区的**乘区级生效条件**（伤害属性 / 伤害类型；类内「或」）。只读取，不修改。同一乘区有多条贡献条目时返回第一条的条件，完整逐条清单请用 get_buff_conf_detail。
 
-| 参数      | 必填   | 类型   | 说明                                       |
-| --------- | ------ | ------ | ------------------------------------------ |
-| `buffSet` | **是** | number | Buff 集序号（见 get_buff_sets 的「[NN]」） |
-| `zoneId`  | **是** | string | 乘区 id（接受旧 id，会自动重映射）         |
+| 参数       | 必填   | 类型   | 说明                                               |
+| ---------- | ------ | ------ | -------------------------------------------------- |
+| `buffConf` | **是** | number | 工程 Buff 配置序号（见 get_buff_confs 的「[NN]」） |
+| `zoneId`   | **是** | string | 乘区 id（接受旧 id，会自动重映射）                 |
 
-### `set_buff_zone_condition`
+### `set_buff_conf_zone_condition`
 
-设置某 Buff 集内指定乘区的**乘区级生效条件**，传 null 清除。只接受 elements（伤害属性）与 damageTypes（伤害类型）两类，可只给其中一类；condition 对象形如 {"elements":["冷凝","热熔"],"damageTypes":["普攻伤害","重击伤害"]}。取值边界：属性取自 game-terms 的 ELEMENTS、伤害类型取自 DAMAGE_TYPES（见参数说明里的完整可选值）。判定口径为**类内「或」、类间「与」**——同类多选任一命中即满足，两类都给了则必须同时满足。链条件（chains）与阶条件（refinements）是整个 Buff 的硬门槛，不允许挂到乘区上（传了会被忽略并回传 strippedKeys），请用 set_buff_condition 设置。生效效果：不满足时仅该乘区不计入，同一条目的其它乘区照常生效。
+设置某条工程 Buff 配置内指定乘区的**乘区级生效条件**，传 null 清除。只接受 elements（伤害属性）与 damageTypes（伤害类型）两类，可只给其中一类；condition 对象形如 {"elements":["冷凝","热熔"],"damageTypes":["普攻伤害","重击伤害"]}。取值边界：属性取自 game-terms 的 ELEMENTS、伤害类型取自 DAMAGE_TYPES（见参数说明里的完整可选值）。判定口径为**类内「或」、类间「与」**——同类多选任一命中即满足，两类都给了则必须同时满足。链条件（chains）与阶条件（refinements）是整个 Buff 的硬门槛，不允许挂到乘区上（传了会被忽略并回传 strippedKeys），请用 set_buff_conf_condition 设置。生效效果：不满足时仅该乘区不计入，同一条目的其它乘区照常生效。
 
 | 参数        | 必填   | 类型   | 说明                                                  |
 | ----------- | ------ | ------ | ----------------------------------------------------- |
-| `buffSet`   | **是** | number | Buff 集序号（见 get_buff_sets 的「[NN]」）            |
+| `buffConf`  | **是** | number | 工程 Buff 配置序号（见 get_buff_confs 的「[NN]」）    |
 | `zoneId`    | **是** | string | 乘区 id（接受旧 id，会自动重映射）                    |
 | `condition` | 否     | object | 乘区级条件（只认 elements/damageTypes），或 null 清除 |
 
 ### `get_damage_entry_buff_sources`
 
-查询某伤害条目的**跨角色影响源**（按**序号**）：本段引用了其它角色的面板（乘区 ref 里 characterIdx 指向他角色）时，作用域指向那个角色、且会改写被引用面板乘区的 Buff —— 这些 Buff 必须用 bind_buff_to_entry 勾到本段才会参与该角色在这一段的面板计算（拉表里它们以「影响源」列/勾选项出现，不是自动生效的）。返回每条影响源的**Buff 集序号**与名称、被引用角色槽位、被改写的面板乘区。
+查询某伤害条目的**跨角色影响源**（按**序号**）：本段引用了其它角色的面板（乘区 ref 里 characterIdx 指向他角色）时，作用域指向那个角色、且会改写被引用面板乘区的 Buff —— 这些 Buff 必须用 bind_buff_conf_to_entry 勾到本段才会参与该角色在这一段的面板计算（拉表里它们以「影响源」列/勾选项出现，不是自动生效的）。返回每条影响源的**工程 Buff 配置序号**与名称、被引用角色槽位、被改写的面板乘区。
 
 | 参数    | 必填   | 类型   | 说明                                             |
 | ------- | ------ | ------ | ------------------------------------------------ |
 | `entry` | **是** | number | 伤害条目序号（见 get_damage_entries 的「[NN]」） |
 
-### `set_buff_scope`
+### `set_buff_conf_scope`
 
-设置 Buff 集的作用范围：all（全队）或槽位数组（如 [1,3] 表示仅 1、3 号位）。全局 Buff 集不可修改范围。
+设置工程 Buff 配置的作用范围：all（全队）或槽位数组（如 [1,3] 表示仅 1、3 号位）。全局工程 Buff 配置不可修改范围。
 
-| 参数      | 必填   | 类型           | 说明                 |
-| --------- | ------ | -------------- | -------------------- |
-| `buffSet` | **是** | number         | Buff 集序号          |
-| `scope`   | **是** | string / array | all 或槽位数组 [1-3] |
+| 参数       | 必填   | 类型           | 说明                 |
+| ---------- | ------ | -------------- | -------------------- |
+| `buffConf` | **是** | number         | 工程 Buff 配置序号   |
+| `scope`    | **是** | string / array | all 或槽位数组 [1-3] |
 
-### `set_buff_condition`
+### `set_buff_conf_condition`
 
-设置 Buff 集生效条件（全部满足才生效），传 null 清除。condition 结构：{"chain":共鸣链要求 0-6,"refinement":精炼要求 1-5,"elements":["伤害属性..."],"damageTypes":["伤害类型..."]}。全局 Buff 集不可设置链/阶条件。
+设置工程 Buff 配置生效条件（全部满足才生效），传 null 清除。condition 结构：{"chain":共鸣链要求 0-6,"refinement":精炼要求 1-5,"elements":["伤害属性..."],"damageTypes":["伤害类型..."]}。全局工程 Buff 配置不可设置链/阶条件。
 
 | 参数        | 必填   | 类型   | 说明                 |
 | ----------- | ------ | ------ | -------------------- |
-| `buffSet`   | **是** | number | Buff 集序号          |
+| `buffConf`  | **是** | number | 工程 Buff 配置序号   |
 | `condition` | 否     | object | 条件定义或 null 清除 |
 
 ### `get_table_history`
@@ -431,7 +431,7 @@ _无参数_
 
 ### `undo_table`
 
-撤销上一次**拉表（表格）**变更（Buff 集增删改、条目↔Buff 绑定、伤害类型勾选等）。只回退表格，不动排轴与词条；排轴请用 undo_timeline。没有可撤销的操作时 ok=false 并给出原因（不会静默成功）。
+撤销上一次**拉表（表格）**变更（工程 Buff 配置增删改、条目↔Buff 绑定、伤害类型勾选等）。只回退表格，不动排轴与词条；排轴请用 undo_timeline。没有可撤销的操作时 ok=false 并给出原因（不会静默成功）。
 
 _无参数_
 
@@ -560,18 +560,18 @@ _无参数_
 
 ### `get_panels_state`
 
-查看当前所有弹窗面板的开关状态（BUFF配置/速查/Buff 集/设置/工坊/角色详情配置/导入 Buff 集等）。
+查看当前所有弹窗面板的开关状态（工程 Buff 配置/速查/主页 Buff 集/设置/工坊/角色详情配置/从 Buff 集导入工程 Buff 配置等）。
 
 _无参数_
 
 ### `open_panel`
 
-打开或关闭指定弹窗面板。panel 取 get_panels_state 返回的 name（如 buff-config/quick-lookup/buff-library/substat-library（快速词条方案）/settings/workshop/character-detail/buff-import/damage-list 等）；open 默认 true。
+打开或关闭指定弹窗面板：buff-set=主页 Buff 集（打开时先返回主页）；buff-conf=当前工程拉表的工程 Buff 配置；buff-conf-import=从 Buff 集导入工程 Buff 配置。两者是不同入口，用户说“打开 Buff 集”时用 buff-set，含义不清时先用 ask_user 确认。其它 panel 取 get_panels_state 返回的 name（quick-lookup/substat-library/settings/workshop/character-detail/damage-list 等）；open 默认 true。
 
-| 参数    | 必填   | 类型    | 说明                              |
-| ------- | ------ | ------- | --------------------------------- |
-| `panel` | **是** | string  | 面板名                            |
-| `open`  | 否     | boolean | 打开(true)/关闭(false)，默认 true |
+| 参数    | 必填   | 类型    | 说明                                                                                                          |
+| ------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `panel` | **是** | string  | buff-set=主页 Buff 集；buff-conf=工程 Buff 配置；buff-conf-import=导入工程 Buff 配置；其它见 get_panels_state |
+| `open`  | 否     | boolean | 打开(true)/关闭(false)，默认 true                                                                             |
 
 ## 工程
 
@@ -605,14 +605,14 @@ _无参数_
 
 重命名指定工程。
 
-| 参数   | 必填   | 类型   | 说明                             |
-| ------ | ------ | ------ | -------------------------------- |
-| `id`   | **是** | string | 工程 id（用 list_projects 获取） |
-| `name` | **是** | string | 新名称                           |
+| 参数   | 必填   | 类型   | 说明                                                   |
+| ------ | ------ | ------ | ------------------------------------------------------ |
+| `id`   | **是** | string | 工程 id（用 list_projects 获取）；空字符串表示返回主页 |
+| `name` | **是** | string | 新名称                                                 |
 
 ### `set_active_project`
 
-切换当前活动工程（后续操作都作用于该工程）。
+切换当前活动工程（后续操作都作用于该工程）；id 传空字符串返回主页。
 
 | 参数 | 必填   | 类型   | 说明                             |
 | ---- | ------ | ------ | -------------------------------- |
@@ -671,9 +671,9 @@ _无参数_
 | ------- | ------ | ------------------------------------------------ | ------------------------------------ |
 | `phase` | **是** | string（team / timeline / calculation / config） | 要解锁的环节（其后的环节会一并解锁） |
 
-### `get_buff_library_summary`
+### `get_buff_set_summary`
 
-获取本地 Buff 集概览：实体数量、按类型分布、数据来源（工坊同步/自定义）。
+获取主页的本地 Buff 集概览（不读取工程 Buff 配置）：实体数量、按类型分布、数据来源（工坊同步/自定义）。
 
 _无参数_
 
@@ -1135,23 +1135,7 @@ _无参数_
 
 ### `web_fetch`
 
-抓取一个**已知** http(s) 地址的网页正文（HTML → 纯文本或轻量 Markdown），返回标题、最终地址、HTTP 状态与正文。
-
-怎么用：
-
-- 必须先有确切链接。本工具**不做搜索**（没有搜索引擎能力）：不知道 URL 时先用服务商自带的 web_search，或直接问用户要链接。
-- 适合读文档 / 更新日志 / 攻略页 / API 说明的正文；不适合抓需要登录、需要 JS 渲染的页面（拿到的是服务端首屏 HTML，可能缺少动态内容）。
-- 自动跟随重定向（最多 5 跳）、剥离脚本/样式/导航/页脚，默认只取正文区域；正文里的链接会按页面地址补成绝对地址。
-
-结果怎么读：
-
-- content 是提取后的正文；truncated=true 表示正文只给到 maxChars 处、**后面还有内容但没有抓取** —— 不要臆造后续，必要时用更精确的 maxChars 或换个更具体的页面再抓一次。
-- title 是页面标题（可能缺失）；url 是跟随重定向后的最终地址；status 是 HTTP 状态码。
-- 非网页文本（PDF / 图片 / 二进制）不会返回正文，只在 note 里说明；这类内容请直接让用户提供文本。
-- 抓取失败（超时 / 目标 4xx-5xx / 内网地址被拦）会返回明确错误，不要重复重试同一个地址。
-
-限制：部署环境下只放行 https 公网地址（内网 / 回环 / 保留地址与云元数据地址由服务端拦截，防 SSRF）；单次抓取超时 15 秒、响应体上限 2MB、正文上限 40000 字符。
-能力归属：本工具**仅内置 AI 助手**可用（需要宿主提供抓取能力），WS 远程接管通道无法调用。
+抓取一个**已知** http(s) 地址的网页正文（HTML → 纯文本或轻量 Markdown），返回标题、最终地址、HTTP 状态与正文。 怎么用： - 必须先有确切链接。本工具**不做搜索**（没有搜索引擎能力）：不知道 URL 时先用服务商自带的 web_search，或直接问用户要链接。 - 适合读文档 / 更新日志 / 攻略页 / API 说明的正文；不适合抓需要登录、需要 JS 渲染的页面（拿到的是服务端首屏 HTML，可能缺少动态内容）。 - 自动跟随重定向（最多 5 跳）、剥离脚本/样式/导航/页脚，默认只取正文区域；正文里的链接会按页面地址补成绝对地址。 结果怎么读： - content 是提取后的正文；truncated=true 表示正文只给到 maxChars 处、**后面还有内容但没有抓取** —— 不要臆造后续，必要时用更精确的 maxChars 或换个更具体的页面再抓一次。 - title 是页面标题（可能缺失）；url 是跟随重定向后的最终地址；status 是 HTTP 状态码。 - 非网页文本（PDF / 图片 / 二进制）不会返回正文，只在 note 里说明；这类内容请直接让用户提供文本。 - 抓取失败（超时 / 目标 4xx-5xx / 内网地址被拦）会返回明确错误，不要重复重试同一个地址。 限制：部署环境下只放行 https 公网地址（内网 / 回环 / 保留地址与云元数据地址由服务端拦截，防 SSRF）；单次抓取超时 15 秒、响应体上限 2MB、正文上限 40000 字符。 能力归属：本工具**仅内置 AI 助手**可用（需要宿主提供抓取能力），WS 远程接管通道无法调用。
 
 | 参数       | 必填   | 类型                      | 说明                                                                                                    |
 | ---------- | ------ | ------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -1190,15 +1174,15 @@ _无参数_
 
 ### `get_character_terms`
 
-按需获取某角色的结构化术语速查：效果名【】、触发关键词（Highlight）、术语链接，以及每条技能/共鸣链（俗称命座）/固有去标签后的纯文本摘要。用于识别 buff 名称的触发来源与归属、以及判定元素/效果。
+按需获取某角色的结构化术语速查：效果名【】以及每条技能/共鸣链（俗称命座）/固有的纯文本摘要。用于识别 buff 名称的触发来源与归属、以及判定元素/效果。
 
 | 参数         | 必填   | 类型   | 说明             |
 | ------------ | ------ | ------ | ---------------- |
 | `entityName` | **是** | string | 角色名称（中文） |
 
-### `get_buff_sets`
+### `get_existing_buffs`
 
-查询已收录的 Buff 集（本地 Buff 集或当前工程拉表）。可按实体类型/实体名精确过滤，或用 query 模糊搜索实体名或 buff 名。返回现有 buff 的 buff_name/scope/exclusive/乘区数值，用于对比、去重或核对。
+查询当前生成目标中的已有 Buff；目标为主页 Buff 集或工程 Buff 配置，由数据源确定，返回 target 标明位置。可按实体类型/实体名精确过滤，或用 query 模糊搜索实体名或 buff 名。返回现有 buff 的 buffName/scope/exclusive/乘区数值，用于对比、去重或核对。
 
 | 参数         | 必填 | 类型                                                                   | 说明                       |
 | ------------ | ---- | ---------------------------------------------------------------------- | -------------------------- |

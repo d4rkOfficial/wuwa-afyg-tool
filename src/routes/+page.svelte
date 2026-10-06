@@ -234,7 +234,7 @@
         })
         const panels: Array<[string, string, () => boolean, (v: boolean) => void]> = [
             ['quick-lookup', '速查', () => sidebarLookupOpen, (v) => (sidebarLookupOpen = v)],
-            ['buff-library', 'Buff 集', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
+            ['buff-set', 'Buff 集', () => showBuffLibrary, (v) => (showBuffLibrary = v)],
             ['substat-library', '快速词条方案', () => getSubstatLibraryOpen(), (v) => setSubstatLibraryOpen(v)],
             ['damage-type', '编辑伤害类型', () => getShowDamageTypeModal(), (v) => setShowDamageTypeModal(v)],
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],

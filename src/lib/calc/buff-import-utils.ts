@@ -4,7 +4,7 @@
 import type { BuffLibraryEntity, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
 import type { CharSlot } from '$lib/types/project'
 import type { ImportBuffInput } from './calculation.store.svelte'
-import type { BuffCondition, BuffSet, BuffZoneValue } from './calculation.types'
+import type { BuffCondition, BuffConf, BuffZoneValue } from './calculation.types'
 import { ownerIdxFor, ownerIdxOfItem, rewriteOwnerInZones } from './buff-owner'
 
 export type { BuffLibraryEntity }
@@ -168,10 +168,10 @@ export function importItemContentKey(item: ImportBuffInput): string {
  */
 export function detectImportConflicts(
     items: readonly ImportBuffInput[],
-    existing: readonly BuffSet[]
+    existing: readonly BuffConf[]
 ): { report: ImportConflictReport; deduped: ImportBuffInput[] } {
     const byName = new Map(existing.map((b) => [b.name, b]))
-    const byContent = new Map<string, BuffSet>()
+    const byContent = new Map<string, BuffConf>()
     for (const b of existing) {
         const key = buffContentKey(b)
         if (!byContent.has(key)) byContent.set(key, b)

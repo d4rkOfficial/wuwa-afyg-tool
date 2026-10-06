@@ -1,4 +1,4 @@
-import type { DamageEntry, BuffSet } from '../calculation.types'
+import type { DamageEntry, BuffConf } from '../calculation.types'
 import type { ConfigState } from '../config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
@@ -15,7 +15,7 @@ export interface AlgorithmInfo {
 
 export type SubstatAlgorithm = (
     damageEntries: DamageEntry[],
-    buffSets: BuffSet[],
+    buffSets: BuffConf[],
     damageEntryBuffSetIds: Record<string, string[]>,
     damageEntryDamageTypes: Record<string, string[]>,
     configState: ConfigState,

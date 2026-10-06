@@ -11,7 +11,7 @@
  * - `active` 由宿主持有（它同时驱动 UI 与其它子系统的互斥清理，见宿主的 `toggle()`）。
  */
 import {
-    getAllBuffSets,
+    getAllBuffConfs,
     getGlobalBuffSetIds,
     deleteBuffSets,
     setBuffSetsGlobal,
@@ -21,7 +21,7 @@ import {
 import { sortedSelectionOrder, toggledSet, toggledGroupSet } from './buff-modal.utils'
 import { addToast } from '$lib/data/toast.svelte'
 import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
-import type { BuffSet } from '$lib/calc/calculation.types'
+import type { BuffConf } from '$lib/calc/calculation.types'
 import type { ComponentsProps } from '$lib/types'
 
 /** @desc 内置默认全局块的 id 前缀：既不可删除、也不可移出全局，故多选里一律不可勾选 */
@@ -52,7 +52,7 @@ export const createMultiSelect = (deps: MultiSelectDeps) => {
 
     /** @desc 可勾选的全部 buff id（排除内置全局块） */
     const selectableIds = (): string[] =>
-        getAllBuffSets()
+        getAllBuffConfs()
             .map((bs) => bs.id)
             .filter((id) => !isDisabled(id))
 
@@ -88,7 +88,7 @@ export const createMultiSelect = (deps: MultiSelectDeps) => {
     }
 
     /** @desc 整组勾选/取消（传入目录的全部成员；内置全局块跳过） */
-    const toggleGroup = (members: BuffSet[]) => {
+    const toggleGroup = (members: BuffConf[]) => {
         const childIds = members.map((c) => c.id).filter((id) => !isDisabled(id))
         if (childIds.length === 0) return
         selectedIds = toggledGroupSet(selectedIds, childIds)
@@ -119,7 +119,7 @@ export const createMultiSelect = (deps: MultiSelectDeps) => {
 
     /** @desc 按名称排序「已选中的那些位置」（未选项与其位置保持不变） */
     const sortSelected = () => {
-        const sorted = sortedSelectionOrder(getAllBuffSets(), selectedIds, getGlobalBuffSetIds(), compareNatural)
+        const sorted = sortedSelectionOrder(getAllBuffConfs(), selectedIds, getGlobalBuffSetIds(), compareNatural)
         if (!sorted) return
         reorderNonGlobalBuffSets(sorted.order)
         addToast(`已按名称排序 ${sorted.count} 个 BUFF`, 'success')

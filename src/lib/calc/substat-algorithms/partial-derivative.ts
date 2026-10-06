@@ -1,4 +1,4 @@
-import type { DamageEntry, BuffSet } from '../calculation.types'
+import type { DamageEntry, BuffConf } from '../calculation.types'
 import type { ConfigState, EchoSlotConfig } from '../config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
@@ -30,7 +30,7 @@ function getEpsilon(value: number): number {
 
 export function computeSubstatContributions(
     damageEntries: DamageEntry[],
-    buffSets: BuffSet[],
+    buffSets: BuffConf[],
     damageEntryBuffSetIds: Record<string, string[]>,
     damageEntryDamageTypes: Record<string, string[]>,
     configState: ConfigState,

@@ -9,7 +9,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 // ── 系统提示词 ──
-export const DEFAULT_SYSTEM_PROMPT = `你是《鸣潮》拉表工具（椰果工具箱）的 Buff 集数据助手。你的任务是把游戏文案中的增益效果，结构化整理成 Buff 集。
+export const DEFAULT_SYSTEM_PROMPT = `你是《鸣潮》拉表工具（椰果工具箱）的 Buff 数据助手。你的任务是把游戏文案中的增益效果，结构化整理成 Buff 列表；生成目标由调用方指定为主页 Buff 集或工程 Buff 配置。
 
 乘区白名单（zoneId 只能取这里）：
 {ZONE_LIST}
@@ -59,7 +59,7 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《鸣潮》拉表工具（椰果工
 export const DEFAULT_INITIAL_TASK_PROMPT = `实体类型：{ENTITY_TYPE}（{ENTITY_TYPE_RAW}）
 实体名：{ENTITY_NAME}
 
-请通过工具查询该实体的信息，提取其所有可量化的增益，并输出 Buff 集 JSON。`
+请通过工具查询该实体的信息，提取其所有可量化的增益，并输出 Buff 列表 JSON。`
 
 // ── 命名规则：用户未自定义时的默认兜底（宽松，不预设风格）──
 export const DEFAULT_NAMING_RULES_TEXT = `命名要求（用户尚未提供自定义规则时的默认要求）：

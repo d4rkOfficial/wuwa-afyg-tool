@@ -1,6 +1,6 @@
 /** @desc 拉表页状态 store：持有伤害条目/Buff 块/条目绑定/生效配置等全局响应式状态，提供 CRUD 与持久化快照接口 */
 import type {
-    BuffSet,
+    BuffConf,
     BuffZoneValue,
     CalcState,
     DamageEntry,
@@ -28,7 +28,7 @@ import { paneEffectSourcesOf, type PaneEffectSource } from './pane-effects'
 import { ownerIdxOfItem, rewriteOwnerInCondition } from './buff-owner'
 
 let _entries = $state<DamageEntry[]>([])
-let _buffSets = $state<BuffSet[]>([])
+let _buffSets = $state<BuffConf[]>([])
 let _damageEntryBuffSetIds = $state<Record<string, string[]>>({})
 let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
 let _showBuffModal = $state(false)
@@ -511,9 +511,9 @@ export function getAllDamageEntries(): DamageEntry[] {
     return _entries
 }
 
-/** @desc ── BuffSet CRUD ── */
+/** @desc ── BuffConf CRUD ── */
 
-export function getAllBuffSets(): BuffSet[] {
+export function getAllBuffConfs(): BuffConf[] {
     return _buffSets
 }
 
@@ -534,7 +534,7 @@ export function takePendingFocusBuffSetId(): string | null {
 /** @desc 新建空 Buff 块（随机 id，默认全队作用域），返回新块 id */
 export function createBuffSet(name: string): string | undefined {
     if (!assertUnlocked()) return undefined
-    const buffSet: BuffSet = {
+    const buffSet: BuffConf = {
         id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name,
         zones: [],
@@ -574,7 +574,7 @@ export interface ImportBuffInput {
 }
 
 /**
- * @desc share 的 scope 语义 → 工具 `BuffSet.scope`（`'all' | number[]`）：由导入方传入 ownerIdx
+ * @desc share 的 scope 语义 → 工具 `BuffConf.scope`（`'all' | number[]`）：由导入方传入 ownerIdx
  * （该实体归属的角色槽位，无则 -1），`self_except` 需要队伍总槽位数。
  *
  * **`effect_only` 必须映射成空数组**（工具侧「效应专属」就是 `scope: []`，见 `classifyBuffScope`）：
@@ -648,7 +648,7 @@ export function importBuffSetsWithDecisions(
     if (!assertUnlocked()) return report
 
     const toRemove = new Set<string>()
-    const fresh: BuffSet[] = []
+    const fresh: BuffConf[] = []
 
     for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
         const item = items[itemIndex]
@@ -784,7 +784,7 @@ export function duplicateBuffSet(id: string, customName?: string): string | unde
     const source = _buffSets.find((s) => s.id === id)
     if (!source) return
     const newId = `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-    const buffSet: BuffSet = {
+    const buffSet: BuffConf = {
         ...source,
         id: newId,
         name: customName ?? source.name + ' 复制',
@@ -835,7 +835,7 @@ export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
 }
 
 /** @desc 对某个 Buff 的乘区条目列表做不可变变换 */
-const withZones = (buff: BuffSet, transform: (zones: BuffZoneValue[]) => BuffZoneValue[]): BuffSet => ({
+const withZones = (buff: BuffConf, transform: (zones: BuffZoneValue[]) => BuffZoneValue[]): BuffConf => ({
     ...buff,
     zones: transform(buff.zones ?? [])
 })
@@ -1124,7 +1124,7 @@ export function getPaneEffectSources(entryId: string): Record<string, PaneEffect
     return paneEffectSourcesOf(charIdx, entry.isEffect, _damageEntryBuffSetIds[entryId] ?? [], _buffSets)
 }
 
-/** @desc ── Entry-BuffSet 绑定 ── */
+/** @desc ── Entry-BuffConf 绑定 ── */
 
 export function getBuffSetIdsForEntry(entryId: string): string[] {
     return _damageEntryBuffSetIds[entryId] ?? []
@@ -1318,7 +1318,7 @@ export function reorderNonGlobalBuffSets(orderedIds: string[]) {
     if (!assertUnlocked()) return
     const global = _buffSets.filter((bs) => _globalBuffSetIds.includes(bs.id))
     const nonGlobalMap = new Map(_buffSets.filter((bs) => !_globalBuffSetIds.includes(bs.id)).map((bs) => [bs.id, bs]))
-    const reordered = orderedIds.map((id) => nonGlobalMap.get(id)).filter(Boolean) as BuffSet[]
+    const reordered = orderedIds.map((id) => nonGlobalMap.get(id)).filter(Boolean) as BuffConf[]
     const remaining = _buffSets.filter((bs) => !_globalBuffSetIds.includes(bs.id) && !orderedIds.includes(bs.id))
     markTableDirty()
     _buffSets = [...global, ...reordered, ...remaining]

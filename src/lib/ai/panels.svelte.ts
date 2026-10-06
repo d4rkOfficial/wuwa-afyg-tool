@@ -40,5 +40,5 @@ export function openPanel(name: string, open: boolean): boolean {
 }
 
 // 由 store 直接管理的面板（无需页面注册）
-registerPanel('buff-config', 'BUFF配置', getShowBuffModal, setShowBuffModal)
+registerPanel('buff-conf', '工程 Buff 配置', getShowBuffModal, setShowBuffModal)
 registerPanel('damage-list', '伤害列表', getShowDamageList, setShowDamageList)

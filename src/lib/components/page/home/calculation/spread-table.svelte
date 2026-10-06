@@ -9,7 +9,7 @@
      *  6) 顶部「伤害源」切换按角色过滤要渲染的子表，从根上减少一次挂载的行/格数量。 */
     import { onMount, onDestroy } from 'svelte'
     import { fade, slide } from 'svelte/transition'
-    import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+    import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
     import type { CharSlot } from '$lib/types/project'
     import type { ConditionProfile } from '$lib/calc/compute'
     import {
@@ -67,7 +67,7 @@
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         damageEntries: DamageEntry[]
-        buffSets: BuffSet[]
+        buffSets: BuffConf[]
         entryBuffSetIdMap: Record<string, string[]>
         entryDamageTypeMap: Record<string, string[]>
         globalBuffSetIds: string[]
@@ -139,7 +139,7 @@
      * `buffUsableByEntry` 是**乘区级硬门槛**：处决/响应/效应的双暴只有「覆盖」写入生效，
      * 因此「追加型暴击率/暴击伤害」buff 在这些行上不可勾（勾了也不参与计算）。
      */
-    const buffEnabledForEntry = (bs: BuffSet, entry: DamageEntry, charIdx: number): boolean =>
+    const buffEnabledForEntry = (bs: BuffConf, entry: DamageEntry, charIdx: number): boolean =>
         buffScopeOk(bs, entry.isEffect, charIdx) &&
         buffUsableByEntry(bs, entry) &&
         buffMatchesEntry(bs, entry, {
@@ -171,7 +171,7 @@
         entries: DamageEntry[] | null
     } = { hide: false, profile: null, types: null, chars: null, infos: null, echoes: null, entries: null }
 
-    function buffEnabledForEntryCached(bs: BuffSet, entry: DamageEntry, charIdx: number): boolean {
+    function buffEnabledForEntryCached(bs: BuffConf, entry: DamageEntry, charIdx: number): boolean {
         const ctx = {
             hide: hideConditionMismatch,
             profile: conditionProfile,
