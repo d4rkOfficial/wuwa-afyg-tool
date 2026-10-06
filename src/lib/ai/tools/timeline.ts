@@ -97,7 +97,7 @@ function resolvePosition(position: Record<string, unknown>): number {
 
 defineTool('get_timeline_summary', {
     description:
-        '获取当前排轴：**按时间（pos）顺序**列出所有操作块、参考线与已绑定的伤害。每行给出秒数、轨道与角色、操作内容、id，其下缩进列出该块绑定的伤害命中（只给命中名，**不含倍率**——倍率用 get_timeline_damage_list 按需查）。AI 需要看排轴结构时调用（比原始 JSON 更紧凑、顺序更清楚）。',
+        '获取当前排轴：**按排轴顺序**列出所有操作块、参考线与已绑定的伤害。每行给出序号、轨道与角色、操作内容，其下缩进列出该块绑定的伤害命中（只给命中名，**不含倍率**——倍率用 get_timeline_damage_list 按需查）。排轴位置只是定位坐标，不代表秒数；参考线时间优先取数据分析配置的有效记点，没有有效记点时按“时间记点自动配置”规则从名称推导，并标为自动推导。AI 需要看排轴结构时调用。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const team = getTeam()
@@ -109,8 +109,6 @@ defineTool('get_timeline_summary', {
                 damageBlocks: getDamageBlocks(),
                 trackLabels: team.map((s, i) => s?.character ?? `轨${i + 1}`),
                 locked: getLocked(),
-                sidePad: SIDE_PAD,
-                pps: PPS,
                 timings: getTimings()
             })
         }
@@ -119,9 +117,9 @@ defineTool('get_timeline_summary', {
 
 defineTool('get_timeline_damage_list', {
     description:
-        '**按需**查询排轴里每个已绑定伤害的**倍率明细**（命中名、倍率、属性、系数类型；含效应/处决/响应的折算结果），按时间顺序每行一条。只想看排轴结构（哪些块、绑了什么）请用 get_timeline_summary —— 那里不含倍率，避免无谓的 token 开销。',
+        '**按需**查询排轴里每个已绑定伤害的**倍率明细**（命中名、倍率、属性、系数类型；含效应/处决/响应的折算结果），按排轴顺序编号，每行一条；序号与排轴位置不代表秒数。只想看排轴结构（哪些块、绑了什么）请用 get_timeline_summary —— 那里不含倍率，避免无谓的 token 开销。',
     parameters: { type: 'object', properties: {} },
-    handler: () => ({ ratios: renderDamageRatioList(getDamageList(), SIDE_PAD, PPS) })
+    handler: () => ({ ratios: renderDamageRatioList(getDamageList()) })
 })
 
 defineTool('add_op_block', {
