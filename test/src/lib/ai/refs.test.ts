@@ -18,7 +18,7 @@ import {
 } from '$lib/ai/refs'
 import { init as initTimeline } from '$lib/calc/timeline.store.svelte'
 import { createProjectData, __seedProjectsForTest } from '$lib/data/project.svelte'
-import { init as initCalculation, getAllBuffSets, createBuffSet } from '$lib/calc/calculation.store.svelte'
+import { init as initCalculation, getAllBuffConfs, createBuffSet } from '$lib/calc/calculation.store.svelte'
 import type { CharSlot } from '$lib/types/project'
 import type { TimelineData } from '$lib/calc/timeline.types'
 
@@ -106,7 +106,7 @@ describe('序号解析：顺序即序号', () => {
         setup()
         createBuffSet('甲套装')
         createBuffSet('乙武器')
-        const names = getAllBuffSets().map((b) => b.name)
+        const names = getAllBuffConfs().map((b) => b.name)
         assert.deepEqual(names, ['甲套装', '乙武器'])
         assert.equal(resolveBuffConf(1).name, '甲套装')
         assert.equal(resolveBuffConf(2).name, '乙武器')

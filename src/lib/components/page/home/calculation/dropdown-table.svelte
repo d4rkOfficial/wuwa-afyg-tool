@@ -45,8 +45,8 @@
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import { DAMAGE_TYPES, groupBuffSets } from '$lib/calc/calculation.consts'
-    import type { GroupedBuffSetItem } from '$lib/calc/calculation.consts'
-    import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+    import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
+    import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
     import type { ConditionProfile } from '$lib/calc/compute'
     import type { CharSlot } from '$lib/types/project'
     import type { CalcState } from '$lib/calc/calculation.types'
@@ -59,7 +59,7 @@
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
         damageEntries: DamageEntry[]
-        buffSets: BuffSet[]
+        buffSets: BuffConf[]
         entryBuffSetIdMap: Record<string, string[]>
         entryDamageTypeMap: Record<string, string[]>
         globalBuffSetIds: string[]
@@ -106,7 +106,7 @@
     let selectedEntrySetIds = $derived(expandedEntryId ? getBuffSetIdsForEntry(expandedEntryId) : [])
     let charToIdx = $derived(buildCharToIdx(team))
     let entryCharIdx = $derived(selectedEntry ? entryCharIdxOf(selectedEntry, charToIdx) : -1)
-    /** @desc buffId → BuffSet 查找索引（替代渲染/差异计算中的线性 find） */
+    /** @desc buffId → BuffConf 查找索引（替代渲染/差异计算中的线性 find） */
     let buffById = $derived(new Map(buffSets.map((b) => [b.id, b])))
 
     /** @desc 条目 → 生效伤害类型：只依赖「条目本身」，与具体 buff 无关（两个视图共用同一口径与同一次记忆） */
@@ -119,7 +119,7 @@
      * 口径在 `damage-table.utils.buffMatchesEntry`：用 `buffContributesToEntry` 而非实例级条件 ——
      * 属性/类型条件挂在**乘区条目**上，只看实例级会让「乘区条件不满足」的 buff 仍可勾选。
      */
-    const buffMatches = (bs: BuffSet | undefined, entry: DamageEntry): boolean =>
+    const buffMatches = (bs: BuffConf | undefined, entry: DamageEntry): boolean =>
         buffMatchesEntry(bs, entry, {
             hideConditionMismatch,
             conditionProfile,
@@ -191,7 +191,7 @@
     }
 
     /** @desc 叠层文件夹整体勾选/取消（子项全选则全部取消，否则全选） */
-    function handleToggleFolder(folder: GroupedBuffSetItem) {
+    function handleToggleFolder(folder: GroupedBuffConfItem) {
         if (!expandedEntryId || !folder.children) return
         const childIds = folder.children.map((c) => c.id)
         setBuffSetIdsForEntry(expandedEntryId, toggleAllIds(childIds, selectedEntrySetIds))
@@ -199,7 +199,7 @@
     }
 
     /** @desc 叠层文件夹按前缀段批量勾选：前 index+1 个（1层、2层…）全选或全取消 */
-    function handleToggleBuffPrefix(folder: GroupedBuffSetItem, index: number) {
+    function handleToggleBuffPrefix(folder: GroupedBuffConfItem, index: number) {
         if (!expandedEntryId || !folder.children) return
         const prefixIds = folder.children.slice(0, index + 1).map((c) => c.id)
         setBuffSetIdsForEntry(expandedEntryId, toggleAllIds(prefixIds, selectedEntrySetIds))

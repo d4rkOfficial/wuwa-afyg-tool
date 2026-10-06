@@ -13,7 +13,7 @@
     } from '$lib/data/buff-library.svelte'
     import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
     import {
-        getAllBuffSets,
+        getAllBuffConfs,
         importBuffSetsWithDecisions,
         type ImportBuffInput
     } from '$lib/calc/calculation.store.svelte'
@@ -146,7 +146,7 @@
             return
         }
         const items = picked.flatMap((e) => buildEntityImportItems(e, team))
-        const { report, deduped } = detectImportConflicts(items, getAllBuffSets())
+        const { report, deduped } = detectImportConflicts(items, getAllBuffConfs())
         if (report.conflicts.length === 0 && report.identical.length === 0) {
             runImport(deduped)
             onclose?.()

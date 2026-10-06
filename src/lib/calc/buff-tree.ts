@@ -12,7 +12,7 @@
 
 import type { BuffInstance } from './calculation.types'
 import type { CharSlot } from '$lib/types/project'
-import { groupBuffSets, type GroupedBuffSetItem } from './calculation.consts'
+import { groupBuffSets, type GroupedBuffConfItem } from './calculation.consts'
 
 /** @desc 二级目录的归属来源：链条件 / 阶条件 */
 export interface BuffGate {
@@ -21,8 +21,8 @@ export interface BuffGate {
     min: number
 }
 
-/** @desc 归类树节点：复用左侧列表既有的「folder/item」渲染结构（GroupedBuffSetItem），并补充拖拽/样式所需信息 */
-export interface BuffTreeNode extends GroupedBuffSetItem {
+/** @desc 归类树节点：复用左侧列表既有的「folder/item」渲染结构（GroupedBuffConfItem），并补充拖拽/样式所需信息 */
+export interface BuffTreeNode extends GroupedBuffConfItem {
     /** @desc 目录种类：全局 / 角色链阶（派生，不可拖动）/ 数字前后缀（可整体拖动） */
     folderKind?: 'global' | 'char-gate' | 'layered'
     /** @desc 角色链阶目录的归属角色槽位（渲染头像用） */
@@ -172,7 +172,7 @@ const gateNodesOf = (buckets: readonly GateBucket[], parentKey: string, keyPrefi
 /**
  * @desc 构建三级归类树（一级全局 / 二级角色链阶 / 三级数字前后缀）。
  *
- * 输出沿用左侧列表既有的 `GroupedBuffSetItem` 结构：目录节点的 `children` 是该容器下的**原始 Buff 列表**，
+ * 输出沿用左侧列表既有的 `GroupedBuffConfItem` 结构：目录节点的 `children` 是该容器下的**原始 Buff 列表**，
  * 三级数字目录由界面用 `groupBuffSets(children)` 就地派生（该函数已按键数字升序）。这样既满足「三级归类」，
  * 又不改变既有列表渲染/拖拽/右键菜单的实现。
  *

@@ -1,5 +1,5 @@
 import type { ResultEntry } from './result.types'
-import type { BuffCondition, BuffSet, BuffZoneValue, DamageEntry } from './calculation.types'
+import type { BuffCondition, BuffConf, BuffZoneValue, DamageEntry } from './calculation.types'
 import type { ConfigState } from './config.types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
@@ -21,7 +21,7 @@ import { ELEMENT_BONUS_MAP, TYPE_BONUS_MAP, WEAPON_SUBSTAT_NAME_MAP } from '$lib
 
 /** @desc 溯源所需上下文（结果页可直接提供的输入，与 computeAll 同源） */
 export interface DamageTraceCtx {
-    buffSets: BuffSet[]
+    buffSets: BuffConf[]
     damageEntryBuffSetIds: Record<string, string[]>
     damageEntryDamageTypes: Record<string, string[]>
     configState: ConfigState
@@ -163,7 +163,7 @@ const zoneApplies = (zone: BuffZoneValue, coeffEntry: boolean): boolean => !coef
  * 溯源直接展示该数值，不再展示规则过程（如「攻击白值 超出2000 每100→5 ≤30」）。
  */
 function buffZoneParts(
-    buffs: BuffSet[],
+    buffs: BuffConf[],
     zoneId: string,
     label: string,
     unit: '%' | 'flat',
@@ -234,7 +234,7 @@ function collectBaseParts(
     baseWhite: number,
     entry: ResultEntry,
     ctx: DamageTraceCtx,
-    buffs: BuffSet[],
+    buffs: BuffConf[],
     { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx
 ): TracePart[] {
     const parts: TracePart[] = []
@@ -388,7 +388,7 @@ function collectCoeffParts(baseUnit: string, coeff: number, ctx: DamageTraceCtx)
 function collectBonusParts(
     entry: ResultEntry,
     ctx: DamageTraceCtx,
-    buffs: BuffSet[],
+    buffs: BuffConf[],
     zoneTrace: ZoneTraceCtx
 ): TracePart[] {
     const parts = buffZoneParts(buffs, 'bonusDmg', '加成', '%', zoneTrace)
@@ -422,7 +422,7 @@ function collectBonusParts(
 function collectEnemyParts(
     entry: ResultEntry,
     ctx: DamageTraceCtx,
-    buffs: BuffSet[],
+    buffs: BuffConf[],
     zone: string,
     zoneTrace: ZoneTraceCtx
 ): TracePart[] {
@@ -473,7 +473,7 @@ function collectEnemyParts(
 function collectCritParts(
     entry: ResultEntry,
     ctx: DamageTraceCtx,
-    buffs: BuffSet[],
+    buffs: BuffConf[],
     zoneTrace: ZoneTraceCtx
 ): TracePart[] {
     const parts: TracePart[] = []
@@ -515,7 +515,7 @@ function collectCritParts(
 }
 
 /** @desc 特殊区：拉表Buff 特殊终伤（加算）与特殊终伤·乘算（连乘因子），含引用/覆盖来源（引用只给结果） */
-function collectCustomParts(buffs: BuffSet[], { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx): TracePart[] {
+function collectCustomParts(buffs: BuffConf[], { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx): TracePart[] {
     const adds: TracePart[] = []
     const overrides: TracePart[] = []
     const refs: TracePart[] = []

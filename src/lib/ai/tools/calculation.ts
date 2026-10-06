@@ -1,7 +1,7 @@
 // 拉表/计算域工具（Phase 2）：伤害条目、工程 Buff 配置、绑定、伤害类型、链/阶配置、导入本地 Buff
 import { defineTool } from './registry'
 import {
-    getAllBuffSets as getAllBuffConfs,
+    getAllBuffConfs,
     createBuffSet as createBuffConf,
     renameBuffSet as renameBuffConf,
     duplicateBuffSet as duplicateBuffConf,

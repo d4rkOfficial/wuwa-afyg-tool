@@ -12,9 +12,9 @@
  * 3. **报错要精准**：定位失败时给出总数、可用的序号区间与一份紧凑清单，模型可直接自我纠正。
  */
 import { getOpBlocks, getRefLines, getTeam } from '$lib/calc/timeline.store.svelte'
-import { getAllBuffSets as getAllBuffConfs, getAllDamageEntries } from '$lib/calc/calculation.store.svelte'
+import { getAllBuffConfs, getAllDamageEntries } from '$lib/calc/calculation.store.svelte'
 import type { OpBlock, RefLine } from '$lib/calc/timeline.types'
-import type { BuffSet as BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
 
 /**
  * @desc 工具入参里的位置引用：**序号**（数字或纯数字字符串，1 起）或原始 id。

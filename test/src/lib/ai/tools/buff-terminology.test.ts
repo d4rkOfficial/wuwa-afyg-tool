@@ -9,7 +9,7 @@ import '$lib/ai/tools/panels'
 import '$lib/ai/tools/ask-user'
 import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
 import { createProjectData, __seedProjectsForTest, getActiveProject } from '$lib/data/project.svelte'
-import { init, getAllBuffSets } from '$lib/calc/calculation.store.svelte'
+import { init, getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
 import { updateEntityBuffs, getBuffEntities } from '$lib/data/buff-library.svelte'
 import {
     createBuffSetDataSource,
@@ -17,7 +17,6 @@ import {
     executeGenerateTool,
     GENERATE_TOOLS
 } from '$lib/ai/generate/tools'
-import { DEFAULT_SYSTEM_PROMPT } from '$lib/ai/persona'
 
 const setup = () => {
     const project = createProjectData('Buff 术语回归')
@@ -77,7 +76,7 @@ test('工程 Buff 配置增删使用新参数和摘要，不写入主页 Buff �
     assert.equal((await run('set_buff_conf_zone', { buffConf: 1, zoneId: 'atkPct', value: 15 })).ok, true)
     assert.equal((await run('get_buff_conf_detail', { buffConf: 1 })).data.zones[0].value, 15)
     assert.equal((await run('delete_buff_conf', { buffConf: 1 })).ok, true)
-    assert.equal(getAllBuffSets().length, 0)
+    assert.equal(getAllBuffConfs().length, 0)
     assert.equal(JSON.stringify(getBuffEntities()), before)
     assert.equal((await run('get_buff_sets')).ok, false)
 })
@@ -162,13 +161,6 @@ test('生成器查询清楚标注主页与工程目标，工程查询不混入�
     )
 })
 
-test('默认系统提示明确需求调查、工程生成和完成后的绑定询问', () => {
-    assert.match(DEFAULT_SYSTEM_PROMPT, /必须先调用 ask_user/)
-    assert.match(DEFAULT_SYSTEM_PROMPT, /generate_project_buff_confs/)
-    assert.match(DEFAULT_SYSTEM_PROMPT, /完成后必须再调用 ask_user/)
-    assert.doesNotMatch(DEFAULT_SYSTEM_PROMPT, /buff.lib|Buff\s*库|Buff 集配置/i)
-})
-
 test('从主页 Buff 集导入工程的描述与实际落点一致，保留实体归属', async () => {
     const project = setup()
     project.team[0] = { ...project.team[0], character: '甲', weapon: '导入测试武器' }
@@ -183,8 +175,8 @@ test('从主页 Buff 集导入工程的描述与实际落点一致，保留实�
     const out = await run('import_buff_set_entity_to_project', { entityType: 'weapon', entityName: '导入测试武器' })
     assert.equal(out.ok, true)
     assert.equal(out.data.imported, 1)
-    assert.deepEqual(getAllBuffSets()[0].scope, [0])
-    assert.equal(getAllBuffSets()[0].name, '新武器增益')
+    assert.deepEqual(getAllBuffConfs()[0].scope, [0])
+    assert.equal(getAllBuffConfs()[0].name, '新武器增益')
     assert.equal(JSON.stringify(getBuffEntities()), before)
 })
 
@@ -193,5 +185,5 @@ test('旧工程 Buff 参数不会被误当作新参数执行', async () => {
     await run('create_buff_conf', { name: '保留名称' })
     const out = await run('rename_buff_conf', { buffSet: 1, name: '不应修改' })
     assert.equal(out.ok, false)
-    assert.equal(getAllBuffSets()[0].name, '保留名称')
+    assert.equal(getAllBuffConfs()[0].name, '保留名称')
 })

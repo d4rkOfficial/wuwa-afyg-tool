@@ -4,14 +4,13 @@ import {
     getWeaponList,
     getEchoList,
     getEchoSetList,
-    getCharacterInfo,
     getWeaponInfo,
     getEchoInfo,
     getEchoSetInfo
 } from '$lib/api/data-cache'
 import { providerQuery } from '$lib/api/provider'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
-import { getAllBuffSets as getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
+import { getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
 import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { EFFECTS_TEXT, SCOPE_RULES_TEXT, EXAMPLES_TEXT, REF_RULES_TEXT } from './prompts.config'
 import { renderConditionRules, renderNamingRules } from './prompts'
@@ -63,6 +62,45 @@ function includesQuery(name: string, query: string): boolean {
     return !query || name.includes(query)
 }
 
+/** @desc 生成器角色信息统一走 v1 纯文本接口，避免把界面富文本带入模型上下文 */
+const getCharacterInfoForGeneration = async (entityName: string): Promise<unknown> => {
+    const res = await fetch(`/api/v1/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+    })
+    if (!res.ok)
+        return {
+            error: res.status === 404 ? `未找到角色「${entityName}」` : `v1 接口失败（HTTP ${res.status}）`
+        }
+    return res.json()
+}
+
+/** @desc 两个生成目标共用实体信息查询；角色使用纯文本，其它实体沿用详情缓存 */
+const getEntityInfoForGeneration = async (
+    entityType: GenerateEntityType,
+    entityName: string
+): Promise<unknown | null> => {
+    try {
+        if (entityType === 'character') {
+            const info = await getCharacterInfoForGeneration(entityName)
+            if (info && typeof info === 'object' && 'error' in info) return null
+            return summarizeAiInfo(entityType, info)
+        }
+        if (entityType === 'weapon') return summarizeAiInfo(entityType, await getWeaponInfo(entityName))
+        if (entityType === 'echo') return summarizeAiInfo(entityType, await getEchoInfo(entityName))
+        return summarizeAiInfo(entityType, await getEchoSetInfo(entityName))
+    } catch {
+        return null
+    }
+}
+
+/** @desc 术语查询与详情查询使用同一纯文本来源；保留效果名和技能摘要 */
+const getCharacterTermsForGeneration = async (entityName: string): Promise<unknown> => {
+    const info = await getCharacterInfoForGeneration(entityName)
+    if (info && typeof info === 'object' && 'error' in info) return info
+    return analyzeCharacterTerms(entityName, info)
+}
+
 // 本地 Buff 集模式：get_existing_buffs 查询主页 Buff 集已收录实体
 export const createBuffSetDataSource = (): GenerateDataSource => ({
     target: 'buff-set',
@@ -73,29 +111,8 @@ export const createBuffSetDataSource = (): GenerateDataSource => ({
         const pieces = Number(entityType.replace('set', ''))
         return (await getEchoSetList()).filter((s) => s.pieces.includes(pieces)).map((s) => s.name)
     },
-    async getEntityInfo(entityType, entityName) {
-        try {
-            if (entityType === 'character') return summarizeAiInfo(entityType, await getCharacterInfo(entityName))
-            if (entityType === 'weapon') return summarizeAiInfo(entityType, await getWeaponInfo(entityName))
-            if (entityType === 'echo') return summarizeAiInfo(entityType, await getEchoInfo(entityName))
-            return summarizeAiInfo(entityType, await getEchoSetInfo(entityName))
-        } catch {
-            return null
-        }
-    },
-    async getCharacterTerms(entityName) {
-        const res = await fetch(`/api/v3/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
-            headers: { Accept: 'application/json' },
-            cache: 'no-store'
-        })
-        if (!res.ok)
-            return {
-                error: res.status === 404 ? `未找到角色「${entityName}」` : `v3 接口失败（HTTP ${res.status}）`
-            }
-        const info = await res.json()
-        if ((info as { error?: string }).error) return info
-        return analyzeCharacterTerms(entityName, info)
-    },
+    getEntityInfo: getEntityInfoForGeneration,
+    getCharacterTerms: getCharacterTermsForGeneration,
     async getExistingBuffs(entityType, entityName, query) {
         const entities = getBuffEntities().filter(
             (e) =>
@@ -135,29 +152,8 @@ export const createProjectDataSource = (): GenerateDataSource => ({
         const pieces = Number(entityType.replace('set', ''))
         return (await getEchoSetList()).filter((s) => s.pieces.includes(pieces)).map((s) => s.name)
     },
-    async getEntityInfo(entityType, entityName) {
-        try {
-            if (entityType === 'character') return summarizeAiInfo(entityType, await getCharacterInfo(entityName))
-            if (entityType === 'weapon') return summarizeAiInfo(entityType, await getWeaponInfo(entityName))
-            if (entityType === 'echo') return summarizeAiInfo(entityType, await getEchoInfo(entityName))
-            return summarizeAiInfo(entityType, await getEchoSetInfo(entityName))
-        } catch {
-            return null
-        }
-    },
-    async getCharacterTerms(entityName) {
-        const res = await fetch(`/api/v3/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
-            headers: { Accept: 'application/json' },
-            cache: 'no-store'
-        })
-        if (!res.ok)
-            return {
-                error: res.status === 404 ? `未找到角色「${entityName}」` : `v3 接口失败（HTTP ${res.status}）`
-            }
-        const info = await res.json()
-        if ((info as { error?: string }).error) return info
-        return analyzeCharacterTerms(entityName, info)
-    },
+    getEntityInfo: getEntityInfoForGeneration,
+    getCharacterTerms: getCharacterTermsForGeneration,
     async getExistingBuffs(_entityType, entityName, query) {
         const buffs: ExistingBuffRow[] = getAllBuffConfs()
             .filter((bs) => (!entityName || bs.name === entityName) && includesQuery(bs.name, query ?? ''))
@@ -234,7 +230,7 @@ export const GENERATE_TOOLS: ToolDefinition[] = [
         function: {
             name: 'get_character_terms',
             description:
-                '按需获取某角色的结构化术语速查：效果名【】、触发关键词（Highlight）、术语链接，以及每条技能/共鸣链（俗称命座）/固有去标签后的纯文本摘要。用于识别 buff 名称的触发来源与归属、以及判定元素/效果。',
+                '按需获取某角色的结构化术语速查：效果名【】以及每条技能/共鸣链（俗称命座）/固有的纯文本摘要。用于识别 buff 名称的触发来源与归属、以及判定元素/效果。',
             parameters: {
                 type: 'object',
                 properties: { entityName: { type: 'string', description: '角色名称（中文）' } },

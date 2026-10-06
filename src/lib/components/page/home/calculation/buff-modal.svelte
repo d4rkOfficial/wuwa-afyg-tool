@@ -1,7 +1,7 @@
 <script lang="ts">
     /** @desc BUFF 配置弹窗：左侧 Buff 块列表（叠层文件夹/拖拽排序/拖出删除）、右侧块编辑器（作用域/生效条件/乘区数值与引用/追加覆盖）、右栏乘区清单，含速查与导入入口 */
     import {
-        getAllBuffSets,
+        getAllBuffConfs,
         createBuffSet,
         takePendingFocusBuffSetId,
         deleteBuffSet,
@@ -22,10 +22,10 @@
         setBuffSetsGlobal
     } from '$lib/calc/calculation.store.svelte'
     import { ZONE_REF_DEFS, LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
-    import type { GroupedBuffSetItem } from '$lib/calc/calculation.consts'
+    import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
     import { buildBuffTree } from '$lib/calc/buff-tree'
     import type { CharSlot } from '$lib/types/project'
-    import type { ZoneRef, BuffSet, BuffCondition } from '$lib/calc/calculation.types'
+    import type { ZoneRef, BuffConf, BuffCondition } from '$lib/calc/calculation.types'
     import { getCharIconMap, elementColor, getLocked } from '$lib/calc/timeline.store.svelte'
     import { getWeaponIcons } from '$lib/api/data-cache'
     import { addToast } from '$lib/data/toast.svelte'
@@ -114,7 +114,7 @@
     let folderMenuOpen = $state(false)
     let folderMenuX = $state(0)
     let folderMenuY = $state(0)
-    let folderMenuTarget = $state<GroupedBuffSetItem | null>(null)
+    let folderMenuTarget = $state<GroupedBuffConfItem | null>(null)
     /** @desc 单个 buff 右键菜单：菜单位置/开关/当前目标 id（多选状态下为多选菜单） */
     let itemMenuOpen = $state(false)
     let itemMenuX = $state(0)
@@ -122,7 +122,7 @@
     let itemMenuTargetId = $state<string | null>(null)
     /** @desc 文件夹批量重命名弹窗 */
     let showFolderRename = $state(false)
-    let folderRenameTarget = $state<GroupedBuffSetItem | null>(null)
+    let folderRenameTarget = $state<GroupedBuffConfItem | null>(null)
 
     /** @desc 多选模式：勾选集合 / 全选 / 批量删除·并入全局·排序，状态机在 `./buff-modal-multiselect.svelte` */
     let multiSelect = $state(false)
@@ -195,7 +195,7 @@
     interface RefModalUi extends RefModalState {}
     let refModal = $state<RefModalUi>(createRefModalState('base_atk'))
 
-    let buffSets = $derived(getAllBuffSets())
+    let buffSets = $derived(getAllBuffConfs())
     let globalBuffSetIds = $derived(getGlobalBuffSetIds())
     let charIconMap = $derived(getCharIconMap())
 
@@ -338,7 +338,7 @@
      */
     const externalOverrides = $derived.by(() => {
         const out: Record<string, { name: string; later: boolean }[]> = {}
-        const list = getAllBuffSets()
+        const list = getAllBuffConfs()
         const selfIdx = list.findIndex((b) => b.id === selectedBuffSetId)
         for (let i = 0; i < list.length; i++) {
             const bs = list[i]
@@ -530,7 +530,7 @@
     const confirmDeleteFolder = () => drag.confirmDeleteFolder(deleteFolderMemberIds)
 
     /** @desc 打开文件夹右键菜单（点击⋯按钮或右键文件夹头均走这里） */
-    function openFolderMenu(e: MouseEvent, folder: GroupedBuffSetItem) {
+    function openFolderMenu(e: MouseEvent, folder: GroupedBuffConfItem) {
         e.preventDefault()
         e.stopPropagation()
         folderMenuTarget = folder
@@ -546,7 +546,7 @@
     const folderMembers = folderMembersOf
 
     /** @desc 目录整体并入 / 移出全局（所有子 Buff 一次性搬迁） */
-    function moveFolderGlobal(folder: GroupedBuffSetItem, global: boolean) {
+    function moveFolderGlobal(folder: GroupedBuffConfItem, global: boolean) {
         const ids = folderMembers(folder).map((c) => c.id)
         if (ids.length === 0) return
         setBuffSetsGlobal(ids, global)
@@ -573,7 +573,7 @@
     })
 
     /** @desc 打开文件夹批量重命名弹窗：按「新前缀 + 序号 + 新后缀」重新编号全部子 Buff */
-    function openFolderRename(folder: GroupedBuffSetItem) {
+    function openFolderRename(folder: GroupedBuffConfItem) {
         folderRenameTarget = folder
         showFolderRename = true
     }

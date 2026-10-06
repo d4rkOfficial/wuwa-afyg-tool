@@ -10,7 +10,7 @@
  * 角色元素色）一律由调用方以**函数参数**注入，故这里可被独立测试、也避免「纯逻辑反向依赖 runes store」。
  */
 import { LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$lib/calc/calculation.consts'
-import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
 import type { PaneEffectSource } from '$lib/calc/pane-effects'
 import type { CharSlot } from '$lib/types/project'
 import { buffRelevantForNonDirect, entryCharIdx, isNonDirectDamage, zoneLabelsOf } from './damage-table.utils'
@@ -20,7 +20,7 @@ export interface FolderGroup {
     key: string
     prefix: string
     suffix: string
-    buffs: BuffSet[]
+    buffs: BuffConf[]
 }
 
 /** @desc 叠层命名键（前缀+后缀）；不匹配叠层命名返回 null */
@@ -81,7 +81,7 @@ export interface GroupData {
     headerGroups: HeadGroupCell[]
     headerCols: HeadCell[]
     /** @desc 该组实际能用的全局 buff（scope/条件/乘区判定）——吃不到的全局 buff 不显示 */
-    visibleGlobalBuffs: BuffSet[]
+    visibleGlobalBuffs: BuffConf[]
 }
 
 /**
@@ -89,8 +89,11 @@ export interface GroupData {
  * 同级按「前缀+后缀」自然排序，使同文件夹列连续。
  * @param compare 自然序比较函数（由调用方注入，其家在 store，不在此处 import）
  */
-export const orderColumns = (rawColumns: readonly BuffSet[], compare: (a: string, b: string) => number): BuffSet[] => {
-    const groupOf = new Map<string, BuffSet[]>()
+export const orderColumns = (
+    rawColumns: readonly BuffConf[],
+    compare: (a: string, b: string) => number
+): BuffConf[] => {
+    const groupOf = new Map<string, BuffConf[]>()
     const order: string[] = []
     for (const b of rawColumns) {
         const k = layeredKeyOf(b.name)
@@ -118,7 +121,7 @@ export const orderColumns = (rawColumns: readonly BuffSet[], compare: (a: string
 }
 
 /** @desc buffId → 叠层组（仅 ≥2 条的组登记） */
-export const buildFolderGroups = (columns: readonly BuffSet[]): Map<string, FolderGroup> => {
+export const buildFolderGroups = (columns: readonly BuffConf[]): Map<string, FolderGroup> => {
     const map = new Map<string, FolderGroup>()
     const groups = new Map<string, FolderGroup>()
     for (const c of columns) {
@@ -162,14 +165,14 @@ export const entrySourceOf = (e: DamageEntry): string => e.character ?? ''
 
 /** @desc 整表结构构建的依赖（store 侧能力一律注入，见文件头注释） */
 export interface SpreadTableDeps {
-    columns: readonly BuffSet[]
+    columns: readonly BuffConf[]
     damageEntries: readonly DamageEntry[]
     charToIdx: Record<string, number>
-    globalBuffs: readonly BuffSet[]
+    globalBuffs: readonly BuffConf[]
     team: readonly CharSlot[]
     folderGroupOf: ReadonlyMap<string, FolderGroup>
     /** @desc 单元格可用性判定（组件侧带模块级缓存的那一个） */
-    enabledFor: (bs: BuffSet, entry: DamageEntry, charIdx: number) => boolean
+    enabledFor: (bs: BuffConf, entry: DamageEntry, charIdx: number) => boolean
     /** @desc 条目的「影响源」查询（scope 指向被引用角色、且改写其面板乘区的 Buff） */
     paneSourcesOf: (entryId: string) => Record<string, PaneEffectSource>
 }
@@ -427,8 +430,8 @@ export const shownGroupIdxOf = (
 export const collectShownGlobalBuffs = (
     tableData: readonly GroupData[],
     shownGroupIdx: readonly number[]
-): BuffSet[] => {
-    const map = new Map<string, BuffSet>()
+): BuffConf[] => {
+    const map = new Map<string, BuffConf>()
     for (const gi of shownGroupIdx) {
         for (const gb of tableData[gi].visibleGlobalBuffs) map.set(gb.id, gb)
     }

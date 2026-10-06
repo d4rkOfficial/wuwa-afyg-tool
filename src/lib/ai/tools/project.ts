@@ -115,7 +115,7 @@ defineTool('rename_project', {
 })
 
 defineTool('set_active_project', {
-    description: '切换当前活动工程（后续操作都作用于该工程）；id 传空字符串返回主页，之后可打开主页的 Buff 集。',
+    description: '切换当前活动工程（后续操作都作用于该工程）；id 传空字符串返回主页。',
     parameters: {
         type: 'object',
         properties: { id: { type: 'string', description: '工程 id（用 list_projects 获取）' } },
