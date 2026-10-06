@@ -14,16 +14,14 @@
  */
 import type { DamageBlock, NonDirectEntry, OpBlock, RefLine } from '$lib/calc/timeline.types'
 import type { DamageEntry } from '$lib/calc/calculation.types'
+import { autoConfigureTimings } from '$lib/calc/ref-line-timing'
 
-/** @desc 像素位置 → 秒（时间轴左侧有 SIDE_PAD 的空白） */
-export const posToSeconds = (pos: number, sidePad: number, pps: number): number => Math.max(0, (pos - sidePad) / pps)
-
-/** @desc 秒数显示：保留两位，去掉多余的 0（0.00s / 0.42s / 12.30s） */
+/** @desc 秒数显示：保留两位（只用于配置或名称推导的参考线时间） */
 export const fmtSeconds = (seconds: number): string => `${seconds.toFixed(2)}s`
 
-/** @desc 时间前缀（无有效位置时给个占位，避免模型把 0.00s 当成真实时间） */
-const timePrefix = (pos: number | undefined, sidePad: number, pps: number): string =>
-    pos === undefined ? '  --  ' : fmtSeconds(posToSeconds(pos, sidePad, pps)).padStart(7)
+/** @desc 有效记点秒数；缺失、非有限值与负数都不能当作真实时间 */
+const isValidSeconds = (seconds: number | null | undefined): seconds is number =>
+    typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0
 
 // ── 排轴 ──
 
@@ -34,8 +32,6 @@ export interface TimelineDigestInput {
     /** @desc 各轨显示名（下标 = trackIndex） */
     trackLabels: readonly string[]
     locked: boolean
-    sidePad: number
-    pps: number
     /** @desc 已启用的时间记点（参考线 id → 秒数；null = 未填写） */
     timings?: readonly { refLineId: string; seconds: number | null }[]
 }
@@ -80,13 +76,13 @@ const damageChildrenOf = (block: DamageBlock): string[] => {
 
 /**
  * @desc 渲染排轴：**按 pos 顺序**的一条时间线。
- * 每行给出秒数、**序号**、轨道与角色、操作内容；紧跟其绑定的伤害（只列命中名，不列倍率）。
+ * 每行给出**序号**、轨道与角色、操作内容；紧跟其绑定的伤害（只列命中名，不列倍率）。
+ * pos 只用于排序，不能表示块的实际时刻；秒数仅标注在有配置或自动推导时间的参考线上。
  *
  * 序号与 `$lib/ai/refs` 的定位器完全同源：操作块按 (pos, 轨道) 编号、参考线按 pos 编号，
  * 因此「块3」「线2」可以直接喂给增删改工具（摘要里不出现内部 id）。
  */
 export const renderTimelineDigest = (input: TimelineDigestInput): string => {
-    const { sidePad, pps } = input
     const damageBySource = new Map<string, DamageBlock[]>()
     for (const db of input.damageBlocks) {
         const list = damageBySource.get(db.sourceId)
@@ -94,6 +90,22 @@ export const renderTimelineDigest = (input: TimelineDigestInput): string => {
         else damageBySource.set(db.sourceId, [db])
     }
     const timingOf = new Map((input.timings ?? []).map((t) => [t.refLineId, t.seconds]))
+    // 优先采用有效的分析记点；全部不可用时，才按数据分析的自动配置规则推导。
+    const hasConfiguredTime = input.refLines.some((rl) => rl.id !== 'left' && isValidSeconds(timingOf.get(rl.id)))
+    const sourcePos = new Map([...input.opBlocks, ...input.refLines].map((source) => [source.id, source.pos]))
+    const damagePositions = input.damageBlocks
+        .filter((db) => db.skillHits.length > 0 || db.nonDirectEntries.length > 0)
+        .map((db) => sourcePos.get(db.sourceId))
+        .filter((pos): pos is number => pos !== undefined)
+    const inferredTimingOf = new Map(
+        (hasConfiguredTime
+            ? []
+            : autoConfigureTimings(
+                  input.refLines.filter((rl) => rl.id !== 'left'),
+                  (pos) => damagePositions.some((damagePos) => damagePos > pos)
+              )
+        ).map((t) => [t.refLineId, t.seconds])
+    )
     // 序号按时间先后分配（不依赖调用方传入顺序，保证与定位器一致）
     const orderedOps = [...input.opBlocks].sort((a, b) => a.pos - b.pos || a.trackIndex - b.trackIndex)
     const orderedRefs = [...input.refLines].sort((a, b) => a.pos - b.pos)
@@ -117,13 +129,13 @@ export const renderTimelineDigest = (input: TimelineDigestInput): string => {
     orderedRefs.forEach((rl, i) => {
         const seconds = timingOf.get(rl.id)
         const isTiming = timingOf.has(rl.id)
-        const timing = isTiming
-            ? `[记点 ${seconds === null || seconds === undefined ? '未填写' : fmtSeconds(seconds)}]`
-            : ''
+        const timing = isTiming ? `[记点 ${isValidSeconds(seconds) ? fmtSeconds(seconds) : '未填写'}]` : ''
+        const inferredSeconds = inferredTimingOf.get(rl.id)
+        const inferred = isValidSeconds(inferredSeconds) ? `[自动推导 ${fmtSeconds(inferredSeconds)}]` : ''
         rows.push({
             pos: rl.pos,
             rank: 0,
-            text: `[线${i + 1}] ── 参考线「${rl.time || '未命名'}」${timing}`,
+            text: `[线${i + 1}] ── 参考线「${rl.time || '未命名'}」${timing}${inferred}`,
             children: (damageBySource.get(rl.id) ?? []).flatMap(damageChildrenOf)
         })
     })
@@ -132,10 +144,11 @@ export const renderTimelineDigest = (input: TimelineDigestInput): string => {
     const damageCount = input.damageBlocks.filter((d) => d.skillHits.length > 0 || d.nonDirectEntries.length > 0).length
     const header =
         `时间线（${input.opBlocks.length} 操作块 / ${damageCount} 伤害块 / ${input.refLines.length} 参考线；` +
-        `${input.locked ? '已锁定' : '未锁定'}）；按时间顺序，方括号里是**序号**（增删改就用它），` +
+        `${input.locked ? '已锁定' : '未锁定'}）；按排轴顺序，方括号里是**序号**（增删改就用它）；` +
+        `排轴位置不代表秒数，参考线时间优先取分析记点，无有效记点时自动推导；` +
         `倍率用 get_timeline_damage_list 按需查`
     if (rows.length === 0) return `${header}\n（时间线为空）`
-    return [header, ...rows.flatMap((r) => [`${timePrefix(r.pos, sidePad, pps)} ${r.text}`, ...r.children])].join('\n')
+    return [header, ...rows.flatMap((r) => [r.text, ...r.children])].join('\n')
 }
 
 // ── 绑定倍率（按需查询）──
@@ -151,16 +164,18 @@ export interface DamageRatioRow {
     element: string
 }
 
-/** @desc 渲染绑定的倍率明细：一行一个已折算倍率，按时间顺序 */
-export const renderDamageRatioList = (rows: readonly DamageRatioRow[], sidePad: number, pps: number): string => {
-    const header = `绑定倍率（${rows.length} 条；已按时间顺序，含效应/处决/响应的折算结果）`
+/** @desc 渲染绑定的倍率明细：按排轴顺序编号，不把所属块的位置换算为秒数 */
+export const renderDamageRatioList = (rows: readonly DamageRatioRow[]): string => {
+    const header = `绑定倍率（${rows.length} 条；已按排轴顺序，含效应/处决/响应的折算结果；序号不代表秒数）`
     if (rows.length === 0) return `${header}\n（没有任何已绑定的伤害倍率）`
-    const lines = rows.map((r) => {
-        const parts = [`${r.character || '无'} · ${r.name} ${r.value}`]
-        if (r.element) parts.push(r.element)
-        if (r.baseType) parts.push(`${r.baseType}系数`)
-        return `${timePrefix(r.time, sidePad, pps)} ${parts.join(' · ')}`
-    })
+    const lines = [...rows]
+        .sort((a, b) => a.time - b.time)
+        .map((r, i) => {
+            const parts = [`${r.character || '无'} · ${r.name} ${r.value}`]
+            if (r.element) parts.push(r.element)
+            if (r.baseType) parts.push(`${r.baseType}系数`)
+            return `[${String(i + 1).padStart(2, '0')}] ${parts.join(' · ')}`
+        })
     return [header, ...lines].join('\n')
 }
 
@@ -174,8 +189,6 @@ export interface CalculationDigestInput {
     damageTypesOf: (entryId: string) => readonly string[]
     /** @desc 条目 id → 该条目在时间轴上的像素位置（无位置传 undefined） */
     posOf: (entry: DamageEntry) => number | undefined
-    sidePad: number
-    pps: number
 }
 
 /** @desc 条目类型标记（效应 / 处决 / 响应 / 直伤） */
@@ -199,7 +212,7 @@ export const renderCalculationDigest = (input: CalculationDigestInput): string =
         `拉表（${rows.length} 条伤害条目，按时间轴顺序，行首就是**序号**，工具参数填这个数字）；` +
         `乘区明细与引用用 get_buff_set_detail / get_damage_entry_buff_sources 按需查`
     if (rows.length === 0) return `${header}\n（还没有任何伤害条目：先到排轴绑定伤害）`
-    const lines = rows.map(({ entry, pos }, i) => {
+    const lines = rows.map(({ entry }, i) => {
         const kind = entryKind(entry)
         const buffs = input.buffNamesOf(entry.id)
         const damageTypes = input.damageTypesOf(entry.id)
@@ -210,7 +223,7 @@ export const renderCalculationDigest = (input: CalculationDigestInput): string =
             kind ? `[${kind}]` : '',
             buffs.length > 0 ? `Buff(${buffs.length}): ${buffs.join('、')}` : 'Buff: 无'
         ].filter(Boolean)
-        return `${timePrefix(pos, input.sidePad, input.pps)} [${String(i + 1).padStart(2, '0')}] ${parts.join(' · ')}`
+        return `[${String(i + 1).padStart(2, '0')}] ${parts.join(' · ')}`
     })
     return [header, ...lines].join('\n')
 }
