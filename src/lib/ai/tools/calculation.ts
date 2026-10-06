@@ -37,7 +37,6 @@ import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getActiveProject } from '$lib/data/project.svelte'
 import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
 import { getOpBlocks, getRefLines } from '$lib/calc/timeline.store.svelte'
-import { PPS, SIDE_PAD } from '$lib/calc/timeline.consts'
 import { renderBuffConfList, renderCalculationDigest } from '$lib/ai/phase-digest'
 import { buffConfsInOrder, damageEntriesInOrder, resolveBuffConf, resolveDamageEntry } from '$lib/ai/refs'
 import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
@@ -98,9 +97,7 @@ defineTool('get_damage_entries', {
                 entries: damageEntriesInOrder(),
                 buffNamesOf,
                 damageTypesOf: (entryId) => getDamageTypesForEntry(entryId),
-                posOf: (e) => timelinePosOf(e.sourceTimelineBlockId),
-                sidePad: SIDE_PAD,
-                pps: PPS
+                posOf: (e) => timelinePosOf(e.sourceTimelineBlockId)
             })
         }
     }

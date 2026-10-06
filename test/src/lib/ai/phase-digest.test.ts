@@ -5,7 +5,6 @@ import assert from 'node:assert/strict'
 
 import {
     fmtSeconds,
-    posToSeconds,
     renderBuffConfList,
     renderCalculationDigest,
     renderDamageRatioList,
@@ -14,15 +13,10 @@ import {
 import type { DamageBlock, OpBlock, RefLine } from '$lib/calc/timeline.types'
 import type { DamageEntry } from '$lib/calc/calculation.types'
 
-const SIDE_PAD = 40
-const PPS = 80
-/** @desc 秒 → 像素位置（与 posToSeconds 互逆，方便构造用例） */
-const posOfSeconds = (s: number): number => SIDE_PAD + s * PPS
-
-const op = (id: string, trackIndex: number, seconds: number, key: string, extra: Partial<OpBlock> = {}): OpBlock => ({
+const op = (id: string, trackIndex: number, pos: number, key: string, extra: Partial<OpBlock> = {}): OpBlock => ({
     id,
     trackIndex,
-    pos: posOfSeconds(seconds),
+    pos,
     key,
     desc: '',
     intro: false,
@@ -30,9 +24,9 @@ const op = (id: string, trackIndex: number, seconds: number, key: string, extra:
     ...extra
 })
 
-const refLine = (id: string, seconds: number, time: string): RefLine => ({
+const refLine = (id: string, pos: number, time: string): RefLine => ({
     id,
-    pos: posOfSeconds(seconds),
+    pos,
     time
 })
 
@@ -66,9 +60,7 @@ describe('排轴时间线渲染', () => {
                 damageBlock('op-b', { skillHits: [hit('乙', '共鸣技能', '共鸣技能伤害', '128.5%')] })
             ],
             trackLabels: ['甲', '乙', '丙'],
-            locked: false,
-            sidePad: SIDE_PAD,
-            pps: PPS
+            locked: false
         })
         const lines = out.split('\n')
         // 跳过表头（表头里也含「参考线」字样）
@@ -77,10 +69,10 @@ describe('排轴时间线渲染', () => {
             .filter((l) => l.includes('轨') || l.includes('参考线'))
             .map((l) => l.trim())
         assert.deepEqual(order, [
-            '0.00s [块1] 轨1 甲 · 普攻',
-            '1.00s [块2] 轨2 乙 · 共鸣技能',
-            '1.50s [线1] ── 参考线「1m30s」',
-            '2.00s [块3] 轨3 丙 · 共鸣解放'
+            '[块1] 轨1 甲 · 普攻',
+            '[块2] 轨2 乙 · 共鸣技能',
+            '[线1] ── 参考线「1m30s」[自动推导 90.00s]',
+            '[块3] 轨3 丙 · 共鸣解放'
         ])
         assert.ok(!out.includes('op-a') && !out.includes('rl-1'), '摘要只给序号，不出现内部 id')
         // 伤害缩进挂在各自块下，且顺序正确
@@ -96,9 +88,7 @@ describe('排轴时间线渲染', () => {
             refLines: [],
             damageBlocks: [damageBlock('op-a', { skillHits: [hit('甲', '共鸣技能', '共鸣技能伤害', '128.5%')] })],
             trackLabels: ['甲'],
-            locked: false,
-            sidePad: SIDE_PAD,
-            pps: PPS
+            locked: false
         })
         assert.ok(!out.includes('128.5'), '排轴摘要里不应出现倍率数值')
         assert.ok(out.includes('共鸣技能(共鸣技能)'), '应给出命中名 + 技能类型')
@@ -117,9 +107,7 @@ describe('排轴时间线渲染', () => {
                 })
             ],
             trackLabels: ['甲'],
-            locked: false,
-            sidePad: SIDE_PAD,
-            pps: PPS
+            locked: false
         })
         assert.ok(out.includes('共鸣技能(共鸣技能) ×2'), '重复命中应合并计数')
         assert.equal(out.split('└ 伤害').length - 1, 1, '只应有一行伤害')
@@ -139,8 +127,6 @@ describe('排轴时间线渲染', () => {
             ],
             trackLabels: ['甲'],
             locked: true,
-            sidePad: SIDE_PAD,
-            pps: PPS,
             timings: [{ refLineId: 'rl-1', seconds: 90 }]
         })
         assert.ok(out.includes('共鸣解放「大招」[变奏入场·切回]'))
@@ -156,53 +142,45 @@ describe('排轴时间线渲染', () => {
             refLines: [],
             damageBlocks: [],
             trackLabels: [],
-            locked: false,
-            sidePad: SIDE_PAD,
-            pps: PPS
+            locked: false
         })
         assert.ok(out.includes('（时间线为空）'))
     })
 
-    it('秒数换算与格式化', () => {
-        assert.equal(posToSeconds(posOfSeconds(1.5), SIDE_PAD, PPS), 1.5)
-        assert.equal(posToSeconds(SIDE_PAD - 100, SIDE_PAD, PPS), 0, '早于左锚点按 0 处理')
+    it('只格式化已确定的参考线秒数', () => {
         assert.equal(fmtSeconds(1.5), '1.50s')
     })
 })
 
 describe('绑定倍率（按需查询）', () => {
     it('一行一条、按时间顺序给出倍率/属性/系数类型', () => {
-        const out = renderDamageRatioList(
-            [
-                {
-                    character: '甲',
-                    name: '普攻(常态攻击)',
-                    value: '100%',
-                    baseType: '攻击',
-                    time: posOfSeconds(0),
-                    element: '物理'
-                },
-                {
-                    character: '乙',
-                    name: '共鸣技能(共鸣技能)',
-                    value: '128.5%*3',
-                    baseType: '攻击',
-                    time: posOfSeconds(1),
-                    element: '冷凝'
-                }
-            ],
-            SIDE_PAD,
-            PPS
-        )
+        const out = renderDamageRatioList([
+            {
+                character: '甲',
+                name: '普攻(常态攻击)',
+                value: '100%',
+                baseType: '攻击',
+                time: 0,
+                element: '物理'
+            },
+            {
+                character: '乙',
+                name: '共鸣技能(共鸣技能)',
+                value: '128.5%*3',
+                baseType: '攻击',
+                time: 100,
+                element: '冷凝'
+            }
+        ])
         const lines = out.split('\n')
         assert.ok(lines[0].includes('绑定倍率（2 条'))
         assert.ok(lines[1].includes('甲 · 普攻(常态攻击) 100% · 物理 · 攻击系数'))
         assert.ok(lines[2].includes('乙 · 共鸣技能(共鸣技能) 128.5%*3 · 冷凝 · 攻击系数'))
-        assert.ok(lines[2].trimStart().startsWith('1.00s'), '时间前缀应写在行首')
+        assert.ok(lines[2].startsWith('[02]'), '倍率行按排轴序号编号，不标伪秒数')
     })
 
     it('没有绑定时给出明确提示', () => {
-        assert.ok(renderDamageRatioList([], SIDE_PAD, PPS).includes('（没有任何已绑定的伤害倍率）'))
+        assert.ok(renderDamageRatioList([]).includes('（没有任何已绑定的伤害倍率）'))
     })
 })
 
@@ -231,15 +209,13 @@ describe('拉表渲染', () => {
             entries: [entry('e2', '乙', '共鸣技能(共鸣技能)'), entry('e1', '甲', '普攻(常态攻击)')],
             buffNamesOf: (id) => (id === 'e2' ? ['攻击加成', '暴击提升'] : []),
             damageTypesOf: (id) => (id === 'e2' ? ['共鸣技能伤害'] : ['普攻伤害']),
-            posOf: (e) => (e.id === 'e1' ? posOfSeconds(0) : posOfSeconds(1.2)),
-            sidePad: SIDE_PAD,
-            pps: PPS
+            posOf: (e) => (e.id === 'e1' ? 0 : 120)
         })
         const lines = out.split('\n')
         assert.ok(lines[0].includes('拉表（2 条伤害条目'))
         assert.ok(lines[1].includes('[01] 甲 · 普攻(常态攻击) · 冷凝 · 普攻伤害 · Buff: 无'))
         assert.ok(lines[2].includes('[02] 乙 · 共鸣技能(共鸣技能) · 冷凝 · 共鸣技能伤害 · Buff(2): 攻击加成、暴击提升'))
-        assert.ok(lines[1].trimStart().startsWith('0.00s'), '时间前缀在行首')
+        assert.ok(lines[1].startsWith('[01]'), '条目序号在行首，不标伪秒数')
         assert.ok(!out.includes('(e1)') && !out.includes('(e2)'), '摘要只给序号，不出现条目 id')
     })
 
@@ -248,13 +224,12 @@ describe('拉表渲染', () => {
             entries: [entry('e9', '无', '电磁效应', { isEffect: true })],
             buffNamesOf: () => [],
             damageTypesOf: () => [],
-            posOf: () => undefined,
-            sidePad: SIDE_PAD,
-            pps: PPS
+            posOf: () => undefined
         })
         assert.ok(out.includes('[效应]'))
         assert.ok(out.includes('未定伤害类型'))
-        assert.ok(out.includes('  --  '), '无时间位置时用占位符，避免被当成 0 秒')
+        assert.ok(out.split('\n')[1].startsWith('[01]'), '无位置的条目仍给序号')
+        assert.ok(!out.includes('0.00s'), '不能把缺失位置当成零秒')
     })
 
     it('空拉表给出明确提示', () => {
@@ -262,9 +237,7 @@ describe('拉表渲染', () => {
             entries: [],
             buffNamesOf: () => [],
             damageTypesOf: () => [],
-            posOf: () => undefined,
-            sidePad: SIDE_PAD,
-            pps: PPS
+            posOf: () => undefined
         })
         assert.ok(out.includes('（还没有任何伤害条目'))
     })
@@ -285,5 +258,118 @@ describe('工程 Buff 配置清单渲染', () => {
 
     it('空清单给出明确提示', () => {
         assert.ok(renderBuffConfList([]).includes('（还没有任何 工程 Buff 配置）'))
+    })
+})
+
+const timelineInput = (extra: Partial<Parameters<typeof renderTimelineDigest>[0]> = {}) => ({
+    opBlocks: [op('op-a', 0, 20, '普攻')],
+    refLines: [
+        refLine('left', 0, ''),
+        refLine('rl-1', 100, '+25s'),
+        refLine('rl-2', 200, '+25s'),
+        refLine('right', 300, '结束')
+    ],
+    damageBlocks: [damageBlock('op-a', { skillHits: [hit('甲', '常态攻击', '普攻伤害', '100%')] })],
+    trackLabels: ['甲'],
+    locked: false,
+    ...extra
+})
+
+describe('AI 时间口径（Issue #11）', () => {
+    it('有效分析记点优先于名称；其它线不能冒充已配置时间', () => {
+        const out = renderTimelineDigest(timelineInput({ timings: [{ refLineId: 'rl-1', seconds: 80 }] }))
+        assert.ok(out.includes('参考线「+25s」[记点 80.00s]'))
+        assert.ok(!out.includes('[自动推导'), '配置有效时不混入另一套自动时间')
+        assert.ok(out.split('\n').find((line) => line.startsWith('[块1]')))
+    })
+
+    it('零秒也是有效配置，不被名称推导覆盖', () => {
+        const out = renderTimelineDigest(timelineInput({ timings: [{ refLineId: 'rl-1', seconds: 0 }] }))
+        assert.ok(out.includes('[记点 0.00s]'))
+        assert.ok(!out.includes('[自动推导'))
+    })
+
+    it('无有效配置时复用相对时间、帧数与无尾部伤害的自动配置规则', () => {
+        const out = renderTimelineDigest(
+            timelineInput({
+                refLines: [
+                    refLine('left', 0, ''),
+                    refLine('rl-1', 100, '+25s'),
+                    refLine('rl-2', 200, '+25s50f'),
+                    refLine('right', 300, '结束')
+                ]
+            })
+        )
+        assert.ok(out.includes('参考线「+25s」[自动推导 25.00s]'))
+        assert.ok(out.includes('参考线「+25s50f」[自动推导 50.50s]'))
+        assert.ok(out.includes('参考线「结束」[自动推导 50.50s]'))
+    })
+
+    it('尾部伤害绑定在参考线上时，结束线也遵守自动配置规则', () => {
+        const out = renderTimelineDigest(
+            timelineInput({
+                damageBlocks: [
+                    damageBlock('right', { sourceType: 'ref', skillHits: [hit('甲', '常态攻击', '普攻伤害', '100%')] })
+                ]
+            })
+        )
+        assert.ok(out.includes('参考线「结束」[自动推导 120.00s]'))
+    })
+
+    it('空伤害块不延长尾部；左锚点不被当作中间参考线', () => {
+        const out = renderTimelineDigest(timelineInput({ damageBlocks: [damageBlock('right')] }))
+        assert.ok(out.includes('参考线「结束」[自动推导 50.00s]'))
+        const onlyEnd = renderTimelineDigest(
+            timelineInput({ refLines: [refLine('left', 0, ''), refLine('right', 300, '结束')] })
+        )
+        assert.ok(onlyEnd.includes('参考线「结束」[自动推导 120.00s]'))
+    })
+
+    it('未填写、失效引用和非法秒数不阻止名称回退，不输出 NaN/Infinity', () => {
+        const out = renderTimelineDigest(
+            timelineInput({
+                timings: [
+                    { refLineId: 'rl-1', seconds: null },
+                    { refLineId: 'rl-2', seconds: NaN },
+                    { refLineId: 'right', seconds: -1 },
+                    { refLineId: 'missing', seconds: 999 }
+                ]
+            })
+        )
+        assert.ok(out.includes('参考线「+25s」[记点 未填写][自动推导 25.00s]'))
+        assert.ok(out.includes('[自动推导 50.00s]'))
+        assert.ok(!out.includes('NaN') && !out.includes('999.00s') && !out.includes('-1.00s'))
+    })
+
+    it('没有记点且名称无法解析时，操作块也不会获得伪秒数', () => {
+        const out = renderTimelineDigest(timelineInput({ refLines: [refLine('rl-1', 100, '起手')] }))
+        assert.ok(!/\d+\.\d+s/.test(out))
+        assert.ok(out.includes('[块1]'))
+    })
+
+    it('位置平移、缩放只保持顺序，不改变摘要中的时间信息', () => {
+        const input = timelineInput()
+        const transformed = {
+            ...input,
+            opBlocks: input.opBlocks.map((b) => ({ ...b, pos: b.pos * 9 + 700 })),
+            refLines: input.refLines.map((r) => ({ ...r, pos: r.pos * 9 + 700 }))
+        }
+        assert.equal(renderTimelineDigest(transformed), renderTimelineDigest(input))
+        const ratios = [
+            { character: '甲', name: '普攻', value: '100%', baseType: '攻击', element: '物理', time: 20 },
+            { character: '乙', name: '共鸣技能', value: '200%', baseType: '攻击', element: '冷凝', time: 10 }
+        ]
+        assert.equal(
+            renderDamageRatioList(ratios),
+            renderDamageRatioList(ratios.map((r) => ({ ...r, time: r.time * 9 + 700 })))
+        )
+        assert.ok(renderDamageRatioList(ratios).split('\n')[1].includes('[01] 乙'))
+        const calcInput = {
+            entries: [entry('e1', '甲', '普攻')],
+            buffNamesOf: () => [],
+            damageTypesOf: () => [],
+            posOf: () => 20
+        }
+        assert.equal(renderCalculationDigest(calcInput), renderCalculationDigest({ ...calcInput, posOf: () => 880 }))
     })
 })
