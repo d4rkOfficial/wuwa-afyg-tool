@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import {
     fmtSeconds,
     posToSeconds,
-    renderBuffSetList,
+    renderBuffConfList,
     renderCalculationDigest,
     renderDamageRatioList,
     renderTimelineDigest
@@ -270,9 +270,9 @@ describe('拉表渲染', () => {
     })
 })
 
-describe('Buff 集清单渲染', () => {
+describe('工程 Buff 配置清单渲染', () => {
     it('一行一条，行首是序号，作用域与条件可读', () => {
-        const out = renderBuffSetList([
+        const out = renderBuffConfList([
             { name: '攻击加成', scope: 'all', global: true, starred: true, zoneCount: 2 },
             { name: '效应专属', scope: [], global: false, starred: false, zoneCount: 1 },
             { name: '双人共享', scope: [0, 1], global: false, starred: false, zoneCount: 3, condition: 'chains=1' }
@@ -284,6 +284,6 @@ describe('Buff 集清单渲染', () => {
     })
 
     it('空清单给出明确提示', () => {
-        assert.ok(renderBuffSetList([]).includes('（还没有任何 Buff 集）'))
+        assert.ok(renderBuffConfList([]).includes('（还没有任何 工程 Buff 配置）'))
     })
 })

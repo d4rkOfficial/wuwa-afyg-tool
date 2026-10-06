@@ -31,7 +31,7 @@ export interface ToolContext {
     requestView?: (phase: string) => void
     // 修改计算态后通知宿主持久化
     notifyCalc?: () => void
-    // 长时间生成任务的进度回调（如 Buff 集生成）
+    // 长时间生成任务的进度回调（如 Buff 生成）
     onGenerateProgress?: (text: string) => void
 }
 

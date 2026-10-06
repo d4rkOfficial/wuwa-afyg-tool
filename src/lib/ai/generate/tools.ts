@@ -11,7 +11,7 @@ import {
 } from '$lib/api/data-cache'
 import { providerQuery } from '$lib/api/provider'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
-import { getAllBuffSets } from '$lib/calc/calculation.store.svelte'
+import { getAllBuffSets as getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
 import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { EFFECTS_TEXT, SCOPE_RULES_TEXT, EXAMPLES_TEXT, REF_RULES_TEXT } from './prompts.config'
 import { renderConditionRules, renderNamingRules } from './prompts'
@@ -39,143 +39,142 @@ function validEntityType(v: unknown): v is GenerateEntityType {
 
 // ── 数据源（按生成目标注入：本地 Buff 集 / 当前工程）──
 
-export interface BuffSetRowLike {
-    buff_name: string
+export interface ExistingBuffRow {
+    buffName: string
     scope?: string
     exclusive?: boolean
     condition?: unknown
-    buff_set?: Array<{ zoneId?: string; value?: number; override?: boolean; condition?: unknown }>
+    zones?: Array<{ zoneId?: string; value?: number; override?: boolean; condition?: unknown }>
 }
 
 export interface GenerateDataSource {
+    target: 'buff-set' | 'project'
     listEntities(entityType: GenerateEntityType): Promise<string[]>
     getEntityInfo(entityType: GenerateEntityType, entityName: string): Promise<unknown | null>
     getCharacterTerms(entityName: string): Promise<unknown>
-    getBuffSets(
+    getExistingBuffs(
         entityType?: string,
         entityName?: string,
         query?: string
-    ): Promise<{ total: number; buffSets: BuffSetRowLike[] }>
+    ): Promise<{ total: number; buffs: ExistingBuffRow[] }>
 }
 
 function includesQuery(name: string, query: string): boolean {
     return !query || name.includes(query)
 }
 
-// 本地 Buff 集模式：get_buff_sets 查库内已收录实体
-export function createLibraryDataSource(): GenerateDataSource {
-    return {
-        async listEntities(entityType) {
-            if (entityType === 'character') return (await getCharacterList()).map((c) => c.name)
-            if (entityType === 'weapon') return (await getWeaponList()).map((w) => w.name)
-            if (entityType === 'echo') return (await getEchoList()).map((e) => e.name)
-            const pieces = Number(entityType.replace('set', ''))
-            return (await getEchoSetList()).filter((s) => s.pieces.includes(pieces)).map((s) => s.name)
-        },
-        async getEntityInfo(entityType, entityName) {
-            try {
-                if (entityType === 'character') return summarizeAiInfo(entityType, await getCharacterInfo(entityName))
-                if (entityType === 'weapon') return summarizeAiInfo(entityType, await getWeaponInfo(entityName))
-                if (entityType === 'echo') return summarizeAiInfo(entityType, await getEchoInfo(entityName))
-                return summarizeAiInfo(entityType, await getEchoSetInfo(entityName))
-            } catch {
-                return null
-            }
-        },
-        async getCharacterTerms(entityName) {
-            const res = await fetch(`/api/v3/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
-                headers: { Accept: 'application/json' },
-                cache: 'no-store'
-            })
-            if (!res.ok)
-                return {
-                    error: res.status === 404 ? `未找到角色「${entityName}」` : `v3 接口失败（HTTP ${res.status}）`
-                }
-            const info = await res.json()
-            if ((info as { error?: string }).error) return info
-            return analyzeCharacterTerms(entityName, info)
-        },
-        async getBuffSets(entityType, entityName, query) {
-            const entities = getBuffEntities().filter(
-                (e) =>
-                    (!entityType || e.entityType === entityType) &&
-                    (!entityName || e.entityName === entityName) &&
-                    includesQuery(e.entityName, query ?? '')
-            )
-            const buffSets: BuffSetRowLike[] = []
-            for (const e of entities) {
-                for (const b of e.buffs) {
-                    if (!includesQuery(b.buffName, query ?? '')) continue
-                    buffSets.push({
-                        buff_name: b.buffName,
-                        scope: b.scope,
-                        exclusive: b.exclusive,
-                        condition: b.condition,
-                        buff_set: b.zones.map((z) => ({
-                            zoneId: z.zoneId,
-                            value: z.value,
-                            ...(z.override ? { override: true } : {}),
-                            ...(z.condition ? { condition: z.condition } : {})
-                        }))
-                    })
-                }
-            }
-            return { total: buffSets.length, buffSets }
+// 本地 Buff 集模式：get_existing_buffs 查询主页 Buff 集已收录实体
+export const createBuffSetDataSource = (): GenerateDataSource => ({
+    target: 'buff-set',
+    async listEntities(entityType) {
+        if (entityType === 'character') return (await getCharacterList()).map((c) => c.name)
+        if (entityType === 'weapon') return (await getWeaponList()).map((w) => w.name)
+        if (entityType === 'echo') return (await getEchoList()).map((e) => e.name)
+        const pieces = Number(entityType.replace('set', ''))
+        return (await getEchoSetList()).filter((s) => s.pieces.includes(pieces)).map((s) => s.name)
+    },
+    async getEntityInfo(entityType, entityName) {
+        try {
+            if (entityType === 'character') return summarizeAiInfo(entityType, await getCharacterInfo(entityName))
+            if (entityType === 'weapon') return summarizeAiInfo(entityType, await getWeaponInfo(entityName))
+            if (entityType === 'echo') return summarizeAiInfo(entityType, await getEchoInfo(entityName))
+            return summarizeAiInfo(entityType, await getEchoSetInfo(entityName))
+        } catch {
+            return null
         }
-    }
-}
-
-// 当前工程模式：get_buff_sets 查当前工程拉表内的 Buff 集
-export function createProjectDataSource(): GenerateDataSource {
-    return {
-        async listEntities(entityType) {
-            if (entityType === 'character') return (await getCharacterList()).map((c) => c.name)
-            if (entityType === 'weapon') return (await getWeaponList()).map((w) => w.name)
-            if (entityType === 'echo') return (await getEchoList()).map((e) => e.name)
-            const pieces = Number(entityType.replace('set', ''))
-            return (await getEchoSetList()).filter((s) => s.pieces.includes(pieces)).map((s) => s.name)
-        },
-        async getEntityInfo(entityType, entityName) {
-            try {
-                if (entityType === 'character') return summarizeAiInfo(entityType, await getCharacterInfo(entityName))
-                if (entityType === 'weapon') return summarizeAiInfo(entityType, await getWeaponInfo(entityName))
-                if (entityType === 'echo') return summarizeAiInfo(entityType, await getEchoInfo(entityName))
-                return summarizeAiInfo(entityType, await getEchoSetInfo(entityName))
-            } catch {
-                return null
+    },
+    async getCharacterTerms(entityName) {
+        const res = await fetch(`/api/v3/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store'
+        })
+        if (!res.ok)
+            return {
+                error: res.status === 404 ? `未找到角色「${entityName}」` : `v3 接口失败（HTTP ${res.status}）`
             }
-        },
-        async getCharacterTerms(entityName) {
-            const res = await fetch(`/api/v3/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
-                headers: { Accept: 'application/json' },
-                cache: 'no-store'
-            })
-            if (!res.ok)
-                return {
-                    error: res.status === 404 ? `未找到角色「${entityName}」` : `v3 接口失败（HTTP ${res.status}）`
-                }
-            const info = await res.json()
-            if ((info as { error?: string }).error) return info
-            return analyzeCharacterTerms(entityName, info)
-        },
-        async getBuffSets(_entityType, entityName, query) {
-            const buffSets: BuffSetRowLike[] = getAllBuffSets()
-                .filter((bs) => (!entityName || bs.name === entityName) && includesQuery(bs.name, query ?? ''))
-                .map((bs) => ({
-                    buff_name: bs.name,
-                    scope: bs.scope === 'all' ? 'all' : JSON.stringify(bs.scope),
-                    condition: bs.condition,
-                    buff_set: bs.zones.map((z) => ({
+        const info = await res.json()
+        if ((info as { error?: string }).error) return info
+        return analyzeCharacterTerms(entityName, info)
+    },
+    async getExistingBuffs(entityType, entityName, query) {
+        const entities = getBuffEntities().filter(
+            (e) =>
+                (!entityType || e.entityType === entityType) &&
+                (!entityName || e.entityName === entityName) &&
+                includesQuery(e.entityName, query ?? '')
+        )
+        const buffs: ExistingBuffRow[] = []
+        for (const e of entities) {
+            for (const b of e.buffs) {
+                if (!includesQuery(b.buffName, query ?? '')) continue
+                buffs.push({
+                    buffName: b.buffName,
+                    scope: b.scope,
+                    exclusive: b.exclusive,
+                    condition: b.condition,
+                    zones: b.zones.map((z) => ({
                         zoneId: z.zoneId,
                         value: z.value,
                         ...(z.override ? { override: true } : {}),
                         ...(z.condition ? { condition: z.condition } : {})
                     }))
-                }))
-            return { total: buffSets.length, buffSets }
+                })
+            }
         }
+        return { total: buffs.length, buffs }
     }
-}
+})
+
+// 当前工程模式：get_existing_buffs 查询当前工程拉表内的工程 Buff 配置
+export const createProjectDataSource = (): GenerateDataSource => ({
+    target: 'project',
+    async listEntities(entityType) {
+        if (entityType === 'character') return (await getCharacterList()).map((c) => c.name)
+        if (entityType === 'weapon') return (await getWeaponList()).map((w) => w.name)
+        if (entityType === 'echo') return (await getEchoList()).map((e) => e.name)
+        const pieces = Number(entityType.replace('set', ''))
+        return (await getEchoSetList()).filter((s) => s.pieces.includes(pieces)).map((s) => s.name)
+    },
+    async getEntityInfo(entityType, entityName) {
+        try {
+            if (entityType === 'character') return summarizeAiInfo(entityType, await getCharacterInfo(entityName))
+            if (entityType === 'weapon') return summarizeAiInfo(entityType, await getWeaponInfo(entityName))
+            if (entityType === 'echo') return summarizeAiInfo(entityType, await getEchoInfo(entityName))
+            return summarizeAiInfo(entityType, await getEchoSetInfo(entityName))
+        } catch {
+            return null
+        }
+    },
+    async getCharacterTerms(entityName) {
+        const res = await fetch(`/api/v3/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store'
+        })
+        if (!res.ok)
+            return {
+                error: res.status === 404 ? `未找到角色「${entityName}」` : `v3 接口失败（HTTP ${res.status}）`
+            }
+        const info = await res.json()
+        if ((info as { error?: string }).error) return info
+        return analyzeCharacterTerms(entityName, info)
+    },
+    async getExistingBuffs(_entityType, entityName, query) {
+        const buffs: ExistingBuffRow[] = getAllBuffConfs()
+            .filter((bs) => (!entityName || bs.name === entityName) && includesQuery(bs.name, query ?? ''))
+            .map((bs) => ({
+                buffName: bs.name,
+                scope: bs.scope === 'all' ? 'all' : JSON.stringify(bs.scope),
+                condition: bs.condition,
+                zones: bs.zones.map((z) => ({
+                    zoneId: z.zoneId,
+                    value: z.value,
+                    ...(z.override ? { override: true } : {}),
+                    ...(z.condition ? { condition: z.condition } : {})
+                }))
+            }))
+        return { total: buffs.length, buffs }
+    }
+})
 
 // ── 工具 schema ──
 export const GENERATE_TOOLS: ToolDefinition[] = [
@@ -246,9 +245,9 @@ export const GENERATE_TOOLS: ToolDefinition[] = [
     {
         type: 'function',
         function: {
-            name: 'get_buff_sets',
+            name: 'get_existing_buffs',
             description:
-                '查询已收录的 Buff 集（本地 Buff 集或当前工程拉表）。可按实体类型/实体名精确过滤，或用 query 模糊搜索实体名或 buff 名。返回现有 buff 的 buff_name/scope/exclusive/乘区数值，用于对比、去重或核对。',
+                '查询当前生成目标中的已有 Buff；目标为主页 Buff 集或工程 Buff 配置，由数据源确定，返回 target 标明位置。可按实体类型/实体名精确过滤，或用 query 模糊搜索实体名或 buff 名。返回现有 buff 的 buffName/scope/exclusive/乘区数值，用于对比、去重或核对。',
             parameters: {
                 type: 'object',
                 properties: {
@@ -411,24 +410,24 @@ export async function executeGenerateTool(
             const res = await data.getCharacterTerms(entityName)
             return JSON.stringify(res)
         }
-        case 'get_buff_sets': {
+        case 'get_existing_buffs': {
             const entityType = validEntityType(args.entityType) ? (args.entityType as string) : undefined
             const entityName = typeof args.entityName === 'string' ? args.entityName.trim() : undefined
             const query = typeof args.query === 'string' ? args.query.trim() : undefined
-            const data2 = await data.getBuffSets(entityType, entityName, query)
-            return JSON.stringify(data2)
+            const data2 = await data.getExistingBuffs(entityType, entityName, query)
+            return JSON.stringify({ target: data.target, ...data2 })
         }
         case 'get_editing_context': {
-            const buffSets = await data.getBuffSets(curType, curName)
-            return JSON.stringify({ entityType: curType, entityName: curName, ...(buffSets as object) })
+            const buffs = await data.getExistingBuffs(curType, curName)
+            return JSON.stringify({ target: data.target, entityType: curType, entityName: curName, ...buffs })
         }
         case 'diff_buffs': {
             const entityType = validEntityType(args.entityType) ? (args.entityType as GenerateEntityType) : curType
             const entityName =
                 typeof args.entityName === 'string' && args.entityName.trim() ? args.entityName.trim() : curName
             const proposed = Array.isArray(args.buffs) ? (args.buffs as ProposedBuff[]) : []
-            const existingRaw = await data.getBuffSets(entityType, entityName)
-            const existing = ((existingRaw as { buffSets?: BuffSetRowLike[] }).buffSets ?? []) as BuffSetRowLike[]
+            const existingRaw = await data.getExistingBuffs(entityType, entityName)
+            const existing = ((existingRaw as { buffs?: ExistingBuffRow[] }).buffs ?? []) as ExistingBuffRow[]
             return JSON.stringify(buildDiff(entityType, entityName, existing, proposed))
         }
         case 'get_zone': {
@@ -488,10 +487,10 @@ interface ProposedBuff {
 export function buildDiff(
     entityType: string,
     entityName: string,
-    existing: BuffSetRowLike[],
+    existing: ExistingBuffRow[],
     proposed: ProposedBuff[]
 ): unknown {
-    const existingKeyed = new Map(existing.map((r) => [r.buff_name, r]))
+    const existingKeyed = new Map(existing.map((r) => [r.buffName, r]))
     const proposedKeyed = new Map<string, ProposedBuff>()
     for (const p of proposed) {
         const name = p.buffName?.trim()
@@ -499,8 +498,8 @@ export function buildDiff(
     }
 
     const toAdd: ProposedBuff[] = []
-    const toModify: Array<{ buffName: string; old: BuffSetRowLike; next: ProposedBuff }> = []
-    const duplicates: Array<{ buffName: string; existing: BuffSetRowLike }> = []
+    const toModify: Array<{ buffName: string; old: ExistingBuffRow; next: ProposedBuff }> = []
+    const duplicates: Array<{ buffName: string; existing: ExistingBuffRow }> = []
     const unchanged: string[] = []
 
     for (const [name, p] of proposedKeyed) {
@@ -517,7 +516,7 @@ export function buildDiff(
         }
     }
 
-    const toRemove: BuffSetRowLike[] = existing.filter((r) => !proposedKeyed.has(r.buff_name))
+    const toRemove: ExistingBuffRow[] = existing.filter((r) => !proposedKeyed.has(r.buffName))
 
     return {
         entityType,
@@ -534,12 +533,12 @@ export function buildDiff(
         toAdd,
         toModify: toModify.map((m) => ({ buffName: m.buffName, old: m.old, next: m.next })),
         duplicates,
-        toRemove: toRemove.map((r) => r.buff_name),
+        toRemove: toRemove.map((r) => r.buffName),
         unchanged
     }
 }
 
-function sameBuff(existing: BuffSetRowLike, p: ProposedBuff): boolean {
+function sameBuff(existing: ExistingBuffRow, p: ProposedBuff): boolean {
     if (existing.scope !== p.scope) return false
     if (!!existing.exclusive !== !!p.exclusive) return false
     const normCond = (c: unknown): string => {
@@ -557,7 +556,7 @@ function sameBuff(existing: BuffSetRowLike, p: ProposedBuff): boolean {
         return parts.join('|')
     }
     if (normCond(existing.condition) !== normCond(p.condition)) return false
-    const eZones = existing.buff_set ?? []
+    const eZones = existing.zones ?? []
     const pZones = p.zones ?? []
     if (eZones.length !== pZones.length) return false
     const key = (z: { zoneId?: string; value?: number; override?: boolean }) =>

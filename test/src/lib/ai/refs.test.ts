@@ -1,7 +1,7 @@
 // 「序号寻址」回归：AI 工具对外只用序号，不暴露内部 id。
 //
 // 三条约定（见 refs.ts）：
-// 1. 顺序即序号：操作块/参考线/伤害条目按时间先后编号，Buff 集按库内顺序；
+// 1. 顺序即序号：操作块/参考线/伤害条目按时间先后编号，工程 Buff 配置按工程配置顺序；
 // 2. 入参兼容原始 id（旧消息里的 id 不会失效），但摘要只输出序号；
 // 3. 定位失败报错要精准：给出总数与可选清单，模型能自我纠正。
 import { describe, it } from 'node:test'
@@ -11,7 +11,7 @@ import {
     asIndex,
     damageEntriesInOrder,
     opBlocksInOrder,
-    resolveBuffSet,
+    resolveBuffConf,
     resolveDamageEntry,
     resolveOpBlock,
     resolveRefLine
@@ -102,14 +102,14 @@ describe('序号解析：顺序即序号', () => {
         assert.equal(asIndex(0), null, '序号从 1 起')
     })
 
-    it('Buff 集序号 = 库内顺序', () => {
+    it('工程 Buff 配置序号 = 工程配置顺序', () => {
         setup()
         createBuffSet('甲套装')
         createBuffSet('乙武器')
         const names = getAllBuffSets().map((b) => b.name)
         assert.deepEqual(names, ['甲套装', '乙武器'])
-        assert.equal(resolveBuffSet(1).name, '甲套装')
-        assert.equal(resolveBuffSet(2).name, '乙武器')
+        assert.equal(resolveBuffConf(1).name, '甲套装')
+        assert.equal(resolveBuffConf(2).name, '乙武器')
     })
 
     it('伤害条目按时间轴先后编号', () => {
@@ -142,6 +142,6 @@ describe('序号解析：报错要精准', () => {
     it('空参数给出用法提示', () => {
         setup()
         assert.throws(() => resolveOpBlock(undefined), /缺少操作块序号（先用 get_timeline_summary 查看时间线）/)
-        assert.throws(() => resolveBuffSet(''), /缺少Buff 集序号（先用 get_buff_sets 查看清单）/)
+        assert.throws(() => resolveBuffConf(''), /缺少工程 Buff 配置序号（先用 get_buff_confs 查看清单）/)
     })
 })

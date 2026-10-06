@@ -78,17 +78,17 @@
     let showRefLookup = $state(false)
     let showImport = $state(false)
 
-    /** @desc 挂载时注册 AI 面板「导入 Buff 集」与拖拽禁区回调（进入 AI 悬浮窗时取消拖拽） */
+    /** @desc 挂载时注册 AI 面板「从 Buff 集导入工程 Buff 配置」与拖拽禁区回调（进入 AI 悬浮窗时取消拖拽） */
     onMount(() => {
         registerPanel(
-            'buff-import',
+            'buff-conf-import',
             '导入 Buff 集',
             () => showImport,
             (v) => (showImport = v)
         )
         unregisterDragCancel = registerDragCancel(cancelBuffDrag)
         return () => {
-            unregisterPanel('buff-import')
+            unregisterPanel('buff-conf-import')
             unregisterDragCancel?.()
         }
     })

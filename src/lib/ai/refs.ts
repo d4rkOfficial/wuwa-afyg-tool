@@ -6,15 +6,15 @@
  * 阶段摘要本来就是按时间顺序渲染的，所以「第 N 个」既稳定又直观。
  *
  * 三条约定（工具与摘要共用，避免两处口径漂移）：
- * 1. **顺序即序号**：操作块/参考线/伤害条目一律**按时间（pos）先后**编号，Buff 集按库内顺序；
+ * 1. **顺序即序号**：操作块/参考线/伤害条目一律**按时间（pos）先后**编号，工程 Buff 配置按工程配置顺序；
  * 2. **入参兼容 id**：解析器接受序号（数字或纯数字字符串）或原始 id —— 旧消息里的 id 不会突然失效，
  *    但摘要**只输出序号**；
  * 3. **报错要精准**：定位失败时给出总数、可用的序号区间与一份紧凑清单，模型可直接自我纠正。
  */
 import { getOpBlocks, getRefLines, getTeam } from '$lib/calc/timeline.store.svelte'
-import { getAllBuffSets, getAllDamageEntries } from '$lib/calc/calculation.store.svelte'
+import { getAllBuffSets as getAllBuffConfs, getAllDamageEntries } from '$lib/calc/calculation.store.svelte'
 import type { OpBlock, RefLine } from '$lib/calc/timeline.types'
-import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffSet as BuffConf, DamageEntry } from '$lib/calc/calculation.types'
 
 /**
  * @desc 工具入参里的位置引用：**序号**（数字或纯数字字符串，1 起）或原始 id。
@@ -80,8 +80,8 @@ export const damageEntriesInOrder = (): DamageEntry[] => {
         .map((x) => x.entry)
 }
 
-/** @desc Buff 集序号 = 库内顺序（与 buff 列表一致） */
-export const buffSetsInOrder = (): BuffSet[] => getAllBuffSets()
+/** @desc 工程 Buff 配置序号 = 工程配置顺序（与 buff 列表一致） */
+export const buffConfsInOrder = (): BuffConf[] => getAllBuffConfs()
 
 /** @desc 时间轴来源（操作块 / 参考线 id）→ 像素位置 */
 export const timelinePosMap = (): Map<string, number> => {
@@ -122,12 +122,12 @@ export const resolveDamageEntry = (ref: PositionRef): DamageEntry =>
         '先用 get_damage_entries 查看拉表'
     )
 
-export const resolveBuffSet = (ref: PositionRef): BuffSet =>
+export const resolveBuffConf = (ref: PositionRef): BuffConf =>
     locate(
-        'Buff 集',
+        '工程 Buff 配置',
         ref,
-        buffSetsInOrder(),
+        buffConfsInOrder(),
         (b) => b.id,
         (b) => b.name,
-        '先用 get_buff_sets 查看清单'
+        '先用 get_buff_confs 查看清单'
     )

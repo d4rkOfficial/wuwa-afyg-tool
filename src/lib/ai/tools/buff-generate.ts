@@ -1,14 +1,19 @@
-// AI 生成工具：本地库实体生成 + 当前工程队伍生成（复用 share 生成流程；命名规则 / 黑话词典取自内置技能卡）
+// AI 生成工具：Buff 集实体生成 + 当前工程队伍生成（复用 share 生成流程；命名规则 / 黑话词典取自内置技能卡）
 import { defineTool } from './registry'
 import { getActiveProject } from '$lib/data/project.svelte'
-import { getBuffEntities, updateEntityBuffs, ENTITY_TYPES, loadBuffLibrary } from '$lib/data/buff-library.svelte'
+import {
+    getBuffEntities,
+    updateEntityBuffs,
+    ENTITY_TYPES,
+    loadBuffLibrary as loadBuffSet
+} from '$lib/data/buff-library.svelte'
 import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$lib/api/data-cache'
 import { importBuffSetsWithDecisions } from '$lib/calc/calculation.store.svelte'
 import type { ImportBuffInput } from '$lib/calc/calculation.store.svelte'
-import { generateBuffSet } from '../generate'
+import { generateBuffs } from '../generate'
 import { getEnabledSkillBody, loadSkills, SKILL_IDS, updateSkill } from '$lib/data/ai-skills.svelte'
 import {
-    createLibraryDataSource,
+    createBuffSetDataSource,
     createProjectDataSource,
     type GenerateEntityType,
     type GeneratedBuff
@@ -113,7 +118,7 @@ defineTool('get_entity_info', {
         const entityName = str(args.entityName)
         if (!ENTITY_TYPES.includes(entityType as never)) throw new Error(`无效实体类型：${entityType}`)
         if (!entityName) throw new Error('实体名不能为空')
-        const info = await createLibraryDataSource().getEntityInfo(entityType as GenerateEntityType, entityName)
+        const info = await createBuffSetDataSource().getEntityInfo(entityType as GenerateEntityType, entityName)
         if (info === null)
             throw new Error(`未找到「${entityName}」的信息，请先用 list_entities / search_entities 确认名称`)
         return info
@@ -149,9 +154,9 @@ defineTool('set_naming_rule', {
     }
 })
 
-defineTool('generate_entity_buffs', {
+defineTool('generate_buff_set_entity_buffs', {
     description:
-        '为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 集并写入本地集（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。',
+        '为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 并写入主页的本地 Buff 集；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。',
     dangerous: true,
     parameters: {
         type: 'object',
@@ -170,22 +175,20 @@ defineTool('generate_entity_buffs', {
         const entityName = str(args.entityName)
         if (!ENTITY_TYPES.includes(entityType as never)) throw new Error(`无效实体类型：${entityType}`)
         if (!entityName) throw new Error('实体名不能为空')
-        await loadBuffLibrary()
+        await loadBuffSet()
         const entity = getBuffEntities().find((e) => e.entityType === entityType && e.entityName === entityName)
         if (!entity)
-            throw new Error(
-                `本地 Buff 集中未找到「${entityName}」（可先 sync_buff_library_from_share 或让用户手动导入）`
-            )
+            throw new Error(`本地 Buff 集中未找到「${entityName}」（可先 sync_buff_set_from_share 或让用户手动导入）`)
         const { rule, missing } = await resolveNamingRule(str(args.namingRule))
         if (missing) throw new Error(NEEDS_RULE_MSG)
 
-        const result = await generateBuffSet({
+        const result = await generateBuffs({
             ...aiRuntime(),
             entityType,
             entityName,
             namingRule: rule,
             slangDict: getEnabledSkillBody(SKILL_IDS.slangDict),
-            data: createLibraryDataSource(),
+            data: createBuffSetDataSource(),
             onProgress: (t) => ctx.onGenerateProgress?.(t)
         })
         if (!result.buffs) throw new Error(`生成失败：${result.parseError ?? '未知错误'}`)
@@ -200,9 +203,9 @@ defineTool('generate_entity_buffs', {
     }
 })
 
-defineTool('generate_project_buffs', {
+defineTool('generate_project_buff_confs', {
     description:
-        '为当前工程队伍中的实体（角色/武器/首位声骸/触发套装）逐个生成 Buff 集并导入当前工程拉表（含归属绑定）。该工具会自动查询各实体官方详情并提取 Buff，无需先调用其它查询工具。默认遍历全队，可用 slot（1-3）或 entityType 过滤。生成前若未定义命名规则会先询问用户。',
+        '为当前工程队伍中的实体（角色/武器/首位声骸/触发套装）逐个生成工程 Buff 配置并导入当前工程拉表（含归属绑定）。该工具会自动查询各实体官方详情并提取 Buff，无需先调用其它查询工具。默认遍历全队，可用 slot（1-3）或 entityType 过滤。生成前若未定义命名规则会先询问用户。',
     dangerous: true,
     parameters: {
         type: 'object',
@@ -252,7 +255,7 @@ defineTool('generate_project_buffs', {
         for (let i = 0; i < entities.length; i++) {
             const e = entities[i]
             ctx.onGenerateProgress?.(`正在生成（${i + 1}/${entities.length}）：${e.entityName}`)
-            const result = await generateBuffSet({
+            const result = await generateBuffs({
                 ...cfg,
                 entityType: e.entityType,
                 entityName: e.entityName,

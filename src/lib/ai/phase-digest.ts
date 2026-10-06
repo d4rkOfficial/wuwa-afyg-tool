@@ -8,7 +8,7 @@
  * - 排轴：按 `pos` 把操作块 / 参考线 / 绑定的伤害串成**一条时间线**；倍率**默认不展开**
  *   （属于「按需查询」的大头，用 `get_timeline_damage_list` 单独查）。
  * - 拉表：按条目在时间轴上的顺序逐条列出（归属 / 属性 / 类型 / 已绑 Buff 名）；
- *   乘区数值与引用明细按需另查（`get_buff_set_detail` / `get_damage_entry_buff_sources`）。
+ *   乘区数值与引用明细按需另查（`get_buff_conf_detail` / `get_damage_entry_buff_sources`）。
  *
  * 工具侧只负责取数，措辞与排版集中在这里，避免同一阶段在不同工具里两种口径。
  */
@@ -188,7 +188,7 @@ const entryKind = (e: DamageEntry): string => {
 
 /**
  * @desc 渲染拉表：按条目在时间轴上的顺序逐条给出「**序号** / 归属 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。
- * 不列倍率、不列乘区数值 —— 前者用 `get_timeline_damage_list`，后者用 `get_buff_set_detail`
+ * 不列倍率、不列乘区数值 —— 前者用 `get_timeline_damage_list`，后者用 `get_buff_conf_detail`
  * 与 `get_damage_entry_buff_sources` 按需查；序号与 `$lib/ai/refs` 的 `resolveDamageEntry` 同源。
  */
 export const renderCalculationDigest = (input: CalculationDigestInput): string => {
@@ -197,7 +197,7 @@ export const renderCalculationDigest = (input: CalculationDigestInput): string =
     rows.sort((a, b) => (a.pos ?? Number.POSITIVE_INFINITY) - (b.pos ?? Number.POSITIVE_INFINITY) || a.order - b.order)
     const header =
         `拉表（${rows.length} 条伤害条目，按时间轴顺序，行首就是**序号**，工具参数填这个数字）；` +
-        `乘区明细与引用用 get_buff_set_detail / get_damage_entry_buff_sources 按需查`
+        `乘区明细与引用用 get_buff_conf_detail / get_damage_entry_buff_sources 按需查`
     if (rows.length === 0) return `${header}\n（还没有任何伤害条目：先到排轴绑定伤害）`
     const lines = rows.map(({ entry, pos }, i) => {
         const kind = entryKind(entry)
@@ -215,9 +215,9 @@ export const renderCalculationDigest = (input: CalculationDigestInput): string =
     return [header, ...lines].join('\n')
 }
 
-// ── Buff 集清单 ──
+// ── 工程 Buff 配置清单 ──
 
-export interface BuffSetDigestItem {
+export interface BuffConfDigestItem {
     name: string
     scope: 'all' | number[]
     global: boolean
@@ -232,12 +232,12 @@ const scopeLabel = (scope: 'all' | number[]): string => {
     return `角色${scope.map((i) => i + 1).join('/')}`
 }
 
-/** @desc 渲染 Buff 集清单：一行一条，行首是**序号**（不展开乘区，乘区明细用 get_buff_set_detail） */
-export const renderBuffSetList = (items: readonly BuffSetDigestItem[]): string => {
+/** @desc 渲染 工程 Buff 配置清单：一行一条，行首是**序号**（不展开乘区，乘区明细用 get_buff_conf_detail） */
+export const renderBuffConfList = (items: readonly BuffConfDigestItem[]): string => {
     const header =
-        `Buff 集清单（${items.length} 条，行首就是**序号**，工具参数填这个数字）；` +
-        `乘区明细用 get_buff_set_detail，绑定关系见 get_damage_entries`
-    if (items.length === 0) return `${header}\n（还没有任何 Buff 集）`
+        `工程 Buff 配置清单（${items.length} 条，行首就是**序号**，工具参数填这个数字）；` +
+        `乘区明细用 get_buff_conf_detail，绑定关系见 get_damage_entries`
+    if (items.length === 0) return `${header}\n（还没有任何 工程 Buff 配置）`
     const lines = items.map((b, i) => {
         const tags = [b.global ? '全局' : '', b.starred ? '★' : ''].filter(Boolean)
         return (

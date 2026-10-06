@@ -15,12 +15,15 @@ const GROUP_RULES: { label: string; test: RegExp }[] = [
     { label: '库街区 · 词条集同步', test: /_kuro_|^kuro_|^check_kuro_login$|^refresh_kuro_echo_data$|_from_kuro$/ },
     { label: '词条集（方案）', test: /_substat_plan/ },
     { label: 'Buff 生成', test: /^generate_|_naming_rule$|^get_entity_info$|^list_entities$|^search_entities$/ },
-    { label: 'Buff 集（实体词条）', test: /buff_library|_entity_buffs|_buff_entit/ },
     {
-        label: '计算 · Buff 集与条件',
-        test: /buff_set|_buff_zone|^bind_buff|^unbind_buff|^import_entity_buffs|condition|^toggle_damage_type$|^set_entry_damage_types$/
+        label: 'Buff 集（主页实体）',
+        test: /^sync_buff_set|^clear_buff_set|^get_buff_set_summary$|^list_buff_set_entities$|^get_buff_set_entity|^update_buff_set_entity|^delete_buff_set_entity/
     },
-    { label: '计算 · 条目与档位', test: /^set_chain$|^set_refinement$|^get_damage_entries$|^set_buff_scope$/ },
+    {
+        label: '计算 · 工程 Buff 配置与条件',
+        test: /buff_conf|^import_buff_set_entity_to_project$|condition|^toggle_damage_type$|^set_entry_damage_types$/
+    },
+    { label: '计算 · 条目与档位', test: /^set_chain$|^set_refinement$|^get_damage_entries$|^set_buff_conf_scope$/ },
     { label: '配队', test: /^team|_team|member|recommended_weapon/ },
     {
         label: '时间轴',
