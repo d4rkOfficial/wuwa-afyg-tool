@@ -1,7 +1,7 @@
 // 共鸣链 / 武器精炼对比：团队级资格判定（扁平，不按 conditionRefCharIdx 归属去重）。
 // 「生效（挂载）」= buff id ∈ 全局绑定 或 任一伤害条目绑定（见 calculation.store）。
 // 队友的条件 buff 即便 refIdx 指向他人，也可能通过 scope 影响本角色，故可设值取全队并集。
-import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
 
 /** @desc 链/阶对比与数据分析弹窗共用的直伤类型色板（7 色循环，保证同组内不重复） */
 export const COMPARISON_PALETTE = ['#6363f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#a855f7', '#ec4899']
@@ -18,7 +18,7 @@ export interface ComparisonEligibility {
 
 /** @desc 团队级对比资格：有挂载的链条件 buff 且有挂载的阶条件 buff 才支持对比 */
 export function getComparisonEligibility(
-    buffSets: BuffSet[],
+    buffSets: BuffConf[],
     globalBuffSetIds: string[],
     entries: DamageEntry[],
     entryBindings: Record<string, string[]>

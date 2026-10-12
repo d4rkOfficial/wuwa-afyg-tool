@@ -5,18 +5,18 @@ import {
     fetchBuffSetsFromShare,
     updateEntityBuffs,
     deleteBuffEntity,
-    clearBuffLibrary,
+    clearBuffLibrary as clearBuffSet,
     ENTITY_TYPES,
-    type BuffLibraryScope
+    type BuffLibraryScope as BuffSetScope
 } from '$lib/data/buff-library.svelte'
 import { ZONE_NO_REF_IDS } from '$lib/calc/calculation.consts'
 
 const str = (v: unknown): string => String(v ?? '').trim()
-const SCOPES: BuffLibraryScope[] = ['self', 'self_except', 'team', 'effect_only']
+const SCOPES: BuffSetScope[] = ['self', 'self_except', 'team', 'effect_only']
 
-defineTool('sync_buff_library_from_share', {
+defineTool('sync_buff_set_from_share', {
     description:
-        '从工坊同步最新 Buff 集到本地集。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。',
+        '从工坊同步最新 Buff 集到主页的本地 Buff 集。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。',
     dangerous: true,
     parameters: { type: 'object', properties: {} },
     handler: async () => {
@@ -26,8 +26,9 @@ defineTool('sync_buff_library_from_share', {
     }
 })
 
-defineTool('list_buff_entities', {
-    description: '列出本地 Buff 集的实体（可按类型过滤）：实体名、类型、来源（share/custom）、Buff 数量。',
+defineTool('list_buff_set_entities', {
+    description:
+        '列出本地 Buff 集的实体（仅管理主页数据，不修改工程 Buff 配置；可按类型过滤）：实体名、类型、来源（share/custom）、Buff 数量。',
     parameters: {
         type: 'object',
         properties: { entityType: { type: 'string', description: '可选：character/weapon/echo/1set-5set' } },
@@ -47,13 +48,14 @@ defineTool('list_buff_entities', {
     }
 })
 
-defineTool('get_entity_buffs', {
-    description: '查看本地 Buff 集中指定实体的全部 Buff 详情（名称、作用范围、生效条件、乘区与数值、引用）。',
+defineTool('get_buff_set_entity_buffs', {
+    description:
+        '查看本地 Buff 集中指定实体的全部 Buff 详情（不读取工程 Buff 配置；名称、作用范围、生效条件、乘区与数值、引用）。',
     parameters: {
         type: 'object',
         properties: {
             entityType: { type: 'string', description: '实体类型：character/weapon/echo/1set-5set' },
-            entityName: { type: 'string', description: '实体名称（中文，用 list_entities 定位）' }
+            entityName: { type: 'string', description: '实体名称（中文，用 list_buff_set_entities 定位）' }
         },
         required: ['entityType', 'entityName']
     },
@@ -77,9 +79,9 @@ defineTool('get_entity_buffs', {
     }
 })
 
-defineTool('update_entity_buffs', {
+defineTool('update_buff_set_entity_buffs', {
     description:
-        '整体覆写本地 Buff 集中指定实体的 Buff 列表（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self|self_except|team|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。',
+        '整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self|self_except|team|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。',
     dangerous: true,
     parameters: {
         type: 'object',
@@ -102,7 +104,7 @@ defineTool('update_entity_buffs', {
             const b = (raw ?? {}) as Record<string, unknown>
             const buffName = str(b.buffName)
             if (!buffName) throw new Error('存在未命名的 Buff')
-            const scope = (b.scope as BuffLibraryScope) ?? 'team'
+            const scope = (b.scope as BuffSetScope) ?? 'team'
             if (!SCOPES.includes(scope)) throw new Error(`无效 scope：${String(b.scope)}`)
             const zones = (Array.isArray(b.zones) ? b.zones : []).map((zr) => {
                 const z = (zr ?? {}) as Record<string, unknown>
@@ -132,7 +134,7 @@ defineTool('update_entity_buffs', {
     }
 })
 
-defineTool('delete_buff_entity', {
+defineTool('delete_buff_set_entity', {
     description: '从本地 Buff 集删除指定实体（不可恢复）。',
     dangerous: true,
     parameters: {
@@ -151,12 +153,12 @@ defineTool('delete_buff_entity', {
     }
 })
 
-defineTool('clear_buff_library', {
+defineTool('clear_buff_set', {
     description: '清空整个本地 Buff 集（所有实体与 Buff，不可恢复）。',
     dangerous: true,
     parameters: { type: 'object', properties: {} },
     handler: () => {
-        clearBuffLibrary()
+        clearBuffSet()
         return { cleared: true }
     }
 })

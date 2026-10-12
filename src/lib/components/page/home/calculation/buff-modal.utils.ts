@@ -6,9 +6,9 @@
  * 纯函数住同目录 `*.utils.ts`，落进 ESLint 的「纯逻辑层」享受函数式约束。
  */
 import { ZONE_REF_DEFS, ZONE_REF_MAP, ZONE_MAP, classifyBuffScope, groupBuffSets } from '$lib/calc/calculation.consts'
-import type { GroupedBuffSetItem, ZoneId } from '$lib/calc/calculation.consts'
+import type { GroupedBuffConfItem, ZoneId } from '$lib/calc/calculation.consts'
 import type { BuffTreeNode } from '$lib/calc/buff-tree'
-import type { BuffCondition, BuffSet, ZoneRef } from '$lib/calc/calculation.types'
+import type { BuffCondition, BuffConf, ZoneRef } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 import { mergeClass } from '$lib/utils/component-style'
 
@@ -135,7 +135,7 @@ export const refineMinOf = (cond: BuffCondition | undefined): number | undefined
     cond?.refinements?.[0]?.min ?? cond?.refinement
 
 /** @desc 生效条件摘要文案（仅链/阶：它们是整个 BUFF 的硬性条件；属性/类型挂在乘区上） */
-export const conditionSummaryOf = (bs: BuffSet | null | undefined, team: readonly CharSlot[]): string => {
+export const conditionSummaryOf = (bs: BuffConf | null | undefined, team: readonly CharSlot[]): string => {
     const cond = bs?.condition
     if (!cond) return ''
     const refIdx = bs?.conditionRefCharIdx ?? 0
@@ -237,7 +237,7 @@ export const buffItemIconClass = (starred: boolean | undefined, draggable = fals
  * `elementColor` 由调用方注入（它是 store 能力，不进本模块）。
  */
 export const scopeBadgesOf = (
-    bs: BuffSet,
+    bs: BuffConf,
     team: readonly CharSlot[],
     elementColor: (name: string) => string
 ): { key: string; label: string; style: string }[] => {
@@ -276,7 +276,7 @@ export const scopeBadgesOf = (
  * 「全局 Buff」目录还要并入二级子目录的成员，否则批量操作会漏掉它们；
  * 二级子目录自身的数字子目录（`children`）也一并并入）
  */
-export const folderMembersOf = (folder: GroupedBuffSetItem): BuffSet[] => [
+export const folderMembersOf = (folder: GroupedBuffConfItem): BuffConf[] => [
     ...(folder.children ?? []),
     ...((folder as BuffTreeNode).gateChildren ?? []).flatMap((gate) => folderMembersOf(gate))
 ]
@@ -286,22 +286,22 @@ export const folderMembersOf = (folder: GroupedBuffSetItem): BuffSet[] => [
  * 数字目录只会出现在 `children` 里（界面就地派生，不是独立节点），
  * 而二级目录走 `gateChildren`，所以这里按节点递归即可覆盖全部层级。
  */
-export const folderHasStar = (folder: GroupedBuffSetItem): boolean =>
+export const folderHasStar = (folder: GroupedBuffConfItem): boolean =>
     (folder.children ?? []).some((c) => c.starred) ||
     ((folder as BuffTreeNode).gateChildren ?? []).some((g) => folderHasStar(g))
 
 /** @desc 普通目录图标配色：内部有收藏条目才标黄，否则灰色（特殊图标目录——链/武器头像——不受影响） */
-export const folderIconClass = (folder: GroupedBuffSetItem, base: string): string =>
+export const folderIconClass = (folder: GroupedBuffConfItem, base: string): string =>
     folderHasStar(folder) ? `${base} text-amber-400` : `${base} opacity-60`
 
 /** @desc 非全局容器（角色链 / 武器目录）下未被数字归并的散条目（数字目录由 foldersOf 分支渲染） */
-export const looseChildrenOf = (children: BuffSet[] | undefined): BuffSet[] =>
+export const looseChildrenOf = (children: BuffConf[] | undefined): BuffConf[] =>
     groupBuffSets(children ?? [])
         .filter((x) => x.type !== 'folder')
         .map((x) => x.buffSet!)
 
 /** @desc 非全局容器下的数字目录（含成员），恒排在散条目前面 */
-export const foldersOf = (children: BuffSet[] | undefined): GroupedBuffSetItem[] =>
+export const foldersOf = (children: BuffConf[] | undefined): GroupedBuffConfItem[] =>
     groupBuffSets(children ?? []).filter((x) => x.type === 'folder')
 
 /** @desc 数字目录（三级）的折叠 key：按所属容器分区，避免不同容器下的同名目录互相影响 */
@@ -341,7 +341,7 @@ export const allSelectedIn = (set: ReadonlySet<string>, ids: readonly string[]):
  * 返回 null 表示无需重排（可排序的已选少于 2 条）。
  */
 export const sortedSelectionOrder = (
-    buffSets: readonly BuffSet[],
+    buffSets: readonly BuffConf[],
     selected: ReadonlySet<string>,
     globalIds: readonly string[],
     compareNatural: (a: string, b: string) => number

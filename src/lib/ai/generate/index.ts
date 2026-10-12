@@ -1,4 +1,4 @@
-// Buff 集生成主循环（移植自 wuwa-afyg-share src/lib/ai/generate.ts）：工具轮询 → JSON 解析 → 清洗 → 自动修复
+// Buff 生成主循环（移植自 wuwa-afyg-share src/lib/ai/generate.ts）：工具轮询 → JSON 解析 → 清洗 → 自动修复
 import { chatCompletionStream, type ChatMessage } from '../client'
 import {
     executeGenerateTool,
@@ -19,7 +19,7 @@ import { sanitizeBuffs } from './sanitize'
 export const MAX_TOOL_ROUNDS = 8
 export const MAX_FIX_RETRY = 2
 
-export interface GenerateBuffSetOptions {
+export interface GenerateBuffOptions {
     apiKey: string
     entityType: string
     entityName: string
@@ -40,13 +40,13 @@ export interface GenerateBuffSetOptions {
     onProgress?: (text: string) => void
 }
 
-export interface GenerateBuffSetResult {
+export interface GenerateBuffResult {
     buffs: GeneratedBuff[] | null
     rawContent: string
     parseError: string | null
 }
 
-export async function generateBuffSet(options: GenerateBuffSetOptions): Promise<GenerateBuffSetResult> {
+export const generateBuffs = async (options: GenerateBuffOptions): Promise<GenerateBuffResult> => {
     const apiKey = options.apiKey.trim()
     const entityType = options.entityType
     const entityName = options.entityName.trim().slice(0, 60)
@@ -71,7 +71,8 @@ export async function generateBuffSet(options: GenerateBuffSetOptions): Promise<
 
     progress(`开始生成：${entityName}`)
 
-    const systemContent = renderSystemPrompt(systemTemplate, { entityType, namingRule })
+    const targetLabel = data.target === 'project' ? '工程 Buff 配置' : '主页 Buff 集'
+    const systemContent = `${renderSystemPrompt(systemTemplate, { entityType, namingRule })}\n当前生成目标：${targetLabel}。`
     const messages: ChatMessage[] = [{ role: 'system', content: systemContent }]
     const initialUser = renderInitialTaskPrompt(initialTaskTemplate, { entityType, entityName })
     messages.push({ role: 'user', content: initialUser })

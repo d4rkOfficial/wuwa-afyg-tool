@@ -14,7 +14,7 @@
 import { buffContributesToEntry, resolveDamageTypes, type ConditionProfile } from '$lib/calc/compute'
 import { inferDamageTypes } from '$lib/calc/utils'
 import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP, zoneAppliesToCoeffEntry } from '$lib/calc/calculation.consts'
-import type { BuffSet, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffConf, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
 /** @desc 直伤判定的最小入参（两个表的入参都是 `DamageEntry`，此处放宽便于共用） */
@@ -107,7 +107,7 @@ export const paneSourceText = (charName: string, zoneLabels: readonly string[], 
  * @desc Buff 作用域是否覆盖本条：效应伤害只吃「全队」或「效应专属（空数组）」；
  * 其余条目要求作用域指向本条目所属角色（charIdx < 0 → 不覆盖）。
  */
-export const buffScopeOk = (bs: BuffSet, isEffect: boolean | undefined, charIdx: number): boolean => {
+export const buffScopeOk = (bs: BuffConf, isEffect: boolean | undefined, charIdx: number): boolean => {
     if (isEffect) return bs.scope === 'all' || (Array.isArray(bs.scope) && bs.scope.length === 0)
     return charIdx >= 0 && (bs.scope === 'all' || (bs.scope as number[]).includes(charIdx))
 }
@@ -161,7 +161,7 @@ export const zoneUsableByNonDirect = (zone: BuffZoneValue, entry: DamageEntry): 
 }
 
 /** @desc 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff） */
-export const buffRelevantForNonDirect = (bs: BuffSet, entry: DamageEntry): boolean =>
+export const buffRelevantForNonDirect = (bs: BuffConf, entry: DamageEntry): boolean =>
     bs.zones.some((z) => zoneUsableByNonDirect(z, entry))
 
 /**
@@ -172,7 +172,7 @@ export const buffRelevantForNonDirect = (bs: BuffSet, entry: DamageEntry): boole
  * 影响源（改写被引用角色面板的 buff）不走本判据：它们改的是**别人的面板**，与本条自己吃不吃双暴无关，
  * 由调用方单独放行（铺开表的 `|| pane`、下拉表的影响源分支都排在它前面）。
  */
-export const buffUsableByEntry = (bs: BuffSet, entry: DamageEntry): boolean =>
+export const buffUsableByEntry = (bs: BuffConf, entry: DamageEntry): boolean =>
     isDirectDamage(entry) || buffRelevantForNonDirect(bs, entry)
 
 /**
@@ -188,7 +188,7 @@ export const buffUsableByEntry = (bs: BuffSet, entry: DamageEntry): boolean =>
  * `buildDamageTypesByEntry` 提供（效应 → `效应伤害`；处决/响应 → 推断类型）。
  */
 export const buffMatchesEntry = (
-    bs: BuffSet | undefined,
+    bs: BuffConf | undefined,
     entry: DamageEntry,
     ctx: {
         hideConditionMismatch: boolean

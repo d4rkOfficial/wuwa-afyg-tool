@@ -18,7 +18,7 @@
     import { slide } from 'svelte/transition'
     import type { ComponentsProps } from '$lib/types'
     import type { CharSlot } from '$lib/types/project'
-    import type { BuffCondition, BuffSet, BuffZoneValue } from '$lib/calc/calculation.types'
+    import type { BuffCondition, BuffConf, BuffZoneValue } from '$lib/calc/calculation.types'
     import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
     import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import { fallbackIcon } from '$lib/utils/icons'
@@ -29,7 +29,7 @@
 
     interface Props extends ComponentsProps {
         /** @desc 当前选中的 Buff 块（父组件已判定非 null 才挂载本组件） */
-        buff: BuffSet
+        buff: BuffConf
         team: [CharSlot, CharSlot, CharSlot]
         /** @desc 队伍槽位角色名（引用前缀用） */
         teamNames: string[]

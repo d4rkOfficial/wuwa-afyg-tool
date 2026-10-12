@@ -7,7 +7,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { buildEntityImportItems, detectImportConflicts } from '$lib/calc/buff-import-utils'
-import { getAllBuffSets, importBuffSetsWithDecisions, mapImportedScope } from '$lib/calc/calculation.store.svelte'
+import { getAllBuffConfs, importBuffSetsWithDecisions, mapImportedScope } from '$lib/calc/calculation.store.svelte'
 import { classifyBuffScope } from '$lib/calc/calculation.consts'
 import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
 import type { CharSlot } from '$lib/types/project'
@@ -98,7 +98,7 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
         const report = importBuffSetsWithDecisions(deduped, {}, -1, TEAM.length)
 
         assert.equal(report.added, 2, '两个主人都应写入')
-        const written = getAllBuffSets().filter((s) => s.name === '首位声骸效果E2E')
+        const written = getAllBuffConfs().filter((s) => s.name === '首位声骸效果E2E')
         assert.equal(written.length, 2, '库中应有两条同名但归属不同的 buff')
         assert.deepEqual(
             written.map((s) => s.scope),
@@ -132,7 +132,7 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
         const { deduped } = detectImportConflicts(items, [])
         importBuffSetsWithDecisions(deduped, {}, -1, TEAM.length)
 
-        const written = getAllBuffSets().filter((s) => s.name === '效应专属加深E2E')
+        const written = getAllBuffConfs().filter((s) => s.name === '效应专属加深E2E')
         assert.equal(written.length, 1)
         assert.deepEqual(written[0].scope, [], '导入后必须仍是「效应专属」（scope 空数组）')
         assert.equal(classifyBuffScope(written[0].scope).kind, 'effect', '徽标也应显示「效应专属」')

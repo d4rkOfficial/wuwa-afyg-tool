@@ -126,5 +126,5 @@ export interface CalcState {
     damageEntryDamageTypes: Record<string, string[]>
 }
 
-/** @desc 兼容别名：Buff 块 == Buff 类实例 */
-export type BuffSet = BuffInstance
+/** @desc 工程 Buff 配置：使用统一 Buff 实例结构，与主页 Buff 集区分命名 */
+export type BuffConf = BuffInstance

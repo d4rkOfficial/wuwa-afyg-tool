@@ -21,9 +21,9 @@
     import { slide } from 'svelte/transition'
     import type { ComponentsProps } from '$lib/types'
     import type { CharSlot } from '$lib/types/project'
-    import type { BuffSet } from '$lib/calc/calculation.types'
+    import type { BuffConf } from '$lib/calc/calculation.types'
     import type { BuffTreeNode } from '$lib/calc/buff-tree'
-    import type { GroupedBuffSetItem } from '$lib/calc/calculation.consts'
+    import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
     import type { BuffDerived, BuffListContext, BuffTree } from './buff-modal.types'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { registerDragCancel } from '$lib/utils/drag-guard'
@@ -71,11 +71,11 @@
         /** @desc 多选态切换单个条目勾选 */
         ontogglemultiid: (id: string) => void
         /** @desc 多选态切换整个目录勾选 */
-        ontogglemultifolder: (members: BuffSet[]) => void
+        ontogglemultifolder: (members: BuffConf[]) => void
         /** @desc 折叠 / 展开目录 */
         ontogglefolder: (key: string) => void
         /** @desc 打开文件夹右键菜单 */
-        onfoldermenu: (e: MouseEvent, folder: GroupedBuffSetItem) => void
+        onfoldermenu: (e: MouseEvent, folder: GroupedBuffConfItem) => void
         /** @desc 打开条目右键菜单 */
         onitemmenu: (e: MouseEvent, id: string) => void
         /** @desc 拖拽把手落下的瞬间（父组件负责指针捕获、收起目录、装配拖拽状态） */
@@ -155,7 +155,7 @@
     const isDisabled = (id: string): boolean => id.startsWith('global-')
 
     /** @desc 某目录是否全选（不可勾选的子项跳过） */
-    const folderAllSelected = (children: BuffSet[]): boolean => {
+    const folderAllSelected = (children: BuffConf[]): boolean => {
         const ids = children.map((c) => c.id).filter((id) => !isDisabled(id))
         return ids.length > 0 && ids.every((id) => multiSelectedIds.has(id))
     }
@@ -515,7 +515,7 @@
 {/snippet}
 
 <!-- @desc 条目作用域徽标（名称右侧）：全队=主题色实心 / 效应专属=主题色空心 / 指定角色=角色属性色空心+半透明底 -->
-{#snippet scopeBadges(bs: BuffSet)}
+{#snippet scopeBadges(bs: BuffConf)}
     {#each scopeBadgesOf(bs, team, derivedQueries.elementColor) as badge (badge.key)}
         <span
             class="shrink-0 whitespace-nowrap rounded-none border px-1 py-px text-[10px] leading-none tabular-nums"
@@ -525,7 +525,7 @@
     {/each}
 {/snippet}
 
-{#snippet buffRow(child: BuffSet, parentKey: string, rowPad: string)}
+{#snippet buffRow(child: BuffConf, parentKey: string, rowPad: string)}
     {@const draggable = !multiSelect && !derivedQueries.isGlobalBuff(child.id)}
     {@render dropLine(child.id, 'before', 'mx-1')}
     <button
@@ -572,13 +572,13 @@
 <!-- @desc 目录折叠时的子级行按钮。本 snippet 自身不带 `space-y-1`：展开态的行间距仍由调用点那层容器
      按**直接子级**给出（Tailwind space-y-* 只作用于直接子级），所以展开态 DOM 与整改前逐字一致。
      折叠用的 `{#if}` 一开一关即产生/销毁这些行，slide 过渡则挂在承载它们的容器上（180ms）。 -->
-{#snippet collapseFolderChildren(children: BuffSet[] | undefined, containerKey: string)}
+{#snippet collapseFolderChildren(children: BuffConf[] | undefined, containerKey: string)}
     {#each children ?? [] as child (child.id)}
         {@render buffRow(child, containerKey, 'px-3 py-1.5')}
     {/each}
 {/snippet}
 
-{#snippet buffContainer(children: BuffSet[] | undefined, containerKey: string)}
+{#snippet buffContainer(children: BuffConf[] | undefined, containerKey: string)}
     {#each foldersOf(children) as sub (sub.key)}
         {@const subKey = layeredKeyOf(containerKey, sub.prefix)}
         {@const subMembers = (sub.children ?? []).map((c) => c.id)}

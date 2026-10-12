@@ -5,7 +5,7 @@
  * 与 `spread-table.utils.ts` 同一分工：只搬「输入 → 输出」的纯计算，交互与 store 写入留在组件里；
  * store 侧能力（条件判定口径）由调用方以函数参数注入。
  */
-import type { BuffSet, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
 import type { PaneEffectSource } from '$lib/calc/pane-effects'
 import { LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
 import { buffScopeOk, buffUsableByEntry, isDirectDamage } from './damage-table.utils'
@@ -81,13 +81,13 @@ export const findPrevEffectEntry = (
  * 「追加型暴击率/暴击伤害」buff 在这些条目上不可勾（勾了也不参与计算），与铺开表同一口径。
  */
 export const visibleBuffSetsOf = (args: {
-    buffSets: readonly BuffSet[]
+    buffSets: readonly BuffConf[]
     globalBuffSetIds: readonly string[]
     entryPaneSources: Record<string, PaneEffectSource>
     selectedEntry: DamageEntry | null
     entryCharIdx: number
-    matches: (bs: BuffSet | undefined, entry: DamageEntry) => boolean
-}): BuffSet[] =>
+    matches: (bs: BuffConf | undefined, entry: DamageEntry) => boolean
+}): BuffConf[] =>
     args.buffSets.filter((b) => {
         if (args.globalBuffSetIds.includes(b.id)) return false
         if (args.entryPaneSources[b.id] !== undefined) {
@@ -107,8 +107,8 @@ export const buildEntryBuffDiff = (args: {
     damageEntries: readonly DamageEntry[]
     entryBuffSetIdMap: Record<string, string[]>
     globalBuffSetIds: readonly string[]
-    buffById: ReadonlyMap<string, BuffSet>
-    matches: (bs: BuffSet | undefined, entry: DamageEntry) => boolean
+    buffById: ReadonlyMap<string, BuffConf>
+    matches: (bs: BuffConf | undefined, entry: DamageEntry) => boolean
 }): Record<string, BuffDiffItem[]> => {
     const { damageEntries, entryBuffSetIdMap, globalBuffSetIds, buffById, matches } = args
     const result: Record<string, BuffDiffItem[]> = {}
