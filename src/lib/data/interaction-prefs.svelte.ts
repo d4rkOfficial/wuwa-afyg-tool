@@ -18,6 +18,17 @@ export const LOCK_WATERMARK_TEXT_MAX = 24
 /** @desc 弹窗关闭按钮位置 */
 export type ModalClosePosition = 'top-left' | 'top-right'
 
+/** @desc 弹窗关闭按钮位置的默认值（未持久化 / 持久化值非法时回落） */
+export const DEFAULT_MODAL_CLOSE_POSITION: ModalClosePosition = 'top-right'
+
+/**
+ * @desc 解析持久化的弹窗关闭按钮位置（纯函数，便于回归）：
+ * 只认 `top-left` / `top-right`，其余（null / 空串 / 历史脏值）一律回落默认。
+ * 本地存储里该值是**裸字符串**（写入口 `setModalClosePosition` 直接 `setItem`），不是 JSON。
+ */
+export const parseModalClosePosition = (raw: string | null): ModalClosePosition =>
+    raw === 'top-left' || raw === 'top-right' ? raw : DEFAULT_MODAL_CLOSE_POSITION
+
 /** @desc Toast 弹出位置；none = 不弹出 */
 export type ToastPosition =
     'top-right' | 'none' | 'top-left' | 'top-center' | 'bottom-center' | 'bottom-left' | 'bottom-right'
@@ -82,6 +93,13 @@ if (browser) {
     } catch {
         /* ignore */
     }
+    // 修复：该键此前只有写入口（setModalClosePosition）没有读入口，刷新后「弹窗关闭按钮位置」被重置为默认；
+    // B 站 Toy 首次进入写入的 top-left 同样会在重进时丢失
+    try {
+        _modalClosePosition = parseModalClosePosition(localStorage.getItem(MODAL_CLOSE_KEY))
+    } catch {
+        /* ignore */
+    }
 }
 
 /** @desc 弹窗关闭按钮位置 */
@@ -90,8 +108,8 @@ export function getModalClosePosition(): ModalClosePosition {
 }
 
 export function setModalClosePosition(v: ModalClosePosition): void {
-    _modalClosePosition = v
-    if (browser) localStorage.setItem(MODAL_CLOSE_KEY, v)
+    _modalClosePosition = parseModalClosePosition(v)
+    if (browser) localStorage.setItem(MODAL_CLOSE_KEY, _modalClosePosition)
 }
 
 /** @desc 侧边栏底部操作区（新建 / 从本地导入 / 从工坊下载）是否显示 */
