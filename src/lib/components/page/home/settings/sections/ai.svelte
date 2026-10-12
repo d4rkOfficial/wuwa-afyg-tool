@@ -22,7 +22,13 @@
     import SettingRow from '$lib/components/ui/setting-row.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
     import { addToast } from '$lib/data/toast.svelte'
-    import { getGenPrefs, updateGenPrefs, type DangerMode } from '$lib/data/ai-prefs.svelte'
+    import {
+        getGenPrefs,
+        getAiSessionDisabled,
+        isAiEnabled,
+        updateGenPrefs,
+        type DangerMode
+    } from '$lib/data/ai-prefs.svelte'
     import {
         addProfile,
         getActiveProfileId,
@@ -59,8 +65,15 @@
 
     const aiProfiles = $derived(getAiProfiles())
     const aiActiveId = $derived(getActiveProfileId())
+    /** @desc 开关的显示态取**实际**启用态（Toy 宿主会话内被抑制时为 off，但偏好本身没被改动） */
+    const aiEnabled = $derived(isAiEnabled())
 
     async function toggleAiEnabled() {
+        // 会话级抑制（Toy 宿主）期间不改动持久化偏好：只提示，不写盘 —— 否则用户存下的开关会被静默改掉
+        if (getAiSessionDisabled()) {
+            addToast('当前为 B 站 Toy 环境，本次会话内不可用 AI 助手；你的开关偏好已保留', 'info')
+            return
+        }
         await updateGenPrefs({ enabled: !getGenPrefs().enabled })
         addToast(getGenPrefs().enabled ? 'AI 助手已启用' : 'AI 助手已禁用', 'success')
     }
@@ -144,12 +157,17 @@
                     <span class="mt-0.5 block text-[10px] text-(--theme-modal-text)/40">
                         开启后页面右下角显示 AI 助手悬浮窗；关闭后悬浮窗隐藏，所有 AI 功能不可用
                     </span>
+                    {#if getAiSessionDisabled()}
+                        <span class="mt-0.5 block text-[10px] text-(--theme-modal-text)/40">
+                            当前为 B 站 Toy 环境：本次会话内 AI 助手不可用；此处显示的是实际状态，你的开关偏好已保留
+                        </span>
+                    {/if}
                 </div>
                 <Tabs
                     items={AI_ENABLED_TABS}
-                    value={getGenPrefs().enabled ? 'on' : 'off'}
+                    value={aiEnabled ? 'on' : 'off'}
                     onchange={(v) => {
-                        if ((v === 'on') !== getGenPrefs().enabled) void toggleAiEnabled()
+                        if ((v === 'on') !== aiEnabled) void toggleAiEnabled()
                     }}
                     compact
                     class={ROW_TABS}

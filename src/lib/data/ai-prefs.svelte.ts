@@ -1,4 +1,5 @@
 // AI 助手偏好（持久化到 IndexedDB）：是否启用 AI 助手 + AI 助手人设提示词 + 危险操作策略，独立于模型配置保存
+// 另有**不持久化**的会话级强制关闭（Toy 宿主每会话要求隐藏，见 _sessionDisabled / isAiEnabled）
 // 注：Buff 命名规则与黑话词典已迁为内置技能卡（见 $lib/ai/skills 的 BUILTIN_SKILLS），
 //     这里只保留旧字段的读取（LegacyPromptPrefs），供技能卡做一次性迁移。
 import { browser } from '$app/environment'
@@ -31,9 +32,31 @@ const DEFAULT_PREFS: AiGenPrefs = {
 let _prefs: AiGenPrefs = $state({ ...DEFAULT_PREFS })
 let _loaded = false
 
+/**
+ * @desc **会话级**强制关闭（不持久化）：B 站 Toy 宿主每会话要求隐藏 AI 助手，
+ * 但那个要求只属于这一次会话，**不能写回**用户的持久化偏好。
+ *
+ * 历史 bug：Toy 进入回调原先直接 `updateGenPrefs({ enabled: false })`（会 `dbSet` 落盘），
+ * 于是「在 Toy 里被关」会**永久改掉**用户存下的开关 —— 用户回到普通浏览器/普通页面再看，
+ * 设置已经被悄悄改成了关闭。这里把它降级为会话级抑制：持久化偏好原样保留。
+ */
+let _sessionDisabled = $state(false)
+
+export const getAiSessionDisabled = (): boolean => _sessionDisabled
+
+export const setAiSessionDisabled = (v: boolean): void => {
+    _sessionDisabled = v
+}
+
 export function getGenPrefs(): AiGenPrefs {
     return _prefs
 }
+
+/**
+ * @desc AI 助手**实际**是否启用 = 持久化偏好 ∧ 非会话级强制关闭。
+ * 界面显隐（悬浮窗）只看这里；设置里的开关读写的仍是持久化偏好本身。
+ */
+export const isAiEnabled = (): boolean => _prefs.enabled && !_sessionDisabled
 
 export function getSystemPrompt(): string {
     return _prefs.systemPrompt.trim()

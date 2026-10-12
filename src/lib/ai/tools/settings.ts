@@ -66,7 +66,13 @@ import {
     updateProfile,
     type AiProfile
 } from '$lib/ai/config.svelte'
-import { getGenPrefs, updateGenPrefs, type DangerMode } from '$lib/data/ai-prefs.svelte'
+import {
+    getAiSessionDisabled,
+    getGenPrefs,
+    isAiEnabled,
+    updateGenPrefs,
+    type DangerMode
+} from '$lib/data/ai-prefs.svelte'
 import {
     DEFAULT_LOCK_WATERMARK_TEXT,
     LOCK_WATERMARK_TEXT_MAX,
@@ -531,7 +537,10 @@ defineTool('get_settings_state', {
                 hint: '用 set_setting key=clear_cache 清理（值 list/info/image/all）'
             },
             ai: {
-                enabled: prefs.enabled,
+                // 实际启用态（会话级抑制期间为 false，但持久化偏好未被改动，故另标出偏好值）
+                enabled: isAiEnabled(),
+                enabledPref: prefs.enabled,
+                sessionDisabled: getAiSessionDisabled(),
                 dangerMode: prefs.dangerMode,
                 personaPrompt: prefs.systemPrompt ? '已自定义' : '默认',
                 skillHint: '命名规则 / 黑话词典已是内置技能卡，用 list_skills / use_skill 查看（设置里可编辑正文）',

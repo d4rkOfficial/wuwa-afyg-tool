@@ -4,7 +4,7 @@
     import { fade } from 'svelte/transition'
     import { runAiTurn, type SessionEvent } from '$lib/ai/session'
     import { getAiConfig, loadAiConfig } from '$lib/ai/config.svelte'
-    import { loadGenPrefs, getGenPrefs, getDangerMode } from '$lib/data/ai-prefs.svelte'
+    import { loadGenPrefs, isAiEnabled, getDangerMode } from '$lib/data/ai-prefs.svelte'
     import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
     import { notifyCalcUpdate, getCalcState } from '$lib/calc/calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
@@ -202,8 +202,8 @@
     }
 
     const aiConfig = $derived(getAiConfig())
-    // AI 助手是否启用（悬浮窗显隐）
-    const aiEnabled = $derived(getGenPrefs().enabled)
+    // AI 助手是否启用（悬浮窗显隐）：取**实际**状态 = 持久化偏好 ∧ 非会话级强制关闭（Toy 宿主会话内隐藏）
+    const aiEnabled = $derived(isAiEnabled())
     // GPU 合成加速（设置 → 交互相关）：拖拽定位用 transform 走合成层
     const gpuAccel = $derived(getGpuAccel())
     // 最新一条用户消息的展示索引（仅它可重试）
