@@ -4,7 +4,8 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="text-scale" content="scale" />
-        <meta name="theme-color" content="#1e1b2e" />
+        <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="椰果工具箱" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -70,6 +71,29 @@
                     sessionStorage.setItem('wuwa-afyg:splash', '1')
                 }
             } catch (e) {}
+            /*
+             * 开屏用纯黑 / 纯白两套（不跟配色，只跟主题）。判定顺序：
+             *   1. `wuwa-afyg:theme-mode` —— 主题的 **localStorage 同步镜像**（theme store 写的）；
+             *      主题本体在 IndexedDB 里是异步的，没有这份镜像就只能按系统猜，
+             *      用户手动切过昼夜后会出现「开屏深色 → 进 App 浅色」。
+             *   2. 系统 `prefers-color-scheme`（首次进入、或镜像还没写出来时）；
+             *   3. 兜底深色（与 DEFAULT_ACTIVE_ID 一致）。
+             * 结果以 class 挂在 <html> 上，CSS 里两套规则分别命中；这段跑在首屏绘制之前。
+             */
+            try {
+                var savedMode = null
+                try {
+                    savedMode = localStorage.getItem('wuwa-afyg:theme-mode')
+                } catch (e) {}
+                var light =
+                    savedMode === 'light' ||
+                    (savedMode !== 'dark' &&
+                        typeof window.matchMedia === 'function' &&
+                        window.matchMedia('(prefers-color-scheme: light)').matches)
+                document.documentElement.classList.add(light ? 'splash-light' : 'splash-dark')
+            } catch (e) {
+                document.documentElement.classList.add('splash-dark')
+            }
             window.__splashStart = performance.now()
             window.addEventListener('load', () => {
                 const el = document.getElementById('splash')
@@ -80,6 +104,13 @@
             })
         </script>
         <style>
+            /* ── 开屏（splash）──
+               只有一个居中的加载环：底色与环色都是**纯黑 / 纯白**，不取主题的强调色（配色），
+               只区分昼夜。昼夜由 <html> 上的 `splash-light` / `splash-dark` 决定
+               （内联脚本在首屏绘制前按「主题的 localStorage 同步镜像 → 系统 → 深色兜底」判定）。
+               深色（默认）：底 `#000` / 环 `#fff`；浅色：底 `#fff` / 环 `#000`。
+               由来：原先这里是靛紫底 + 椰子 logo + 标题 + 小加载环，按用户要求改成
+               「纯黑白、去掉所有文本、只要一个放大的居中图标」。 */
             #splash {
                 position: fixed;
                 inset: 0;
@@ -87,32 +118,23 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: #1e1b2e;
+                background: #000000;
                 transition: opacity 0.4s ease;
             }
-            #splash .splash-inner {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 18px;
-            }
-            #splash .splash-logo {
-                width: 80px;
-                height: 80px;
-                animation: splash-breathe 2s ease-in-out infinite;
-            }
-            #splash .splash-title {
-                font-size: 18px;
-                letter-spacing: 0.2em;
-                color: #e8e4f0;
-            }
             #splash .splash-spinner {
-                width: 26px;
-                height: 26px;
+                width: 44px;
+                height: 44px;
                 border-radius: 50%;
-                border: 2px solid rgba(255, 255, 255, 0.15);
-                border-top-color: #6366f1;
+                border: 3px solid rgba(255, 255, 255, 0.22);
+                border-top-color: #ffffff;
                 animation: splash-spin 0.9s linear infinite;
+            }
+            html.splash-light #splash {
+                background: #ffffff;
+            }
+            html.splash-light #splash .splash-spinner {
+                border-color: rgba(0, 0, 0, 0.15);
+                border-top-color: #000000;
             }
             #splash.splash-hidden {
                 opacity: 0;
@@ -120,15 +142,6 @@
             }
             html.splash-skip #splash {
                 display: none;
-            }
-            @keyframes splash-breathe {
-                0%,
-                100% {
-                    transform: scale(1);
-                }
-                50% {
-                    transform: scale(1.08);
-                }
             }
             @keyframes splash-spin {
                 to {
@@ -140,11 +153,7 @@
     </head>
     <body data-sveltekit-preload-data="hover">
         <div id="splash">
-            <div class="splash-inner">
-                <img src="/pwa-icon.svg" alt="椰果工具箱" class="splash-logo" />
-                <div class="splash-title">椰果工具箱</div>
-                <div class="splash-spinner"></div>
-            </div>
+            <div class="splash-spinner"></div>
         </div>
         <div style="display: contents">%sveltekit.body%</div>
     </body>

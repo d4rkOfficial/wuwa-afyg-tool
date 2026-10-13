@@ -19,8 +19,38 @@ import lightPreset from './preset/light.json'
 const ACTIVE_KEY = 'theme-active'
 const OVERRIDES_KEY = 'theme-overrides'
 
+/**
+ * @desc 当前昼夜的 **localStorage 同步镜像**，只给 `app.html` 的开屏读。
+ * 为什么需要它：主题本体存在 IndexedDB（`ACTIVE_KEY`，异步），而开屏必须在本 bundle 之前
+ * 同步渲染 —— 没有这份镜像，开屏就只能按系统猜，用户手动切过昼夜后会「开屏深色 → App 浅色」。
+ * 存的是 `'dark' | 'light'` 两个字符串值，与 `ThemeMode` 同口径。
+ */
+const THEME_MODE_KEY = 'wuwa-afyg:theme-mode'
+
+/** @desc 把当前昼夜写进同步镜像（localStorage 在隐私模式 / 严格 iframe 下可能抛错，失败即忽略） */
+function writeThemeModeMirror() {
+    if (!browser) return
+    try {
+        localStorage.setItem(THEME_MODE_KEY, activeId === 'light' ? 'light' : 'dark')
+    } catch {
+        /* 写不进去也不影响 App 运行，只是开屏会退回按系统判断 */
+    }
+}
+
 /** @desc 用户未选过昼夜主题时的默认主题（黑夜：与内置默认外观/背景图配套） */
 const DEFAULT_ACTIVE_ID = 'dark'
+
+/**
+ * @desc 首次进入（没有存过主题）时按**系统**深浅色选默认昼夜。
+ * 为什么必须与开屏同步：`app.html` 的开屏用 `prefers-color-scheme` 选深/浅两套配色，
+ * 若 App 这边固定落 'dark'，浅色系统下就会「浅色开屏 → 深色 App」跳一次。
+ * 判定失败（SSR / 老浏览器没有 matchMedia）时返回 null，由调用方回落到 `DEFAULT_ACTIVE_ID`。
+ * 只影响**首次**：用户手动选过主题后一律以存值为准（`loadThemes` 里的 `savedId ?? …`）。
+ */
+function systemDefaultThemeId(): string | null {
+    if (!browser || typeof window.matchMedia !== 'function') return null
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+}
 
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
@@ -233,13 +263,23 @@ function applyThemeCSS() {
     const titlebarBg =
         root.style.getPropertyValue('--theme-titlebar-bg')?.trim() || theme.components.titlebar?.backgroundImage
     if (titlebarBg) {
-        let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+        /*
+         * `app.html` 为了「开屏跟随系统」放了**两条** `meta[name=theme-color]`，各自带
+         * `media="(prefers-color-scheme: dark|light)"`。JS 启动后颜色真相源变成用户选择的主题，
+         * 而用户的选择未必等于系统档 —— 若只改第一条（原实现），浅色系统 + 手动选深色主题时
+         * 浏览器会用另一条 media 命中的值，标题栏颜色就错了。
+         * 故这里把整组收敛成一条无 media 的 meta：改第一条、摘掉它的 media、删掉其余。
+         */
+        const metas = Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))
+        let meta = metas[0]
         if (!meta) {
             meta = document.createElement('meta')
             meta.name = 'theme-color'
             document.head.appendChild(meta)
         }
+        meta.removeAttribute('media')
         meta.content = titlebarBg
+        for (const extra of metas.slice(1)) extra.remove()
     }
 }
 
@@ -458,8 +498,11 @@ export async function loadThemes() {
 
     const activeSaved = await dbGet<string>(ACTIVE_KEY)
     const savedId = activeSaved && themes.find((t) => t.id === activeSaved.data) ? activeSaved.data : null
-    // 用户没选过主题时回落到默认昼夜（白天，与内置默认外观一致）；选过之后一律按保存值
-    activeId = savedId ?? themes.find((t) => t.id === DEFAULT_ACTIVE_ID)?.id ?? themes[0]?.id ?? ''
+    // 用户没选过主题时按系统深浅色落档（与开屏同一判定）；选过之后一律按保存值
+    const fallbackId = systemDefaultThemeId() ?? DEFAULT_ACTIVE_ID
+    activeId = savedId ?? themes.find((t) => t.id === fallbackId)?.id ?? themes[0]?.id ?? ''
+    // 供开屏同步读取（见 THEME_MODE_KEY 的说明）
+    writeThemeModeMirror()
 
     const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
     if (ov) {
@@ -520,6 +563,7 @@ export async function setActiveTheme(id: string) {
         // 背景图效果与背景质感按昼夜分别保存，切主题即切到另一套设置，不再做正负反转
         activeId = id
         await dbSet(ACTIVE_KEY, id)
+        writeThemeModeMirror()
         applyThemeCSS()
     }
 }

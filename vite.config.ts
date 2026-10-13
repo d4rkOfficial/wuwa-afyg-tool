@@ -19,8 +19,10 @@ export default defineConfig({
                 name: '椰果工具箱',
                 short_name: '椰果',
                 description: '鸣潮社区公益工具',
-                theme_color: '#1e1b2e',
-                background_color: '#1e1b2e',
+                // 与 app.html 的开屏同口径：纯黑 / 纯白，只跟主题不跟配色。
+                // 注：manifest 只能存单值，装到桌面的系统开屏无法按系统深浅色二选一，故取深色档。
+                theme_color: '#000000',
+                background_color: '#000000',
                 display: 'standalone',
                 scope: '/',
                 start_url: '/',
