@@ -6,6 +6,8 @@
     import { openHelp } from '$lib/data/help.svelte'
     import Modal from '$lib/components/layout/modal.svelte'
     import {
+        WS_ICON,
+        WS_LABEL,
         getWsTarget,
         getWsStatus,
         getWsUrl,
@@ -17,6 +19,7 @@
         pushState
     } from '$lib/ws-remote/ws-remote.svelte'
     import { getPanelsState } from '$lib/ai/panels.svelte'
+    import WsStatusChip from './ws-status-chip.svelte'
 
     let workflowHelpItems = [
         {
@@ -103,20 +106,6 @@
     let wsToolCount = $derived(getWsToolCount())
     let wsRecentTools = $derived(getWsRecentTools())
     let wsModal = $state(false)
-
-    const WS_ICON = {
-        idle: 'mdi:access-point-off',
-        connecting: 'mdi:lan-connect',
-        connected: 'mdi:access-point',
-        error: 'mdi:lan-disconnect'
-    } as const
-
-    const WS_LABEL = {
-        idle: '未连接',
-        connecting: '连接中',
-        connected: '已连接',
-        error: '连接失败'
-    } as const
 
     /** @desc 工程/视图/锁定/弹窗变化时向 WS 服务器推送最新状态（顶栏常驻期间实时同步） */
     $effect(() => {
@@ -261,25 +250,7 @@
                 />
                 WS 远程接管
             </span>
-            <span
-                class="inline-flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-[10px] font-black"
-                style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: {wsStatus ===
-                'connected'
-                    ? 'var(--theme-accent-text)'
-                    : wsStatus === 'error'
-                      ? '#ef4444'
-                      : 'var(--theme-modal-text)/60'};"
-            >
-                <span
-                    class="size-1.5 rounded-full"
-                    style="background: {wsStatus === 'connected'
-                        ? 'var(--theme-accent-bg)'
-                        : wsStatus === 'error'
-                          ? '#ef4444'
-                          : 'var(--theme-modal-text)/40'};"
-                ></span>
-                {WS_LABEL[wsStatus]}
-            </span>
+            <WsStatusChip />
         </div>
     {/snippet}
 

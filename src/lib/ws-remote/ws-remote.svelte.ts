@@ -5,8 +5,29 @@ import { getPanelsState } from '$lib/ai/panels.svelte'
 import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
 import { getCalcState, notifyCalcUpdate } from '$lib/calc/calculation.store.svelte'
 import { addToast } from '$lib/data/toast.svelte'
+import { getWsEnabled, getWsServerUrl, setWsEnabled, setWsServerUrl } from '$lib/data/ws-prefs.svelte'
+import { parseWsTarget } from './ws-target'
+
+/** @desc 连接目标解析（纯函数在 `./ws-target`，这里转出以保持「WS 相关都从本模块取」的单一入口） */
+export { parseWsTarget }
 
 export type WsStatus = 'idle' | 'connecting' | 'connected' | 'error'
+
+/** @desc 状态图标（顶栏状态按钮与设置-连接配置共用，避免两处各写一份） */
+export const WS_ICON: Record<WsStatus, string> = {
+    idle: 'mdi:access-point-off',
+    connecting: 'mdi:lan-connect',
+    connected: 'mdi:access-point',
+    error: 'mdi:lan-disconnect'
+}
+
+/** @desc 状态文案（同上，两处共用） */
+export const WS_LABEL: Record<WsStatus, string> = {
+    idle: '未连接',
+    connecting: '连接中',
+    connected: '已连接',
+    error: '连接失败'
+}
 
 interface WsHost {
     requestView?: (phase: string) => void
@@ -33,17 +54,7 @@ let _reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let _queue: Array<{ id: string; tool: string; args: Record<string, unknown> }> = []
 let _processing = false
 
-/** @desc 解析用户提供的 WS 目标：host:port 自动补全协议（https 页面默认 wss 防混合内容拦截）；完整 ws(s):// 原样 */
-export function parseWsTarget(raw: string): string | null {
-    const s = raw.trim()
-    if (!s) return null
-    if (/^wss?:\/\//i.test(s)) return s
-    if (/^[\w.-]+:\d{1,5}$/.test(s)) {
-        const scheme = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss' : 'ws'
-        return `${scheme}://${s}`
-    }
-    return null
-}
+/** @desc 解析用户提供的 WS 目标：见 `./ws-target`（纯函数，独立模块以便 node 侧回归） */
 
 function clearReconnectTimer() {
     if (_reconnectTimer !== null) {
@@ -85,6 +96,32 @@ export function disconnectWs(): void {
     _status = 'idle'
     _queue = []
     _processing = false
+}
+
+/**
+ * @desc 应用「设置-连接配置」的开关 / 地址（该面板的唯一写入口：落盘 + 立即生效）。
+ * 开 = 保存地址并连接；关 = 保存地址并断开。
+ * 开启时地址非法则**不落盘、不改开关**，返回 `false` 交给调用方提示。
+ */
+export function setWsConnection(enabled: boolean, rawUrl: string): boolean {
+    const raw = rawUrl.trim()
+    if (enabled && !parseWsTarget(raw)) return false
+    setWsEnabled(enabled)
+    setWsServerUrl(raw)
+    if (enabled) connectWs(raw)
+    else disconnectWs()
+    return true
+}
+
+/**
+ * @desc 启动时按保存的偏好自动连接。宿主在**没有** `#websocket=` hash 时才调用（hash 优先）。
+ * 地址缺失 / 非法时静默跳过 —— 偏好里允许停着半成品，不该在启动时弹错。
+ */
+export function autoConnectWs(): void {
+    if (!browser || !getWsEnabled()) return
+    const raw = getWsServerUrl()
+    if (!raw || !parseWsTarget(raw)) return
+    connectWs(raw)
 }
 
 function openSocket(url: string): void {

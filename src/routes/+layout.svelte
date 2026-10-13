@@ -1,7 +1,7 @@
 <script lang="ts">
     import { browser } from '$app/environment'
     import { clearCache } from '$lib/api/data-cache'
-    import { connectWs, disconnectWs } from '$lib/ws-remote/ws-remote.svelte'
+    import { connectWs, disconnectWs, autoConnectWs } from '$lib/ws-remote/ws-remote.svelte'
     import {
         parseHashParams,
         registerHashAction,
@@ -45,7 +45,10 @@
                 run: (value) => connectWs(value),
                 cleanup: () => disconnectWs()
             })
+            const hashHasWs = parseHashParams(globalThis.location.hash).some((p) => p.key === 'websocket')
             runHashActions()
+            // hash 未显式指定时，回落到「设置-连接配置」保存的开关 + 地址（hash 优先，见该 action 的 cleanup）
+            if (!hashHasWs) autoConnectWs()
             detachHash = initHashActions()
         }
         if ('serviceWorker' in navigator) {

@@ -58,6 +58,9 @@
  *   - `connection`：`kuroPhone` / `kuroCode` / `kuroLoginBusy` / `kuroLoginInfo` / `kuroLoginError` /
  *     `kuroCountdown`（+ 非响应式的 `kuroTimer`）与 `newWorkshopUrl` 同样因重挂载而必须上移；
  *     倒计时定时器的起停（`startKuroCountdown`）也随之进 store，否则卸载后没人能清理/复用它。
+ *     后补的 WS 服务地址草稿 `wsServerInput` 同理上移：输入框允许停在半成品（未点「应用」不落盘），
+ *     留在 section 会被切换栏目重挂载清空。**落盘的**开关与地址不在这里，在
+ *     `$lib/data/ws-prefs.svelte`（跨会话持久，且 `+layout` 启动时要读）。
  *   - 留在各自 section 的：`COLOR_PRESETS` / `getPresetStyle` / `compressImage`（theme）与
  *     `clearKuroMessages` / 各 `handle*` 处理函数（connection）—— 都是带文案 / DOM 的展示逻辑；
  *     `fileInput`（`bind:this`）也只能留在 section。
@@ -354,4 +357,13 @@ export const getNewWorkshopUrl = () => newWorkshopUrl
 
 export const setNewWorkshopUrl = (url: string) => {
     newWorkshopUrl = url
+}
+
+/** @desc WS 服务地址输入草稿（"应用并连接"才落盘到 `$lib/data/ws-prefs.svelte`） */
+let wsServerInput = $state('')
+
+export const getWsServerInput = () => wsServerInput
+
+export const setWsServerInput = (url: string) => {
+    wsServerInput = url
 }

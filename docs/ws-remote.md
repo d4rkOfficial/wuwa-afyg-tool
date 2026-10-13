@@ -1,6 +1,13 @@
 # WS 远程接管
 
-椰果工具箱支持通过 URL hash 连接用户指定的 WebSocket 服务器，由服务器**接管操作**：AI 助手能做什么、能查什么，WS 服务器就能做什么、查什么（两者共用同一套工具注册表与执行引擎（完整清单见 docs/tools.md，共 128 个））。
+椰果工具箱支持连接用户指定的 WebSocket 服务器，由服务器**接管操作**：AI 助手能做什么、能查什么，WS 服务器就能做什么、查什么（两者共用同一套工具注册表与执行引擎（完整清单见 docs/tools.md，共 128 个））。
+
+连接目标有两个来源，**hash 优先**：
+
+| 来源                   | 位置                          | 生命周期                                |
+| ---------------------- | ----------------------------- | --------------------------------------- |
+| 设置开关 + 服务地址    | 设置 → 连接配置 → WS 远程接管 | 持久（保存在本机，刷新 / 重进自动重连） |
+| URL hash `#websocket=` | 地址栏                        | 临时（当次访问有效，移除 hash 即断开）  |
 
 ## 快速开始
 
@@ -8,8 +15,10 @@
 # 1. 启动示例服务端（零依赖）
 node scripts/ws-demo-server.mjs 8765
 
-# 2. 用带 hash 的地址打开应用（dev 环境为 http）
-#    http://localhost:5173/#websocket=127.0.0.1:8765
+# 2. 二选一连接
+#    ① 设置 → 连接配置 → WS 远程接管：填 127.0.0.1:8765 并打开开关（地址持久保存，重进自动连）
+#    ② 用带 hash 的地址打开应用（dev 环境为 http）：
+#       http://localhost:5173/#websocket=127.0.0.1:8765
 ```
 
 连接成功后：
@@ -42,13 +51,16 @@ exec set_team_character {"slot":1,"character":"散华"}
 
 - **https 部署必须用 wss**（浏览器禁止 https 页面建立明文 `ws://` 混合内容连接）；内网自签证书的 wss 需要在客户端信任证书
 - hash 变化实时生效：移除 hash 即断开连接，不再自动重连
-- 连接断开后自动 3 秒重连（手动点击「断开连接」除外）
+- 连接断开后自动 3 秒重连（手动点击「断开连接」或关掉设置开关除外）
+- hash 与「设置-连接配置」同时存在时 **hash 优先**：有 `#websocket=` 时按 hash 连（且不覆盖保存的地址）；没有 hash 时才回落到保存的开关 + 地址
+- 设置里的地址非法或开关关闭时**不连接、不报错**（地址输入框允许停在半成品，点「应用」才落盘）
 
 ## 权限模型
 
-- 带 hash 访问即视为授权，**直接连接、无确认弹窗**
+- **设置开关打开**（持久）或**带 hash 访问**（临时）即视为授权，**直接连接、无确认弹窗**
 - 危险工具（删除工程、归档、清空 Buff 集等）**无条件放行**，与 AI 助手的危险操作权限设置无关
 - 服务端可调用全部工具，包括修改工程/排轴/拉表/配装数据与切换视图
+- 断开方式：设置里关掉开关（同时不再自动重连）、顶栏状态弹窗的「断开连接」（仅当次会话，开关仍为开）、或移除 hash
 
 ## 消息协议
 
@@ -147,7 +159,10 @@ node scripts/ws-demo-server.mjs [port]   # 默认 8765
 
 ## 实现说明（开发者）
 
-- 客户端：`src/lib/ws-remote/ws-remote.svelte.ts`（连接/重连/协议/串行执行队列/状态推送），挂载于 `src/routes/+layout.svelte`（hash 解析）与 `src/routes/+page.svelte`（宿主桥：`requestView`/`view`）
+- 客户端：`src/lib/ws-remote/ws-remote.svelte.ts`（连接/重连/协议/串行执行队列/状态推送），挂载于 `src/routes/+layout.svelte`（hash 解析 + 按保存偏好自动连接）与 `src/routes/+page.svelte`（宿主桥：`requestView`/`view`）
+- 连接偏好（开关 + 地址）：`src/lib/data/ws-prefs.svelte.ts`（localStorage，跨会话持久）；设置面板的输入草稿在
+  `src/lib/components/page/home/settings/settings-ui.svelte.ts`，UI 在 `settings/sections/connection.svelte`（写入入口统一走
+  `setWsConnection()`），状态胶囊 `components/page/home/ws-status-chip.svelte` 与顶栏弹窗共用
 - 执行入口：`executeTool(ctx, name, args)`（`src/lib/ai/tools/registry.ts`），与 AI 会话（`session.ts`）共用同一注册表，因此工具能力天然同步
 - 状态推送：顶栏组件 `phase-tabs.svelte` 内 `$effect` 观察工程/视图/锁定/弹窗变化后调用 `pushState()`
 - 危险操作放行：`ToolContext.onConfirm` 恒为 `true`；如需收紧，改 `buildCtx()` 即可
