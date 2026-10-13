@@ -8,6 +8,12 @@
  * - `settings`（设置）：外观 / 交互 / 数据 / AI 助手等**偏好类**，导入后直接改变使用习惯；
  * - `libraries`（本地库）：Buff 集、词条方案（含标准词条集）、自定义技能等**自建库数据**。
  *
+ * ## 选择粒度：单个配置项
+ * 导出 / 导入的选择器是**条目 key 清单**（{@link selectConfigEntries}），不是分组：
+ * 界面上的「大类 / 分组」勾选只是聚合快捷方式，最终都折算成 key（{@link configKeysOfGroup} /
+ * {@link configKeysOfCategory}）。文件格式不受影响 —— 仍按大类 → 分组 → 键的嵌套结构存放，
+ * 只是**少导出的条目整条不出现**，导入时也只处理被选中的条目。
+ *
  * ## 导出文件结构（v2）
  * ```json
  * {
@@ -47,13 +53,13 @@ export interface ConfigCategoryDef {
     desc: string
 }
 
-/** @desc 两大类（界面按此分组展示与勾选） */
+/** @desc 两大类（界面按此分组展示；勾选粒度到单条配置项，见 {@link configKeysOfCategory}） */
 export const CONFIG_CATEGORIES: ConfigCategoryDef[] = [
     { id: 'settings', label: '设置', desc: '外观、交互、数据源、性能、AI 助手等偏好' },
     { id: 'libraries', label: '本地库', desc: 'Buff 集、词条方案（含标准词条集）、自定义技能' }
 ]
 
-/** @desc 配置分组（界面按此分组展示与勾选） */
+/** @desc 配置分组（界面按此分组展示；勾选粒度到单条配置项，见 {@link configKeysOfGroup}） */
 export type ConfigGroup = 'appearance' | 'interaction' | 'data' | 'assistant' | 'library'
 
 export interface ConfigGroupDef {
@@ -241,21 +247,38 @@ const emptyCategoryBuckets = (): Record<ConfigCategory, Record<string, Record<st
 })
 
 /**
- * @desc 导出完整配置为可下载的 JSON 结构（始终为新格式 v{@link CONFIG_VERSION}）。
- * @param includeApiKey 是否包含 AI API Key（默认不包含，避免明文外泄）
- * @param groups 仅导出这些分组（缺省=全部）
+ * @desc 按选择器过滤登记表（纯函数，导出 / 导入共用的唯一口径）：
+ * - `keys === undefined` → 全部条目（不筛选）
+ * - `keys = []` → 空（**全不选**，不是「全选」）
+ */
+export const selectConfigEntries = (entries: readonly ConfigEntry[], keys?: readonly string[]): ConfigEntry[] => {
+    if (keys === undefined) return [...entries]
+    const wanted = new Set(keys)
+    return entries.filter((e) => wanted.has(e.key))
+}
+
+/** @desc 某分组下登记的配置项 key（界面「按分组全选」用；顺序即登记顺序） */
+export const configKeysOfGroup = (group: ConfigGroup): string[] =>
+    CONFIG_ENTRIES.filter((e) => e.group === group).map((e) => e.key)
+
+/** @desc 某大类下登记的配置项 key（界面「按大类全选」用；顺序即登记顺序） */
+export const configKeysOfCategory = (category: ConfigCategory): string[] =>
+    CONFIG_ENTRIES.filter((e) => e.category === category).map((e) => e.key)
+
+/**
+ * @desc 导出配置为可下载的 JSON 结构（始终为新格式 v{@link CONFIG_VERSION}）。
+ * @param options.includeApiKey 是否包含 AI API Key（默认不包含，避免明文外泄）
+ * @param options.keys 只导出这些配置项（缺省 = 全部）；粒度到单条，见 {@link selectConfigEntries}
  */
 export const exportConfig = async (options?: {
     includeApiKey?: boolean
-    groups?: ConfigGroup[]
+    keys?: readonly string[]
 }): Promise<ExportedConfig> => {
     const includeApiKey = options?.includeApiKey ?? false
-    const groups = options?.groups
     const buckets = emptyCategoryBuckets()
     const skipped: string[] = []
 
-    for (const entry of CONFIG_ENTRIES) {
-        if (groups && !groups.includes(entry.group)) continue
+    for (const entry of selectConfigEntries(CONFIG_ENTRIES, options?.keys)) {
         if (!includeApiKey && entry.key === 'ai-config') {
             skipped.push(entry.label)
             continue
@@ -428,21 +451,19 @@ export interface ConfigImportResult {
 /**
  * @desc 导入配置（新旧格式皆可：旧格式已在 {@link parseConfigFile} 里升级为新结构）。
  * - `merge`（默认）：只覆盖文件中出现的项，未出现的保持现状
- * - `replace`：文件中未出现的受管项会被清除（回到默认）
- * @param groups 仅应用这些分组（缺省=全部）
+ * - `replace`：**被选中的**条目里，文件中未出现的会被清除（回到默认）
+ * @param options.keys 只应用这些配置项（缺省 = 全部）；粒度到单条，见 {@link selectConfigEntries}
  */
 export const importConfig = async (
     config: ExportedConfig,
-    options?: { mode?: 'merge' | 'replace'; groups?: ConfigGroup[] }
+    options?: { mode?: 'merge' | 'replace'; keys?: readonly string[] }
 ): Promise<ConfigImportResult> => {
     const mode = options?.mode ?? 'merge'
-    const groups = options?.groups
     const incoming = flattenConfigValues(config)
 
     const unknownKeys: string[] = []
     let applied = 0
-    for (const entry of CONFIG_ENTRIES) {
-        if (groups && !groups.includes(entry.group)) continue
+    for (const entry of selectConfigEntries(CONFIG_ENTRIES, options?.keys)) {
         if (incoming.has(entry.key)) {
             await writeConfigEntry(entry, incoming.get(entry.key))
             applied++
