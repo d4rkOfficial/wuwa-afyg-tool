@@ -153,14 +153,14 @@ describe('排轴时间线渲染', () => {
 })
 
 describe('绑定倍率（按需查询）', () => {
-    it('一行一条、按时间顺序给出倍率/属性/系数类型', () => {
+    it('一行一条、按排轴顺序给出倍率/属性/系数类型', () => {
         const out = renderDamageRatioList([
             {
                 character: '甲',
                 name: '普攻(常态攻击)',
                 value: '100%',
                 baseType: '攻击',
-                time: 0,
+                pos: 0,
                 element: '物理'
             },
             {
@@ -168,7 +168,7 @@ describe('绑定倍率（按需查询）', () => {
                 name: '共鸣技能(共鸣技能)',
                 value: '128.5%*3',
                 baseType: '攻击',
-                time: 100,
+                pos: 100,
                 element: '冷凝'
             }
         ])
@@ -356,12 +356,12 @@ describe('AI 时间口径（Issue #11）', () => {
         }
         assert.equal(renderTimelineDigest(transformed), renderTimelineDigest(input))
         const ratios = [
-            { character: '甲', name: '普攻', value: '100%', baseType: '攻击', element: '物理', time: 20 },
-            { character: '乙', name: '共鸣技能', value: '200%', baseType: '攻击', element: '冷凝', time: 10 }
+            { character: '甲', name: '普攻', value: '100%', baseType: '攻击', element: '物理', pos: 20 },
+            { character: '乙', name: '共鸣技能', value: '200%', baseType: '攻击', element: '冷凝', pos: 10 }
         ]
         assert.equal(
             renderDamageRatioList(ratios),
-            renderDamageRatioList(ratios.map((r) => ({ ...r, time: r.time * 9 + 700 })))
+            renderDamageRatioList(ratios.map((r) => ({ ...r, pos: r.pos * 9 + 700 })))
         )
         assert.ok(renderDamageRatioList(ratios).split('\n')[1].includes('[01] 乙'))
         const calcInput = {

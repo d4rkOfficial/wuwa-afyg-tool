@@ -746,7 +746,7 @@
                 {/each}
             </div>
 
-            <!-- Header time label overlay -->
+            <!-- 参考线名称浮层（名称只是标签，不代表时间） -->
             <div class="absolute pointer-events-none" style="left: 5rem; top: 0; height: 2rem; z-index: 20;">
                 {#each getRefLines() as rl (rl.id)}
                     <div

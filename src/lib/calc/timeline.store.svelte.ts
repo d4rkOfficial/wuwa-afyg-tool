@@ -1198,9 +1198,9 @@ export function resetLeftDamageBindings(refId: string) {
     save()
 }
 
-export function startEdit(id: string, time: string) {
+export function startEdit(id: string, label: string) {
     _editingId = id
-    _editValue = time
+    _editValue = label
 }
 
 export function confirmEdit() {
@@ -2494,7 +2494,7 @@ function buildDamageList() {
     return _damageBlocks
         .flatMap((d) => {
             if (d.skillHits.length === 0 && d.nonDirectEntries.length === 0) return []
-            const time =
+            const pos =
                 d.sourceType === 'ref'
                     ? (_refLines.find((r) => r.id === d.sourceId)?.pos ?? 0)
                     : (_opBlocks.find((b) => b.id === d.sourceId)?.pos ?? 0)
@@ -2513,7 +2513,8 @@ function buildDamageList() {
                 name: string
                 value: string
                 baseType: string
-                time: number
+                /** @desc 所属块的像素位置（仅作同 x 时的排序 tie-breaker） */
+                pos: number
                 x: number
                 element: string
             }[] = []
@@ -2535,7 +2536,7 @@ function buildDamageList() {
                 const value = valueParts.join('+') + ((h.hits ?? 0) > 1 ? '*' + h.hits : '')
                 const baseTypes = [...new Set(comps.map((c) => c.baseType || '固定'))]
                 const baseType = baseTypes.join('+')
-                entries.push({ character, name, value, baseType, time, x, element: h.element })
+                entries.push({ character, name, value, baseType, pos, x, element: h.element })
             }
             const ndEntries = d.nonDirectEntries
             const effectNDs = ndEntries.filter((nd) => nd.category === '效应')
@@ -2557,7 +2558,7 @@ function buildDamageList() {
                             ? (mult * 100).toFixed(2) + '%+' + (burstMult * 100).toFixed(2) + '%'
                             : (mult * 100).toFixed(2) + '%') + (hits > 1 ? `*${hits}` : ''),
                     baseType: '效应系数',
-                    time,
+                    pos,
                     x,
                     element: '导电'
                 })
@@ -2571,7 +2572,7 @@ function buildDamageList() {
                     name: nd.name + nd.layers + '层' + (hits > 1 ? `×${hits}段` : ''),
                     value: (mult * 100).toFixed(2) + '%' + (hits > 1 ? `*${hits}` : ''),
                     baseType: '效应系数',
-                    time,
+                    pos,
                     x,
                     element: NON_DIRECT_ELEMENT[nd.name] ?? ''
                 })
@@ -2584,7 +2585,7 @@ function buildDamageList() {
                         name: '谐度破坏',
                         value: '1600%',
                         baseType: '偏谐系数',
-                        time,
+                        pos,
                         x,
                         element: '物理'
                     })
@@ -2619,19 +2620,19 @@ function buildDamageList() {
                                 name: nd.name,
                                 value: respValue,
                                 baseType: respBase,
-                                time,
+                                pos,
                                 x,
                                 element: getSharedCharElementMap()[r] ?? ''
                             })
                         }
                     } else {
-                        entries.push({ character: '无', name: nd.name, value: '—', baseType: '', time, x, element: '' })
+                        entries.push({ character: '无', name: nd.name, value: '—', baseType: '', pos, x, element: '' })
                     }
                 }
             }
             return entries
         })
-        .sort((a, b) => a.x - b.x || a.time - b.time)
+        .sort((a, b) => a.x - b.x || a.pos - b.pos)
 }
 
 const _damageList = $derived(buildDamageList())

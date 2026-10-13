@@ -159,8 +159,8 @@ export interface DamageRatioRow {
     name: string
     value: string
     baseType: string
-    /** @desc 该行所属块的像素位置（store 里字段名是 time） */
-    time: number
+    /** @desc 该行所属块的像素位置（仅作排序用，与秒数无关） */
+    pos: number
     element: string
 }
 
@@ -169,7 +169,7 @@ export const renderDamageRatioList = (rows: readonly DamageRatioRow[]): string =
     const header = `绑定倍率（${rows.length} 条；已按排轴顺序，含效应/处决/响应的折算结果；序号不代表秒数）`
     if (rows.length === 0) return `${header}\n（没有任何已绑定的伤害倍率）`
     const lines = [...rows]
-        .sort((a, b) => a.time - b.time)
+        .sort((a, b) => a.pos - b.pos)
         .map((r, i) => {
             const parts = [`${r.character || '无'} · ${r.name} ${r.value}`]
             if (r.element) parts.push(r.element)
