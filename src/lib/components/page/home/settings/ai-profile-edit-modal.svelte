@@ -3,11 +3,13 @@
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import Button from '$lib/components/ui/button.svelte'
+    import FieldLabel from '$lib/components/ui/field-label.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
     import { updateProfile, type AiProfile } from '$lib/ai/config.svelte'
     import { AI_PROVIDER_PRESETS, type AiProviderPreset } from '$lib/ai/ai-providers'
     import { addToast } from '$lib/data/toast.svelte'
     import { mergeComponentsStyle } from '$lib/utils/component-style'
+    import { ROW_TABS, TAB_ACCENT, ACTION_BTN, ACTION_BTN_ACCENT } from './utils'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -31,7 +33,7 @@
 
     /**
      * @desc 思考强度（T15：原来是 3 个手搓分段按钮，与「类型 / 状态」两个控件同一形态）
-     * → `ui/tabs` 的三段文字 tab（`w-32` 定宽 → 三段必然等分，指示块无需测量即可对齐）。
+     * → `ui/tabs` 的三段文字 tab（轨道取设置内统一的 `ROW_TABS`，三段必然等分，指示块无需测量即可对齐）。
      */
     const REASONING_TABS = [
         { value: 'low', label: '低' },
@@ -112,49 +114,46 @@
             class="flex items-center justify-end gap-2 border-t pt-3"
             style="border-color: var(--theme-divider-border);"
         >
+            <Button variant="text" size="none" bare onclick={onclose} class={ACTION_BTN}>取消</Button>
             <Button
-                variant="text"
+                variant="icon-text"
                 size="none"
                 bare
-                onclick={onclose}
-                backgroundImage="transparent"
-                class="h-7 border border-(--theme-divider-border) px-2.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                >取消</Button
-            >
-            <button
+                keepDisabled
                 onclick={handleSave}
                 disabled={!canSave}
-                class="inline-flex h-7 items-center gap-1.5 rounded-none px-2.5 text-[10px] font-medium transition-all hover:brightness-110 disabled:pointer-events-none disabled:opacity-40"
-                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                backgroundImage="var(--theme-accent-bg)"
+                textColor="var(--theme-accent-text-on-bg)"
+                class={ACTION_BTN_ACCENT}
             >
-                <Icon icon="mdi:content-save-outline" class="size-3" />
+                <Icon icon="mdi:content-save-outline" class="size-3.5" />
                 保存
-            </button>
+            </Button>
         </div>
     {/snippet}
 
     {#if draft}
         <div class="flex flex-col gap-3">
             <label class="block">
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">配置名</span>
+                <FieldLabel label="配置名" class="mb-1" />
                 <input
                     type="text"
                     value={draft.label}
                     oninput={(e) => setDraft({ label: (e.currentTarget as HTMLInputElement).value })}
                     placeholder="如 本地 Ollama"
-                    class="w-full rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                    class="w-full rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
             </label>
             <label class="block">
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">AI 服务地址</span>
+                <FieldLabel label="AI 服务地址" class="mb-1" />
                 <div class="relative flex items-stretch gap-1.5" bind:this={providerPickerAnchor}>
                     <input
                         type="url"
                         value={draft.baseUrl}
                         oninput={(e) => setDraft({ baseUrl: (e.currentTarget as HTMLInputElement).value })}
                         placeholder="https://api.deepseek.com"
-                        class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                        class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
                         style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                     />
                     <button
@@ -175,7 +174,7 @@
                     </button>
                     {#if providerPickerOpen}
                         <div
-                            class="animate-pop-in theme-scrollbar absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-none border py-1"
+                            class="sf-radius animate-pop-in theme-scrollbar absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-none border py-1"
                             style="background: color-mix(in srgb, var(--theme-modal-bg) 94%, transparent); border-color: var(--theme-divider-border);"
                         >
                             <div class="px-2.5 py-1 text-[10px] text-(--theme-modal-text)/40">
@@ -209,24 +208,24 @@
                 {/if}
             </label>
             <label class="block">
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">模型名</span>
+                <FieldLabel label="模型名" class="mb-1" />
                 <input
                     type="text"
                     value={draft.model}
                     oninput={(e) => setDraft({ model: (e.currentTarget as HTMLInputElement).value })}
                     placeholder={matchedPreset?.modelHint ?? 'deepseek-v4-flash'}
-                    class="w-full rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                    class="w-full rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
             </label>
             <label class="block">
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">AI API Key</span>
+                <FieldLabel label="AI API Key" class="mb-1" />
                 <input
                     type="password"
                     value={draft.apiKey}
                     oninput={(e) => setDraft({ apiKey: (e.currentTarget as HTMLInputElement).value })}
                     placeholder="sk-..."
-                    class="w-full rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors"
+                    class="w-full rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
                 {#if matchedPreset}
@@ -247,15 +246,14 @@
                 {/if}
             </label>
             <div>
-                <span class="mb-1 block text-xs text-(--theme-modal-text)/70">思考强度</span>
+                <FieldLabel label="思考强度" class="mb-1" />
                 <Tabs
                     items={REASONING_TABS}
                     value={draft.reasoningEffort ?? 'medium'}
                     onchange={pickReasoning}
                     compact
-                    class="w-32 shrink-0"
-                    backgroundImage="var(--theme-accent-bg)"
-                    textColor="var(--theme-accent-text-on-bg)"
+                    class={ROW_TABS}
+                    {...TAB_ACCENT}
                 />
             </div>
         </div>

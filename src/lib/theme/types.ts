@@ -86,7 +86,17 @@ export interface ThemeOverrides {
     backgroundImageLight: string
     /** @desc 背景图效果与背景质感：按昼夜分别保存 */
     appearance: Record<ThemeMode, ThemeAppearance>
-    neonText: number // 0=关, 1-100=霓虹灯强度
+    /** @desc 霓虹灯字体：发光半径（px），0 = 关闭。给文本与图标加 text-shadow */
+    neonTextGlow: number
+    /** @desc 霓虹灯内阴影：发光半径（px），0 = 关闭。给卡片/按钮/弹窗加一层 inset box-shadow */
+    neonInsetGlow: number
+    /**
+     * @desc 卡片 / 弹窗 / 小部件三类表面容器的统一圆角（px，0 = 直角）。
+     * 由「设置-外观主题-圆角」一处调节，`layout.css` 里那条**未分层**规则把它套到
+     * `[data-sf='card'|'modal'|'widget']` 的非 flat 元素上（flat 是成片逐行/逐格元素，
+     * 逐个圆角会把表格画成一片药丸，故排除在外）。
+     */
+    surfaceRadius: number
 }
 
 /**

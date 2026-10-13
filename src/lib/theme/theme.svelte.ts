@@ -62,13 +62,25 @@ export const DEFAULT_APPEARANCE: Record<ThemeMode, ThemeAppearance> = {
     }
 }
 
+/** @desc 卡片 / 弹窗 / 小部件 / 按钮 / 输入框的默认圆角（px）。刻意不是 0：默认就该是「微圆」而不是直角 */
+export const DEFAULT_SURFACE_RADIUS = 2
+/** @desc 圆角可调范围（px）；上限压住以免把卡片画成胶囊 */
+export const SURFACE_RADIUS_MAX = 20
+
 const DEFAULT_OVERRIDES: ThemeOverrides = {
     accentHue: 190,
     backgroundImage: '',
     backgroundImageLight: '',
     appearance: structuredClone(DEFAULT_APPEARANCE),
-    neonText: 1
+    neonTextGlow: 0,
+    neonInsetGlow: 0,
+    surfaceRadius: DEFAULT_SURFACE_RADIUS
 }
+
+/** @desc 霓虹灯两档发光的可调上限（px）；再大就糊成一团 */
+export const NEON_GLOW_MAX = 10
+/** @desc 霓虹灯两档发光的默认值（px）= 关闭 */
+export const DEFAULT_NEON_GLOW = 0
 
 /**
  * @desc 首次进入：把外观恢复为默认（昼夜两套默认质感 + 内置默认背景图），并落盘。
@@ -396,9 +408,38 @@ function applyBgBlend(root: HTMLElement) {
 function applyOverridesCSS(root: HTMLElement) {
     applyAccentOverride(root)
     applyBgBlend(root)
-    const neonOn = overrides.neonText > 0
-    root.classList.toggle('neon-text', neonOn)
-    root.style.setProperty('--theme-neon-glow', neonOn ? `${(overrides.neonText / 100) * 10}px` : '0px')
+    applySurfaceRadius(root)
+    applyNeonGlow(root)
+}
+
+/**
+ * @desc 霓虹灯两档发光（字体 / 内阴影）——各自独立开关，默认都是 0px（关闭）。
+ * 用**加类 + 写变量**而不是直接写内联样式：发光要作用到整棵子树（字体）或一类元素（内阴影），
+ * 只能靠样式表里的 `.neon-text *` / `.neon-inset …` 规则；这里只负责开关与半径。
+ * 关掉时必须把对应 class 摘掉 —— 否则会留下一条 0px 的 `box-shadow` 声明，
+ * 那依然会覆盖元素原有的 `shadow-*`（内阴影那条规则会重排整条 box-shadow）。
+ */
+function applyNeonGlow(root: HTMLElement) {
+    const textGlow = getNeonGlow('text')
+    const insetGlow = getNeonGlow('inset')
+    root.classList.toggle('neon-text', textGlow > 0)
+    root.classList.toggle('neon-inset', insetGlow > 0)
+    root.style.setProperty('--theme-neon-glow', `${textGlow}px`)
+    root.style.setProperty('--theme-neon-inset-glow', `${insetGlow}px`)
+    /**
+     * @desc 内阴影颜色：**与主题明暗相反的一极** —— 浅色主题用白、深色主题用黑。
+     * 刻意不用 `currentColor`：那是「按文字色发光」，而文字色在浅色主题下是深色、
+     * 在深色主题下是浅色，正好与内阴影想要的明暗相反（用户实测点出「做反了」）。
+     * 口径与 `--sf-{key}-target`（背景深度的极值色）一致，故复用它同一套判断。
+     */
+    root.style.setProperty('--theme-neon-inset-color', activeId === 'light' ? '#ffffff' : '#000000')
+}
+
+/** @desc 霓虹灯某一档的当前半径（px）；脏值/缺项一律回落默认（关闭） */
+export function getNeonGlow(kind: 'text' | 'inset'): number {
+    const raw = Number(kind === 'text' ? overrides.neonTextGlow : overrides.neonInsetGlow)
+    if (!Number.isFinite(raw)) return DEFAULT_NEON_GLOW
+    return clamp(raw, 0, NEON_GLOW_MAX)
 }
 
 function setCSSVar(root: HTMLElement, key: string, prop: string, value?: string) {
@@ -440,6 +481,22 @@ export async function loadThemes() {
                 trimmed = true
             }
         }
+        // 圆角：旧数据没有这一项（回落默认），有但越界/非数的也一并夹回来
+        const radius = clamp(Number(overrides.surfaceRadius), 0, SURFACE_RADIUS_MAX)
+        if (!Number.isFinite(radius) || radius !== overrides.surfaceRadius) {
+            overrides.surfaceRadius = Number.isFinite(radius) ? radius : DEFAULT_SURFACE_RADIUS
+            trimmed = true
+        }
+        // 霓虹灯：旧字段是**百分比**强度 `neonText`（默认 1，即肉眼不可见的 0.1px），
+        // 现已拆成「字体 / 边框」两档 px 值。转换口径：`neonText <= 1`（含历史默认值）
+        // 视为「没开过」，直接落到新的 0px 默认；其余按原换算 强度/100*10 折成 px。
+        const legacyNeon = Number((ov.data as { neonText?: unknown }).neonText)
+        if (Number.isFinite(legacyNeon)) {
+            overrides.neonTextGlow =
+                legacyNeon > 1 ? clamp((legacyNeon / 100) * 10, 0, NEON_GLOW_MAX) : DEFAULT_NEON_GLOW
+            overrides.neonInsetGlow = DEFAULT_NEON_GLOW
+            trimmed = true
+        }
         if (trimmed) await dbSet(OVERRIDES_KEY, toPlain(overrides))
     }
 
@@ -477,11 +534,30 @@ export async function updateOverride<K extends keyof ThemeOverrides>(key: K, val
     const root = document.documentElement
     applyAccentOverride(root)
     if (key === 'backgroundImage' || key === 'backgroundImageLight' || key === 'appearance') applyBgBlend(root)
-    if (key === 'neonText') {
-        const on = overrides.neonText > 0
-        root.classList.toggle('neon-text', on)
-        root.style.setProperty('--theme-neon-glow', on ? `${(overrides.neonText / 100) * 10}px` : '0px')
-    }
+    if (key === 'surfaceRadius') applySurfaceRadius(root)
+    if (key === 'neonTextGlow' || key === 'neonInsetGlow') applyNeonGlow(root)
+}
+
+/**
+ * @desc 当前统一圆角（px）。给**无法走 CSS 变量**的消费方用：SVG `<rect rx>` 是几何**属性**，
+ * 属性值不接受 `var()`（只能靠 CSS `rx` 属性覆盖，而该属性的浏览器支持还不齐），
+ * 故侧边栏占位图标这类 SVG 直接用脚本值绑定。普通 DOM 请用 `layout.css` 的 `sf-radius` / 未分层规则。
+ */
+export function getSurfaceRadius(): number {
+    const raw = Number(overrides.surfaceRadius)
+    // 旧持久化数据缺这一项 / 被写坏时回落默认，避免 NaN 让 `border-radius` 整条声明失效
+    if (!Number.isFinite(raw)) return DEFAULT_SURFACE_RADIUS
+    return clamp(raw, 0, SURFACE_RADIUS_MAX)
+}
+
+/**
+ * @desc 把统一圆角写到 `--theme-surface-radius`（`layout.css` 的未分层规则消费它）。
+ * 用 CSS 变量而不是逐个改组件 class：全项目 508 处 `rounded-none` 分属不同语义
+ * （输入框 / 表格单元格 / 装饰线…），逐个替换既动不了「统一调节」这件事，也会误伤直角语义。
+ * `layout.css` 的 `:root` 里另有一份同样的默认值，供 JS 尚未执行时兜底。
+ */
+function applySurfaceRadius(root: HTMLElement) {
+    root.style.setProperty('--theme-surface-radius', `${getSurfaceRadius()}px`)
 }
 
 export function getComponentTheme(key: ThemeComponentKey): ComponentTheme {

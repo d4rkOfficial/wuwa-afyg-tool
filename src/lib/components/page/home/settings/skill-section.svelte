@@ -4,6 +4,8 @@
     import { onMount } from 'svelte'
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
+    import EmptyState from '$lib/components/ui/empty-state.svelte'
+    import Chip from '$lib/components/ui/chip.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
     import Button from '$lib/components/ui/button.svelte'
     import SkillEditModal from './ai-skill-edit-modal.svelte'
@@ -17,6 +19,8 @@
     } from '$lib/data/ai-skills.svelte'
     import { SKILL_MODE_LABELS } from '$lib/ai/skills'
     import { addToast } from '$lib/data/toast.svelte'
+    import { mergeClass } from '$lib/utils/component-style'
+    import { ROW_TABS, TAB_ACCENT } from './utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()
@@ -31,13 +35,16 @@
     /**
      * @desc 逐行启停（T15）：原来是 `mdi:toggle-switch` 图标按钮，与编辑弹窗里那个手搓 toggle 按钮
      * 是**同一个概念的两套实现**，现统一为 `ui/tabs` 的两段文字 tab（启用｜禁用）。
-     * `w-28` 定宽 → 两段必然等分，滑动指示块无需测量即可对齐（见 `ui/tabs` 顶部注释）。
+     * 轨道宽度取设置内统一的 `ROW_TABS`（`./utils`），原先这里是 `w-28`。
      */
     const ENABLED_TABS = [
         { value: 'on', label: '启用' },
         { value: 'off', label: '禁用' }
     ]
-    const ROW_TABS = 'w-28 shrink-0'
+
+    /** @desc 次要动作按钮的统一规格（导出 / 导入 这一族；`bare` 档的 `ui/Button` 不带焦点层，故自带 outline） */
+    const ACTION_BTN =
+        'h-7 shrink-0 gap-1 rounded-none border border-(--theme-divider-border) px-2.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-(--theme-accent-bg)'
 
     onMount(() => {
         void loadSkills()
@@ -91,44 +98,47 @@
     }
 </script>
 
-<div class={['space-y-2', className].join(' ')} style={styleProp}>
+<div class={mergeClass(['flex flex-col gap-2', className])} style={styleProp}>
     <div class="flex items-start gap-2">
         <Icon
             icon="mdi:lightning-bolt-outline"
             class="mt-0.5 size-4 shrink-0"
             style="color: var(--theme-accent-text);"
         />
-        <div class="min-w-0 flex-1 text-xs leading-relaxed text-(--theme-modal-text)/60">
+        <div class="min-w-0 flex-1 text-xs leading-5 text-(--theme-modal-text)/60">
             <span class="font-black text-(--theme-modal-text)/80">技能</span>
-            是预置的操作规范：<span class="text-(--theme-accent-text)">主动</span>技能只把名称与描述列给助手，
-            匹配时由助手调用 <span class="font-mono">use_skill</span> 激活正文；
-            <span class="text-(--theme-accent-text)">被动</span>技能每轮直接注入正文，常驻生效。
+            是给助手的操作规范：<span class="text-(--theme-accent-text)">主动</span>技能由助手判断需要时启用，
+            <span class="text-(--theme-accent-text)">被动</span
+            >技能每轮都会生效。内置技能可改描述、正文与启停，但不能删除。
         </div>
     </div>
 
     <div class="flex items-center gap-1.5">
-        <span class="text-[10px] text-(--theme-modal-text)/40">
-            {enabledCount}/{skills.length} 启用 · 内置技能不可删除，可改描述 / 正文 / 类型与启停
+        <span class="text-[10px] tabular-nums text-(--theme-modal-text)/40">
+            {enabledCount}/{skills.length} 启用
         </span>
         <div class="flex-1"></div>
-        <button
-            onclick={() => openEditor()}
-            class="inline-flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
-            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-        >
-            <Icon icon="mdi:plus" class="size-3" />
-            新建技能
-        </button>
         <Button
-            variant="text"
+            variant="icon-text"
+            size="none"
+            bare
+            onclick={() => openEditor()}
+            backgroundImage="var(--theme-accent-bg)"
+            textColor="var(--theme-accent-text-on-bg)"
+            class="h-7 gap-1 px-2.5 text-xs font-medium transition-all hover:brightness-110"
+        >
+            <Icon icon="mdi:plus" class="size-3.5" />
+            新建技能
+        </Button>
+        <Button
+            variant="icon-text"
             size="none"
             bare
             onclick={exportSkills}
-            backgroundImage="transparent"
-            class="shrink-0 gap-1 border border-(--theme-divider-border) px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+            class={ACTION_BTN}
             title="导出全部技能为 JSON"
         >
-            <Icon icon="mdi:download-outline" class="size-3" />
+            <Icon icon="mdi:download-outline" class="size-3.5" />
             导出
         </Button>
         <input
@@ -138,21 +148,23 @@
             bind:this={importInput}
             onchange={handleImport}
         />
-        <button
+        <Button
+            variant="icon-text"
+            size="none"
+            bare
             onclick={() => importInput?.click()}
-            class="inline-flex shrink-0 items-center gap-1 rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-            style="border-color: var(--theme-divider-border);"
+            class={ACTION_BTN}
             title="从 JSON 导入技能（同名跳过）"
         >
-            <Icon icon="mdi:upload-outline" class="size-3" />
+            <Icon icon="mdi:upload-outline" class="size-3.5" />
             导入
-        </button>
+        </Button>
     </div>
 
     <div class="space-y-1.5">
         {#each skills as skill (skill.id)}
             <div
-                class="flex items-center gap-2 border px-2.5 py-1.5"
+                class="sf-radius flex items-center gap-2 border px-2.5 py-1.5"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <Tabs
@@ -169,21 +181,21 @@
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1.5">
                         <span class="truncate text-xs font-black tracking-tight">{skill.name}</span>
-                        <span
-                            class="shrink-0 rounded-none px-1 py-px text-[9px] {skill.mode === 'passive'
-                                ? 'bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
-                                : 'text-(--theme-modal-text)/45'}"
+                        <Chip
+                            class={skill.mode === 'passive'
+                                ? 'shrink-0 bg-(--theme-accent-bg)/20 text-(--theme-accent-text)'
+                                : 'shrink-0 text-(--theme-modal-text)/50'}
                             style={skill.mode === 'active'
                                 ? 'background: color-mix(in srgb, var(--theme-modal-text) 10%, transparent);'
                                 : ''}
                         >
                             {SKILL_MODE_LABELS[skill.mode]}
-                        </span>
+                        </Chip>
                         {#if skill.builtin}
-                            <span class="shrink-0 text-[9px] text-(--theme-modal-text)/35">内置</span>
+                            <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40">内置</span>
                         {/if}
                         {#if !skill.enabled}
-                            <span class="shrink-0 text-[9px] text-(--theme-modal-text)/35">已禁用</span>
+                            <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40">已禁用</span>
                         {/if}
                     </div>
                     <div class="truncate text-[10px] text-(--theme-modal-text)/40">
@@ -209,16 +221,11 @@
             </div>
         {/each}
         {#if skills.length === 0}
-            <div
-                class="border px-2.5 py-2 text-[11px] text-(--theme-modal-text)/35"
-                style="border-color: var(--theme-divider-border);"
-            >
-                暂无技能卡，点「新建技能」添加
-            </div>
+            <EmptyState size="sm">暂无技能卡，点「新建技能」添加</EmptyState>
         {/if}
     </div>
 
-    <p class="text-[10px] text-(--theme-modal-text)/35">
+    <p class="text-[10px] leading-4 text-(--theme-modal-text)/35">
         导出格式为 <span class="font-mono">{'{ kind: "wuwa-afyg-skills", skills: [...] }'}</span
         >，导入时同名技能自动跳过。
     </p>

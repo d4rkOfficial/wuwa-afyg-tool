@@ -13,6 +13,8 @@
      */
     import Icon from '@iconify/svelte'
     import SectionTitle from '$lib/components/ui/section-title.svelte'
+    import Button from '$lib/components/ui/button.svelte'
+    import EmptyState from '$lib/components/ui/empty-state.svelte'
     import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import {
@@ -33,6 +35,7 @@
     } from '../settings-ui.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
+    import { ACTION_BTN, ACTION_BTN_DANGER } from '../utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()
@@ -109,23 +112,26 @@
         <Icon icon="mdi:archive-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
         归档管理
     </SectionTitle>
-    <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
-        已归档的工程不会出现在侧边栏，可取消归档恢复、全量导出、分享或永久删除
+    <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/40">
+        归档的工程不显示在侧边栏；可恢复、导出、分享或永久删除
     </p>
     {#if archivedProjects.length === 0}
-        <div
-            class="flex flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed px-4 py-10"
+        <EmptyState
+            size="lg"
+            class="sf-radius rounded-none border-2 border-dashed"
             style="border-color: var(--theme-divider-border);"
         >
-            <Icon icon="mdi:archive-outline" class="size-8 text-(--theme-modal-text)/20" />
-            <span class="text-xs text-(--theme-modal-text)/40">暂无归档的工程</span>
-        </div>
+            <div class="flex flex-col items-center gap-2">
+                <Icon icon="mdi:archive-outline" class="size-8 text-(--theme-modal-text)/20" />
+                <span>暂无归档的工程</span>
+            </div>
+        </EmptyState>
     {:else}
         <div class="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
             {#each archivedProjects as p (p.id)}
                 {@const avatars = p.team.map((s) => (s.character ? charIconMap[s.character] : undefined))}
                 <div
-                    class="group relative overflow-hidden border-2 p-4 transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-card-bg-focused)"
+                    class="sf-radius group relative overflow-hidden border-2 p-4 transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-card-bg-focused)"
                     style="border-color: var(--theme-card-border); background: var(--theme-card-bg);"
                 >
                     <!-- 角色头像叠底（右下：1号大→3号小，向右递减；半透明 + 边缘淡出） -->
@@ -175,7 +181,7 @@
                                 <div class="flex flex-wrap items-center gap-1.5 text-[10px]" title={slot.character}>
                                     {#if slot.weapon}
                                         <span
-                                            class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
+                                            class="sf-radius inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
                                             style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                         >
                                             {#if weaponIcons[slot.weapon]}
@@ -190,7 +196,7 @@
                                     {/if}
                                     {#if slot.echoes?.[0]?.name}
                                         <span
-                                            class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
+                                            class="sf-radius inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
                                             style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                             title="首位声骸"
                                         >
@@ -206,7 +212,7 @@
                                     {/if}
                                     {#each slot.triggerSets as ts, ti (ti)}
                                         <span
-                                            class="inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
+                                            class="sf-radius inline-flex items-center gap-1 border px-1.5 py-0.5 text-(--theme-modal-text)/65"
                                             style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-modal-text) 5%, transparent);"
                                         >
                                             {#if setIcons[ts.name]}
@@ -228,39 +234,49 @@
                         class="relative z-10 mt-3 flex flex-wrap items-center gap-1.5 border-t pt-2.5"
                         style="border-color: var(--theme-divider-border);"
                     >
-                        <button
+                        <Button
+                            variant="icon-text"
+                            size="none"
+                            bare
                             onclick={() => handleUnarchive(p.id)}
-                            class="flex items-center gap-1 rounded-none px-2 py-0.5 text-[10px] transition-colors text-(--theme-accent-text) hover:brightness-125"
-                            style="background: color-mix(in srgb, var(--theme-accent-bg) 14%, transparent);"
+                            backgroundImage="color-mix(in srgb, var(--theme-accent-bg) 14%, transparent)"
+                            textColor="var(--theme-accent-text)"
+                            class={ACTION_BTN}
                         >
-                            <Icon icon="mdi:archive-arrow-up-outline" class="size-3" />
+                            <Icon icon="mdi:archive-arrow-up-outline" class="size-3.5" />
                             取消归档
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="icon-text"
+                            size="none"
+                            bare
                             onclick={() => handleArchiveExport(p.id)}
-                            class="flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                            style="border-color: var(--theme-divider-border);"
+                            class={ACTION_BTN}
                         >
-                            <Icon icon="mdi:file-export" class="size-3" />
+                            <Icon icon="mdi:file-export" class="size-3.5" />
                             导出
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="icon-text"
+                            size="none"
+                            bare
                             onclick={() => handleArchiveShare(p.id)}
-                            class="flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                            style="border-color: var(--theme-divider-border);"
+                            class={ACTION_BTN}
                         >
-                            <Icon icon="mdi:share-variant" class="size-3" />
+                            <Icon icon="mdi:share-variant" class="size-3.5" />
                             分享(10分钟)
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="icon-text"
+                            size="none"
+                            bare
                             onclick={() => openArchiveDelete(p.id)}
-                            class="flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/50 hover:text-red-500"
-                            style="border-color: var(--theme-divider-border);"
+                            class={ACTION_BTN_DANGER}
                             title="永久删除，不可恢复"
                         >
-                            <Icon icon="mdi:delete-outline" class="size-3" />
+                            <Icon icon="mdi:delete-outline" class="size-3.5" />
                             永久删除
-                        </button>
+                        </Button>
                     </div>
                 </div>
             {/each}

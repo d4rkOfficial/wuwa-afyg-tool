@@ -20,6 +20,9 @@
     let { watermark, active = false, onclick, children, class: className, style: styleProp }: Props = $props()
 </script>
 
+<!-- 有 `onclick` 时本容器同时给 `role="button"` + `tabindex` + Enter/Space 处理（下方），
+     故 `a11y_no_noninteractive_tabindex` 是对静态分析的误报，按需抑制。 -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
     data-press={onclick ? '' : undefined}
     data-sf="card"

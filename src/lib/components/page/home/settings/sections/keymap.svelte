@@ -7,11 +7,14 @@
      */
     import Icon from '@iconify/svelte'
     import SectionTitle from '$lib/components/ui/section-title.svelte'
+    import SettingRow from '$lib/components/ui/setting-row.svelte'
+    import Button from '$lib/components/ui/button.svelte'
     import { GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
     import { getKeyMapEntries, physicalLabel, resetKeyMap } from '$lib/data/keymap.svelte'
     import { getUiBtnIconList, setKeyPickerFor, setTab, updateEntry } from '../settings-ui.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
+    import { ACTION_BTN, ACTION_BTN_ACCENT } from '../utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()
@@ -31,15 +34,10 @@
         <Icon icon="mdi:keyboard-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
         按键图标
     </SectionTitle>
-    <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
-        每行决定排轴时操作块显示的按键图标（键盘或手柄）；快速排轴输入键与界面快捷键可在「交互相关」中配置
-    </p>
+    <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/40">设置排轴时操作块显示的按键图标（键盘或手柄）</p>
     <div class="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-4">
         {#each keymapEntries as entry (entry.id)}
-            <div
-                class="flex items-center gap-2 rounded-none border px-2.5 py-2"
-                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-            >
+            <SettingRow>
                 <span class="flex size-9 shrink-0 items-center justify-center">
                     {#if iconOf(entry.blockKey)}
                         <img
@@ -60,43 +58,47 @@
                 <input
                     value={entry.label}
                     onchange={(e) => updateEntry(entry.id, { label: (e.target as HTMLInputElement).value })}
-                    class="min-w-0 flex-1 bg-transparent text-xs text-(--theme-modal-text) outline-none placeholder:text-(--theme-modal-text)/30"
+                    class="min-w-0 flex-1 bg-transparent text-xs text-(--theme-modal-text) outline-none placeholder:text-(--theme-modal-text)/30 focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-(--theme-accent-bg)"
                 />
                 <span
-                    class="shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/60"
+                    class="sf-radius shrink-0 rounded-none border px-1.5 py-0.5 font-mono text-[10px] text-(--theme-modal-text)/60"
                     style="border-color: var(--theme-divider-border);"
                     title="快捷键"
                 >
                     {physicalLabel(entry.physical)}
                 </span>
-                <button
+                <Button
+                    variant="text"
+                    size="none"
+                    bare
                     onclick={() => setKeyPickerFor(entry.id)}
-                    class="shrink-0 rounded-none px-2 py-0.5 text-[10px] font-medium transition-all hover:brightness-125"
-                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
+                    backgroundImage="var(--theme-accent-bg)"
+                    textColor="var(--theme-accent-text-on-bg)"
+                    class={ACTION_BTN_ACCENT}
                 >
-                    选择自定义key
-                </button>
-            </div>
+                    选择自定义 key
+                </Button>
+            </SettingRow>
         {/each}
     </div>
     <div class="mt-3 flex items-center gap-2">
-        <button
+        <Button
+            variant="icon-text"
+            size="none"
+            bare
             onclick={() => setTab('shortcuts')}
-            class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-accent-text) transition-colors hover:brightness-125"
-            style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);"
+            backgroundImage="color-mix(in srgb, var(--theme-accent-bg) 12%, transparent)"
+            textColor="var(--theme-accent-text)"
+            class={ACTION_BTN}
             title="跳转到「快捷键位」页配置界面快捷键"
         >
             <Icon icon="mdi:keyboard-settings-outline" class="size-3.5" />
             界面快捷键设置
             <Icon icon="mdi:arrow-right" class="size-3" />
-        </button>
-        <button
-            onclick={() => resetKeyMap()}
-            class="flex items-center gap-1 rounded-none border px-2.5 py-1 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-            style="border-color: var(--theme-divider-border);"
-        >
+        </Button>
+        <Button variant="icon-text" size="none" bare onclick={() => resetKeyMap()} class={ACTION_BTN}>
             <Icon icon="mdi:restore" class="size-3.5" />
             恢复默认
-        </button>
+        </Button>
     </div>
 </div>

@@ -5,7 +5,7 @@
     import Button from '$lib/components/ui/button.svelte'
     import QuickLookupContent from '$lib/components/page/home/quick-lookup/quick-lookup-content.svelte'
     import type { Project, PhaseKey, CharSlot } from '$lib/types/project'
-    import { setActiveTheme, getActiveId as getActiveThemeId, getThemes } from '$lib/theme'
+    import { setActiveTheme, getActiveId as getActiveThemeId, getThemes, getSurfaceRadius } from '$lib/theme'
     import { addToast } from '$lib/data/toast.svelte'
     import { getCharElementMap } from '$lib/data/char-elements.svelte'
     import { getSidebarActions } from '$lib/data/interaction-prefs.svelte'
@@ -151,6 +151,13 @@
     ])
 
     let currentTheme = $derived(getActiveThemeId())
+    /**
+     * @desc 统一圆角（px），只给**两处 SVG 占位图标**的 `<rect rx>` 用。
+     * 为什么这里不用 CSS 变量：`rx` 是 SVG 的**几何属性**，属性值写不了 `var()`；
+     * 而把它当 CSS 属性（`rect { rx: var(…) }`）在部分浏览器上还没支持，会静默退回直角。
+     * 其余 DOM 一律走 `layout.css` 的 `sf-radius` / 未分层圆角规则，不要在这里扩散。
+     */
+    let surfaceRadius = $derived(getSurfaceRadius())
 
     function selectProject(id: string) {
         onselect(id)
@@ -338,7 +345,7 @@
                                     />
                                 </linearGradient>
                             </defs>
-                            <rect x="0" y="0" width="16" height="16" rx="0" fill={`url(#teamGrad-${i})`} />
+                            <rect x="0" y="0" width="16" height="16" rx={surfaceRadius} fill={`url(#teamGrad-${i})`} />
                         </svg>
                         {#if !compact}
                             <span class="flex flex-1 items-center gap-0 truncate">
@@ -377,7 +384,7 @@
                                 >
                                     {#if compact}
                                         <span
-                                            class="flex size-6 items-center justify-center rounded-none bg-(--theme-sidebar-text)/10 text-xs"
+                                            class="sf-radius flex size-6 items-center justify-center rounded-none bg-(--theme-sidebar-text)/10 text-xs"
                                             >{project.name[0]}</span
                                         >
                                     {:else}
@@ -402,7 +409,7 @@
                                 y="0"
                                 width="16"
                                 height="16"
-                                rx="0"
+                                rx={surfaceRadius}
                                 fill="color-mix(in srgb, var(--theme-sidebar-text) 45%, transparent)"
                             />
                         </svg>
@@ -432,7 +439,7 @@
                         >
                             {#if compact}
                                 <span
-                                    class="flex size-6 items-center justify-center rounded-none bg-(--theme-sidebar-text)/10 text-xs"
+                                    class="sf-radius flex size-6 items-center justify-center rounded-none bg-(--theme-sidebar-text)/10 text-xs"
                                     >{project.name[0]}</span
                                 >
                             {:else}

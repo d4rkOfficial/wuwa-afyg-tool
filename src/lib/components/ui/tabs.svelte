@@ -58,6 +58,12 @@
      *
      * 减弱动态效果：指示块是 `<span>`，不吃 layout.css 里 `:where(button)` 的全局归零规则，
      * 故自己带 `motion-reduce:transition-none`；按钮的文字色过渡由该全局规则负责。
+     *
+     * `overflow-hidden` + `sf-radius-inner`（两者配套，缺一不可）：
+     * 轨道的直角由「设置-外观主题-圆角」统一接管（轨道是 `data-sf="widget"`，那条未分层规则会给它加圆角）。
+     * 指示块自身若保持直角，视觉上就只是**被轨道裁掉了一个角**（看着像缺角，而不是圆角 —— 实测反馈）。
+     * 故指示块自己也吃 `.sf-radius-inner`（同心圆角 = 外圆角 − `p-0.5` 的 2px）；`overflow-hidden`
+     * 退化为兜底：两者几何不一致时（例如用户把半径调到 0）不会露出轨道外的部分。
      */
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
@@ -121,7 +127,10 @@
 <div
     data-sf="widget"
     data-sf-flat
-    class={mergeClass(['relative flex rounded-none border border-(--theme-divider-border) p-0.5', className])}
+    class={mergeClass([
+        'sf-radius relative flex overflow-hidden rounded-none border border-(--theme-divider-border) p-0.5',
+        className
+    ])}
     style="--sf-base: var(--theme-input-bg); {styleProp || ''}"
     role="tablist"
 >
@@ -130,7 +139,7 @@
     {#if items.length > 0}
         <span
             aria-hidden="true"
-            class="pointer-events-none absolute top-0.5 bottom-0.5 left-0.5 rounded-none bg-(--theme-tabs-bg) transition-[transform,background-color] duration-[var(--motion-base)] ease-out motion-reduce:transition-none"
+            class="sf-radius-inner pointer-events-none absolute top-0.5 bottom-0.5 left-0.5 rounded-none bg-(--theme-tabs-bg) transition-[transform,background-color] duration-[var(--motion-base)] ease-out motion-reduce:transition-none"
             style={indicatorStyle}
         ></span>
     {/if}

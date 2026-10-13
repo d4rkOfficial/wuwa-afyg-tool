@@ -47,6 +47,7 @@
     import SkillSection from '../skill-section.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
+    import { ROW_TABS, TAB_ACCENT } from '../utils'
 
     interface Props extends ComponentsProps {
         /**
@@ -94,12 +95,6 @@
         { value: 'off', label: '禁用' }
     ]
 
-    /**
-     * @desc 设置行内文字 tab 的定宽：`w-44` 让**轨道**宽度确定，`flex-1` 的两段必然等分
-     * （见 `ui/tabs` 顶部注释）；`shrink-0` 让窄屏时被压缩的是左侧文案列。
-     */
-    const ROW_TABS = 'w-44 shrink-0'
-
     async function setDangerMode(mode: DangerMode) {
         await updateGenPrefs({ dangerMode: mode })
         addToast(
@@ -143,23 +138,20 @@
         />
         {tab === 'ai-conn' ? '启用 / 接入配置' : '权限 / 提示词'}
     </SectionTitle>
-    <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
+    <p class="mb-3 text-[10px] leading-4 text-(--theme-modal-text)/40">
         {tab === 'ai-conn'
-            ? '开关 AI 助手悬浮窗，并配置多组「提供商 / 模型 / API Key」一键切换，每组独立保存；API Key 仅存本机。点击配置文件即可切换，点「编辑」打开独立弹窗修改'
-            : '控制 AI 助手的危险操作权限与角色提示词；提示词为空时使用内置默认人设'}
+            ? '开关 AI 助手悬浮窗，并管理多组「提供商 / 模型 / API Key」，点击配置即可切换；API Key 只保存在本机'
+            : '设置 AI 助手执行危险操作前的确认方式，以及它的角色人设'}
     </p>
     <div class="flex flex-col gap-2">
         {#if tab === 'ai-conn'}
             <!-- 启用 AI 助手（独立开关，立即保存） -->
             <SettingRow>
                 <div class="min-w-0">
-                    <FieldLabel label="启用 AI 助手" />
-                    <span class="mt-0.5 block text-[10px] text-(--theme-modal-text)/40">
-                        开启后页面右下角显示 AI 助手悬浮窗；关闭后悬浮窗隐藏，所有 AI 功能不可用
-                    </span>
+                    <FieldLabel label="启用 AI 助手" hint="关闭后隐藏悬浮窗，AI 功能一并停用" />
                     {#if getAiSessionDisabled()}
-                        <span class="mt-0.5 block text-[10px] text-(--theme-modal-text)/40">
-                            当前为 B 站 Toy 环境：本次会话内 AI 助手不可用；此处显示的是实际状态，你的开关偏好已保留
+                        <span class="mt-0.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                            当前为 B 站 Toy 环境，本次会话内不可用；你保存的开关偏好未改动
                         </span>
                     {/if}
                 </div>
@@ -171,8 +163,7 @@
                     }}
                     compact
                     class={ROW_TABS}
-                    backgroundImage="var(--theme-accent-bg)"
-                    textColor="var(--theme-accent-text-on-bg)"
+                    {...TAB_ACCENT}
                 />
             </SettingRow>
         {/if}
@@ -180,14 +171,11 @@
             {#if tab === 'ai'}
                 <!-- 危险操作权限（独立设置，立即保存） -->
                 <div
-                    class="rounded-none border px-3 py-2.5"
+                    class="sf-radius rounded-none border px-3 py-2.5"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
-                    <FieldLabel label="危险操作权限" />
-                    <p class="mt-1 mb-2 text-[10px] text-(--theme-modal-text)/40">
-                        AI 执行危险操作（删除工程、清空数据等）时的确认策略；「批量」= 一次指令内的多次调用只询问一次
-                    </p>
-                    <div class="flex flex-col gap-1">
+                    <FieldLabel label="危险操作权限" hint="AI 删除工程、清空数据等操作前的确认方式" />
+                    <div class="mt-2 flex flex-col gap-1">
                         {#each DANGER_MODE_OPTIONS as opt (opt.value)}
                             {@const active = getGenPrefs().dangerMode === opt.value}
                             <button
@@ -220,11 +208,11 @@
             {#if tab === 'ai-conn'}
                 <!-- AI配置文件设置：独占整行，内部列表双列 -->
                 <div
-                    class="rounded-none border px-3 py-2.5 xl:col-span-2"
+                    class="sf-radius rounded-none border px-3 py-2.5 xl:col-span-2"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
                     <div class="mb-2 flex items-center justify-between">
-                        <span class="text-xs font-medium text-(--theme-modal-text)/70">AI配置文件设置</span>
+                        <FieldLabel label="AI 配置文件" class="mb-0" />
                         <button
                             onclick={handleAddAiProfile}
                             class="inline-flex items-center gap-1 rounded-none px-2.5 py-1 text-[10px] font-medium transition-all hover:brightness-110"
@@ -234,14 +222,14 @@
                             新建
                         </button>
                     </div>
-                    <p class="mb-2 text-[10px] text-(--theme-modal-text)/40">
-                        点击配置文件即可切换；编辑、删除请使用右侧按钮
+                    <p class="mb-2 text-[10px] leading-4 text-(--theme-modal-text)/40">
+                        点击配置即可切换；右侧按钮用于编辑与删除
                     </p>
                     <div class="mb-1.5 grid grid-cols-1 gap-1 xl:grid-cols-2 xl:gap-x-4">
                         {#each aiProfiles as p (p.id)}
                             {@const isActive = p.id === aiActiveId}
                             <div
-                                class="flex items-center gap-2 rounded-none border px-2.5 py-1.5 transition-colors"
+                                class="sf-radius flex items-center gap-2 rounded-none border px-2.5 py-1.5 transition-colors"
                                 style="border-color: {isActive
                                     ? 'color-mix(in srgb, var(--theme-accent-bg) 45%, transparent)'
                                     : 'var(--theme-divider-border)'}; background: color-mix(in srgb, var(--theme-accent-bg) {isActive
@@ -298,23 +286,20 @@
             {#if tab === 'ai'}
                 <!-- 提示词设置 -->
                 <div
-                    class="rounded-none border px-3 py-2.5"
+                    class="sf-radius rounded-none border px-3 py-2.5"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
-                    <span class="text-xs font-medium text-(--theme-modal-text)/70">提示词设置</span>
-                    <p class="mb-2 mt-1 text-[10px] text-(--theme-modal-text)/40">
-                        人设提示词与模型配置分开保存；Buff 命名规则与黑话词典已内置为技能卡（见下方「技能」）
-                    </p>
-                    <div class="flex flex-col gap-1">
+                    <FieldLabel
+                        label="提示词设置"
+                        hint="人设提示词与模型配置分开保存；Buff 命名规则与黑话词典是内置技能"
+                    />
+                    <div class="mt-2 flex flex-col gap-1">
                         <div
-                            class="flex items-center gap-2 rounded-none border px-2.5 py-1.5"
+                            class="sf-radius flex items-center gap-2 rounded-none border px-2.5 py-1.5"
                             style="border-color: var(--theme-divider-border);"
                         >
                             <div class="min-w-0 flex-1">
-                                <FieldLabel label="人设提示词" />
-                                <span class="mt-0.5 block truncate text-[10px] text-(--theme-modal-text)/40">
-                                    AI 助手的角色与行为规则（system prompt）
-                                </span>
+                                <FieldLabel label="人设提示词" hint="AI 助手的角色与行为规则" />
                             </div>
                             <button
                                 onclick={() => setPromptEditOpen(true)}
@@ -333,7 +318,7 @@
         <!-- 技能卡管理（主动 / 被动）：从助手头部 ⚡ 面板迁移至此 -->
         {#if tab === 'ai'}
             <div
-                class="mt-2 rounded-none border px-3 py-2.5"
+                class="sf-radius mt-2 rounded-none border px-3 py-2.5"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <SkillSection />

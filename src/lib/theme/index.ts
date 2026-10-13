@@ -17,6 +17,12 @@ export {
     resetAppearance,
     DEFAULT_SURFACES,
     DEFAULT_APPEARANCE,
+    DEFAULT_SURFACE_RADIUS,
+    SURFACE_RADIUS_MAX,
+    DEFAULT_NEON_GLOW,
+    NEON_GLOW_MAX,
+    getSurfaceRadius,
+    getNeonGlow,
     defaultSurfaceStyle,
     applyFirstRunAppearance
 } from './theme.svelte.js'

@@ -5,6 +5,8 @@
      * `<div class="flex items-center justify-between gap-3 rounded-none border px-3 py-2">`，
      * 且各自重复内联 `border-color` / `background` 两条样式。
      * 需要额外上边距的实例用 `class="mt-2"` 传入（原文件 5 处）。
+     *
+     * `sf-radius`：让这一行的直角跟随「设置-外观主题-圆角」的统一圆角（规则见 `layout.css` 的未分层段）。
      */
     import type { Snippet } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
@@ -18,7 +20,7 @@
 </script>
 
 <div
-    class={mergeClass(['flex items-center justify-between gap-3 rounded-none border px-3 py-2', className])}
+    class={mergeClass(['sf-radius flex items-center justify-between gap-3 rounded-none border px-3 py-2', className])}
     style={joinStyle(['border-color: var(--theme-divider-border); background: var(--theme-input-bg)', styleProp])}
 >
     {@render children?.()}

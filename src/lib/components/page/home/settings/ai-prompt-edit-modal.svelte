@@ -9,6 +9,7 @@
     import ToolPicker from './tool-picker.svelte'
     import { insertTextAt } from '$lib/utils/text-insert'
     import { mergeComponentsStyle } from '$lib/utils/component-style'
+    import { ACTION_BTN, ACTION_BTN_ACCENT } from './utils'
 
     /** @desc 人设提示词编辑弹窗（Buff 命名规则 / 黑话词典已迁为内置技能卡，在「技能」里编辑）。 */
     interface Props extends ComponentsProps {
@@ -65,35 +66,29 @@
             class="flex items-center justify-between gap-2 border-t pt-3"
             style="border-color: var(--theme-divider-border);"
         >
-            <button
+            <Button
+                variant="icon-text"
+                size="none"
+                bare
                 onclick={() => (draft = DEFAULT_SYSTEM_PROMPT)}
+                class={ACTION_BTN}
                 title="恢复为默认内容（保存后生效）"
-                class="inline-flex h-7 items-center gap-1.5 rounded-none border px-2.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                style="border-color: var(--theme-divider-border);"
             >
-                <Icon icon="mdi:restore" class="size-3" />
+                <Icon icon="mdi:restore" class="size-3.5" />
                 恢复默认
-            </button>
+            </Button>
             <div class="flex items-center gap-2">
+                <Button variant="text" size="none" bare onclick={onclose} class={ACTION_BTN}>取消</Button>
                 <Button
-                    variant="text"
-                    size="none"
-                    bare
-                    onclick={onclose}
-                    backgroundImage="transparent"
-                    class="h-7 border border-(--theme-divider-border) px-2.5 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                    >取消</Button
-                >
-                <Button
-                    variant="text"
+                    variant="icon-text"
                     size="none"
                     bare
                     onclick={handleSave}
                     backgroundImage="var(--theme-accent-bg)"
-                    textColor="var(--theme-accent-text-on-bg, #fff)"
-                    class="h-7 gap-1.5 px-2.5 text-[10px] font-medium transition-all hover:brightness-110"
+                    textColor="var(--theme-accent-text-on-bg)"
+                    class={ACTION_BTN_ACCENT}
                 >
-                    <Icon icon="mdi:content-save-outline" class="size-3" />
+                    <Icon icon="mdi:content-save-outline" class="size-3.5" />
                     保存
                 </Button>
             </div>
@@ -108,10 +103,10 @@
                 oninput={(e) => (draft = (e.currentTarget as HTMLTextAreaElement).value)}
                 rows="22"
                 placeholder={hintText}
-                class="theme-scrollbar w-full flex-1 resize-y rounded-none border px-2.5 py-1.5 text-xs leading-relaxed outline-none transition-colors"
+                class="theme-scrollbar w-full flex-1 resize-y rounded-none border px-2.5 py-1.5 text-xs leading-relaxed outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
                 style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
             ></textarea>
-            <p class="text-[10px] text-(--theme-modal-text)/40">{hintText}</p>
+            <p class="text-[10px] leading-4 text-(--theme-modal-text)/40">{hintText}</p>
         </div>
 
         <!-- 可调用工具列表（与技能编辑弹窗共用 ToolPicker） -->

@@ -8,6 +8,7 @@
      *
      * T15：本 tab 的 7 个 `ui/switch` + 3 处手搓分段按钮组（拉表视图 / 关闭按钮位置 / 消息提示位置）
      * 全部换成 `ui/tabs` 的文字 tab（两段短语写「该状态下的实际行为」，多段保留原值域与文案）。
+     * 分段控件的宽度 / 配色 / 布尔换算统一走 `../utils`。
      */
     import Icon from '@iconify/svelte'
     import SectionTitle from '$lib/components/ui/section-title.svelte'
@@ -41,9 +42,14 @@
     } from '$lib/data/interaction-prefs.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
+    import { ROW_TABS, TAB_ACCENT, pair, segBool, segValue } from '../utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()
+
+    /** @desc 卡片表面（与 theme / config / cache 的卡片同规格） */
+    const CARD_SURFACE = 'sf-radius rounded-none border'
+    const CARD_STYLE = 'border-color: var(--theme-divider-border); background: var(--theme-input-bg);'
 
     /** @desc Toast 位置按钮文案与说明（顺序取自 TOAST_POSITIONS） */
     const TOAST_POSITION_LABELS: Record<ToastPosition, string> = {
@@ -75,23 +81,6 @@
     // 改造前本 tab 混用两种实现：`ui/switch`（布尔项）与手搓分段按钮组（互斥取值）。
     // 现在统一为「文字 tab + 单一滑动指示块」；布尔项的两个分段写**该状态下的实际行为**，
     // 而不是偷懒的「开｜关」（用户明确要求）。
-
-    /** @desc 两段布尔项：入参是 on / off 两个分段各自的文案 */
-    const pair = (on: string, off: string) => [
-        { value: 'on', label: on },
-        { value: 'off', label: off }
-    ]
-
-    /** @desc boolean ⇄ 分段值的唯一换算处（`ui/tabs` 的 value 是 string） */
-    const segValue = (on: boolean): string => (on ? 'on' : 'off')
-    const segBool = (value: string): boolean => value === 'on'
-
-    /**
-     * @desc 设置行内文字 tab 的定宽：`w-44` 让**轨道**宽度确定，`flex-1` 的两段必然等分，
-     * 滑动指示块无需 DOM 测量即可对齐（与两段文案字数无关，见 `ui/tabs` 顶部注释）；
-     * `shrink-0` 保证窄屏时被压缩的是左侧文案列（它有 `min-w-0`）而不是控件本身。
-     */
-    const ROW_TABS = 'w-44 shrink-0'
 
     const SIMPLIFY_TOOLBAR_TABS = pair('简化', '完整')
     const SIDEBAR_ACTIONS_TABS = pair('显示', '隐藏')
@@ -134,33 +123,29 @@
 </script>
 
 <div class={mergeClass(['flex flex-col', className])} style={styleProp}>
-    <SectionTitle>
-        <Icon icon="mdi:table-large" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
-        拉表视图
-    </SectionTitle>
-    <p class="mb-3 text-[10px] text-(--theme-modal-text)/40">
-        选择拉表页面的 Buff 编辑方式；后续拉表/排轴等快捷键设置也将集中在此区域
-    </p>
-    <Tabs
-        items={CALC_VIEW_TABS}
-        value={getCalcViewMode()}
-        onchange={pickCalcViewMode}
-        compact
-        backgroundImage="var(--theme-accent-bg)"
-        textColor="var(--theme-accent-text-on-bg)"
-    />
-
-    <div class="mt-5">
+    <div>
         <SectionTitle>
             <Icon icon="mdi:widgets-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             界面显示
         </SectionTitle>
+        <!-- 拉表视图：原先是独立分区（自己一个 SectionTitle + 一行卡片），
+             按用户要求并入「界面显示」—— 它本来就是同一类「界面怎么显示」的开关，不是另一类设置。 -->
         <SettingRow>
             <div class="min-w-0">
-                <FieldLabel
-                    label="简化底部工具栏"
-                    hint="开启后底部工具栏变为可拖动的圆角胶囊（仅图标按钮），拖动时可吸附到侧栏右侧或屏幕右缘"
-                />
+                <FieldLabel label="拉表视图" hint="选择拉表页面编辑 Buff 的方式" />
+            </div>
+            <Tabs
+                items={CALC_VIEW_TABS}
+                value={getCalcViewMode()}
+                onchange={pickCalcViewMode}
+                compact
+                class={ROW_TABS}
+                {...TAB_ACCENT}
+            />
+        </SettingRow>
+        <SettingRow class="mt-2">
+            <div class="min-w-0">
+                <FieldLabel label="简化底部工具栏" hint="把底部工具栏收成可拖动的图标条，可吸附到侧栏旁或屏幕右缘" />
             </div>
             <Tabs
                 items={SIMPLIFY_TOOLBAR_TABS}
@@ -168,15 +153,14 @@
                 onchange={(v) => setSimplifyToolbar(segBool(v))}
                 compact
                 class={ROW_TABS}
-                backgroundImage="var(--theme-accent-bg)"
-                textColor="var(--theme-accent-text-on-bg)"
+                {...TAB_ACCENT}
             />
         </SettingRow>
         <SettingRow class="mt-2">
             <div class="min-w-0">
                 <FieldLabel
                     label="侧边栏显示新建 / 导入按钮"
-                    hint="在侧边栏底部显示「新建工程 / 从本地导入 / 从工坊下载」操作区；默认关闭（关闭后仍可从欢迎页使用）"
+                    hint="在侧边栏底部显示新建工程与导入入口；关闭后仍可从欢迎页使用"
                 />
             </div>
             <Tabs
@@ -185,16 +169,12 @@
                 onchange={(v) => setSidebarActions(segBool(v))}
                 compact
                 class={ROW_TABS}
-                backgroundImage="var(--theme-accent-bg)"
-                textColor="var(--theme-accent-text-on-bg)"
+                {...TAB_ACCENT}
             />
         </SettingRow>
         <SettingRow class="mt-2">
             <div class="min-w-0">
-                <FieldLabel
-                    label="允许结果页同时展开多个伤害条目"
-                    hint="开启后结果页的伤害条目可各自独立展开 / 收起；关闭（默认）时同时只展开一个，展开新条目会收起上一个"
-                />
+                <FieldLabel label="结果页展开多个条目" hint="关闭时同时只展开一个，展开新条目会自动收起上一个" />
             </div>
             <Tabs
                 items={MULTI_ENTRY_TABS}
@@ -202,20 +182,20 @@
                 onchange={(v) => setMultiEntryExpand(segBool(v))}
                 compact
                 class={ROW_TABS}
-                backgroundImage="var(--theme-accent-bg)"
-                textColor="var(--theme-accent-text-on-bg)"
+                {...TAB_ACCENT}
             />
         </SettingRow>
         <SettingRow class="mt-2">
-            <span class="min-w-0 text-xs font-medium text-(--theme-modal-text)/70">弹窗关闭按钮位置</span>
+            <div class="min-w-0">
+                <FieldLabel label="弹窗关闭按钮位置" />
+            </div>
             <Tabs
                 items={CLOSE_POSITION_TABS}
                 value={getModalClosePosition()}
                 onchange={pickClosePosition}
                 compact
                 class={ROW_TABS}
-                backgroundImage="var(--theme-accent-bg)"
-                textColor="var(--theme-accent-text-on-bg)"
+                {...TAB_ACCENT}
             />
         </SettingRow>
     </div>
@@ -227,10 +207,7 @@
         </SectionTitle>
         <SettingRow>
             <div class="min-w-0">
-                <FieldLabel
-                    label="磁力光标"
-                    hint="开启后鼠标移至按钮/链接等可点击元素上时，光标变形框住元素并带磁力吸附"
-                />
+                <FieldLabel label="磁力光标" hint="鼠标移到按钮等可点击元素上时，光标会框住它并轻微吸附" />
             </div>
             <Tabs
                 items={MAGNETIC_POINTER_TABS}
@@ -238,8 +215,7 @@
                 onchange={(v) => setMagneticPointer(segBool(v))}
                 compact
                 class={ROW_TABS}
-                backgroundImage="var(--theme-accent-bg)"
-                textColor="var(--theme-accent-text-on-bg)"
+                {...TAB_ACCENT}
             />
         </SettingRow>
     </div>
@@ -251,10 +227,7 @@
         </SectionTitle>
         <SettingRow>
             <div class="min-w-0">
-                <FieldLabel
-                    label="删除前二次确认"
-                    hint="关闭后删除工程、Buff、排轴等对象时跳过二次确认弹窗，直接删除；默认开启"
-                />
+                <FieldLabel label="删除前二次确认" hint="删除工程、Buff、排轴等对象前弹出确认框" />
             </div>
             <Tabs
                 items={CONFIRM_DELETES_TABS}
@@ -262,8 +235,7 @@
                 onchange={(v) => setConfirmDeletes(segBool(v))}
                 compact
                 class={ROW_TABS}
-                backgroundImage="var(--theme-accent-bg)"
-                textColor="var(--theme-accent-text-on-bg)"
+                {...TAB_ACCENT}
             />
         </SettingRow>
     </div>
@@ -279,10 +251,7 @@
         </SectionTitle>
         <SettingRow>
             <div class="min-w-0">
-                <FieldLabel
-                    label="简化右键菜单"
-                    hint="开启后排轴页的操作块/参考线右键菜单仅保留重命名、伤害绑定与删除；多选菜单不受影响。默认开启"
-                />
+                <FieldLabel label="简化右键菜单" hint="操作块与参考线的右键菜单只保留常用项；多选菜单不受影响" />
             </div>
             <Tabs
                 items={SIMPLIFY_CONTEXT_MENU_TABS}
@@ -290,8 +259,7 @@
                 onchange={(v) => setSimplifyContextMenu(segBool(v))}
                 compact
                 class={ROW_TABS}
-                backgroundImage="var(--theme-accent-bg)"
-                textColor="var(--theme-accent-text-on-bg)"
+                {...TAB_ACCENT}
             />
         </SettingRow>
     </div>
@@ -301,17 +269,19 @@
             <Icon icon="mdi:bell-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             消息提示位置
         </SectionTitle>
-        <Tabs
-            items={TOAST_POSITION_TABS}
-            value={getToastPosition()}
-            onchange={pickToastPosition}
-            compact
-            backgroundImage="var(--theme-accent-bg)"
-            textColor="var(--theme-accent-text-on-bg)"
-        />
-        <span class="mt-1.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
-            操作反馈（Toast）的弹出位置，默认右上角；选「不弹出」后所有操作反馈都不再显示
-        </span>
+        <!-- 说明进卡片：标签 + 分段 + 说明同处一块表面 -->
+        <div class={mergeClass([CARD_SURFACE, 'px-3 py-2.5'])} style={CARD_STYLE}>
+            <FieldLabel label="消息提示位置" hint="操作反馈的弹出位置；选「不弹出」后不再显示任何反馈" />
+            <div class="mt-2">
+                <Tabs
+                    items={TOAST_POSITION_TABS}
+                    value={getToastPosition()}
+                    onchange={pickToastPosition}
+                    compact
+                    {...TAB_ACCENT}
+                />
+            </div>
+        </div>
     </div>
 
     <div class="mt-5">
@@ -319,36 +289,39 @@
             <Icon icon="mdi:watermark" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             锁定水印
         </SectionTitle>
-        <SettingRow>
-            <div class="min-w-0">
-                <FieldLabel label="显示锁定水印" hint="排轴页阶段锁定时，在画面上平铺显示自定义文字；默认开启" />
+        <div class={CARD_SURFACE} style={CARD_STYLE}>
+            <div class="flex items-center justify-between gap-3 px-3 py-2">
+                <div class="min-w-0">
+                    <FieldLabel label="显示锁定水印" hint="阶段锁定时在画面上平铺显示自定义文字" />
+                </div>
+                <Tabs
+                    items={LOCK_WATERMARK_TABS}
+                    value={segValue(getLockWatermark())}
+                    onchange={(v) => setLockWatermark(segBool(v))}
+                    compact
+                    class={ROW_TABS}
+                    {...TAB_ACCENT}
+                />
             </div>
-            <Tabs
-                items={LOCK_WATERMARK_TABS}
-                value={segValue(getLockWatermark())}
-                onchange={(v) => setLockWatermark(segBool(v))}
-                compact
-                class={ROW_TABS}
-                backgroundImage="var(--theme-accent-bg)"
-                textColor="var(--theme-accent-text-on-bg)"
-            />
-        </SettingRow>
-        <div class="mt-2 flex items-center gap-2">
-            <input
-                value={getLockWatermarkText()}
-                oninput={(e) => setLockWatermarkText(e.currentTarget.value)}
-                maxlength={LOCK_WATERMARK_TEXT_MAX}
-                placeholder={DEFAULT_LOCK_WATERMARK_TEXT}
-                class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none transition-colors placeholder:text-(--theme-modal-text)/35 focus:border-(--theme-accent-bg)/50"
-                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                title="锁定水印文本"
-            />
-            <span class="shrink-0 text-[10px] tracking-[0.18em] text-(--theme-modal-text)/40">
-                {getLockWatermarkText().length}/{LOCK_WATERMARK_TEXT_MAX}
-            </span>
+            <div class="border-t px-3 py-2" style="border-color: var(--theme-divider-border);">
+                <div class="flex items-center gap-2">
+                    <input
+                        value={getLockWatermarkText()}
+                        oninput={(e) => setLockWatermarkText(e.currentTarget.value)}
+                        maxlength={LOCK_WATERMARK_TEXT_MAX}
+                        placeholder={DEFAULT_LOCK_WATERMARK_TEXT}
+                        class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                        title="锁定水印文本"
+                    />
+                    <span class="shrink-0 text-[10px] tabular-nums text-(--theme-modal-text)/40">
+                        {getLockWatermarkText().length}/{LOCK_WATERMARK_TEXT_MAX}
+                    </span>
+                </div>
+                <span class="mt-1 block text-[10px] leading-4 text-(--theme-modal-text)/40">
+                    留空时使用「{DEFAULT_LOCK_WATERMARK_TEXT}」
+                </span>
+            </div>
         </div>
-        <span class="mt-1.5 block text-[10px] leading-4 text-(--theme-modal-text)/40">
-            留空则使用「{DEFAULT_LOCK_WATERMARK_TEXT}」
-        </span>
     </div>
 </div>

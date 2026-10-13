@@ -257,6 +257,12 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
         --z-modal-deep: 70; /* 再深一层（如 buff 弹窗的二级确认、设置里的按键选择） */
         --z-popover: 80; /* 速查浮层 */
         --z-top: 100; /* 最顶层气泡（伤害追踪） */
+
+        /* 统一圆角（卡片 / 弹窗 / 小部件 / 按钮 / 输入框）的**兜底默认值**。
+           正常运行时由 `theme.svelte.ts` 的 `applySurfaceRadius()` 用内联变量覆盖（用户在
+           「设置-外观主题-圆角」调的那个值）；这里的 2px 只负责「JS 还没跑到」的那一帧
+           （首屏 / 只热更了 CSS 的 HMR），必须与 `DEFAULT_SURFACE_RADIUS` 保持一致。 */
+        --theme-surface-radius: 2px;
     }
 
     /* ── 全局按压反馈（Phase 8.2 立，T18 泛化到任意可显式标记的元素）──
@@ -695,11 +701,42 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
     }
     /* 霓虹灯字体：所有文本与图标以 currentColor 发光 */
     .neon-text * {
-        text-shadow: 0 0 var(--theme-neon-glow, 6px) currentColor !important;
+        text-shadow: 0 0 var(--theme-neon-glow, 0px) currentColor !important;
     }
     .neon-text svg {
-        filter: drop-shadow(0 0 var(--theme-neon-glow, 6px) currentColor) !important;
+        filter: drop-shadow(0 0 var(--theme-neon-glow, 0px) currentColor) !important;
     }
+}
+
+/* ── 霓虹灯内阴影：只给**卡片 / 按钮 / 弹窗**加一层 inset currentColor 发光 ──
+   范围是刻意收窄的。为什么不是「所有带边框的元素」：`box-shadow` 与有没有边框无关，
+   按边框宽度工具类铺开会把分隔线（`border-t` 86 处 / `border-b` 48 处）、表格单元格、输入框、
+   纯装饰描边一并点亮 —— 满屏发光反而不像霓虹。故这里按**类别**选，而不是按边框宽度选：
+   · 卡片：`data-sf='card'`（走区域质感的卡片）+ `.sf-radius`（设置面板里手写的卡片表面）；
+   · 弹窗：`data-sf='modal'`（`layout/modal.svelte` 的面板本体）；
+   · 按钮：所有 `<button>` 与 `[role='button']`（`ui/Button` 的图标钮表面归 `widget`，
+     但它本身就是按钮，故按元素选而不是按 surface 选）。
+   排除 `role='tablist'`：`ui/tabs` 的轨道也带 `.sf-radius`，但它是分段控件、既不是卡片也不是按钮。
+   颜色取 `--theme-neon-inset-color`（浅色主题=白、深色主题=黑，由 `theme.svelte.ts` 按当前昼夜发射），
+   **不是 `currentColor`** —— 文字色在浅色主题下是深色、深色主题下是浅色，与内阴影想要的明暗正好相反。
+
+   **不覆盖原有外阴影**（用户明确要求）：`box-shadow` 是整条属性，直接写 `inset …` 会把元素原有的
+   `shadow-2xl` / `ring-*` 一并顶掉。Tailwind v4 的阴影是「五段变量拼一条」的写法
+   （见产物 CSS：`.shadow-2xl{--tw-shadow:…;box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),
+   var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}`），
+   故这里**照抄同一段拼接**、把自己的 inset 层插在 `--tw-shadow` 之前：
+   外阴影与 ring 原样保留，只是多了一层内发光。五段变量由 Tailwind 的 `@property` 提供初值
+   （未使用 `shadow-*`/`ring-*` 时解析为透明 `0 0 #0000`），括号里的兜底值供不支持 `@property` 的环境用。
+   注：元素若用**内联** `box-shadow`（全项目 17 处），内联优先级更高，那处不会有内发光 —— 属预期。
+   默认 0px（关闭）时 `.neon-inset` 不加类，完全不受影响。 */
+.neon-inset :is([data-sf='card'], [data-sf='modal'], .sf-radius:not([role='tablist']), button, [role='button']) {
+    box-shadow:
+        var(--tw-inset-shadow, 0 0 #0000),
+        var(--tw-inset-ring-shadow, 0 0 #0000),
+        var(--tw-ring-offset-shadow, 0 0 #0000),
+        var(--tw-ring-shadow, 0 0 #0000),
+        inset 0 0 var(--theme-neon-inset-glow, 0px) var(--theme-neon-inset-color, #000000),
+        var(--tw-shadow, 0 0 #0000);
 }
 
 /* ── 减弱动态效果（块一）：位移/缩放归零 + 全局 CSS 过渡兜底 —— 未分层 ──
@@ -757,4 +794,80 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
             transition: none !important;
         }
     }
+}
+
+/* ── 统一圆角：卡片 / 弹窗 / 小部件（「设置-外观主题-圆角」一处调节）──
+   为什么必须写在**未分层**（而不是上面那段 `@layer base` 的 `[data-sf]` 规则里）：
+   级联层优先于特异性，utilities 层里的 `.rounded-none` 会无条件压过 `@layer base` 里的任何声明，
+   而全项目 508 处 `rounded-none` 里相当一部分正是这三类容器的直角声明。
+   未分层规则对**普通声明**优先于一切 @layer，故这里能稳定覆盖（与文件末尾 reduce 块同一手法）。
+
+   覆盖范围与排除理由：
+   · 只覆盖 `card` / `modal` / `widget` —— 正是「卡片 / 弹窗 / 小部件」三类容器；
+     `sidebar` / `content` / `toolbar` 是整块版面区域，圆角对它们没有意义（且会与本文件的
+     `aside[data-sf='sidebar']` 宽度补间打架）。
+   · 排除 `card` 上的 `data-sf-flat` / 全部 `data-sf-under`：前者是**铺开/下拉拉表的行与单元格**，
+     逐个加圆角会把表格画成一排药丸（它们的圆角应由外层容器决定）。
+   · 保留 `widget` 的 `data-sf-flat`：小部件里的 flat 是 picker 卡 / 声骸槽卡 / 标签页轨道这类
+     **独立小块**（只是为省掉逐块 backdrop-filter），圆角对它们正是想要的。
+   · 值来自 `theme.svelte.ts` 的 `applySurfaceRadius()`；**兜底值 2px 必须与脚本里的
+     `DEFAULT_SURFACE_RADIUS` 保持一致** —— 它在 JS 尚未跑到（首屏 SSR / HMR 只换了 CSS）时
+     提供默认圆角，否则会先闪一帧直角。
+   探针：`.tmp/settings-css-probe.ps1` 的产物 CSS 复核；`pnpm run check:surfaces` 校验 data-sf 取值合法性。 */
+[data-sf='card']:not([data-sf-flat]):not([data-sf-under]),
+[data-sf='modal']:not([data-sf-under]),
+[data-sf='widget']:not([data-sf-under]) {
+    border-radius: var(--theme-surface-radius, 2px);
+}
+
+/* ── 统一圆角：`.sf-radius`（自绘表面）──
+   设置面板等处的卡片 / 分区块是**手写表面**（内联 `border-color` + `background: var(--theme-input-bg)`），
+   没有 `data-sf`，落不进上面那条规则；给它们一个显式类，比逐个改成 `data-sf` 稳妥
+   （改成 data-sf 会让这些小块吃 widget 表面的 20% 不透明度，观感变化远大于「加个圆角」）。
+   同样必须未分层，才能压过组件 class 里的 `rounded-none`。 */
+.sf-radius {
+    border-radius: var(--theme-surface-radius, 2px);
+}
+
+/* ── 统一圆角：`.sf-radius-inner`（圆角容器**内部**的块）──
+   用于 `ui/tabs` 的滑动指示块（也就是用户看到的那个「胶囊选段」）：
+   轨道是 `.sf-radius` + `p-0.5`（内缩 2px），指示块若保持直角，就只能靠轨道的 `overflow-hidden`
+   **把角裁掉** —— 看起来是「缺了一角」而不是圆角（用户实测点出，已用无头渲染复现对照）。
+
+   刻意用**与轨道同值**的圆角，而不是几何上更「同心理」的 `calc(r - 2px)`：
+   后者在用户把半径调到默认的 2px 时算出 0，选段又变回直角 —— 正好是这次要修的症状。
+   同值不会溢出：给角加圆角只会**削掉**面积，内缩 2px 的块用与外层相同半径仍然完整落在轨道内。
+   经实测（半径 14px 对照渲染）：同值圆角在选段左右两端都成立了真正的圆角。 */
+.sf-radius-inner {
+    border-radius: var(--theme-surface-radius, 2px);
+}
+
+/* ── 统一圆角：输入框 ──
+   文本框与 textarea 也是「框」。只挑 `rounded-none` 的（矩形输入框）；
+   range 滑块的轨道是 `rounded-full`、复选框不写圆角类，都不在此列。 */
+input[class~='rounded-none'],
+textarea[class~='rounded-none'],
+select[class~='rounded-none'] {
+    border-radius: var(--theme-surface-radius, 2px);
+}
+
+/* ── 统一圆角：按钮 ──
+   要求「圆角也要作用到按钮」，而按钮有两类**必须保持原状**，故按下面的口径收窄：
+   · `rounded-full`（开关滑钮、圆形图标钮等 8 处）—— 圆形是它们的语义，不是「直角」；
+   · `role="tab"`（`ui/tabs` 的分段）—— 分段是**轨道内部**的格子，它们自身透明、只有被选中的那段
+     由滑动指示块着色，所以圆角做在**指示块**上（`.sf-radius-inner`）而不是逐个分段上。
+   用全量 `button` 而不是只挑 `[class~='rounded-none']`：全项目另有 163 个 `<button>` 根本没写
+   圆角类（浏览器默认就是直角），只挑其一会让界面一半圆一半方。
+   未分层，理由同上（utilities 层的 `rounded-*` 会被它压过，这正是我们想要的）。 */
+button:not([class~='rounded-full']):not([role='tab']),
+[role='button']:not([class~='rounded-full']) {
+    border-radius: var(--theme-surface-radius, 2px);
+}
+
+/* 顶部工具栏（`toolbar.svelte` 是唯一 `role="toolbar"` 的根节点）内的按钮保持直角：
+   那里的按钮与工具栏自身的方框边缘咬合，圆角会让它们「浮」在框里。
+   必须排在上面那条之后、且带上同样的 `:not(...)` 补回特异性（两者同为 0,2,1），靠源码顺序取胜。 */
+[role='toolbar'] button:not([class~='rounded-full']),
+[role='toolbar'] [role='button']:not([class~='rounded-full']) {
+    border-radius: 0;
 }
