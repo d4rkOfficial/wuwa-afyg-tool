@@ -61,9 +61,16 @@
         request: AskUserRequest
         /** @desc 收尾回调：提交 / 放弃都走它（单词型事件 prop 全小写，AGENTS §3） */
         onresolve: (result: AskUserResult) => void
+        /**
+         * @desc 嵌在助手 composer 卡片**内部**时置 true：不再自带边框 / 底色 / 内边距。
+         *  外壳（composer）已经提供了表面，再叠一层会变成「卡片里的卡片」。
+         *  刻意用 prop 而不是让调用方传 `class`/`style` 去压：根节点的边框色与底色是**内联 style**
+         *  （见下），内联样式压不过 class，用 `!important` 又会与主题变量打架。
+         */
+        embedded?: boolean
     }
 
-    let { request, onresolve, class: className, style: styleProp }: Props = $props()
+    let { request, onresolve, embedded = false, class: className, style: styleProp }: Props = $props()
 
     /** @desc 本实例的 id 前缀（`aria-labelledby` 关联用；同页多张卡也不会撞 id） */
     const uid = $props.id()
@@ -97,9 +104,9 @@
     }
 
     const FOOT_BTN =
-        'rounded-none border border-(--theme-divider-border) px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:pointer-events-none disabled:opacity-30'
+        'sf-radius rounded-none border border-(--theme-divider-border) px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:pointer-events-none disabled:opacity-30'
     const STEP_BTN =
-        'flex size-5 shrink-0 items-center justify-center rounded-none border text-[10px] tabular-nums transition-colors'
+        'flex size-5 shrink-0 items-center justify-center sf-radius rounded-none border text-[10px] tabular-nums transition-colors'
     const STEP_BTN_TONE: Record<AskQuestionStatus, string> = {
         answered: 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/20 font-black text-(--theme-accent-text)',
         skipped: 'border-(--theme-divider-border) text-(--theme-modal-text)/35 line-through',
@@ -162,12 +169,14 @@
 <div
     role="group"
     aria-labelledby={titleId}
-    class={mergeClass(['rounded-none border px-3 py-2.5', className])}
-    style={joinStyle([
-        'border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);',
-        'background: color-mix(in srgb, var(--theme-input-bg) 80%, transparent);',
-        styleProp
-    ])}
+    class={mergeClass([embedded ? 'sf-radius rounded-none' : 'sf-radius rounded-none border px-3 py-2.5', className])}
+    style={embedded
+        ? joinStyle([styleProp])
+        : joinStyle([
+              'border-color: color-mix(in srgb, var(--theme-accent-bg) 45%, transparent);',
+              'background: color-mix(in srgb, var(--theme-input-bg) 80%, transparent);',
+              styleProp
+          ])}
 >
     <!-- 头部：AI 为什么问、这组问题的标题 -->
     <div class="flex items-start gap-2">
@@ -207,7 +216,7 @@
         <span id={questionLabelId} class="text-xs leading-snug font-black">{current.question}</span>
         {#each questionBadges(current) as badge (badge)}
             <span
-                class="rounded-none border border-(--theme-divider-border) px-1 py-px text-[9px] text-(--theme-modal-text)/45"
+                class="sf-radius rounded-none border border-(--theme-divider-border) px-1 py-px text-[9px] text-(--theme-modal-text)/45"
                 >{badge}</span
             >
         {/each}
@@ -222,7 +231,7 @@
     {#snippet optionRow(opt: AskCardOption, control: 'radio' | 'checkbox', custom: boolean)}
         {@const on = custom ? isCustomOn(draft, current.id) : isPicked(draft, current.id, opt.value)}
         <div
-            class="rounded-none border transition-colors hover:border-(--theme-accent-bg)"
+            class="sf-radius rounded-none border transition-colors hover:border-(--theme-accent-bg)"
             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
         >
             <label class="flex cursor-pointer items-start gap-2 px-2.5 py-2">
@@ -262,7 +271,7 @@
                             // 与窗口级 Enter 同一语义：非最后一题先推进，最后一题才提交
                             enterAction()
                         }}
-                        class="w-full rounded-none border px-2 py-1 text-xs outline-none transition-colors"
+                        class="w-full sf-radius rounded-none border px-2 py-1 text-xs outline-none transition-colors"
                         style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                     />
                 </div>
@@ -303,7 +312,7 @@
         </div>
     {/if}
 
-    <!-- 四个动作：上一题 / 忽略本题 / 下一题 / 提交（必答未作答时提交禁用并指出是第几题） -->
+    <!-- 动作：上一题 / 忽略本题 / （下一题 **或** 确认答案）（必答未作答时提交禁用并指出是第几题） -->
     <div class="mt-2.5 flex flex-wrap items-center gap-2">
         <Button
             type="button"
@@ -330,31 +339,42 @@
             title={skipAllowed ? '把本题标记为「忽略」，不计入作答' : '必答题不能忽略'}>忽略本题</Button
         >
         <span class="min-w-0 flex-1"></span>
-        <Button
-            type="button"
-            variant="text"
-            size="none"
-            bare
-            keepDisabled
-            onclick={goNext}
-            disabled={!canGoNext(index, total)}
-            backgroundImage="transparent"
-            class={FOOT_BTN}
-            title="继续下一题">下一题</Button
-        >
-        <Button
-            type="button"
-            variant="text"
-            size="none"
-            bare
-            keepDisabled
-            onclick={submit}
-            disabled={!submittable}
-            backgroundImage="var(--theme-accent-bg)"
-            textColor="var(--theme-accent-text-on-bg, #fff)"
-            class="px-2.5 py-1 text-[10px] font-black transition-all hover:brightness-110"
-            title={submittable ? '提交这一组作答' : blockerText(blockers)}>提交</Button
-        >
+        {#if canGoNext(index, total)}
+            <Button
+                type="button"
+                variant="text"
+                size="none"
+                bare
+                keepDisabled
+                onclick={goNext}
+                disabled={!canGoNext(index, total)}
+                backgroundImage="transparent"
+                class={FOOT_BTN}
+                title="继续下一题">下一题</Button
+            >
+        {:else}
+            <!--
+              最后一题：**「下一题」这一格直接变成「确认答案」**（而不是另起一个提交按钮）。
+
+              两个意图：
+              1. 只有答到最后一问才有「确认答案」可按 —— 不能再在任何一题上提前提交；
+              2. 位置不变（提交与被替换掉的「下一题」同格），按钮数量不增加，不会出现两个都像「继续」的按钮。
+              必答未作答时按钮禁用，下方那行 blocker 文案会指出还差第几题。
+            -->
+            <Button
+                type="button"
+                variant="text"
+                size="none"
+                bare
+                keepDisabled
+                onclick={submit}
+                disabled={!submittable}
+                backgroundImage="var(--theme-accent-bg)"
+                textColor="var(--theme-accent-text-on-bg, #fff)"
+                class="px-2.5 py-1 text-[10px] font-black transition-all hover:brightness-110"
+                title={submittable ? '提交这一组作答' : blockerText(blockers)}>确认答案</Button
+            >
+        {/if}
     </div>
     {#if blockers.length > 0}
         <div class="mt-1.5 flex items-start gap-1 text-[10px] leading-relaxed text-amber-400/90">

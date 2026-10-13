@@ -15,6 +15,7 @@
  *   - 分段配色 → 一律 `{...TAB_ACCENT}`；
  *   - 行内动作按钮 → `ACTION_BTN` / `ACTION_BTN_ACCENT` / `ACTION_BTN_DANGER` 三档之一。
  */
+import type { DangerMode } from '$lib/data/ai-prefs.svelte'
 
 /**
  * @desc 行内分段控件的统一轨道宽度。
@@ -33,6 +34,19 @@ export const TAB_ACCENT = {
     backgroundImage: 'var(--theme-accent-bg)',
     textColor: 'var(--theme-accent-text-on-bg)'
 } as const
+
+/**
+ * @desc 危险操作策略的三档（**单轴**，与 DSH 的「沙箱模式 × 审批策略」两轴不同 —— 本应用没有
+ * 文件系统隔离的概念，硬搬文件策略那三档只会造出无对应物的档位）。
+ *
+ * 原先只定义在 `sections/ai.svelte` 内部；助手弹窗新增权限切换后提取到此处，
+ * **设置页与弹窗共用这一份**，避免同一组档位在两处各写一遍文案。
+ */
+export const DANGER_MODE_OPTIONS: { value: DangerMode; label: string; desc: string }[] = [
+    { value: 'ask', label: '每次都询问', desc: '每个危险操作都弹确认' },
+    { value: 'ask_once', label: '批量只询问一次', desc: '一次指令内只确认一次，后续直接放行' },
+    { value: 'trust', label: '无条件信任', desc: '危险操作直接执行，不再确认' }
+]
 
 /**
  * @desc 行内动作按钮的三档统一规格（原先同一个「恢复默认」在设置里有 4 种内边距 / 字号）。

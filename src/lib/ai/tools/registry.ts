@@ -2,6 +2,7 @@
 import type { ChatToolCall } from '../client'
 import type { AskUserFn } from './ask-user.types'
 import type { WebFetchFn } from './web-fetch.types'
+import type { RunScriptFn } from '../sandbox/protocol'
 
 export interface ToolDefinition {
     type: 'function'
@@ -33,6 +34,18 @@ export interface ToolContext {
     notifyCalc?: () => void
     // 长时间生成任务的进度回调（如 Buff 生成）
     onGenerateProgress?: (text: string) => void
+    /**
+     * @desc `run_js` 的**沙箱**运行器。**只有内置 AI 助手注入** ——
+     *  脚本在 Worker 里执行：无 DOM / 网络 / 存储、拿不到密钥，工具调用经 `invoke` 桥回
+     *  `executeTool`（危险工具照样确认）。安全模型见 `$lib/ai/sandbox/sandbox.worker.ts`。
+     */
+    sandboxRun?: RunScriptFn
+    /**
+     * @desc `run_js` 的**真 window** 运行器。**只有 WS 远程接管注入** ——
+     *  按无条件信任处理：不设沙箱、不注入工具，脚本直接用页面里的真 `window`。
+     *  与 `sandboxRun` 互斥出现；`run_js` 按「谁存在」选路径，故模型无法靠传参提升自己的权限。
+     */
+    windowRun?: RunScriptFn
 }
 
 export interface ToolHandler {

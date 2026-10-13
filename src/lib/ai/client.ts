@@ -1,5 +1,6 @@
 // AI 流式客户端（OpenAI 兼容的 chat/completions；无 CORS 的端点自动走站点 /api/ai/stream 转发代理）
 // 不绑定服务商：baseUrl / model 来自 AI 配置，这里只提供默认值。
+import { toChatContentParts } from './image-parts'
 
 /** @desc 默认服务地址 / 模型（可在 AI 配置里改成任意 OpenAI 兼容端点与模型） */
 const DEFAULT_BASE = 'https://api.deepseek.com'
@@ -8,6 +9,20 @@ const TIMEOUT_MS = 240000
 const MAX_TOKENS = 65536
 // 支持浏览器直连（已配置 CORS）的 host；本地服务与白名单 host 直连，其余走站点代理
 const DIRECT_BASE_HOSTS = ['api.deepseek.com']
+
+/**
+ * @desc 把内部消息转成请求体里的消息。
+ *
+ * 只有带图片附件的消息需要转换：`content` 由字符串变成 content parts，并把 `images`
+ * 这个**内部字段摘掉**（它不是协议字段，发出去只会让服务商困惑）。
+ * 其余消息原样传递，保持与改动前完全一致的请求体。
+ */
+export const toChatWireMessages = (messages: readonly ChatMessage[]): unknown[] =>
+    messages.map((message) => {
+        const { images, ...rest } = message
+        if (!images || images.length === 0) return rest
+        return { ...rest, content: toChatContentParts(rest.content ?? '', images) }
+    })
 
 export interface ChatMessage {
     role: 'system' | 'user' | 'assistant' | 'tool'
@@ -21,6 +36,15 @@ export interface ChatMessage {
     }>
     // Responses API 模式：本轮的服务端 web_search 调用（下轮原样回传）
     webSearchCalls?: Array<{ id: string }>
+    /**
+     * @desc 图片附件（data URL 数组）。
+     *
+     * 为什么是**独立字段**而不是把 `content` 改成 content parts：`content` 被 token 估算、
+     * Markdown 渲染、工具结果等多处按字符串消费，改类型会把这些消费点全部拖下水。
+     * 这里只在**发请求那一刻**（`toChatWireMessages`）转成协议要求的 parts，
+     * 转换逻辑与两条协议的形状差异集中在 `image-parts.ts`。
+     */
+    images?: string[]
 }
 
 export interface ChatDelta {
@@ -107,7 +131,7 @@ export async function chatCompletionStream(
     const maxTokens = options.maxTokens ?? MAX_TOKENS
     const body: Record<string, unknown> = {
         model: options.model?.trim() || DEFAULT_MODEL,
-        messages,
+        messages: toChatWireMessages(messages),
         stream: true,
         stream_options: { include_usage: true },
         temperature: 0.3,

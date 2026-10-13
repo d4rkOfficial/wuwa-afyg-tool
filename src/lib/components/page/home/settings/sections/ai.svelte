@@ -30,7 +30,7 @@
         type DangerMode
     } from '$lib/data/ai-prefs.svelte'
     import {
-        addProfile,
+        createBlankAiProfile,
         getActiveProfileId,
         getAiProfiles,
         setActiveProfile,
@@ -47,7 +47,7 @@
     import SkillSection from '../skill-section.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
-    import { ROW_TABS, TAB_ACCENT } from '../utils'
+    import { DANGER_MODE_OPTIONS, ROW_TABS, TAB_ACCENT } from '../utils'
 
     interface Props extends ComponentsProps {
         /**
@@ -79,12 +79,6 @@
         addToast(getGenPrefs().enabled ? 'AI 助手已启用' : 'AI 助手已禁用', 'success')
     }
 
-    const DANGER_MODE_OPTIONS: { value: DangerMode; label: string; desc: string }[] = [
-        { value: 'ask', label: '每次都询问', desc: '每个危险操作都弹确认' },
-        { value: 'ask_once', label: '批量只询问一次', desc: '一次指令内只确认一次，后续直接放行' },
-        { value: 'trust', label: '无条件信任', desc: '危险操作直接执行，不再确认' }
-    ]
-
     // ── 文字 tab（T15）──
     /**
      * @desc 「启用 AI 助手」是功能总开关，没有比「启用 / 禁用」更具体的语义轴
@@ -115,10 +109,13 @@
         }
     }
 
-    async function handleAddAiProfile() {
-        const profile = await addProfile('新配置')
-        setAiEditTarget(profile)
-        addToast('已新建配置文件，请填写 API Key 后保存', 'success')
+    /**
+     * @desc 新建配置：**只打开弹窗，不预先创建**（草稿 `id` 为空即「尚未创建」）。
+     * 用户点保存才真正落库，取消则什么都不发生 —— 原先先 `addProfile` 再开弹窗，
+     * 于是「取消」也会留下一条空配置。
+     */
+    function handleAddAiProfile() {
+        setAiEditTarget(createBlankAiProfile())
     }
 
     /** @desc 删除入口：二次确认关闭时直接删除（删除实现由 store 提供，与外壳的确认弹窗共用同一份） */

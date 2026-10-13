@@ -3,8 +3,10 @@
     import Icon from '@iconify/svelte'
     import { fade } from 'svelte/transition'
     import { runAiTurn, type SessionEvent } from '$lib/ai/session'
-    import { getAiConfig, loadAiConfig } from '$lib/ai/config.svelte'
-    import { loadGenPrefs, isAiEnabled, getDangerMode } from '$lib/data/ai-prefs.svelte'
+    import { loadAiConfig } from '$lib/ai/config.svelte'
+    import { getEffectiveDangerMode, resolveAiConfig } from '$lib/ai/session-overrides.svelte'
+    import { applyCompaction, planCompaction, summarizeMessages } from '$lib/ai/compaction'
+    import { loadGenPrefs, isAiEnabled } from '$lib/data/ai-prefs.svelte'
     import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
     import { notifyCalcUpdate, getCalcState } from '$lib/calc/calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
@@ -18,23 +20,28 @@
     import {
         describeTurnPhase,
         getLastTurnSummary,
+        getSessionUsage,
         getTurnRuntime,
+        getWorkSummary,
+        recordCompaction,
         resetAiSessionState
     } from '$lib/ai/turn-state.svelte'
-    import { formatDuration, summarizeTurn } from '$lib/ai/token-usage'
+    import { formatDuration, formatTokens, summarizeTurn } from '$lib/ai/token-usage'
     import { MOTION_MS, motionDuration, slideParams } from '$lib/utils/motion'
+    import AiComposer from './ai-composer.svelte'
     import AiContextPanel from './ai-context-panel.svelte'
     import AskUserCard from './ask-user-card.svelte'
-    import { cancelResult, settleOnce } from './ask-user-card.utils'
+    import { cancelResult, normalizeGroup, settleOnce } from './ask-user-card.utils'
+    import { applyToolEvent, applyToolProgress, type ToolCard } from './ai-tools.utils'
     import TabPanel from '$lib/components/ui/tab-panel.svelte'
     import Button from '$lib/components/ui/button.svelte'
     import type { ComponentsProps } from '$lib/types'
 
-    interface ToolCard {
-        name: string
-        args: Record<string, unknown>
-        resultLen?: number
-    }
+    /**
+     * @desc 工具时间线的并入逻辑（含 `ToolCard` 类型）抽在 `./ai-tools.utils`：
+     *  它是纯函数、可单测，而「最后一张卡 + 名称相同」那套旧配对一旦漏一次就全体错位
+     *  （实测：服务端 `web_search` 完成时不发结果事件，后面所有工具的结果都记错人）。
+     */
 
     /**
      * 当前待作答的提问卡（`ask_user` 工具）。与「危险操作确认卡」同一处渲染：都不遮罩弹窗。
@@ -52,14 +59,24 @@
     }
 
     interface DisplayMsg {
-        role: 'user' | 'assistant'
+        /**
+         * @desc `compaction` 是**压缩标记**：不是对话气泡，而是在对话流里插一条分隔标记，
+         *  说明「从这里往上的原始消息已移出模型上下文」。界面刻意保留旧气泡供回看（DSH 同样如此）。
+         */
+        role: 'user' | 'assistant' | 'compaction'
         text: string
+        /** @desc 用户消息附带的图片（data URL），仅 user 角色有值 */
+        images?: string[]
         reasoning?: string
         tools?: ToolCard[]
         // 发言是否已结束（结束后自动收起思考过程与工具调用）
         done?: boolean
         // 气泡内当前激活的 tab（聊天/思考/工具）
         tab?: 'chat' | 'reasoning' | 'tools'
+        // 压缩标记的统计（仅 role === 'compaction' 时有值；`text` 即摘要正文）
+        compaction?: { summarized: number; tokensBefore: number; tokensAfter: number }
+        // 压缩标记是否展开显示摘要正文
+        expanded?: boolean
     }
 
     interface Props extends ComponentsProps {
@@ -89,7 +106,6 @@
     // 悬浮窗形态：collapsed=48px 圆钮 / small=默认小卡片 / large=全尺寸卡片
     let size = $state<'collapsed' | 'small' | 'large'>('collapsed')
     let busy = $state(false)
-    let input = $state('')
     let messages = $state<ChatMessage[]>([])
     let display = $state<DisplayMsg[]>([])
     // 危险操作确认卡片（显示在聊天框中，不遮罩弹窗）
@@ -100,6 +116,8 @@
     // 批量信任：一次指令回合内已批准过危险操作 → 后续危险操作直接放行（dangerMode=ask_once）
     let turnDangerApproved = $state(false)
     let abortCtrl = $state<AbortController | null>(null)
+    /** @desc 压缩请求进行中（与 `busy` 分开：压缩不占回合，但同样要防重入） */
+    let compacting = $state(false)
 
     // 拖动位置（左上角坐标；null = 默认右下角）
     let dragPos = $state<{ x: number; y: number } | null>(null)
@@ -114,6 +132,36 @@
     const statusText = $derived.by(() => {
         if (runtime.running) return `${describeTurnPhase(runtime)} · ${formatDuration(runtime.elapsedMs)}`
         return turnSummary ? summarizeTurn(turnSummary) : ''
+    })
+    /** @desc 会话累计（对齐 DSH 状态行的「N 轮 N 步」）；一次都没跑过时不显示 */
+    const sessionStatus = $derived.by(() => {
+        const usage = getSessionUsage()
+        if (usage.turns === 0 && usage.steps === 0) return ''
+        return `${usage.turns} 轮 · ${usage.steps} 步`
+    })
+    /**
+     * @desc 是否存在待确认 / 待作答的卡片。
+     * 用它（而不是把卡片状态搬进 composer）决定 composer 显示输入行还是显示卡片：
+     * 卡片的 resolve 回调、幂等收尾、`{#key}` 重挂全归本组件，composer 只是容器。
+     */
+    const hasPendingCard = $derived(Boolean(confirmCard || askCard))
+
+    /** @desc 悬浮窗大标题 = 当前工作摘要（AI 每轮经 `set_work_summary` 工具更新） */
+    const workSummary = $derived(getWorkSummary())
+
+    /**
+     * @desc 待作答卡片**收起时**显示的那一行，也就是 AI 的问题。
+     * 危险确认 → 「确认执行「工具名」」；提问卡 → 归一后的**第一题**正文。
+     * composer 拿不到 snippet 内部内容（snippet 是不透明的），故在这里算好传进去。
+     */
+    const pendingLabel = $derived.by(() => {
+        if (confirmCard) return `确认执行「${confirmCard.toolName}」`
+        if (askCard) {
+            const group = normalizeGroup(askCard.request)
+            const first = group.questions[0]
+            return first ? `第 ${first.no} 题：${first.question}` : group.title || '需要你的作答'
+        }
+        return ''
     })
 
     // ── 技能管理已迁到「设置 → AI助手 → 权限 / 提示词 → 技能」；工程变化队列纯后台静默，界面都不显示 ──
@@ -201,7 +249,6 @@
         return { x: Math.max(8, Math.min(pos.x, maxX)), y: Math.max(8, Math.min(pos.y, maxY)) }
     }
 
-    const aiConfig = $derived(getAiConfig())
     // AI 助手是否启用（悬浮窗显隐）：取**实际**状态 = 持久化偏好 ∧ 非会话级强制关闭（Toy 宿主会话内隐藏）
     const aiEnabled = $derived(isAiEnabled())
     // GPU 合成加速（设置 → 交互相关）：拖拽定位用 transform 走合成层
@@ -334,11 +381,24 @@
         askCard?.resolve(cancelResult())
     }
 
+    /**
+     * @desc 中止待确认的危险操作：按「拒绝」收尾并清掉卡片。
+     *
+     * 与 `cancelAskCard` 同理 —— **危险确认也把工具执行挂在 Promise 上**：
+     * 只 `abort()` 是解不开的（abort 只打断 HTTP 流，打不断工具处理器），
+     * 于是整轮会永远停在「正在调用工具「X」」、计时一直涨，而且停止按钮按了没反应（实测故障）。
+     */
+    function cancelConfirmCard() {
+        confirmCard?.resolve(false)
+        confirmCard = null
+    }
+
     /** @desc 清空对话（入口已从头部右上角移到上下文面板底部的「清空对话历史」按钮） */
     function clearConversation() {
         abortCtrl?.abort()
         // 对话清掉后提问卡不该还能作答（它的 Promise 也要收尾，否则 ask_user 会永久悬挂）
         cancelAskCard()
+        cancelConfirmCard()
         messages = []
         display = []
         // 会话级用量累计 / 分段快照 / 回合汇总一并清掉（分段临时禁用选择保留）
@@ -347,36 +407,92 @@
 
     function stopGenerating() {
         abortCtrl?.abort()
-        // 提问卡正等着用户作答时，光 abort 是**解不开**的：工具挂在我们的 Promise 上，
-        // 只有把它按「放弃」收尾，回合才会往下走（下一轮的 stream 会因已 abort 立即抛 aborted）。
+        // 提问卡 / 危险确认卡都在等用户操作，而**工具执行挂在它们的 Promise 上**：
+        // 光 abort 是解不开的，必须把两张卡都按「放弃」收尾，否则整轮会永远停在「正在调用工具」。
         cancelAskCard()
+        cancelConfirmCard()
     }
 
-    async function send(retryText?: string) {
-        const text = (retryText ?? input).trim()
-        if (!text || busy) return
-        input = ''
+    /**
+     * @desc 压缩历史：把较旧的历史交给模型压成摘要，用「摘要 + 最近若干条原文」替换它。
+     *
+     * 两点刻意的取舍：
+     * 1. **不删对话气泡** —— 界面保留完整对话，只有**模型上下文**被压（DSH 同样如此），
+     *    并在对话流里插一条可展开的压缩标记；否则用户会以为消息丢了。
+     * 2. **摘要失败就不动历史** —— 不做静默降级。本地裁剪（直接丢最旧若干轮）会无声丢信息，
+     *    与本仓库「失败要响」的口径冲突，故只报错、不改上下文。
+     */
+    async function compactHistory() {
+        if (compacting) return
+        const plan = planCompaction(messages)
+        if (!plan) {
+            addToast('历史太短，或切点之后找不到用户消息这一安全边界，暂不压缩', 'info')
+            return
+        }
+        compacting = true
+        try {
+            const outcome = await summarizeMessages(resolveAiConfig(), plan.older)
+            if (!outcome.ok) {
+                addToast(`压缩失败：${outcome.error}`, 'error')
+                return
+            }
+            const applied = applyCompaction(messages, plan, outcome.summary)
+            messages = applied.history
+            display = [
+                ...display,
+                {
+                    role: 'compaction',
+                    text: outcome.summary,
+                    done: true,
+                    compaction: {
+                        summarized: applied.summarizedCount,
+                        tokensBefore: applied.tokensBefore,
+                        tokensAfter: applied.tokensAfter
+                    }
+                }
+            ]
+            recordCompaction({
+                summarizedCount: applied.summarizedCount,
+                tokensBefore: applied.tokensBefore,
+                tokensAfter: applied.tokensAfter
+            })
+            addToast(`已压缩 ${applied.summarizedCount} 条历史`, 'success')
+            scrollToBottom()
+        } finally {
+            compacting = false
+        }
+    }
+
+    /**
+     * @desc 发送一条指令。
+     * @param text 指令正文（可能为空串 —— 只发图片是合法消息）
+     * @param retry 是否为「重试」—— 重试先把该条用户消息（含）之后的展示与历史一并回退，再重新发送
+     * @param images 图片附件 data URL（重试时沿用原消息的附件，否则会静默丢图）
+     */
+    async function send(text: string, retry = false, images: string[] = []) {
+        const trimmed = text.trim()
+        if ((!trimmed && images.length === 0) || busy) return
         busy = true
         abortCtrl = new AbortController()
         turnDangerApproved = false
         // 重试：回退到该条用户消息（含）之后全部内容，重新发送
-        if (retryText) {
+        if (retry) {
             let lastUserIdx = -1
             for (let i = display.length - 1; i >= 0; i--) {
-                if (display[i].role === 'user' && display[i].text === retryText) {
+                if (display[i].role === 'user' && display[i].text === trimmed) {
                     lastUserIdx = i
                     break
                 }
             }
             if (lastUserIdx > 0) display = display.slice(0, lastUserIdx)
             const msgUsers = messages
-                .map((m, i) => (m.role === 'user' && m.content === retryText ? i : -1))
+                .map((m, i) => (m.role === 'user' && m.content === trimmed ? i : -1))
                 .filter((i) => i >= 0)
             if (msgUsers.length > 0) messages = messages.slice(0, msgUsers[msgUsers.length - 1])
         }
         display = [
             ...display,
-            { role: 'user', text },
+            { role: 'user', text: trimmed, ...(images.length > 0 ? { images } : {}) },
             { role: 'assistant', text: '', reasoning: '', tools: [], done: false, tab: 'chat' }
         ]
         const last = () => display[display.length - 1]
@@ -384,7 +500,7 @@
         try {
             await runAiTurn({
                 history: messages,
-                newUserMessage: text,
+                newUserMessage: trimmed,
                 context: contextState,
                 signal: abortCtrl.signal,
                 onMessages: (msgs) => (messages = msgs),
@@ -394,21 +510,16 @@
                     updateCalculation(getCalcState())
                 },
                 onGenerateProgress: (status) => {
-                    // 生成任务进度：合并到正在执行的 generate_* 工具卡片上，并切到工具 tab
-                    const tools = last().tools ?? []
-                    const prev = tools[tools.length - 1]
-                    if (prev && prev.name.startsWith('generate_') && prev.resultLen === undefined) {
-                        prev.args = { ...prev.args, status }
-                    } else {
-                        tools.push({ name: 'buff生成', args: { status } })
-                    }
-                    last().tools = tools
+                    // 生成任务进度：合并到正在执行的 generate_* 工具卡片上（否则追加纯进度伪卡），
+                    // 并切到工具 tab。伪卡没有 seq，因此不会抢走真实调用的结果配对。
+                    last().tools = applyToolProgress(last().tools ?? [], status)
                     last().tab = 'tools'
                     scrollToBottom()
                 },
                 onConfirm: (toolName, summary) =>
                     new Promise<boolean>((resolve) => {
-                        const mode = getDangerMode()
+                        // 生效策略来自会话覆盖层（弹窗工具条可临时切换），而不是直接读全局设置
+                        const mode = getEffectiveDangerMode()
                         // 无条件信任：直接放行
                         if (mode === 'trust') {
                             resolve(true)
@@ -455,25 +566,14 @@
                         last().reasoning = (last().reasoning ?? '') + (evt.text ?? '')
                         last().tab = 'reasoning'
                     } else if (evt.type === 'tool') {
-                        const tools = last().tools ?? []
-                        const prev = tools[tools.length - 1]
-                        if (
-                            evt.resultLen !== undefined &&
-                            prev &&
-                            prev.name === evt.toolName &&
-                            prev.resultLen === undefined
-                        ) {
-                            prev.resultLen = evt.resultLen
-                            // AI 切换工程/视图后告知用户
-                            if (evt.toolName === 'switch_view') {
-                                addToast('AI 已切换视图', 'success')
-                            } else if (evt.toolName === 'set_active_project') {
-                                addToast('AI 已切换工程', 'success')
-                            }
-                        } else if (evt.toolName) {
-                            tools.push({ name: evt.toolName, args: evt.toolArgs ?? {} })
+                        // 按 seq 配对（不再用「最后一张卡 + 名称相同」）：一次漏配对只影响自己
+                        last().tools = applyToolEvent(last().tools ?? [], evt)
+                        // AI 切换工程/视图后告知用户（只在真正出结果的那条事件上提示一次）
+                        if (evt.resultLen !== undefined && evt.toolName === 'switch_view') {
+                            addToast('AI 已切换视图', 'success')
+                        } else if (evt.resultLen !== undefined && evt.toolName === 'set_active_project') {
+                            addToast('AI 已切换工程', 'success')
                         }
-                        last().tools = tools
                         last().tab = 'tools'
                         scrollToBottom()
                     } else if (evt.type === 'error') {
@@ -663,17 +763,22 @@
                 }}
             >
                 <Icon icon="mdi:robot-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
+                <!-- 大标题 = 当前工作摘要（AI 每轮经 `set_work_summary` 更新）。
+                     提供商 / 模型刻意不再占位：输入区右侧的「模型 · 等级」已承担该信息，
+                     标题留给「正在做什么」这件对用户更有用的事。 -->
                 <div class="min-w-0 flex-1 leading-tight">
-                    <div class="truncate text-sm font-black tracking-tight" title={aiConfig.baseUrl}>
-                        {aiConfig.model}
-                    </div>
-                    <div class="truncate text-[10px] text-(--theme-modal-text)/40" title={aiConfig.baseUrl}>
-                        {aiConfig.label}
+                    <div
+                        class="truncate text-sm font-black tracking-tight {workSummary
+                            ? ''
+                            : 'text-(--theme-modal-text)/35'}"
+                        title={workSummary || 'AI 尚未给出工作摘要'}
+                    >
+                        {workSummary || '新对话'}
                     </div>
                 </div>
                 <button
                     onclick={() => (contextOpen = !contextOpen)}
-                    class="rounded-none p-1 transition-colors {contextOpen
+                    class="sf-radius rounded-none p-1 transition-colors {contextOpen
                         ? 'text-(--theme-accent-text)'
                         : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)'}"
                     title="上下文 / 用量 / 运行情况"
@@ -711,27 +816,15 @@
                 </Button>
             </div>
 
-            <!-- 实时状态条：运行中走时钟，结束后保留最后一次回合汇总 -->
-            {#if statusText}
-                <div
-                    class="flex shrink-0 items-center gap-1.5 border-b px-3 py-1 text-[10px] tabular-nums"
-                    style="border-color: var(--theme-divider-border);"
-                >
-                    <span
-                        class="inline-block size-1.5 shrink-0 rounded-full"
-                        style="background: var(--theme-accent-bg); opacity: {runtime.running ? 1 : 0.3};"
-                    ></span>
-                    <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)/50" title={statusText}>
-                        {statusText}
-                    </span>
-                </div>
-            {/if}
+            <!-- 实时状态条原先挂在头部下方；现按 DSH 的形态**下移**到 composer 之后（见文件底部） -->
 
             <!-- 上下文 / 用量 / 运行情况面板（默认收起；入口为头部 layers 按钮） -->
             <AiContextPanel
                 open={contextOpen}
                 onclose={() => (contextOpen = false)}
                 onClearHistory={clearConversation}
+                onCompactHistory={compactHistory}
+                {compacting}
             />
 
             <!-- 消息区 -->
@@ -747,15 +840,30 @@
                         {@const isLastUser = i === lastUserDisplayIdx}
                         <div class="flex justify-end">
                             <div
-                                class="max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-none px-3 py-2 text-xs leading-relaxed"
+                                class="max-w-[85%] wrap-break-word sf-radius rounded-none px-3 py-2 text-xs leading-relaxed"
                                 style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
                             >
-                                {m.text}
+                                {#if m.images && m.images.length > 0}
+                                    <!-- 附件缩略图：用索引作 key（同一张图可被附两次，值会重复） -->
+                                    <div class="mb-1.5 flex flex-wrap gap-1.5">
+                                        {#each m.images as url, imgIdx (imgIdx)}
+                                            <img
+                                                src={url}
+                                                alt={`附件 ${imgIdx + 1}`}
+                                                class="size-16 sf-radius rounded-none border object-cover"
+                                                style="border-color: color-mix(in srgb, var(--theme-accent-text-on-bg, #fff) 30%, transparent);"
+                                            />
+                                        {/each}
+                                    </div>
+                                {/if}
+                                {#if m.text}
+                                    <span class="whitespace-pre-wrap">{m.text}</span>
+                                {/if}
                                 {#if isLastUser}
                                     <button
-                                        onclick={() => send(m.text)}
+                                        onclick={() => send(m.text, true, m.images ?? [])}
                                         disabled={busy}
-                                        class="ml-1 inline-flex items-center rounded-none px-0.5 py-0.5 align-middle opacity-50 transition-opacity hover:opacity-100 disabled:opacity-30"
+                                        class="ml-1 inline-flex items-center sf-radius rounded-none px-0.5 py-0.5 align-middle opacity-50 transition-opacity hover:opacity-100 disabled:opacity-30"
                                         style="color: var(--theme-accent-text-on-bg, #fff);"
                                         title="重试这条指令"
                                     >
@@ -764,13 +872,41 @@
                                 {/if}
                             </div>
                         </div>
+                    {:else if m.role === 'compaction'}
+                        <!-- 压缩标记：居中分隔条，展开可看摘要正文（旧气泡保留在它上方供回看） -->
+                        <div class="flex flex-col items-center gap-1 py-1">
+                            <button
+                                type="button"
+                                onclick={() => (m.expanded = !m.expanded)}
+                                class="flex items-center gap-1.5 sf-radius rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/45 transition-colors hover:text-(--theme-modal-text)"
+                                style="border-color: var(--theme-divider-border);"
+                                title="原始消息已移出模型上下文；上方的对话气泡保留供你回看"
+                            >
+                                <Icon icon="mdi:archive-arrow-down-outline" class="size-3 shrink-0" />
+                                已压缩 {m.compaction?.summarized} 条历史 · ≈{formatTokens(m.compaction?.tokensBefore)} → ≈{formatTokens(
+                                    m.compaction?.tokensAfter
+                                )} token
+                                <Icon
+                                    icon={m.expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                                    class="size-3 shrink-0 opacity-60"
+                                />
+                            </button>
+                            {#if m.expanded}
+                                <div
+                                    class="theme-scrollbar max-h-48 w-full overflow-y-auto sf-radius rounded-none border px-2.5 py-2 text-[10px] leading-relaxed whitespace-pre-wrap text-(--theme-modal-text)/60"
+                                    style="border-color: var(--theme-divider-border); background: color-mix(in srgb, var(--theme-input-bg) 60%, transparent);"
+                                >
+                                    {m.text}
+                                </div>
+                            {/if}
+                        </div>
                     {:else}
                         {@const hasReasoning = !!m.reasoning}
                         {@const hasTools = !!(m.tools && m.tools.length > 0)}
                         {@const activeTab = m.tab ?? 'chat'}
                         <div class="flex justify-start">
                             <div
-                                class="ai-md max-w-[92%] wrap-break-word rounded-none px-3 py-2 text-xs leading-relaxed"
+                                class="ai-md max-w-[92%] wrap-break-word sf-radius rounded-none px-3 py-2 text-xs leading-relaxed"
                                 style="background: var(--theme-input-bg);"
                             >
                                 {#if hasReasoning || hasTools}
@@ -780,7 +916,7 @@
                                     >
                                         <button
                                             onclick={() => setTab(m, 'chat')}
-                                            class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                            class="sf-radius rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                             'chat'
                                                 ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                 : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
@@ -790,7 +926,7 @@
                                         {#if hasReasoning}
                                             <button
                                                 onclick={() => setTab(m, 'reasoning')}
-                                                class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                                class="sf-radius rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                                 'reasoning'
                                                     ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
@@ -801,7 +937,7 @@
                                         {#if hasTools}
                                             <button
                                                 onclick={() => setTab(m, 'tools')}
-                                                class="rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
+                                                class="sf-radius rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
                                                 'tools'
                                                     ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
                                                     : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
@@ -830,7 +966,11 @@
                                         {/if}
                                     {:else}
                                         <div class="flex flex-col gap-1">
-                                            {#each m.tools ?? [] as t (t.name)}
+                                            <!-- 用**索引**作 key：同一个工具在一次回合里可以被调用多次
+                                                 （`run_js` 连调两轮、或一轮里并行两个同名工具都会），
+                                                 用 `t.name` 会撞 key 并抛 each_key_duplicate（实测踩过）。
+                                                 该列表只追加、不重排，故位置即身份。 -->
+                                            {#each m.tools ?? [] as t, toolIdx (toolIdx)}
                                                 <div
                                                     class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/40"
                                                 >
@@ -844,6 +984,8 @@
                                                         <span class="truncate text-(--theme-modal-text)/40"
                                                             >{t.args.status}</span
                                                         >
+                                                    {:else if t.done}
+                                                        <span class="text-(--theme-modal-text)/35">已完成</span>
                                                     {:else}
                                                         <span class="text-(--theme-accent-text)">执行中…</span>
                                                     {/if}
@@ -857,88 +999,87 @@
                     {/if}
                 {/each}
 
-                {#if confirmCard}
-                    <div
-                        class="rounded-none border border-red-500/40 px-3 py-2.5"
-                        style="background: color-mix(in srgb, var(--theme-input-bg) 80%, transparent);"
-                    >
-                        <div class="flex items-center gap-2 text-xs font-black tracking-tight">
-                            <Icon icon="mdi:alert-outline" class="size-4 shrink-0 text-red-500" />
-                            确认执行操作
-                        </div>
-                        <div class="mt-1.5 rounded-none px-2.5 py-2 text-xs" style="background: var(--theme-input-bg);">
-                            <div class="font-black text-(--theme-accent-text)">{confirmCard.toolName}</div>
-                            <div class="mt-0.5 wrap-break-word text-(--theme-modal-text)/70">{confirmCard.summary}</div>
-                        </div>
-                        <div class="mt-2.5 flex justify-end gap-2">
-                            <button
-                                onclick={() => {
-                                    confirmCard?.resolve(false)
-                                    confirmCard = null
-                                }}
-                                class="rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
-                                style="border-color: var(--theme-divider-border);"
-                            >
-                                拒绝
-                            </button>
-                            <button
-                                onclick={() => {
-                                    confirmCard?.resolve(true)
-                                    confirmCard = null
-                                }}
-                                class="rounded-none bg-red-500 px-2.5 py-1 text-[10px] font-medium text-white transition-all hover:brightness-110"
-                            >
-                                允许执行
-                            </button>
-                        </div>
-                    </div>
-                {/if}
-
-                <!-- 「向用户提问」卡片（ask_user）：与确认卡同处渲染；`{#key}` 保证换一组问题一定重挂新实例，
-                     组件卸载时按「放弃」收尾，不会把上一组问题与作答残留到下一轮 -->
-                {#if askCard}
-                    {#key askCard}
-                        <AskUserCard request={askCard.request} onresolve={askCard.resolve} />
-                    {/key}
-                {/if}
+                <!-- 危险确认卡与 ask_user 提问卡已移入 composer 卡片内部（见本文件末尾的 `pendingCard` snippet） -->
             </div>
 
-            <!-- 输入区：`ask_user` 提问卡激活时**整块隐藏** —— 此刻回合正阻塞在工具里等作答，
-                 发送任何文本都不会被处理（只会让用户以为说上了话），且 Enter 已接管为「下一题 / 提交」。
-                 作答与提交全在卡片内完成；卡片消失（提交或放弃）后输入区自动回来。 -->
-            {#if !askCard}
-                <div class="shrink-0 border-t p-2.5" style="border-color: var(--theme-divider-border);">
-                    <div class="flex items-end gap-2">
-                        <textarea
-                            bind:value={input}
-                            placeholder="输入指令…（Enter 发送，Shift+Enter 换行）"
-                            rows="2"
-                            onkeydown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    send()
-                                }
-                            }}
-                            class="min-h-0 flex-1 resize-none rounded-none border px-2.5 py-2 text-xs leading-relaxed outline-none transition-colors"
-                            style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
-                        ></textarea>
-                        <div class="flex shrink-0 flex-col items-center gap-1">
-                            <button
-                                onclick={() => (busy ? stopGenerating() : send())}
-                                disabled={!busy && !input.trim()}
-                                class="flex size-9 items-center justify-center rounded-none transition-all hover:brightness-115 disabled:opacity-40"
-                                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                                title={busy ? '停止生成' : '发送'}
-                            >
-                                <Icon icon={busy ? 'mdi:stop' : 'mdi:send'} class="size-4" />
-                            </button>
-                        </div>
-                    </div>
+            <!-- composer（输入框 + 权限 / 模型·等级 / 用量圈 / 发送）与状态行都在子组件里，宿主只给 busy 与回调。
+                 危险确认卡 / `ask_user` 卡经 `pending` 槽位渲染在 composer **卡片内部**（替掉输入行）：
+                 此刻回合正阻塞在工具里等作答，发送任何文本都不会被处理，故不再并排留一个用不了的输入框。 -->
+            <AiComposer
+                {busy}
+                onsend={(text, images) => send(text, false, images)}
+                onstop={stopGenerating}
+                pending={hasPendingCard ? pendingCard : undefined}
+                {pendingLabel}
+            />
+            <!-- 会话状态行：对齐 DSH 的「本轮汇总 ｜ N 轮 N 步」，挂在 composer **下方** -->
+            {#if statusText || sessionStatus}
+                <div class="flex shrink-0 items-center gap-1.5 px-3 pb-2.5 text-[10px] tabular-nums">
+                    <span
+                        class="inline-block size-1.5 shrink-0 rounded-full"
+                        style="background: var(--theme-accent-bg); opacity: {runtime.running ? 1 : 0.3};"
+                    ></span>
+                    <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)/45" title={statusText}>
+                        {statusText}
+                    </span>
+                    {#if sessionStatus}
+                        <span class="shrink-0 text-(--theme-modal-text)/30">{sessionStatus}</span>
+                    {/if}
                 </div>
             {/if}
         {/if}
     </div>
 {/if}
+
+{#snippet pendingCard()}
+    {#if confirmCard}
+        <!-- 危险操作确认：内容驱动，样式交给 composer 卡片（不再自带外框与底色） -->
+        <div class="flex items-start gap-2">
+            <Icon icon="mdi:alert-outline" class="mt-px size-4 shrink-0 text-red-500" />
+            <div class="min-w-0 flex-1 leading-tight">
+                <div class="text-xs font-black tracking-tight">确认执行操作</div>
+                <div class="mt-0.5 text-[10px] text-(--theme-modal-text)/55">这一步可能改动你的数据，请确认</div>
+            </div>
+        </div>
+        <div
+            class="mt-2 sf-radius rounded-none border px-2.5 py-2 text-xs"
+            style="background: var(--theme-input-bg); border-color: var(--theme-divider-border);"
+        >
+            <div class="font-black text-(--theme-accent-text)">{confirmCard.toolName}</div>
+            <div class="mt-0.5 wrap-break-word text-(--theme-modal-text)/70">{confirmCard.summary}</div>
+        </div>
+        <div class="mt-2 flex justify-end gap-2">
+            <button
+                type="button"
+                onclick={() => {
+                    confirmCard?.resolve(false)
+                    confirmCard = null
+                }}
+                class="sf-radius rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                style="border-color: var(--theme-divider-border);"
+            >
+                拒绝
+            </button>
+            <button
+                type="button"
+                onclick={() => {
+                    confirmCard?.resolve(true)
+                    confirmCard = null
+                }}
+                class="sf-radius rounded-none bg-red-500 px-2.5 py-1 text-[10px] font-medium text-white transition-all hover:brightness-110"
+            >
+                允许执行
+            </button>
+        </div>
+    {:else if askCard}
+        <!-- 「向用户提问」卡片（ask_user）：`{#key}` 保证换一组问题一定重挂新实例，
+             组件卸载时按「放弃」收尾，不会把上一组问题与作答残留到下一轮。
+             `embedded` 让卡片不再自带外框/底色 —— composer 卡片已经提供了表面。 -->
+        {#key askCard}
+            <AskUserCard request={askCard.request} onresolve={askCard.resolve} embedded />
+        {/key}
+    {/if}
+{/snippet}
 
 <style>
     .ai-md > :first-child {

@@ -10,7 +10,13 @@ const MAX_OUTPUT_TOKENS = 65536
 export interface ResponseMessageItem {
     type: 'message'
     role: 'user' | 'assistant' | 'system'
-    content: Array<{ type: string; text: string }>
+    /**
+     * @desc Responses 的 content parts。
+     * `text` 与 `image_url` 都可选：文本 part 用 `input_text` / `output_text`，
+     * 图片附件用 `input_image`（且 `image_url` 是**字符串**，与 Chat Completions 的对象形状不同）。
+     * 形状的唯一真源是 `image-parts.ts`，两侧都有单测钉住。
+     */
+    content: Array<{ type: string; text?: string; image_url?: string }>
 }
 
 export interface ResponseFunctionCallItem {

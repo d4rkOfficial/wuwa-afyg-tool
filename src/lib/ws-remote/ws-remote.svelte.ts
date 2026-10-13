@@ -1,6 +1,7 @@
 // WS 远程接管客户端：解析 #websocket= 目标 → 连接/自动重连 → 复用 AI 工具注册表（executeTool）执行服务器下发的 exec 指令并回传结果/状态
 import { browser, version } from '$app/environment'
 import { availableTools, executeTool } from '$lib/ai/tools'
+import { runInWindow } from '$lib/ai/sandbox/window-runner'
 import { getPanelsState } from '$lib/ai/panels.svelte'
 import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
 import { getCalcState, notifyCalcUpdate } from '$lib/calc/calculation.store.svelte'
@@ -236,7 +237,9 @@ function wsCtx() {
         },
         onGenerateProgress: (text: string) => {
             _socket?.send(JSON.stringify({ type: 'progress', text }))
-        }
+        },
+        // run_js：远程接管走**真 window** 路径（不设沙箱、不注入工具）—— 见 run-js.ts 的说明
+        windowRun: runInWindow
     }
 }
 

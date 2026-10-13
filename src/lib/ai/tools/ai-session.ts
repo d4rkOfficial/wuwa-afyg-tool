@@ -12,6 +12,7 @@ import {
     hasContextSnapshot,
     resetDisabledSegments,
     setContextSnapshot,
+    setWorkSummary,
     toggleSegmentDisabled
 } from '../turn-state.svelte'
 import { TURN_SEGMENT_HINTS, TURN_SEGMENT_LABELS, type TurnSegmentId } from '../turn-context'
@@ -172,6 +173,26 @@ defineTool('get_ai_turn_state', {
                 summary: c.summary ?? null
             }))
         }
+    }
+})
+
+defineTool('set_work_summary', {
+    description:
+        '更新「当前工作摘要」—— 显示在助手悬浮窗标题上、给用户看的一句话。**每轮回复开始前先调用它**（这是硬性要求，见 system 的「当前工作摘要」段）：用一句话概括正在做什么、进行到哪一步。它面向用户而非自己的备忘，不要写寒暄、过程或本次回答的结论。仍在做同一件事就沿用以求稳定，转向新任务才改写。',
+    parameters: {
+        type: 'object',
+        properties: {
+            summary: {
+                type: 'string',
+                description: '一句话工作摘要（建议 10~30 字），例如「给椿配装，正在对比两把武器」。传空串表示清空摘要。'
+            }
+        },
+        required: ['summary']
+    },
+    handler: (args) => {
+        const summary = str(args.summary)
+        setWorkSummary(summary)
+        return { summary, cleared: summary.length === 0 }
     }
 })
 

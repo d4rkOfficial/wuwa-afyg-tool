@@ -131,6 +131,32 @@ let _runtime = $state<TurnRuntime>({ ...IDLE_RUNTIME })
 let _turnUsage = $state<UsageTotals>(emptyUsageTotals())
 let _sessionUsage = $state<SessionUsageTotals>(emptySessionUsageTotals())
 let _lastSummary = $state<TurnSummary | null>(null)
+/**
+ * @desc **最近一次请求**的 prompt token（`undefined` = 还没发出过请求）。
+ *  与 `_turnUsage.promptTokens` 的区别：后者是**本轮累计**（一轮内多次工具轮次请求会相加），
+ *  而用量圈要的是「当下这一次往模型塞了多少」，故单独记这一个数。
+ *  刻意**不在 `beginTurn()` 里清空**：新请求返回前应继续显示上一次的占用，而不是让圈闪一下空。
+ */
+let _lastPromptTokens = $state<number | undefined>(undefined)
+/**
+ * @desc 最近一次**上下文压缩**的结果（会话级，不持久化）。
+ *  只用于界面展示「已压缩 N 条 / 前后 token」，上下文面板读它；不参与任何请求装配。
+ */
+export interface CompactionRecord {
+    /** @desc 被压掉的消息条数 */
+    summarizedCount: number
+    tokensBefore: number
+    tokensAfter: number
+}
+
+let _lastCompaction = $state<CompactionRecord | null>(null)
+/**
+ * @desc 「当前工作摘要」：助手悬浮窗**大标题**的内容，由 AI 每轮通过 `set_work_summary` 工具更新。
+ *
+ * 会话级、不持久化 —— 与对话历史一致（本应用的对话本身也不落盘），清空对话时一并归零。
+ * 它同时会作为「工作摘要」分段每轮注入，故模型能看到自己上一轮写的内容并据此修订。
+ */
+let _workSummary = $state('')
 let _clock: ReturnType<typeof setInterval> | null = null
 
 const stopClock = (): void => {
@@ -235,10 +261,33 @@ export const recordRequestUsage = (
         requests: _turnUsage.requests + 1,
         estimatedRequests: _turnUsage.estimatedRequests + (providerUsage === null ? 1 : 0)
     }
+    // 用量圈的分子：只记「这一次请求」的 prompt，不累加（取值口径见 `_lastPromptTokens` 注释）
+    if (prompt !== undefined) _lastPromptTokens = prompt
 }
 
 export const getTurnUsage = (): UsageTotals => _turnUsage
 export const getSessionUsage = (): SessionUsageTotals => _sessionUsage
+/**
+ * @desc 最近一次请求的 prompt token（用量圈分子）。
+ * @returns 还没发出过任何请求时为 `undefined`（界面显示「—」而不是 0）。
+ */
+export const getLastPromptTokens = (): number | undefined => _lastPromptTokens
+
+/** @desc 最近一次压缩的结果（还没压过时为 `null`） */
+export const getLastCompaction = (): CompactionRecord | null => _lastCompaction
+
+/** @desc 记录一次压缩的结果（由 `ai-assistant.svelte` 在压缩成功后调用） */
+export const recordCompaction = (record: CompactionRecord): void => {
+    _lastCompaction = record
+}
+
+/** @desc 当前工作摘要（空串 = 还没有，界面显示占位文案） */
+export const getWorkSummary = (): string => _workSummary
+
+/** @desc 写入工作摘要（`set_work_summary` 工具的唯一落点；纯空白视为清空） */
+export const setWorkSummary = (summary: string): void => {
+    _workSummary = summary.trim()
+}
 /** @desc 上一次完成的回合汇总（回合结束后保留，直到下一轮开始） */
 export const getLastTurnSummary = (): TurnSummary | null => _lastSummary
 
@@ -269,6 +318,7 @@ export const finishTurn = (): void => {
                 : (_sessionUsage.cacheMissTokens ?? 0) + _turnUsage.cacheMissTokens,
         requests: _sessionUsage.requests + _turnUsage.requests,
         estimatedRequests: _sessionUsage.estimatedRequests + _turnUsage.estimatedRequests,
+        steps: _sessionUsage.steps + toolCalls.length,
         turns: _sessionUsage.turns + 1
     }
 }
@@ -280,5 +330,9 @@ export const resetAiSessionState = (): void => {
     _turnUsage = emptyUsageTotals()
     _sessionUsage = emptySessionUsageTotals()
     _lastSummary = null
+    // 对话清空后上下文占用归零，用量圈必须跟着清（否则会一直停在上一次的占用上）
+    _lastPromptTokens = undefined
+    _lastCompaction = null
+    _workSummary = ''
     _segments = []
 }

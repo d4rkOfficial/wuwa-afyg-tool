@@ -5,7 +5,14 @@
     import Button from '$lib/components/ui/button.svelte'
     import FieldLabel from '$lib/components/ui/field-label.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
-    import { updateProfile, type AiProfile } from '$lib/ai/config.svelte'
+    import {
+        addProfile,
+        coerceContextWindow,
+        DEFAULT_CONTEXT_WINDOW,
+        updateProfile,
+        type AiProfile
+    } from '$lib/ai/config.svelte'
+    import { THINKING_LABELS, THINKING_LEVELS, isThinkingLevel } from '$lib/ai/thinking'
     import { AI_PROVIDER_PRESETS, type AiProviderPreset } from '$lib/ai/ai-providers'
     import { addToast } from '$lib/data/toast.svelte'
     import { mergeComponentsStyle } from '$lib/utils/component-style'
@@ -33,24 +40,32 @@
 
     /**
      * @desc 思考强度（T15：原来是 3 个手搓分段按钮，与「类型 / 状态」两个控件同一形态）
-     * → `ui/tabs` 的三段文字 tab（轨道取设置内统一的 `ROW_TABS`，三段必然等分，指示块无需测量即可对齐）。
+     * → `ui/tabs` 的文字 tab（轨道取设置内统一的 `ROW_TABS`，分段必然等分，指示块无需测量即可对齐）。
+     *
+     * 档位与助手弹窗的会话级覆盖**共用** `$lib/ai/thinking` 的 `THINKING_LEVELS`：
+     * 新增 `off`（关）后这里由三段变四段，`.tmp/components.md` 无需改动（`ui/tabs` 按段数算指示块宽）。
      */
-    const REASONING_TABS = [
-        { value: 'low', label: '低' },
-        { value: 'medium', label: '中' },
-        { value: 'high', label: '高' }
-    ]
+    const REASONING_TABS = THINKING_LEVELS.map((level) => ({ value: level, label: THINKING_LABELS[level] }))
     const pickReasoning = (value: string) => {
-        if (value === 'low' || value === 'medium' || value === 'high') setDraft({ reasoningEffort: value })
+        if (isThinkingLevel(value)) setDraft({ reasoningEffort: value })
     }
 
     let draft = $state<AiProfile | null>(null)
     let providerPickerOpen = $state(false)
     let providerPickerAnchor = $state<HTMLElement | undefined>()
+    /**
+     * @desc 上下文窗口的**输入框文本**（不是 `draft.contextWindow` 那个数字）。
+     * 为什么分开：`coerceContextWindow()` 对越界/非法值会回落默认，若在每次 `oninput` 就归一，
+     * 用户删空再重打（`""` → 128000）时输入框会自己跳回去，根本没法编辑。
+     * 故这里保留原始文本，只在**保存这一个写入点**归一。
+     */
+    let contextWindowText = $state('')
 
     $effect(() => {
         if (open && profile) {
             draft = { ...profile }
+            // 新建草稿（id 为空）时留白：让占位符把默认值说清楚，而不是先替用户填一个具体数字
+            contextWindowText = profile.id === '' ? '' : String(profile.contextWindow)
         }
     })
 
@@ -96,7 +111,19 @@
 
     async function handleSave() {
         if (!draft) return
-        await updateProfile(draft.id, { ...draft })
+        // 上下文窗口在此**唯一写入点**归一：非法/越界回落默认（见 coerceContextWindow）
+        const patch = { ...draft, contextWindow: coerceContextWindow(Number(contextWindowText)) }
+
+        // `id` 为空 = 尚未创建的新配置：**此刻才真正新建**（弹窗打开时不落库，取消即无副作用）
+        if (!draft.id) {
+            await addProfile(patch.label, patch)
+        } else if (!(await updateProfile(draft.id, patch))) {
+            // 配置已不存在（被设置页 / AI 的 manage_ai_profile 工具删掉）——必须报错，
+            // 不能像原先那样无条件弹「已保存」，那会让「保存不生效」看起来像静默失败
+            addToast('保存失败：该配置已不存在，请关掉弹窗重新打开设置', 'error')
+            return
+        }
+
         addToast('配置文件已保存', 'success')
         onsaved?.()
         onclose?.()
@@ -152,7 +179,7 @@
                         type="url"
                         value={draft.baseUrl}
                         oninput={(e) => setDraft({ baseUrl: (e.currentTarget as HTMLInputElement).value })}
-                        placeholder="https://api.deepseek.com"
+                        placeholder="https://api.example.com/v1"
                         class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
                         style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                     />
@@ -213,7 +240,7 @@
                     type="text"
                     value={draft.model}
                     oninput={(e) => setDraft({ model: (e.currentTarget as HTMLInputElement).value })}
-                    placeholder={matchedPreset?.modelHint ?? 'deepseek-v4-flash'}
+                    placeholder={matchedPreset?.modelHint ?? '模型名'}
                     class="w-full rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
                     style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
                 />
@@ -256,6 +283,21 @@
                     {...TAB_ACCENT}
                 />
             </div>
+            <label class="block">
+                <FieldLabel label="上下文窗口（token）" class="mb-1" />
+                <input
+                    type="text"
+                    inputmode="numeric"
+                    bind:value={contextWindowText}
+                    placeholder={String(DEFAULT_CONTEXT_WINDOW)}
+                    class="w-full rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
+                    style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                />
+                <p class="mt-1 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                    助手输入区那个用量圈的分母。服务商不会下发窗口大小，故需按模型填写（默认
+                    {DEFAULT_CONTEXT_WINDOW}）；留空或填非法值会回落默认。
+                </p>
+            </label>
         </div>
     {/if}
 </Modal>

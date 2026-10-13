@@ -6,6 +6,7 @@
     import {
         describeTurnPhase,
         getContextSegments,
+        getLastCompaction,
         getLastTurnSummary,
         getSessionUsage,
         getTurnRuntime,
@@ -30,15 +31,28 @@
         onclose?: () => void
         // 清空对话历史（由助手宿主执行，面板不持有消息）
         onClearHistory?: () => void
+        /** @desc 压缩历史（由助手宿主执行：面板不持有消息，也不发请求） */
+        onCompactHistory?: () => void
+        /** @desc 压缩请求进行中：按钮禁用并换文案 */
+        compacting?: boolean
     }
 
-    let { open = false, onclose, onClearHistory, class: className, style: styleProp }: Props = $props()
+    let {
+        open = false,
+        onclose,
+        onClearHistory,
+        onCompactHistory,
+        compacting = false,
+        class: className,
+        style: styleProp
+    }: Props = $props()
 
     const segments = $derived(getContextSegments())
     const runtime = $derived(getTurnRuntime())
     const turnUsage = $derived(getTurnUsage())
     const sessionUsage = $derived(getSessionUsage())
     const summary = $derived(getLastTurnSummary())
+    const lastCompaction = $derived(getLastCompaction())
     const changeCount = $derived(getChangeCount())
 
     // 分段合计：仅统计「启用且非空」的段（它们才会进本轮请求）
@@ -150,7 +164,7 @@
                 {#if disabledSegments > 0}
                     <button
                         onclick={resetDisabledSegments}
-                        class="rounded-none border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/50 transition-colors hover:text-(--theme-modal-text)"
+                        class="sf-radius rounded-none border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/50 transition-colors hover:text-(--theme-modal-text)"
                         style="border-color: var(--theme-divider-border);"
                     >
                         全部恢复
@@ -167,7 +181,7 @@
                 <div class="flex flex-col gap-1">
                     {#each segments as seg (seg.id)}
                         <div
-                            class="flex items-center gap-1.5 rounded-none border-l-2 py-0.5 pl-1.5 {seg.enabled
+                            class="flex items-center gap-1.5 sf-radius rounded-none border-l-2 py-0.5 pl-1.5 {seg.enabled
                                 ? ''
                                 : 'opacity-45'}"
                             style="border-color: {seg.enabled ? 'transparent' : 'rgb(239 68 68 / 0.6)'};"
@@ -193,7 +207,7 @@
                                 {seg.charCount} 字符 · ≈{formatTokens(seg.tokens)} · {Math.round(seg.ratio * 100)}%
                             </span>
                             <span
-                                class="h-[3px] w-10 shrink-0 overflow-hidden rounded-none"
+                                class="h-[3px] w-10 shrink-0 overflow-hidden sf-radius rounded-none"
                                 style="background: color-mix(in srgb, var(--theme-modal-text) 12%, transparent);"
                             >
                                 <span
@@ -262,11 +276,45 @@
             {/if}
         </div>
 
+        {#if lastCompaction}
+            <!-- 上次压缩的结果：只展示统计，摘要正文在对话区的压缩标记里可展开 -->
+            <div
+                class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-[10px]"
+                style="border-color: var(--theme-divider-border);"
+            >
+                <span class="flex items-center gap-1 font-black tracking-tight">
+                    <Icon
+                        icon="mdi:archive-arrow-down-outline"
+                        class="size-3.5"
+                        style="color: var(--theme-accent-text);"
+                    />
+                    上次压缩
+                </span>
+                <span class="text-(--theme-modal-text)/45 tabular-nums">
+                    已压掉 {lastCompaction.summarizedCount} 条 · 历史 ≈{formatTokens(lastCompaction.tokensBefore)} → ≈{formatTokens(
+                        lastCompaction.tokensAfter
+                    )} token（估算）
+                </span>
+            </div>
+        {/if}
+
         <!-- 操作 -->
         <div class="flex flex-wrap gap-1.5 border-t pt-2" style="border-color: var(--theme-divider-border);">
             <button
+                type="button"
+                onclick={() => onCompactHistory?.()}
+                disabled={compacting}
+                class="flex items-center gap-1 sf-radius rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text) disabled:opacity-45"
+                style="border-color: var(--theme-divider-border);"
+                title="把较旧的历史交给模型压成一份摘要，用「摘要 + 最近若干条原文」替换它（不删对话气泡）"
+            >
+                <Icon icon={compacting ? 'mdi:loading' : 'mdi:archive-arrow-down-outline'} class="size-3" />
+                {compacting ? '正在压缩…' : '压缩历史'}
+            </button>
+            <button
+                type="button"
                 onclick={() => onClearHistory?.()}
-                class="flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                class="flex items-center gap-1 sf-radius rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                 style="border-color: var(--theme-divider-border);"
                 title="清空对话历史与本会话用量累计"
             >
@@ -274,8 +322,9 @@
                 清空对话历史
             </button>
             <button
+                type="button"
                 onclick={onClearChanges}
-                class="flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                class="flex items-center gap-1 sf-radius rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                 style="border-color: var(--theme-divider-border);"
                 title="丢弃队列里待上报的工程变化（已注入的历史消息不回退）"
             >
@@ -286,7 +335,7 @@
                 <span class="min-w-0 flex-1"></span>
                 <button
                     onclick={() => onclose?.()}
-                    class="flex items-center gap-1 rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                    class="flex items-center gap-1 sf-radius rounded-none border px-2 py-1 text-[10px] text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
                     style="border-color: var(--theme-divider-border);"
                     title="收起面板"
                 >

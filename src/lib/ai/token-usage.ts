@@ -19,6 +19,8 @@
  * - 局限：不区分 BPE 词表、不建模代码 / 数字 / 罕见字符的真实切分，也不含系统提示与
  *   工具 schema 的固定开销。实测中文文本通常偏差在 ±20% 内，仅用于占比观察与无 usage 兜底，
  *   **不能当作计费依据**。
+ * - 另：**图片附件不计入估算**（`ChatMessage.images` 被忽略）。服务商对图片的计费口径各不相同
+ *   （按张 / 按像素折算），本地无法建模，故附图的回合估算会偏低；有服务商 usage 时以 usage 为准。
  */
 import type { ChatMessage } from './client'
 
@@ -137,6 +139,33 @@ export const formatPercent = (rate: number | null | undefined): string =>
 /** @desc 耗时展示：`4.2s` */
 export const formatDuration = (ms: number): string => `${(Math.max(0, ms) / 1000).toFixed(1)}s`
 
+/**
+ * @desc 输出吞吐（token/秒）。
+ *
+ * 口径：`completionTokens ÷ 回合总耗时`，**含工具执行时间**——服务商 usage 只给 token 数、
+ * 不给「生成花了多久」，而本仓库没有单独的 TTFT / 解码计时（那是 DSH 轨迹视图才有的字段）。
+ * 因此有工具调用的回合，这个数会明显低于纯生成速度；它是「整体吞吐」而非「解码速度」，
+ * 界面不得把它当作模型速度展示。耗时或 completion 缺失时返回 `null`（界面显示「—」，不臆造）。
+ */
+export const throughputTps = (usage: Pick<UsageTotals, 'completionTokens'>, elapsedMs: number): number | null =>
+    elapsedMs > 0 && usage.completionTokens > 0 ? (usage.completionTokens / elapsedMs) * 1000 : null
+
+/** @desc 吞吐展示：`181 tok/s` / 无法计算时「—」 */
+export const formatThroughput = (tps: number | null): string => (tps === null ? '—' : `${Math.round(tps)} tok/s`)
+
+/**
+ * @desc 上下文占用比（0~1），助手 composer 的用量圈用它画弧。
+ *
+ * 分子是**最近一次请求**的 prompt token（不是本轮累计）—— 上下文占用看的是「当下这一次请求
+ * 往模型塞了多少」，累计值会随工具轮次叠加而虚高。
+ * @returns 分子缺失、或窗口非正数时返回 `null`（界面画空圈 + 显示「—」，不臆造分母）；
+ *   比值超过 1 时**钳到 1**：占用超窗属异常态，圈不该画出界。
+ */
+export const contextUsageRatio = (promptTokens: number | undefined, contextWindow: number): number | null => {
+    if (promptTokens === undefined || !Number.isFinite(promptTokens) || contextWindow <= 0) return null
+    return Math.min(1, promptTokens / contextWindow)
+}
+
 // ── 用量累计与回合汇总 ────────────────────────────────────────────────
 
 /**
@@ -167,9 +196,11 @@ export const emptyUsageTotals = (): UsageTotals => ({
 export interface SessionUsageTotals extends UsageTotals {
     /** @desc 已完成的回合数 */
     turns: number
+    /** @desc 已完成的工具调用步数（对齐 DSH 状态行的「N 步」；每轮可能多步） */
+    steps: number
 }
 
-export const emptySessionUsageTotals = (): SessionUsageTotals => ({ ...emptyUsageTotals(), turns: 0 })
+export const emptySessionUsageTotals = (): SessionUsageTotals => ({ ...emptyUsageTotals(), turns: 0, steps: 0 })
 
 /** @desc 回合汇总（回合结束后保留，直到下一轮开始） */
 export interface TurnSummary {
@@ -181,8 +212,10 @@ export interface TurnSummary {
 
 /**
  * @desc 一行式回合汇总文案，例如
- * `本轮：4.2s · 3 次工具调用 · prompt 8.1k / completion 0.6k · 缓存命中 74%`。
+ * `本轮：4.2s · 3 次工具调用 · prompt 8.1k / completion 0.6k · 181 tok/s · 缓存命中 74%`。
  * 没有任何请求（例如未配置 Key 就失败）时只保留耗时与工具信息。
+ *
+ * 吞吐只在能算出时出现（`throughputTps` 的口径见其注释：含工具耗时的**整体**吞吐，不是解码速度）。
  */
 export const summarizeTurn = (summary: TurnSummary): string => {
     const parts = [`本轮：${formatDuration(summary.elapsedMs)}`]
@@ -192,6 +225,8 @@ export const summarizeTurn = (summary: TurnSummary): string => {
     const { usage } = summary
     if (usage.requests > 0) {
         parts.push(`prompt ${formatTokens(usage.promptTokens)} / completion ${formatTokens(usage.completionTokens)}`)
+        const tps = throughputTps(usage, summary.elapsedMs)
+        if (tps !== null) parts.push(formatThroughput(tps))
         parts.push(`缓存命中 ${formatPercent(cacheHitRate(usage))}`)
         if (usage.estimatedRequests > 0) parts.push(`含 ${usage.estimatedRequests} 次本地估算`)
     }
