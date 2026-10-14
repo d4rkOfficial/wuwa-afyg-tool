@@ -114,7 +114,7 @@
             })
         }
         for (const s of seg.segments) {
-            // 值恰为 1 的乘区（如效应伤害的增伤/易伤/集谐区）无实际作用，不在链上展示
+            // 值恰为 1 的乘区（如效应伤害的增伤/易伤/集谐区、直伤的谐度区）无实际作用，不在链上展示
             if (Math.abs(s.value - 1) < 1e-9) continue
             list.push({
                 id: s.id,

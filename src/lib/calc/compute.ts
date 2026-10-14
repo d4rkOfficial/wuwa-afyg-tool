@@ -1010,7 +1010,7 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
         { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
         { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
-        { label: '谐度增幅区', value: tuneBreakZone, detail: `(1 + ${stats.totalTuneBreakBoost.toFixed(1)}%)` },
+        { label: '谐度区', value: tuneBreakZone, detail: `(1 + ${stats.totalTuneBreakBoost.toFixed(1)}%)` },
         { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
         { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
         {

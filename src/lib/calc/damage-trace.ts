@@ -710,12 +710,28 @@ export function buildDamageSegments(
             collectEnemyParts(entry, ctx, buffs, 'dmgRed', zoneTrace)
         )
     )
-    // 集谐（集谐直伤 = 1+干涉层数；偏谐系数 = 谐度破坏增幅；效应系数 = 1）
-    const tuneDelta = entry.finalTuneStrainMulti + entry.finalTuneBreakZone
+    // 集谐区（只有直伤吃）：1 + 0.12% × 该角色谐度破坏增幅 × 目标侧集谐·干涉层数
     // 集谐·干涉层数挂在目标身上、全队一份：来源可能指向别的角色，按目标侧口径取（不做作用域过滤）
-    const tuneParts = buffZoneParts(targetSideBuffs, 'tuneStrainLayer', '集谐层数', 'flat', zoneTrace)
-    tuneParts.push(...buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat', zoneTrace))
-    segments.push(seg('tune', '集谐区', 1 + tuneDelta, `(1 + ${(tuneDelta * 100).toFixed(2)}%)`, tuneParts))
+    // 该区不生效（值恒为 1）时不列来源：否则溯源/AI 会读到「区值 1 却有一堆来源」的幻影贡献
+    const tuneStrainDelta = entry.finalTuneStrainMulti
+    const tuneStrainParts =
+        tuneStrainDelta > 0
+            ? [
+                  ...buffZoneParts(targetSideBuffs, 'tuneStrainLayer', '集谐层数', 'flat', zoneTrace),
+                  ...buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat', zoneTrace)
+              ]
+            : []
+    segments.push(
+        seg('tune', '集谐区', 1 + tuneStrainDelta, `(1 + ${(tuneStrainDelta * 100).toFixed(2)}%)`, tuneStrainParts)
+    )
+    // 谐度区（只有处决/偏谐响应吃）：1 + 谐度破坏增幅% —— 与集谐区是两个独立乘区，不能合并
+    // （直伤/效应不读该区，值恒为 1，溯源链上由视图按「值 = 1 不展示」过滤掉）
+    const tuneBreakDelta = entry.finalTuneBreakZone
+    const tuneBreakParts =
+        tuneBreakDelta > 0 ? buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat', zoneTrace) : []
+    segments.push(
+        seg('tuneBreak', '谐度区', 1 + tuneBreakDelta, `(1 + ${(tuneBreakDelta * 100).toFixed(2)}%)`, tuneBreakParts)
+    )
     // 同奏（同奏区 = 1 + 3%×同奏增益层数，直伤/效应/处决响应全生效）
     const unisonParts = buffZoneParts(buffs, 'unisonBoonLayer', '同奏层数', 'flat', zoneTrace)
     segments.push(
