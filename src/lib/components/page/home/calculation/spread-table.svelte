@@ -57,6 +57,8 @@
     import { fallbackIcon } from '$lib/utils/icons'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
+    import { getActiveId } from '$lib/data/project.svelte'
+    import { attachSessionScroll, readSessionScroll, readSessionTab, writeSessionTab } from '$lib/data/view-session'
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
@@ -229,9 +231,13 @@
     /** @desc 勾选统计（已选数）：按「已绑定的 (条目, buff) 对」增量累加——成本 O(已绑定数)，而非 O(行×列) */
     const selStats = $derived(buildSelectionStats(tableData, entryBuffSetIdMap, colIndexById))
 
+    /** @desc 视角记忆所属工程：本组件随工程切换重挂载（+page 的 `{#key activeProject.id}`），取挂载时的活动工程即可 */
+    const sessionProjectId = getActiveId()
+
     /** @desc ── 伤害源切换（主内容区顶部）：按角色过滤要渲染的子表，减少一次要挂载的行/格（大表卡顿从根上缓解）；
-     *  UI 对齐「词条/环境配置」的角色页签；只影响显示哪些子表，不改任何勾选数据 ── */
-    let sourceKey = $state<string | null>(null)
+     *  UI 对齐「词条/环境配置」的角色页签；只影响显示哪些子表，不改任何勾选数据。
+     *  初值取本工程上次看的页签（会话记忆，见 `$lib/data/view-session`）── */
+    let sourceKey = $state<string | null>(readSessionTab(sessionProjectId, 'calculation'))
     const charIconMap = $derived(getCharIconMap())
 
     /** @desc 页签固定为「角色1 / 角色2 / 角色3 / 其它」四个队伍维度（不做「全部」——全部子表同时渲染最卡） */
@@ -246,6 +252,7 @@
 
     const selectSource = (key: string) => {
         sourceKey = key
+        writeSessionTab(sessionProjectId, 'calculation', key)
         // 被过滤掉的子表上的高亮随之失效，避免留下看不见的高亮状态
         highlight = null
     }
@@ -379,6 +386,43 @@
     })
     /** @desc 已揭示的行（切片而非逐行 {#if} 判断：每帧只处理新增 chunk，且未揭示时复用原数组引用） */
     const shownRows = (g: GroupData): RowData[] => visibleRowsOf(g.rows, visibleRows)
+
+    /**
+     * @desc 表格滚动位置的会话记忆（切页签/切工程再回来时回到原来的视野，见 `$lib/data/view-session`）。
+     *
+     * 位置**按页签分别记**：页签之间行数差别很大，共用一份会被较短页签夹掉。
+     * 记录与恢复都要让着「渐进渲染」与浏览器的夹取：
+     *  - 必须等本页签的行**铺满**（`visibleRows >= activeGroupRows`）再恢复：行是逐帧揭示的，过早写
+     *    scrollTop 会被夹到「当前已揭示的高度」，对着还没长高的表设位置只会把记忆里的位置丢掉；
+     *  - 恢复落定前**不记录**：切页签时浏览器会把 scrollTop 夹到新内容的高度并补发一次 scroll 事件，
+     *    记下来就会把新页签的位置覆盖成「夹后的值」（恰是马上要恢复的那个值）。
+     */
+    const spreadSlotOf = (source: string): string => `spread:${source}`
+    const spreadScrollKey = (source: string): string => `${source}|${rowFingerprint}`
+    /** @desc 当前页签要渲染的行数上限：渐进渲染进度拿它比，不必等别的页签的大表铺完才恢复本页签的位置 */
+    const activeGroupRows = $derived(shownGroupIdx.reduce((m, gi) => Math.max(m, tableData[gi]?.rows.length ?? 0), 0))
+    /** @desc 已恢复落定的「页签|结构指纹」（$state：记录下来要让上面的记录 effect 重新挂上监听） */
+    let scrollRestoredKey = $state('')
+    $effect(() => {
+        const el = rootEl
+        const source = activeSource
+        if (!el || source === null) return
+        if (scrollRestoredKey !== spreadScrollKey(source)) return
+        return attachSessionScroll(el, sessionProjectId, 'calculation', spreadSlotOf(source), { restore: false })
+    })
+    $effect(() => {
+        const el = rootEl
+        const source = activeSource
+        if (!el || source === null) return
+        if (visibleRows < activeGroupRows) return
+        const key = spreadScrollKey(source)
+        if (scrollRestoredKey === key) return
+        scrollRestoredKey = key
+        const pos = readSessionScroll(sessionProjectId, 'calculation', spreadSlotOf(source))
+        if (!pos) return
+        el.scrollTop = pos.top
+        el.scrollLeft = pos.left
+    })
 
     /** @desc mousedown：记录框选起点单元格（仅左键）；起点为 folder 列时进入层级框选模式 */
     function handleMouseDown(e: MouseEvent) {

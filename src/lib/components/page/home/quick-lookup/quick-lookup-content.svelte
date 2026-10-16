@@ -12,6 +12,8 @@
     } from '$lib/api/data-cache'
     import { richTextToHtml, colorizeNumbers } from '$lib/utils/rich-text'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
+    import { getActiveId } from '$lib/data/project.svelte'
+    import { attachSessionScroll, readSessionScroll, readSessionTab, writeSessionTab } from '$lib/data/view-session'
     import { ELEMENT_COLORS } from '$lib/consts/game-terms'
     import type { CharacterInfo, CharacterTag, WeaponInfo } from '$lib/api/types'
     import type { CharSlot } from '$lib/types/project'
@@ -78,6 +80,30 @@
 
     let charNames = $derived(team.map((s) => s.character).filter((c): c is string => c !== null))
     let currentSlot = $derived(team[charIndex])
+
+    /**
+     * @desc ── 视角记忆（会话级，见 `$lib/data/view-session`）──
+     * 速查挂在侧栏/弹窗上，**不随工程切换重挂载**，故这里用 `$derived` 跟随活动工程；
+     * 记的是**角色名**而不是下标 —— 队伍换人后下标会指到别人身上。
+     */
+    const sessionProjectId = $derived(getActiveId())
+    /** @desc 已按哪个工程恢复过页签（换工程才恢复一次，之后用户的切换不被覆盖） */
+    let appliedSessionProjectId = ''
+    $effect(() => {
+        const id = sessionProjectId
+        if (appliedSessionProjectId === id) return
+        appliedSessionProjectId = id
+        const stored = readSessionTab(id, 'quick-lookup')
+        const idx = stored ? charNames.indexOf(stored) : -1
+        charIndex = idx >= 0 ? idx : 0
+    })
+
+    /** @desc 切角色页签：记住本次选择（切走再回来、切工程再回来都回到这个角色） */
+    const selectChar = (i: number) => {
+        charIndex = i
+        const name = charNames[i]
+        if (name) writeSessionTab(sessionProjectId, 'quick-lookup', name)
+    }
     /** @desc 角色定位标签（v3 角色详情带回；老缓存里没有该字段时兜底为空） */
     let charTags = $derived(charData?.tags ?? [])
     /** @desc 标签色：上游缺色时回落到当前文字色，保证边框/底色/图标三处取色一致 */
@@ -116,6 +142,34 @@
     /** @desc 当前槽位有角色时拉取角色详情（切角色 tab 时自动触发） */
     $effect(() => {
         if (currentSlot.character) fetchData(currentSlot)
+    })
+
+    /**
+     * @desc 正文滚动位置的**恢复**：等这一屏内容真正加载完（`!loading && charData`）再写。
+     *
+     * 位置写在两个 effect 之后：切角色/切工程时先由上面的 `fetchData` 把 `charData` 清空、
+     * `loading` 置位，这里读到的就不是上一屏的旧内容 —— 否则会把「上一屏还留着的高度」当成
+     * 新内容的，恢复被夹到 0 后又被记成 0（记忆被写坏）。
+     */
+    let restoredScrollKey = ''
+    $effect(() => {
+        const el = scrollContainer
+        const name = currentSlot.character ?? ''
+        if (!el || loading || !charData || !name) return
+        const key = `${sessionProjectId}|${name}`
+        if (restoredScrollKey === key) return
+        restoredScrollKey = key
+        const pos = readSessionScroll(sessionProjectId, 'quick-lookup', `char:${name}`)
+        el.scrollTop = pos?.top ?? 0
+        el.scrollLeft = pos?.left ?? 0
+    })
+
+    /** @desc 正文滚动位置的**记录**：按角色分别记（每个角色的正文长度差别很大）；加载中不记，避免把空容器记成 0 */
+    $effect(() => {
+        const el = scrollContainer
+        const name = currentSlot.character ?? ''
+        if (!el || loading || !charData || !name) return
+        return attachSessionScroll(el, sessionProjectId, 'quick-lookup', `char:${name}`, { restore: false })
     })
 
     /** @desc 并行加载六类图标映射 */
@@ -294,7 +348,7 @@
             {#each charNames as name, i (i)}
                 <button
                     onclick={() => {
-                        charIndex = i
+                        selectChar(i)
                     }}
                     class={[
                         'rounded-none px-3 py-1 text-sm font-medium transition-colors',
@@ -812,7 +866,7 @@
             {#each charNames as name, i (i)}
                 <button
                     onclick={() => {
-                        charIndex = i
+                        selectChar(i)
                     }}
                     class={[
                         'rounded-none px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors @max-[200px]:px-1.5',

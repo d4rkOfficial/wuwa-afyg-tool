@@ -100,6 +100,23 @@
         if (refreshKey > 0) untrack(() => computeAll())
     })
 
+    /**
+     * @desc 伤害条目被**异步重建**时重算结果。
+     *
+     * 条目不是纯派生：偏谐响应（震谐/骇破）的倍率要等技能缓存异步就绪后由 store 补建一次
+     * （见 `calculation.store.init`）。若这里不跟着重算，进工程首帧已算过一遍的结果就会停在
+     * 「响应伤害 = 0」，直到用户手动刷新。
+     */
+    let _entriesFp = ''
+    $effect(() => {
+        const list = getAllDamageEntries()
+        const fp = `${list.length}:${list.reduce((sum, e) => sum + (e.ratioValue || 0), 0)}`
+        if (fp === _entriesFp) return
+        _entriesFp = fp
+        if (loading) return
+        untrack(() => computeAll())
+    })
+
     // 链/阶档位变化（含从数据分析弹窗打开角色详情配置修改）→ 轻量重算 entries；
     // 数据分析弹窗打开时同步刷新词条贡献分析；指纹避免挂载期与 loadData 重复计算
     let _profileFp = ''

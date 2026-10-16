@@ -42,6 +42,8 @@
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { addToast } from '$lib/data/toast.svelte'
+    import { getActiveId } from '$lib/data/project.svelte'
+    import { attachSessionScroll } from '$lib/data/view-session'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import { DAMAGE_TYPES, groupBuffSets } from '$lib/calc/calculation.consts'
@@ -86,6 +88,15 @@
 
     let expandedEntryId = $state<string | null>(null)
     let calcContainer = $state<HTMLDivElement | undefined>()
+
+    /** @desc 视角记忆所属工程：本组件随工程切换重挂载（+page 的 `{#key activeProject.id}`），取挂载时的活动工程即可 */
+    const sessionProjectId = getActiveId()
+    /** @desc 表格滚动位置（横纵都记）：切页签/切工程再回来时回到原来的视野 */
+    $effect(() => {
+        const el = calcContainer
+        if (!el) return
+        return attachSessionScroll(el, sessionProjectId, 'calculation', 'dropdown')
+    })
 
     /** @desc 角色元素映射与自动推导伤害类型（未手填时按条目特征推断；规则2需要角色/声骸技能文案，故先补齐数据） */
     let calcElementMap = $derived(getCalcElementMap())

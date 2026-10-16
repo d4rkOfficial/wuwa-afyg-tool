@@ -9,6 +9,7 @@ import type { TimelineData } from '$lib/calc/timeline.types'
 import type { CalcState } from '$lib/calc/calculation.types'
 import type { ConfigState } from '$lib/calc/config.types'
 import { conditionProfileFromTeam, migrateProject, toPlainProject, PHASE_ORDER } from '$lib/data/migration'
+import { clearProjectSession } from '$lib/data/view-session'
 
 const PROJECTS_KEY = 'projects'
 const ACTIVE_KEY = 'project-active'
@@ -246,6 +247,8 @@ export async function cloneProject(id: string, newName: string, selectedPhases: 
 
 export async function deleteProject(id: string) {
     projects = projects.filter((p) => p.id !== id)
+    // 视野记忆（页签/滚动位置）随工程一并丢弃：同 id 再被导入时不该继承上一个工程的位置
+    clearProjectSession(id)
     if (activeId === id) {
         activeId = projects.length > 0 ? projects[0].id : ''
         await dbSet(ACTIVE_KEY, activeId)

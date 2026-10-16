@@ -33,6 +33,7 @@ import {
     GAMEPAD_BUTTONS
 } from './timeline.consts'
 import { getEffectMultiplier, getEffectBurstMultiplier } from '$lib/consts/tune-data'
+import { SKILL_TYPE_TUNE_BREAK } from '$lib/consts/game-terms'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { addToast } from '$lib/data/toast.svelte'
 import { getCharElementMap as getSharedCharElementMap, setCharElements } from '$lib/data/char-elements.svelte'
@@ -756,8 +757,12 @@ let _refSkillPickerCache = $state<Record<string, SkillPickerGroup[]>>({})
 let _opSkillPickerCache = $state<Record<string, SkillPickerGroup[]>>({})
 let _skillPickerHitHits = $state<Record<string, number>>({})
 let _nonDirectPickerBlockId = $state<string | null>(null)
-let _nonDirectPickerData = $state<{ name: string; category: string; layers: number; hits: number }[]>([])
-let _nonDirectPickerSelected = $state<Set<string>>(new Set())
+/**
+ * @desc 弹窗里各效应的 层数/段数（按配置名），处决/响应**不在这里** —— 它们由
+ * `_nonDirectPickerTuneTrigger` / `_nonDirectPickerResponders` 表达：
+ * 「谁触发」即「启用」，没有第二个开关，也就不会出现「选了响应却没指定触发者」这种空配置。
+ */
+let _nonDirectPickerEffects = $state<Record<string, { layers: number; hits: number }>>({})
 let _nonDirectPickerResponders = $state<Record<string, string[]>>({})
 let _nonDirectPickerBurstLayers = $state<Record<string, number>>({})
 let _nonDirectPickerTuneTrigger = $state<string | null>(null)
@@ -862,6 +867,11 @@ export function charHasResponseSkill(charName: string, responseName: string): bo
     return groups.some((g) => g.hits.some((h) => h.name.includes(responseName)))
 }
 
+/** @desc 这些角色的技能表是否都已就绪。未就绪时「谁会响应」判断不出来（`charHasResponseSkill` 只会返回 false），调用方不应据此隐藏 UI */
+export function isSkillCacheReady(names: string[]): boolean {
+    return names.every((n) => !!_skillCache[n])
+}
+
 function refreshSkillPickerGroups() {
     if (!_skillPickerBlockId) return
     const base = _skillPickerGroups.filter((g) => g.type !== '自定义')
@@ -874,17 +884,15 @@ export function getNonDirectPickerBlockId() {
 export function setNonDirectPickerBlockId(v: string | null) {
     _nonDirectPickerBlockId = v
 }
-export function getNonDirectPickerData() {
-    return _nonDirectPickerData
+export function getNonDirectPickerEffects() {
+    return _nonDirectPickerEffects
 }
-export function setNonDirectPickerData(v: { name: string; category: string; layers: number; hits: number }[]) {
-    _nonDirectPickerData = v
-}
-export function getNonDirectPickerSelected() {
-    return _nonDirectPickerSelected
-}
-export function setNonDirectPickerSelected(v: Set<string>) {
-    _nonDirectPickerSelected = v
+/** @desc 更新某效应的 层数 / 段数（只传要改的字段）：层数归 0 时把段数一并复位，避免留下「0 层 ×3 段」的脏值 */
+export function updateNonDirectPickerEffect(name: string, patch: { layers?: number; hits?: number }) {
+    const prev = _nonDirectPickerEffects[name] ?? { layers: 0, hits: 1 }
+    const layers = patch.layers ?? prev.layers
+    const hits = layers < 1 ? 1 : (patch.hits ?? prev.hits)
+    _nonDirectPickerEffects = { ..._nonDirectPickerEffects, [name]: { layers, hits: Math.max(1, hits) } }
 }
 export function getNonDirectPickerResponders() {
     return _nonDirectPickerResponders
@@ -2183,6 +2191,30 @@ export async function loadCharSkills(charName: string): Promise<SkillPickerGroup
     return groups
 }
 
+/** @desc 在途的技能表加载（同一角色的并发请求合并成一次；`loadCharSkills` 自身也走 data-cache 去重） */
+const _skillLoads = new Map<string, Promise<SkillPickerGroup[]>>()
+
+/**
+ * @desc 确保这些角色的技能表已进 `_skillCache`，返回时已尽力加载（失败静默）。
+ *
+ * 排轴页的 `loadCharElements()` 是异步预热，而拉表页建设伤害条目时**同步**读技能缓存取偏谐响应倍率
+ * （震谐/骇破响应就在技能表里）—— 首帧进工程时缓存往往还没回来，故由调用方在条目建成后调这里补一次。
+ */
+export async function ensureSkillCache(names: string[]): Promise<void> {
+    const missing = [...new Set(names.filter((n) => n && !_skillCache[n]))]
+    await Promise.allSettled(
+        missing.map(async (n) => {
+            const pending = _skillLoads.get(n) ?? loadCharSkills(n)
+            _skillLoads.set(n, pending)
+            try {
+                return await pending
+            } finally {
+                return _skillLoads.delete(n)
+            }
+        })
+    )
+}
+
 // 完整技能命中（AI 绑定用）：角色技能 + 装备声骸技能 + 用户自定义直伤，与 UI 选择器一致
 export async function getFullSkillGroups(charName: string): Promise<SkillPickerGroup[]> {
     const groups = await loadCharSkills(charName)
@@ -2424,55 +2456,47 @@ export function openNonDirectPicker(sourceType: 'op' | 'ref', blockId: string) {
     const block = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!block) return
     _nonDirectPickerBlockId = block.id
-    _nonDirectPickerData = NON_DIRECT_CONFIGS.map((cfg) => {
-        const existing = block.nonDirectEntries.find((e) => e.name === cfg.name)
-        return {
-            name: cfg.name,
-            category: cfg.category,
-            layers: cfg.category === '响应' ? 0 : (existing?.layers ?? 0),
-            hits: cfg.category === '响应' ? 1 : (existing?.hits ?? 1)
-        }
-    })
-    _nonDirectPickerSelected = new Set<string>([
-        ...block.nonDirectEntries.filter((e) => e.category === '响应').map((e) => e.name),
-        ...(block.nonDirectEntries.some((e) => e.name === '谐度破坏') ? ['谐度破坏'] : [])
-    ])
+    // 效应：每个配置一行「层数/段数」；处决/响应的开关就是触发者本身（见状态声明处的注释）
+    _nonDirectPickerEffects = Object.fromEntries(
+        NON_DIRECT_CONFIGS.filter((cfg) => cfg.category === '效应').map((cfg) => {
+            const existing = block.nonDirectEntries.find((e) => e.name === cfg.name)
+            return [cfg.name, { layers: existing?.layers ?? 0, hits: existing?.hits ?? 1 }]
+        })
+    )
     _nonDirectPickerResponders = Object.fromEntries(
         block.nonDirectEntries.filter((e) => e.category === '响应').map((e) => [e.name, e.responders ?? []])
     )
-    const existingTune = block.nonDirectEntries.find((e) => e.name === '谐度破坏')
-    const op = _opBlocks.find((b) => b.id === blockId)
-    const sourceChar = op && op.trackIndex < getTRACKS().length - 1 ? (_team[op.trackIndex]?.character ?? null) : null
-    _nonDirectPickerTuneTrigger = existingTune?.responders?.[0] ?? sourceChar ?? null
+    const existingTune = block.nonDirectEntries.find((e) => e.name === SKILL_TYPE_TUNE_BREAK)
+    /**
+     * @desc 处决的触发者**只来自已有配置**：这个字段同时是「处决是否启用」的唯一表达
+     * （UI 上点头像即启用），所以**不能**拿操作块来源角色兜底 —— 那会让每次打开弹窗、
+     * 只要点一下确认就凭空多出一条处决伤害。
+     */
+    _nonDirectPickerTuneTrigger = existingTune?.responders?.[0] ?? null
     const burstEntry = block.nonDirectEntries.find((e) => e.name === '电磁爆发')
     _nonDirectPickerBurstLayers = burstEntry ? { burst: burstEntry.layers } : {}
 }
 
 export function applyNonDirectEntries() {
     if (!_nonDirectPickerBlockId) return
+    // 按 NON_DIRECT_CONFIGS 的固定顺序产出（与历史一致）：处决 → 响应 → 效应 → 电磁爆发
     const entries: NonDirectEntry[] = []
-    for (const d of _nonDirectPickerData) {
-        if (d.category === '响应') {
-            if (_nonDirectPickerSelected.has(d.name)) {
-                const entry: NonDirectEntry = { name: d.name, category: '响应', layers: 0 }
-                entry.responders = _nonDirectPickerResponders[d.name] ?? []
-                entries.push(entry)
+    for (const cfg of NON_DIRECT_CONFIGS) {
+        if (cfg.category === '响应') {
+            const responders = _nonDirectPickerResponders[cfg.name] ?? []
+            // 没指定触发者的响应**不写入**：写进去也会在拉表侧建不出条目（响应伤害按触发者逐条展开）
+            if (responders.length > 0) {
+                entries.push({ name: cfg.name, category: '响应', layers: 0, responders: [...responders] })
             }
-        } else if (d.name === '谐度破坏') {
-            if (_nonDirectPickerSelected.has(d.name)) {
-                const entry: NonDirectEntry = { name: d.name, category: '处决', layers: 0 }
-                if (_nonDirectPickerTuneTrigger) {
-                    entry.responders = [_nonDirectPickerTuneTrigger]
-                }
-                entries.push(entry)
+        } else if (cfg.name === SKILL_TYPE_TUNE_BREAK) {
+            if (_nonDirectPickerTuneTrigger) {
+                entries.push({ name: cfg.name, category: '处决', layers: 0, responders: [_nonDirectPickerTuneTrigger] })
             }
-        } else if (d.layers > 0) {
-            entries.push({
-                name: d.name,
-                category: d.category as '处决' | '效应' | '响应',
-                layers: d.layers,
-                hits: d.hits
-            })
+        } else {
+            const effect = _nonDirectPickerEffects[cfg.name]
+            if (effect && effect.layers > 0) {
+                entries.push({ name: cfg.name, category: '效应', layers: effect.layers, hits: effect.hits })
+            }
         }
     }
     const burstLayers = _nonDirectPickerBurstLayers['burst'] ?? 0

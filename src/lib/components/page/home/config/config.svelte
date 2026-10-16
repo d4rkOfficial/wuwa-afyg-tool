@@ -18,6 +18,8 @@
     import type { CharSlot } from '$lib/types/project'
     import type { ConfigState } from '$lib/calc/config.types'
     import { getCharIconMap, elementColor } from '$lib/calc/timeline.store.svelte'
+    import { getActiveId } from '$lib/data/project.svelte'
+    import { attachSessionScroll, readSessionScroll, readSessionTab, writeSessionTab } from '$lib/data/view-session'
     import EnemyPanel from './enemy-panel.svelte'
     import RandomEnhanceModal from './random-enhance-modal.svelte'
     import EchoSlotCard from './echo-slot-card.svelte'
@@ -36,7 +38,15 @@
 
     let { team, data, locked = false, onupdate, class: className, style: styleProp }: Props = $props()
 
-    let activeTab = $state<'char0' | 'char1' | 'char2' | 'enemy'>('char0')
+    type ConfigTab = 'char0' | 'char1' | 'char2' | 'enemy'
+    const CONFIG_TABS: readonly ConfigTab[] = ['char0', 'char1', 'char2', 'enemy']
+    const isConfigTab = (v: string | null): v is ConfigTab => v !== null && CONFIG_TABS.includes(v as ConfigTab)
+
+    /** @desc 视角记忆所属工程：本组件随工程切换重挂载（+page 的 `{#key activeProject.id}`），取挂载时的活动工程即可 */
+    const sessionProjectId = getActiveId()
+    /** @desc 打开的页签：初值取本工程上次看的那个（会话记忆，见 `$lib/data/view-session`） */
+    const rememberedTab = readSessionTab(sessionProjectId, 'config')
+    let activeTab = $state<ConfigTab>(isConfigTab(rememberedTab) ? rememberedTab : 'char0')
     let showMainStatMenu = $state<{ ci: number; si: number } | null>(null)
     let showSubstatModal = $state<{ ci: number; si: number } | null>(null)
     let showEnhanceModal = $state<{ ci: number; si: number } | null>(null)
@@ -44,6 +54,49 @@
     let mainStatMenuPos = $state<{ left: number; top: number; width: number } | null>(null)
     let mainStatMenuEl: HTMLElement | undefined = $state()
     let mainStatOverlayEl: HTMLDivElement | undefined = $state()
+    /** @desc 角色声骸区 / 敌人配置区滚动容器（各自记滚动位置） */
+    let charAreaEl = $state<HTMLDivElement | undefined>()
+    let enemyAreaEl = $state<HTMLDivElement | undefined>()
+
+    /** @desc 切页签：记住本次选择（切走再回来、切工程再回来都回到这里） */
+    const selectTab = (tab: ConfigTab) => {
+        activeTab = tab
+        writeSessionTab(sessionProjectId, 'config', tab)
+        closeMainStatMenu()
+        showSubstatModal = null
+    }
+
+    /**
+     * @desc 角色声骸区的滚动位置：**按页签分别记** —— 三个角色页签复用同一个滚动容器（节点不重建），
+     * 只记一份的话切角色会串位。
+     *
+     * 恢复落定前不记录（`restoredCharTab`，用 `$state` 让记录 effect 在恢复后重新挂上监听）：切页签时
+     * 浏览器会把 scrollTop 夹到新内容高度并补发一次 scroll 事件，记下来就把新页签的位置覆盖成夹后的值。
+     */
+    let restoredCharTab = $state('')
+    $effect(() => {
+        const el = charAreaEl
+        const tab = activeTab
+        if (!el || tab === 'enemy' || restoredCharTab !== tab) return
+        return attachSessionScroll(el, sessionProjectId, 'config', tab, { restore: false })
+    })
+    $effect(() => {
+        const el = charAreaEl
+        const tab = activeTab
+        if (!el || tab === 'enemy' || restoredCharTab === tab) return
+        restoredCharTab = tab
+        const pos = readSessionScroll(sessionProjectId, 'config', tab)
+        if (!pos) return
+        el.scrollTop = pos.top
+        el.scrollLeft = pos.left
+    })
+
+    /** @desc 敌人配置区的滚动位置 */
+    $effect(() => {
+        const el = enemyAreaEl
+        if (!el) return
+        return attachSessionScroll(el, sessionProjectId, 'config', 'enemy')
+    })
 
     function getMainStatTrigger(ci: number, si: number): HTMLButtonElement | null {
         return document.querySelector(`[data-main-stat-trigger="${ci}:${si}"]`)
@@ -267,9 +320,7 @@
             {@const isActive = i < 3 ? activeTab === `char${i}` : activeTab === 'enemy'}
             <button
                 onclick={() => {
-                    activeTab = i < 3 ? (`char${i}` as 'char0' | 'char1' | 'char2') : 'enemy'
-                    closeMainStatMenu()
-                    showSubstatModal = null
+                    selectTab(i < 3 ? (`char${i}` as ConfigTab) : 'enemy')
                 }}
                 class={[
                     'rounded-none border px-3 py-1.5 text-xs font-black tracking-tight transition-colors flex items-center gap-2',
@@ -313,7 +364,7 @@
 
     <!-- Content -->
     {#if activeTab === 'enemy'}
-        <div class="flex-1 overflow-y-auto">
+        <div class="flex-1 overflow-y-auto" bind:this={enemyAreaEl}>
             <EnemyPanel />
         </div>
     {:else}
@@ -322,6 +373,7 @@
             <div class="relative flex-1 min-h-0">
                 <div
                     class="flex flex-wrap content-start gap-4 overflow-y-auto pb-2 hide-scrollbar absolute inset-0"
+                    bind:this={charAreaEl}
                     onscroll={closeMainStatMenu}
                 >
                     {#each config.characters[ci].echoes as slot, si (si)}

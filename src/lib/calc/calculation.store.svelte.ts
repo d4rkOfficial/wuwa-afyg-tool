@@ -11,7 +11,7 @@ import type { TimelineData } from './timeline.types'
 import type { CharSlot } from '$lib/types/project'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { NON_DIRECT_ELEMENT } from './timeline.consts'
-import { getSkillCache } from './timeline.store.svelte'
+import { getSkillCache, ensureSkillCache } from './timeline.store.svelte'
 import { getCharElementMap, ensureCharElements } from '$lib/data/char-elements.svelte'
 import { addToast } from '$lib/data/toast.svelte'
 import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_NO_OVERRIDE_IDS, ZONE_REF_MAP } from './calculation.consts'
@@ -232,10 +232,26 @@ export function init(
     const names = team.map((s) => s.character).filter(Boolean) as string[]
     const haveAllElements = names.every((n) => getCharElementMap()[n])
     _entries = buildDamageEntries(team, timelineData)
+    /**
+     * @desc 条目里「倍率还没拿到」的偏谐响应触发角色。
+     *
+     * 震谐/骇破响应的倍率来自**技能表**（`getSkillCache()`），而技能表由排轴页的
+     * `loadCharElements()` 异步预热 —— 进工程的首帧建设条目时缓存往往还是空的，
+     * 于是倍率恒为 0。这里把这类角色挑出来，缓存补齐后重建一次条目；
+     * 否则整场会话都停在 0（历史上条目只在 init 时建一次，不会再刷新）。
+     */
+    const coldResponders = [
+        ...new Set(_entries.filter((e) => e.isTuneResponse && !e.ratioValue).map((e) => e.character))
+    ].filter((n): n is string => !!n)
+    const pending: Promise<unknown>[] = []
     if (names.length > 0 && !haveAllElements) {
         // 元素图异步就绪后重建一次条目（补齐 damageElement）；与排轴页共用共享元素图，
         // 由 data/char-elements 去重在途请求，避免重复抓取与条目二次构建竞态
-        void ensureCharElements(names).then(() => {
+        pending.push(ensureCharElements(names))
+    }
+    if (coldResponders.length > 0) pending.push(ensureSkillCache(coldResponders))
+    if (pending.length > 0) {
+        void Promise.allSettled(pending).then(() => {
             if (_initTeam && _initTimelineData) _entries = buildDamageEntries(_initTeam, _initTimelineData)
         })
     }

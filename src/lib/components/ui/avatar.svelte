@@ -5,13 +5,20 @@
     interface Props extends ComponentsProps {
         src?: string
         alt: string
-        size?: 'sm' | 'md' | 'lg'
+        /** @desc 尺寸档：`xs`（24px，密集行内用）/ `sm`（32）/ `md`（40，默认）/ `lg`（56） */
+        size?: 'xs' | 'sm' | 'md' | 'lg'
     }
 
     let { src, alt, size = 'md', backgroundImage, textColor, class: className, style: styleProp }: Props = $props()
 
     let sizeClass = $derived(
-        size === 'sm' ? 'h-8 w-8 text-xs' : size === 'lg' ? 'h-14 w-14 text-lg' : 'h-10 w-10 text-sm'
+        size === 'xs'
+            ? 'h-6 w-6 text-[10px]'
+            : size === 'sm'
+              ? 'h-8 w-8 text-xs'
+              : size === 'lg'
+                ? 'h-14 w-14 text-lg'
+                : 'h-10 w-10 text-sm'
     )
 
     let mergedStyle = $derived(

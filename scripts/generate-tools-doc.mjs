@@ -637,7 +637,10 @@ function buildDoc() {
             // 注册表自身与测试夹具不是暴露给 AI/WS 的工具，文档里必须排除
             f !== 'index.ts' &&
             f !== 'registry.ts' &&
-            !f.endsWith('.test.ts')
+            !f.endsWith('.test.ts') &&
+            // 点号开头 = 临时草稿（与 .gitignore / eslint 的 `.tmp*` 口径一致）：目录里放着的草稿
+            // 不该被当成已注册工具写进文档，否则 `--check` 会因为一份草稿而红
+            !f.startsWith('.')
     )) {
         const src = fs.readFileSync(path.join(TOOLS_DIR, file), 'utf8')
         const tools = extractDefineToolBlocks(src)

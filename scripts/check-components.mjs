@@ -105,11 +105,10 @@ const BASELINE = {
      *   不足以承接现状 —— 已扩充合同（`children` / `type` / `$restProps` / `compact` / `bare`），
      *   并接线**弹窗 footer 族 10 处**（实测该族原本只有 `transition-colors hover:*`，
      *   `bare` 关掉元件自带的状态层后与原生按钮无可见差异）。剩余 371 处按目录分批推进。
-     * • `avatar`：两个真实候选点都在 `team/pickers/character-picker.svelte`（`size-14` 圆形 +
-     *   首字母兜底，2 处逐字相同）。**未接线**的原因：该处圆形容器带
-     *   `bg-(--theme-modal-text)/10` 占位底，而 `avatar` 自带 `theme-glass-surface` +
-     *   `bg-(--theme-avatar-bg)` —— 换过去会改可外观，且组件没有 `size-14` 档。
-     *   即同样属**待扩充**（需 `size` 档 + 可关掉自身表面），不是「没有场景」。
+     * • `avatar`：✅ **已回收**（非直伤弹窗重做）：接线点是该弹窗「处决/响应」行的触发者头像
+     *   （点头像 = 启用 + 指定触发者），并为此给元件补了 `xs`（24px）档 —— 原先最小 `sm` 是 32px，
+     *   在 36px 行高的密集行里偏大。T34 记的另一个障碍（「不可关掉自身表面」）实测不构成问题：
+     *   行本身已有底色/描边，头像自带的 `theme-glass-surface` 叠上去正是想要的观感。
      * • `search-box`：三个 picker 的搜索框都在 `{#snippet title()}` 里，形态是
      *   「放大镜 + 无边框透明 input + 清除钮」；`search-box` 是**有边框+底色**的独立输入控件，
      *   与本项目 title 行设计不同；且它 `value`/`oninput` 非 `$bindable`，换用要把
@@ -118,11 +117,10 @@ const BASELINE = {
      * • `select`：见 2.7 决策 —— 全项目手搓下拉（`layout/context-menu`、`timeline/context-menu`、
      *   `config.svelte` 主词条菜单）**语义是命令菜单/就地菜单**，与「取值选择器」不同，
      *   不应硬接。判定为「保留的通用控件」，故永久留在基线而非待办。
-     * → 结论：`button` / `avatar` / `search-box` 三项是**元件扩充**任务（AGENTS §3「ui/ 缺失的
-     *   元件应补在 ui/」），接线点已定位；`select` + `switch` 是**明确保留**的通用控件。
+     * → 结论：`search-box` 是**元件扩充**任务（AGENTS §3「ui/ 缺失的元件应补在 ui/」），
+     *   接线点已定位；`select` + `switch` 是**明确保留**的通用控件。
      */
     uiNoRef: new Set([
-        'src/lib/components/ui/avatar.svelte',
         'src/lib/components/ui/search-box.svelte',
         'src/lib/components/ui/select.svelte',
         'src/lib/components/ui/switch.svelte'

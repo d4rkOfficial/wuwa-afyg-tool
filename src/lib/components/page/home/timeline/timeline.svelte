@@ -97,6 +97,8 @@
     import DamageList from './damage-list.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
+    import { getActiveId } from '$lib/data/project.svelte'
+    import { attachSessionScroll } from '$lib/data/view-session'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import { getInputShortcutId, getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { addToast } from '$lib/data/toast.svelte'
@@ -154,6 +156,15 @@
         team
         locked
         untrack(() => init(data, onupdate, team, locked))
+    })
+
+    /** @desc 视角记忆所属工程：本组件随工程切换重挂载（+page 的 `{#key activeProject.id}`），取挂载时的活动工程即可 */
+    const sessionProjectId = getActiveId()
+    /** @desc 时间轴横向滚动位置（切页签/切工程再回来时回到原来的视野） */
+    $effect(() => {
+        const el = timelineEl
+        if (!el) return
+        return attachSessionScroll(el, sessionProjectId, 'timeline', 'timeline')
     })
 
     $effect(() => {
