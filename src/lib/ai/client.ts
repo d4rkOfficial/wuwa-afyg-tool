@@ -19,7 +19,9 @@ const DIRECT_BASE_HOSTS = ['api.deepseek.com']
  */
 export const toChatWireMessages = (messages: readonly ChatMessage[]): unknown[] =>
     messages.map((message) => {
-        const { images, ...rest } = message
+        // webSearchCalls / ephemeral 与 images 一样是**内部字段**，不属于 Chat Completions 的协议形状，
+        // 发出去只会让严格校验的服务商报 400。
+        const { images, webSearchCalls: _webSearchCalls, ephemeral: _ephemeral, ...rest } = message
         if (!images || images.length === 0) return rest
         return { ...rest, content: toChatContentParts(rest.content ?? '', images) }
     })
@@ -45,6 +47,14 @@ export interface ChatMessage {
      * 转换逻辑与两条协议的形状差异集中在 `image-parts.ts`。
      */
     images?: string[]
+    /**
+     * @desc **仅本回合内有效**的临时消息（长任务模式自动追加的「继续推进」提示）。
+     *
+     * 它必须发给模型，但**不能进入下一轮历史**：否则每次自动继续都会在历史里多一条
+     * 「继续」，越长越乱。`session.ts` 回传 `onMessages` 时会过滤掉它；
+     * 协议层（`toChatWireMessages`）也会把这个内部字段摘掉。
+     */
+    ephemeral?: boolean
 }
 
 export interface ChatDelta {
@@ -108,9 +118,22 @@ export interface StreamOptions {
     baseUrl?: string
     model?: string
     signal?: AbortSignal
+    /**
+     * @desc 浏览器直连（`true` = 不经站点 /api/ai/stream 转发）。
+     * 由配置文件声明：转发平台有请求体 / 执行时长限制，且会多一跳；端点自己支持 CORS 时直连更稳。
+     * 端点不支持 CORS 时浏览器会在预检阶段拦下 —— 这是用户可感知的选择，不静默回退到代理。
+     */
+    direct?: boolean
+    /** @desc 单次请求的最大输出 token（缺省用内置默认值） */
+    maxOutputTokens?: number
 }
 
-function needsProxy(base: string): boolean {
+/** @desc 响应是否因输出 token 上限被截断（`length` = Chat Completions 的标准值） */
+export const isOutputTruncated = (finishReason?: string): boolean => finishReason === 'length'
+
+function needsProxy(base: string, direct = false): boolean {
+    // 用户显式选择浏览器直连：无条件直连（本地 / 公网都走这条路）
+    if (direct) return false
     try {
         const u = new URL(base)
         // 本地服务（Ollama/LM Studio/vLLM 等）默认开放 CORS，浏览器直连即可
@@ -128,7 +151,7 @@ export async function chatCompletionStream(
 ): Promise<ChatResult> {
     if (!apiKey.trim()) throw new Error('未配置 AI API Key')
 
-    const maxTokens = options.maxTokens ?? MAX_TOKENS
+    const maxTokens = options.maxTokens ?? options.maxOutputTokens ?? MAX_TOKENS
     const body: Record<string, unknown> = {
         model: options.model?.trim() || DEFAULT_MODEL,
         messages: toChatWireMessages(messages),
@@ -152,7 +175,7 @@ export async function chatCompletionStream(
 
     let res: Response
     try {
-        if (needsProxy(base)) {
+        if (needsProxy(base, options.direct)) {
             // 无 CORS 的端点：经站点 /api/ai/stream 转发（同源，绕过浏览器预检）
             res = await fetch('/api/ai/stream', {
                 method: 'POST',
@@ -204,6 +227,42 @@ export async function chatCompletionStream(
     let usage: ChatResult['usage'] | undefined
     const toolCalls = new Map<number, { id: string; name: string; args: string }>()
 
+    /** @desc 处理一行 SSE（抽成函数是为了让「流结束后缓冲里剩下的最后一行」走同一条解析路径） */
+    const handleLine = (line: string): void => {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) return
+        const payload = trimmed.slice(5).trim()
+        if (payload === '[DONE]') return
+        let chunk: StreamChunk
+        try {
+            chunk = JSON.parse(payload)
+        } catch {
+            return
+        }
+        if (chunk.error?.message) throw new AiClientError(`AI 流错误：${chunk.error.message}`, payload)
+        const delta = chunk.choices?.[0]?.delta
+        if (delta?.content) {
+            content += delta.content
+            options.onDelta?.({ content: delta.content })
+        }
+        if (delta?.reasoning_content) {
+            reasoning += delta.reasoning_content
+            options.onDelta?.({ reasoning: delta.reasoning_content })
+        }
+        if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+                const idx = tc.index ?? 0
+                const cur = toolCalls.get(idx) ?? { id: '', name: '', args: '' }
+                if (tc.id) cur.id += tc.id
+                if (tc.function?.name) cur.name += tc.function.name
+                if (tc.function?.arguments) cur.args += tc.function.arguments
+                toolCalls.set(idx, cur)
+            }
+        }
+        if (chunk.choices?.[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason
+        if (chunk.usage) usage = chunk.usage
+    }
+
     try {
         for (;;) {
             const { done, value } = await reader.read()
@@ -211,41 +270,12 @@ export async function chatCompletionStream(
             buffer += decoder.decode(value, { stream: true })
             const lines = buffer.split('\n')
             buffer = lines.pop() ?? ''
-            for (const line of lines) {
-                const trimmed = line.trim()
-                if (!trimmed.startsWith('data:')) continue
-                const payload = trimmed.slice(5).trim()
-                if (payload === '[DONE]') continue
-                let chunk: StreamChunk
-                try {
-                    chunk = JSON.parse(payload)
-                } catch {
-                    continue
-                }
-                if (chunk.error?.message) throw new AiClientError(`AI 流错误：${chunk.error.message}`, payload)
-                const delta = chunk.choices?.[0]?.delta
-                if (delta?.content) {
-                    content += delta.content
-                    options.onDelta?.({ content: delta.content })
-                }
-                if (delta?.reasoning_content) {
-                    reasoning += delta.reasoning_content
-                    options.onDelta?.({ reasoning: delta.reasoning_content })
-                }
-                if (delta?.tool_calls) {
-                    for (const tc of delta.tool_calls) {
-                        const idx = tc.index ?? 0
-                        const cur = toolCalls.get(idx) ?? { id: '', name: '', args: '' }
-                        if (tc.id) cur.id += tc.id
-                        if (tc.function?.name) cur.name += tc.function.name
-                        if (tc.function?.arguments) cur.args += tc.function.arguments
-                        toolCalls.set(idx, cur)
-                    }
-                }
-                if (chunk.choices?.[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason
-                if (chunk.usage) usage = chunk.usage
-            }
+            for (const line of lines) handleLine(line)
         }
+        // 少数实现最后一条 data 不带换行（甚至 `[DONE]` 也没有）：不 flush 就会静默丢掉最后一个 chunk，
+        // 症状正是「回复/工具参数在结尾处莫名缺一截」。
+        buffer += decoder.decode()
+        if (buffer.trim()) handleLine(buffer)
     } catch (e) {
         if (e instanceof AiClientError) throw e
         const err = e instanceof Error ? e.message : String(e)

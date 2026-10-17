@@ -1,6 +1,6 @@
 // AI 对话会话：工具轮询循环 + 事件分发（ai/reasoning/tool/confirm/error/done）
 // 双协议：DeepSeek 官方 profile（Responses API + 原生服务端 web_search）与其他提供商（Chat Completions）
-import { chatCompletionStream, type ChatMessage } from './client'
+import { chatCompletionStream, isOutputTruncated, type ChatMessage } from './client'
 import {
     responsesStream,
     supportsResponsesWebSearch,
@@ -18,6 +18,7 @@ import { getGenPrefs, loadGenPrefs } from '$lib/data/ai-prefs.svelte'
 import { drainChanges, renderChangesForPrompt } from './change-queue.svelte'
 import { getSkills, loadSkills, renderActiveSkillListing, renderPassiveSkillsPrompt } from '$lib/data/ai-skills.svelte'
 import { buildTurnSegments, segmentsToMessages, type TurnContextInput, type TurnSegmentId } from './turn-context'
+import { buildLongTaskContinuation, canAutoContinue } from './long-task'
 import { DEFAULT_SYSTEM_PROMPT } from './persona'
 import { estimateMessagesTokens, estimateTokens, parseUsage } from './token-usage'
 import {
@@ -26,15 +27,21 @@ import {
     endToolCall,
     finishTurn,
     getDisabledSegments,
+    getLongTaskContinuations,
+    getLongTaskNote,
     getWorkSummary,
+    isLongTaskActive,
+    markLongTaskContinuation,
     markStreaming,
     markToolWaiting,
     recordRequestUsage,
     setContextSnapshot,
+    setLongTaskActive,
     setTurnPhase
 } from './turn-state.svelte'
 
-export const MAX_TOOL_ROUNDS = 8
+/** @desc 工具轮次的**兜底默认**（每份 AI 配置可用 `maxToolRounds` 覆盖；见 `config.svelte.ts`） */
+export const MAX_TOOL_ROUNDS = 48
 
 /**
  * @desc 回传历史时**保留**的分段：只有这两段属于「对话本身」。
@@ -50,11 +57,13 @@ const PERSISTED_SEGMENT_IDS: readonly TurnSegmentId[] = ['history', 'user']
 export { DEFAULT_SYSTEM_PROMPT as SYSTEM_PROMPT }
 
 export interface SessionEvent {
-    type: 'ai' | 'reasoning' | 'tool' | 'confirm' | 'error' | 'done'
+    type: 'ai' | 'reasoning' | 'tool' | 'confirm' | 'error' | 'done' | 'longTask'
     text?: string
     toolName?: string
     toolArgs?: Record<string, unknown>
     resultLen?: number
+    /** @desc 工具返回的完整结果文本（JSON 字符串），供聊天卡片展开查看；服务端 web_search 无结果体时不带 */
+    resultText?: string
     /**
      * @desc 本次工具调用的序号（进程内单调递增）。**「开始调用」与「出结果」两条事件共用它**，
      *  界面据此配对；不靠「最后一张卡 + 名称相同」——那套配对一旦漏一次就全体错位，
@@ -197,7 +206,7 @@ async function runResponsesRound(
     emit: (evt: SessionEvent) => void,
     options: Pick<RunTurnOptions, 'signal' | 'onEvent'>,
     systemPrompt: string
-): Promise<{ text: string; reasoning: string; done: boolean; usage: unknown }> {
+): Promise<{ text: string; reasoning: string; done: boolean; usage: unknown; finishReason?: string }> {
     const { instructions, input } = toResponseItems(messages.slice(1), systemPrompt)
     let text = ''
     let reasoning = ''
@@ -214,6 +223,7 @@ async function runResponsesRound(
         tools,
         reasoningEffort: toReasoningEffort(cfg.thinkingLevel),
         signal: options.signal,
+        maxOutputTokens: cfg.maxOutputTokens,
         onDelta: (delta) => {
             if (delta.content) {
                 text += delta.content
@@ -267,16 +277,23 @@ async function runResponsesRound(
             const seq = nextToolSeq()
             emit({ type: 'tool', toolName: c.name, toolArgs: args, seq })
             const output = await runToolCall(toolContext, c.name, args, options.signal)
-            emit({ type: 'tool', toolName: c.name, toolArgs: args, resultLen: output.length, seq })
+            emit({
+                type: 'tool',
+                toolName: c.name,
+                toolArgs: args,
+                resultLen: output.length,
+                resultText: output,
+                seq
+            })
             messages.push({ role: 'tool', tool_call_id: callId, content: output })
         }
-        return { text, reasoning, done: false, usage: result.usage }
+        return { text, reasoning, done: false, usage: result.usage, finishReason: result.finishReason }
     }
 
     if (result.content?.trim()) {
         text = result.content
     }
-    return { text, reasoning, done: true, usage: result.usage }
+    return { text, reasoning, done: true, usage: result.usage, finishReason: result.finishReason }
 }
 
 export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult> {
@@ -311,6 +328,8 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
         notifyCalc: options.onCalcUpdate,
         // 抓取网页：宿主直连（同源代理内部已做 SSRF 校验），不需要额外的阶段包装
         webFetch: options.onWebFetch,
+        // 长任务模式：只注入给内置助手；WS 远程接管没有「回合」，不提供该能力
+        longTask: (active, note) => setLongTaskActive(active, note),
         // 长任务进度：仍是等待工具结果
         onGenerateProgress: (text) => {
             markToolWaiting(text || '生成中…')
@@ -366,19 +385,61 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
      * 代价是这一轮没有服务端检索（可用本地 `web_fetch` 兜底）。
      */
     const useResponses = supportsResponsesWebSearch(cfg.baseUrl, cfg.model) && !hasImageAttachments(messages)
+    /** @desc 是否因输出 token 触顶被截断（两种协议都会在这里收敛成 `true`） */
+    let truncated = false
+    /** @desc 是否正常收尾（工具轮次耗尽时仍为 `false`，需要向用户报告而不是假装完成） */
+    let finished = false
+    /** @desc 兜底：配置缺字段（老数据 / 手工构造）时不让循环次数变成 0 */
+    const maxRounds = cfg.maxToolRounds || MAX_TOOL_ROUNDS
+    /** @desc 长任务模式因轮次预算耗尽而停止（需要在收尾时明确告诉用户） */
+    let longTaskHitLimit = false
+
+    /**
+     * @desc 模型输出停止时，若长任务模式开着就追加「继续推进」提示并让回合继续。
+     * @returns `true` = 已安排继续（调用方应 `continue`）；`false` = 应当正常收尾。
+     *
+     * 续写提示用 `ephemeral` 标记：它会发给模型，但回传历史时被过滤掉，
+     * 避免自动继续次数一多，历史里堆满「继续」。
+     */
+    const continueLongTask = (round: number, content: string): boolean => {
+        const active = isLongTaskActive()
+        const aborted = options.signal?.aborted === true
+        if (!canAutoContinue({ active, aborted, nextRound: round + 1, maxRounds })) {
+            if (active && !aborted) longTaskHitLimit = true
+            return false
+        }
+        // 模型这一轮可能只有思考没有正文：仍要补一条 assistant 消息，保证续写有上下文
+        messages.push({ role: 'assistant', content: content.trim() ? content : '（本轮没有正文输出）' })
+        const count = getLongTaskContinuations() + 1
+        const note = getLongTaskNote()
+        messages.push({
+            role: 'user',
+            content: buildLongTaskContinuation(count, note),
+            ephemeral: true
+        })
+        markLongTaskContinuation()
+        emit({ type: 'longTask', message: `自动继续第 ${count} 次${note ? `：${note}` : ''}` })
+        return true
+    }
 
     beginTurn()
     try {
-        for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        for (let round = 0; round < maxRounds; round++) {
             if (useResponses) {
                 const r = await runResponsesRound(cfg, messages, tools, toolContext, emit, options, systemPrompt)
                 text = r.text
+                if (isOutputTruncated(r.finishReason)) truncated = true
                 // usage 优先取服务商上报；完全没有时用本地估算兜底
                 recordRequestUsage(parseUsage(r.usage), {
                     promptTokens: estimateMessagesTokens(messages),
                     completionTokens: estimateTokens(r.text + r.reasoning)
                 })
-                if (r.done) break
+                if (r.done) {
+                    if (continueLongTask(round, r.text)) continue
+                    if (r.text.trim()) messages.push({ role: 'assistant', content: r.text })
+                    finished = true
+                    break
+                }
                 continue
             }
 
@@ -389,6 +450,8 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
                 baseUrl: cfg.baseUrl,
                 model: cfg.model,
                 signal: options.signal,
+                maxOutputTokens: cfg.maxOutputTokens,
+                direct: cfg.directRequest,
                 onDelta: (delta) => {
                     if (delta.content) {
                         text += delta.content
@@ -402,6 +465,7 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
                 }
             })
 
+            if (isOutputTruncated(result.finishReason)) truncated = true
             recordRequestUsage(parseUsage(result.usage), {
                 promptTokens: promptEstimate,
                 completionTokens: estimateTokens(result.content + result.reasoning)
@@ -424,7 +488,14 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
                     const seq = nextToolSeq()
                     emit({ type: 'tool', toolName: tc.name, toolArgs: args, seq })
                     const output = await runToolCall(toolContext, tc.name, args, options.signal)
-                    emit({ type: 'tool', toolName: tc.name, toolArgs: args, resultLen: output.length, seq })
+                    emit({
+                        type: 'tool',
+                        toolName: tc.name,
+                        toolArgs: args,
+                        resultLen: output.length,
+                        resultText: output,
+                        seq
+                    })
                     messages.push({ role: 'tool', tool_call_id: tc.id, content: output })
                 }
                 continue
@@ -433,9 +504,31 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
             if (result.content?.trim()) {
                 text = result.content
             }
+            if (continueLongTask(round, result.content ?? '')) continue
+            // 最终回复也写进历史：下一轮模型才知道自己上一轮回答了什么（原来只回传工具往返）
+            if (result.content?.trim()) messages.push({ role: 'assistant', content: result.content })
+            finished = true
             break
         }
 
+        if (longTaskHitLimit) {
+            emit({
+                type: 'error',
+                message: `长任务模式已达到轮次上限（${maxRounds}）并停止；可在 设置 → AI 配置 里调大「工具轮次上限」`
+            })
+        }
+        if (!finished) {
+            emit({
+                type: 'error',
+                message: `已达到轮次上限（${maxRounds}），本轮提前停止${isLongTaskActive() ? '（长任务模式已结束）' : ''}；可在 设置 → AI 配置 里调大「工具轮次上限」`
+            })
+        }
+        if (truncated) {
+            emit({
+                type: 'error',
+                message: `回复达到单次输出上限（${cfg.maxOutputTokens} token）被截断；可在 设置 → AI 配置 里调大「单次最大输出」`
+            })
+        }
         emit({ type: 'done', text })
         /*
          * 回传历史 = 「对话历史 + 本轮用户输入」两段的原文 + 本轮新产生的消息（assistant / tool 往返）。
@@ -445,7 +538,8 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
          */
         options.onMessages?.([
             ...segmentsToMessages(segments.filter((s) => PERSISTED_SEGMENT_IDS.includes(s.id))),
-            ...messages.slice(injected.length)
+            // ephemeral = 长任务模式的「继续推进」提示：只在本回合发给模型，不进历史
+            ...messages.slice(injected.length).filter((m) => !m.ephemeral)
         ])
         return { ok: true, text }
     } finally {

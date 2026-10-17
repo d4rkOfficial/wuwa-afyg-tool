@@ -28,6 +28,11 @@ export interface ToolContext {
      *  既不上清单、也无法被执行。
      */
     webFetch?: WebFetchFn
+    /**
+     * @desc 开关「长任务模式」：开启后模型输出停止时自动继续，直到 AI 主动关闭。
+     *  同样**只有内置 AI 助手注入** —— WS 远程接管没有「回合」概念，故不提供。
+     */
+    longTask?: (active: boolean, note?: string) => void
     // AI 请求切换视图（team/timeline/calculation/config/result），由宿主提供
     requestView?: (phase: string) => void
     // 修改计算态后通知宿主持久化

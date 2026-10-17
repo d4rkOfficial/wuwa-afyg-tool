@@ -92,7 +92,7 @@ export type SummarizeOutcome = { ok: true; summary: string } | { ok: false; erro
  * 不传 `tools`，也不传思考强度（用提供商默认），避免把压缩变成一次昂贵的长思考。
  */
 export const summarizeMessages = async (
-    cfg: { apiKey: string; baseUrl: string; model: string },
+    cfg: { apiKey: string; baseUrl: string; model: string; directRequest?: boolean },
     older: readonly ChatMessage[],
     signal?: AbortSignal
 ): Promise<SummarizeOutcome> => {
@@ -104,6 +104,7 @@ export const summarizeMessages = async (
                 baseUrl: cfg.baseUrl,
                 model: cfg.model,
                 signal,
+                direct: cfg.directRequest,
                 maxTokens: COMPACTION_MAX_TOKENS
             }
         )

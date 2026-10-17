@@ -13,6 +13,7 @@ import type { AskUserRequest } from '$lib/ai/tools/ask-user.types'
 import type { WebFetchRequest } from '$lib/ai/tools/web-fetch.types'
 import '$lib/ai/tools/ask-user'
 import '$lib/ai/tools/web-fetch'
+import '$lib/ai/tools/ai-session'
 
 test('defineTool 重复注册同名工具时去重，且以后一次定义为准', async () => {
     defineTool('__dup_test', {
@@ -253,6 +254,45 @@ test('web_fetch 声明 webFetch 能力需求：WS 式上下文不可见、不可
     assert.equal(availableTools(WS_LIKE_CTX).length > 0, true)
 })
 
+// ── set_long_task：AI 独享 / WS 禁止调用 ──────────────────────────────────────
+
+test('set_long_task 声明 longTask 能力需求：WS 式上下文不可见、不可执行，注入后可开关', async () => {
+    assert.equal(toolRequires('set_long_task'), 'longTask')
+    assert.equal(isToolAvailable(WS_LIKE_CTX, 'set_long_task'), false)
+
+    const denied = JSON.parse(await executeTool(WS_LIKE_CTX, 'set_long_task', { enabled: true })) as {
+        ok: boolean
+        error: string
+    }
+    assert.equal(denied.ok, false)
+    assert.match(denied.error, /longTask/)
+
+    const calls: Array<[boolean, string | undefined]> = []
+    const ctx = {
+        longTask: (active: boolean, note?: string) => {
+            calls.push([active, note])
+        }
+    }
+    assert.equal(isToolAvailable(ctx, 'set_long_task'), true)
+    const on = JSON.parse(await executeTool(ctx, 'set_long_task', { enabled: true, note: '批量配装' })) as {
+        ok: boolean
+    }
+    assert.equal(on.ok, true)
+    assert.deepEqual(calls, [[true, '批量配装']])
+
+    const off = JSON.parse(await executeTool(ctx, 'set_long_task', { enabled: false })) as { ok: boolean }
+    assert.equal(off.ok, true)
+    assert.deepEqual(calls[1], [false, ''])
+
+    // 非布尔 enabled 被拒，而不是把字符串 "false" 当 truthy
+    const bad = JSON.parse(await executeTool(ctx, 'set_long_task', { enabled: 'yes' })) as {
+        ok: boolean
+        error: string
+    }
+    assert.equal(bad.ok, false)
+    assert.match(bad.error, /布尔/)
+})
+
 test('web_fetch handler：入参先归一（补协议 / 去 fragment / 钳制 maxChars）再交给宿主能力', async () => {
     const seen: WebFetchRequest[] = []
     const ctx = {
@@ -278,12 +318,17 @@ test('web_fetch handler：入参先归一（补协议 / 去 fragment / 钳制 ma
     assert.equal(out.ok, true)
     assert.equal(out.data.content, '正文')
     assert.equal(out.data.title, '标题')
-    // 宿主拿到的是**归一后**的请求：https 补全、fragment 去掉、maxChars 压到硬顶、mainOnly 保留 false
+    // 宿主拿到的是**归一后**的请求：https 补全、fragment 去掉、maxChars 压到硬顶、mainOnly 保留 false，
+    // 且完整 fetch 的字段有确定的默认值（GET / 无自定义头 / 无请求体 / 15s 超时）
     assert.deepEqual(seen[0], {
         url: 'https://example.com/doc',
         format: 'markdown',
         maxChars: 40000,
-        mainOnly: false
+        mainOnly: false,
+        method: 'GET',
+        headers: {},
+        body: '',
+        timeoutMs: 15000
     })
 })
 

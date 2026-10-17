@@ -38,6 +38,12 @@ export interface ResolvedAiConfig {
     dangerMode: DangerMode
     /** @desc 上下文窗口（token），用量圈的分母；由配置文件声明，见 `config.svelte.ts` */
     contextWindow: number
+    /** @desc 单次请求的最大输出 token（请求体的 `max_tokens`） */
+    maxOutputTokens: number
+    /** @desc 单回合工具轮次上限 */
+    maxToolRounds: number
+    /** @desc 浏览器直连（`true` = 绕过站点转发） */
+    directRequest: boolean
 }
 
 /** @desc 覆盖项初值一律为 `null`（= 跟随持久化设置）；界面不提供清除入口，故无 setter 接受 `null` */
@@ -82,6 +88,9 @@ export const resolveAiConfig = (): ResolvedAiConfig => {
         apiKey: profile.apiKey,
         thinkingLevel: _thinkingLevel ?? coerceThinkingLevel(profile.reasoningEffort),
         dangerMode: _dangerMode ?? getDangerMode(),
-        contextWindow: profile.contextWindow
+        contextWindow: profile.contextWindow,
+        maxOutputTokens: profile.maxOutputTokens,
+        maxToolRounds: profile.maxToolRounds,
+        directRequest: profile.directRequest
     }
 }

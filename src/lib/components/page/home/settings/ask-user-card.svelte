@@ -194,7 +194,9 @@
     <!-- 进度：第 N / M 题 + 题号点（点即跳题；底色/划线区分 已答/已忽略/未答） -->
     <div class="mt-2 flex items-center gap-2 border-t pt-2" style="border-color: var(--theme-divider-border);">
         <span class="shrink-0 text-[10px] tabular-nums text-(--theme-modal-text)/45">{progressText(index, total)}</span>
-        <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        <!-- p-1 + -m-1：overflow-x-auto 会同时裁掉纵向内容（CSS 会把另一轴算成 auto），
+             题号按钮的选中描边是 1px 外扩的 box-shadow，不留内边距会被裁掉上下边 -->
+        <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-1 -m-1">
             {#each questions as q (q.id)}
                 {@const status = questionStatus(q, draftOf(draft, q.id))}
                 <button

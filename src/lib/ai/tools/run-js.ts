@@ -41,6 +41,7 @@ defineTool('run_js', {
         '- 直接写语句即可（不要自己包 async 函数），可以用**顶层 await** 调工具，例如 `const t = await get_team({})`。',
         '- 所有可用工具都注入为全局函数，也可写成 `tools.get_team(...)`；返回值就是该工具的 data（JSON 已解开），失败会 throw。',
         '- 用 `return` 交出结果；`console.log` 的输出会一并回传（适合看中间过程）。',
+        '- 抓网页/调接口直接用**同名工具 `web_fetch`**：`await web_fetch({ url, method, headers, body, json })`，返回 url / status / headers / content / truncated。它走宿主抓取能力（SSRF 校验照常），不是浏览器的真 fetch；只有宿主提供该能力时才会出现在工具清单里。',
         '- 脚本跑在 Worker 沙箱里：没有 DOM、没有网络、没有存储，也拿不到密钥；',
         '  但**工具调用仍会经过正常的权限确认** —— 危险工具该问还是会问，绕不过去。',
         `- 上限：${RUN_JS_MAX_TOOL_CALLS} 次工具调用 / ${RUN_JS_TIMEOUT_MS / 1000}s 超时 / 输出 ${RUN_JS_MAX_OUTPUT_CHARS} 字符。`,

@@ -44,6 +44,11 @@ test('isInjectableToolName：合法标识符且不在两个保留名单里才可
     }
 })
 
+test('web_fetch 按工具名原样注入（合法标识符，不占用沙箱设施名）', () => {
+    assert.equal(isInjectableToolName('web_fetch'), true)
+    assert.equal(RESERVED_SANDBOX_NAMES.includes('web_fetch'), false)
+})
+
 test('buildScriptBody：严格模式 + async IIFE，脚本内可用顶层 await 与 return', () => {
     const body = buildScriptBody('return await get_team({})')
     assert.equal(

@@ -45,8 +45,8 @@
         MAX_ATTACHMENTS,
         MAX_ATTACHMENT_BYTES,
         formatBytes,
-        planAttachments,
-        readImageAsDataUrl
+        optimizeImageFile,
+        planAttachments
     } from '$lib/ai/attachments'
     import { addToast } from '$lib/data/toast.svelte'
     import AiUsageRing from './ai-usage-ring.svelte'
@@ -55,6 +55,8 @@
     interface Props extends ComponentsProps {
         /** @desc 生成中：发送按钮变为停止，且不允许再发送 */
         busy: boolean
+        /** @desc 长任务模式是否开启（仅用于把停止按钮的提示改成「结束长任务」） */
+        longTask?: boolean
         /** @desc 发送：正文（可能为空串）+ 图片附件 data URL 列表（可能为空数组） */
         onsend: (text: string, images: string[]) => void
         onstop: () => void
@@ -72,7 +74,16 @@
         pendingLabel?: string
     }
 
-    let { busy, onsend, onstop, pending, pendingLabel, class: className, style: styleProp }: Props = $props()
+    let {
+        busy,
+        longTask = false,
+        onsend,
+        onstop,
+        pending,
+        pendingLabel,
+        class: className,
+        style: styleProp
+    }: Props = $props()
 
     let input = $state('')
     /** @desc 待发送的图片附件（data URL）；发送后清空 */
@@ -137,7 +148,7 @@
         for (const reason of plan.rejections) addToast(reason, 'error')
         for (const file of plan.accepted) {
             try {
-                const url = await readImageAsDataUrl(file)
+                const url = await optimizeImageFile(file)
                 draftImages = [...draftImages, url]
             } catch (e) {
                 addToast(e instanceof Error ? e.message : '读取图片失败', 'error')
@@ -184,8 +195,9 @@
     }
 </script>
 
-<!-- composer 卡片：底色走 data-sf 区域质感（widget，flat = 不叠第二层毛玻璃，外层窗口已经模糊过） -->
-<div class="shrink-0 px-2.5 pt-1 pb-2.5 {className || ''}" style={styleProp}>
+<!-- composer 卡片：底色走 data-sf 区域质感（widget，flat = 不叠第二层毛玻璃，外层窗口已经模糊过）。
+     根节点挂 @container：工具条按**卡片实际宽度**（不是视口宽度）收起模型名，小卡片 / 窄半屏都不会把发送按钮挤出边界。 -->
+<div class="@container shrink-0 px-2.5 pt-1 pb-2.5 {className || ''}" style={styleProp}>
     <div
         data-sf="widget"
         data-sf-flat
@@ -350,17 +362,21 @@
 
                     <span class="min-w-0 flex-1"></span>
 
-                    <!-- ── 右：提供商配置 · 思考强度（两级信息一个按钮，对齐 DSH 的「模型 · 等级」） ── -->
-                    <div class="relative shrink-0" bind:this={modelAnchor}>
+                    <!-- ── 右：提供商配置 · 思考强度（两级信息一个按钮，对齐 DSH 的「模型 · 等级」） ──
+                         ⚠️ 这个 wrapper 不能 shrink-0：它和发送按钮在同一行，宽度不够时先让模型按钮收缩。
+                         卡片内容宽度 < 440px（小卡片 / 窄半屏）时直接隐藏模型名，只留思考等级 + 箭头；
+                         阈值按**实测总宽**取：名称隐藏后仍需给权限按钮、用量圈、发送按钮留足位置。 -->
+                    <div class="relative min-w-0" bind:this={modelAnchor}>
                         <button
                             type="button"
                             onclick={() => (openMenu = openMenu === 'model' ? null : 'model')}
                             title="{config.label} · {config.baseUrl}"
-                            class="flex max-w-52 items-center gap-1.5 sf-radius rounded-none border px-2 py-1 transition-colors hover:brightness-110"
+                            class="flex max-w-52 min-w-0 items-center gap-1.5 sf-radius rounded-none border px-2 py-1 whitespace-nowrap transition-colors hover:brightness-110"
                             style="border-color: var(--theme-divider-border);"
                         >
-                            <span class="truncate text-[11px] font-black" style="color: var(--theme-modal-text);"
-                                >{config.model}</span
+                            <span
+                                class="min-w-0 truncate text-[11px] font-black @max-[440px]:hidden"
+                                style="color: var(--theme-modal-text);">{config.model}</span
                             >
                             <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40"
                                 >{thinkingLabel(config.thinkingLevel)}</span
@@ -441,7 +457,7 @@
                         disabled={!busy && !canSend}
                         class="flex size-8 shrink-0 items-center justify-center sf-radius rounded-none transition-all hover:brightness-110 disabled:opacity-35"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
-                        title={busy ? '停止生成' : '发送（Enter）'}
+                        title={busy ? (longTask ? '停止生成并结束长任务' : '停止生成') : '发送（Enter）'}
                     >
                         <Icon icon={busy ? 'mdi:stop' : 'mdi:arrow-up'} class="size-4" />
                     </button>

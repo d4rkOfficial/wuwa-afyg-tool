@@ -59,6 +59,10 @@ import {
 } from '$lib/data/shortcuts.svelte'
 import {
     addProfile,
+    coerceContextWindow,
+    coerceDirectRequest,
+    coerceMaxOutputTokens,
+    coerceMaxToolRounds,
     deleteProfile,
     getActiveProfileId,
     getAiProfiles,
@@ -643,7 +647,11 @@ const maskProfile = (p: AiProfile) => ({
     baseUrl: p.baseUrl,
     model: p.model,
     apiKeySet: !!p.apiKey,
-    reasoningEffort: p.reasoningEffort
+    reasoningEffort: p.reasoningEffort,
+    contextWindow: p.contextWindow,
+    maxOutputTokens: p.maxOutputTokens,
+    maxToolRounds: p.maxToolRounds,
+    directRequest: p.directRequest
 })
 
 // ── 按键图标 ──
@@ -761,7 +769,7 @@ defineTool('get_ai_profiles', {
 
 defineTool('manage_ai_profile', {
     description:
-        '管理 AI 配置文件：add=新建（传 label，可选 baseUrl/model/apiKey/reasoningEffort）、switch=切换激活（传 id）、update=修改（传 id + 可选字段）、delete=删除（传 id，至少保留 1 个）。reasoningEffort 须为 low/medium/high。返回操作结果（apiKey 永远不回显明文）。',
+        '管理 AI 配置文件：add=新建（传 label，可选 baseUrl/model/apiKey/reasoningEffort/contextWindow/maxOutputTokens/maxToolRounds/directRequest）、switch=切换激活（传 id）、update=修改（传 id + 可选字段）、delete=删除（传 id，至少保留 1 个）。reasoningEffort 须为 low/medium/high；directRequest=true 表示由浏览器直连（绕过站点转发）。返回操作结果（apiKey 永远不回显明文）。',
     parameters: {
         type: 'object',
         properties: {
@@ -775,6 +783,22 @@ defineTool('manage_ai_profile', {
                 type: 'string',
                 enum: ['low', 'medium', 'high'],
                 description: '思考强度（add/update 可选）'
+            },
+            contextWindow: {
+                type: 'number',
+                description: '上下文窗口 token 数（add/update 可选；用量圈分母，默认 256000）'
+            },
+            maxOutputTokens: {
+                type: 'number',
+                description: '单次请求最大输出 token（add/update 可选；默认 65536，太小会导致回复截断）'
+            },
+            maxToolRounds: {
+                type: 'number',
+                description: '单回合工具轮次上限（add/update 可选；默认 48）'
+            },
+            directRequest: {
+                type: 'boolean',
+                description: '是否浏览器直连（add/update 可选；true=绕过站点转发，需要端点支持 CORS）'
             }
         },
         required: ['action']
@@ -795,6 +819,11 @@ defineTool('manage_ai_profile', {
                     throw new Error('reasoningEffort 须为 low/medium/high')
                 patch.reasoningEffort = effort
             }
+            if (args.contextWindow !== undefined) patch.contextWindow = coerceContextWindow(Number(args.contextWindow))
+            if (args.maxOutputTokens !== undefined)
+                patch.maxOutputTokens = coerceMaxOutputTokens(Number(args.maxOutputTokens))
+            if (args.maxToolRounds !== undefined) patch.maxToolRounds = coerceMaxToolRounds(Number(args.maxToolRounds))
+            if (args.directRequest !== undefined) patch.directRequest = coerceDirectRequest(args.directRequest === true)
             const profile = await addProfile(label, patch)
             return { action, profile: maskProfile(profile) }
         }
@@ -816,6 +845,11 @@ defineTool('manage_ai_profile', {
                     throw new Error('reasoningEffort 须为 low/medium/high')
                 patch.reasoningEffort = effort
             }
+            if (args.contextWindow !== undefined) patch.contextWindow = coerceContextWindow(Number(args.contextWindow))
+            if (args.maxOutputTokens !== undefined)
+                patch.maxOutputTokens = coerceMaxOutputTokens(Number(args.maxOutputTokens))
+            if (args.maxToolRounds !== undefined) patch.maxToolRounds = coerceMaxToolRounds(Number(args.maxToolRounds))
+            if (args.directRequest !== undefined) patch.directRequest = coerceDirectRequest(args.directRequest === true)
             const ok = await updateProfile(id, patch)
             if (!ok) throw new Error(`配置 ${id} 不存在`)
             return { action, updated: id }

@@ -9,7 +9,14 @@ const ASSISTANT = 'src/lib/components/page/home/settings/ai-assistant.svelte'
 test('工具时间线的 each key 不能是工具名（同一工具一次回合内可被调用多次）', () => {
     const source = readFileSync(ASSISTANT, 'utf8')
     // 反例：`{#each m.tools ?? [] as t (t.name)}` —— run_js 连调两轮、或一轮内并行两个同名工具
-    // 都会产生重复 key，Svelte 抛 each_key_duplicate 并让界面整个挂掉（实测踩过）
+    // 都会产生重复 key，Svelte 抛 each_key_duplicate 并让整个界面挂掉（实测踩过）
     assert.equal(/as t \(t\.name\)/.test(source), false, '工具时间线的 key 必须唯一，请改用索引')
-    assert.equal(/as t, \w+ \(\w+\)/.test(source), true, '应当改成以索引作 key')
+    assert.equal(/as act, actIdx \(actIdx\)/.test(source), true, '活动流应当以索引作 key')
+})
+
+test('AI 输出是活动流，不再使用「聊天 / 思考 / 工具」tab 或气泡', () => {
+    const source = readFileSync(ASSISTANT, 'utf8')
+    assert.equal(source.includes('TabPanel'), false, '旧的 tab 容器应已移除')
+    assert.equal(source.includes('m.tab'), false, '旧的 tab 状态应已移除')
+    assert.match(source, /appendActivityText|applyToolEventToActivities/, '事件应写入活动流')
 })

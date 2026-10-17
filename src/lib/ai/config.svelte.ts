@@ -22,14 +22,53 @@ export interface AiProfile {
      * 缺失/非法由 `coerceContextWindow()` 回落默认值（不臆造、也不让分母为 0）。
      */
     contextWindow: number
+    /**
+     * @desc 单次请求的最大**输出** token（请求体的 `max_tokens` / `max_output_tokens`）。
+     *
+     * 它决定一次回复最多能写多长：思考模型会先消耗它做推理，再输出正文 ——
+     * 上限偏小（或服务商默认值偏小）时正文会在半句处被砍断，而流式协议只会给一个
+     * `finish_reason=length`，界面看起来就是「莫名其妙截断」。故开放给用户按模型填写。
+     */
+    maxOutputTokens: number
+    /**
+     * @desc 单个回合内允许的工具轮次上限（模型调用 → 执行工具 → 再调模型的循环次数）。
+     *
+     * 原先硬编码 8 轮：查数据 + 改配置 + 校验这类任务很容易超过，超过后回合被静默掐断。
+     * 现在按配置声明，默认值也放宽；到顶时会向界面明确报告，而不是假装正常结束。
+     */
+    maxToolRounds: number
+    /**
+     * @desc 是否**绕过**站点转发代理、由浏览器直连 AI 服务（`true` = 直连）。
+     *
+     * 为什么要给用户这个开关：
+     * - Cloudflare / Vercel 的转发有请求体与执行时长限制，附图的回合容易被平台掐断；
+     * - 部分端点本身支持 CORS，直连还能少一跳、少暴露一次 API Key。
+     * 代价：端点必须自己配置 CORS（预检要放行 `Authorization` 头），否则浏览器会拦下。
+     * 默认 `false` = 沿用原来的自动策略（本地 / 已知支持 CORS 的 host 直连，其余走代理）。
+     */
+    directRequest: boolean
 }
 
-/** @desc 上下文窗口默认值（token）：128k，覆盖当前主流模型的常见窗口 */
-export const DEFAULT_CONTEXT_WINDOW = 128_000
+/** @desc 上下文窗口默认值（token）：256k，覆盖当前主流模型的常见窗口 */
+export const DEFAULT_CONTEXT_WINDOW = 256_000
 
 /** @desc 上下文窗口的合法区间：下限 1k 防止分母为 0 / 弧长失真，上限 10M 防止误填溢出 */
 const MIN_CONTEXT_WINDOW = 1_000
 const MAX_CONTEXT_WINDOW = 10_000_000
+
+/** @desc 单次最大输出 token 默认值：64k（与多数 OpenAI 兼容端点的上限对齐） */
+export const DEFAULT_MAX_OUTPUT_TOKENS = 65_536
+
+/** @desc 输出 token 的合法区间：下限 256（再小连一句完整回答都放不下），上限 1M 防误填 */
+const MIN_MAX_OUTPUT_TOKENS = 256
+const MAX_MAX_OUTPUT_TOKENS = 1_000_000
+
+/** @desc 工具轮次默认值：48（8 轮对「查数据 → 改配置 → 校验」这类任务明显不够） */
+export const DEFAULT_MAX_TOOL_ROUNDS = 48
+
+/** @desc 工具轮次的合法区间：至少 1 轮，最多 200 轮（防死循环把 API 额度烧光） */
+const MIN_MAX_TOOL_ROUNDS = 1
+const MAX_MAX_TOOL_ROUNDS = 200
 
 /**
  * @desc 归一化「上下文窗口」：只接受区间内的有限数值并取整，其余（缺失 / 非数 / 越界）一律回落默认。
@@ -41,6 +80,25 @@ export const coerceContextWindow = (value: unknown): number => {
     if (rounded < MIN_CONTEXT_WINDOW || rounded > MAX_CONTEXT_WINDOW) return DEFAULT_CONTEXT_WINDOW
     return rounded
 }
+
+/** @desc 归一化「单次最大输出 token」（口径同 `coerceContextWindow`） */
+export const coerceMaxOutputTokens = (value: unknown): number => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_MAX_OUTPUT_TOKENS
+    const rounded = Math.round(value)
+    if (rounded < MIN_MAX_OUTPUT_TOKENS || rounded > MAX_MAX_OUTPUT_TOKENS) return DEFAULT_MAX_OUTPUT_TOKENS
+    return rounded
+}
+
+/** @desc 归一化「工具轮次上限」（口径同上） */
+export const coerceMaxToolRounds = (value: unknown): number => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_MAX_TOOL_ROUNDS
+    const rounded = Math.round(value)
+    if (rounded < MIN_MAX_TOOL_ROUNDS || rounded > MAX_MAX_TOOL_ROUNDS) return DEFAULT_MAX_TOOL_ROUNDS
+    return rounded
+}
+
+/** @desc 归一化「浏览器直连」开关：只认真正的 `true`，其余（缺失 / 旧数据）一律 `false`（自动策略） */
+export const coerceDirectRequest = (value: unknown): boolean => value === true
 
 export interface AiConfig {
     activeProfileId: string
@@ -57,7 +115,10 @@ const DEFAULT_PROFILES: AiProfile[] = [
         model: '',
         apiKey: '',
         reasoningEffort: 'medium',
-        contextWindow: DEFAULT_CONTEXT_WINDOW
+        contextWindow: DEFAULT_CONTEXT_WINDOW,
+        maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
+        maxToolRounds: DEFAULT_MAX_TOOL_ROUNDS,
+        directRequest: false
     }
 ]
 
@@ -77,7 +138,10 @@ export const createBlankAiProfile = (): AiProfile => ({
     model: '',
     apiKey: '',
     reasoningEffort: 'medium',
-    contextWindow: DEFAULT_CONTEXT_WINDOW
+    contextWindow: DEFAULT_CONTEXT_WINDOW,
+    maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
+    maxToolRounds: DEFAULT_MAX_TOOL_ROUNDS,
+    directRequest: false
 })
 
 const AI_CONFIG_KEY = 'ai-config'
@@ -213,7 +277,10 @@ export async function loadAiConfig(): Promise<void> {
                 apiKey: await decryptApiKey(p.apiKey ?? ''),
                 // 归一化交给 `thinking.ts`：非法/缺失回落 medium，与新增 `off` 档前的读盘容错一致
                 reasoningEffort: coerceThinkingLevel(p.reasoningEffort),
-                contextWindow: coerceContextWindow(p.contextWindow)
+                contextWindow: coerceContextWindow(p.contextWindow),
+                maxOutputTokens: coerceMaxOutputTokens(p.maxOutputTokens),
+                maxToolRounds: coerceMaxToolRounds(p.maxToolRounds),
+                directRequest: coerceDirectRequest(p.directRequest)
             })
         }
         if (profiles.length > 0) {
@@ -242,7 +309,10 @@ export async function addProfile(label: string, patch: Partial<AiProfile> = {}):
         model: patch.model ?? base.model,
         apiKey: patch.apiKey ?? '',
         reasoningEffort: patch.reasoningEffort ?? base.reasoningEffort,
-        contextWindow: patch.contextWindow ?? base.contextWindow
+        contextWindow: patch.contextWindow ?? base.contextWindow,
+        maxOutputTokens: patch.maxOutputTokens ?? base.maxOutputTokens,
+        maxToolRounds: patch.maxToolRounds ?? base.maxToolRounds,
+        directRequest: patch.directRequest ?? base.directRequest
     }
     _config = { ..._config, profiles: [..._config.profiles, profile] }
     _config.activeProfileId = profile.id

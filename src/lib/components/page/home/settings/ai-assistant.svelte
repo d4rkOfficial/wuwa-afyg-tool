@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte'
+    import { onMount, tick } from 'svelte'
     import Icon from '@iconify/svelte'
     import { fade } from 'svelte/transition'
     import { runAiTurn, type SessionEvent } from '$lib/ai/session'
@@ -20,11 +20,14 @@
     import {
         describeTurnPhase,
         getLastTurnSummary,
+        getLongTaskContinuations,
         getSessionUsage,
         getTurnRuntime,
         getWorkSummary,
+        isLongTaskActive,
         recordCompaction,
-        resetAiSessionState
+        resetAiSessionState,
+        resetLongTask
     } from '$lib/ai/turn-state.svelte'
     import { formatDuration, formatTokens, summarizeTurn } from '$lib/ai/token-usage'
     import { MOTION_MS, motionDuration, slideParams } from '$lib/utils/motion'
@@ -32,8 +35,15 @@
     import AiContextPanel from './ai-context-panel.svelte'
     import AskUserCard from './ask-user-card.svelte'
     import { cancelResult, normalizeGroup, settleOnce } from './ask-user-card.utils'
-    import { applyToolEvent, applyToolProgress, type ToolCard } from './ai-tools.utils'
-    import TabPanel from '$lib/components/ui/tab-panel.svelte'
+    import {
+        appendActivityNotice,
+        appendActivityText,
+        applyToolEventToActivities,
+        applyToolProgressToActivities,
+        describeToolActivity,
+        describeToolCard,
+        type AssistantActivity
+    } from './ai-tools.utils'
     import Button from '$lib/components/ui/button.svelte'
     import type { ComponentsProps } from '$lib/types'
 
@@ -67,12 +77,13 @@
         text: string
         /** @desc 用户消息附带的图片（data URL），仅 user 角色有值 */
         images?: string[]
-        reasoning?: string
-        tools?: ToolCard[]
-        // 发言是否已结束（结束后自动收起思考过程与工具调用）
+        /**
+         * @desc AI 输出的**活动流**（按发生顺序）：思考 / 工具 / 回复 / 提示。
+         * 这是新的列表式 UI 的数据源 —— 不再有聊天气泡与「聊天 / 思考 / 工具」tab。
+         */
+        activities?: AssistantActivity[]
+        // 发言是否已结束（结束后保留活动流，不再自动收起）
         done?: boolean
-        // 气泡内当前激活的 tab（聊天/思考/工具）
-        tab?: 'chat' | 'reasoning' | 'tools'
         // 压缩标记的统计（仅 role === 'compaction' 时有值；`text` 即摘要正文）
         compaction?: { summarized: number; tokensBefore: number; tokensAfter: number }
         // 压缩标记是否展开显示摘要正文
@@ -139,6 +150,9 @@
         if (usage.turns === 0 && usage.steps === 0) return ''
         return `${usage.turns} 轮 · ${usage.steps} 步`
     })
+    /** @desc 长任务模式（AI 开启后输出停止会自动继续；用户按停止按钮即结束） */
+    const longTaskActive = $derived(isLongTaskActive())
+    const longTaskContinuations = $derived(getLongTaskContinuations())
     /**
      * @desc 是否存在待确认 / 待作答的卡片。
      * 用它（而不是把卡片状态搬进 composer）决定 composer 显示输入行还是显示卡片：
@@ -407,6 +421,9 @@
 
     function stopGenerating() {
         abortCtrl?.abort()
+        // 停止按钮同时是「结束长任务」入口：即使工具调用还挂在确认卡上，也先把状态摘掉，
+        // 避免自动继续逻辑在 abort 传播前又多续一轮。
+        resetLongTask()
         // 提问卡 / 危险确认卡都在等用户操作，而**工具执行挂在它们的 Promise 上**：
         // 光 abort 是解不开的，必须把两张卡都按「放弃」收尾，否则整轮会永远停在「正在调用工具」。
         cancelAskCard()
@@ -493,8 +510,11 @@
         display = [
             ...display,
             { role: 'user', text: trimmed, ...(images.length > 0 ? { images } : {}) },
-            { role: 'assistant', text: '', reasoning: '', tools: [], done: false, tab: 'chat' }
+            { role: 'assistant', text: '', activities: [], done: false }
         ]
+        // 发送新消息是明确的「我要看最新」意图：强制回到底部并恢复吸附
+        stickToBottom = true
+        scrollToBottom(true)
         const last = () => display[display.length - 1]
 
         try {
@@ -510,10 +530,9 @@
                     updateCalculation(getCalcState())
                 },
                 onGenerateProgress: (status) => {
-                    // 生成任务进度：合并到正在执行的 generate_* 工具卡片上（否则追加纯进度伪卡），
-                    // 并切到工具 tab。伪卡没有 seq，因此不会抢走真实调用的结果配对。
-                    last().tools = applyToolProgress(last().tools ?? [], status)
-                    last().tab = 'tools'
+                    // 生成任务进度：合并到正在执行的 generate_* 工具行上（否则追加纯进度伪行）。
+                    // 伪行没有 seq，因此不会抢走真实调用的结果配对。
+                    last().activities = applyToolProgressToActivities(last().activities ?? [], status)
                     scrollToBottom()
                 },
                 onConfirm: (toolName, summary) =>
@@ -560,25 +579,32 @@
                 onWebFetch: fetchWebPage,
                 onEvent: (evt: SessionEvent) => {
                     if (evt.type === 'ai') {
-                        last().text += evt.text ?? ''
-                        last().tab = 'chat'
+                        last().activities = appendActivityText(last().activities ?? [], 'text', evt.text ?? '')
                     } else if (evt.type === 'reasoning') {
-                        last().reasoning = (last().reasoning ?? '') + (evt.text ?? '')
-                        last().tab = 'reasoning'
+                        last().activities = appendActivityText(last().activities ?? [], 'reasoning', evt.text ?? '')
                     } else if (evt.type === 'tool') {
-                        // 按 seq 配对（不再用「最后一张卡 + 名称相同」）：一次漏配对只影响自己
-                        last().tools = applyToolEvent(last().tools ?? [], evt)
+                        // 按 seq 配对（不再用「最后一行 + 名称相同」）：一次漏配对只影响自己
+                        last().activities = applyToolEventToActivities(last().activities ?? [], evt)
                         // AI 切换工程/视图后告知用户（只在真正出结果的那条事件上提示一次）
                         if (evt.resultLen !== undefined && evt.toolName === 'switch_view') {
                             addToast('AI 已切换视图', 'success')
                         } else if (evt.resultLen !== undefined && evt.toolName === 'set_active_project') {
                             addToast('AI 已切换工程', 'success')
                         }
-                        last().tab = 'tools'
                         scrollToBottom()
+                    } else if (evt.type === 'longTask') {
+                        last().activities = appendActivityNotice(
+                            last().activities ?? [],
+                            evt.message ?? '自动继续',
+                            'info',
+                            'longTask'
+                        )
                     } else if (evt.type === 'error') {
-                        last().text = (last().text ? last().text + '\n' : '') + `⚠ ${evt.message ?? 'AI 请求失败'}`
-                        last().tab = 'chat'
+                        last().activities = appendActivityNotice(
+                            last().activities ?? [],
+                            evt.message ?? 'AI 请求失败',
+                            'error'
+                        )
                     }
                     scrollToBottom()
                 }
@@ -586,38 +612,63 @@
         } catch (e) {
             const isAborted = e instanceof AiClientError && e.debug === 'aborted'
             if (!isAborted) {
-                last().text =
-                    (last().text ? last().text + '\n' : '') + `⚠ ${e instanceof Error ? e.message : 'AI 请求失败'}`
+                last().activities = appendActivityNotice(
+                    last().activities ?? [],
+                    e instanceof Error ? e.message : 'AI 请求失败',
+                    'error'
+                )
             }
         }
         // 回合结束（正常 / 中止 / 报错）：提问卡一律收尾 —— 否则 `ask_user` 的 Promise 会永久悬挂
         // （提交过的卡在收尾时已把 askCard 置空，这里是无副作用的空操作）
         cancelAskCard()
-        // 发言结束：切回聊天 tab（自动收起思考过程与工具调用）
+        // 发言结束：活动流保持原样（不再有 tab 切换与自动收起）
         const lastMsg = display[display.length - 1]
-        if (lastMsg?.role === 'assistant') {
-            lastMsg.done = true
-            lastMsg.tab = 'chat'
-        }
+        if (lastMsg?.role === 'assistant') lastMsg.done = true
         busy = false
         abortCtrl = null
         scrollToBottom()
     }
 
     let bodyEl: HTMLDivElement | undefined = $state()
-    $effect(() => {
-        if (bodyEl) bodyEl.scrollTop = bodyEl.scrollHeight
-    })
+    /**
+     * @desc 是否「吸附在底部」。
+     *
+     * 只有用户本来就在底部时才自动跟随新内容；一旦用户往上翻（读旧消息 / 展开某张工具卡），
+     * 后续流式输出不再把他拽回去 —— 这正是「AI 输出时不再总是强制向下滚动」。
+     * 用户手动滚回底部、或点「回到底部」按钮 / 发送新消息时恢复吸附。
+     */
+    let stickToBottom = $state(true)
+    /** @desc 自动滚动的帧级节流：流式 delta 可能一秒几十次，合并到一次 `tick` 后的写入 */
+    let scrollScheduled = false
+    /** @desc 距底部多少像素以内仍算「在底部」（给触控板惯性 / 1px 取整留余量） */
+    const NEAR_BOTTOM_PX = 48
 
-    // 滚动到聊天区底部（tab 切换 / 内容更新时调用）
-    function scrollToBottom() {
-        if (bodyEl) bodyEl.scrollTop = bodyEl.scrollHeight
+    const isNearBottom = (): boolean => {
+        if (!bodyEl) return true
+        return bodyEl.scrollHeight - bodyEl.scrollTop - bodyEl.clientHeight <= NEAR_BOTTOM_PX
     }
 
-    // 切换气泡内 tab（聊天/思考/工具）并滚动到底部
-    function setTab(m: DisplayMsg, tab: NonNullable<DisplayMsg['tab']>) {
-        m.tab = tab
-        scrollToBottom()
+    // 用户滚动只更新吸附状态，不做任何强制滚动
+    function onBodyScroll() {
+        stickToBottom = isNearBottom()
+    }
+
+    /**
+     * @desc 滚动到底部。
+     * @param force `true` = 用户明确要求（发送新消息 / 点回到底部 / 切 tab），忽略吸附状态。
+     */
+    function scrollToBottom(force = false) {
+        // force 先恢复吸附：这样即使已有一帧排队，排队的那次 tick 也会跟随到底部
+        if (force) stickToBottom = true
+        else if (!stickToBottom) return
+        if (scrollScheduled) return
+        scrollScheduled = true
+        void tick().then(() => {
+            scrollScheduled = false
+            if (!bodyEl || !stickToBottom) return
+            bodyEl.scrollTop = bodyEl.scrollHeight
+        })
     }
 
     // AI 回复 Markdown 渲染（换行即 <br>；链接新窗口打开）
@@ -828,7 +879,11 @@
             />
 
             <!-- 消息区 -->
-            <div bind:this={bodyEl} class="theme-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+            <div
+                bind:this={bodyEl}
+                class="theme-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3"
+                onscroll={onBodyScroll}
+            >
                 {#if display.length === 0}
                     <div class="py-10 text-center text-xs text-(--theme-modal-text)/35">
                         用文字指挥我：创建工程、锁定环节、查队伍、
@@ -901,103 +956,151 @@
                             {/if}
                         </div>
                     {:else}
-                        {@const hasReasoning = !!m.reasoning}
-                        {@const hasTools = !!(m.tools && m.tools.length > 0)}
-                        {@const activeTab = m.tab ?? 'chat'}
-                        <div class="flex justify-start">
-                            <div
-                                class="ai-md max-w-[92%] wrap-break-word sf-radius rounded-none px-3 py-2 text-xs leading-relaxed"
-                                style="background: var(--theme-input-bg);"
-                            >
-                                {#if hasReasoning || hasTools}
-                                    <div
-                                        class="mb-1.5 flex items-center gap-0.5 border-b pb-1"
-                                        style="border-color: var(--theme-divider-border);"
-                                    >
+                        <div class="flex w-full flex-col gap-1 py-0.5 text-[11px] leading-relaxed">
+                            {#each m.activities ?? [] as act, actIdx (actIdx)}
+                                {#if act.kind === 'reasoning'}
+                                    <div class="flex items-start gap-1.5 text-(--theme-modal-text)/45">
+                                        <Icon icon="mdi:lightbulb-on-outline" class="mt-0.5 size-3 shrink-0" />
+                                        <span class="shrink-0 font-black">思考</span>
+                                        <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
                                         <button
-                                            onclick={() => setTab(m, 'chat')}
-                                            class="sf-radius rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
-                                            'chat'
-                                                ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
+                                            type="button"
+                                            onclick={() => (act.expanded = !act.expanded)}
+                                            class="min-w-0 flex-1 text-left transition-colors hover:text-(--theme-modal-text)/70"
+                                            title={act.expanded ? '收起思考' : '展开思考'}
                                         >
-                                            聊天
+                                            <span
+                                                class={act.expanded
+                                                    ? 'whitespace-pre-wrap'
+                                                    : 'line-clamp-2 whitespace-pre-wrap'}>{act.text}</span
+                                            >
                                         </button>
-                                        {#if hasReasoning}
-                                            <button
-                                                onclick={() => setTab(m, 'reasoning')}
-                                                class="sf-radius rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
-                                                'reasoning'
-                                                    ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
+                                    </div>
+                                {:else if act.kind === 'text'}
+                                    <div class="flex items-start gap-1.5">
+                                        <Icon
+                                            icon="mdi:format-text"
+                                            class="mt-0.5 size-3 shrink-0 text-(--theme-accent-text)"
+                                        />
+                                        <span class="shrink-0 font-black text-(--theme-modal-text)/70">回复</span>
+                                        <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
+                                        <div class="ai-md min-w-0 flex-1 text-xs leading-relaxed">
+                                            {@html renderMd(act.text ?? '')}
+                                        </div>
+                                    </div>
+                                {:else if act.kind === 'longTask'}
+                                    <div class="flex items-start gap-1.5 text-(--theme-accent-text)/75">
+                                        <Icon icon="mdi:sync" class="mt-0.5 size-3 shrink-0" />
+                                        <span class="shrink-0 font-black">长任务</span>
+                                        <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
+                                        <span class="min-w-0 flex-1 whitespace-pre-wrap">{act.text}</span>
+                                    </div>
+                                {:else if act.kind === 'notice'}
+                                    <div
+                                        class="flex items-start gap-1.5 {act.tone === 'error'
+                                            ? 'text-red-400'
+                                            : 'text-(--theme-modal-text)/45'}"
+                                    >
+                                        <Icon
+                                            icon={act.tone === 'error'
+                                                ? 'mdi:alert-circle-outline'
+                                                : 'mdi:information-outline'}
+                                            class="mt-0.5 size-3 shrink-0"
+                                        />
+                                        <span class="shrink-0 font-black">{act.tone === 'error' ? '错误' : '提示'}</span
+                                        >
+                                        <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
+                                        <span class="min-w-0 flex-1 whitespace-pre-wrap">{act.text}</span>
+                                    </div>
+                                {:else if act.kind === 'tool' && act.tool}
+                                    {@const tool = act.tool}
+                                    {@const meta = describeToolActivity(tool)}
+                                    <div class="text-(--theme-modal-text)/40">
+                                        <button
+                                            type="button"
+                                            onclick={() => (tool.expanded = !tool.expanded)}
+                                            class="flex w-full items-center gap-1.5 rounded-none px-1 py-0.5 text-left transition-colors hover:bg-(--theme-modal-text)/5"
+                                            title={tool.expanded ? '收起请求 / 响应' : '展开请求 / 响应'}
+                                        >
+                                            <Icon icon={meta.icon} class="size-3 shrink-0" />
+                                            <span class="shrink-0 font-black">{meta.label}</span>
+                                            <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
+                                            <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)/55">
+                                                {meta.summary}
+                                            </span>
+                                            {#if tool.resultLen !== undefined}
+                                                <span class="shrink-0 text-(--theme-modal-text)/30"
+                                                    >{tool.resultLen} 字符</span
+                                                >
+                                            {:else if typeof tool.args.status === 'string' && tool.args.status}
+                                                <span class="max-w-20 shrink-0 truncate text-(--theme-modal-text)/35"
+                                                    >{tool.args.status}</span
+                                                >
+                                            {:else if tool.done}
+                                                <span class="shrink-0 text-(--theme-modal-text)/30">已完成</span>
+                                            {:else}
+                                                <span class="shrink-0 text-(--theme-accent-text)">执行中…</span>
+                                            {/if}
+                                            <Icon
+                                                icon={tool.expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                                                class="size-3 shrink-0 opacity-50"
+                                            />
+                                        </button>
+                                        {#if tool.expanded}
+                                            {@const detail = describeToolCard(tool)}
+                                            <div
+                                                class="ml-4 space-y-1.5 border-l py-1 pl-2 text-[10px]"
+                                                style="border-color: var(--theme-divider-border);"
                                             >
-                                                思考{busy && !m.text ? '（生成中…）' : ''}
-                                            </button>
-                                        {/if}
-                                        {#if hasTools}
-                                            <button
-                                                onclick={() => setTab(m, 'tools')}
-                                                class="sf-radius rounded-none px-1.5 py-0.5 text-[10px] transition-colors {activeTab ===
-                                                'tools'
-                                                    ? 'font-black bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                                    : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'}"
-                                            >
-                                                工具（{m.tools!.length}）
-                                            </button>
+                                                <div>
+                                                    <div class="mb-0.5 text-(--theme-modal-text)/35">
+                                                        {detail.requestLabel}
+                                                    </div>
+                                                    <pre
+                                                        class="theme-scrollbar max-h-48 overflow-auto whitespace-pre-wrap break-all sf-radius rounded-none p-1.5 font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/70"
+                                                        style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent);">{detail.request}</pre>
+                                                </div>
+                                                {#if detail.response !== undefined}
+                                                    <div>
+                                                        <div class="mb-0.5 text-(--theme-modal-text)/35">
+                                                            {detail.responseLabel}
+                                                        </div>
+                                                        <pre
+                                                            class="theme-scrollbar max-h-48 overflow-auto whitespace-pre-wrap break-all sf-radius rounded-none p-1.5 font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/70"
+                                                            style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent);">{detail.response}</pre>
+                                                    </div>
+                                                {/if}
+                                            </div>
                                         {/if}
                                     </div>
                                 {/if}
-                                <TabPanel active={activeTab}>
-                                    {#if activeTab === 'chat'}
-                                        {#if m.text}
-                                            {@html renderMd(m.text)}
-                                        {:else if busy}
-                                            <span class="text-(--theme-modal-text)/40">思考中…</span>
-                                        {/if}
-                                    {:else if activeTab === 'reasoning'}
-                                        {#if m.reasoning}
-                                            <div
-                                                class="whitespace-pre-wrap text-[10px] leading-relaxed text-(--theme-modal-text)/40"
-                                            >
-                                                {m.reasoning}
-                                            </div>
-                                        {:else}
-                                            <span class="text-(--theme-modal-text)/40">思考中…</span>
-                                        {/if}
-                                    {:else}
-                                        <div class="flex flex-col gap-1">
-                                            <!-- 用**索引**作 key：同一个工具在一次回合里可以被调用多次
-                                                 （`run_js` 连调两轮、或一轮里并行两个同名工具都会），
-                                                 用 `t.name` 会撞 key 并抛 each_key_duplicate（实测踩过）。
-                                                 该列表只追加、不重排，故位置即身份。 -->
-                                            {#each m.tools ?? [] as t, toolIdx (toolIdx)}
-                                                <div
-                                                    class="flex items-center gap-1.5 text-[10px] text-(--theme-modal-text)/40"
-                                                >
-                                                    <Icon icon="mdi:wrench-outline" class="size-3 shrink-0" />
-                                                    <span class="font-black">{t.name}</span>
-                                                    {#if t.resultLen !== undefined}
-                                                        <span class="text-(--theme-modal-text)/35"
-                                                            >→ {t.resultLen} 字符</span
-                                                        >
-                                                    {:else if typeof t.args.status === 'string' && t.args.status}
-                                                        <span class="truncate text-(--theme-modal-text)/40"
-                                                            >{t.args.status}</span
-                                                        >
-                                                    {:else if t.done}
-                                                        <span class="text-(--theme-modal-text)/35">已完成</span>
-                                                    {:else}
-                                                        <span class="text-(--theme-accent-text)">执行中…</span>
-                                                    {/if}
-                                                </div>
-                                            {/each}
-                                        </div>
-                                    {/if}
-                                </TabPanel>
-                            </div>
+                            {/each}
+                            {#if busy && (!m.activities || m.activities.length === 0)}
+                                <div class="flex items-center gap-1.5 text-(--theme-modal-text)/40">
+                                    <Icon icon="mdi:lightbulb-on-outline" class="size-3 shrink-0" />
+                                    <span class="font-black">思考</span>
+                                    <span class="text-(--theme-modal-text)/25">·</span>
+                                    <span>思考中…</span>
+                                </div>
+                            {/if}
                         </div>
                     {/if}
                 {/each}
+
+                <!-- 用户向上翻看时给出「回到底部」入口；不滚动时始终隐藏，不占布局 -->
+                {#if !stickToBottom}
+                    <div class="sticky bottom-0 flex justify-center pb-1">
+                        <button
+                            type="button"
+                            onclick={() => scrollToBottom(true)}
+                            class="flex items-center gap-1 sf-radius rounded-none border px-2 py-1 text-[10px] shadow-lg transition-colors"
+                            style="background: color-mix(in srgb, var(--theme-modal-bg) 92%, transparent); border-color: var(--theme-divider-border); color: var(--theme-modal-text);"
+                        >
+                            <Icon icon="mdi:arrow-down" class="size-3" />
+                            回到底部
+                        </button>
+                    </div>
+                {/if}
 
                 <!-- 危险确认卡与 ask_user 提问卡已移入 composer 卡片内部（见本文件末尾的 `pendingCard` snippet） -->
             </div>
@@ -1007,18 +1110,28 @@
                  此刻回合正阻塞在工具里等作答，发送任何文本都不会被处理，故不再并排留一个用不了的输入框。 -->
             <AiComposer
                 {busy}
+                longTask={longTaskActive}
                 onsend={(text, images) => send(text, false, images)}
                 onstop={stopGenerating}
                 pending={hasPendingCard ? pendingCard : undefined}
                 {pendingLabel}
             />
             <!-- 会话状态行：对齐 DSH 的「本轮汇总 ｜ N 轮 N 步」，挂在 composer **下方** -->
-            {#if statusText || sessionStatus}
+            {#if statusText || sessionStatus || longTaskActive}
                 <div class="flex shrink-0 items-center gap-1.5 px-3 pb-2.5 text-[10px] tabular-nums">
                     <span
                         class="inline-block size-1.5 shrink-0 rounded-full"
                         style="background: var(--theme-accent-bg); opacity: {runtime.running ? 1 : 0.3};"
                     ></span>
+                    {#if longTaskActive}
+                        <span
+                            class="flex shrink-0 items-center gap-1 text-(--theme-accent-text)"
+                            title="长任务模式：输出停止后会自动继续；点停止按钮结束该状态"
+                        >
+                            <Icon icon="mdi:sync" class="size-3" />
+                            长任务{longTaskContinuations > 0 ? ` · 已续 ${longTaskContinuations} 次` : ''}
+                        </span>
+                    {/if}
                     <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)/45" title={statusText}>
                         {statusText}
                     </span>

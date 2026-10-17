@@ -9,7 +9,7 @@
  * 边界（**刻意不做**的事）：不做完整 HTML 解析（不引入依赖），也不还原复杂排版 ——
  *  表格、嵌套列表缩进、CSS 隐藏元素一律按「尽力而为」处理；markdown 模式只保留标题 / 链接 / 列表 / 行内代码 / 粗斜体 / 代码块。
  */
-import type { WebFetchFormat, WebFetchRequest, WebFetchResult } from './web-fetch.types'
+import type { WebFetchFormat, WebFetchMethod, WebFetchRequest, WebFetchResult } from './web-fetch.types'
 
 /** @desc 正文默认字符上限（模型不指定时用） */
 export const DEFAULT_MAX_CHARS = 8000
@@ -17,10 +17,27 @@ export const DEFAULT_MAX_CHARS = 8000
 export const HARD_MAX_CHARS = 40000
 /** @desc 单次抓取超时（毫秒） */
 export const DEFAULT_TIMEOUT_MS = 15000
+/** @desc 超时下限：再短几乎必然失败 */
+export const MIN_TIMEOUT_MS = 1000
+/** @desc 超时上限：服务端代理的执行时长同样有限，不允许无限等 */
+export const MAX_TIMEOUT_MS = 60000
 /** @desc 响应体字节上限（超限即停止读取并截断，防超大页面打爆内存） */
 export const MAX_RESPONSE_BYTES = 2_000_000
-/** @desc 支持的正文格式（供工具入参 enum 与归一复用） */
-export const WEB_FETCH_FORMATS: WebFetchFormat[] = ['text', 'markdown']
+/** @desc 请求体字符上限（防一次 POST 把平台/内存打爆） */
+export const MAX_REQUEST_BODY_CHARS = 1_000_000
+/** @desc 支持的正文格式（供工具入参 enum 与归一复用；`raw` = 原样返回响应体） */
+export const WEB_FETCH_FORMATS: WebFetchFormat[] = ['text', 'markdown', 'raw']
+/** @desc 支持的 HTTP 方法（顺序即文档展示顺序） */
+export const WEB_FETCH_METHODS: WebFetchMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+
+/**
+ * @desc 不允许调用方覆盖的请求头。
+ * 这些头由运行时/代理自己维护：手工设置要么被底层静默丢弃，要么造成请求走私（长度/连接复用不一致）。
+ */
+const FORBIDDEN_REQUEST_HEADERS = new Set(['host', 'content-length', 'connection', 'transfer-encoding', 'upgrade'])
+
+/** @desc 响应头白名单：只把对读正文有用的字段带回上下文，避免塞进一堆 cookie/缓存策略 */
+const KEPT_RESPONSE_HEADERS = ['content-type', 'content-length', 'content-encoding', 'location', 'cache-control']
 
 /** @desc 命名实体（只收常用集；数字实体走码点通用处理，不认识的实体原样保留） */
 const NAMED_ENTITIES: Record<string, string> = {
@@ -222,6 +239,68 @@ export const clampMaxChars = (raw: unknown): number => {
  */
 export const readFormat = (raw: unknown): WebFetchFormat => WEB_FETCH_FORMATS.find((format) => format === raw) ?? 'text'
 
+/** @desc 归一 HTTP 方法（大小写不敏感；不支持的方法抛可读错误，而不是悄悄退化成 GET） */
+export const readMethod = (raw: unknown): WebFetchMethod => {
+    const text = String(raw ?? '')
+        .trim()
+        .toUpperCase()
+    if (!text) return 'GET'
+    const hit = WEB_FETCH_METHODS.find((method) => method === text)
+    if (!hit) throw new Error(`method 不支持：${text}（可用 ${WEB_FETCH_METHODS.join(' / ')}）`)
+    return hit
+}
+
+/** @desc 归一超时（非法/缺省用默认值；越界钳到 1s-60s，避免模型传 0 或 1 小时） */
+export const clampTimeout = (raw: unknown): number => {
+    const parsed = typeof raw === 'number' ? raw : Number.parseInt(String(raw ?? ''), 10)
+    if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_TIMEOUT_MS
+    return Math.min(Math.max(Math.floor(parsed), MIN_TIMEOUT_MS), MAX_TIMEOUT_MS)
+}
+
+/**
+ * @desc 归一自定义请求头。
+ * - 只接受「对象 → 字符串值」的简单形状（数组/字符串一律拒绝，避免形状歧义）；
+ * - 非法头名 / 禁用头直接忽略（宁可少发一个头，也不要让整次抓取因一个拼写错误失败）；
+ * - 条目数与单值长度都有上限，防止把请求头当请求体用。
+ */
+export const normalizeFetchHeaders = (raw: unknown): Record<string, string> => {
+    if (raw === undefined || raw === null) return {}
+    if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('headers 须为对象：{ "Header-Name": "value" }')
+    const out: Record<string, string> = {}
+    for (const [rawName, rawValue] of Object.entries(raw as Record<string, unknown>)) {
+        if (Object.keys(out).length >= 50) break
+        const name = rawName.trim()
+        if (!name || /[\s:]/.test(name) || FORBIDDEN_REQUEST_HEADERS.has(name.toLowerCase())) continue
+        const value = typeof rawValue === 'string' ? rawValue : String(rawValue ?? '')
+        if (!value.trim() || value.length > 8000 || /[\r\n]/.test(value)) continue
+        out[name] = value
+    }
+    return out
+}
+
+/** @desc 归一请求体（字符串；对象请用 `json` 参数，由工具层序列化并补 Content-Type） */
+export const normalizeRequestBody = (raw: unknown): string => {
+    if (raw === undefined || raw === null) return ''
+    const text = typeof raw === 'string' ? raw : JSON.stringify(raw)
+    if (text.length > MAX_REQUEST_BODY_CHARS) {
+        throw new Error(`body 过长（${text.length} 字符，上限 ${MAX_REQUEST_BODY_CHARS}）`)
+    }
+    return text
+}
+
+/** @desc 方法是否允许带请求体（GET / HEAD 带 body 会被运行时拒绝或静默丢弃） */
+export const methodAllowsBody = (method: WebFetchMethod): boolean => method !== 'GET' && method !== 'HEAD'
+
+/** @desc 从响应头里挑出对读正文有用的字段 */
+export const pickResponseHeaders = (headers: Headers): Record<string, string> => {
+    const out: Record<string, string> = {}
+    for (const name of KEPT_RESPONSE_HEADERS) {
+        const value = headers.get(name)
+        if (value) out[name] = value
+    }
+    return out
+}
+
 /** @desc 归一目标地址：必填、缺协议按 https 补全、只允许 http/https、去掉 fragment */
 export const normalizeFetchUrl = (raw: unknown): string => {
     const text = String(raw ?? '').trim()
@@ -240,13 +319,32 @@ export const normalizeFetchUrl = (raw: unknown): string => {
     return parsed.href
 }
 
-/** @desc 归一工具入参（非法 URL 抛可读错误；其余字段给默认值） */
-export const normalizeWebFetchArgs = (args: Record<string, unknown>): Required<WebFetchRequest> => ({
-    url: normalizeFetchUrl(args.url),
-    format: readFormat(args.format),
-    maxChars: clampMaxChars(args.maxChars),
-    mainOnly: args.mainOnly !== false
-})
+/**
+ * @desc 归一工具入参（非法 URL / 方法 / 请求头抛可读错误；其余字段给默认值）。
+ *
+ * `json` 是 `body` 的便捷写法：传对象即序列化并自动补 `Content-Type: application/json`，
+ * 省掉模型自己转义字符串这一步（转义写错时整次请求会以 400 失败）。手写 `headers` 优先。
+ */
+export const normalizeWebFetchArgs = (args: Record<string, unknown>): Required<WebFetchRequest> => {
+    const method = readMethod(args.method)
+    const headers = normalizeFetchHeaders(args.headers)
+    let body = methodAllowsBody(method) ? normalizeRequestBody(args.body) : ''
+    if (args.json !== undefined && methodAllowsBody(method)) {
+        body = normalizeRequestBody(args.json)
+        const hasContentType = Object.keys(headers).some((name) => name.toLowerCase() === 'content-type')
+        if (!hasContentType) headers['Content-Type'] = 'application/json'
+    }
+    return {
+        url: normalizeFetchUrl(args.url),
+        format: readFormat(args.format),
+        maxChars: clampMaxChars(args.maxChars),
+        mainOnly: args.mainOnly !== false,
+        method,
+        headers,
+        body,
+        timeoutMs: clampTimeout(args.timeoutMs)
+    }
+}
 
 /** @desc 响应类型归类：HTML / 纯文本 / JSON / 其它（未声明 Content-Type 时按 HTML 赌一把，网页居多） */
 export const contentKindOf = (contentType: string): 'html' | 'text' | 'json' | 'other' => {
@@ -267,14 +365,26 @@ export const buildFetchResult = (input: {
     format: WebFetchFormat
     maxChars: number
     mainOnly: boolean
+    method?: string
+    headers?: Record<string, string>
 }): WebFetchResult => {
     const contentType = input.contentType || '(未声明)'
     const kind = contentKindOf(input.contentType)
+    const shared = {
+        url: input.url,
+        status: input.status,
+        contentType,
+        ...(input.method ? { method: input.method } : {}),
+        ...(input.headers && Object.keys(input.headers).length > 0 ? { headers: input.headers } : {})
+    }
+    // raw：不做任何提取，原样返回响应体（调 API / 看 JSON / 对原文时用）
+    if (input.format === 'raw') {
+        const clipped = truncateContent(input.body, input.maxChars)
+        return { ...shared, content: clipped.content, truncated: clipped.truncated }
+    }
     if (kind === 'other') {
         return {
-            url: input.url,
-            status: input.status,
-            contentType,
+            ...shared,
             content: '',
             truncated: false,
             note: `Content-Type 为 ${contentType}，不是网页文本（可能是 PDF / 图片 / 二进制），未提取正文`
@@ -289,9 +399,7 @@ export const buildFetchResult = (input: {
     const clipped = truncateContent(text, input.maxChars)
     const title = isHtml ? extractTitle(input.body) : ''
     return {
-        url: input.url,
-        status: input.status,
-        contentType,
+        ...shared,
         ...(title ? { title } : {}),
         content: clipped.content,
         truncated: clipped.truncated

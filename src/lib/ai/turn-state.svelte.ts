@@ -157,6 +157,17 @@ let _lastCompaction = $state<CompactionRecord | null>(null)
  * 它同时会作为「工作摘要」分段每轮注入，故模型能看到自己上一轮写的内容并据此修订。
  */
 let _workSummary = $state('')
+/**
+ * @desc 「长任务模式」状态（会话级、不持久化）。
+ *
+ * 由 `set_long_task` 工具开关：开着时，模型输出停止后 `session.ts` 会自动追加一条续写提示，
+ * 直到 AI 主动关闭 / 用户按停止 / 轮次预算耗尽。`note` 是 AI 写的目标或进度，
+ * 既用于续写提示，也用于界面状态行展示。
+ */
+let _longTaskActive = $state(false)
+let _longTaskNote = $state('')
+/** @desc 本次长任务已经自动继续过多少次（界面展示用；关闭 / 新回合归零） */
+let _longTaskContinuations = $state(0)
 let _clock: ReturnType<typeof setInterval> | null = null
 
 const stopClock = (): void => {
@@ -186,8 +197,43 @@ export const describeTurnPhase = (runtime: Pick<TurnRuntime, 'running' | 'phase'
     return runtime.detail ? `等待工具结果（${runtime.detail}）` : '等待工具结果'
 }
 
+/** @desc 长任务模式是否开启 */
+export const isLongTaskActive = (): boolean => _longTaskActive
+
+/** @desc 长任务的目标 / 进度（AI 开启时写入；可能为空串） */
+export const getLongTaskNote = (): string => _longTaskNote
+
+/** @desc 本次长任务已自动继续的次数 */
+export const getLongTaskContinuations = (): number => _longTaskContinuations
+
+/**
+ * @desc 开关长任务模式（`set_long_task` 工具的唯一落点）。
+ * 开启时重置已继续次数，并记录目标；关闭时清空目标。
+ */
+export const setLongTaskActive = (active: boolean, note?: string): void => {
+    const wasActive = _longTaskActive
+    _longTaskActive = active
+    _longTaskNote = active ? (note ?? '').trim() : ''
+    // 已经在长任务里时只更新目标，不要把「已续次数」清零（否则状态行数字会无故回退）
+    if (active && !wasActive) _longTaskContinuations = 0
+}
+
+/** @desc 记一次自动继续（由 `session.ts` 在追加续写提示时调用） */
+export const markLongTaskContinuation = (): void => {
+    _longTaskContinuations += 1
+}
+
+/** @desc 清掉长任务状态（用户停止 / 回合收尾 / 清空对话） */
+export const resetLongTask = (): void => {
+    _longTaskActive = false
+    _longTaskNote = ''
+    _longTaskContinuations = 0
+}
+
 /** @desc 回合开始：清空上一轮实时数据与用量，进入「思考中」 */
 export const beginTurn = (): void => {
+    // 新回合从干净状态开始：上一回合的长任务状态不能漏进来
+    resetLongTask()
     _turnUsage = emptyUsageTotals()
     _runtime = { running: true, phase: 'thinking', startedAt: Date.now(), elapsedMs: 0, toolCalls: [] }
     startClock()
@@ -304,6 +350,8 @@ export const finishTurn = (): void => {
         failedTools: toolCalls.filter((c) => c.ok === false).length,
         usage: { ..._turnUsage }
     }
+    // 回合结束一律清掉长任务状态：正常完成、轮次耗尽、用户停止都算结束
+    resetLongTask()
     _sessionUsage = {
         promptTokens: _sessionUsage.promptTokens + _turnUsage.promptTokens,
         completionTokens: _sessionUsage.completionTokens + _turnUsage.completionTokens,
@@ -334,5 +382,6 @@ export const resetAiSessionState = (): void => {
     _lastPromptTokens = undefined
     _lastCompaction = null
     _workSummary = ''
+    resetLongTask()
     _segments = []
 }

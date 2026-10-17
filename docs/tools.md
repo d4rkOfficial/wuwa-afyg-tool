@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **147** 个工具。
+> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **148** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
@@ -67,7 +67,7 @@ _无参数_
 
 ### `get_ai_turn_state`
 
-读取 AI 助手的**实时运行情况**：是否正在请求、当前阶段（思考中 / 收到流式文本 / 正在调用工具 / 等待工具结果 / 空闲）、已耗时、当前工具名与补充说明，以及本轮已发生的工具调用列表（名称 / 参数 / 耗时 / 成败 / 结果梗概）。用于自检卡在哪一步或复盘本轮调用了哪些工具。
+读取 AI 助手的**实时运行情况**：是否正在请求、当前阶段（思考中 / 收到流式文本 / 正在调用工具 / 等待工具结果 / 空闲）、已耗时、当前工具名与补充说明、长任务模式状态（是否开启 / 目标 / 已自动继续次数），以及本轮已发生的工具调用列表（名称 / 参数 / 耗时 / 成败 / 结果梗概）。用于自检卡在哪一步或复盘本轮调用了哪些工具。
 
 _无参数_
 
@@ -78,6 +78,15 @@ _无参数_
 | 参数      | 必填   | 类型   | 说明                                                                                      |
 | --------- | ------ | ------ | ----------------------------------------------------------------------------------------- |
 | `summary` | **是** | string | 一句话工作摘要（建议 10~30 字），例如「给椿配装，正在对比两把武器」。传空串表示清空摘要。 |
+
+### `set_long_task`
+
+开启 / 关闭「长任务模式」。开启后，如果你一次回复结束但任务还没做完，系统会自动追加一条「继续推进」的提示让回合继续，你不需要让用户反复说「继续」；只有当你确认**整个任务已经完成**（或确认无法继续）时，才调用本工具传 enabled=false 关闭它。适用于需要多轮工具往返、大批量处理、长文档分析等一次回复做不完的任务；普通问答不要开启。用户按停止按钮会立即结束该状态。
+
+| 参数      | 必填   | 类型    | 说明                                                                              |
+| --------- | ------ | ------- | --------------------------------------------------------------------------------- |
+| `enabled` | **是** | boolean | true=开启长任务模式，false=关闭（任务完成时务必关闭）                             |
+| `note`    | 否     | string  | 可选：一句话说明当前长任务的目标 / 进度（会显示在状态行，并用于自动继续时的提示） |
 
 ### `get_share_cooldown`
 
@@ -783,17 +792,21 @@ _无参数_
 
 ### `manage_ai_profile`
 
-管理 AI 配置文件：add=新建（传 label，可选 baseUrl/model/apiKey/reasoningEffort）、switch=切换激活（传 id）、update=修改（传 id + 可选字段）、delete=删除（传 id，至少保留 1 个）。reasoningEffort 须为 low/medium/high。返回操作结果（apiKey 永远不回显明文）。
+管理 AI 配置文件：add=新建（传 label，可选 baseUrl/model/apiKey/reasoningEffort/contextWindow/maxOutputTokens/maxToolRounds/directRequest）、switch=切换激活（传 id）、update=修改（传 id + 可选字段）、delete=删除（传 id，至少保留 1 个）。reasoningEffort 须为 low/medium/high；directRequest=true 表示由浏览器直连（绕过站点转发）。返回操作结果（apiKey 永远不回显明文）。
 
-| 参数              | 必填   | 类型                                     | 说明                                                     |
-| ----------------- | ------ | ---------------------------------------- | -------------------------------------------------------- |
-| `action`          | **是** | string（add / switch / update / delete） | 操作类型                                                 |
-| `id`              | 否     | string                                   | 配置 id（switch/update/delete 用）                       |
-| `label`           | 否     | string                                   | 配置名称（add 用，update 可选）                          |
-| `baseUrl`         | 否     | string                                   | 服务地址（add/update 可选，如 https://api.deepseek.com） |
-| `model`           | 否     | string                                   | 模型名（add/update 可选）                                |
-| `apiKey`          | 否     | string                                   | API Key（add/update 可选；空串=清除）                    |
-| `reasoningEffort` | 否     | string（low / medium / high）            | 思考强度（add/update 可选）                              |
+| 参数              | 必填   | 类型                                     | 说明                                                                      |
+| ----------------- | ------ | ---------------------------------------- | ------------------------------------------------------------------------- |
+| `action`          | **是** | string（add / switch / update / delete） | 操作类型                                                                  |
+| `id`              | 否     | string                                   | 配置 id（switch/update/delete 用）                                        |
+| `label`           | 否     | string                                   | 配置名称（add 用，update 可选）                                           |
+| `baseUrl`         | 否     | string                                   | 服务地址（add/update 可选，如 https://api.deepseek.com）                  |
+| `model`           | 否     | string                                   | 模型名（add/update 可选）                                                 |
+| `apiKey`          | 否     | string                                   | API Key（add/update 可选；空串=清除）                                     |
+| `reasoningEffort` | 否     | string（low / medium / high）            | 思考强度（add/update 可选）                                               |
+| `contextWindow`   | 否     | number                                   | 上下文窗口 token 数（add/update 可选；用量圈分母，默认 256000）           |
+| `maxOutputTokens` | 否     | number                                   | 单次请求最大输出 token（add/update 可选；默认 65536，太小会导致回复截断） |
+| `maxToolRounds`   | 否     | number                                   | 单回合工具轮次上限（add/update 可选；默认 48）                            |
+| `directRequest`   | 否     | boolean                                  | 是否浏览器直连（add/update 可选；true=绕过站点转发，需要端点支持 CORS）   |
 
 ### `get_cache_counts`
 
@@ -1151,14 +1164,18 @@ _无参数_
 
 ### `web_fetch`
 
-抓取一个**已知** http(s) 地址的网页正文（HTML → 纯文本或轻量 Markdown），返回标题、最终地址、HTTP 状态与正文。 怎么用： - 必须先有确切链接。本工具**不做搜索**（没有搜索引擎能力）：不知道 URL 时先用服务商自带的 web_search，或直接问用户要链接。 - 适合读文档 / 更新日志 / 攻略页 / API 说明的正文；不适合抓需要登录、需要 JS 渲染的页面（拿到的是服务端首屏 HTML，可能缺少动态内容）。 - 自动跟随重定向（最多 5 跳）、剥离脚本/样式/导航/页脚，默认只取正文区域；正文里的链接会按页面地址补成绝对地址。 结果怎么读： - content 是提取后的正文；truncated=true 表示正文只给到 maxChars 处、**后面还有内容但没有抓取** —— 不要臆造后续，必要时用更精确的 maxChars 或换个更具体的页面再抓一次。 - title 是页面标题（可能缺失）；url 是跟随重定向后的最终地址；status 是 HTTP 状态码。 - 非网页文本（PDF / 图片 / 二进制）不会返回正文，只在 note 里说明；这类内容请直接让用户提供文本。 - 抓取失败（超时 / 目标 4xx-5xx / 内网地址被拦）会返回明确错误，不要重复重试同一个地址。 限制：部署环境下只放行 https 公网地址（内网 / 回环 / 保留地址与云元数据地址由服务端拦截，防 SSRF）；单次抓取超时 15 秒、响应体上限 2MB、正文上限 40000 字符。 能力归属：本工具**仅内置 AI 助手**可用（需要宿主提供抓取能力），WS 远程接管通道无法调用。
+抓取一个**已知** http(s) 地址（网页正文或一类 API），做成一次**完整的 HTTP 请求**：可指定方法 / 请求头 / 请求体，返回标题、最终地址、HTTP 状态、响应头与正文。 怎么用： - 必须先有确切链接。本工具**不做搜索**（没有搜索引擎能力）：不知道 URL 时先用服务商自带的 web_search，或直接问用户要链接。 - 读网页：默认 GET + format=text，剥离脚本/样式/导航/页脚，只取正文区域；需要看清结构时用 format=markdown。 - 调接口：用 method=POST/PUT/PATCH/DELETE，请求体写 body（字符串）或 json（对象，会自动补 Content-Type: application/json）；format=raw 可原样看响应体。 - 自动跟随重定向（最多 5 跳），303 / 301-302+POST 会按规范改成 GET 并丢弃请求体；正文里的链接会按页面地址补成绝对地址。 结果怎么读： - content 是提取后的正文（format=raw 时是原始响应体）；truncated=true 表示正文只给到 maxChars 处、**后面还有内容但没有抓取** —— 不要臆造后续，必要时用更大的 maxChars 或换个更具体的页面再抓一次。 - title 是页面标题（可能缺失）；url 是跟随重定向后的最终地址；status 是 HTTP 状态码；method 是最终使用的方法；headers 是响应头（content-type / content-length / location 等）。 - **4xx / 5xx 也按成功返回**：status 与响应体就是服务端的真实答复，请据此判断（例如 401 缺鉴权、422 参数错），不要当成本工具坏了。 - 非网页文本（PDF / 图片 / 二进制）默认不提取正文，只在 note 里说明；需要原文时用 format=raw。 - 网络层失败（超时 / DNS / 内网地址被拦）才是错误，不要重复重试同一个地址。 限制：部署环境下只放行 https 公网地址（内网 / 回环 / 保留地址与云元数据地址由服务端拦截，防 SSRF）；单次抓取超时默认 15 秒（可调 1-60 秒）、响应体上限 2MB、正文上限 40000 字符、请求体上限 1M 字符。 能力归属：本工具**仅内置 AI 助手**可用（需要宿主提供抓取能力），WS 远程接管通道无法调用。
 
-| 参数       | 必填   | 类型                      | 说明                                                                                                    |
-| ---------- | ------ | ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `url`      | **是** | string                    | 要抓取的 http(s) 链接；缺协议时按 https 补全                                                            |
-| `format`   | 否     | string（text / markdown） | 正文格式：text=去标签纯文本（默认，省 token）；markdown=保留标题/链接/列表/代码（需要看清页面结构时用） |
-| `maxChars` | 否     | number                    | 正文最大字符数（默认 8000，硬顶 40000）；长文档建议先小后大，truncated=true 时再按需追加                |
-| `mainOnly` | 否     | boolean                   | 只取正文区域并剥离导航/页眉/页脚（默认 true）；false = 连侧栏与页脚一起返回                             |
+| 参数        | 必填   | 类型                                                         | 说明                                                                                                                       |
+| ----------- | ------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `url`       | **是** | string                                                       | 要抓取的 http(s) 链接；缺协议时按 https 补全                                                                               |
+| `format`    | 否     | string（text / markdown / raw）                              | 正文格式：text=去标签纯文本（默认，省 token）；markdown=保留标题/链接/列表/代码；raw=原样返回响应体（调 API / 看 JSON 用） |
+| `maxChars`  | 否     | number                                                       | 正文最大字符数（默认 8000，硬顶 40000）；长文档建议先小后大，truncated=true 时再按需追加                                   |
+| `mainOnly`  | 否     | boolean                                                      | 只取正文区域并剥离导航/页眉/页脚（默认 true）；false = 连侧栏与页脚一起返回                                                |
+| `method`    | 否     | string（GET / POST / PUT / PATCH / DELETE / HEAD / OPTIONS） | HTTP 方法（默认 GET）；调接口时按服务端要求填写                                                                            |
+| `headers`   | 否     | object                                                       | 自定义请求头（与宿主默认头合并，同名字段以这里为准）：{ "Authorization": "Bearer …" }                                      |
+| `body`      | 否     | string                                                       | 请求体字符串（POST/PUT/PATCH 等；GET/HEAD 会忽略）                                                                         |
+| `timeoutMs` | 否     | number                                                       | 单次抓取超时毫秒数（默认 15000，允许 1000-60000）                                                                          |
 
 ## Buff 生成辅助
 

@@ -33,6 +33,12 @@ export interface GenerateBuffOptions {
     systemPrompt?: string
     initialTaskPrompt?: string
     data: GenerateDataSource
+    /** @desc 单回合工具轮次上限（缺省用本模块内置的 8；由 AI 配置透传） */
+    maxToolRounds?: number
+    /** @desc 单次请求最大输出 token（缺省用 client 内置默认值） */
+    maxOutputTokens?: number
+    /** @desc 浏览器直连（缺省走自动策略） */
+    direct?: boolean
     history?: ChatMessage[]
     newUserMessage?: string
     signal?: AbortSignal
@@ -81,8 +87,9 @@ export const generateBuffs = async (options: GenerateBuffOptions): Promise<Gener
 
     let content = ''
     let fixCount = 0
+    const maxToolRounds = options.maxToolRounds && options.maxToolRounds > 0 ? options.maxToolRounds : MAX_TOOL_ROUNDS
 
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    for (let round = 0; round < maxToolRounds; round++) {
         let result
         try {
             result = await chatCompletionStream(apiKey, messages, {
@@ -91,6 +98,8 @@ export const generateBuffs = async (options: GenerateBuffOptions): Promise<Gener
                 baseUrl: options.baseUrl,
                 model: options.model,
                 signal: options.signal,
+                maxOutputTokens: options.maxOutputTokens,
+                direct: options.direct,
                 onDelta: () => {}
             })
         } catch (e) {
@@ -173,6 +182,6 @@ export const generateBuffs = async (options: GenerateBuffOptions): Promise<Gener
         return { buffs: null, rawContent: content, parseError }
     }
 
-    progress(`超过最大工具轮数（${MAX_TOOL_ROUNDS}）`)
-    return { buffs: null, rawContent: content, parseError: `超过最大工具轮数（${MAX_TOOL_ROUNDS}）` }
+    progress(`超过最大工具轮数（${maxToolRounds}）`)
+    return { buffs: null, rawContent: content, parseError: `超过最大工具轮数（${maxToolRounds}）` }
 }

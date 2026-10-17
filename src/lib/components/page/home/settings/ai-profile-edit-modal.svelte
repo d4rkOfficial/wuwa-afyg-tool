@@ -8,7 +8,11 @@
     import {
         addProfile,
         coerceContextWindow,
+        coerceMaxOutputTokens,
+        coerceMaxToolRounds,
         DEFAULT_CONTEXT_WINDOW,
+        DEFAULT_MAX_OUTPUT_TOKENS,
+        DEFAULT_MAX_TOOL_ROUNDS,
         updateProfile,
         type AiProfile
     } from '$lib/ai/config.svelte'
@@ -60,14 +64,28 @@
      * 故这里保留原始文本，只在**保存这一个写入点**归一。
      */
     let contextWindowText = $state('')
+    /** @desc 单次最大输出的输入框文本（归一与落盘只在保存时做，理由同 `contextWindowText`） */
+    let maxOutputText = $state('')
+    /** @desc 工具轮次上限的输入框文本 */
+    let maxToolRoundsText = $state('')
 
     $effect(() => {
         if (open && profile) {
             draft = { ...profile }
             // 新建草稿（id 为空）时留白：让占位符把默认值说清楚，而不是先替用户填一个具体数字
             contextWindowText = profile.id === '' ? '' : String(profile.contextWindow)
+            maxOutputText = profile.id === '' ? '' : String(profile.maxOutputTokens)
+            maxToolRoundsText = profile.id === '' ? '' : String(profile.maxToolRounds)
         }
     })
+
+    /** @desc 请求路径：自动（本地/白名单 host 直连，其余走站点转发）/ 浏览器直连（永远不走转发） */
+    const REQUEST_MODE_TABS = [
+        { value: 'auto', label: '自动' },
+        { value: 'direct', label: '浏览器直连' }
+    ]
+    const requestMode = $derived(draft?.directRequest ? 'direct' : 'auto')
+    const pickRequestMode = (value: string) => setDraft({ directRequest: value === 'direct' })
 
     // 点击图标按钮以外的区域时收起提供商弹层
     $effect(() => {
@@ -112,7 +130,12 @@
     async function handleSave() {
         if (!draft) return
         // 上下文窗口在此**唯一写入点**归一：非法/越界回落默认（见 coerceContextWindow）
-        const patch = { ...draft, contextWindow: coerceContextWindow(Number(contextWindowText)) }
+        const patch = {
+            ...draft,
+            contextWindow: coerceContextWindow(Number(contextWindowText)),
+            maxOutputTokens: coerceMaxOutputTokens(Number(maxOutputText)),
+            maxToolRounds: coerceMaxToolRounds(Number(maxToolRoundsText))
+        }
 
         // `id` 为空 = 尚未创建的新配置：**此刻才真正新建**（弹窗打开时不落库，取消即无副作用）
         if (!draft.id) {
@@ -298,6 +321,52 @@
                     {DEFAULT_CONTEXT_WINDOW}）；留空或填非法值会回落默认。
                 </p>
             </label>
+            <label class="block">
+                <FieldLabel label="单次最大输出（token）" class="mb-1" />
+                <input
+                    type="text"
+                    inputmode="numeric"
+                    bind:value={maxOutputText}
+                    placeholder={String(DEFAULT_MAX_OUTPUT_TOKENS)}
+                    class="w-full rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
+                    style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                />
+                <p class="mt-1 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                    单次回复最多能写多少 token（含思考）。偏小时回复会在半句处截断（默认
+                    {DEFAULT_MAX_OUTPUT_TOKENS}）；请按模型真实上限填写，超出上限服务商会直接报错。
+                </p>
+            </label>
+            <label class="block">
+                <FieldLabel label="工具轮次上限" class="mb-1" />
+                <input
+                    type="text"
+                    inputmode="numeric"
+                    bind:value={maxToolRoundsText}
+                    placeholder={String(DEFAULT_MAX_TOOL_ROUNDS)}
+                    class="w-full rounded-none border px-2.5 py-1.5 text-xs outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
+                    style="background: var(--theme-input-bg); color: var(--theme-modal-text); border-color: var(--theme-divider-border);"
+                />
+                <p class="mt-1 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                    一个回合内最多「模型 → 工具 → 模型」循环多少次（默认 {DEFAULT_MAX_TOOL_ROUNDS}）。查数据 + 改配置 +
+                    校验这类任务容易超过旧上限，到顶时助手会明确提示而不是静默停止。
+                </p>
+            </label>
+            <div>
+                <FieldLabel label="请求方式" class="mb-1" />
+                <Tabs
+                    items={REQUEST_MODE_TABS}
+                    value={requestMode}
+                    onchange={pickRequestMode}
+                    compact
+                    class={ROW_TABS}
+                    {...TAB_ACCENT}
+                />
+                <p class="mt-1 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
+                    自动 = 本地服务与已知支持 CORS 的地址直连，其余经站点转发；浏览器直连 =
+                    所有请求都由浏览器直接发出（不经过 Cloudflare / Vercel 转发，不受平台请求体与时长限制）。
+                    直连要求端点自身放行 CORS（预检需允许 Authorization 头），否则浏览器会拦下请求。
+                </p>
+            </div>
         </div>
     {/if}
 </Modal>

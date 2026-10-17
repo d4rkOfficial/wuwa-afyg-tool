@@ -11,10 +11,11 @@ import { dev } from '$app/environment'
 import { MAX_REDIRECTS, assertPublicHttps } from '$lib/ai/proxy-guard'
 import type { WebFetchRequest } from '$lib/ai/tools/web-fetch.types'
 import {
-    DEFAULT_TIMEOUT_MS,
     MAX_RESPONSE_BYTES,
     buildFetchResult,
-    normalizeWebFetchArgs
+    methodAllowsBody,
+    normalizeWebFetchArgs,
+    pickResponseHeaders
 } from '$lib/ai/tools/web-fetch.utils'
 
 /** @desc 一部分站点对无 UA 的请求直接 403；给一个诚实的工具标识，不伪装浏览器 */
@@ -86,6 +87,16 @@ export async function POST({ request }: { request: Request }) {
         return json({ ok: false, error: `url 不是合法链接：${params.url}` }, { status: 400 })
     }
 
+    /** @desc 跟随重定向时方法可能被改写（303 / 301-302+POST → GET 且丢弃请求体） */
+    let method = params.method
+    let body = params.body
+    const requestHeaders = new Headers({
+        'User-Agent': USER_AGENT,
+        Accept: ACCEPT,
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+    })
+    for (const [name, value] of Object.entries(params.headers)) requestHeaders.set(name, value)
+
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
         if (!dev) {
             // 先自己给一句「面向抓取」的提示：proxy-guard 的文案是为 AI 端点写的（会提「服务地址」与 localhost 直连），
@@ -102,12 +113,14 @@ export async function POST({ request }: { request: Request }) {
 
         let upstream: Response
         try {
-            upstream = await fetch(current.href, {
-                method: 'GET',
-                headers: { 'User-Agent': USER_AGENT, Accept: ACCEPT, 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8' },
+            const init: RequestInit = {
+                method,
+                headers: requestHeaders,
                 redirect: 'manual',
-                signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS)
-            })
+                signal: AbortSignal.timeout(params.timeoutMs)
+            }
+            if (methodAllowsBody(method) && body) init.body = body
+            upstream = await fetch(current.href, init)
         } catch (e) {
             const err = e instanceof Error ? e : new Error(String(e))
             const cause = err.cause instanceof Error ? err.cause : null
@@ -115,7 +128,7 @@ export async function POST({ request }: { request: Request }) {
             // 错误文案要**短且可行动**：TLS/DNS 这类底层原因带一长串 boringSSL 描述，只留错误码
             const reason =
                 err.name === 'TimeoutError'
-                    ? `抓取超时（超过 ${DEFAULT_TIMEOUT_MS / 1000} 秒）`
+                    ? `抓取超时（超过 ${params.timeoutMs / 1000} 秒）`
                     : code
                       ? `抓取失败（${code}）`
                       : `抓取失败：${cause ? cause.message : err.message}`
@@ -130,21 +143,19 @@ export async function POST({ request }: { request: Request }) {
             } catch {
                 return json({ ok: false, error: '目标返回了非法重定向地址', url: current.href }, { status: 502 })
             }
+            // 303 强制 GET；301/302 只把 POST 改成 GET（与 fetch 规范一致），并把请求体丢掉
+            if (
+                upstream.status === 303 ||
+                (method === 'POST' && (upstream.status === 301 || upstream.status === 302))
+            ) {
+                method = 'GET'
+                body = ''
+            }
             continue
         }
 
-        if (!upstream.ok) {
-            return json(
-                {
-                    ok: false,
-                    error: `目标返回 HTTP ${upstream.status}${upstream.statusText ? ` ${upstream.statusText}` : ''}`,
-                    url: current.href,
-                    status: upstream.status
-                },
-                { status: 502 }
-            )
-        }
-
+        // 4xx / 5xx **不再是工具错误**：完整 fetch 的语义是「把服务端真实响应交回来」，
+        // 由 status + 响应体让模型自己判断；否则调错一个 API 参数都拿不到错误详情。
         const contentType = upstream.headers.get('content-type') ?? ''
         const declared = Number.parseInt(upstream.headers.get('content-length') ?? '', 10)
         if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
@@ -166,7 +177,9 @@ export async function POST({ request }: { request: Request }) {
             body: text,
             format: params.format,
             maxChars: params.maxChars,
-            mainOnly: params.mainOnly
+            mainOnly: params.mainOnly,
+            method,
+            headers: pickResponseHeaders(upstream.headers)
         })
         if (overBytes && !result.note) {
             result.note = `响应体超过 ${MAX_RESPONSE_BYTES} 字节，已截断读取（正文可能不完整）`

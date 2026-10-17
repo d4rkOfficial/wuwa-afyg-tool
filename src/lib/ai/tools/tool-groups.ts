@@ -12,6 +12,11 @@ const GROUP_RULES: { label: string; test: RegExp }[] = [
     { label: 'AI 助手 · 交互', test: /^ask_user$/ },
     // 联网抓取（web_fetch）：同样只属于内置 AI 助手（WS 无此能力），单列一组便于在工具清单里辨认
     { label: 'AI 助手 · 联网', test: /^web_fetch$/ },
+    // 会话级状态（长任务 / 工作摘要 / 上下文分段 / 用量）：都是「管理助手自身」的工具
+    {
+        label: 'AI 助手 · 会话',
+        test: /^set_long_task$|^set_work_summary$|^get_ai_(context_state|usage|turn_state)$|^set_ai_context_segment$|^reset_ai_context_segments$|^clear_ai_context_snapshot$/
+    },
     { label: '库街区 · 词条集同步', test: /_kuro_|^kuro_|^check_kuro_login$|^refresh_kuro_echo_data$|_from_kuro$/ },
     { label: '词条集（方案）', test: /_substat_plan/ },
     { label: 'Buff 生成', test: /^generate_|_naming_rule$|^get_entity_info$|^list_entities$|^search_entities$/ },

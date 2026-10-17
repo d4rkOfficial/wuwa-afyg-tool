@@ -160,7 +160,9 @@ const execute = async (source: string, toolNames: readonly string[]): Promise<Ru
     sandboxGlobal.tools = namespace
     sandboxGlobal.console = fakeConsole
 
-    // 形参顺序与下面实参顺序必须逐项对应
+    // 形参顺序与下面实参顺序必须逐项对应。
+    // web_fetch 与其它工具一样按**工具名原样**注入（裸调用 web_fetch({ url, ... }) 即可），
+    // 不再另加驼峰别名；它仍走 executeTool / requires 能力门控，不是浏览器的真 fetch。
     const paramNames = ['window', 'globalThis', 'self', 'console', 'tools', ...SHADOWED_HOST_NAMES, ...injectable]
     const paramValues = [
         sandboxGlobal,

@@ -53,6 +53,8 @@ export interface ResponsesStreamOptions {
     tools?: unknown[]
     reasoningEffort?: 'low' | 'medium' | 'high'
     signal?: AbortSignal
+    /** @desc 单次请求的最大输出 token（缺省用内置默认值） */
+    maxOutputTokens?: number
     onDelta?: (delta: { content?: string; reasoning?: string }) => void
     onSearch?: (status: 'searching' | 'completed', query?: string) => void
 }
@@ -100,7 +102,7 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
         input,
         stream: true,
         temperature: 0.3,
-        max_output_tokens: MAX_OUTPUT_TOKENS,
+        max_output_tokens: options.maxOutputTokens ?? MAX_OUTPUT_TOKENS,
         tools: toResponsesTools(options.tools),
         tool_choice: 'auto'
     }
@@ -152,6 +154,87 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
     const webSearchCalls = new Map<string, { id: string; query?: string }>()
     let completedPayload: Record<string, unknown> | null = null
 
+    /** @desc 处理一行 SSE（与 Chat Completions 同理：流结束后的残余缓冲也要走同一解析路径） */
+    const handleLine = (line: string): void => {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) return
+        const payload = trimmed.slice(5).trim()
+        if (!payload) return
+        let chunk: Record<string, unknown>
+        try {
+            chunk = JSON.parse(payload) as Record<string, unknown>
+        } catch {
+            return
+        }
+        const type = String(chunk.type ?? '')
+        switch (type) {
+            case 'response.output_text.delta':
+                if (typeof chunk.delta === 'string') {
+                    content += chunk.delta
+                    options.onDelta?.({ content: chunk.delta })
+                }
+                break
+            case 'response.reasoning_text.delta':
+                if (typeof chunk.delta === 'string') {
+                    reasoning += chunk.delta
+                    options.onDelta?.({ reasoning: chunk.delta })
+                }
+                break
+            case 'response.function_call_arguments.delta': {
+                const itemId = String(chunk.item_id ?? '')
+                if (!itemId) break
+                const cur = functionCalls.get(itemId) ?? { name: '', args: '' }
+                if (typeof chunk.delta === 'string') cur.args += chunk.delta
+                functionCalls.set(itemId, cur)
+                break
+            }
+            case 'response.output_item.done': {
+                const item = chunk.item as Record<string, unknown> | undefined
+                if (!item) break
+                if (item.type === 'function_call') {
+                    const itemId = String(item.id ?? '')
+                    const cur = functionCalls.get(itemId) ?? { name: '', args: '' }
+                    cur.id = itemId
+                    if (typeof item.call_id === 'string') cur.call_id = item.call_id
+                    if (typeof item.name === 'string' && !cur.name) cur.name = item.name
+                    if (typeof item.arguments === 'string' && item.arguments) cur.args = item.arguments
+                    functionCalls.set(itemId, cur)
+                } else if (item.type === 'web_search_call') {
+                    const id = String(item.id ?? '')
+                    const action = item.action as { query?: string } | undefined
+                    webSearchCalls.set(id, { id, query: action?.query })
+                    options.onSearch?.('completed', action?.query)
+                }
+                break
+            }
+            case 'response.web_search_call.in_progress':
+            case 'response.web_search_call.searching':
+                options.onSearch?.('searching')
+                break
+            case 'response.completed':
+            case 'response.incomplete': {
+                completedPayload = chunk.response as Record<string, unknown> | null
+                // usage 真源在 response 对象上（规范形态）；少数实现放在事件顶层，两者都认
+                const responseUsage = completedPayload?.usage
+                if (responseUsage) usage = responseUsage as Record<string, unknown>
+                else if (chunk.usage) usage = chunk.usage as Record<string, unknown>
+                const status = (chunk.response as { status?: string })?.status
+                if (typeof status === 'string') finishReason = status
+                // 服务端把「输出触顶」标记为 incomplete + incomplete_details.reason=max_output_tokens；
+                // 统一映射成 Chat Completions 的 'length'，界面才对两种协议说同一句话。
+                const details = (chunk.response as { incomplete_details?: { reason?: string } })?.incomplete_details
+                if (type === 'response.incomplete' || details?.reason === 'max_output_tokens') finishReason = 'length'
+                break
+            }
+            case 'response.failed': {
+                const errPayload = (chunk.response as { error?: unknown }) ?? chunk
+                throw new AiClientError(`AI 流错误：${parseErrorPayload(errPayload) || '生成失败'}`, payload)
+            }
+            default:
+                break
+        }
+    }
+
     try {
         for (;;) {
             const { done, value } = await reader.read()
@@ -159,82 +242,11 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
             buffer += decoder.decode(value, { stream: true })
             const lines = buffer.split('\n')
             buffer = lines.pop() ?? ''
-            for (const line of lines) {
-                const trimmed = line.trim()
-                if (!trimmed.startsWith('data:')) continue
-                const payload = trimmed.slice(5).trim()
-                if (!payload) continue
-                let chunk: Record<string, unknown>
-                try {
-                    chunk = JSON.parse(payload) as Record<string, unknown>
-                } catch {
-                    continue
-                }
-                const type = String(chunk.type ?? '')
-                switch (type) {
-                    case 'response.output_text.delta':
-                        if (typeof chunk.delta === 'string') {
-                            content += chunk.delta
-                            options.onDelta?.({ content: chunk.delta })
-                        }
-                        break
-                    case 'response.reasoning_text.delta':
-                        if (typeof chunk.delta === 'string') {
-                            reasoning += chunk.delta
-                            options.onDelta?.({ reasoning: chunk.delta })
-                        }
-                        break
-                    case 'response.function_call_arguments.delta': {
-                        const itemId = String(chunk.item_id ?? '')
-                        if (!itemId) break
-                        const cur = functionCalls.get(itemId) ?? { name: '', args: '' }
-                        if (typeof chunk.delta === 'string') cur.args += chunk.delta
-                        functionCalls.set(itemId, cur)
-                        break
-                    }
-                    case 'response.output_item.done': {
-                        const item = chunk.item as Record<string, unknown> | undefined
-                        if (!item) break
-                        if (item.type === 'function_call') {
-                            const itemId = String(item.id ?? '')
-                            const cur = functionCalls.get(itemId) ?? { name: '', args: '' }
-                            cur.id = itemId
-                            if (typeof item.call_id === 'string') cur.call_id = item.call_id
-                            if (typeof item.name === 'string' && !cur.name) cur.name = item.name
-                            if (typeof item.arguments === 'string' && item.arguments) cur.args = item.arguments
-                            functionCalls.set(itemId, cur)
-                        } else if (item.type === 'web_search_call') {
-                            const id = String(item.id ?? '')
-                            const action = item.action as { query?: string } | undefined
-                            webSearchCalls.set(id, { id, query: action?.query })
-                            options.onSearch?.('completed', action?.query)
-                        }
-                        break
-                    }
-                    case 'response.web_search_call.in_progress':
-                    case 'response.web_search_call.searching':
-                        options.onSearch?.('searching')
-                        break
-                    case 'response.completed': {
-                        completedPayload = chunk.response as Record<string, unknown> | null
-                        // usage 真源在 response 对象上（规范形态）；少数实现放在事件顶层，两者都认
-                        const responseUsage = completedPayload?.usage
-                        if (responseUsage) usage = responseUsage as Record<string, unknown>
-                        else if (chunk.usage) usage = chunk.usage as Record<string, unknown>
-                        if (typeof (chunk.response as { status?: string })?.status === 'string') {
-                            finishReason = (chunk.response as { status?: string }).status ?? ''
-                        }
-                        break
-                    }
-                    case 'response.failed': {
-                        const errPayload = (chunk.response as { error?: unknown }) ?? chunk
-                        throw new AiClientError(`AI 流错误：${parseErrorPayload(errPayload) || '生成失败'}`, payload)
-                    }
-                    default:
-                        break
-                }
-            }
+            for (const line of lines) handleLine(line)
         }
+        // 见 client.ts 的同名处理：最后一条 data 可能不带换行，不 flush 会丢掉末尾内容
+        buffer += decoder.decode()
+        if (buffer.trim()) handleLine(buffer)
     } catch (e) {
         if (e instanceof AiClientError) throw e
         const err = e instanceof Error ? e.message : String(e)
@@ -243,7 +255,8 @@ export async function responsesStream(options: ResponsesStreamOptions): Promise<
 
     // 以 response.completed 的 output 为准组装 items（兜底：用事件累积的数据）
     const items: ResponsesItem[] = []
-    const completedOutput = (completedPayload?.output as unknown[]) ?? null
+    // 显式断言：completedPayload 只在 handleLine 回调里赋值，TS 的控制流分析会把它窄化成 null
+    const completedOutput = ((completedPayload as Record<string, unknown> | null)?.output as unknown[]) ?? null
     if (Array.isArray(completedOutput)) {
         for (const raw of completedOutput) {
             const item = raw as Record<string, unknown>

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 
 import {
     DEFAULT_MAX_CHARS,
+    DEFAULT_TIMEOUT_MS,
     HARD_MAX_CHARS,
     buildFetchResult,
     clampMaxChars,
@@ -75,16 +76,47 @@ describe('入参归一：URL / 格式 / 上限 / 正文区域', () => {
         assert.throws(() => normalizeFetchUrl('javascript:alert(1)'), /http/)
     })
 
-    it('缺省值：format=text、maxChars=8000、mainOnly=true', () => {
+    it('缺省值：format=text、maxChars=8000、mainOnly=true、method=GET、无请求头/请求体', () => {
         assert.deepEqual(normalizeWebFetchArgs({ url: 'a.test' }), {
             url: 'https://a.test/',
             format: 'text',
             maxChars: DEFAULT_MAX_CHARS,
-            mainOnly: true
+            mainOnly: true,
+            method: 'GET',
+            headers: {},
+            body: '',
+            timeoutMs: DEFAULT_TIMEOUT_MS
         })
         assert.equal(normalizeWebFetchArgs({ url: 'a.test', mainOnly: false }).mainOnly, false)
         // 显式 mainOnly=true 保持 true（只有 === false 才算关）
         assert.equal(normalizeWebFetchArgs({ url: 'a.test', mainOnly: true }).mainOnly, true)
+    })
+
+    it('完整 fetch：方法 / 请求头 / 请求体 / JSON 快捷写法 / 超时', () => {
+        const post = normalizeWebFetchArgs({
+            url: 'https://api.test/echo',
+            method: 'post',
+            headers: { Authorization: 'Bearer x', Host: 'evil', 'X-Ok': '1' },
+            body: '{"a":1}',
+            timeoutMs: 500
+        })
+        assert.equal(post.method, 'POST')
+        assert.equal(post.body, '{"a":1}')
+        assert.equal(post.headers.Authorization, 'Bearer x')
+        assert.equal(post.headers['X-Ok'], '1')
+        assert.equal('Host' in post.headers, false, '禁止覆盖 Host')
+        assert.equal(post.timeoutMs, 1000, '超时下限钳到 1s')
+
+        const json = normalizeWebFetchArgs({ url: 'a.test', method: 'PUT', json: { ok: true } })
+        assert.equal(json.body, '{"ok":true}')
+        assert.equal(json.headers['Content-Type'], 'application/json')
+
+        const get = normalizeWebFetchArgs({ url: 'a.test', method: 'GET', body: 'ignored' })
+        assert.equal(get.body, '', 'GET 忽略请求体')
+    })
+
+    it('非法方法抛错，而不是悄悄退化成 GET', () => {
+        assert.throws(() => normalizeWebFetchArgs({ url: 'a.test', method: 'TRACE' }), /method/)
     })
 
     it('maxChars 钳制：非法/非正数回落默认值，超限压到硬顶，字符串数字也认', () => {
@@ -285,6 +317,24 @@ describe('响应类型与结果组装', () => {
         })
         assert.equal(pdf.content, '')
         assert.match(pdf.note ?? '', /application\/pdf/)
+    })
+
+    it('raw 格式原样返回响应体（含 HTML 原文），并透传 method / 响应头', () => {
+        const raw = buildFetchResult({
+            url: BASE,
+            status: 200,
+            contentType: 'text/html',
+            body: PAGE,
+            format: 'raw',
+            maxChars: 200,
+            mainOnly: true,
+            method: 'POST',
+            headers: { 'content-type': 'text/html' }
+        })
+        assert.match(raw.content, /<script>/, 'raw 不做标签剥离')
+        assert.equal(raw.truncated, true)
+        assert.equal(raw.method, 'POST')
+        assert.deepEqual(raw.headers, { 'content-type': 'text/html' })
     })
 
     it('未声明 Content-Type 时 contentType 记为「(未声明)」且仍按 HTML 提取', () => {

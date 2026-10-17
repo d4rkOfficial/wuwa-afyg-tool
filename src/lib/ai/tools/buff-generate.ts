@@ -45,7 +45,10 @@ function aiRuntime() {
         apiKey: cfg.apiKey,
         baseUrl: cfg.baseUrl,
         model: cfg.model,
-        reasoningEffort: cfg.reasoningEffort as 'low' | 'medium' | 'high'
+        reasoningEffort: cfg.reasoningEffort as 'low' | 'medium' | 'high',
+        maxToolRounds: cfg.maxToolRounds,
+        maxOutputTokens: cfg.maxOutputTokens,
+        direct: cfg.directRequest
     }
 }
 

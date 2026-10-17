@@ -67,6 +67,13 @@ test('toChatWireMessages：无图消息原样传递（保持改动前的请求�
     assert.equal(wire[2].content, '结果')
 })
 
+test('toChatWireMessages：webSearchCalls 也是内部字段，不能发进 Chat Completions 请求体', () => {
+    const messages: ChatMessage[] = [{ role: 'assistant', content: '查完了', webSearchCalls: [{ id: 'ws_1' }] }]
+    const wire = toChatWireMessages(messages) as Array<Record<string, unknown>>
+    assert.equal('webSearchCalls' in wire[0], false)
+    assert.equal(wire[0].content, '查完了')
+})
+
 test('toChatWireMessages：空图片数组等同于无图（不产生 parts）', () => {
     const messages: ChatMessage[] = [{ role: 'user', content: '文字', images: [] }]
     const wire = toChatWireMessages(messages) as Array<Record<string, unknown>>

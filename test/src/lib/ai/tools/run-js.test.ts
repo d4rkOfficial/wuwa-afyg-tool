@@ -2,6 +2,7 @@
 // （沙箱路径注入工具并桥回 executeTool；真 window 路径不注入任何工具）
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { defineTool, executeTool } from '$lib/ai/tools/registry'
 import type { RunScriptFn, RunScriptRequest } from '$lib/ai/sandbox/protocol'
 // 副作用 import：完成 run_js 注册
@@ -44,6 +45,36 @@ test('run_js：沙箱路径注入工具名（排除 run_js 自身）并把调用
     assert.equal(captured.toolNames?.includes('__runjs_probe'), true)
     assert.equal(captured.toolNames?.includes('run_js'), false, 'run_js 自身不能注入，否则脚本可递归开新沙箱')
     assert.equal(typeof captured.invoke, 'function')
+})
+
+test('run_js：宿主有 webFetch 能力时，web_fetch 按工具名出现在沙箱工具清单', async () => {
+    const seen: RunScriptRequest[] = []
+    const out = parse(
+        await executeTool(
+            {
+                sandboxRun: async (request) => {
+                    seen.push(request)
+                    return { ok: true, value: null, logs: [] }
+                },
+                webFetch: async () => ({
+                    url: 'https://a.test',
+                    status: 200,
+                    contentType: 'text/html',
+                    content: '正文',
+                    truncated: false
+                })
+            },
+            'run_js',
+            { code: 'return 1' }
+        )
+    )
+    assert.equal(out.ok, true)
+    assert.equal(seen[0].toolNames?.includes('web_fetch'), true, '有 webFetch 能力时 web_fetch 才可注入')
+})
+
+test('run_js 沙箱不注入驼峰 webFetch：抓网页统一用与工具同名的 web_fetch', () => {
+    const source = readFileSync('src/lib/ai/sandbox/sandbox.worker.ts', 'utf8')
+    assert.equal(source.includes('webFetch'), false, '沙箱只保留工具名 web_fetch，不另造驼峰别名')
 })
 
 test('run_js：真 window 路径只给脚本文本，**不注入工具、不给调用桥**', async () => {

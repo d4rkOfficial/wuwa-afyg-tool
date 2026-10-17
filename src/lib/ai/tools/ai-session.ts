@@ -6,10 +6,13 @@ import {
     getContextSegments,
     getDisabledSegments,
     getLastTurnSummary,
+    getLongTaskContinuations,
+    getLongTaskNote,
     getSessionUsage,
     getTurnRuntime,
     getTurnUsage,
     hasContextSnapshot,
+    isLongTaskActive,
     resetDisabledSegments,
     setContextSnapshot,
     setWorkSummary,
@@ -154,12 +157,17 @@ defineTool('get_ai_usage', {
 
 defineTool('get_ai_turn_state', {
     description:
-        '读取 AI 助手的**实时运行情况**：是否正在请求、当前阶段（思考中 / 收到流式文本 / 正在调用工具 / 等待工具结果 / 空闲）、已耗时、当前工具名与补充说明，以及本轮已发生的工具调用列表（名称 / 参数 / 耗时 / 成败 / 结果梗概）。用于自检卡在哪一步或复盘本轮调用了哪些工具。',
+        '读取 AI 助手的**实时运行情况**：是否正在请求、当前阶段（思考中 / 收到流式文本 / 正在调用工具 / 等待工具结果 / 空闲）、已耗时、当前工具名与补充说明、长任务模式状态（是否开启 / 目标 / 已自动继续次数），以及本轮已发生的工具调用列表（名称 / 参数 / 耗时 / 成败 / 结果梗概）。用于自检卡在哪一步或复盘本轮调用了哪些工具。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const runtime = getTurnRuntime()
         return {
             running: runtime.running,
+            longTask: {
+                active: isLongTaskActive(),
+                note: getLongTaskNote(),
+                continuations: getLongTaskContinuations()
+            },
             phase: runtime.phase,
             phaseText: describeTurnPhase(runtime),
             toolName: runtime.toolName ?? null,
@@ -193,6 +201,41 @@ defineTool('set_work_summary', {
         const summary = str(args.summary)
         setWorkSummary(summary)
         return { summary, cleared: summary.length === 0 }
+    }
+})
+
+// 工具名必须写成字符串字面量：scripts/generate-tools-doc.mjs 是源码文本解析，不认常量
+defineTool('set_long_task', {
+    description:
+        '开启 / 关闭「长任务模式」。开启后，如果你一次回复结束但任务还没做完，系统会自动追加一条「继续推进」的提示让回合继续，你不需要让用户反复说「继续」；只有当你确认**整个任务已经完成**（或确认无法继续）时，才调用本工具传 enabled=false 关闭它。适用于需要多轮工具往返、大批量处理、长文档分析等一次回复做不完的任务；普通问答不要开启。用户按停止按钮会立即结束该状态。',
+    parameters: {
+        type: 'object',
+        properties: {
+            enabled: { type: 'boolean', description: 'true=开启长任务模式，false=关闭（任务完成时务必关闭）' },
+            note: {
+                type: 'string',
+                description: '可选：一句话说明当前长任务的目标 / 进度（会显示在状态行，并用于自动继续时的提示）'
+            }
+        },
+        required: ['enabled']
+    },
+    requires: 'longTask',
+    handler: (args, ctx) => {
+        const setLongTask = ctx.longTask
+        if (!setLongTask) {
+            throw new Error('当前上下文不支持长任务模式（缺少宿主能力 longTask）')
+        }
+        if (typeof args.enabled !== 'boolean') throw new Error('enabled 须为布尔值（true/false）')
+        const enabled = args.enabled
+        const note = str(args.note)
+        setLongTask(enabled, note)
+        return {
+            enabled,
+            note,
+            hint: enabled
+                ? '长任务模式已开启：输出停止后会自动继续；任务完成时记得调用 set_long_task 关闭'
+                : '长任务模式已关闭：本回合将在当前回复结束后正常结束'
+        }
     }
 })
 

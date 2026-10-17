@@ -27,20 +27,22 @@
 import { defineTool } from './registry'
 import { normalizeWebFetchArgs } from './web-fetch.utils'
 
-const DESCRIPTION = `抓取一个**已知** http(s) 地址的网页正文（HTML → 纯文本或轻量 Markdown），返回标题、最终地址、HTTP 状态与正文。
+const DESCRIPTION = `抓取一个**已知** http(s) 地址（网页正文或一类 API），做成一次**完整的 HTTP 请求**：可指定方法 / 请求头 / 请求体，返回标题、最终地址、HTTP 状态、响应头与正文。
 
 怎么用：
 - 必须先有确切链接。本工具**不做搜索**（没有搜索引擎能力）：不知道 URL 时先用服务商自带的 web_search，或直接问用户要链接。
-- 适合读文档 / 更新日志 / 攻略页 / API 说明的正文；不适合抓需要登录、需要 JS 渲染的页面（拿到的是服务端首屏 HTML，可能缺少动态内容）。
-- 自动跟随重定向（最多 5 跳）、剥离脚本/样式/导航/页脚，默认只取正文区域；正文里的链接会按页面地址补成绝对地址。
+- 读网页：默认 GET + format=text，剥离脚本/样式/导航/页脚，只取正文区域；需要看清结构时用 format=markdown。
+- 调接口：用 method=POST/PUT/PATCH/DELETE，请求体写 body（字符串）或 json（对象，会自动补 Content-Type: application/json）；format=raw 可原样看响应体。
+- 自动跟随重定向（最多 5 跳），303 / 301-302+POST 会按规范改成 GET 并丢弃请求体；正文里的链接会按页面地址补成绝对地址。
 
 结果怎么读：
-- content 是提取后的正文；truncated=true 表示正文只给到 maxChars 处、**后面还有内容但没有抓取** —— 不要臆造后续，必要时用更精确的 maxChars 或换个更具体的页面再抓一次。
-- title 是页面标题（可能缺失）；url 是跟随重定向后的最终地址；status 是 HTTP 状态码。
-- 非网页文本（PDF / 图片 / 二进制）不会返回正文，只在 note 里说明；这类内容请直接让用户提供文本。
-- 抓取失败（超时 / 目标 4xx-5xx / 内网地址被拦）会返回明确错误，不要重复重试同一个地址。
+- content 是提取后的正文（format=raw 时是原始响应体）；truncated=true 表示正文只给到 maxChars 处、**后面还有内容但没有抓取** —— 不要臆造后续，必要时用更大的 maxChars 或换个更具体的页面再抓一次。
+- title 是页面标题（可能缺失）；url 是跟随重定向后的最终地址；status 是 HTTP 状态码；method 是最终使用的方法；headers 是响应头（content-type / content-length / location 等）。
+- **4xx / 5xx 也按成功返回**：status 与响应体就是服务端的真实答复，请据此判断（例如 401 缺鉴权、422 参数错），不要当成本工具坏了。
+- 非网页文本（PDF / 图片 / 二进制）默认不提取正文，只在 note 里说明；需要原文时用 format=raw。
+- 网络层失败（超时 / DNS / 内网地址被拦）才是错误，不要重复重试同一个地址。
 
-限制：部署环境下只放行 https 公网地址（内网 / 回环 / 保留地址与云元数据地址由服务端拦截，防 SSRF）；单次抓取超时 15 秒、响应体上限 2MB、正文上限 40000 字符。
+限制：部署环境下只放行 https 公网地址（内网 / 回环 / 保留地址与云元数据地址由服务端拦截，防 SSRF）；单次抓取超时默认 15 秒（可调 1-60 秒）、响应体上限 2MB、正文上限 40000 字符、请求体上限 1M 字符。
 能力归属：本工具**仅内置 AI 助手**可用（需要宿主提供抓取能力），WS 远程接管通道无法调用。`
 
 defineTool('web_fetch', {
@@ -51,9 +53,9 @@ defineTool('web_fetch', {
             format: {
                 type: 'string',
                 // 取值与 web-fetch.utils.ts 的 WEB_FETCH_FORMATS 保持一致（文档解析器要求内联字面量）
-                enum: ['text', 'markdown'],
+                enum: ['text', 'markdown', 'raw'],
                 description:
-                    '正文格式：text=去标签纯文本（默认，省 token）；markdown=保留标题/链接/列表/代码（需要看清页面结构时用）'
+                    '正文格式：text=去标签纯文本（默认，省 token）；markdown=保留标题/链接/列表/代码；raw=原样返回响应体（调 API / 看 JSON 用）'
             },
             maxChars: {
                 type: 'number',
@@ -62,6 +64,28 @@ defineTool('web_fetch', {
             mainOnly: {
                 type: 'boolean',
                 description: '只取正文区域并剥离导航/页眉/页脚（默认 true）；false = 连侧栏与页脚一起返回'
+            },
+            method: {
+                type: 'string',
+                // 取值与 web-fetch.utils.ts 的 WEB_FETCH_METHODS 保持一致（文档解析器要求内联字面量）
+                enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
+                description: 'HTTP 方法（默认 GET）；调接口时按服务端要求填写'
+            },
+            headers: {
+                type: 'object',
+                description: '自定义请求头（与宿主默认头合并，同名字段以这里为准）：{ "Authorization": "Bearer …" }'
+            },
+            body: {
+                type: 'string',
+                description: '请求体字符串（POST/PUT/PATCH 等；GET/HEAD 会忽略）'
+            },
+            json: {
+                description:
+                    '请求体对象的便捷写法（自动 JSON 序列化并补 Content-Type: application/json）；与 body 二选一'
+            },
+            timeoutMs: {
+                type: 'number',
+                description: '单次抓取超时毫秒数（默认 15000，允许 1000-60000）'
             }
         },
         required: ['url'],

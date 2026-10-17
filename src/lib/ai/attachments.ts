@@ -96,3 +96,73 @@ export const readImageAsDataUrl = (file: Blob): Promise<string> =>
         reader.onerror = () => reject(new Error('读取图片失败'))
         reader.readAsDataURL(file)
     })
+
+/** @desc 上传前缩边的最长边（视觉模型通常按 ~2k 像素内采样；再大只会白涨请求体） */
+export const MAX_IMAGE_DIMENSION = 2048
+
+/**
+ * @desc 超过这个字节数才重编码；小图保持原样，避免无谓的有损压缩。
+ * 定在 512KB 是因为代理平台的请求体限制按**整包**算：4 张图各自 1.5MB 时 base64 后已超过 Vercel 的 4.5MB 上限。
+ */
+export const COMPRESS_THRESHOLD_BYTES = 512_000
+
+/** @desc 重编码后的目标质量（WebP） */
+const COMPRESS_QUALITY = 0.9
+
+/**
+ * @desc 等比缩放到最长边不超过 `max`（纯函数，便于单测）。
+ * 任一维非正数 / 非有限值时返回 `null`（调用方走「不缩放」分支）。
+ */
+export const computeScaledSize = (
+    width: number,
+    height: number,
+    max: number
+): { width: number; height: number } | null => {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
+    const longest = Math.max(width, height)
+    if (longest <= max) return { width: Math.round(width), height: Math.round(height) }
+    const ratio = max / longest
+    return { width: Math.round(width * ratio), height: Math.round(height * ratio) }
+}
+
+/** @desc 是否值得重编码：GIF（怕丢动画）与「已足够小」的文件保持原样 */
+export const shouldOptimizeImage = (file: AttachmentCandidate): boolean =>
+    file.type !== 'image/gif' && file.size > COMPRESS_THRESHOLD_BYTES
+
+/** @desc 把图片画到 canvas 再导出 data URL（浏览器路径；任何一步失败都回落原图） */
+const redrawToDataUrl = async (file: Blob): Promise<string | null> => {
+    if (typeof document === 'undefined' || typeof createImageBitmap !== 'function') return null
+    const bitmap = await createImageBitmap(file)
+    try {
+        const size = computeScaledSize(bitmap.width, bitmap.height, MAX_IMAGE_DIMENSION)
+        if (!size) return null
+        const canvas = document.createElement('canvas')
+        canvas.width = size.width
+        canvas.height = size.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return null
+        // 透明 PNG 转 WebP 仍保留 alpha；底色不铺白，避免把透明区域抹成黑/白
+        ctx.drawImage(bitmap, 0, 0, size.width, size.height)
+        const out = canvas.toDataURL('image/webp', COMPRESS_QUALITY)
+        return out.startsWith('data:image/') ? out : null
+    } finally {
+        bitmap.close?.()
+    }
+}
+
+/**
+ * @desc 读取图片并**按需压缩**后转成 data URL。
+ *
+ * 为什么需要压缩（实测故障）：站点转发代理在 Vercel 上有 4.5MB 请求体上限、Cloudflare 也有类似限制，
+ * 5MB 原图经 base64 膨胀后单张就超过平台限制，症状正是「界面里带了图，模型却收不到」。
+ * 缩边到 {@link MAX_IMAGE_DIMENSION} + WebP 后通常 <1MB，既绕过代理限制，也更接近视觉模型的有效输入。
+ */
+export const optimizeImageFile = async (file: File): Promise<string> => {
+    const original = await readImageAsDataUrl(file)
+    if (!shouldOptimizeImage(file)) return original
+    try {
+        return (await redrawToDataUrl(file)) ?? original
+    } catch {
+        return original
+    }
+}

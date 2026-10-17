@@ -3,10 +3,14 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     ACCEPTED_IMAGE_TYPES,
+    COMPRESS_THRESHOLD_BYTES,
     MAX_ATTACHMENTS,
     MAX_ATTACHMENT_BYTES,
+    MAX_IMAGE_DIMENSION,
+    computeScaledSize,
     formatBytes,
     planAttachments,
+    shouldOptimizeImage,
     validateImageFile
 } from '$lib/ai/attachments'
 
@@ -78,4 +82,17 @@ test('planAttachments：透传原始类型（传 File 拿回 File，不必再断
     const plan = planAttachments(0, [file('a.png')])
     // 类型层面即可断言：accepted 的元素类型与入参一致（此处的 name 访问即为证据）
     assert.equal(plan.accepted[0].name, 'a.png')
+})
+
+test('computeScaledSize：等比缩到最长边上限，小图保持原尺寸，非法尺寸返回 null', () => {
+    assert.deepEqual(computeScaledSize(4096, 2048, MAX_IMAGE_DIMENSION), { width: 2048, height: 1024 })
+    assert.deepEqual(computeScaledSize(1000, 800, MAX_IMAGE_DIMENSION), { width: 1000, height: 800 })
+    assert.equal(computeScaledSize(0, 800, MAX_IMAGE_DIMENSION), null)
+    assert.equal(computeScaledSize(Number.NaN, 800, MAX_IMAGE_DIMENSION), null)
+})
+
+test('shouldOptimizeImage：大图才重编码；GIF 与小图保持原样（不丢动画 / 不无谓有损）', () => {
+    assert.equal(shouldOptimizeImage(file('big.png', 'image/png', COMPRESS_THRESHOLD_BYTES + 1)), true)
+    assert.equal(shouldOptimizeImage(file('edge.png', 'image/png', COMPRESS_THRESHOLD_BYTES)), false)
+    assert.equal(shouldOptimizeImage(file('anim.gif', 'image/gif', 5 * 1024 * 1024)), false)
 })
