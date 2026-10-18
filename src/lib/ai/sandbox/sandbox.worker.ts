@@ -155,28 +155,67 @@ const callTool = async (name: string, args: Record<string, unknown>): Promise<un
     return parsed?.data ?? null
 }
 
-/** @desc 执行脚本：搭建假全局 → 以形参注入工具 → 跑 → 序列化结果 */
+/**
+ * @desc 真实 Worker 全局对象。脚本里的 `globalThis.xxx = …` 会写到这里，因此**跨调用保留**；
+ * 这也让后续脚本里的裸引用（`helper()`）在真正的全局作用域里解析得到，而不是只挂在一个假对象上。
+ * 宿主能力已在首个 run 前 `stripCapabilities()` 删除，写函数不会重新获得网络/存储能力。
+ */
+const globalScope = scope as unknown as Record<string, unknown>
+
+/** @desc 工具命名空间（持久对象；每次执行时更新其中的工具，旧的引用也能看到新工具） */
+const namespace: Record<string, unknown> = {}
+let facilitiesReady = false
+
+const ensureFacilities = (): void => {
+    if (facilitiesReady) return
+    facilitiesReady = true
+    // `window` / `globalThis` / `self` 作为**形参**注入（不必、也不应改写 Worker 的只读全局属性）；
+    // 这里只挂 `tools` / `console`，让 `globalThis.tools.xxx` 这类写法也能工作。
+    try {
+        globalScope.tools = namespace
+        globalScope.console = fakeConsole
+    } catch {
+        /* 极少数环境里属性只读：裸 `tools`/`console` 形参仍然可用 */
+    }
+}
+
+/** @desc 每次执行前重置「本次调用」的统计，但**不清** globalThis 上的用户函数/变量 */
+const resetRunState = (): void => {
+    pendingCalls.clear()
+    nextCallId = 1
+    toolCallCount = 0
+    logs.length = 0
+    logChars = 0
+}
+
+/** @desc 执行脚本：在持久全局上注入工具 → 跑 → 序列化结果 */
 const execute = async (source: string, toolNames: readonly string[]): Promise<RunScriptPayload> => {
+    resetRunState()
+    ensureFacilities()
+
     const injectable = toolNames.filter(isInjectableToolName)
     const wrappers: Record<string, (args?: Record<string, unknown>) => Promise<unknown>> = {}
     for (const name of injectable) wrappers[name] = (args) => callTool(name, args ?? {})
 
-    const namespace: Record<string, unknown> = { ...wrappers }
-    const sandboxGlobal: Record<string, unknown> = { ...wrappers }
-    sandboxGlobal.window = sandboxGlobal
-    sandboxGlobal.globalThis = sandboxGlobal
-    sandboxGlobal.self = sandboxGlobal
-    sandboxGlobal.tools = namespace
-    sandboxGlobal.console = fakeConsole
+    // 刷新 tools 命名空间（持久对象，旧脚本捕获的 tools 引用仍有效）
+    for (const key of Object.keys(namespace)) delete namespace[key]
+    Object.assign(namespace, wrappers)
+    // 也挂到真实全局：这样以后定义的函数即使没把工具名当形参，也能通过全局查找找到它们
+    for (const name of injectable) globalScope[name] = wrappers[name]
+    try {
+        globalScope.tools = namespace
+    } catch {
+        /* 裸 tools 形参仍可用 */
+    }
 
     // 形参顺序与下面实参顺序必须逐项对应。
     // web_fetch 与其它工具一样按**工具名原样**注入（裸调用 web_fetch({ url, ... }) 即可），
     // 不再另加驼峰别名；它仍走 executeTool / requires 能力门控，不是浏览器的真 fetch。
     const paramNames = ['window', 'globalThis', 'self', 'console', 'tools', ...SHADOWED_HOST_NAMES, ...injectable]
     const paramValues = [
-        sandboxGlobal,
-        sandboxGlobal,
-        sandboxGlobal,
+        globalScope,
+        globalScope,
+        globalScope,
         fakeConsole,
         namespace,
         ...SHADOWED_HOST_NAMES.map(() => undefined),
@@ -202,11 +241,13 @@ const execute = async (source: string, toolNames: readonly string[]): Promise<Ru
 }
 
 /**
- * @desc 宿主消息入口：`tool-result` 回填工具调用、首个 `run` 触发「掏空能力 + 执行」。
+ * @desc 宿主消息入口：`tool-result` 回填工具调用、每个 `run` 触发一次执行。
  *
  * 注意这里**不是** `scope.onmessage` —— 那是个可以被 `delete` 掉的全局属性，
  * 掏空之后我们就收不到 `tool-result` 了（脚本里的工具调用会永远挂住直到超时）。
  * 用捕获的 `addEventListener` 注册的监听器活在内部监听器列表里，删全局方法动不到它。
+ *
+ * 能力**只掏空一次**；之后的 run 复用同一个 Worker，因此 `globalThis` 上定义的用户函数会保留。
  */
 const onHostMessage = (event: MessageEvent<HostToSandbox>): void => {
     const message = event.data
@@ -216,10 +257,12 @@ const onHostMessage = (event: MessageEvent<HostToSandbox>): void => {
         pendingCalls.delete(message.callId)
         return
     }
-    if (message.type !== 'run' || stripped) return
-    stripped = true
-    // 先掏空能力，再跑模型代码 —— 之后它再也拿不到任何宿主能力
-    stripCapabilities()
+    if (message.type !== 'run') return
+    if (!stripped) {
+        stripped = true
+        // 首个 run 前掏空能力；之后复用 Worker，不再重复掏空（否则会误删用户全局设施）
+        stripCapabilities()
+    }
     void execute(message.source, message.toolNames).then((payload) => hostPost({ type: 'done', payload }))
 }
 

@@ -35,7 +35,7 @@ import { getConfig, init as initConfig } from '$lib/calc/config.store.svelte'
 import type { ConfigState } from '$lib/calc/config.types'
 import { init as initTimeline, loadIcons } from '$lib/calc/timeline.store.svelte'
 import type { TimelineData } from '$lib/calc/timeline.types'
-import { loadGenPrefs, setAiSessionDisabled, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
+import { loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
 import { setCalcViewMode } from '$lib/data/calc-view.svelte'
 import { setModalClosePosition } from '$lib/data/interaction-prefs.svelte'
 import { loadKeyMap } from '$lib/data/keymap.svelte'
@@ -153,11 +153,9 @@ export const bootstrapRouteStores = async (): Promise<void> => {
         markVisited()
     }
     // 进入 Toy 环境（消息异步到达，每会话首次触发）：
-    // - 关闭 AI 助手（**会话级**：只抑制本次会话，绝不写回持久化偏好 —— 原先这里调 updateGenPrefs 会落盘，
-    //   把用户在设置里的开关永久改成关闭，属于「重进丢失配置」）
+    // - AI 助手不再按平台强制关闭：Toy 与普通浏览器共用同一份持久化开关
     // - 首次在 Toy 手机环境进入 → 关闭磁力光标（一次性持久设定）
     onToyEnter(() => {
-        setAiSessionDisabled(true)
         if (isToyMobile() && !isMagneticToySet()) {
             setMagneticPointer(false)
             markMagneticToySet()

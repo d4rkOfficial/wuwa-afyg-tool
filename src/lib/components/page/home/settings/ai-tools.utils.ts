@@ -178,18 +178,23 @@ export interface AssistantActivity {
     expanded?: boolean
 }
 
-/** @desc 连续同类文本合并到同一行；切换类型（如工具调用之后）则新起一行 */
+/**
+ * @desc 连续同类文本合并到同一行；切换类型（如工具调用之后）则新起一行。
+ *
+ * 流式 delta 可能一秒几十次；这里对「追加到最后一个同类活动」走**原地更新**，
+ * 不再每次复制整个活动数组。长会话里这能把每次 token 的 O(活动数) 拷贝降成 O(1)；
+ * 仅在新起一行时才创建新数组。
+ */
 export const appendActivityText = (
     activities: readonly AssistantActivity[],
     kind: 'reasoning' | 'text',
     delta: string
 ): AssistantActivity[] => {
-    if (!delta) return [...activities]
+    if (!delta) return activities as AssistantActivity[]
     const last = activities[activities.length - 1]
     if (last && last.kind === kind) {
-        return activities.map((activity, i) =>
-            i === activities.length - 1 ? { ...activity, text: (activity.text ?? '') + delta } : activity
-        )
+        last.text = (last.text ?? '') + delta
+        return activities as AssistantActivity[]
     }
     return [...activities, { kind, text: delta }]
 }

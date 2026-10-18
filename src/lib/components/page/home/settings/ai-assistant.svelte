@@ -85,6 +85,8 @@
         activities?: AssistantActivity[]
         // 发言是否已结束（结束后保留活动流，不再自动收起）
         done?: boolean
+        /** @desc 单条消息当前渲染的活动行上限（长任务可点「显示更早的活动」回看；只影响显示） */
+        activityLimit?: number
         // 压缩标记的统计（仅 role === 'compaction' 时有值；`text` 即摘要正文）
         compaction?: { summarized: number; tokensBefore: number; tokensAfter: number }
         // 压缩标记是否展开显示摘要正文
@@ -264,7 +266,7 @@
         return { x: Math.max(8, Math.min(pos.x, maxX)), y: Math.max(8, Math.min(pos.y, maxY)) }
     }
 
-    // AI 助手是否启用（悬浮窗显隐）：取**实际**状态 = 持久化偏好 ∧ 非会话级强制关闭（Toy 宿主会话内隐藏）
+    // AI 助手是否启用（悬浮窗显隐）：只取持久化偏好；B 站 Toy 与普通浏览器一致
     const aiEnabled = $derived(isAiEnabled())
     // GPU 合成加速（设置 → 交互相关）：拖拽定位用 transform 走合成层
     const gpuAccel = $derived(getGpuAccel())
@@ -275,6 +277,31 @@
         }
         return -1
     })
+
+    /**
+     * @desc 消息窗口：长会话只渲染最近 `MESSAGE_PAGE_SIZE` 条，往上翻时再按页加载。
+     *
+     * 为什么要窗口化而不是全量渲染：一条 assistant 消息可能包含几十条活动行、每行还有
+     * Markdown/图标/工具详情；几百条历史时 DOM 会到数千节点，悬浮窗拖动/滚动/流式更新都会卡。
+     * 这里只减少**渲染**量，`display` 仍保留完整记录，用户点「显示更早」即可回看。
+     */
+    const MESSAGE_PAGE_SIZE = 30
+    /** @desc 单条 assistant 消息默认只渲染最后这么多活动行（工具/思考/回复混排时可能很多） */
+    const ACTIVITY_PAGE_SIZE = 60
+    let visibleMessageCount = $state(MESSAGE_PAGE_SIZE)
+    const visibleStart = $derived(Math.max(0, display.length - visibleMessageCount))
+    const visibleMessages = $derived(display.slice(visibleStart))
+
+    const showEarlierMessages = async (): Promise<void> => {
+        if (!bodyEl || visibleStart === 0) return
+        // 保留当前阅读位置：上方插入内容后把 scrollTop 补上高度差，避免视图跳到别处
+        const beforeHeight = bodyEl.scrollHeight
+        const beforeTop = bodyEl.scrollTop
+        visibleMessageCount += MESSAGE_PAGE_SIZE
+        await tick()
+        if (!bodyEl) return
+        bodyEl.scrollTop = beforeTop + (bodyEl.scrollHeight - beforeHeight)
+    }
 
     // 当前状态上下文（工程 + 视图），每轮注入给 AI；用户切换工程/视图会自动反映
     const contextState = $derived.by(() => {
@@ -416,6 +443,7 @@
         cancelConfirmCard()
         messages = []
         display = []
+        visibleMessageCount = MESSAGE_PAGE_SIZE
         // 会话级用量累计 / 分段快照 / 回合汇总一并清掉（分段临时禁用选择保留）
         resetAiSessionState()
     }
@@ -677,15 +705,28 @@
     }
 
     // AI 回复 Markdown 渲染（换行即 <br>；链接新窗口打开）
+    // 缓存已渲染文本：长会话里父级任意更新都会重新求值模板，Markdown 解析比 DOM diff 贵得多。
+    const MD_CACHE_MAX = 200
+    const mdCache = new Map<string, string>()
     function renderMd(text: string): string {
+        const cached = mdCache.get(text)
+        if (cached !== undefined) return cached
+        let html: string
         try {
             const renderer = new marked.Renderer()
             const link = renderer.link.bind(renderer)
             renderer.link = (linkArg) => link(linkArg).replace('<a ', '<a target="_blank" rel="noreferrer" ')
-            return marked.parse(text, { breaks: true, renderer }) as string
+            html = marked.parse(text, { breaks: true, renderer }) as string
         } catch {
-            return text
+            html = text
         }
+        // 简单 FIFO 淘汰：流式过程中每个 delta 会产生一个新 key，缓存不能无限增长
+        if (mdCache.size >= MD_CACHE_MAX) {
+            const oldest = mdCache.keys().next().value
+            if (oldest !== undefined) mdCache.delete(oldest)
+        }
+        mdCache.set(text, html)
+        return html
     }
 
     // 卡片尺寸：固定横屏形态（宽度 = 半个视口宽，高度随窗口占满）
@@ -895,9 +936,22 @@
                         <br />后续还可排轴、拉表、配置 Buff 集
                     </div>
                 {/if}
-                {#each display as m, i (m)}
+                {#if visibleStart > 0}
+                    <div class="flex justify-center pb-1">
+                        <button
+                            type="button"
+                            onclick={showEarlierMessages}
+                            class="sf-radius rounded-none border px-2.5 py-1 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)"
+                            style="border-color: var(--theme-divider-border);"
+                            title="只影响显示；完整对话仍在本地"
+                        >
+                            显示更早的消息（还有 {visibleStart} 条）
+                        </button>
+                    </div>
+                {/if}
+                {#each visibleMessages as m, i (m)}
                     {#if m.role === 'user'}
-                        {@const isLastUser = i === lastUserDisplayIdx}
+                        {@const isLastUser = i + visibleStart === lastUserDisplayIdx}
                         <div class="flex justify-end">
                             <div
                                 class="max-w-[85%] wrap-break-word sf-radius rounded-none px-3 py-2 text-xs leading-relaxed"
@@ -961,8 +1015,27 @@
                             {/if}
                         </div>
                     {:else}
+                        {@const allActivities = m.activities ?? []}
+                        {@const activityLimit = m.activityLimit ?? ACTIVITY_PAGE_SIZE}
+                        {@const activityStart = Math.max(0, allActivities.length - activityLimit)}
+                        {@const visibleActivities = allActivities.slice(activityStart)}
                         <div class="flex w-full flex-col gap-1 py-0.5 text-[11px] leading-relaxed">
-                            {#each m.activities ?? [] as act, actIdx (actIdx)}
+                            {#if activityStart > 0}
+                                <div class="flex justify-center pb-0.5">
+                                    <button
+                                        type="button"
+                                        onclick={() =>
+                                            (m.activityLimit =
+                                                (m.activityLimit ?? ACTIVITY_PAGE_SIZE) + ACTIVITY_PAGE_SIZE)}
+                                        class="sf-radius rounded-none border px-2 py-0.5 text-[10px] text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-modal-text)"
+                                        style="border-color: var(--theme-divider-border);"
+                                        title="只影响显示；完整活动记录仍在内存中"
+                                    >
+                                        显示更早的活动（还有 {activityStart} 条）
+                                    </button>
+                                </div>
+                            {/if}
+                            {#each visibleActivities as act, actIdx (actIdx)}
                                 {#if act.kind === 'reasoning'}
                                     <div class="flex items-start gap-1.5 text-(--theme-modal-text)/45">
                                         <Icon icon="mdi:lightbulb-on-outline" class="mt-0.5 size-3 shrink-0" />
@@ -1018,20 +1091,48 @@
                                         <span class="min-w-0 flex-1 whitespace-pre-wrap">{act.text}</span>
                                     </div>
                                 {:else if act.kind === 'runResult'}
+                                    {@const expanded = act.expanded !== false}
                                     <div class="flex items-start gap-1.5 text-(--theme-modal-text)/65">
                                         <Icon icon="mdi:check-circle" class="mt-0.5 size-3 shrink-0" />
                                         <span class="shrink-0 font-black">运行结果</span>
                                         <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
                                         <pre
-                                            class="theme-scrollbar max-h-64 min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/70">{act.text}</pre>
+                                            class="theme-scrollbar min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/70 {expanded
+                                                ? 'max-h-64 overflow-auto'
+                                                : 'line-clamp-2 max-h-10 overflow-hidden'}">{act.text}</pre>
+                                        <button
+                                            type="button"
+                                            onclick={() => (act.expanded = !expanded)}
+                                            class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-modal-text)"
+                                            title={expanded ? '收起运行结果' : '展开运行结果'}
+                                        >
+                                            <Icon
+                                                icon={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                                                class="size-3"
+                                            />
+                                        </button>
                                     </div>
                                 {:else if act.kind === 'runError'}
+                                    {@const expanded = act.expanded !== false}
                                     <div class="flex items-start gap-1.5 text-red-400">
                                         <Icon icon="mdi:alert-circle-outline" class="mt-0.5 size-3 shrink-0" />
                                         <span class="shrink-0 font-black">运行报错</span>
                                         <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
                                         <pre
-                                            class="theme-scrollbar max-h-64 min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed">{act.text}</pre>
+                                            class="theme-scrollbar min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed {expanded
+                                                ? 'max-h-64 overflow-auto'
+                                                : 'line-clamp-2 max-h-10 overflow-hidden'}">{act.text}</pre>
+                                        <button
+                                            type="button"
+                                            onclick={() => (act.expanded = !expanded)}
+                                            class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-modal-text)"
+                                            title={expanded ? '收起运行报错' : '展开运行报错'}
+                                        >
+                                            <Icon
+                                                icon={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                                                class="size-3"
+                                            />
+                                        </button>
                                     </div>
                                 {:else if act.kind === 'tool' && act.tool}
                                     {@const tool = act.tool}
