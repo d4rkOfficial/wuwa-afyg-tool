@@ -1,7 +1,7 @@
 import type { DamageEntry, BuffInstance, BuffZoneValue, BuffCondition, ZoneRef } from './calculation.types'
 import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { ResultEntry, MultiplierZone } from './result.types'
+import type { ResultEntry, MultiplierZone, RatioFactor } from './result.types'
 import type { CharSlot } from '$lib/types/project'
 import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS, zoneAppliesToCoeffEntry } from './calculation.consts'
 import { applyZone, recomputeTotals, type CharacterComputed } from './zone-ops'
@@ -637,6 +637,52 @@ const overrideZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string
             : []
     )
 
+// ── 复合倍率因子（结果页下拉的「每一因子的伤害」） ──
+
+/**
+ * @desc 把条目的倍率成分转成因子（`%` 条目为「百分比×成分乘数×段数」，固定值条目为「固定值×段数」）。
+ *
+ * 两个数刻意分开记：
+ * - `weight` 参与伤害分摊（含成分乘数与段数）；
+ * - `segmentRatio` 只描述该成分自身的单段倍率（倍率串里的 `47.22%*2` → 47.22%），界面「单段倍率」列用它。
+ *
+ * 命名：**只有一个技能成分**（或拿不到成分信息）时叫「技能单段」—— 这是「提取单段」的语义，
+ * 与倍率链里的「段数」chunk 对应；多个成分时才用「技能成分 N」区分。
+ */
+const skillRatioFactors = (entry: DamageEntry): RatioFactor[] => {
+    const hits = entry.hits || 1
+    const parts = entry.ratioParts ?? []
+    if (parts.length === 0) {
+        return [{ label: '技能单段', weight: entry.ratioValue, segmentRatio: entry.ratioValue / hits, kind: 'skill' }]
+    }
+    const single = parts.length === 1
+    return parts.map((part, i) => {
+        const flat = part.flatValue !== undefined
+        return {
+            label: flat ? `固定值成分 ${i + 1}` : single ? '技能单段' : `技能成分 ${i + 1}`,
+            ...(part.mult && part.mult > 1 ? { note: `×${part.mult}` } : {}),
+            weight: flat ? part.flatValue! * hits : part.ratioNum * (part.mult ?? 1) * hits,
+            segmentRatio: flat ? part.flatValue! : part.ratioNum,
+            kind: 'skill' as const
+        }
+    })
+}
+
+/** @desc 追加「额外倍率」因子（buff 提供；权重 = 额外倍率% × 段数，与技能倍率同一量纲） */
+const withExtraRatioFactor = (factors: RatioFactor[], extraRatio: number, hits: number): RatioFactor[] =>
+    extraRatio === 0
+        ? factors
+        : [
+              ...factors,
+              {
+                  label: '额外倍率',
+                  weight: extraRatio * hits,
+                  segmentRatio: extraRatio,
+                  kind: 'buff',
+                  note: 'Buff 提供'
+              }
+          ]
+
 // ── compute a single ResultEntry ──
 
 /**
@@ -697,6 +743,7 @@ function computeResultEntry(
         r.totalDamage = Math.round(baseValue)
         r.totalMultiplier = 1
         r.damageTypes = damageTypes
+        r.ratioFactors = skillRatioFactors(entry)
         return r
     }
 
@@ -870,7 +917,8 @@ function computeResultEntry(
         damageTypes,
         // 溯源辅助：增伤区元素/类型拆分（%）
         elBonus,
-        typeBonus: typeBonusSum
+        typeBonus: typeBonusSum,
+        ratioFactors: withExtraRatioFactor(skillRatioFactors(entry), stats.extraRatio, entry.hits || 1)
     }
 }
 
@@ -923,7 +971,8 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         critPerHit: 0,
         canCrit: false,
         multiplierZones: [],
-        damageTypes: []
+        damageTypes: [],
+        ratioFactors: []
     }
 }
 
@@ -1081,7 +1130,8 @@ function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: C
         critPerHit: canCrit ? critValue : expectedPerHit,
         canCrit,
         multiplierZones: multZones,
-        damageTypes: []
+        damageTypes: [],
+        ratioFactors: withExtraRatioFactor(skillRatioFactors(entry), stats.extraRatio, entry.hits || 1)
     }
 }
 
@@ -1206,6 +1256,27 @@ function computeEffectEntry(
         { label: '特殊区', value: customMultVal, detail: customMultVal.toFixed(4) }
     ]
 
+    /**
+     * @desc ── 复合倍率因子：效应层数倍率 + 爆发倍率（两者相加构成总倍率）+ 额外倍率 ──
+     * 三者同量纲（绝对倍率），按权重分摊最终伤害是精确的。
+     */
+    const effectFactors: RatioFactor[] = [
+        {
+            label: `${entry.hitName} ${layers} 层`,
+            weight: effectMult * (entry.hits || 1) * 100,
+            segmentRatio: effectMult * 100,
+            kind: 'effect'
+        }
+    ]
+    if (burstMult > 0) {
+        effectFactors.push({
+            label: `${entry.hitName}爆发 ${burstLayers} 层`,
+            weight: burstMult * (entry.hits || 1) * 100,
+            segmentRatio: burstMult * 100,
+            kind: 'effect'
+        })
+    }
+
     /** @desc
      * ── 输出 ResultEntry：伤害类型为推导/显式结果（damageTypes: ['效应伤害'] 等）、
      * 面板类字段（攻击等）恒为 0，双暴走系数基类口径（基准 0% / 100%，只有绑定 buff 能加）、
@@ -1269,7 +1340,8 @@ function computeEffectEntry(
         critPerHit: canCrit ? critValue : expectedPerHit,
         canCrit,
         multiplierZones: multZones,
-        damageTypes
+        damageTypes,
+        ratioFactors: withExtraRatioFactor(effectFactors, stats.extraRatio, entry.hits || 1)
     }
 }
 

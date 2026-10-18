@@ -1,205 +1,58 @@
-import type { DamageEntry, BuffConf } from '../calculation.types'
-import type { ConfigState, EchoSlotConfig } from '../config.types'
-import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { CharSlot } from '$lib/types/project'
-import type { CharSubstatAnalysis, SubstatContribution, EchoContribution } from '../result.types'
-import type { ConditionProfile } from '../compute'
+import type { EchoContribution, CharSubstatAnalysis, SubstatContribution } from '../result.types'
+import { cloneEchoesWithoutAllSubstats, cloneEchoesWithoutSubstat } from '../compute'
 import {
-    computeAll,
-    computeOneEntry,
-    cloneEchoesWithoutSubstat,
-    cloneEchoesWithoutAllSubstats,
-    DEFAULT_CONDITION_PROFILE
-} from '../compute'
+    aggregateSubstats,
+    assembleSubstatAnalysis,
+    diffTotals,
+    makeEchoContribution,
+    makeSubstatContribution,
+    type CharacterDamageContext
+} from './shared'
 
-export function computeSubstatContributions(
-    damageEntries: DamageEntry[],
-    buffSets: BuffConf[],
-    damageEntryBuffSetIds: Record<string, string[]>,
-    damageEntryDamageTypes: Record<string, string[]>,
-    configState: ConfigState,
-    team: CharSlot[],
-    charInfoMap: Record<string, CharacterInfo>,
-    weaponInfoMap: Record<string, WeaponInfo>,
-    rigCritEntryIds: Set<string>,
-    noCritEntryIds: Set<string>,
-    missEntryIds: Set<string>,
-    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
-): CharSubstatAnalysis[] {
-    const allEntries = computeAll(
-        damageEntries,
-        buffSets,
-        damageEntryBuffSetIds,
-        damageEntryDamageTypes,
-        configState,
-        team,
-        charInfoMap,
-        weaponInfoMap,
-        conditionProfile
-    )
+/**
+ * @desc 单条损失算法：依次移除每个副词条后重算，用「伤害损失」衡量该词条价值。
+ *
+ * 直观、快，但忽略词条间交互（暴击与暴伤的配合等）—— 这也是另外两种算法存在的理由。
+ */
+export const analyzeCharacterSubstats = (ctx: CharacterDamageContext): CharSubstatAnalysis => {
+    const echoes: EchoContribution[] = []
+    const allSubstats: SubstatContribution[] = []
 
-    const charNames = team.map((s) => s.character).filter((c): c is string => c !== null)
-
-    return charNames.map((charName, ci) => {
-        // 未命中条目伤害恒为 0，直接过滤（等价于归零，占比/贡献口径不变）
-        const charEntries = allEntries.filter((e) => e.character === charName && !missEntryIds.has(e.id))
-        const charDmgEntries = damageEntries.filter((e) => e.character === charName && !missEntryIds.has(e.id))
-
-        const baselineNorm = charEntries.reduce((s, e) => s + e.totalDamageRaw, 0)
-        const baselineRig = charEntries.reduce(
-            (s, e) => s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamageRaw),
-            0
-        )
-        const baselineNoCrit = charEntries.reduce(
-            (s, e) => s + (noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw),
-            0
-        )
-
-        const echoes = configState.characters[ci]?.echoes ?? []
-
-        const info: EchoContribution[] = []
-        const allSubstats: SubstatContribution[] = []
-
-        function computeDamageForEchoes(modEchoes: EchoSlotConfig[]): {
-            norm: number
-            rigVal: number
-            noCritVal: number
-        } {
-            let norm = 0
-            let rigVal = 0
-            let noCritVal = 0
-            for (const de of charDmgEntries) {
-                const re = computeOneEntry(
-                    de,
-                    ci,
-                    modEchoes,
-                    buffSets,
-                    damageEntryBuffSetIds,
-                    damageEntryDamageTypes,
-                    configState,
-                    team,
-                    charInfoMap,
-                    weaponInfoMap,
-                    conditionProfile
-                )
-                norm += re.totalDamageRaw
-                rigVal += rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamageRaw
-                noCritVal += noCritEntryIds.has(re.id) ? re.nonCritPerHit : re.totalDamageRaw
-            }
-            return { norm, rigVal, noCritVal }
-        }
-
-        const emptyEchoes = cloneEchoesWithoutAllSubstats(echoes)
-        const emptyDamage = computeDamageForEchoes(emptyEchoes)
-
-        for (let ei = 0; ei < echoes.length; ei++) {
-            const echo = echoes[ei]
-            if (echo.substats.length === 0) continue
-
-            const echoSubstats: SubstatContribution[] = []
-
-            for (let si = 0; si < echo.substats.length; si++) {
-                const sub = echo.substats[si]
-                const modified = cloneEchoesWithoutSubstat(echoes, ei, si)
-
-                let reducedNorm = 0
-                let reducedRig = 0
-                let reducedNoCrit = 0
-                for (const de of charDmgEntries) {
-                    const re = computeOneEntry(
-                        de,
-                        ci,
-                        modified,
-                        buffSets,
-                        damageEntryBuffSetIds,
-                        damageEntryDamageTypes,
-                        configState,
-                        team,
-                        charInfoMap,
-                        weaponInfoMap,
-                        conditionProfile
-                    )
-                    reducedNorm += re.totalDamageRaw
-                    reducedRig += rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamageRaw
-                    reducedNoCrit += noCritEntryIds.has(re.id) ? re.nonCritPerHit : re.totalDamageRaw
-                }
-
-                const contribNorm = baselineNorm - reducedNorm
-                const contribRig = baselineRig - reducedRig
-                const contribNoCrit = baselineNoCrit - reducedNoCrit
-
-                echoSubstats.push({
+    ctx.echoes.forEach((echo, ei) => {
+        if (echo.substats.length === 0) return
+        const substats = echo.substats
+            .map((sub, si) =>
+                makeSubstatContribution({
                     type: sub.type,
                     value: sub.value,
                     unit: sub.unit,
-                    contributionNorm: contribNorm,
-                    contributionRig: contribRig,
-                    contribPctNorm: baselineNorm > 0 ? (contribNorm / baselineNorm) * 100 : 0,
-                    contribPctRig: baselineRig > 0 ? (contribRig / baselineRig) * 100 : 0,
-                    contributionNoCrit: contribNoCrit,
-                    contribPctNoCrit: baselineNoCrit > 0 ? (contribNoCrit / baselineNoCrit) * 100 : 0
+                    contribution: diffTotals(
+                        ctx.baseline,
+                        ctx.recompute({ echoes: cloneEchoesWithoutSubstat(ctx.echoes, ei, si) })
+                    ),
+                    baseline: ctx.baseline
                 })
-            }
+            )
+            .sort((a, b) => b.contributionNorm - a.contributionNorm)
 
-            echoSubstats.sort((a, b) => b.contributionNorm - a.contributionNorm)
-
-            const echoTotalNorm = echoSubstats.reduce((s, sub) => s + sub.contributionNorm, 0)
-            const echoTotalRig = echoSubstats.reduce((s, sub) => s + sub.contributionRig, 0)
-            const echoTotalNoCrit = echoSubstats.reduce((s, sub) => s + sub.contributionNoCrit, 0)
-
-            const mainStat = echo.mainStat?.type ?? ''
-            info.push({
+        echoes.push(
+            makeEchoContribution({
                 cost: echo.cost,
-                mainStat,
-                substats: echoSubstats,
-                totalNorm: echoTotalNorm,
-                totalRig: echoTotalRig,
-                totalPctNorm: baselineNorm > 0 ? (echoTotalNorm / baselineNorm) * 100 : 0,
-                totalPctRig: baselineRig > 0 ? (echoTotalRig / baselineRig) * 100 : 0,
-                totalNoCrit: echoTotalNoCrit,
-                totalPctNoCrit: baselineNoCrit > 0 ? (echoTotalNoCrit / baselineNoCrit) * 100 : 0
+                mainStat: echo.mainStat?.type ?? '',
+                substats,
+                baseline: ctx.baseline
             })
+        )
+        allSubstats.push(...substats)
+    })
 
-            allSubstats.push(...echoSubstats)
-        }
-
-        const aggMap = new Map<string, SubstatContribution>()
-        for (const s of allSubstats) {
-            const existing = aggMap.get(s.type)
-            if (existing) {
-                existing.contributionNorm += s.contributionNorm
-                existing.contributionRig += s.contributionRig
-                existing.contributionNoCrit += s.contributionNoCrit
-                existing.value += s.value
-            } else {
-                aggMap.set(s.type, { ...s })
-            }
-        }
-        const aggregated = [...aggMap.values()].map((s) => ({
-            ...s,
-            contribPctNorm: baselineNorm > 0 ? (s.contributionNorm / baselineNorm) * 100 : 0,
-            contribPctRig: baselineRig > 0 ? (s.contributionRig / baselineRig) * 100 : 0,
-            contribPctNoCrit: baselineNoCrit > 0 ? (s.contributionNoCrit / baselineNoCrit) * 100 : 0
-        }))
-        aggregated.sort((a, b) => b.contributionNorm - a.contributionNorm)
-
-        const substatTotalNorm = baselineNorm - emptyDamage.norm
-        const substatTotalRig = baselineRig - emptyDamage.rigVal
-        const substatTotalNoCrit = baselineNoCrit - emptyDamage.noCritVal
-
-        return {
-            character: charName,
-            totalDamageNorm: baselineNorm,
-            totalDamageRig: baselineRig,
-            totalDamageNoCrit: baselineNoCrit,
-            substatTotalNorm,
-            substatTotalRig,
-            substatTotalPctNorm: baselineNorm > 0 ? (substatTotalNorm / baselineNorm) * 100 : 0,
-            substatTotalPctRig: baselineRig > 0 ? (substatTotalRig / baselineRig) * 100 : 0,
-            substatTotalNoCrit,
-            substatTotalPctNoCrit: baselineNoCrit > 0 ? (substatTotalNoCrit / baselineNoCrit) * 100 : 0,
-            echoes: info,
-            aggregated
-        }
+    const empty = ctx.recompute({ echoes: cloneEchoesWithoutAllSubstats(ctx.echoes) })
+    return assembleSubstatAnalysis({
+        character: ctx.character,
+        baseline: ctx.baseline,
+        empty,
+        echoes,
+        aggregated: aggregateSubstats(allSubstats, ctx.baseline),
+        standard: ctx.standard
     })
 }

@@ -56,7 +56,7 @@ export async function dbGet<T>(key: string): Promise<{ data: T; ts: number } | n
  *
  * 两条路：先试 `structuredClone`（原生、保真，Date/Map/Blob 等原样保留），失败（= Proxy / 含函数）
  * 再退回 JSON 深拷贝（各 store 存的本就是 JSON 安全结构）。收敛到落盘口而不是逐个调用点改，
- * 是为了不再有下一个 store 忘掉 `$state.snapshot`（Worker 那边有同类先例，见 `analysis-runner.svelte.ts`）。
+ * 是为了不再有下一个 store 忘掉 `$state.snapshot`（结构化克隆不认 Proxy 这类坑在 Worker/序列化场景里反复出现过）。
  */
 export const toStorable = <T>(data: T): unknown => {
     try {

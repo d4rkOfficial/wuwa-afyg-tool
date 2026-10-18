@@ -1,206 +1,84 @@
-import type { DamageEntry, BuffConf } from '../calculation.types'
-import type { ConfigState, EchoSlotConfig } from '../config.types'
-import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { CharSlot } from '$lib/types/project'
-import type { CharSubstatAnalysis, SubstatContribution, EchoContribution } from '../result.types'
-import type { ConditionProfile } from '../compute'
-import { computeAll, computeOneEntry, cloneEchoesWithoutAllSubstats, DEFAULT_CONDITION_PROFILE } from '../compute'
+import type { EchoContribution, CharSubstatAnalysis, SubstatContribution } from '../result.types'
+import type { EchoSlotConfig } from '../config.types'
+import { cloneEchoesWithoutAllSubstats } from '../compute'
+import {
+    aggregateSubstats,
+    assembleSubstatAnalysis,
+    diffTotals,
+    makeEchoContribution,
+    makeSubstatContribution,
+    type CharacterDamageContext
+} from './shared'
 
-function cloneEchoesWithIncreasedSubstat(
+/** @desc 把某声骸的某个副词条数值抬高 delta */
+const cloneEchoesWithIncreasedSubstat = (
     echoes: EchoSlotConfig[],
     echoIdx: number,
     substatIdx: number,
     delta: number
-): EchoSlotConfig[] {
-    return echoes.map((echo, ei) => {
-        if (ei !== echoIdx) return echo
-        return {
-            ...echo,
-            substats: echo.substats.map((sub, si) => {
-                if (si !== substatIdx) return sub
-                return { ...sub, value: sub.value + delta }
-            })
-        }
-    })
-}
-
-function getEpsilon(value: number): number {
-    return Math.max(0.5, Math.abs(value) * 0.05)
-}
-
-export function computeSubstatContributions(
-    damageEntries: DamageEntry[],
-    buffSets: BuffConf[],
-    damageEntryBuffSetIds: Record<string, string[]>,
-    damageEntryDamageTypes: Record<string, string[]>,
-    configState: ConfigState,
-    team: CharSlot[],
-    charInfoMap: Record<string, CharacterInfo>,
-    weaponInfoMap: Record<string, WeaponInfo>,
-    rigCritEntryIds: Set<string>,
-    noCritEntryIds: Set<string>,
-    missEntryIds: Set<string>,
-    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
-): CharSubstatAnalysis[] {
-    const allEntries = computeAll(
-        damageEntries,
-        buffSets,
-        damageEntryBuffSetIds,
-        damageEntryDamageTypes,
-        configState,
-        team,
-        charInfoMap,
-        weaponInfoMap,
-        conditionProfile
+): EchoSlotConfig[] =>
+    echoes.map((echo, ei) =>
+        ei !== echoIdx
+            ? echo
+            : {
+                  ...echo,
+                  substats: echo.substats.map((sub, si) =>
+                      si === substatIdx ? { ...sub, value: sub.value + delta } : sub
+                  )
+              }
     )
 
-    const charNames = team.map((s) => s.character).filter((c): c is string => c !== null)
+/** @desc 有限差分步长：至少 0.5，避免小数值词条被浮点噪声淹没 */
+const getEpsilon = (value: number): number => Math.max(0.5, Math.abs(value) * 0.05)
 
-    return charNames.map((charName, ci) => {
-        // 未命中条目伤害恒为 0，直接过滤（等价于归零，占比/贡献口径不变）
-        const charEntries = allEntries.filter((e) => e.character === charName && !missEntryIds.has(e.id))
-        const charDmgEntries = damageEntries.filter((e) => e.character === charName && !missEntryIds.has(e.id))
+/**
+ * @desc 偏导数算法：对每个副词条施加微小增量 ε，用有限差分估出当前面板下的偏导，再乘词条当前值。
+ *
+ * 回答的是「再刷这一条能涨多少」，而不是「这条现在值多少」—— 两者在满暴/溢出场景下会分叉。
+ */
+export const analyzeCharacterSubstats = (ctx: CharacterDamageContext): CharSubstatAnalysis => {
+    const echoes: EchoContribution[] = []
+    const allSubstats: SubstatContribution[] = []
 
-        const baselineNorm = charEntries.reduce((s, e) => s + e.totalDamageRaw, 0)
-        const baselineRig = charEntries.reduce(
-            (s, e) => s + (rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamageRaw),
-            0
-        )
-        const baselineNoCrit = charEntries.reduce(
-            (s, e) => s + (noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw),
-            0
-        )
-
-        const echoes = configState.characters[ci]?.echoes ?? []
-
-        function computeDamageForEchoes(modEchoes: EchoSlotConfig[]): {
-            norm: number
-            rigVal: number
-            noCritVal: number
-        } {
-            let norm = 0
-            let rigVal = 0
-            let noCritVal = 0
-            for (const de of charDmgEntries) {
-                const re = computeOneEntry(
-                    de,
-                    ci,
-                    modEchoes,
-                    buffSets,
-                    damageEntryBuffSetIds,
-                    damageEntryDamageTypes,
-                    configState,
-                    team,
-                    charInfoMap,
-                    weaponInfoMap,
-                    conditionProfile
-                )
-                norm += re.totalDamageRaw
-                rigVal += rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamageRaw
-                noCritVal += noCritEntryIds.has(re.id) ? re.nonCritPerHit : re.totalDamageRaw
-            }
-            return { norm, rigVal, noCritVal }
-        }
-
-        const info: EchoContribution[] = []
-        const allSubstats: SubstatContribution[] = []
-
-        const emptyEchoes = cloneEchoesWithoutAllSubstats(echoes)
-        const emptyDamage = computeDamageForEchoes(emptyEchoes)
-
-        for (let ei = 0; ei < echoes.length; ei++) {
-            const echo = echoes[ei]
-            if (echo.substats.length === 0) continue
-
-            const echoSubstats: SubstatContribution[] = []
-
-            for (let si = 0; si < echo.substats.length; si++) {
-                const sub = echo.substats[si]
+    ctx.echoes.forEach((echo, ei) => {
+        if (echo.substats.length === 0) return
+        const substats = echo.substats
+            .map((sub, si) => {
                 const epsilon = getEpsilon(sub.value)
-
-                const modified = cloneEchoesWithIncreasedSubstat(echoes, ei, si, epsilon)
-                const boosted = computeDamageForEchoes(modified)
-
-                const derivNorm = (boosted.norm - baselineNorm) / epsilon
-                const derivRig = (boosted.rigVal - baselineRig) / epsilon
-                const derivNoCrit = (boosted.noCritVal - baselineNoCrit) / epsilon
-
-                const contribNorm = derivNorm * sub.value
-                const contribRig = derivRig * sub.value
-                const contribNoCrit = derivNoCrit * sub.value
-
-                echoSubstats.push({
+                const boosted = ctx.recompute({ echoes: cloneEchoesWithIncreasedSubstat(ctx.echoes, ei, si, epsilon) })
+                const slope = diffTotals(boosted, ctx.baseline)
+                return makeSubstatContribution({
                     type: sub.type,
                     value: sub.value,
                     unit: sub.unit,
-                    contributionNorm: contribNorm,
-                    contributionRig: contribRig,
-                    contribPctNorm: baselineNorm > 0 ? (contribNorm / baselineNorm) * 100 : 0,
-                    contribPctRig: baselineRig > 0 ? (contribRig / baselineRig) * 100 : 0,
-                    contributionNoCrit: contribNoCrit,
-                    contribPctNoCrit: baselineNoCrit > 0 ? (contribNoCrit / baselineNoCrit) * 100 : 0
+                    contribution: {
+                        norm: (slope.norm / epsilon) * sub.value,
+                        rig: (slope.rig / epsilon) * sub.value,
+                        noCrit: (slope.noCrit / epsilon) * sub.value
+                    },
+                    baseline: ctx.baseline
                 })
-            }
-
-            echoSubstats.sort((a, b) => b.contributionNorm - a.contributionNorm)
-
-            const echoTotalNorm = echoSubstats.reduce((s, sub) => s + sub.contributionNorm, 0)
-            const echoTotalRig = echoSubstats.reduce((s, sub) => s + sub.contributionRig, 0)
-            const echoTotalNoCrit = echoSubstats.reduce((s, sub) => s + sub.contributionNoCrit, 0)
-
-            const mainStat = echo.mainStat?.type ?? ''
-            info.push({
-                cost: echo.cost,
-                mainStat,
-                substats: echoSubstats,
-                totalNorm: echoTotalNorm,
-                totalRig: echoTotalRig,
-                totalPctNorm: baselineNorm > 0 ? (echoTotalNorm / baselineNorm) * 100 : 0,
-                totalPctRig: baselineRig > 0 ? (echoTotalRig / baselineRig) * 100 : 0,
-                totalNoCrit: echoTotalNoCrit,
-                totalPctNoCrit: baselineNoCrit > 0 ? (echoTotalNoCrit / baselineNoCrit) * 100 : 0
             })
+            .sort((a, b) => b.contributionNorm - a.contributionNorm)
 
-            allSubstats.push(...echoSubstats)
-        }
+        echoes.push(
+            makeEchoContribution({
+                cost: echo.cost,
+                mainStat: echo.mainStat?.type ?? '',
+                substats,
+                baseline: ctx.baseline
+            })
+        )
+        allSubstats.push(...substats)
+    })
 
-        const aggMap = new Map<string, SubstatContribution>()
-        for (const s of allSubstats) {
-            const existing = aggMap.get(s.type)
-            if (existing) {
-                existing.contributionNorm += s.contributionNorm
-                existing.contributionRig += s.contributionRig
-                existing.contributionNoCrit += s.contributionNoCrit
-                existing.value += s.value
-            } else {
-                aggMap.set(s.type, { ...s })
-            }
-        }
-        const aggregated = [...aggMap.values()].map((s) => ({
-            ...s,
-            contribPctNorm: baselineNorm > 0 ? (s.contributionNorm / baselineNorm) * 100 : 0,
-            contribPctRig: baselineRig > 0 ? (s.contributionRig / baselineRig) * 100 : 0,
-            contribPctNoCrit: baselineNoCrit > 0 ? (s.contributionNoCrit / baselineNoCrit) * 100 : 0
-        }))
-        aggregated.sort((a, b) => b.contributionNorm - a.contributionNorm)
-
-        const substatTotalNorm = baselineNorm - emptyDamage.norm
-        const substatTotalRig = baselineRig - emptyDamage.rigVal
-        const substatTotalNoCrit = baselineNoCrit - emptyDamage.noCritVal
-
-        return {
-            character: charName,
-            totalDamageNorm: baselineNorm,
-            totalDamageRig: baselineRig,
-            totalDamageNoCrit: baselineNoCrit,
-            substatTotalNorm,
-            substatTotalRig,
-            substatTotalPctNorm: baselineNorm > 0 ? (substatTotalNorm / baselineNorm) * 100 : 0,
-            substatTotalPctRig: baselineRig > 0 ? (substatTotalRig / baselineRig) * 100 : 0,
-            substatTotalNoCrit,
-            substatTotalPctNoCrit: baselineNoCrit > 0 ? (substatTotalNoCrit / baselineNoCrit) * 100 : 0,
-            echoes: info,
-            aggregated
-        }
+    const empty = ctx.recompute({ echoes: cloneEchoesWithoutAllSubstats(ctx.echoes) })
+    return assembleSubstatAnalysis({
+        character: ctx.character,
+        baseline: ctx.baseline,
+        empty,
+        echoes,
+        aggregated: aggregateSubstats(allSubstats, ctx.baseline),
+        standard: ctx.standard
     })
 }

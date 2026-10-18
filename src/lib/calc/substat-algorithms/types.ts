@@ -1,9 +1,5 @@
-import type { DamageEntry, BuffConf } from '../calculation.types'
-import type { ConfigState } from '../config.types'
-import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { CharSlot } from '$lib/types/project'
+import type { AnalysisInputs, CharacterDamageContext } from './shared'
 import type { CharSubstatAnalysis } from '../result.types'
-import type { ConditionProfile } from '../compute'
 
 export type AlgorithmId = 'single-loss' | 'shapley' | 'partial-derivative'
 
@@ -13,20 +9,11 @@ export interface AlgorithmInfo {
     description: string
 }
 
-export type SubstatAlgorithm = (
-    damageEntries: DamageEntry[],
-    buffSets: BuffConf[],
-    damageEntryBuffSetIds: Record<string, string[]>,
-    damageEntryDamageTypes: Record<string, string[]>,
-    configState: ConfigState,
-    team: CharSlot[],
-    charInfoMap: Record<string, CharacterInfo>,
-    weaponInfoMap: Record<string, WeaponInfo>,
-    rigCritEntryIds: Set<string>,
-    noCritEntryIds: Set<string>,
-    missEntryIds: Set<string>,
-    conditionProfile?: ConditionProfile
-) => CharSubstatAnalysis[]
+/** @desc 单角色副词条贡献算法：入参是共用底座建好的角色上下文，返回该角色的完整分析结果 */
+export type SubstatCharacterAnalyzer = (ctx: CharacterDamageContext) => CharSubstatAnalysis
+
+/** @desc 全量副词条算法（逐角色跑同一个 analyzer）：供 AI/WS 与一次性同步计算使用 */
+export type SubstatAlgorithm = (inputs: AnalysisInputs) => CharSubstatAnalysis[]
 
 export const ALGORITHMS_INFO: AlgorithmInfo[] = [
     { id: 'single-loss', name: '单条损失', description: '移除该词条后损失的伤害值' },

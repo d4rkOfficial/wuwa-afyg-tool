@@ -17,13 +17,13 @@
         getGlobalBuffSetIds
     } from '$lib/calc/calculation.store.svelte'
     import { getConfig } from '$lib/calc/config.store.svelte'
-    import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$lib/calc/result.types'
     import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
-    import { createSubstatAnalysisRunner } from '$lib/calc/substat-algorithms/analysis-runner.svelte'
-    import type { SubstatAnalysisRequest } from '$lib/calc/substat-algorithms/analysis'
-    import { tick, untrack, onMount, onDestroy } from 'svelte'
+    import { runContributionAnalysisAsync } from '$lib/calc/substat-algorithms/analysis-runner'
+    import type { ContributionAnalysisRequest } from '$lib/calc/substat-algorithms/analysis'
+    import { tick, untrack, onMount } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { slide } from 'svelte/transition'
@@ -33,7 +33,8 @@
     import DataAnalysisModal from './data-analysis-modal.svelte'
     import ComparisonModal from './comparison-modal.svelte'
     import DamageTraceView from './damage-trace-view.svelte'
-    import type { DamageTraceCtx, CritDisplayMode } from '$lib/calc/damage-trace'
+    import DamageFactorList from './damage-factor-list.svelte'
+    import { damageFactorRows, type DamageTraceCtx, type CritDisplayMode } from '$lib/calc/damage-trace'
     import {
         CARD,
         CARD_PAD,
@@ -128,7 +129,7 @@
         if (loading) return
         untrack(() => {
             computeAll()
-            if (showDataAnalysis) scheduleAnalysis()
+            if (showDataAnalysis) void runAnalysis(['substat', 'buff'])
         })
     })
 
@@ -315,71 +316,82 @@
 
     let selectedAlgorithm = $state<AlgorithmId>('single-loss')
     let substatAnalysis = $state<CharSubstatAnalysis[]>([])
-    let analysisComputing = $state(false)
-    let analysisTimeoutId: ReturnType<typeof setTimeout> | null = null
-
-    /** @desc 词条贡献分析执行器：优先 Worker 线程（Shapley/偏导这类重算不阻塞界面），开不了 Worker 时由它回退主线程 */
-    const analysisRunner = createSubstatAnalysisRunner()
+    let buffAnalysis = $state<CharBuffAnalysis[]>([])
+    let substatComputing = $state(false)
+    let buffComputing = $state(false)
     /** @desc 请求序号：只接受最新一次的结果，避免快速切换算法时旧结果覆盖新结果 */
     let analysisSeq = 0
-    onDestroy(() => {
-        analysisRunner.dispose()
-        if (analysisTimeoutId) clearTimeout(analysisTimeoutId)
-    })
 
-    function scheduleAnalysis() {
-        if (analysisTimeoutId) clearTimeout(analysisTimeoutId)
-        analysisComputing = true
-        analysisTimeoutId = setTimeout(() => {
-            const calc = getCalcState()
-            const config = getConfig()
-            const dmgEntries = getAllDamageEntries()
-            if (dmgEntries.length === 0) {
-                analysisComputing = false
-                return
-            }
-            const seq = ++analysisSeq
-            // 入参直接用 store 里的对象；runner 发往 Worker 前会自己 $state.snapshot 成纯数据
-            const req: SubstatAnalysisRequest = {
-                algorithm: selectedAlgorithm,
-                damageEntries: dmgEntries,
-                buffSets: calc.buffSets,
-                damageEntryBuffSetIds: calc.damageEntryBuffSetIds,
-                damageEntryDamageTypes: calc.damageEntryDamageTypes,
-                configState: config,
-                team,
-                charInfoMap,
-                weaponInfoMap,
-                rigCritEntryIds,
-                noCritEntryIds,
-                missEntryIds,
-                conditionProfile: getConditionProfile(),
-                echoSkillText: getEchoSkillText()
-            }
-            analysisRunner.run(req).then(
-                (res) => {
+    type AnalysisPart = 'substat' | 'buff'
+
+    /** @desc 组装直伤贡献分析入参（与 computeAll 同源：同一份 store 状态，不另建缓存） */
+    function analysisRequest(): ContributionAnalysisRequest {
+        const calc = getCalcState()
+        return {
+            damageEntries: getAllDamageEntries(),
+            buffSets: calc.buffSets,
+            damageEntryBuffSetIds: calc.damageEntryBuffSetIds,
+            damageEntryDamageTypes: calc.damageEntryDamageTypes,
+            configState: getConfig(),
+            team,
+            charInfoMap,
+            weaponInfoMap,
+            rigCritEntryIds,
+            noCritEntryIds,
+            missEntryIds,
+            conditionProfile: getConditionProfile(),
+            echoSkillText: getEchoSkillText()
+        }
+    }
+
+    /**
+     * @desc 跑直伤贡献分析（主线程分片，无 Worker）。
+     *
+     * `parts` 决定算哪一半：切换副词条算法时只重算副词条（Buff 与算法无关，重算纯属浪费）。
+     * 每次结果都按 `analysisSeq` 校验，晚到的旧结果直接丢弃。
+     */
+    async function runAnalysis(parts: AnalysisPart[]) {
+        if (getAllDamageEntries().length === 0) return
+        const seq = ++analysisSeq
+        if (parts.includes('substat')) substatComputing = true
+        if (parts.includes('buff')) buffComputing = true
+        // 先让「计算中…」渲染出来，再开始同步重算
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        if (seq !== analysisSeq) return
+        try {
+            const res = await runContributionAnalysisAsync(
+                analysisRequest(),
+                { algorithm: selectedAlgorithm, parts },
+                (partial) => {
                     if (seq !== analysisSeq) return
-                    substatAnalysis = res
-                    analysisComputing = false
-                },
-                (err) => {
-                    if (seq !== analysisSeq) return
-                    analysisComputing = false
-                    console.warn('[substat-analysis] 词条贡献分析失败', err)
+                    if (parts.includes('substat')) substatAnalysis = partial.substat
+                    if (parts.includes('buff')) buffAnalysis = partial.buff
                 }
             )
-        }, 0)
+            if (seq !== analysisSeq) return
+            if (parts.includes('substat')) substatAnalysis = res.substat
+            if (parts.includes('buff')) buffAnalysis = res.buff
+        } catch (err) {
+            console.warn('[contribution-analysis] 直伤贡献分析失败', err)
+        } finally {
+            if (seq === analysisSeq) {
+                substatComputing = false
+                buffComputing = false
+            }
+        }
     }
 
     function handleOpenAnalysis() {
-        scheduleAnalysis()
         showDataAnalysis = true
+        void runAnalysis(['substat', 'buff'])
     }
 
-    $effect(() => {
-        const _ = selectedAlgorithm
-        if (showDataAnalysis) untrack(() => scheduleAnalysis())
-    })
+    /** @desc 切换算法：只重算副词条那一半（Buff 贡献与算法无关） */
+    function selectAlgorithm(id: AlgorithmId) {
+        if (id === selectedAlgorithm) return
+        selectedAlgorithm = id
+        if (showDataAnalysis) void runAnalysis(['substat'])
+    }
 
     let expandedEntryIds = $state<Set<string>>(new Set())
     let showDataAnalysis = $state(false)
@@ -392,7 +404,11 @@
             'data-analysis',
             '数据分析',
             () => showDataAnalysis,
-            (v) => (showDataAnalysis = v)
+            (v) => {
+                showDataAnalysis = v
+                // 由 AI / 快捷键打开与点按钮打开必须同口径：打开即跑一次分析
+                if (v) void runAnalysis(['substat', 'buff'])
+            }
         )
         return () => unregisterPanel('data-analysis')
     })
@@ -588,12 +604,19 @@
                                         style="border-color: var(--theme-divider-border);"
                                     >
                                         {#if entry.baseUnit === '固定'}
+                                            {@const fixedFactors = damageFactorRows(
+                                                entry,
+                                                missEntryIds.includes(entry.id)
+                                            )}
                                             <div class="font-black font-sans text-(--theme-accent-text)">
                                                 固定值为 {entry.baseValue.toLocaleString()}
                                             </div>
                                             <div class="font-black font-sans text-(--theme-accent-text)">
                                                 最终 = {entry.baseValue.toLocaleString()}
                                             </div>
+                                            {#if fixedFactors.length > 1}
+                                                <DamageFactorList factors={fixedFactors} canCrit={entry.canCrit} />
+                                            {/if}
                                         {:else if entry.baseUnit.startsWith('偏谐系数') || entry.baseUnit === '效应系数'}
                                             <DamageTraceView
                                                 {entry}
@@ -733,7 +756,9 @@
         {totalDamage}
         {resultAnalysis}
         {substatAnalysis}
-        {analysisComputing}
+        {buffAnalysis}
+        {substatComputing}
+        {buffComputing}
         algorithmsInfo={ALGORITHMS_INFO}
         {selectedAlgorithm}
         {rigCritEntryIds}
@@ -745,7 +770,7 @@
             showDataAnalysis = false
             showComparison = true
         }}
-        onSelectAlgorithm={(id: AlgorithmId) => (selectedAlgorithm = id)}
+        onSelectAlgorithm={selectAlgorithm}
         onUpdateResultAnalysis={(data) => updateResultAnalysis(data)}
         onclose={() => (showDataAnalysis = false)}
     />

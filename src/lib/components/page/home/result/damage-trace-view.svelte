@@ -8,6 +8,7 @@
     } from '$lib/calc/damage-trace'
     import type { ResultEntry } from '$lib/calc/result.types'
     import type { ComponentsProps } from '$lib/types'
+    import DamageFactorList from './damage-factor-list.svelte'
 
     interface Props extends ComponentsProps {
         entry: ResultEntry
@@ -310,17 +311,16 @@
         </span>
     </div>
 
-    <!-- 汇总：每段/不暴击/暴击/未命中 -->
+    <!-- 汇总：合计期望 / 不暴击 / 暴击 / 未命中（三者都是「本条目全部段数」的合计，不是每段值） -->
     <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]" style="color: var(--theme-modal-text);">
         {#if missed}
             <span class="tabular-nums"
-                ><span style="color: var(--theme-rigcrit-from);">未命中</span> 每段期望
-                <span style="text-decoration: line-through; opacity: 0.6;">{fmt(seg.perHit)}</span> →
+                ><span style="color: var(--theme-rigcrit-from);">未命中</span> 合计期望
                 <span style="color: var(--theme-accent-text); font-weight: 900;">0</span></span
             >
         {:else}
             <span class="tabular-nums"
-                >每段期望 <span style="color: var(--theme-accent-text);">{fmt(seg.perHit)}</span></span
+                >合计期望 <span style="color: var(--theme-accent-text);">{fmt(seg.expected)}</span></span
             >
         {/if}
         {#if seg.canCrit}
@@ -331,6 +331,11 @@
             >
         {/if}
     </div>
+
+    <!-- 倍率因子：由复合倍率（多成分/多段乘数）、额外倍率 Buff 或多段数组成时，逐因子给出伤害 -->
+    {#if seg.factors.length > 1 || seg.hits > 1}
+        <DamageFactorList factors={seg.factors} canCrit={seg.canCrit} />
+    {/if}
 
     <!-- 来源浮窗 -->
     {#if tip}

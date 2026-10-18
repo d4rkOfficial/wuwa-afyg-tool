@@ -1,18 +1,23 @@
-import type { AlgorithmId, SubstatAlgorithm, AlgorithmInfo } from './types'
+import type { AlgorithmId, SubstatCharacterAnalyzer, AlgorithmInfo } from './types'
 import { ALGORITHMS_INFO } from './types'
-import { computeSubstatContributions as singleLoss } from './single-loss'
-import { computeSubstatContributions as shapley } from './shapley'
-import { computeSubstatContributions as partialDerivative } from './partial-derivative'
+import type { AnalysisInputs } from './shared'
+import { prepareAnalysis } from './shared'
+import { analyzeCharacterSubstats as singleLoss } from './single-loss'
+import { analyzeCharacterSubstats as shapley } from './shapley'
+import { analyzeCharacterSubstats as partialDerivative } from './partial-derivative'
 
-const algorithms: Record<AlgorithmId, SubstatAlgorithm> = {
+/** @desc 算法表：单角色分析器（界面按角色分批算，AI/WS 用下面的全量包装） */
+const analyzers: Record<AlgorithmId, SubstatCharacterAnalyzer> = {
     'single-loss': singleLoss,
     shapley,
     'partial-derivative': partialDerivative
 }
 
-function getAlgorithm(id: AlgorithmId): SubstatAlgorithm {
-    return algorithms[id]
-}
+const getAlgorithm = (id: AlgorithmId): SubstatCharacterAnalyzer => analyzers[id]
 
-export { algorithms, getAlgorithm, ALGORITHMS_INFO }
-export type { AlgorithmId, AlgorithmInfo }
+/** @desc 全量运行某个算法（逐角色） */
+const computeSubstatContributions = (id: AlgorithmId, inputs: AnalysisInputs) =>
+    prepareAnalysis(inputs).map((ctx) => analyzers[id](ctx))
+
+export { analyzers, getAlgorithm, computeSubstatContributions, ALGORITHMS_INFO }
+export type { AlgorithmId, AlgorithmInfo, SubstatCharacterAnalyzer }

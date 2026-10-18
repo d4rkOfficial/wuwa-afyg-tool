@@ -799,7 +799,7 @@
                 <section class="space-y-2">
                     <div class="flex items-center gap-2 text-[11px]" style="opacity: 0.6;">
                         <Icon icon="mdi:cursor-default-click-outline" class="size-3.5" />
-                        <span>当前口径：{rangeLabel}（时长 {rangeSpan.toFixed(1)}s）· 点下方分段行可切换</span>
+                        <span>当前范围：{rangeLabel}（时长 {rangeSpan.toFixed(1)}s）· 点下方分段行可切换</span>
                     </div>
                     <div class="theme-scrollbar flex gap-3 overflow-x-auto">
                         {#each rangeStats as stat (stat.config.key)}
@@ -846,7 +846,7 @@
                         />
                         <h3 class="text-base font-black tracking-tight text-(--theme-modal-text)">分段 DPS</h3>
                         <span class="text-[10px] text-(--theme-modal-text)/40"
-                            >点击时段行切换上方卡片与明细的口径（默认总计）</span
+                            >点击时段行切换上方卡片与明细的统计范围（默认总计）</span
                         >
                     </div>
                     <div class="px-4 py-3">

@@ -25,6 +25,7 @@
         getLocked
     } from '$lib/calc/timeline.store.svelte'
     import { parseRatioHits, summarizeSelectedHits } from '$lib/calc/skill-segments'
+    import { customHitRatio } from '$lib/calc/custom-hit'
     import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
     import type { CustomHit } from '$lib/calc/timeline.types'
     import { addToast } from '$lib/data/toast.svelte'
@@ -60,26 +61,6 @@
         custom: boolean
     }
 
-    /** @desc 自定义直伤 → 倍率串（写法与 timeline.store 的 customHitRatio 一致，另按段数 `*N` 展开便于逐段取用） */
-    const customRatioString = (hit: CustomHit) => {
-        const count = Math.max(1, hit.hits ?? 1)
-        const suffix = count > 1 ? `*${count}` : ''
-        const parts: string[] = []
-        if (hit.flatValue > 0) parts.push(`${hit.flatValue}${suffix}`)
-        if (hit.pctValue > 0) {
-            const unit =
-                hit.pctUnit === '攻击%'
-                    ? ''
-                    : hit.pctUnit === '生命%'
-                      ? '生命'
-                      : hit.pctUnit === '防御%'
-                        ? '防御'
-                        : hit.pctUnit
-            parts.push(`${hit.pctValue}%${unit}${suffix}`)
-        }
-        return parts.join('+')
-    }
-
     /** @desc 上区域可选倍率：当前角色的技能命中（含声骸、排除自定义/谐度/响应）+ 已有自定义直伤 */
     let ratioOptions = $derived.by<RatioOption[]>(() => {
         const out: RatioOption[] = []
@@ -100,7 +81,7 @@
             out.push({
                 key: `custom|${ch.id}`,
                 name: ch.name,
-                ratio: customRatioString(ch),
+                ratio: customHitRatio(ch),
                 element: ch.element,
                 custom: true
             })

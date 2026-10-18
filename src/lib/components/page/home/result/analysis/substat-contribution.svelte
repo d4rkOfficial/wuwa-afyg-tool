@@ -1,16 +1,16 @@
 <script lang="ts">
     /**
-     * @desc 数据分析 → 声骸词条贡献分析（三角色并排，不切换视图）。
-     * Phase 5.3：自 `data-analysis-modal.svelte` 原样抽出，标记与行为未改。
+     * @desc 数据分析 → 副词条贡献（单角色视图）。
      *
-     * 柱状图的画布、Chart 实例随区块抽出（绘制体在 `./chart-utils`）；
-     * 算法说明帮助条目由 `algorithmsInfo` 就地派生（原本也在弹窗外壳里算，只此一处消费）。
+     * 旧版是「三角色并排」的窄栏（每栏约 1/3 宽），塞不下 Buff 明细；现在改成
+     * 「角色页签 + 左右两栏（副词条 / Buff）」，本组件只负责其中一个角色的副词条那一栏。
+     * 柱状图（按词条类型汇总）的画布与 Chart 实例仍在此持有，绘制体在 ./chart-utils。
      */
     import { onMount, untrack } from 'svelte'
     import Icon from '@iconify/svelte'
     import { openHelp } from '$lib/data/help.svelte'
     import { ALGORITHM_HELP } from '$lib/calc/result.consts'
-    import { CARD_SURFACE_STYLE, STAT_VALUE_MD } from '$lib/calc/result.styles'
+    import { CARD_SURFACE_STYLE, SECTION_LABEL, STAT_VALUE_MD, STAT_VALUE_SM } from '$lib/calc/result.styles'
     import type { CharSubstatAnalysis } from '$lib/calc/result.types'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
@@ -18,18 +18,19 @@
     import { renderBarCharts, type BarChartInstance } from './chart-utils'
 
     interface Props extends ComponentsProps {
-        substatAnalysis: CharSubstatAnalysis[]
+        /** @desc 该角色的副词条分析结果（undefined = 尚未算出） */
+        analysis: CharSubstatAnalysis | undefined
         algorithmsInfo: AlgorithmInfo[]
         selectedAlgorithm: AlgorithmId
-        analysisComputing: boolean
+        computing: boolean
         onSelectAlgorithm: (id: AlgorithmId) => void
     }
 
     let {
-        substatAnalysis,
+        analysis,
         algorithmsInfo,
         selectedAlgorithm,
-        analysisComputing,
+        computing,
         onSelectAlgorithm,
         class: className,
         style: styleProp
@@ -48,47 +49,38 @@
     const NOCRIT_GRAD_TEXT =
         'background: var(--theme-nocrit-grad); -webkit-background-clip: text; background-clip: text; color: transparent;'
 
-    // ── bar chart (substat aggregation) ──
-    let barCharts: BarChartInstance[] = []
-    const barCanvasMap = new Map<string, HTMLCanvasElement>()
+    // ── 柱状图（词条类型汇总） ──
+    let barChart: BarChartInstance | null = null
+    let barCanvas = $state<HTMLCanvasElement | null>(null)
 
-    function registerBarCanvas(node: HTMLCanvasElement, charName: string) {
-        barCanvasMap.set(charName, node)
-        return {
-            destroy() {
-                barCanvasMap.delete(charName)
-            }
-        }
-    }
-
-    const drawBarCharts = () => {
-        for (const c of barCharts) c.destroy()
-        barCharts = renderBarCharts(substatAnalysis, barCanvasMap)
+    const drawBarChart = () => {
+        barChart?.destroy()
+        barChart = null
+        if (!analysis || !barCanvas || analysis.aggregated.length === 0) return
+        const canvases = new Map([[analysis.character, barCanvas]])
+        barChart = renderBarCharts([analysis], canvases)[0] ?? null
     }
 
     $effect(() => {
-        substatAnalysis
-        untrack(() => drawBarCharts())
+        analysis
+        barCanvas
+        untrack(() => drawBarChart())
     })
 
-    onMount(() => {
-        return () => {
-            for (const c of barCharts) c.destroy()
-        }
-    })
+    onMount(() => () => barChart?.destroy())
 </script>
 
-<!-- ── 声骸词条贡献分析（三角色并排，不切换视图） ── -->
-<section class={mergeClass(['rounded-none border', className])} style={joinStyle([CARD_SURFACE_STYLE, styleProp])}>
+<section
+    class={mergeClass(['flex min-w-0 flex-col rounded-none border', className])}
+    style={joinStyle([CARD_SURFACE_STYLE, styleProp])}
+>
     <div
         class="flex flex-wrap items-center gap-2 border-b px-4 py-3"
         style="border-color: var(--theme-divider-border);"
     >
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="flex shrink-0 items-center gap-2">
             <Icon icon="mdi:chart-bar" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
-            <h3 class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);">
-                声骸词条贡献分析
-            </h3>
+            <h3 class="text-sm font-black tracking-tight" style="color: var(--theme-modal-text);">副词条贡献</h3>
             <button
                 onclick={() => openHelp('算法说明', helpItems)}
                 class="flex h-5 w-5 items-center justify-center rounded-none text-xs font-black transition-colors hover:bg-(--theme-modal-text)/10"
@@ -122,194 +114,142 @@
                 </button>
             {/each}
         </div>
-        {#if analysisComputing}
+        {#if computing}
             <span class="ml-auto text-[10px]" style="color: var(--theme-accent-text); opacity: 0.6;">计算中…</span>
         {/if}
     </div>
-    <div class="p-4">
-        {#if substatAnalysis.length === 0}
+
+    <div class="min-h-0 flex-1 p-4">
+        {#if !analysis}
             <div class="py-8 text-center text-xs" style="color: var(--theme-modal-text); opacity: 0.4;">
-                {analysisComputing ? '计算中…' : '暂无数据'}
+                {computing ? '计算中…' : '暂无数据'}
             </div>
         {:else}
-            <div class="grid grid-cols-1 gap-3 xl:grid-cols-3">
-                {#each substatAnalysis as charSA (charSA.character)}
-                    <div
-                        class="rounded-none border"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                    >
-                        <div class="px-4 py-3">
-                            <div class="flex items-center justify-between">
-                                <div class="flex flex-col gap-0.5">
-                                    <div class="flex flex-wrap items-center gap-3">
-                                        <span class="text-xs font-black" style="color: var(--theme-modal-text);"
-                                            >{charSA.character}</span
-                                        >
-                                        <span
-                                            class="text-[10px] tabular-nums"
-                                            style="color: var(--theme-modal-text); opacity: 0.5;"
-                                        >
-                                            总伤: {Math.round(charSA.totalDamageNorm).toLocaleString()}
-                                        </span>
-                                        {#if charSA.totalDamageRig !== charSA.totalDamageNorm}
-                                            <span class="text-[10px] tabular-nums" style={RIG_GRAD_TEXT}>
-                                                [凹暴 {Math.round(charSA.totalDamageRig).toLocaleString()}]
-                                            </span>
-                                        {/if}
-                                        {#if charSA.totalDamageNoCrit !== charSA.totalDamageNorm}
-                                            <span class="text-[10px] tabular-nums" style={NOCRIT_GRAD_TEXT}>
-                                                [不暴 {Math.round(charSA.totalDamageNoCrit).toLocaleString()}]
-                                            </span>
-                                        {/if}
-                                    </div>
-                                    <div class="text-[10px]" style="color: var(--theme-modal-text); opacity: 0.6;">
-                                        副词条总贡献:
-                                        <span class="font-medium text-(--theme-accent-text)"
-                                            >+{Math.round(charSA.substatTotalNorm).toLocaleString()} ({charSA.substatTotalPctNorm.toFixed(
-                                                1
-                                            )}%)</span
-                                        >
-                                        {#if charSA.substatTotalRig !== charSA.substatTotalNorm}
-                                            <span style={RIG_GRAD_TEXT}>
-                                                [凹暴 +{Math.round(charSA.substatTotalRig).toLocaleString()} ({charSA.substatTotalPctRig.toFixed(
-                                                    1
-                                                )}%)]</span
-                                            >
-                                        {/if}
-                                        {#if charSA.substatTotalNoCrit !== charSA.substatTotalNorm}
-                                            <span style={NOCRIT_GRAD_TEXT}>
-                                                [不暴 +{Math.round(charSA.substatTotalNoCrit).toLocaleString()} ({charSA.substatTotalPctNoCrit.toFixed(
-                                                    1
-                                                )}%)]</span
-                                            >
-                                        {/if}
-                                    </div>
-                                </div>
-                                <div class="flex shrink-0 flex-col items-end gap-0.5">
-                                    <div class={`${STAT_VALUE_MD} text-(--theme-accent-text)`}>
-                                        {charSA.substatTotalPctNorm.toFixed(1)}
-                                    </div>
-                                    <div class="text-[9px]" style="color: var(--theme-modal-text); opacity: 0.35;">
-                                        总分
-                                    </div>
-                                </div>
-                            </div>
-
-                            {#if charSA.aggregated.length > 0}
-                                <div class="pt-3">
-                                    <div
-                                        class="mb-1 text-[10px] font-medium"
-                                        style="color: var(--theme-modal-text); opacity: 0.5;"
-                                    >
-                                        词条类型汇总
-                                    </div>
-                                    <div
-                                        class="w-full"
-                                        style="height: {Math.max(140, charSA.aggregated.length * 26)}px"
-                                    >
-                                        <canvas use:registerBarCanvas={charSA.character}></canvas>
-                                    </div>
-                                </div>
+            <!-- 统计头：角色总伤 / 副词条总贡献 / 总分 -->
+            <div class="grid grid-cols-3 gap-2">
+                <div class="rounded-none border px-3 py-2" style="border-color: var(--theme-divider-border);">
+                    <div class="{SECTION_LABEL} text-(--theme-modal-text)/45">角色总伤</div>
+                    <div class="mt-1 {STAT_VALUE_SM} text-(--theme-modal-text)">
+                        {Math.round(analysis.totalDamageNorm).toLocaleString()}
+                    </div>
+                    {#if analysis.totalDamageRig !== analysis.totalDamageNorm}
+                        <div class="text-[10px] tabular-nums" style={RIG_GRAD_TEXT}>
+                            凹暴 {Math.round(analysis.totalDamageRig).toLocaleString()}
+                        </div>
+                    {/if}
+                    {#if analysis.totalDamageNoCrit !== analysis.totalDamageNorm}
+                        <div class="text-[10px] tabular-nums" style={NOCRIT_GRAD_TEXT}>
+                            不暴 {Math.round(analysis.totalDamageNoCrit).toLocaleString()}
+                        </div>
+                    {/if}
+                </div>
+                <div class="rounded-none border px-3 py-2" style="border-color: var(--theme-divider-border);">
+                    <div class="{SECTION_LABEL} text-(--theme-modal-text)/45">副词条总贡献</div>
+                    <!-- 占比直接跟在数值后面（同一行括号），不再单独占一行灰字 -->
+                    <div class="mt-1 flex items-baseline gap-1 text-(--theme-accent-text)">
+                        <span class={STAT_VALUE_SM}>
+                            +{Math.round(analysis.substatTotalNorm).toLocaleString()}
+                        </span>
+                        <span class="text-[11px] font-medium tabular-nums"
+                            >({analysis.substatTotalPctNorm.toFixed(1)}%)</span
+                        >
+                    </div>
+                    {#if analysis.substatTotalRig !== analysis.substatTotalNorm || analysis.substatTotalNoCrit !== analysis.substatTotalNorm}
+                        <div
+                            class="mt-0.5 text-[10px] tabular-nums"
+                            style="color: var(--theme-modal-text); opacity: 0.55;"
+                        >
+                            {#if analysis.substatTotalRig !== analysis.substatTotalNorm}
+                                <span style={RIG_GRAD_TEXT}
+                                    >凹暴 +{Math.round(analysis.substatTotalRig).toLocaleString()} ({analysis.substatTotalPctRig.toFixed(
+                                        1
+                                    )}%)</span
+                                >
                             {/if}
+                            {#if analysis.substatTotalNoCrit !== analysis.substatTotalNorm}
+                                <span class="ml-1" style={NOCRIT_GRAD_TEXT}
+                                    >不暴 +{Math.round(analysis.substatTotalNoCrit).toLocaleString()} ({analysis.substatTotalPctNoCrit.toFixed(
+                                        1
+                                    )}%)</span
+                                >
+                            {/if}
+                        </div>
+                    {/if}
+                </div>
+                <div
+                    class="rounded-none border px-3 py-2"
+                    style="border-color: var(--theme-divider-border);"
+                    title="总分 = 副词条贡献占角色总伤的百分比；表级14词分 = 把声骸换成「标准 14 词条」方案后的同样分数"
+                >
+                    <div class="{SECTION_LABEL} text-(--theme-modal-text)/45">总分 / 表级14词分</div>
+                    <div class="mt-1 flex items-baseline gap-1">
+                        <span class="{STAT_VALUE_MD} text-(--theme-accent-text)">
+                            {analysis.substatTotalPctNorm.toFixed(1)}
+                        </span>
+                        <span class={STAT_VALUE_MD} style="color: var(--theme-modal-text); opacity: 0.45">
+                            / {analysis.standardSubstatPctNorm === null
+                                ? '—'
+                                : analysis.standardSubstatPctNorm.toFixed(1)}
+                        </span>
+                    </div>
+                </div>
+            </div>
 
-                            <div class="mt-3 space-y-1.5">
-                                {#each charSA.echoes as echo, ei (ei)}
-                                    <div
-                                        class="rounded-none border"
-                                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+            {#if analysis.aggregated.length > 0}
+                <div class="pt-4">
+                    <div class="mb-1 text-[10px] font-medium" style="color: var(--theme-modal-text); opacity: 0.5;">
+                        词条类型汇总（按贡献降序）
+                    </div>
+                    <div class="w-full" style="height: {Math.max(140, analysis.aggregated.length * 26)}px">
+                        <canvas bind:this={barCanvas}></canvas>
+                    </div>
+                </div>
+            {/if}
+
+            <div class="mt-4 space-y-1.5">
+                {#each analysis.echoes as echo, ei (ei)}
+                    <div class="rounded-none border" style="border-color: var(--theme-divider-border);">
+                        <div class="px-3 py-2">
+                            <!-- 只保留这块声骸的分数（右侧、放大）；不再有底部「小计」行 -->
+                            <div class="mb-1.5 flex items-start justify-between gap-2">
+                                <span
+                                    class="pt-0.5 text-[10px] font-medium"
+                                    style="color: var(--theme-modal-text); opacity: 0.6;"
+                                >
+                                    Cost{echo.cost}{echo.mainStat ? ' · ' + echo.mainStat : ''}
+                                </span>
+                                <span class="{STAT_VALUE_MD} text-(--theme-accent-text)">
+                                    {echo.totalPctNorm.toFixed(1)}<span
+                                        class="ml-0.5 text-[10px] font-normal opacity-60">分</span
                                     >
-                                        <div class="px-3 py-2">
-                                            <div class="mb-1.5 flex items-center justify-between">
-                                                <span
-                                                    class="text-[10px] font-medium"
-                                                    style="color: var(--theme-modal-text); opacity: 0.6;"
-                                                >
-                                                    Cost{echo.cost}{echo.mainStat ? ' · ' + echo.mainStat : ''}
-                                                </span>
-                                                <span
-                                                    class="text-sm font-black tabular-nums"
-                                                    style="color: var(--theme-accent-text);"
-                                                >
-                                                    {echo.totalPctNorm.toFixed(1)}<span
-                                                        class="ml-0.5 text-[9px] font-normal opacity-70">分</span
-                                                    >
-                                                </span>
-                                            </div>
-                                            <div class="space-y-0.5">
-                                                {#each echo.substats as sub (sub.type)}
-                                                    <div
-                                                        class="flex flex-wrap items-center gap-2 text-[10px]"
-                                                        style="color: var(--theme-modal-text);"
-                                                    >
-                                                        <span class="shrink-0 tabular-nums"
-                                                            >{sub.type} {sub.value}{sub.unit}</span
-                                                        >
-                                                        <span
-                                                            class="shrink-0 tabular-nums"
-                                                            style="color: var(--theme-accent-text);"
-                                                        >
-                                                            → +{Math.round(sub.contributionNorm).toLocaleString()} ({sub.contribPctNorm.toFixed(
-                                                                1
-                                                            )}%)
-                                                        </span>
-                                                        {#if sub.contributionRig !== sub.contributionNorm}
-                                                            <span class="shrink-0 tabular-nums" style={RIG_GRAD_TEXT}>
-                                                                [凹暴 +{Math.round(
-                                                                    sub.contributionRig
-                                                                ).toLocaleString()} ({sub.contribPctRig.toFixed(1)}%)]
-                                                            </span>
-                                                        {/if}
-                                                        {#if sub.contributionNoCrit !== sub.contributionNorm}
-                                                            <span
-                                                                class="shrink-0 tabular-nums"
-                                                                style={NOCRIT_GRAD_TEXT}
-                                                            >
-                                                                [不暴 +{Math.round(
-                                                                    sub.contributionNoCrit
-                                                                ).toLocaleString()} ({sub.contribPctNoCrit.toFixed(
-                                                                    1
-                                                                )}%)]
-                                                            </span>
-                                                        {/if}
-                                                    </div>
-                                                {/each}
-                                            </div>
-                                            <div
-                                                class="mt-1.5 flex items-center justify-between border-t pt-1.5 text-[10px]"
-                                                style="border-color: var(--theme-divider-border); color: var(--theme-modal-text); opacity: 0.6;"
-                                            >
-                                                <span>
-                                                    小计:
-                                                    <span class="tabular-nums" style="color: var(--theme-accent-text);"
-                                                        >+{Math.round(echo.totalNorm).toLocaleString()} ({echo.totalPctNorm.toFixed(
-                                                            1
-                                                        )}%)</span
-                                                    >
-                                                    {#if echo.totalRig !== echo.totalNorm}
-                                                        <span class="tabular-nums" style={RIG_GRAD_TEXT}>
-                                                            [凹暴 +{Math.round(echo.totalRig).toLocaleString()} ({echo.totalPctRig.toFixed(
-                                                                1
-                                                            )}%)]
-                                                        </span>
-                                                    {/if}
-                                                    {#if echo.totalNoCrit !== echo.totalNorm}
-                                                        <span class="tabular-nums" style={NOCRIT_GRAD_TEXT}>
-                                                            [不暴 +{Math.round(echo.totalNoCrit).toLocaleString()} ({echo.totalPctNoCrit.toFixed(
-                                                                1
-                                                            )}%)]
-                                                        </span>
-                                                    {/if}
-                                                </span>
-                                                <span
-                                                    class="font-black tabular-nums"
-                                                    style="color: var(--theme-accent-text);"
-                                                >
-                                                    {echo.totalPctNorm.toFixed(1)}<span
-                                                        class="ml-0.5 text-[9px] font-normal opacity-70">分</span
-                                                    >
-                                                </span>
-                                            </div>
-                                        </div>
+                                </span>
+                            </div>
+                            <div class="space-y-0.5">
+                                {#each echo.substats as sub, si (si)}
+                                    <div
+                                        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]"
+                                        style="color: var(--theme-modal-text);"
+                                    >
+                                        <span class="shrink-0 tabular-nums">{sub.type} {sub.value}{sub.unit}</span>
+                                        <span class="shrink-0 tabular-nums" style="color: var(--theme-accent-text);">
+                                            → +{Math.round(sub.contributionNorm).toLocaleString()} ({sub.contribPctNorm.toFixed(
+                                                1
+                                            )}%)
+                                        </span>
+                                        {#if sub.contributionRig !== sub.contributionNorm}
+                                            <span class="shrink-0 tabular-nums" style={RIG_GRAD_TEXT}>
+                                                [凹暴 +{Math.round(sub.contributionRig).toLocaleString()} ({sub.contribPctRig.toFixed(
+                                                    1
+                                                )}%)]
+                                            </span>
+                                        {/if}
+                                        {#if sub.contributionNoCrit !== sub.contributionNorm}
+                                            <span class="shrink-0 tabular-nums" style={NOCRIT_GRAD_TEXT}>
+                                                [不暴 +{Math.round(sub.contributionNoCrit).toLocaleString()} ({sub.contribPctNoCrit.toFixed(
+                                                    1
+                                                )}%)]
+                                            </span>
+                                        {/if}
                                     </div>
                                 {/each}
                             </div>

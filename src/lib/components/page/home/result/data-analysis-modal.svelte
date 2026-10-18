@@ -2,20 +2,20 @@
     import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import { getCharElementMap, getCharIconMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
     import { resolveRefLineSeconds, autoConfigureTimings as autoConfigureTimingsPure } from '$lib/calc/ref-line-timing'
-    import type { ResultEntry, CharSummary, CharSubstatAnalysis } from '$lib/calc/result.types'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$lib/calc/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
     import Icon from '@iconify/svelte'
-    import { getActiveProject } from '$lib/data/project.svelte'
     import { openPanel } from '$lib/ai/panels.svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import { mergeClass } from '$lib/utils/component-style'
+    import Tabs from '$lib/components/ui/tabs.svelte'
     import KpiOverview from './analysis/kpi-overview.svelte'
     import SegmentDps from './analysis/segment-dps.svelte'
     import DamageCurve from './analysis/damage-curve.svelte'
     import DamageShare from './analysis/damage-share.svelte'
-    import SubstatContribution from './analysis/substat-contribution.svelte'
+    import ContributionAnalysis from './analysis/contribution-analysis.svelte'
     import { cssVar, fadedColor } from './analysis/chart-utils'
     import type { CharCard, DpsSegment, EffectCard, RangeStats, SegTotals, ShareItem, Timing } from './analysis/types'
 
@@ -26,7 +26,9 @@
         totalDamage: number
         resultAnalysis: ResultAnalysisData | undefined
         substatAnalysis: CharSubstatAnalysis[]
-        analysisComputing: boolean
+        buffAnalysis: CharBuffAnalysis[]
+        substatComputing: boolean
+        buffComputing: boolean
         algorithmsInfo: AlgorithmInfo[]
         selectedAlgorithm: AlgorithmId
         rigCritEntryIds: string[]
@@ -46,7 +48,9 @@
         totalDamage,
         resultAnalysis,
         substatAnalysis,
-        analysisComputing,
+        buffAnalysis,
+        substatComputing,
+        buffComputing,
         algorithmsInfo,
         selectedAlgorithm,
         rigCritEntryIds,
@@ -61,11 +65,17 @@
         style: styleProp
     }: Props = $props()
 
+    /** @desc 页签（放在标题栏）：总览（KPI + 分段）/ 图表（出伤曲线 + 占比）/ 贡献（副词条 + Buff） */
+    type TabId = 'overview' | 'chart' | 'contribution'
+    const TABS: { value: TabId; label: string }[] = [
+        { value: 'overview', label: '总览' },
+        { value: 'chart', label: '图表' },
+        { value: 'contribution', label: '贡献' }
+    ]
+    let activeTab = $state<TabId>('overview')
+
     let charElements = $derived(getCharElementMap())
     let charIcons = $derived(getCharIconMap())
-
-    // ── 当前工程名（标题栏展示）──
-    let projectName = $derived(getActiveProject()?.name ?? '未命名工程')
 
     // ── timing state ──
     let timings = $state<Timing[]>([])
@@ -427,14 +437,18 @@
     style={styleProp}
 >
     {#snippet title()}
-        <div class="flex items-center gap-2.5">
+        <div class="flex min-w-0 items-center gap-2.5">
             <Icon icon="mdi:chart-box-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             <h2>数据分析</h2>
-            <span
-                class="hidden max-w-56 truncate rounded-none border px-2 py-0.5 text-[10px] tracking-[0.22em] md:inline-block"
-                style="color: var(--theme-modal-text); opacity: 0.5; border-color: var(--theme-divider-border);"
-                title={projectName}>{projectName}</span
-            >
+            <!-- 页签放标题栏：省掉一整行，内容区只留卷轴 -->
+            <Tabs
+                items={TABS}
+                value={activeTab}
+                onchange={(v) => (activeTab = v as TabId)}
+                backgroundImage="var(--theme-accent-bg)"
+                textColor="var(--theme-accent-text-on-bg, #ffffff)"
+                class="ml-1 min-w-[12rem] shrink-0"
+            />
         </div>
         <div
             class="flex items-center gap-2 text-[11px] {getModalClosePosition() === 'top-left' ? '' : 'ml-auto'}"
@@ -488,43 +502,48 @@
 
     <!-- Scrollable body -->
     <div class="theme-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-        <!-- ── KPI 总览（口径随「分段 DPS」里选中的时段切换，默认总计）── -->
-        <KpiOverview {rangeLabel} {rangeStats} {charCards} {effectCards} />
+        {#if activeTab === 'overview'}
+            <!-- ── KPI 总览（口径随「分段 DPS」里选中的时段切换，默认总计）── -->
+            <KpiOverview {rangeLabel} {rangeStats} {charCards} {effectCards} />
 
-        <!-- ── 时间记点 + 分段 DPS ── -->
-        <SegmentDps
-            {team}
-            {effectColumns}
-            {segments}
-            {segTotals}
-            {segTotalDps}
-            {totalDur}
-            {timings}
-            {sortedTimings}
-            {refLines}
-            {activeRange}
-            bind:selectedRange
-            bind:timingOpen
-            {overallDps}
-            onToggleRefLine={toggleRefLine}
-            onUpdateSeconds={updateSeconds}
-            onPrevValidSeconds={prevValidSeconds}
-            onAutoConfigure={autoConfigureTimings}
-        />
+            <!-- ── 时间记点 + 分段 DPS ── -->
+            <SegmentDps
+                {team}
+                {effectColumns}
+                {segments}
+                {segTotals}
+                {segTotalDps}
+                {totalDur}
+                {timings}
+                {sortedTimings}
+                {refLines}
+                {activeRange}
+                bind:selectedRange
+                bind:timingOpen
+                {overallDps}
+                onToggleRefLine={toggleRefLine}
+                onUpdateSeconds={updateSeconds}
+                onPrevValidSeconds={prevValidSeconds}
+                onAutoConfigure={autoConfigureTimings}
+            />
+        {:else if activeTab === 'chart'}
+            <!-- ── 队伍出伤曲线 ── -->
+            <DamageCurve events={curveEvents} {validTimings} {rigCritEntryIds} {noCritEntryIds} />
 
-        <!-- ── 队伍出伤曲线 ── -->
-        <DamageCurve events={curveEvents} {validTimings} {rigCritEntryIds} {noCritEntryIds} />
-
-        <!-- ── 伤害占比：队伍 + 角色直伤类型 ── -->
-        <DamageShare {entries} {shareItems} {totalDamage} {charElements} />
-
-        <!-- ── 声骸词条贡献分析（三角色并排，不切换视图） ── -->
-        <SubstatContribution
-            {substatAnalysis}
-            {algorithmsInfo}
-            {selectedAlgorithm}
-            {analysisComputing}
-            {onSelectAlgorithm}
-        />
+            <!-- ── 伤害占比：队伍 + 角色直伤类型 ── -->
+            <DamageShare {entries} {shareItems} {totalDamage} {charElements} />
+        {:else}
+            <!-- ── 直伤贡献分析（角色页签 + 副词条 / Buff 两栏） ── -->
+            <ContributionAnalysis
+                {team}
+                {substatAnalysis}
+                {buffAnalysis}
+                {algorithmsInfo}
+                {selectedAlgorithm}
+                {substatComputing}
+                {buffComputing}
+                {onSelectAlgorithm}
+            />
+        {/if}
     </div>
 </Modal>

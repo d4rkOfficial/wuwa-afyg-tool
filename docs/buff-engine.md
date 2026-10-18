@@ -26,7 +26,8 @@ BuffInstance ─┘
 
 - **贡献键 = 乘区键**（`ZoneId`）：`atkPct` / `bonusDmg` / `defPen` / `finalDmg` / `specialFinal2` … 见 `ZONE_DEFS`。
 - 装备（武器/声骸）与内置源也走同一套乘区键，经 `applyEntryStatToAccum` 归一化后写入同一个累加器。
-- `ResultEntry` 与界面数据形状保持不变，结果页 / 乘区溯源 / 副词条分析无需感知引擎内部结构。
+- `ResultEntry` 是结果页 / 乘区溯源 / 贡献分析唯一消费的数据形状：它们只读 `ResultEntry`，不感知引擎内部结构。
+  贡献分析（副词条 / Buff）另走「改动入参 → `computeOneEntry` 重算 → 差值」这一条路径，与结果页同一实现。
 
 ### 乘区算子（`ZONE_OPS`）
 

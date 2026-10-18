@@ -1,4 +1,4 @@
-import type { ResultEntry } from './result.types'
+import type { RatioFactor, ResultEntry } from './result.types'
 import type { BuffCondition, BuffConf, BuffZoneValue, DamageEntry } from './calculation.types'
 import type { ConfigState } from './config.types'
 import type { CharSlot } from '$lib/types/project'
@@ -77,6 +77,33 @@ export interface DamageSegments {
     expected: number
     /** @desc 每段期望 = 总期望 / 段数 */
     perHit: number
+    /**
+     * @desc 倍率因子拆解（复合倍率 / 额外倍率 Buff）：每个因子分摊到的伤害。
+     * 空数组 / 单因子条目表示「倍率不可再拆」，界面只在 `length > 1` 时展示。
+     */
+    factors: DamageFactorRow[]
+}
+
+/** @desc 一个倍率因子的展示数据（`damage` 为该条目总伤害中分摊到这个因子的部分） */
+export interface DamageFactorRow {
+    label: string
+    /** 来源类别：技能成分 / 效应 / Buff（额外倍率） */
+    kind: 'skill' | 'effect' | 'buff'
+    note?: string
+    /** 权重：`% ` 条目为「倍率百分比 × 成分乘数 × 段数」，固定值条目为「固定值 × 段数」 */
+    weight: number
+    /** 单段倍率：该因子自身的倍率，不含成分乘数（*N）与段数（界面「单段倍率」列） */
+    segmentRatio: number
+    /** 占总权重的比例（0..1） */
+    share: number
+    /** 每段伤害（当前展示口径） */
+    perHit: number
+    /** 该因子分摊到的总伤害（全部因子之和 = 条目期望） */
+    damage: number
+    nonCrit: number
+    crit: number
+    /** 权重单位（固定值条目为 flat，其余为 %） */
+    unit: '%' | 'flat'
 }
 
 type BaseKind = 'atk' | 'hp' | 'def'
@@ -566,6 +593,67 @@ function seg(id: string, label: string, value: number, detail: string, parts: Tr
     return { id, label, value, detail, parts }
 }
 
+/**
+ * @desc 倍率因子 → 伤害分摊。
+ *
+ * 「每一因子的伤害」按权重占比分摊：同一条目内所有因子都乘以同一份技能倍率基数
+ * （% 条目是同一角色面板、系数条目是同一系数），所以按权重比例拆分是**精确的**，不是近似。
+ * 额外倍率若来自多条 Buff，则按各 Buff 的额外倍率值再拆一次（此处用溯源的来源列表做同口径拆分）。
+ */
+const buildFactorRows = (entry: ResultEntry, extraRatioParts: TracePart[], missed: boolean): DamageFactorRow[] => {
+    const hits = entry.hits || 1
+    const raw: RatioFactor[] = entry.ratioFactors?.length
+        ? entry.ratioFactors
+        : [
+              {
+                  label: '技能单段',
+                  weight: entry.ratioNum * 100,
+                  segmentRatio: (entry.ratioNum * 100) / hits,
+                  kind: 'skill'
+              }
+          ]
+
+    const factors = raw.flatMap((factor) => {
+        if (factor.kind !== 'buff') return [factor]
+        const sourceTotal = extraRatioParts.reduce((s, p) => s + p.value, 0)
+        if (extraRatioParts.length === 0 || Math.abs(sourceTotal - factor.weight / hits) > 1e-6) return [factor]
+        return extraRatioParts.map((p) => ({
+            label: p.source,
+            weight: p.value * hits,
+            segmentRatio: p.value,
+            kind: 'buff' as const,
+            note: '额外倍率'
+        }))
+    })
+
+    const totalWeight = factors.reduce((s, f) => s + f.weight, 0)
+    const damage = missed ? 0 : entry.expectedPerHit
+    const nonCrit = missed ? 0 : entry.nonCritPerHit
+    const crit = missed ? 0 : entry.critPerHit
+    const unit: '%' | 'flat' = entry.baseUnit === '固定' ? 'flat' : '%'
+
+    return factors.map((factor) => {
+        const share = totalWeight > 0 ? factor.weight / totalWeight : 0
+        return {
+            label: factor.label,
+            kind: factor.kind,
+            ...(factor.note ? { note: factor.note } : {}),
+            weight: factor.weight,
+            segmentRatio: factor.segmentRatio,
+            share,
+            perHit: (damage * share) / hits,
+            damage: damage * share,
+            nonCrit: nonCrit * share,
+            crit: crit * share,
+            unit
+        }
+    })
+}
+
+/** @desc 只算倍率因子（不建整条溯源链）：固定值条目等「没有乘区链」的轻量场景用 */
+export const damageFactorRows = (entry: ResultEntry, missed = false): DamageFactorRow[] =>
+    buildFactorRows(entry, [], missed)
+
 /** @desc 把 ResultEntry 适配回 DamageEntry，复用 compute 的 getBoundBuffSets/conditionMet（同口径判定生效 Buff） */
 function toDamageEntryLike(entry: ResultEntry): DamageEntry {
     return {
@@ -815,6 +903,7 @@ export function buildDamageSegments(
         crit: entry.critPerHit,
         nonCrit: entry.nonCritPerHit,
         expected: entry.expectedPerHit,
-        perHit: (entry.expectedPerHit || 0) / (entry.hits || 1)
+        perHit: (entry.expectedPerHit || 0) / (entry.hits || 1),
+        factors: buildFactorRows(entry, extraRatioParts, missed)
     }
 }

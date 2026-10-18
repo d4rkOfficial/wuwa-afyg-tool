@@ -5,6 +5,7 @@ import type {
     CalcState,
     DamageEntry,
     DamageEntryConfig,
+    DamageRatioPart,
     BuffCondition
 } from './calculation.types'
 import type { TimelineData } from './timeline.types'
@@ -314,7 +315,11 @@ function pruneOrphanedBindings(): boolean {
 }
 
 /** @desc 从时间线数据构建全部伤害条目：遍历 damageBlocks 中的 skillHits（解析倍率成分→按基础类型分组，含固定值条目）与非直伤条目（响应/处决/效应：查技能缓存取倍率、按元素归类、效应层数映射） */
-function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, CharSlot, CharSlot]): DamageEntry[] {
+/**
+ * @desc 从一份**显式的时间线 + 队伍**推导伤害条目（不读任何全局活动工程状态）。
+ * 跨工程只读工具直接用它：只要传入目标工程的持久化数据即可，无需切换活动工程。
+ */
+export function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, CharSlot, CharSlot]): DamageEntry[] {
     const temp: Array<{ item: DamageEntry; pos: number; order: number }> = []
     let order = 0
 
@@ -341,14 +346,25 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
             }
 
             const pctMap = new Map<string, number>()
+            /** @desc 复合倍率成分（按基础类型分组）：结果页下拉据此拆出「每一因子的伤害」 */
+            const partsByType = new Map<string, DamageRatioPart[]>()
+            /** @desc 固定值成分（倍率串里不带 % 的部分，如 "200+300"） */
+            const flatParts: DamageRatioPart[] = []
             let flatTotal = 0
             for (const c of comps) {
                 if (c.flatValue !== undefined) {
                     flatTotal += c.flatValue
+                    flatParts.push({ ratioNum: 0, flatValue: c.flatValue, baseType: '固定' })
                 } else {
                     const resolvedType = c.implicitSuffix ? contextBaseType : c.baseType
                     const weighted = c.ratioNum * (c.mult ?? 1)
                     pctMap.set(resolvedType, (pctMap.get(resolvedType) ?? 0) + weighted)
+                    const part: DamageRatioPart = {
+                        ratioNum: c.ratioNum,
+                        baseType: resolvedType,
+                        ...(c.mult ? { mult: c.mult } : {})
+                    }
+                    partsByType.set(resolvedType, [...(partsByType.get(resolvedType) ?? []), part])
                 }
             }
 
@@ -377,7 +393,8 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         damageBaseType: baseType,
                         damageElement: hit.element || getCharElementMap()[hit.character] || '',
                         sourceTimelineBlockId: db.sourceId,
-                        hits: hit.hits ?? 1
+                        hits: hit.hits ?? 1,
+                        ratioParts: partsByType.get(baseType) ?? []
                     },
                     pos,
                     order: order++
@@ -401,7 +418,8 @@ function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, Char
                         damageBaseType: '固定',
                         damageElement: hit.element || getCharElementMap()[hit.character] || '',
                         sourceTimelineBlockId: db.sourceId,
-                        hits: hit.hits ?? 1
+                        hits: hit.hits ?? 1,
+                        ratioParts: flatParts
                     },
                     pos,
                     order: order++

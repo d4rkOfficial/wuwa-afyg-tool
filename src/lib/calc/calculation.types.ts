@@ -1,3 +1,18 @@
+/**
+ * @desc 复合倍率的一个成分（来源：时间线上该段技能的倍率串，如 `20%攻击*2+15%生命` 拆成两个成分）。
+ * 结果页下拉靠它把「这一条伤害」拆成「每一因子的伤害」。
+ */
+export interface DamageRatioPart {
+    /** 成分倍率数值（%）；固定值成分为 0 */
+    ratioNum: number
+    /** 每成分乘数（`*N`），无则省略 */
+    mult?: number
+    /** 固定值成分的数值（与 ratioNum 二选一） */
+    flatValue?: number
+    /** 成分的基础类型（攻击/生命/防御/固定） */
+    baseType: string
+}
+
 /** @desc 拉表页的伤害条目：由排轴时间线中的伤害块/非直伤条目派生而来，是「给谁配 Buff」的最小粒度 */
 export interface DamageEntry {
     id: string
@@ -15,6 +30,8 @@ export interface DamageEntry {
     sourceTimelineBlockId: string
     burstLayers?: number
     hits: number
+    /** @desc 该条目的倍率成分（复合倍率拆解；单成分条目也保留 1 项，缺省表示无法拆解） */
+    ratioParts?: DamageRatioPart[]
 }
 
 /** @desc 乘区定义：id 对应计算引擎乘区键，label 为界面显示名，unit 表示数值单位（百分比/固定值） */

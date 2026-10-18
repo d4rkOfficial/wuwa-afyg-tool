@@ -837,6 +837,25 @@ export function removeCustomHit(charName: string, hitId: string) {
     refreshSkillPickerGroups()
 }
 
+/**
+ * @desc 修改一条自定义直伤（AI 管理自定义倍率用）。`id` 不可改；返回修改后的条目，
+ * 找不到时返回 null（调用方负责给出可读错误）。
+ */
+export function updateCustomHit(
+    charName: string,
+    hitId: string,
+    patch: Partial<Omit<CustomHit, 'id'>>
+): CustomHit | null {
+    const list = _customSkillHits[charName] ?? []
+    const source = list.find((h) => h.id === hitId)
+    if (!source) return null
+    const next: CustomHit = { ...source, ...patch, id: source.id }
+    _customSkillHits = { ..._customSkillHits, [charName]: list.map((h) => (h.id === hitId ? next : h)) }
+    updateCustomSkillHits(_customSkillHits)
+    refreshSkillPickerGroups()
+    return next
+}
+
 /** @desc 复制一条自定义直伤（同名不同 Buff 的倍率可直接复用）：名称自动加序号保证命中名唯一 */
 export function duplicateCustomHit(charName: string, hitId: string): string | null {
     const list = _customSkillHits[charName] ?? []
@@ -2245,7 +2264,7 @@ function buildSkillGroups(skills: SkillEntry[]): SkillPickerGroup[] {
     return groups
 }
 
-async function loadEchoSkill(echoName: string): Promise<{ values: [string, string, string][] } | null> {
+export async function loadEchoSkill(echoName: string): Promise<{ values: [string, string, string][] } | null> {
     if (_echoSkillCache[echoName]) return _echoSkillCache[echoName]
     try {
         const info = await getEchoInfo(echoName)
@@ -2514,23 +2533,37 @@ export function applyNonDirectEntries() {
 }
 
 // ── Damage List ──
-function buildDamageList() {
-    return _damageBlocks
+
+/** @desc 构造伤害列表所需的**显式数据**（不读活动工程）：跨工程只读工具据此复用同一套渲染口径 */
+export interface DamageListSource {
+    damageBlocks: readonly DamageBlock[]
+    opBlocks: readonly OpBlock[]
+    refLines: readonly RefLine[]
+    team: readonly (CharSlot | undefined)[]
+    blockWidths: Record<string, number>
+    skillCache: Record<string, SkillPickerGroup[]>
+    elementOf: (character: string) => string
+    trackCount: number
+}
+
+/** @desc 从显式数据构建伤害列表（与活动工程的 buildDamageList 完全同口径） */
+export function buildDamageListFrom(source: DamageListSource) {
+    const { damageBlocks, opBlocks, refLines, team, blockWidths, skillCache, elementOf, trackCount } = source
+    return damageBlocks
         .flatMap((d) => {
             if (d.skillHits.length === 0 && d.nonDirectEntries.length === 0) return []
             const pos =
                 d.sourceType === 'ref'
-                    ? (_refLines.find((r) => r.id === d.sourceId)?.pos ?? 0)
-                    : (_opBlocks.find((b) => b.id === d.sourceId)?.pos ?? 0)
-            const op = _opBlocks.find((b) => b.id === d.sourceId)
-            const rl = d.sourceType === 'ref' ? _refLines.find((r) => r.id === d.sourceId) : null
-            const x =
-                d.sourceType === 'ref' ? (rl ? vx(rl.id, rl.pos) : 0) : op ? op.pos - (_blockWidths[op.id] ?? 0) / 2 : 0
+                    ? (refLines.find((r) => r.id === d.sourceId)?.pos ?? 0)
+                    : (opBlocks.find((b) => b.id === d.sourceId)?.pos ?? 0)
+            const op = opBlocks.find((b) => b.id === d.sourceId)
+            // x 只参与同 pos 时的 tie-breaker（与活动工程原来的口径一致）；跨工程没有 DOM 实测宽度时用默认 56
+            const x = d.sourceType === 'ref' ? pos : op ? op.pos - (blockWidths[op.id] ?? 56) / 2 : pos
             const sourceChar =
                 d.sourceType === 'ref'
                     ? '无'
-                    : op && op.trackIndex < getTRACKS().length - 1
-                      ? (_team[op.trackIndex]?.character ?? '无')
+                    : op && op.trackIndex < trackCount - 1
+                      ? (team[op.trackIndex]?.character ?? '无')
                       : '无'
             const entries: {
                 character: string
@@ -2545,7 +2578,7 @@ function buildDamageList() {
             for (const h of d.skillHits) {
                 const echoName =
                     h.skillType === '声骸技能'
-                        ? (_team.find((s) => s.character === h.character)?.echoes?.[0]?.name ?? '?')
+                        ? (team.find((s) => s?.character === h.character)?.echoes?.[0]?.name ?? '?')
                         : null
                 const character = d.sourceType === 'ref' ? h.character || '无' : h.character || sourceChar
                 const name =
@@ -2618,7 +2651,7 @@ function buildDamageList() {
                         for (const r of nd.responders) {
                             let respValue = '—'
                             let respBase = ''
-                            const respGroups = r !== '无' ? _skillCache[r] : null
+                            const respGroups = r !== '无' ? skillCache[r] : null
                             if (respGroups) {
                                 for (const group of respGroups) {
                                     const match = group.hits.find(
@@ -2646,7 +2679,7 @@ function buildDamageList() {
                                 baseType: respBase,
                                 pos,
                                 x,
-                                element: getSharedCharElementMap()[r] ?? ''
+                                element: elementOf(r)
                             })
                         }
                     } else {
@@ -2657,6 +2690,20 @@ function buildDamageList() {
             return entries
         })
         .sort((a, b) => a.x - b.x || a.pos - b.pos)
+}
+
+function buildDamageList() {
+    const team = _team
+    return buildDamageListFrom({
+        damageBlocks: _damageBlocks,
+        opBlocks: _opBlocks,
+        refLines: _refLines,
+        team,
+        blockWidths: _blockWidths,
+        skillCache: _skillCache,
+        elementOf: (name) => getSharedCharElementMap()[name] ?? '',
+        trackCount: getTRACKS().length
+    })
 }
 
 const _damageList = $derived(buildDamageList())

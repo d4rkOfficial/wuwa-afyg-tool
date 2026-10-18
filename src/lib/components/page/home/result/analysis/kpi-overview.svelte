@@ -89,7 +89,7 @@
 
     <div class="flex flex-wrap items-center gap-2 text-[11px] text-(--theme-modal-text)/45">
         <Icon icon="mdi:cursor-default-click-outline" class="size-3.5" />
-        <span>当前口径：{rangeLabel}</span>
+        <span>当前范围：{rangeLabel}</span>
         <span class="tabular-nums">（时长 {rangeStats.span.toFixed(1)}s）</span>
         <span>· 在「分段 DPS」点时段行可切换</span>
     </div>
