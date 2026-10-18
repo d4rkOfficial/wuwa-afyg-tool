@@ -78,6 +78,35 @@ async function getDnsLookup(): Promise<DnsLookup | null> {
     return _dnsLookup
 }
 
+/**
+ * @desc 是否本机回环地址（`localhost` / `127.0.0.0/8` / `::1`）。
+ *
+ * `web_fetch` 允许抓本机服务（本地文档站、开发服务器等）：这类地址**只**由本机访问，
+ * 不会成为探测内网/云元数据的入口；`assertFetchTarget` 只对回环地址放开，
+ * `.local`、内网网段与保留地址仍然由 `assertPublicHttps` 拦截。
+ */
+export const isLoopbackHost = (hostname: string): boolean => {
+    const host = hostname
+        .trim()
+        .toLowerCase()
+        .replace(/^\[|\]$/g, '')
+        .replace(/\.$/, '')
+    if (host === 'localhost' || host === '::1') return true
+    return /^127\.(?:\d{1,3}\.){2}\d{1,3}$/.test(host)
+}
+
+/**
+ * @desc 校验 `web_fetch` 的目标地址：回环地址（含明文 http）放行；其余仍要求 https 公网地址。
+ * 与 `assertPublicHttps` 分开：AI 请求转发代理不能放开回环，抓网页工具可以。
+ */
+export async function assertFetchTarget(u: URL): Promise<string | null> {
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return `只支持 http/https 链接（收到 ${u.protocol}）`
+    }
+    if (isLoopbackHost(u.hostname)) return null
+    return assertPublicHttps(u)
+}
+
 /** 校验目标地址：非 https 或命中内网/回环/保留地址时返回错误文案，否则返回 null（null 表示放行） */
 export async function assertPublicHttps(u: URL): Promise<string | null> {
     if (u.protocol !== 'https:') return '仅支持 https 服务地址（本地服务请填 http://localhost:端口 由浏览器直连）'

@@ -12,7 +12,7 @@ import type { Character, Weapon } from '$lib/api/types'
 import type { CharSlot, EchoSlot, SelectedSet } from '$lib/types/project'
 import { HECATE_ECHO } from '$lib/consts/game-terms'
 // 有效套装总件数（同名取最大件数后求和）与 UI 共用 `$lib/utils/set-selection` 的同一口径
-import { totalPiecesOf as effectiveTotal } from '$lib/utils/set-selection'
+import { normalizeSetSelection, totalPiecesOf as effectiveTotal } from '$lib/utils/set-selection'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -234,7 +234,7 @@ defineTool('set_team_first_echo', {
 
 defineTool('set_team_trigger_sets', {
     description:
-        '设置指定槽位（1-3）的触发套装（整体覆盖）。sets 为 [{name, pieces}]，套装名与支持件数用 get_team_catalog 查询，总有效件数 ≤5；满 5 件且首位声骸不属于任何已选套装（赫卡忒除外）时清空首位声骸。',
+        '设置指定槽位（1-3）的触发套装（整体覆盖）。sets 为 [{name, pieces}]，套装名与支持件数用 get_team_catalog 查询，总有效件数 ≤5。**只传 {name,5} 即可**：工具会自动附带同套的 {name,2}（5 件套包含 2 件套效果），不要自己再补；5 件套占满全部部位，不能与其它套装同时传。满 5 件且首位声骸不属于任何已选套装（赫卡忒除外）时清空首位声骸。',
     parameters: {
         type: 'object',
         properties: {
@@ -257,12 +257,14 @@ defineTool('set_team_trigger_sets', {
         const slot = assertSlot(args.slot)
         editableProject()
         const raw = Array.isArray(args.sets) ? args.sets : []
-        const sets: SelectedSet[] = raw.map((item) => {
+        const requested: SelectedSet[] = raw.map((item) => {
             const o = (item ?? {}) as Record<string, unknown>
             const name = str(o.name)
             if (!name) throw new Error('存在未命名的套装')
             return { name, pieces: Number(o.pieces) }
         })
+        // 与 UI 的选择器同一口径：5 件套自动附带同套 2 件套；5 件套不能与其它套装共存
+        const sets = normalizeSetSelection(requested)
 
         const echoSets = await getEchoSetList()
         const setMap = new Map(echoSets.map((s) => [s.name, s]))
@@ -287,6 +289,10 @@ defineTool('set_team_trigger_sets', {
             }
         }
         await updateTeam(team)
-        return { slot, sets }
+        return {
+            slot,
+            sets,
+            ...(sets.some((s) => s.pieces === 5) ? { note: '5 件套已自动附带同套的 2 件套条目' } : {})
+        }
     }
 })

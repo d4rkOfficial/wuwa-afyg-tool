@@ -296,7 +296,7 @@
         <div
             role={pickable ? 'radiogroup' : 'group'}
             aria-labelledby={questionLabelId}
-            class="mt-2 flex flex-col gap-1"
+            class="theme-scrollbar mt-2 flex max-h-64 flex-col gap-1 overflow-y-auto pr-0.5"
         >
             {#each current.options as opt (opt.value)}
                 <!-- 只有**被归一选中的那一项**是自定义槽（同题出现多个写法相近的「其它」时不会有两行抢同一个 customOn） -->

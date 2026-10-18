@@ -11,7 +11,7 @@ import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$l
 import { importBuffSetsWithDecisions } from '$lib/calc/calculation.store.svelte'
 import type { ImportBuffInput } from '$lib/calc/calculation.store.svelte'
 import { generateBuffs } from '../generate'
-import { getEnabledSkillBody, loadSkills, SKILL_IDS, updateSkill } from '$lib/data/ai-skills.svelte'
+import { getEnabledSkillBody, loadSkills, SKILL_IDS } from '$lib/data/ai-skills.svelte'
 import {
     createBuffSetDataSource,
     createProjectDataSource,
@@ -23,21 +23,16 @@ import { getAiConfig } from '../config.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
-// 命名规则解析：工具参数优先（写入内置技能卡）；否则用技能卡现有正文；都没有 → 提示先询问用户
-async function resolveNamingRule(argsRule: string): Promise<{ rule: string; missing: boolean }> {
+// 命名规则解析：只读内置技能卡「Buff 命名规则」（用户/AI 通过通用技能工具维护）
+async function resolveNamingRule(): Promise<{ rule: string; missing: boolean }> {
     await loadSkills()
-    const r = argsRule.trim()
-    if (r) {
-        await updateSkill(SKILL_IDS.buffNaming, { body: r, enabled: true })
-        return { rule: r, missing: false }
-    }
     const stored = getEnabledSkillBody(SKILL_IDS.buffNaming)
     if (stored) return { rule: stored, missing: false }
     return { rule: '', missing: true }
 }
 
 const NEEDS_RULE_MSG =
-    '尚未定义 Buff 命名规则（内置技能卡「Buff 命名规则」已禁用或正文为空）。请先询问用户希望如何为 Buff 命名（完全由用户从零定义，无预设风格），然后用 set_naming_rule 保存用户给出的规则，再重新调用生成工具。'
+    '尚未定义 Buff 命名规则（内置技能卡「Buff 命名规则」已禁用或正文为空）。请先询问用户希望如何为 Buff 命名（完全由用户从零定义，无预设风格），然后调用 update_skill（name="Buff 命名规则"，body=用户给出的规则，enabled=true）保存，再重新调用生成工具。'
 
 function aiRuntime() {
     const cfg = getAiConfig()
@@ -128,35 +123,6 @@ defineTool('get_entity_info', {
     }
 })
 
-defineTool('get_naming_rule', {
-    description:
-        '获取当前的 Buff 命名规则（即内置技能卡「Buff 命名规则」的正文，用户可自行编辑）。返回空字符串表示该技能已禁用或正文被清空，生成前需要先询问用户。',
-    parameters: { type: 'object', properties: {} },
-    handler: async () => {
-        await loadSkills()
-        return { namingRule: getEnabledSkillBody(SKILL_IDS.buffNaming) }
-    }
-})
-
-defineTool('set_naming_rule', {
-    description:
-        '保存用户自定义的 Buff 命名规则：写入内置技能卡「Buff 命名规则」的正文（由用户从零定义，无预设风格，可能包含格式示例/简写习惯等）并启用它。保存后生成 Buff 会自动遵守。',
-    parameters: {
-        type: 'object',
-        properties: { rule: { type: 'string', description: '用户给出的完整命名规则描述' } },
-        required: ['rule']
-    },
-    handler: async (args) => {
-        const rule = str(args.rule)
-        if (!rule) throw new Error('命名规则不能为空')
-        await loadSkills()
-        if (!(await updateSkill(SKILL_IDS.buffNaming, { body: rule, enabled: true }))) {
-            throw new Error('命名规则保存失败：未找到内置技能卡「Buff 命名规则」')
-        }
-        return { saved: rule }
-    }
-})
-
 defineTool('generate_buff_set_entity_buffs', {
     description:
         '为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 并写入主页的本地 Buff 集；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。',
@@ -165,11 +131,7 @@ defineTool('generate_buff_set_entity_buffs', {
         type: 'object',
         properties: {
             entityType: { type: 'string', description: '实体类型' },
-            entityName: { type: 'string', description: '实体名称（中文）' },
-            namingRule: {
-                type: 'string',
-                description: '可选：用户新定义的命名规则（会写入内置技能卡「Buff 命名规则」）'
-            }
+            entityName: { type: 'string', description: '实体名称（中文）' }
         },
         required: ['entityType', 'entityName']
     },
@@ -182,7 +144,7 @@ defineTool('generate_buff_set_entity_buffs', {
         const entity = getBuffEntities().find((e) => e.entityType === entityType && e.entityName === entityName)
         if (!entity)
             throw new Error(`本地 Buff 集中未找到「${entityName}」（可先 sync_buff_set_from_share 或让用户手动导入）`)
-        const { rule, missing } = await resolveNamingRule(str(args.namingRule))
+        const { rule, missing } = await resolveNamingRule()
         if (missing) throw new Error(NEEDS_RULE_MSG)
 
         const result = await generateBuffs({
@@ -214,11 +176,7 @@ defineTool('generate_project_buff_confs', {
         type: 'object',
         properties: {
             slot: { type: 'number', description: '可选：只处理该槽位（1-3）' },
-            entityType: { type: 'string', description: '可选：只处理该实体类型' },
-            namingRule: {
-                type: 'string',
-                description: '可选：用户新定义的命名规则（会写入内置技能卡「Buff 命名规则」）'
-            }
+            entityType: { type: 'string', description: '可选：只处理该实体类型' }
         }
     },
     handler: async (args, ctx) => {
@@ -231,7 +189,7 @@ defineTool('generate_project_buff_confs', {
         }
         const typeArg = str(args.entityType) || null
         if (typeArg && !ENTITY_TYPES.includes(typeArg as never)) throw new Error(`无效实体类型：${typeArg}`)
-        const { rule, missing } = await resolveNamingRule(str(args.namingRule))
+        const { rule, missing } = await resolveNamingRule()
         if (missing) throw new Error(NEEDS_RULE_MSG)
 
         // 收集队伍实体

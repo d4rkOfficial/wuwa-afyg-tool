@@ -10,3 +10,12 @@ test('题号滚动容器留出纵向 padding，避免裁掉选中题号的描边
     // CSS 的 overflow-x: auto 会把 overflow-y 计算成 auto，故 1px 外扩的 box-shadow 会被裁掉
     assert.match(source, /overflow-x-auto p-1 -m-1/, '题号滚动容器需要有 p-1（配 -m-1 抵消布局高度）')
 })
+
+test('选项过多时选项容器可滚动（不把卡片撑破）', () => {
+    const source = readFileSync(CARD, 'utf8')
+    assert.match(
+        source,
+        /max-h-64[^"']*overflow-y-auto|overflow-y-auto[^"']*max-h-64/,
+        '选项列表需要最大高度 + 纵向滚动'
+    )
+})

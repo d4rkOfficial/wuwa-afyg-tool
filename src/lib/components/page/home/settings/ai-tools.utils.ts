@@ -167,7 +167,7 @@ export const describeToolCard = (card: Pick<ToolCard, 'name' | 'args' | 'result'
 
 /** @desc 一条活动（渲染顺序即发生顺序） */
 export interface AssistantActivity {
-    kind: 'reasoning' | 'text' | 'tool' | 'notice' | 'longTask'
+    kind: 'reasoning' | 'text' | 'tool' | 'notice' | 'longTask' | 'runResult' | 'runError'
     /** @desc 思考 / 回复 / 提示的正文（流式累积） */
     text?: string
     /** @desc 工具活动对应的卡片 */
@@ -199,7 +199,7 @@ export const appendActivityNotice = (
     activities: readonly AssistantActivity[],
     text: string,
     tone: 'info' | 'error' = 'info',
-    kind: 'notice' | 'longTask' = 'notice'
+    kind: 'notice' | 'longTask' | 'runResult' | 'runError' = 'notice'
 ): AssistantActivity[] => [...activities, { kind, text, tone }]
 
 /**
@@ -250,6 +250,26 @@ export const applyToolProgressToActivities = (
         break
     }
     return [...activities, { kind: 'tool', tool: { name: 'buff生成', args: { status } } }]
+}
+
+/**
+ * @desc `run_js` 的执行结果 → **顶层活动行**（与「代码」工具行分开）。
+ *
+ * 用户要求「代码 / 运行结果 / 运行报错」是三行独立输出：返回值与错误不再只藏在
+ * 代码卡片的展开结果里。返回值与日志由 worker 侧按上限截断过，这里只负责解析与排版。
+ */
+export const appendRunJsOutput = (activities: readonly AssistantActivity[], raw?: string): AssistantActivity[] => {
+    const parsed = parseToolResult(raw)
+    if (!parsed) return appendActivityNotice(activities, raw ?? '（无输出）', 'info', 'runResult')
+    if (parsed.ok === false) {
+        return appendActivityNotice(activities, parsed.error ?? '脚本执行失败', 'error', 'runError')
+    }
+    const data = (parsed.data ?? {}) as { value?: unknown; logs?: unknown; truncated?: boolean }
+    const valueText = data.truncated && typeof data.value === 'string' ? data.value : formatDetailValue(data.value)
+    const parts = [data.truncated ? `（结果超过输出上限，已截断）\n${valueText}` : valueText]
+    const logs = Array.isArray(data.logs) ? data.logs.map((line) => String(line)) : []
+    if (logs.length > 0) parts.push(`脚本日志（${logs.length} 条）\n${logs.join('\n')}`)
+    return appendActivityNotice(activities, parts.join('\n\n'), 'info', 'runResult')
 }
 
 /** @desc 工具行左侧的「类别 · 摘要」：让用户不展开也能看懂这次操作做了什么 */

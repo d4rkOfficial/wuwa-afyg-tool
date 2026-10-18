@@ -51,9 +51,9 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《鸣潮》拉表工具（椰果工
 12. buffName 命名：{NAMING_RULES}
 13. 尤其要注意延奏类 Buff 是全队能吃还是只有队友能吃，这里很容易出错。
 14. 特殊终伤区分：文案明确为"多个来源相乘计算/连乘"的终伤用 specialFinal2（特殊终伤(2)，乘算），
-    普通相加语义的终伤/倍率用 specialFinal1（特殊终伤(1)，加算）；拿不准时调用 get_naming_rules。
+    普通相加语义的终伤/倍率用 specialFinal1（特殊终伤(1)，加算）；命名规则已在 system 提示中给出，直接遵守即可。
 
-需要黑话词典、命名规则、few-shot 示例、效应表、scope 判定细则、生效条件规则或转模(ref)规则时，调用对应工具获取。`
+需要黑话词典、few-shot 示例、效应表、scope 判定细则、生效条件规则或转模(ref)规则时，调用对应工具获取。`
 
 // ── 首轮任务指令 ──
 export const DEFAULT_INITIAL_TASK_PROMPT = `实体类型：{ENTITY_TYPE}（{ENTITY_TYPE_RAW}）

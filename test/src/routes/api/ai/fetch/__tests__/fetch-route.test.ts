@@ -45,15 +45,14 @@ describe('web_fetch 代理：生产分支的拦截与入参校验', () => {
         assert.match(res.body.error ?? '', /https/)
     })
 
-    it('内网 / 回环 / 云元数据地址一律被拦（防 SSRF，且**在出网之前**）', async () => {
+    it('内网 / 云元数据地址一律被拦（防 SSRF，且**在出网之前**）；本机回环不在此列', async () => {
+        // 回环地址由 assertFetchTarget 明确放行（见 proxy-guard.test），这里不调用路由，
+        // 否则会真的向 localhost 发请求。内网 / 元数据地址仍必须在这里被拦下。
         for (const [url, expected] of [
-            ['http://127.0.0.1:8080/secret', /https/],
-            ['https://127.0.0.1/secret', /内网|回环|保留/],
-            ['https://localhost/secret', /回环/],
             ['https://10.0.0.5/admin', /内网|回环|保留/],
             ['https://192.168.1.1/router', /内网|回环|保留/],
             ['https://169.254.169.254/latest/meta-data/', /内网|回环|保留/],
-            ['https://[::1]/secret', /内网|回环|保留/]
+            ['https://[fe80::1]/secret', /内网|回环|保留/]
         ] as const) {
             const res = await call({ url })
             assert.equal(res.status, 400, `${url} 应当被拦截`)

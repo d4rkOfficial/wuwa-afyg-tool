@@ -31,14 +31,17 @@ import {
     undoTable,
     redoTable,
     canUndoTable,
-    canRedoTable
+    canRedoTable,
+    buildDamageEntriesFromTimeline
 } from '$lib/calc/calculation.store.svelte'
+import { loadCharSkills } from '$lib/calc/timeline.store.svelte'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
-import { getActiveProject } from '$lib/data/project.svelte'
+import { getActiveProject, getProjects } from '$lib/data/project.svelte'
 import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
+import { paneEffectSourcesOf } from '$lib/calc/pane-effects'
 import { getOpBlocks, getRefLines } from '$lib/calc/timeline.store.svelte'
 import { renderBuffConfList, renderCalculationDigest } from '$lib/ai/phase-digest'
-import { buffConfsInOrder, damageEntriesInOrder, resolveBuffConf, resolveDamageEntry } from '$lib/ai/refs'
+import { asIndex, buffConfsInOrder, damageEntriesInOrder, resolveBuffConf, resolveDamageEntry } from '$lib/ai/refs'
 import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import type { ZoneRef } from '$lib/calc/calculation.types'
@@ -51,6 +54,41 @@ const timelinePosOf = (sourceId: string): number | undefined => {
     if (op) return op.pos
     return getRefLines().find((r) => r.id === sourceId)?.pos
 }
+/** @desc 跨工程只读：按 id 找持久化工程（找不到给出可读错误） */
+const findProjectById = (projectId: string) => {
+    const project = getProjects().find((p) => p.id === projectId)
+    if (!project) throw new Error(`未找到工程：${projectId}`)
+    return project
+}
+
+/** @desc 持久化工程里的排轴数据（老工程可能为空） */
+const storedTimeline = (project: ReturnType<typeof findProjectById>) =>
+    project.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] }
+
+/** @desc 持久化工程里的拉表状态 */
+const storedCalc = (project: ReturnType<typeof findProjectById>) =>
+    project.encounter.calculation.data ?? { buffSets: [], damageEntryBuffSetIds: {}, damageEntryDamageTypes: {} }
+
+/** @desc 从队伍槽位恢复链/阶配置（结果类工具跨工程只读用） */
+const conditionProfileOf = (project: ReturnType<typeof findProjectById>) => ({
+    chains: project.team.map((s) => s.chain ?? 0),
+    refinements: project.team.map((s) => s.refinement ?? 1)
+})
+
+/** @desc 跨工程取一条工程 Buff 配置（按序号或 id） */
+const storedBuffConf = (project: ReturnType<typeof findProjectById>, ref: unknown) => {
+    const buffs = storedCalc(project).buffSets
+    const index = asIndex(ref)
+    if (index !== null) {
+        const hit = buffs[index - 1]
+        if (hit) return hit
+        throw new Error(`工程 Buff 配置序号超出范围：${index}（共 ${buffs.length} 个）`)
+    }
+    const hit = buffs.find((b) => b.id === String(ref ?? ''))
+    if (!hit) throw new Error(`未找到工程 Buff 配置「${String(ref ?? '')}」；重新用 get_buff_confs 查看`)
+    return hit
+}
+
 const CONDITION_KEYS = ['chain', 'refinement', 'elements', 'damageTypes'] as const
 /** @desc 乘区级条件允许的 key（链/阶是 Buff 实例级硬门槛，不允许挂到乘区上） */
 const ZONE_CONDITION_KEYS = ['elements', 'damageTypes'] as const
@@ -85,9 +123,38 @@ function conditionSummary(c: Record<string, unknown> | undefined): string | unde
 
 defineTool('get_damage_entries', {
     description:
-        '获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「**序号** / 归属角色 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。行首方括号里的数字就是序号，增删改（bind_buff_conf_to_entry / set_entry_damage_types / toggle_damage_type / get_damage_entry_buff_sources）填它。不含倍率与乘区数值——倍率用 get_timeline_damage_list，乘区与引用明细用 get_buff_conf_detail / get_damage_entry_buff_sources 按需查。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => {
+        '获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「**序号** / 归属角色 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。行首方括号里的数字就是序号，增删改（bind_buff_conf_to_entry / set_entry_damage_types / toggle_damage_type / get_damage_entry_buff_sources）填它。不含倍率与乘区数值——倍率用 get_timeline_damage_list，乘区与引用明细用 get_buff_conf_detail / get_damage_entry_buff_sources 按需查。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        }
+    },
+    handler: async (args) => {
+        const projectId = str(args.projectId)
+        if (projectId) {
+            const project = findProjectById(projectId)
+            // 跨工程可能包含活动工程没加载过的角色：先补齐技能缓存，响应条目才推导得出来
+            await Promise.all(
+                project.team.map((s) => (s.character ? loadCharSkills(s.character) : Promise.resolve(null)))
+            )
+            const timeline = storedTimeline(project)
+            const calc = storedCalc(project)
+            const entries = buildDamageEntriesFromTimeline(timeline, project.team)
+            const nameById = new Map(calc.buffSets.map((b) => [b.id, b.name]))
+            const posOfSource = new Map([...timeline.opBlocks, ...timeline.refLines].map((s) => [s.id, s.pos]))
+            return {
+                projectId,
+                projectName: project.name,
+                calculation: renderCalculationDigest({
+                    entries,
+                    buffNamesOf: (entryId) =>
+                        (calc.damageEntryBuffSetIds[entryId] ?? []).map((id) => nameById.get(id) ?? id),
+                    damageTypesOf: (entryId) => calc.damageEntryDamageTypes[entryId] ?? [],
+                    posOf: (e) => posOfSource.get(e.sourceTimelineBlockId)
+                })
+            }
+        }
         const nameById = new Map(getAllBuffConfs().map((b) => [b.id, b.name]))
         const buffNamesOf = (entryId: string): string[] =>
             getBuffConfIdsForEntry(entryId).map((id) => nameById.get(id) ?? id)
@@ -106,8 +173,33 @@ defineTool('get_damage_entries', {
 defineTool('get_buff_confs', {
     description:
         '获取工程 Buff 配置清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_conf_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => {
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        }
+    },
+    handler: (args) => {
+        const projectId = str(args.projectId)
+        if (projectId) {
+            const project = findProjectById(projectId)
+            const buffs = storedCalc(project).buffSets
+            return {
+                projectId,
+                projectName: project.name,
+                buffConfs: renderBuffConfList(
+                    buffs.map((bs) => ({
+                        id: bs.id,
+                        name: bs.name,
+                        scope: bs.scope,
+                        global: !!bs.global,
+                        starred: !!bs.starred,
+                        condition: conditionSummary(bs.condition as Record<string, unknown> | undefined),
+                        zoneCount: bs.zones.length
+                    }))
+                )
+            }
+        }
         const globalIds = new Set(getGlobalBuffConfIds())
         return {
             buffConfs: renderBuffConfList(
@@ -286,13 +378,31 @@ defineTool('toggle_damage_type', {
 })
 
 defineTool('get_condition_profile', {
-    description: '获取当前链/阶配置（每个角色的共鸣链 0-6 与武器精炼 0-5，0=未精炼）及“可用Buff”过滤开关状态。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => ({
-        chains: getConditionProfile().chains,
-        refinements: getConditionProfile().refinements,
-        hideConditionMismatch: getHideConditionMismatch()
-    })
+    description:
+        '获取链/阶配置（每个角色的共鸣链 0-6 与武器精炼 0-5，0=未精炼）及“可用Buff”过滤开关状态。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程；省略则读活动工程。',
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        }
+    },
+    handler: (args) => {
+        const projectId = str(args.projectId)
+        if (projectId) {
+            const project = findProjectById(projectId)
+            return {
+                projectId,
+                projectName: project.name,
+                ...conditionProfileOf(project),
+                hideConditionMismatch: getHideConditionMismatch()
+            }
+        }
+        return {
+            chains: getConditionProfile().chains,
+            refinements: getConditionProfile().refinements,
+            hideConditionMismatch: getHideConditionMismatch()
+        }
+    }
 })
 
 defineTool('set_chain', {
@@ -380,11 +490,16 @@ defineTool('get_buff_conf_detail', {
         '获取指定工程 Buff 配置的完整详情：作用范围、是否全局、生效条件（链/阶硬门槛 + 属性/类型条件）、每个乘区条目（zoneId/数值/是否覆盖/引用/**各自的乘区级条件**）及其生效角色槽位。同一乘区可有多条，每条各自判定条件后相加；覆盖唯一（同一乘区仅一个覆盖条目）。',
     parameters: {
         type: 'object',
-        properties: { buffConf: { type: 'number', description: '工程 Buff 配置序号（见 get_buff_confs 的「[NN]」）' } },
+        properties: {
+            buffConf: { type: 'number', description: '工程 Buff 配置序号（见 get_buff_confs 的「[NN]」）' },
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        },
         required: ['buffConf']
     },
     handler: (args) => {
-        const set = resolveBuffConf(args.buffConf)
+        const projectId = str(args.projectId)
+        const project = projectId ? findProjectById(projectId) : null
+        const set = project ? storedBuffConf(project, args.buffConf) : resolveBuffConf(args.buffConf)
         // 同一乘区可能有多条贡献条目：按出现顺序全部列出，并标出每条自身的条件
         const zoneEntries = set.zones.map((z, index) => ({
             index,
@@ -398,10 +513,11 @@ defineTool('get_buff_conf_detail', {
         const zoneCounts = new Map<string, number>()
         for (const z of zoneEntries) zoneCounts.set(z.zoneId, (zoneCounts.get(z.zoneId) ?? 0) + 1)
         return {
+            ...(projectId ? { projectId, projectName: project!.name } : {}),
             id: set.id,
             name: set.name,
             scope: set.scope,
-            global: getGlobalBuffConfIds().includes(set.id),
+            global: project ? !!set.global : getGlobalBuffConfIds().includes(set.id),
             starred: !!set.starred,
             condition: set.condition ?? null,
             conditionRefCharIdx: set.conditionRefCharIdx ?? null,
@@ -547,23 +663,29 @@ defineTool('get_buff_conf_zone_condition', {
         type: 'object',
         properties: {
             buffConf: { type: 'number', description: '工程 Buff 配置序号（见 get_buff_confs 的「[NN]」）' },
-            zoneId: { type: 'string', description: '乘区 id（接受旧 id，会自动重映射）' }
+            zoneId: { type: 'string', description: '乘区 id（接受旧 id，会自动重映射）' },
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
         },
         required: ['buffConf', 'zoneId']
     },
     handler: (args) => {
-        const setId = resolveBuffConf(args.buffConf).id
+        const projectId = str(args.projectId)
+        const project = projectId ? findProjectById(projectId) : null
         const rawZoneId = str(args.zoneId)
         if (!rawZoneId) throw new Error('zoneId 不能为空')
         const { zoneId, remappedFrom } = normalizeZoneId(rawZoneId)
-        const set = resolveBuffConf(args.buffConf)
+        const set = project ? storedBuffConf(project, args.buffConf) : resolveBuffConf(args.buffConf)
         if (!set.zones.some((z) => z.zoneId === (zoneId as never))) throw new Error(`工程 Buff 配置无乘区：${zoneId}`)
+        const condition = project
+            ? (set.zones.find((z) => z.zoneId === (zoneId as never))?.condition ?? null)
+            : (getBuffConfZoneCondition(set.id, zoneId) ?? null)
         return {
+            ...(projectId ? { projectId, projectName: project!.name } : {}),
             buffConf: args.buffConf,
             zoneId,
             label: ZONE_MAP.get(zoneId)?.label ?? zoneId,
-            condition: getBuffConfZoneCondition(setId, zoneId) ?? null,
-            summary: conditionSummary(getBuffConfZoneCondition(setId, zoneId) as Record<string, unknown> | undefined),
+            condition,
+            summary: conditionSummary(condition as Record<string, unknown> | undefined),
             ...remapNote(remappedFrom, zoneId)
         }
     }
@@ -652,10 +774,57 @@ defineTool('get_damage_entry_buff_sources', {
         '查询某伤害条目的**跨角色影响源**（按**序号**）：本段引用了其它角色的面板（乘区 ref 里 characterIdx 指向他角色）时，作用域指向那个角色、且会改写被引用面板乘区的 Buff —— 这些 Buff 必须用 bind_buff_conf_to_entry 勾到本段才会参与该角色在这一段的面板计算（拉表里它们以「影响源」列/勾选项出现，不是自动生效的）。返回每条影响源的**工程 Buff 配置序号**与名称、被引用角色槽位、被改写的面板乘区。',
     parameters: {
         type: 'object',
-        properties: { entry: { type: 'number', description: '伤害条目序号（见 get_damage_entries 的「[NN]」）' } },
+        properties: {
+            entry: { type: 'number', description: '伤害条目序号（见 get_damage_entries 的「[NN]」）' },
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        },
         required: ['entry']
     },
-    handler: (args) => {
+    handler: async (args) => {
+        const projectId = str(args.projectId)
+        if (projectId) {
+            const project = findProjectById(projectId)
+            await Promise.all(
+                project.team.map((s) => (s.character ? loadCharSkills(s.character) : Promise.resolve(null)))
+            )
+            const timeline = storedTimeline(project)
+            const calc = storedCalc(project)
+            const entries = buildDamageEntriesFromTimeline(timeline, project.team)
+            const index = asIndex(args.entry)
+            const entry = index !== null ? entries[index - 1] : entries.find((e) => e.id === String(args.entry ?? ''))
+            if (!entry) throw new Error(`未找到伤害条目：${String(args.entry ?? '')}（先用 get_damage_entries 查询）`)
+            const charIdx = entry.character ? project.team.findIndex((s) => s.character === entry.character) : -1
+            const sources = paneEffectSourcesOf(
+                charIdx,
+                entry.isEffect,
+                calc.damageEntryBuffSetIds[entry.id] ?? [],
+                calc.buffSets
+            )
+            const boundIds = new Set(calc.damageEntryBuffSetIds[entry.id] ?? [])
+            const buffConfs = calc.buffSets
+            return {
+                projectId,
+                projectName: project.name,
+                entry: args.entry,
+                displayName: entry.displayName,
+                character: entry.character ?? null,
+                boundCount: boundIds.size,
+                sources: Object.entries(sources).map(([buffId, src]) => {
+                    const buffIndex = buffConfs.findIndex((s) => s.id === buffId)
+                    const buff = buffIndex >= 0 ? buffConfs[buffIndex] : undefined
+                    return {
+                        buffConf: buffIndex >= 0 ? buffIndex + 1 : null,
+                        name: buff?.name ?? null,
+                        scope: buff?.scope ?? null,
+                        refCharacterSlot: src.charIdx + 1,
+                        refCharacter: project.team[src.charIdx]?.character ?? null,
+                        rewrittenPanelZones: src.zoneIds,
+                        bound: boundIds.has(buffId)
+                    }
+                }),
+                hint: 'bound=false 的影响源当前未勾到本段，不参与面板计算；写入需先 set_active_project 切到该工程'
+            }
+        }
         const entry = resolveDamageEntry(args.entry)
         const entryId = entry.id
         const sources = getPaneEffectSources(entryId)

@@ -45,15 +45,23 @@ defineTool('list_projects', {
 
 defineTool('get_project_state', {
     description:
-        '获取当前活动工程的状态：工程名、队伍（各槽位角色与武器）、各环节锁定情况。AI 动手前应调用以了解现状。要看某一个环节的**内容**，用按时间顺序渲染的摘要工具（比原始工程 JSON 紧凑）：排轴 get_timeline_summary、拉表 get_damage_entries、配装 get_config_summary。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => {
-        const p = getActiveProject()
-        if (!p) return { hasProject: false }
+        '获取工程状态：工程名、队伍（各槽位角色与武器）、各环节锁定情况。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程；省略则读活动工程。AI 动手前应调用以了解现状。要看某一个环节的**内容**，用按时间顺序渲染的摘要工具（比原始工程 JSON 紧凑）：排轴 get_timeline_summary（也支持 projectId）、拉表 get_damage_entries、配装 get_config_summary。',
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: { type: 'string', description: '可选：工程 id（用 list_projects 获取）；省略 = 当前活动工程' }
+        }
+    },
+    handler: (args) => {
+        const id = str(args.projectId)
+        const p = id ? getProjects().find((item) => item.id === id) : getActiveProject()
+        if (!p) return { hasProject: false, missing: id || undefined }
         return {
             hasProject: true,
             id: p.id,
             name: p.name,
+            active: p.id === getActiveId(),
+            archived: !!p.archived,
             team: p.team.map((s, i) => ({
                 slot: i + 1,
                 character: s.character,
@@ -65,11 +73,18 @@ defineTool('get_project_state', {
 })
 
 defineTool('get_team', {
-    description: '获取当前活动工程队伍配置摘要（每个槽位的角色与武器）。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => {
-        const p = getActiveProject()
-        if (!p) return { error: '当前没有活动工程' }
+    description:
+        '获取队伍配置摘要（每个槽位的角色、武器、触发套装、声骸）。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程；省略则读活动工程。',
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: { type: 'string', description: '可选：工程 id（用 list_projects 获取）；省略 = 当前活动工程' }
+        }
+    },
+    handler: (args) => {
+        const id = str(args.projectId)
+        const p = id ? getProjects().find((item) => item.id === id) : getActiveProject()
+        if (!p) return { error: id ? `未找到工程：${id}` : '当前没有活动工程' }
         return p.team.map((s, i) => ({
             slot: i + 1,
             character: s.character,
@@ -115,7 +130,8 @@ defineTool('rename_project', {
 })
 
 defineTool('set_active_project', {
-    description: '切换当前活动工程（后续操作都作用于该工程）；id 传空字符串返回主页。',
+    description:
+        '切换当前活动工程（**所有写工具只作用于当前活动工程**）；id 传空字符串返回主页。跨工程任务：只读查询优先用 get_project_state / get_team / get_timeline_summary 的 projectId，不必切换；需要写入时先切到目标工程，操作完再切回原工程，并重新读状态确认。',
     parameters: {
         type: 'object',
         properties: { id: { type: 'string', description: '工程 id（用 list_projects 获取）' } },

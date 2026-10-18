@@ -50,6 +50,39 @@ export const canPickPiece = (sets: readonly SelectedSet[], name: string, pieces:
 }
 
 /**
+ * @desc 归一化「触发套装」输入（AI 工具与导入数据共用）。
+ *
+ * - 同名多条只保留最大件数（UI 的 toggle 本身不会产生重复，但 AI / 导入可能给）；
+ * - 只要出现 5 件套，就按 UI 的 `fivePieceSelection` **自动补上同套 2 件套**；
+ * - 5 件套占满全部 5 个部位，因此不允许与其它套装同时出现（与 UI 的替换行为一致，但这里报错而不是静默丢弃）。
+ *
+ * @throws 件数非法、同时出现多个 5 件套、或 5 件套与其它套装混用
+ */
+export const normalizeSetSelection = (sets: readonly SelectedSet[]): SelectedSet[] => {
+    const byName = new Map<string, number>()
+    for (const s of sets) {
+        if (!Number.isInteger(s.pieces) || s.pieces < 1 || s.pieces > MAX_SET_PIECES) {
+            throw new Error(`套装「${s.name}」的件数必须是 1-${MAX_SET_PIECES} 的整数（收到 ${s.pieces}）`)
+        }
+        const cur = byName.get(s.name) ?? 0
+        if (s.pieces > cur) byName.set(s.name, s.pieces)
+    }
+    const fiveNames = [...byName.entries()].filter(([, pieces]) => pieces >= MAX_SET_PIECES).map(([name]) => name)
+    if (fiveNames.length > 1) {
+        throw new Error(`不能同时选择多个 5 件套：${fiveNames.join('、')}`)
+    }
+    if (fiveNames.length === 1) {
+        if (byName.size > 1) {
+            throw new Error(
+                `5 件套「${fiveNames[0]}」占满全部部位，不能与其它套装共存；请只传这一个套装（会自动附带同套 2 件套）`
+            )
+        }
+        return fivePieceSelection(fiveNames[0])
+    }
+    return [...byName.entries()].map(([name, pieces]) => ({ name, pieces }))
+}
+
+/**
  * @desc 切换某套装的件数档位，返回新的选择：
  * - 点已选中的同一档 → 取消该套装
  * - 点该套装的另一档 → 换成那一档（5 件套仍按 `fivePieceSelection` 处理）

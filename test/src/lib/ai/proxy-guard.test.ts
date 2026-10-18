@@ -1,7 +1,7 @@
 // 防 SSRF 校验单测：覆盖 IP 网段判定与 URL 校验（IP 字面量无需网络即可解析）
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isBlockedAddress, assertPublicHttps } from '$lib/ai/proxy-guard'
+import { isBlockedAddress, assertFetchTarget, assertPublicHttps, isLoopbackHost } from '$lib/ai/proxy-guard'
 
 const cases: [ip: string, blocked: boolean][] = [
     // 回环/内网/保留：应拦截
@@ -58,4 +58,24 @@ test('私网 IP 字面量被拒绝（无需网络）', async () => {
 test('公网 IP 字面量放行（无需网络）', async () => {
     const msg = await assertPublicHttps(new URL('https://8.8.8.8'))
     assert.equal(msg, null)
+})
+
+test('isLoopbackHost：localhost / 127.0.0.0/8 / ::1 以及带点/方括号写法', () => {
+    for (const host of ['localhost', 'LOCALHOST', 'localhost.', '127.0.0.1', '127.1.2.3', '::1', '[::1]']) {
+        assert.equal(isLoopbackHost(host), true, `${host} 应视为回环`)
+    }
+    for (const host of ['10.0.0.1', '192.168.1.1', 'localhost.evil', '127.0.0.1.example.com', '::2']) {
+        assert.equal(isLoopbackHost(host), false, `${host} 不应视为回环`)
+    }
+})
+
+test('assertFetchTarget：本机地址（含明文 http）放行，其余仍按 https 公网校验', async () => {
+    for (const url of ['http://localhost:3000/doc', 'http://127.0.0.1:8080/doc', 'https://[::1]/doc']) {
+        assert.equal(await assertFetchTarget(new URL(url)), null, `${url} 应放行`)
+    }
+    // 非回环的明文 http 仍拒绝
+    assert.match((await assertFetchTarget(new URL('http://api.example.com'))) ?? '', /https/)
+    // 私网/元数据地址仍拒绝
+    assert.match((await assertFetchTarget(new URL('https://192.168.1.5'))) ?? '', /内网|保留/)
+    assert.match((await assertFetchTarget(new URL('https://169.254.169.254/'))) ?? '', /内网|保留/)
 })

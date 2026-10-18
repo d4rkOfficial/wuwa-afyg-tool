@@ -73,17 +73,14 @@ export const truncateText = (text: string, max: number): { text: string; truncat
         ? { text, truncated: false }
         : { text: `${text.slice(0, max)}…[已截断 ${text.length - max} 字符]`, truncated: true }
 
-/** @desc 单个容器最多转换多少项（防止巨大数组/对象把结果撑爆） */
-const MAX_ITEMS = 200
-
-/** @desc 递归深度上限 */
-const MAX_DEPTH = 6
-
 /**
  * @desc 把脚本返回值转成可跨进程 / 可 JSON 化的形式。
- * 有界深度 + 环检测 + 函数/符号/BigInt 降级为可读占位，**任何输入都不抛错**。
+ *
+ * **不按条目数 / 深度截断**：脚本返回的原始数组、Map、Set、嵌套对象要完整转换，
+ * 否则「处理了 10000 条数据」在返回时会被悄悄砍成 200 条，模型看到的是错的。
+ * 输出体积由最终序列化后的字符上限（`RUN_JS_MAX_OUTPUT_CHARS`）兜底；环检测仍保留。
  */
-export const toSerializable = (value: unknown, depth = 0, seen: WeakSet<object> = new WeakSet()): unknown => {
+export const toSerializable = (value: unknown, seen: WeakSet<object> = new WeakSet()): unknown => {
     if (value === null || value === undefined) return null
     if (typeof value === 'string' || typeof value === 'boolean') return value
     if (typeof value === 'number') return Number.isFinite(value) ? value : String(value)
@@ -92,23 +89,18 @@ export const toSerializable = (value: unknown, depth = 0, seen: WeakSet<object> 
     if (typeof value === 'function') return `[Function ${value.name || 'anonymous'}]`
     if (typeof value !== 'object') return String(value)
     if (seen.has(value)) return '[循环引用]'
-    if (depth >= MAX_DEPTH) return '[嵌套过深]'
     if (value instanceof Error) return { name: value.name, message: value.message }
     seen.add(value)
-    if (Array.isArray(value)) return value.slice(0, MAX_ITEMS).map((item) => toSerializable(item, depth + 1, seen))
+    if (Array.isArray(value)) return value.map((item) => toSerializable(item, seen))
     if (value instanceof Map) {
-        return {
-            '[Map]': [...value.entries()]
-                .slice(0, MAX_ITEMS)
-                .map(([k, v]) => [toSerializable(k, depth + 1, seen), toSerializable(v, depth + 1, seen)])
-        }
+        return { '[Map]': [...value.entries()].map(([k, v]) => [toSerializable(k, seen), toSerializable(v, seen)]) }
     }
     if (value instanceof Set) {
-        return { '[Set]': [...value].slice(0, MAX_ITEMS).map((item) => toSerializable(item, depth + 1, seen)) }
+        return { '[Set]': [...value].map((item) => toSerializable(item, seen)) }
     }
     const out: Record<string, unknown> = {}
-    for (const [key, item] of Object.entries(value as Record<string, unknown>).slice(0, MAX_ITEMS)) {
-        out[key] = toSerializable(item, depth + 1, seen)
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+        out[key] = toSerializable(item, seen)
     }
     return out
 }
@@ -123,6 +115,5 @@ export const safeStringify = (value: unknown): string => {
     }
 }
 
-/** @desc 一条 console 日志行（非字符串先 JSON 化，单行上限 500 字符） */
-export const formatLogLine = (value: unknown): string =>
-    truncateText(typeof value === 'string' ? value : safeStringify(value), 500).text
+/** @desc 一条 console 日志行（非字符串先 JSON 化；单条不预先截断，总长度由 worker 的日志预算兜底） */
+export const formatLogLine = (value: unknown): string => (typeof value === 'string' ? value : safeStringify(value))

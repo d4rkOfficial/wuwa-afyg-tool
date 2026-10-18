@@ -214,10 +214,20 @@ export const normalizeQuestions = (rawQuestions: AskUserQuestion[] | undefined):
     return (rawQuestions ?? []).map((raw, i) => normalizeQuestion(raw, i, used))
 }
 
-/** @desc 建立整组草稿（每题一份空草稿） */
+/**
+ * @desc 建立整组草稿（每题一份独立草稿）。
+ *
+ * **是否型默认选中「是」**：分段控件在空值时会把第 0 段（是）画成选中态，
+ * 若草稿仍是空 picked，用户直接提交会得到 skipped —— 视觉上明明选了「是」。
+ * 这里让默认态与视觉一致；用户仍可改选「否」，显式忽略则按 skipped 处理。
+ */
 export const createDraft = (questions: AskCardQuestion[]): AskDraft => {
     const draft: AskDraft = {}
-    for (const q of questions) draft[q.id] = emptyDraftItem()
+    for (const q of questions) {
+        const item = emptyDraftItem()
+        if (q.type === 'boolean') item.picked = [YES_VALUE]
+        draft[q.id] = item
+    }
     return draft
 }
 

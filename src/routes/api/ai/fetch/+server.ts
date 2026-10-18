@@ -1,14 +1,15 @@
 // 网页抓取代理：`web_fetch` 工具（AI 独享）的出网入口。
 //
 // 为什么走服务端而不是浏览器直连：任意站点的 CORS 策略不可控，浏览器侧抓取对绝大多数站点会直接失败；
-//  服务端取字节没有 CORS 限制，且能统一做 SSRF 校验。放行策略与 `/api/ai/stream` 完全一致：
-//  开发环境（dev）放行任意 http/https（含本机，便于本地调试）；生产环境只放行 https 公网地址，
-//  拦截内网/回环/保留地址与云元数据地址（`$lib/ai/proxy-guard`），重定向逐跳复查。
+//  服务端取字节没有 CORS 限制，且能统一做 SSRF 校验。放行策略（与 `/api/ai/stream` 的严格版不同）：
+//  开发环境（dev）放行任意 http/https；生产环境放行 https 公网地址 + **本机回环**
+//  （localhost / 127.0.0.0/8 / ::1，含明文 http，便于抓本地文档站与开发服务器）；
+//  内网/保留地址与云元数据地址仍由 `$lib/ai/proxy-guard` 拦截，重定向逐跳复查。
 //
 // 只取字节与元信息，正文提取一律走 `$lib/ai/tools/web-fetch.utils` 的纯函数（本文件不做解析）。
 import { json } from '@sveltejs/kit'
 import { dev } from '$app/environment'
-import { MAX_REDIRECTS, assertPublicHttps } from '$lib/ai/proxy-guard'
+import { MAX_REDIRECTS, assertFetchTarget } from '$lib/ai/proxy-guard'
 import type { WebFetchRequest } from '$lib/ai/tools/web-fetch.types'
 import {
     MAX_RESPONSE_BYTES,
@@ -99,15 +100,9 @@ export async function POST({ request }: { request: Request }) {
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
         if (!dev) {
-            // 先自己给一句「面向抓取」的提示：proxy-guard 的文案是为 AI 端点写的（会提「服务地址」与 localhost 直连），
-            // 直接透传给模型不好读。明文 http 一律不代理（与 /api/ai/stream 的 https-only 策略一致）。
-            if (current.protocol !== 'https:') {
-                return json(
-                    { ok: false, error: '目标地址不可抓取：只支持 https 链接（明文 http 地址不由服务端代理）' },
-                    { status: 400 }
-                )
-            }
-            const blocked = await assertPublicHttps(current)
+            // 抓取工具允许回环地址（localhost / 127.0.0.0/8 / ::1；本地服务常是明文 http），
+            // 其余目标仍要求 https 公网地址；文案由 assertFetchTarget 给成面向抓取的口径。
+            const blocked = await assertFetchTarget(current)
             if (blocked) return json({ ok: false, error: `目标地址不可抓取：${blocked}` }, { status: 400 })
         }
 

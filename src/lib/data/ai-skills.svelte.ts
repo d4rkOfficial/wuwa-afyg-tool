@@ -101,18 +101,26 @@ export async function addSkill(input: {
 export async function updateSkill(id: string, patch: Partial<Omit<AiSkill, 'id' | 'builtin'>>): Promise<boolean> {
     const target = _skills.find((s) => s.id === id)
     if (!target) return false
-    if (patch.name !== undefined) {
-        const name = patch.name.trim()
+    const nextPatch = { ...patch }
+    if (nextPatch.name !== undefined) {
+        const name = nextPatch.name.trim()
         if (!name) return false
         if (_skills.some((s) => s.id !== id && s.name.toLowerCase() === name.toLowerCase())) return false
+        nextPatch.name = name
+    }
+    // 内置技能正文被清空 = 恢复内置默认（与 mergeBuiltinSkills 重新加载时的口径一致，
+    // 避免「本次会话清空后生成流程认为没有命名规则、刷新后又变回默认」的不一致）
+    if (target.builtin && nextPatch.body !== undefined && !nextPatch.body.trim()) {
+        const builtin = BUILTIN_SKILLS.find((s) => s.id === id)
+        if (builtin) nextPatch.body = builtin.body
     }
     _skills = _skills.map((s) =>
         s.id === id
             ? {
                   ...s,
-                  ...patch,
-                  name: patch.name?.trim() ?? s.name,
-                  mode: patch.mode === undefined ? s.mode : coerceSkillMode(patch.mode)
+                  ...nextPatch,
+                  name: nextPatch.name ?? s.name,
+                  mode: nextPatch.mode === undefined ? s.mode : coerceSkillMode(nextPatch.mode)
               }
             : s
     )

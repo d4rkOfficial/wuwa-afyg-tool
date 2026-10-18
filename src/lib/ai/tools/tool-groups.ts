@@ -17,9 +17,13 @@ const GROUP_RULES: { label: string; test: RegExp }[] = [
         label: 'AI 助手 · 会话',
         test: /^set_long_task$|^set_work_summary$|^get_ai_(context_state|usage|turn_state)$|^set_ai_context_segment$|^reset_ai_context_segments$|^clear_ai_context_snapshot$/
     },
+    {
+        label: 'AI 助手 · 技能',
+        test: /^list_skills$|^get_skill$|^create_skill$|^update_skill$|^delete_skill$|^use_skill$/
+    },
     { label: '库街区 · 词条集同步', test: /_kuro_|^kuro_|^check_kuro_login$|^refresh_kuro_echo_data$|_from_kuro$/ },
     { label: '词条集（方案）', test: /_substat_plan/ },
-    { label: 'Buff 生成', test: /^generate_|_naming_rule$|^get_entity_info$|^list_entities$|^search_entities$/ },
+    { label: 'Buff 生成', test: /^generate_|^get_entity_info$|^list_entities$|^search_entities$/ },
     {
         label: 'Buff 集（主页实体）',
         test: /^sync_buff_set|^clear_buff_set|^get_buff_set_summary$|^list_buff_set_entities$|^get_buff_set_entity|^update_buff_set_entity|^delete_buff_set_entity/
@@ -32,7 +36,7 @@ const GROUP_RULES: { label: string; test: RegExp }[] = [
     { label: '配队', test: /^team|_team|member|recommended_weapon/ },
     {
         label: '时间轴',
-        test: /timeline|_block|_ref_line|^get_char_skills$|^reflow_track$|^get_non_direct_options$/
+        test: /timeline|_block|_ref_line|^get_char_skills$|^reflow_track$|^get_non_direct_options$|custom_hit/
     },
     { label: '结果与图表', test: /^get_result|^get_data_analysis|breakdown/ },
     {

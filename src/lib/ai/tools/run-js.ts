@@ -3,7 +3,13 @@
 // 于是模型无法通过传参把自己提升到「真 window」那条路径上。
 import { availableTools, defineTool, executeTool } from './registry'
 import type { RunScriptFn, RunScriptResult } from '../sandbox/protocol'
-import { RUN_JS_MAX_OUTPUT_CHARS, RUN_JS_MAX_TOOL_CALLS, RUN_JS_TIMEOUT_MS } from '../sandbox/protocol'
+import {
+    RUN_JS_MAX_ERROR_CHARS,
+    RUN_JS_MAX_OUTPUT_CHARS,
+    RUN_JS_MAX_TOOL_CALLS,
+    RUN_JS_TIMEOUT_MS
+} from '../sandbox/protocol'
+import { truncateText } from '../sandbox/format'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -24,12 +30,13 @@ const injectableNames = (ctx: Parameters<typeof availableTools>[0]): string[] =>
         .filter((name) => name !== 'run_js')
 
 /** @desc 把执行结果转成工具返回值；失败时 throw（registry 会转成 `ok:false`），并带上脚本日志 */
-const toToolOutput = (result: RunScriptResult): { value: unknown; logs: string[] } => {
+const toToolOutput = (result: RunScriptResult): { value: unknown; logs: string[]; truncated?: boolean } => {
     if (!result.ok) {
         const logText = result.logs.length > 0 ? `\n--- 脚本日志 ---\n${result.logs.join('\n')}` : ''
-        throw new Error(`${result.error}${logText}`)
+        // 报错 + 日志合并后再按报错预算截断：错误输出同样要有上限
+        throw new Error(truncateText(`${result.error}${logText}`, RUN_JS_MAX_ERROR_CHARS).text)
     }
-    return { value: result.value, logs: result.logs }
+    return { value: result.value, logs: result.logs, ...(result.truncated ? { truncated: true } : {}) }
 }
 
 defineTool('run_js', {

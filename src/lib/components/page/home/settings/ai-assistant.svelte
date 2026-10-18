@@ -38,6 +38,7 @@
     import {
         appendActivityNotice,
         appendActivityText,
+        appendRunJsOutput,
         applyToolEventToActivities,
         applyToolProgressToActivities,
         describeToolActivity,
@@ -585,6 +586,10 @@
                     } else if (evt.type === 'tool') {
                         // 按 seq 配对（不再用「最后一行 + 名称相同」）：一次漏配对只影响自己
                         last().activities = applyToolEventToActivities(last().activities ?? [], evt)
+                        // run_js 的返回值 / 报错独立成顶层行，不塞进「代码」卡片的展开结果里
+                        if (evt.toolName === 'run_js' && evt.resultText !== undefined) {
+                            last().activities = appendRunJsOutput(last().activities ?? [], evt.resultText)
+                        }
                         // AI 切换工程/视图后告知用户（只在真正出结果的那条事件上提示一次）
                         if (evt.resultLen !== undefined && evt.toolName === 'switch_view') {
                             addToast('AI 已切换视图', 'success')
@@ -1012,6 +1017,22 @@
                                         <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
                                         <span class="min-w-0 flex-1 whitespace-pre-wrap">{act.text}</span>
                                     </div>
+                                {:else if act.kind === 'runResult'}
+                                    <div class="flex items-start gap-1.5 text-(--theme-modal-text)/65">
+                                        <Icon icon="mdi:check-circle" class="mt-0.5 size-3 shrink-0" />
+                                        <span class="shrink-0 font-black">运行结果</span>
+                                        <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
+                                        <pre
+                                            class="theme-scrollbar max-h-64 min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/70">{act.text}</pre>
+                                    </div>
+                                {:else if act.kind === 'runError'}
+                                    <div class="flex items-start gap-1.5 text-red-400">
+                                        <Icon icon="mdi:alert-circle-outline" class="mt-0.5 size-3 shrink-0" />
+                                        <span class="shrink-0 font-black">运行报错</span>
+                                        <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
+                                        <pre
+                                            class="theme-scrollbar max-h-64 min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed">{act.text}</pre>
+                                    </div>
                                 {:else if act.kind === 'tool' && act.tool}
                                     {@const tool = act.tool}
                                     {@const meta = describeToolActivity(tool)}
@@ -1060,7 +1081,9 @@
                                                         class="theme-scrollbar max-h-48 overflow-auto whitespace-pre-wrap break-all sf-radius rounded-none p-1.5 font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/70"
                                                         style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent);">{detail.request}</pre>
                                                 </div>
-                                                {#if detail.response !== undefined}
+                                                <!-- run_js 的返回值 / 报错已提升为顶层「运行结果 / 运行报错」行，
+                                                     代码卡片只保留脚本源码，避免同一份结果出现两次 -->
+                                                {#if tool.name !== 'run_js' && detail.response !== undefined}
                                                     <div>
                                                         <div class="mb-0.5 text-(--theme-modal-text)/35">
                                                             {detail.responseLabel}

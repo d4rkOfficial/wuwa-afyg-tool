@@ -10,6 +10,7 @@ import {
     canPickPiece,
     fivePieceSelection,
     formatSetSelection,
+    normalizeSetSelection,
     remainingPiecesOf,
     togglePieceSelection,
     totalPiecesOf
@@ -82,6 +83,32 @@ describe('可点判定：5 件套恒定可点（它会替换），其余受剩�
         const sets = fivePieceSelection('A')
         assert.equal(canPickPiece(sets, 'A', 5), true)
         assert.equal(canPickPiece(sets, 'A', 2), true)
+    })
+})
+
+describe('归一化 AI / 导入输入', () => {
+    it('只给 {A,5} 时自动补 {A,2}（5 件套包含 2 件套效果）', () => {
+        assert.deepEqual(normalizeSetSelection(sel(['A', 5])), fivePieceSelection('A'))
+        assert.equal(totalPiecesOf(normalizeSetSelection(sel(['A', 5]))), 5)
+    })
+
+    it('同名多条只保留最大件数；重复的 5+2 不会重复计数', () => {
+        assert.deepEqual(normalizeSetSelection(sel(['A', 2], ['A', 5])), fivePieceSelection('A'))
+        assert.deepEqual(normalizeSetSelection(sel(['A', 3], ['A', 2])), sel(['A', 3]))
+    })
+
+    it('5 件套不能与其它套装共存 / 不能有多个 5 件套', () => {
+        assert.throws(() => normalizeSetSelection(sel(['A', 5], ['B', 2])), /不能与其它套装共存/)
+        assert.throws(() => normalizeSetSelection(sel(['A', 5], ['B', 5])), /多个 5 件套/)
+    })
+
+    it('件数越界（0 / 6）直接报错，不会被悄悄归一成 5 件套', () => {
+        assert.throws(() => normalizeSetSelection(sel(['A', 6])), /1-5/)
+        assert.throws(() => normalizeSetSelection(sel(['A', 0])), /1-5/)
+    })
+
+    it('非 5 件套保持原样（顺序按名称首次出现）', () => {
+        assert.deepEqual(normalizeSetSelection(sel(['A', 3], ['B', 2])), sel(['A', 3], ['B', 2]))
     })
 })
 

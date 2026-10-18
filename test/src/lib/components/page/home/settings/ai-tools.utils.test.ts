@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
     appendActivityNotice,
     appendActivityText,
+    appendRunJsOutput,
     applyToolEvent,
     applyToolEventToActivities,
     applyToolProgress,
@@ -62,6 +63,28 @@ test('活动流：工具调用与结果按 seq 配对到同一行；找不到 se
     const orphan = applyToolEventToActivities(activities, { toolName: 'a', resultLen: 3, seq: 999 })
     assert.equal(orphan.length, 2)
     assert.equal(orphan[1].tool?.resultLen, 3)
+})
+
+test('活动流：run_js 返回值和报错各自成为顶层行，不与代码卡片混在一起', () => {
+    const success = appendRunJsOutput([], JSON.stringify({ ok: true, data: { value: { count: 3 }, logs: ['第一行'] } }))
+    assert.equal(success.length, 1)
+    assert.equal(success[0].kind, 'runResult')
+    assert.match(success[0].text ?? '', /"count": 3/)
+    assert.match(success[0].text ?? '', /第一行/)
+
+    const failure = appendRunJsOutput([], JSON.stringify({ ok: false, error: 'TypeError: boom' }))
+    assert.equal(failure[0].kind, 'runError')
+    assert.equal(failure[0].tone, 'error')
+    assert.match(failure[0].text ?? '', /TypeError: boom/)
+})
+
+test('活动流：run_js 结果被输出上限截断时保留截断标记与字符串正文', () => {
+    const [activity] = appendRunJsOutput(
+        [],
+        JSON.stringify({ ok: true, data: { value: 'xxx…[已截断 10 字符]', logs: [], truncated: true } })
+    )
+    assert.match(activity.text ?? '', /超过输出上限/)
+    assert.match(activity.text ?? '', /已截断/)
 })
 
 test('活动流：长任务提示与错误提示各起一行，且保留语气', () => {

@@ -71,14 +71,16 @@ test('toSerializable：函数 / 符号 / BigInt / Error 降级为可读占位', 
     assert.equal(toSerializable(NaN), 'NaN', 'NaN 不能序列化成 null 而不留痕迹')
 })
 
-test('toSerializable：环引用与超深嵌套有界，不会抛错也不会无限展开', () => {
+test('toSerializable：环引用有界，但超深嵌套完整保留（不按深度截断）', () => {
     const cyclic: Record<string, unknown> = { name: 'root' }
     cyclic.self = cyclic
     assert.equal((toSerializable(cyclic) as Record<string, unknown>).self, '[循环引用]')
 
     let deep: unknown = 'leaf'
-    for (let i = 0; i < 10; i++) deep = { next: deep }
-    assert.equal(safeStringify(toSerializable(deep)).includes('[嵌套过深]'), true)
+    for (let i = 0; i < 30; i++) deep = { next: deep }
+    const json = safeStringify(toSerializable(deep))
+    assert.equal(json.includes('"[嵌套过深]"'), false, '不应再按深度丢弃原始数据')
+    assert.equal(json.includes('"leaf"'), true, '深层叶子必须完整保留')
 })
 
 test('toSerializable：Map / Set 转成带标记的普通结构', () => {
@@ -99,10 +101,10 @@ test('truncateText：超长才截断，并说明截掉多少', () => {
     assert.equal(out.text.includes('已截断 5 字符'), true)
 })
 
-test('formatLogLine：非字符串先 JSON 化，单行不超过 500 字符', () => {
+test('formatLogLine：非字符串先 JSON 化，单行不预截断（总长度交给日志预算）', () => {
     assert.equal(formatLogLine('纯文本'), '纯文本')
     assert.equal(formatLogLine({ a: 1 }), '{"a":1}')
-    assert.equal(formatLogLine('x'.repeat(600)).length < 600, true)
+    assert.equal(formatLogLine('x'.repeat(600)).length, 600)
 })
 
 test('safeStringify：BigInt 与环引用都不抛错', () => {

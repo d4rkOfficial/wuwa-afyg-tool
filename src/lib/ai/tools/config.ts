@@ -10,20 +10,29 @@ import {
     updateEnemy,
     updateResistance
 } from '$lib/calc/config.store.svelte'
-import { getActiveProject, updateConfig } from '$lib/data/project.svelte'
+import { getActiveProject, getProjects, updateConfig } from '$lib/data/project.svelte'
 import { MAIN_STAT_POOL } from '$lib/consts/stat-data'
+import { defaultConfig } from '$lib/calc/config.consts'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 const COSTS = [1, 3, 4, 5]
 
 defineTool('get_config_summary', {
     description:
-        '获取当前配装配置摘要：每个角色的 5 个声骸（cost、主词条、副词条）与敌人配置（类型/等级/防御/减伤/各抗性）。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => {
-        const cfg = getConfig()
-        const p = getActiveProject()
+        '获取配装配置摘要：每个角色的 5 个声骸（cost、主词条、副词条）与敌人配置（类型/等级/防御/减伤/各抗性）。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程；省略则读活动工程。',
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: { type: 'string', description: '可选：工程 id（用 list_projects 获取）；省略 = 当前活动工程' }
+        }
+    },
+    handler: (args) => {
+        const projectId = str(args.projectId)
+        const p = projectId ? getProjects().find((item) => item.id === projectId) : getActiveProject()
+        if (projectId && !p) throw new Error(`未找到工程：${projectId}`)
+        const cfg = projectId ? (p!.encounter.config.data ?? defaultConfig()) : getConfig()
         return {
+            ...(projectId ? { projectId, projectName: p!.name } : {}),
             characters: cfg.characters.map((c, i) => ({
                 slot: i + 1,
                 character: p?.team[i]?.character ?? null,

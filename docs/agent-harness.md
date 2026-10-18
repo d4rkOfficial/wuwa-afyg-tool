@@ -15,7 +15,7 @@
 > | `src/lib/ai/change-queue.svelte.ts`                                | 工程变化队列（静默，界面不显示；面板可查看待上报条数并清空）                |
 > | `src/lib/ai/skills.ts`                                             | 技能卡纯逻辑（类型 / 兼容归一化 / 内置合并 / 注入文本渲染）                 |
 > | `src/lib/data/ai-skills.svelte.ts`                                 | 自定义 Skill（技能卡）存储（IndexedDB）                                     |
-> | `src/lib/ai/tools/skills.ts`                                       | `list_skills` / `use_skill` 工具                                            |
+> | `src/lib/ai/tools/skills.ts`                                       | 技能卡 CRUD + `use_skill` 工具（`list/get/create/update/delete_skill`）     |
 > | `src/lib/ai/thinking.ts`                                           | 思考强度档位与协议映射（纯逻辑；设置与弹窗共用一份）                        |
 > | `src/lib/ai/session-overrides.svelte.ts`                           | **会话覆盖层**：模型 / 提供商 / 思考 / 权限的临时覆盖（内存态）             |
 > | `src/lib/ai/compaction.ts`                                         | 上下文压缩（切分点规划 / 摘要消息 / 摘要请求 / token 统计）                 |
@@ -190,7 +190,8 @@ history 段原文 + user 段原文 + 本轮新产生的 assistant / tool 消息
 
 抓网页/调接口直接用**与工具同名**的 `web_fetch({ url, method, headers, body, json })`：
 它与其它工具一样按原名注入沙箱全局，桥回宿主 `web_fetch` 工具、走同源代理与 SSRF 校验
-（返回值相同）。它**不是浏览器的真 fetch**；宿主没有 webFetch 能力时该工具不会出现在沙箱清单里。
+（回环地址放行，内网与云元数据地址仍拦截）；返回值与活动工程里的 web_fetch 相同。
+它**不是浏览器的真 fetch**；宿主没有 webFetch 能力时该工具不会出现在沙箱清单里。
 
 因为选路看「哪个能力存在」而不是工具参数，**模型无法靠传参把自己提升到真 window 那条路径**；
 两者同时存在时优先走沙箱（更严的那条）。
@@ -206,14 +207,50 @@ history 段原文 + user 段原文 + 本轮新产生的 assistant / tool 消息
 **越权的第二道闸**：脚本里的工具调用经 postMessage 桥回页面，由**真正的 `executeTool`** 执行 ——
 危险工具照样弹确认、`requires` 能力校验照样生效，脚本绕不过去。
 
-**上限**：50 次工具调用 / 20s 超时（到点 `worker.terminate()` 强杀）/ 输出 20000 字符 / 日志 200 条。
-每次执行后销毁 Worker，不留复用状态。
+**上限**：50 次工具调用 / **2 分钟**超时（到点 `worker.terminate()` 强杀）/ 返回值 20000 字符 /
+报错 4000 字符 / 日志 200 条且合计 20000 字符。每次执行后销毁 Worker，不留复用状态。
+超时从 20s 放宽到 120s：单次 `web_fetch` 自身就可能用掉 15s，脚本连抓几页时旧上限会误杀正常脚本。
+
+**原始数据不截断**：脚本返回值在 `toSerializable()` 阶段不再按「200 项 / 6 层深度」砍掉数组与嵌套对象，
+完整处理后才在最终序列化字符串上按上述上限截断；日志也是单条不预截断、只受总字符预算约束。
+这样「脚本里处理了 10000 条」不会在返回时被悄悄缩成 200 条。
+
+**UI 顶层输出**：`run_js` 在活动流里拆成三行 ——「代码」工具行只放脚本源码（可展开查看完整代码），
+返回值/日志单独成「运行结果」行，失败时单独成「运行报错」行；结果不再藏在代码卡片的展开结果栏里。
 
 **已知残余风险（接受）**：动态 `import()` 是语法而非全局属性、删不掉；但它加载的模块同样运行在
 **已被掏空**的 realm 里，没有网络与存储，不构成越权。
 
 **WS 路径的代价**：真 window 意味着脚本能碰 DOM 与 storage，且页面 realm 里的死循环**无法中断**
 （不能 `terminate()`）；这是按「WS 远程接管无条件信任」的产品决定接受的。
+
+## 1.5 自定义倍率（自定义直伤）
+
+排轴里除了角色技能倍率，还可以有用户自定义的直伤倍率。AI 通过四个工具管理：
+
+| 工具                | 作用                                                                   |
+| ------------------- | ---------------------------------------------------------------------- |
+| `list_custom_hits`  | 按角色列出名称 / 固定值 / 百分比 / 单位 / 属性 / 段数 / 渲染后的倍率串 |
+| `add_custom_hit`    | 新建（名称同角色内唯一；固定值与百分比至少一个 >0）                    |
+| `update_custom_hit` | 按当前名称定位并修改（可改名、改数值/单位/属性/段数）                  |
+| `remove_custom_hit` | 删除（已绑定到操作块的同名命中不会自动解绑）                           |
+
+倍率串格式化由 `$lib/calc/custom-hit` 的 `customHitRatio()` 统一提供，界面选择器与 AI 工具共用同一口径。
+创建后再用 `get_char_skills` 确认，并用 `bind_damage_to_block` 绑定到操作块。
+
+## 1.6 跨工程只读
+
+所有**写工具**仍然只作用于当前活动工程（`set_active_project` 之后）。为避免「只想看一眼别的工程却被迫切换」，
+下列读取工具接受可选的 `projectId`，直接读持久化工程数据、不切换活动工程：
+
+- 工程 / 队伍 / 排轴：`get_project_state` / `get_team` / `get_timeline_summary` / `get_timeline_damage_list` / `get_ref_line_timings` / `get_char_skills`
+- 配装：`get_config_summary`
+- 拉表：`get_damage_entries` / `get_buff_confs` / `get_buff_conf_detail` / `get_buff_conf_zone_condition` / `get_damage_entry_buff_sources` / `get_condition_profile`
+- 结果：`get_result_summary` / `get_result_entry_breakdown` / `get_data_analysis`
+- 自定义倍率：`list_custom_hits`
+
+跨工程结果类工具用目标工程的持久化时间线重新推导伤害条目（`buildDamageEntriesFromTimeline()`），
+不读活动工程的全局 store。需要写入时先 `set_active_project`，完成后再切回并重读状态。
 
 ## 2. 上下文装配顺序
 
@@ -331,13 +368,16 @@ interface AiSkill {
     - **主动（active）**：清单只进名称与描述，正文只在被 `use_skill` 激活时进入上下文 —— 最主要的 token 优化
     - **被动（passive）**：正文每轮直接进 system 常驻生效，**不**出现在可用技能清单里（避免重复）
     - `enabled=false` 时两者都不注入
-- 工具：`list_skills`（列出，标注主动/被动）、`use_skill(name)`（激活主动技能正文；对被动技能返回
-  「已常驻生效，无需激活」并附正文；未找到/被禁用时回传可用名称）
+- 工具（通用 CRUD）：`list_skills`（列出，标注主动/被动/内置）、`get_skill(name)`（读取完整正文）、
+  `create_skill`（新建自定义技能）、`update_skill`（改名称/描述/正文/类型/启停；内置技能不可改名）、
+  `delete_skill`（只删自定义技能）、`use_skill(name)`（激活主动技能正文；对被动技能返回
+  「已常驻生效，无需激活」并附正文；未找到/被禁用时回传可用名称）。
+  旧的 `get_naming_rule` / `set_naming_rule` 已删除：命名规则改为通过 `update_skill` 维护内置技能「Buff 命名规则」。
 - 内置技能四张（类型均可在设置里改）：
     - **数据自愈**（主动）—— 查询类工具返回空/异常时，按 team → timeline → calculation → config 重载后重试
     - **条件与链阶**（被动）—— 条件挂在乘区（伤害类型/属性）、链阶是整块硬性条件且互斥、链阶真源是角色槽位
     - **Buff 命名规则**（主动）—— 原「提示词设置 → Buff 命名规则」，正文即生成流程使用的命名规范（含叠层/精炼拆分硬性要求）；
-      `get_naming_rule` / `set_naming_rule` 与 `generate_entity_buffs` / `generate_project_buffs` 都按此技能卡取正文，禁用或清空则回落内置宽松默认
+      生成工具按此技能卡取正文，禁用或清空则回落内置宽松默认；AI 用 `update_skill` 维护它
     - **黑话词典**（主动）—— 原「提示词设置 → 黑话词典」，正文即官方/生僻叫法 → 玩家黑话对照表；生成流程的 `get_slang_dict` 返回其正文
 - 界面：**设置 → AI助手 → 权限 / 提示词 → 技能**（列表 + 编辑弹窗）。编辑弹窗可改名称 / 描述 / 正文 / 类型 / 启停，
   右侧「可调用工具」面板点击即把工具名插入正文光标处；导入导出格式为 `{ kind: 'wuwa-afyg-skills', skills: [...] }`，

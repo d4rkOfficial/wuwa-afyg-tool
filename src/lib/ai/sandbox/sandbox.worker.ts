@@ -22,6 +22,8 @@
  * 同样没有网络与存储，故不构成越权。
  */
 import {
+    RUN_JS_MAX_ERROR_CHARS,
+    RUN_JS_MAX_LOG_CHARS,
     RUN_JS_MAX_LOGS,
     RUN_JS_MAX_OUTPUT_CHARS,
     RUN_JS_MAX_TOOL_CALLS,
@@ -107,8 +109,15 @@ const stripCapabilities = (): void => {
     }
 }
 
+/** @desc 日志正文总预算（条数之外再按字符数兜底；超出部分截断并标记，不让日志撑爆最终输出） */
+let logChars = 0
+
 const pushLog = (text: string): void => {
-    if (logs.length < RUN_JS_MAX_LOGS) logs.push(text)
+    if (logs.length >= RUN_JS_MAX_LOGS || logChars >= RUN_JS_MAX_LOG_CHARS) return
+    const room = RUN_JS_MAX_LOG_CHARS - logChars
+    const clipped = text.length > room ? `${text.slice(0, room)}…[日志已截断]` : text
+    logs.push(clipped)
+    logChars += clipped.length
 }
 
 const formatArgs = (args: readonly unknown[]): string => args.map(formatLogLine).join(' ')
@@ -177,14 +186,16 @@ const execute = async (source: string, toolNames: readonly string[]): Promise<Ru
     try {
         const factory = new Function(...paramNames, buildScriptBody(source)) as (...values: unknown[]) => unknown
         const raw = await factory(...paramValues)
+        // 原始返回值**完整**序列化（不按条目/深度截断），只在最终输出这一步按字符上限截断
         const serialized = toSerializable(raw)
         const { text, truncated } = truncateText(safeStringify(serialized), RUN_JS_MAX_OUTPUT_CHARS)
         // 能放下就给结构化值；放不下才退化成截断字符串（不把上下文撑爆）
         return { ok: true, value: truncated ? text : serialized, logs: [...logs], truncated }
     } catch (e) {
+        const error = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
         return {
             ok: false,
-            error: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+            error: truncateText(error, RUN_JS_MAX_ERROR_CHARS).text,
             logs: [...logs]
         }
     }

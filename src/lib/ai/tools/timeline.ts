@@ -24,14 +24,25 @@ import {
     setRefLinePos,
     getMaxPos,
     getCustomSkillHits,
+    addCustomHit,
+    removeCustomHit,
+    updateCustomHit,
+    buildDamageListFrom,
+    getSkillCache,
+    getTRACKS,
+    loadCharSkills,
+    loadEchoSkill,
     getTimelineState
 } from '$lib/calc/timeline.store.svelte'
-import { updateTimeline, updateResultAnalysis, getActiveProject } from '$lib/data/project.svelte'
+import { getCharElementMap } from '$lib/data/char-elements.svelte'
+import { customHitRatio } from '$lib/calc/custom-hit'
+import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
+import { updateTimeline, updateResultAnalysis, getActiveProject, getProjects } from '$lib/data/project.svelte'
 import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/calc/timeline.consts'
 import { resolveRefLineSeconds, type RefLineLike } from '$lib/calc/ref-line-timing'
 import { renderDamageRatioList, renderTimelineDigest } from '$lib/ai/phase-digest'
 import { opBlocksInOrder, refLinesInOrder, resolveOpBlock, resolveRefLine } from '$lib/ai/refs'
-import type { SkillHit, NonDirectEntry } from '$lib/calc/timeline.types'
+import type { CustomHit, SkillHit, NonDirectEntry } from '$lib/calc/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 const BLOCK_W = 60
@@ -67,6 +78,64 @@ function normalizeBlockKey(raw: string): string {
     return ''
 }
 
+// ── 自定义倍率（自定义直伤）的归一 / 展示 ──
+
+const teamCharacterNames = (): string[] =>
+    getTeam()
+        .map((s) => s.character)
+        .filter((n): n is string => typeof n === 'string' && n.length > 0)
+
+const assertTeamCharacter = (name: string): void => {
+    if (!name) throw new Error('缺少 character（角色名）')
+    const names = teamCharacterNames()
+    if (!names.includes(name)) {
+        throw new Error(`角色「${name}」不在当前队伍中（可用：${names.join('、') || '无'}）`)
+    }
+}
+
+const readNonNegative = (value: unknown, key: string): number | undefined => {
+    if (value === undefined || value === null) return undefined
+    const n = Number(value)
+    if (!Number.isFinite(n) || n < 0) throw new Error(`${key} 须为非负数字`)
+    return n
+}
+
+const readHits = (value: unknown): number | undefined => {
+    if (value === undefined || value === null) return undefined
+    const n = Number(value)
+    if (!Number.isInteger(n) || n < 1 || n > 999) throw new Error('hits 须为 1-999 的整数')
+    return n
+}
+
+const readPctUnit = (value: unknown): string | undefined => {
+    if (value === undefined || value === null || value === '') return undefined
+    const unit = str(value)
+    if (!(PCT_UNITS as readonly string[]).includes(unit)) {
+        throw new Error(`pctUnit 须为 ${PCT_UNITS.join(' / ')}`)
+    }
+    return unit
+}
+
+const readElement = (value: unknown): string | undefined => {
+    if (value === undefined || value === null || value === '') return undefined
+    const element = str(value)
+    if (!(ELEMENTS as readonly string[]).includes(element)) {
+        throw new Error(`element 须为 ${ELEMENTS.join(' / ')}`)
+    }
+    return element
+}
+
+const customHitView = (hit: CustomHit) => ({
+    id: hit.id,
+    name: hit.name,
+    flatValue: hit.flatValue,
+    pctValue: hit.pctValue,
+    pctUnit: hit.pctUnit,
+    element: hit.element,
+    hits: hit.hits ?? 1,
+    ratio: customHitRatio(hit)
+})
+
 // 追加位置：三行（所有轨道）最右空白位置，保证按顺序排轴
 function appendPos(): number {
     let maxRight = 0
@@ -97,9 +166,38 @@ function resolvePosition(position: Record<string, unknown>): number {
 
 defineTool('get_timeline_summary', {
     description:
-        '获取当前排轴：**按排轴顺序**列出所有操作块、参考线与已绑定的伤害。每行给出序号、轨道与角色、操作内容，其下缩进列出该块绑定的伤害命中（只给命中名，**不含倍率**——倍率用 get_timeline_damage_list 按需查）。排轴位置只是定位坐标，不代表秒数；参考线时间优先取数据分析配置的有效记点，没有有效记点时按“时间记点自动配置”规则从名称推导，并标为自动推导。AI 需要看排轴结构时调用。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => {
+        '获取排轴：**按排轴顺序**列出所有操作块、参考线与已绑定的伤害。每行给出序号、轨道与角色、操作内容，其下缩进列出该块绑定的伤害命中（只给命中名，**不含倍率**——倍率用 get_timeline_damage_list 按需查）。排轴位置只是定位坐标，不代表秒数；参考线时间优先取数据分析配置的有效记点，没有有效记点时按“时间记点自动配置”规则从名称推导，并标为自动推导。**可跨工程只读**：传 projectId 读任意工程的持久化排轴且不切换当前工程（结构与绑定名；倍率明细用 get_timeline_damage_list 同样传 projectId 查）；省略则读活动工程。',
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: {
+                type: 'string',
+                description: '可选：读取指定工程（用 list_projects 获取），不切换当前工程；省略 = 当前活动工程'
+            }
+        }
+    },
+    handler: (args) => {
+        const projectId = str(args.projectId)
+        if (projectId) {
+            // 跨工程**只读**：直接读持久化工程数据，不切活动工程，也不动全局排轴 store
+            const project = getProjects().find((p) => p.id === projectId)
+            if (!project) throw new Error(`未找到工程：${projectId}`)
+            const data = project.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] }
+            const locked = project.encounter.timeline.locked
+            return {
+                projectId,
+                projectName: project.name,
+                locked,
+                timeline: renderTimelineDigest({
+                    opBlocks: data.opBlocks,
+                    refLines: data.refLines,
+                    damageBlocks: data.damageBlocks,
+                    trackLabels: project.team.map((s, i) => s.character ?? `轨${i + 1}`),
+                    locked,
+                    timings: project.analysis?.timings
+                })
+            }
+        }
         const team = getTeam()
         return {
             locked: getLocked(),
@@ -117,9 +215,37 @@ defineTool('get_timeline_summary', {
 
 defineTool('get_timeline_damage_list', {
     description:
-        '**按需**查询排轴里每个已绑定伤害的**倍率明细**（命中名、倍率、属性、系数类型；含效应/处决/响应的折算结果），按排轴顺序编号，每行一条；序号与排轴位置不代表秒数。只想看排轴结构（哪些块、绑了什么）请用 get_timeline_summary —— 那里不含倍率，避免无谓的 token 开销。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => ({ ratios: renderDamageRatioList(getDamageList()) })
+        '**按需**查询排轴里每个已绑定伤害的**倍率明细**（命中名、倍率、属性、系数类型；含效应/处决/响应的折算结果），按排轴顺序编号，每行一条；序号与排轴位置不代表秒数。只想看排轴结构（哪些块、绑了什么）请用 get_timeline_summary —— 那里不含倍率，避免无谓的 token 开销。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        }
+    },
+    handler: async (args) => {
+        const projectId = str(args.projectId)
+        if (projectId) {
+            const project = getProjects().find((p) => p.id === projectId)
+            if (!project) throw new Error(`未找到工程：${projectId}`)
+            // 跨工程可能包含活动工程没加载过的角色：先补齐技能缓存，响应倍率才解析得出来
+            await Promise.all(
+                project.team.map((s) => (s.character ? loadCharSkills(s.character) : Promise.resolve(null)))
+            )
+            const timeline = project.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] }
+            const rows = buildDamageListFrom({
+                damageBlocks: timeline.damageBlocks,
+                opBlocks: timeline.opBlocks,
+                refLines: timeline.refLines,
+                team: project.team,
+                blockWidths: {},
+                skillCache: getSkillCache(),
+                elementOf: (name) => getCharElementMap()[name] ?? '',
+                trackCount: getTRACKS().length
+            })
+            return { projectId, projectName: project.name, ratios: renderDamageRatioList(rows) }
+        }
+        return { ratios: renderDamageRatioList(getDamageList()) }
+    }
 })
 
 defineTool('add_op_block', {
@@ -159,15 +285,48 @@ defineTool('add_op_block', {
 
 defineTool('get_char_skills', {
     description:
-        '获取指定角色可绑定的伤害命中列表（技能类型、命中名、倍率、元素），含：角色技能、装备声骸技能、用户自定义直伤（技能类型分别为声骸技能/自定义）。用于把伤害倍率绑定到操作块。',
+        '获取指定角色可绑定的伤害命中列表（技能类型、命中名、倍率、元素），含：角色技能、装备声骸技能、用户自定义直伤（技能类型分别为声骸技能/自定义）。用于把伤害倍率绑定到操作块。**可跨工程只读**：传 projectId 时，声骸技能与自定义倍率按该工程队伍/数据读取，不切换活动工程。',
     parameters: {
         type: 'object',
-        properties: { character: { type: 'string', description: '角色名' } },
+        properties: {
+            character: { type: 'string', description: '角色名' },
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        },
         required: ['character']
     },
     handler: async (args) => {
         const character = str(args.character)
         if (!character) throw new Error('缺少角色名')
+        const projectId = str(args.projectId)
+        if (projectId) {
+            const project = getProjects().find((p) => p.id === projectId)
+            if (!project) throw new Error(`未找到工程：${projectId}`)
+            const groups = [...(await loadCharSkills(character))]
+            const echoName = project.team.find((s) => s.character === character)?.echoes?.[0]?.name
+            if (echoName) {
+                const cached = await loadEchoSkill(echoName)
+                if (cached?.values?.length) {
+                    groups.push({
+                        type: '声骸技能',
+                        hits: cached.values.map(([n, v, e]) => ({ name: n, ratio: v, element: e }))
+                    })
+                }
+            }
+            const hits = groups.flatMap((g) =>
+                g.hits.map((h) => ({ skillType: g.type, hitName: h.name, ratio: h.ratio, element: h.element }))
+            )
+            for (const ch of project.customSkillHits?.[character] ?? []) {
+                // 与活动工程 getFullSkillGroups 的口径一致：ratio 不含 `*段数`，段数由 bind 时的 hits 表达
+                hits.push({
+                    skillType: '自定义',
+                    hitName: ch.name,
+                    ratio: customHitRatio({ ...ch, hits: 1 }),
+                    element: ch.element
+                })
+            }
+            if (hits.length === 0) throw new Error(`工程「${project.name}」的角色「${character}」没有技能数据`)
+            return { projectId, projectName: project.name, hits }
+        }
         const groups = await getFullSkillGroups(character)
         const hits: Array<{ skillType: string; hitName: string; ratio: string; element: string }> = []
         for (const g of groups) {
@@ -182,6 +341,202 @@ defineTool('get_char_skills', {
         }
         if (hits.length === 0) throw new Error(`未找到角色「${character}」的技能数据`)
         return hits
+    }
+})
+
+defineTool('list_custom_hits', {
+    description:
+        '列出自定义倍率（自定义直伤）：按角色返回名称、固定值、百分比、单位、属性、段数与渲染后的倍率串。character 省略时列出当前队伍全部角色。创建 / 修改后用 get_char_skills 也能看到它们并绑定到操作块。',
+    parameters: {
+        type: 'object',
+        properties: {
+            character: { type: 'string', description: '可选：只列该角色的自定义倍率' },
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        }
+    },
+    handler: (args) => {
+        const wanted = str(args.character)
+        const projectId = str(args.projectId)
+        if (projectId) {
+            const project = getProjects().find((p) => p.id === projectId)
+            if (!project) throw new Error(`未找到工程：${projectId}`)
+            const teamNames = project.team
+                .map((s) => s.character)
+                .filter((n): n is string => typeof n === 'string' && n.length > 0)
+            if (wanted && !teamNames.includes(wanted)) {
+                throw new Error(
+                    `角色「${wanted}」不在工程「${project.name}」的队伍中（可用：${teamNames.join('、') || '无'}）`
+                )
+            }
+            const names = wanted ? [wanted] : teamNames
+            const all = project.customSkillHits ?? {}
+            return {
+                projectId,
+                projectName: project.name,
+                characters: names.map((character) => ({
+                    character,
+                    hits: (all[character] ?? []).map(customHitView)
+                })),
+                hint: '自定义倍率的增删改仍作用于当前活动工程；要写该工程请先 set_active_project'
+            }
+        }
+        if (wanted) assertTeamCharacter(wanted)
+        const names = wanted ? [wanted] : teamCharacterNames()
+        const all = getCustomSkillHits()
+        return {
+            characters: names.map((character) => ({
+                character,
+                hits: (all[character] ?? []).map(customHitView)
+            })),
+            hint: '用 add_custom_hit 新建、update_custom_hit 修改、remove_custom_hit 删除；绑定到操作块时把 name 作为 hitName'
+        }
+    }
+})
+
+defineTool('add_custom_hit', {
+    description:
+        '为当前队伍中的角色创建一条**自定义倍率**（自定义直伤）。固定值与百分比至少填一个（>0）；pctUnit 为 攻击% / 生命% / 防御% / 偏谐系数；element 为 物理/冷凝/热熔/导电/气动/衍射/湮灭。创建后可用 get_char_skills 看到它，再用 bind_damage_to_block 绑定到操作块。',
+    parameters: {
+        type: 'object',
+        properties: {
+            character: { type: 'string', description: '角色名（须在当前队伍中）' },
+            name: { type: 'string', description: '倍率名（同角色内唯一，例如「自定义重击」）' },
+            flatValue: { type: 'number', description: '固定值（默认 0；与 pctValue 至少一个 >0）' },
+            pctValue: { type: 'number', description: '百分比数值（默认 0；与 flatValue 至少一个 >0）' },
+            pctUnit: {
+                type: 'string',
+                enum: ['攻击%', '生命%', '防御%', '偏谐系数'],
+                description: '百分比单位（默认 攻击%）'
+            },
+            element: {
+                type: 'string',
+                enum: ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭'],
+                description: '伤害属性（默认 物理）'
+            },
+            hits: { type: 'number', description: '段数（默认 1，整数 1-999）' }
+        },
+        required: ['character', 'name']
+    },
+    handler: (args) => {
+        const character = str(args.character)
+        assertTeamCharacter(character)
+        const name = str(args.name)
+        if (!name) throw new Error('缺少 name（自定义倍率名）')
+
+        const existing = getCustomSkillHits()[character] ?? []
+        if (existing.some((h) => h.name === name)) {
+            throw new Error(`角色「${character}」已有同名自定义倍率「${name}」；改名或用 update_custom_hit`)
+        }
+
+        const flatValue = readNonNegative(args.flatValue, 'flatValue') ?? 0
+        const pctValue = readNonNegative(args.pctValue, 'pctValue') ?? 0
+        if (flatValue <= 0 && pctValue <= 0) throw new Error('flatValue 与 pctValue 至少一个须 >0')
+        const hits = readHits(args.hits) ?? 1
+        const hit: CustomHit = {
+            id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name,
+            flatValue,
+            pctValue,
+            pctUnit: readPctUnit(args.pctUnit) ?? '攻击%',
+            element: readElement(args.element) ?? '物理',
+            hits
+        }
+        addCustomHit(character, hit)
+        return { added: true, character, hit: customHitView(hit) }
+    }
+})
+
+defineTool('update_custom_hit', {
+    description:
+        '修改一条自定义倍率（按角色 + 当前倍率名定位）。可改 newName（改名，仍须同角色内唯一）、flatValue、pctValue、pctUnit、element、hits；未提供的字段保持原值。修改后至少仍保留一个 >0 的固定值 / 百分比。',
+    dangerous: true,
+    parameters: {
+        type: 'object',
+        properties: {
+            character: { type: 'string', description: '角色名（须在当前队伍中）' },
+            hitName: { type: 'string', description: '要修改的自定义倍率当前名称' },
+            newName: { type: 'string', description: '可选：改成的新名称' },
+            flatValue: { type: 'number', description: '新的固定值' },
+            pctValue: { type: 'number', description: '新的百分比数值' },
+            pctUnit: {
+                type: 'string',
+                enum: ['攻击%', '生命%', '防御%', '偏谐系数'],
+                description: '新的百分比单位'
+            },
+            element: {
+                type: 'string',
+                enum: ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭'],
+                description: '新的伤害属性'
+            },
+            hits: { type: 'number', description: '新的段数（整数 1-999）' }
+        },
+        required: ['character', 'hitName']
+    },
+    handler: (args) => {
+        const character = str(args.character)
+        assertTeamCharacter(character)
+        const hitName = str(args.hitName)
+        if (!hitName) throw new Error('缺少 hitName')
+        const list = getCustomSkillHits()[character] ?? []
+        const source = list.find((h) => h.name === hitName)
+        if (!source) {
+            throw new Error(`角色「${character}」没有自定义倍率「${hitName}」（可先用 list_custom_hits 查看）`)
+        }
+
+        const patch: Partial<Omit<CustomHit, 'id'>> = {}
+        const newName = str(args.newName)
+        if (newName && newName !== source.name) {
+            if (list.some((h) => h.id !== source.id && h.name === newName)) {
+                throw new Error(`角色「${character}」已有同名自定义倍率「${newName}」`)
+            }
+            patch.name = newName
+        }
+        const flatValue = readNonNegative(args.flatValue, 'flatValue')
+        if (flatValue !== undefined) patch.flatValue = flatValue
+        const pctValue = readNonNegative(args.pctValue, 'pctValue')
+        if (pctValue !== undefined) patch.pctValue = pctValue
+        const pctUnit = readPctUnit(args.pctUnit)
+        if (pctUnit !== undefined) patch.pctUnit = pctUnit
+        const element = readElement(args.element)
+        if (element !== undefined) patch.element = element
+        const hits = readHits(args.hits)
+        if (hits !== undefined) patch.hits = hits
+
+        if (Object.keys(patch).length === 0) throw new Error('没有需要修改的字段')
+        const finalFlat = patch.flatValue ?? source.flatValue
+        const finalPct = patch.pctValue ?? source.pctValue
+        if (finalFlat <= 0 && finalPct <= 0) throw new Error('修改后 flatValue 与 pctValue 至少一个须 >0')
+
+        const updated = updateCustomHit(character, source.id, patch)
+        if (!updated) throw new Error('修改失败：自定义倍率已不存在')
+        return { updated: true, character, hit: customHitView(updated) }
+    }
+})
+
+defineTool('remove_custom_hit', {
+    description:
+        '删除一条自定义倍率（按角色 + 倍率名定位）。已经绑定到操作块的同名命中不会自动解除绑定，删除前请确认不再需要。',
+    dangerous: true,
+    parameters: {
+        type: 'object',
+        properties: {
+            character: { type: 'string', description: '角色名（须在当前队伍中）' },
+            hitName: { type: 'string', description: '要删除的自定义倍率名' }
+        },
+        required: ['character', 'hitName']
+    },
+    handler: (args) => {
+        const character = str(args.character)
+        assertTeamCharacter(character)
+        const hitName = str(args.hitName)
+        if (!hitName) throw new Error('缺少 hitName')
+        const list = getCustomSkillHits()[character] ?? []
+        const source = list.find((h) => h.name === hitName)
+        if (!source) {
+            throw new Error(`角色「${character}」没有自定义倍率「${hitName}」（可先用 list_custom_hits 查看）`)
+        }
+        removeCustomHit(character, source.id)
+        return { removed: true, character, hitName }
     }
 })
 
@@ -572,11 +927,21 @@ const getTimings = (): { refLineId: string; seconds: number | null }[] => {
 
 defineTool('get_ref_line_timings', {
     description:
-        '查询时间参考线记点状态：哪些参考线已启用为时间记点、各自的秒数（null=未填写/未解析，不参与 DPS 分段）。秒数来源：自动推导（从参考线命名解析）或自定义覆盖。结果按参考线在时间轴上的位置排序，并给出**序号**。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => {
-        const timings = getTimings()
-        const ordered = refLinesInOrder()
+        '查询时间参考线记点状态：哪些参考线已启用为时间记点、各自的秒数（null=未填写/未解析，不参与 DPS 分段）。秒数来源：自动推导（从参考线命名解析）或自定义覆盖。结果按参考线在时间轴上的位置排序，并给出**序号**。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
+    parameters: {
+        type: 'object',
+        properties: {
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+        }
+    },
+    handler: (args) => {
+        const projectId = str(args.projectId)
+        const project = projectId ? getProjects().find((p) => p.id === projectId) : null
+        if (projectId && !project) throw new Error(`未找到工程：${projectId}`)
+        const timings = project ? (project.analysis?.timings ?? []) : getTimings()
+        const ordered = project
+            ? [...(project.encounter.timeline.data?.refLines ?? [])].sort((a, b) => a.pos - b.pos)
+            : refLinesInOrder()
         const enabled = new Map(timings.map((t) => [t.refLineId, t.seconds]))
         const rows = ordered
             .map((rl, i) => ({ rl, line: i + 1 }))
@@ -591,6 +956,7 @@ defineTool('get_ref_line_timings', {
                 }
             })
         return {
+            ...(projectId ? { projectId, projectName: project!.name } : {}),
             timings: rows,
             totalEnabled: rows.length,
             validCount: rows.filter((r) => r.seconds !== null).length,

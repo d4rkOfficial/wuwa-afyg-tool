@@ -13,7 +13,7 @@ import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
 import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { EFFECTS_TEXT, SCOPE_RULES_TEXT, EXAMPLES_TEXT, REF_RULES_TEXT } from './prompts.config'
-import { renderConditionRules, renderNamingRules } from './prompts'
+import { renderConditionRules } from './prompts'
 import { analyzeCharacterTerms } from './terms'
 import { sanitizeCondition } from './sanitize'
 import type { GeneratedBuff } from './sanitize'
@@ -337,15 +337,6 @@ export const GENERATE_TOOLS: ToolDefinition[] = [
     {
         type: 'function',
         function: {
-            name: 'get_naming_rules',
-            description:
-                '获取当前 Buff 命名规则（用户自定义规则或默认要求，含叠层/精炼拆分硬性要求）。开始命名前调用。',
-            parameters: { type: 'object', properties: {} }
-        }
-    },
-    {
-        type: 'function',
-        function: {
             name: 'get_examples',
             description: '获取 few-shot 示例（声骸套装/武器叠层/角色引用属性的输入输出对照），用于理解格式与判定。',
             parameters: { type: 'object', properties: {} }
@@ -367,7 +358,7 @@ export async function executeGenerateTool(
     name: string,
     args: Record<string, unknown>
 ): Promise<string> {
-    const { entityType: curType, entityName: curName, namingRule, data } = ctx
+    const { entityType: curType, entityName: curName, data } = ctx
 
     switch (name) {
         case 'list_entities': {
@@ -446,8 +437,6 @@ export async function executeGenerateTool(
         case 'get_slang_dict':
             // 词典正文来自内置技能卡「黑话词典」；被禁用 / 清空时如实告知，不再回落硬编码词典
             return ctx.slangDict?.trim() || '（黑话词典技能已被用户清空或禁用，本次不做黑话对照）'
-        case 'get_naming_rules':
-            return renderNamingRules(namingRule)
         case 'get_examples':
             return filterExamples(curType)
         default:

@@ -38,8 +38,13 @@ export interface RunScriptRequest {
 export type RunScriptResult = RunScriptPayload
 export type RunScriptFn = (request: RunScriptRequest) => Promise<RunScriptResult>
 
-/** @desc 单次脚本超时（到点由宿主 `worker.terminate()` 强杀） */
-export const RUN_JS_TIMEOUT_MS = 20_000
+/**
+ * @desc 单次脚本超时（到点由宿主 `worker.terminate()` 强杀）。
+ *
+ * 20s 对「脚本里串几次 web_fetch / 批量调工具」明显不够：单次网页抓取本身就可能用到 15s，
+ * 一次脚本连抓两三页就超时，脚本明明没写错却被强杀。放宽到 2 分钟，仍保留强制终止兜底。
+ */
+export const RUN_JS_TIMEOUT_MS = 120_000
 
 /** @desc 单次脚本允许的工具调用次数上限（防脚本把确认弹窗刷爆 / 无限循环调工具） */
 export const RUN_JS_MAX_TOOL_CALLS = 50
@@ -47,5 +52,11 @@ export const RUN_JS_MAX_TOOL_CALLS = 50
 /** @desc `console` 日志条数上限 */
 export const RUN_JS_MAX_LOGS = 200
 
+/** @desc `console` 日志正文的合计字符上限（条数之外再按总长度兜底，防止单条超长日志撑爆上下文） */
+export const RUN_JS_MAX_LOG_CHARS = 20_000
+
 /** @desc 返回值序列化后的字符上限（超出则退化成截断字符串，而不是把上下文撑爆） */
 export const RUN_JS_MAX_OUTPUT_CHARS = 20_000
+
+/** @desc 报错文本的字符上限（错误栈/序列化异常可能很长，但只需要可读原因） */
+export const RUN_JS_MAX_ERROR_CHARS = 4_000

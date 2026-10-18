@@ -103,14 +103,15 @@ describe('归一：问题组 / 题号 / 选项 / allowCustom / required', () => 
         assert.equal(q(g, 1).required, true)
         assert.equal(q(g, 2).required, false)
         assert.equal(q(g, 2).customPlaceholder, '其它环节')
-        // 每个 id 都有初始草稿
-        for (const question of g.questions)
+        // 每个 id 都有初始草稿；是否型默认「是」（与分段控件把第 0 段画成选中态一致）
+        for (const question of g.questions) {
             assert.deepEqual(draftOf(g.draft, question.id), {
-                picked: [],
+                picked: question.type === 'boolean' ? [YES_VALUE] : [],
                 customOn: false,
                 customText: '',
                 skipped: false
             })
+        }
     })
 
     it('重复 id 被改写、空 options / 重复 value / 缺 label 被安全处理（保证 {#each} key 唯一）', () => {
@@ -270,6 +271,13 @@ describe('「其它」唯一化', () => {
 })
 
 describe('是否型：两段 tab 取值 → values yes/no', () => {
+    it('默认草稿就是「是」：不点任何分段直接提交不会变成 skipped', () => {
+        const g = group()
+        assert.deepEqual(draftOf(g.draft, 'b1').picked, [YES_VALUE])
+        assert.deepEqual(answerValues(q(g, 0), draftOf(g.draft, 'b1')), ['yes'])
+        assert.equal(questionStatus(q(g, 0), draftOf(g.draft, 'b1')), 'answered')
+    })
+
     it('选「是」/「否」分别得到 [yes] / [no]', () => {
         const g = group()
         const yes = pickRadio(g.draft, 'b1', YES_VALUE)
@@ -414,14 +422,26 @@ describe('忽略本题 / 必答校验', () => {
     it('多题同时未答时逐一列出（顿号连接）', () => {
         const g = normalizeGroup({
             questions: [
-                { type: 'boolean', question: 'A', required: true },
+                {
+                    type: 'single',
+                    question: 'A',
+                    required: true,
+                    options: [{ value: 'a', label: '甲' }]
+                },
                 { type: 'boolean', question: 'B' },
-                { type: 'boolean', question: 'C', required: true }
+                {
+                    type: 'single',
+                    question: 'C',
+                    required: true,
+                    options: [{ value: 'c', label: '丙' }]
+                }
             ]
         })
         assert.equal(blockerText(submitBlockers(g.questions, g.draft)), '第 1、3 题必答，尚未作答')
         assert.equal(questionStatus(g.questions[0], draftOf(g.draft, 'q1')), 'unanswered')
-        assert.deepEqual(questionBadges(g.questions[0]), ['是否', '必答'])
+        assert.deepEqual(questionBadges(g.questions[0]), ['单选', '可自定义', '必答'])
+        // 是否型默认「是」→ 一上来就是已作答，不会误报必答阻断
+        assert.equal(questionStatus(g.questions[1], draftOf(g.draft, 'q2')), 'answered')
         assert.deepEqual(questionBadges(g.questions[1]), ['是否'])
     })
 })
@@ -454,9 +474,10 @@ describe('导航边界', () => {
 describe('提交归一（AskUserResult）', () => {
     it('逐题按顺序归一：已答→skipped:false，未作答的非必答题→skipped:true + values:[]', () => {
         const g = group()
-        // 第 1 题不答（非必答）、第 2 题答 a（必答）、第 3 题多选 x + 自定义
+        // 第 1 题显式忽略（非必答）、第 2 题答 a（必答）、第 3 题多选 x + 自定义
         const draft = setCustomText(setCustomPick(toggleCheck(g.draft, 'q3', 'x'), q(g, 2), true), q(g, 2), '深塔')
-        const result = toResult(g.questions, pickRadio(draft, 'q2', 'a'))
+        const withSkip = skipQuestion(draft, q(g, 0))
+        const result = toResult(g.questions, pickRadio(withSkip, 'q2', 'a'))
         assert.equal(result.submitted, true)
         assert.deepEqual(result.answers, [
             { id: 'b1', type: 'boolean', skipped: true, values: [] },
