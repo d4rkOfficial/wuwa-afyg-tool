@@ -19,6 +19,7 @@ export const TRACK_COLORS = [
 
 export const BUTTON_KEY_ORDER = [
     'MouseLeft',
+    'MouseLeftHold',
     'MouseRight',
     'MouseMiddle',
     'SpaceBar',
@@ -78,6 +79,7 @@ export const BUTTON_KEY_ORDER = [
 
 export const ORIGINAL_BUTTON_KEYS = [
     'MouseLeft',
+    'MouseLeftHold',
     'MouseRight',
     'Q',
     'E',
@@ -87,6 +89,20 @@ export const ORIGINAL_BUTTON_KEYS = [
     'SpaceBar',
     'MouseMiddle'
 ] as const
+
+/** @desc 原始按键 → 操作名（空白轨道右键菜单「图 + 文」显示用；普攻短按与普攻长按/重击已分图标） */
+export const BUTTON_KEY_LABELS: Record<string, string> = {
+    MouseLeft: '普攻短按',
+    MouseLeftHold: '普攻长按 / 重击',
+    MouseRight: '闪避',
+    MouseMiddle: '锁定',
+    SpaceBar: '跳跃',
+    Q: '声骸技能',
+    E: '共鸣技能',
+    R: '共鸣解放',
+    F: '谐度破坏',
+    T: '探索工具'
+}
 
 export const QUICK_CHAR_MARKER = '__char__'
 

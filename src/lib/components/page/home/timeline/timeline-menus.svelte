@@ -48,7 +48,7 @@
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import { getSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import { remapDuplicatedDamageBuffs } from '$lib/calc/calculation.store.svelte'
-    import { ORIGINAL_BUTTON_KEYS, GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
+    import { ORIGINAL_BUTTON_KEYS, BUTTON_KEY_LABELS, GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
     import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 
     let confirmMultiAction = $state<'delete' | 'reset' | null>(null)
@@ -81,6 +81,18 @@
         { value: 'switchback', label: '切回' }
     ] as const
 
+    // 图标缺失时的文字兜底（图标来自游戏素材，加载失败也能认出按键）
+    const KEY_ICON_FALLBACK: Record<string, string> = {
+        SpaceBar: '⎵',
+        MouseLeft: 'L',
+        MouseLeftHold: 'L+',
+        MouseRight: 'R',
+        MouseMiddle: 'M'
+    }
+
+    const keyLabel = (name: string): string => BUTTON_KEY_LABELS[name] ?? name
+    const keyFallback = (name: string): string => KEY_ICON_FALLBACK[name] ?? name
+
     function copyToClipboard() {
         copySelection()
     }
@@ -105,6 +117,14 @@
 
 {#snippet shortcut(label: string)}
     <span class="ml-auto pl-3 text-[10px] text-(--theme-context-menu-text)/30">{label}</span>
+{/snippet}
+
+{#snippet keyIcon(name: string, url: string, sizeClass: string)}
+    {#if url}
+        <img src={url} alt={name} draggable="false" class="{sizeClass} object-contain pointer-events-none" />
+    {:else}
+        <span class="text-[10px] font-bold opacity-60">{keyFallback(name)}</span>
+    {/if}
 {/snippet}
 
 {#snippet damageBinding(id: string, sourceType: 'op' | 'ref')}
@@ -507,7 +527,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="animate-pop-in fixed z-(--z-modal) max-w-[80vw] overflow-x-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1.5 px-2 backdrop-blur-lg"
+        class="animate-pop-in fixed z-(--z-modal) max-w-[80vw] overflow-x-auto rounded-none border bg-(--theme-context-menu-bg) text-(--theme-context-menu-text) py-1 backdrop-blur-lg"
         style="left: {tm.x}px; top: {tm.y}px; border-color: var(--theme-divider-border);"
         data-track-menu="true"
         use:clampMenu={{ x: tm.x, y: tm.y }}
@@ -515,33 +535,18 @@
         out:popOut={slideParams(MOTION_MS.fast)}
     >
         <div class="flex flex-col">
-            <div class="flex items-center gap-1">
+            <!-- 左 5（鼠标键 + 跳跃）· 右 5（技能键）：列优先填满 5 行，下方「创建参考线」整行 -->
+            <div class="grid grid-flow-col grid-cols-2 grid-rows-5 gap-x-1">
                 {#each menuBtnIcons as [name, url] (name)}
                     <button
-                        class="size-7 flex items-center justify-center rounded-none hover:bg-(--theme-context-menu-bg-focused) transition-colors"
+                        data-press="none"
+                        class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs whitespace-nowrap text-(--theme-context-menu-text) transition-colors hover:bg-(--theme-context-menu-bg-focused)"
                         onclick={() => addOpBlock(tm.trackIndex, tm.pos, name)}
-                        title={name}
                     >
-                        {#if url}
-                            <img
-                                src={url}
-                                alt={name}
-                                draggable="false"
-                                class="size-5 object-contain pointer-events-none"
-                            />
-                        {:else}
-                            <span class="text-[10px] font-bold text-(--theme-context-menu-text)"
-                                >{name === 'SpaceBar'
-                                    ? '⎵'
-                                    : name === 'MouseLeft'
-                                      ? 'L'
-                                      : name === 'MouseRight'
-                                        ? 'R'
-                                        : name === 'MouseMiddle'
-                                          ? 'M'
-                                          : name}</span
-                            >
-                        {/if}
+                        <span class="flex size-5 shrink-0 items-center justify-center">
+                            {@render keyIcon(name, url, 'size-5')}
+                        </span>
+                        {keyLabel(name)}
                     </button>
                 {/each}
             </div>
@@ -549,9 +554,11 @@
             <button
                 data-press="none"
                 onclick={() => addRefLineAt(tm.pos)}
-                class="w-full flex items-center gap-2 px-1 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
             >
-                <Icon icon="mdi:timeline-plus-outline" class="size-4 shrink-0" />
+                <span class="flex size-5 shrink-0 items-center justify-center">
+                    <Icon icon="mdi:timeline-plus-outline" class="size-4" />
+                </span>
                 创建参考线
             </button>
             {#if hasClipboard()}
@@ -559,9 +566,11 @@
                 <button
                     data-press="none"
                     onclick={pasteFromClipboard}
-                    class="w-full flex items-center gap-2 px-1 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
+                    class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors whitespace-nowrap"
                 >
-                    <Icon icon="mdi:clipboard-arrow-left" class="size-4 shrink-0" />
+                    <span class="flex size-5 shrink-0 items-center justify-center">
+                        <Icon icon="mdi:clipboard-arrow-left" class="size-4" />
+                    </span>
                     粘贴
                     {@render shortcut('Ctrl+V')}
                 </button>
@@ -591,26 +600,7 @@
                         style="border-color: var(--theme-divider-border);"
                         title={name}
                     >
-                        {#if url}
-                            <img
-                                src={url}
-                                alt={name}
-                                draggable="false"
-                                class="size-6 object-contain pointer-events-none"
-                            />
-                        {:else}
-                            <span class="text-xs font-bold text-(--theme-modal-text)"
-                                >{name === 'SpaceBar'
-                                    ? '⎵'
-                                    : name === 'MouseLeft'
-                                      ? 'L'
-                                      : name === 'MouseRight'
-                                        ? 'R'
-                                        : name === 'MouseMiddle'
-                                          ? 'M'
-                                          : name}</span
-                            >
-                        {/if}
+                        {@render keyIcon(name, url, 'size-6')}
                     </button>
                 {/each}
                 {#each GAMEPAD_BUTTONS as btn (btn.id)}

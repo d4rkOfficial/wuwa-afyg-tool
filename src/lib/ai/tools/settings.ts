@@ -663,12 +663,12 @@ defineTool('get_keymap', {
 
 defineTool('set_keymap_entry', {
     description:
-        '修改单个按键图标映射。id 为操作动作 id（如 attack/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseRight/Q/E/R/F/T/SpaceBar）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。传 reset=true 可恢复全部按键图标为默认（此时忽略 id 等其它参数）。',
+        '修改单个按键图标映射。id 为操作动作 id（如 attack/heavypress/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseLeftHold/MouseRight/Q/E/R/F/T/SpaceBar，重击默认使用独立的 MouseLeftHold）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。传 reset=true 可恢复全部按键图标为默认（此时忽略 id 等其它参数）。',
     parameters: {
         type: 'object',
         properties: {
             id: { type: 'string', description: '操作动作 id（见 get_keymap 返回）' },
-            blockKey: { type: 'string', description: '图标 key（如 MouseLeft/Q/SpaceBar）' },
+            blockKey: { type: 'string', description: '图标 key（如 MouseLeft/MouseLeftHold/Q/SpaceBar）' },
             physical: { type: 'string', description: '物理按键（单个小写字母 a-z 或空格 " "）' },
             reset: { type: 'boolean', description: 'true = 恢复默认按键图标映射' }
         },

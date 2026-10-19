@@ -10,14 +10,9 @@ export interface KeyMapEntry {
 
 const KEY = 'keymap'
 
-const SHARED_KEY_GROUPS: Record<string, string> = {
-    attack: 'left-attack',
-    heavypress: 'left-attack'
-}
-
 const DEFAULT_ENTRIES: KeyMapEntry[] = [
     { id: 'attack', blockKey: 'MouseLeft', physical: 'a', label: '普攻' },
-    { id: 'heavypress', blockKey: 'MouseLeft', physical: 'z', label: '重击' },
+    { id: 'heavypress', blockKey: 'MouseLeftHold', physical: 'z', label: '重击' },
     { id: 'dodge', blockKey: 'MouseRight', physical: 's', label: '闪避' },
     { id: 'q', blockKey: 'Q', physical: 'q', label: 'Q' },
     { id: 'e', blockKey: 'E', physical: 'e', label: 'E' },
@@ -35,6 +30,16 @@ function isValidShortcut(physical: string): boolean {
     return physical === ' ' || /^[a-z]$/.test(physical)
 }
 
+/** @desc 旧版「重击与普攻共用左键图标」：存量数据里的旧默认值迁到独立的重击图标，用户自定义值保持不变 */
+const LEGACY_BLOCK_KEYS: Record<string, string> = {
+    heavypress: 'MouseLeft'
+}
+
+const migrateBlockKey = (id: string, blockKey: string): string => {
+    if (LEGACY_BLOCK_KEYS[id] !== blockKey) return blockKey
+    return DEFAULT_ENTRIES.find((e) => e.id === id)?.blockKey ?? blockKey
+}
+
 let entries = $state<KeyMapEntry[]>(clone(DEFAULT_ENTRIES))
 
 export async function loadKeyMap() {
@@ -50,20 +55,13 @@ export async function loadKeyMap() {
         seen.add(e.id)
         normalized.push({
             id: e.id,
-            blockKey: e.blockKey || def.blockKey,
+            blockKey: migrateBlockKey(e.id, e.blockKey || def.blockKey),
             physical: isValidShortcut(e.physical) ? e.physical : def.physical,
             label: e.label || def.label
         })
     }
     for (const d of DEFAULT_ENTRIES) {
         if (!seen.has(d.id)) normalized.push({ ...d })
-    }
-    for (const group of new Set(Object.values(SHARED_KEY_GROUPS))) {
-        const first = normalized.find((n) => SHARED_KEY_GROUPS[n.id] === group)
-        if (!first) continue
-        for (const n of normalized) {
-            if (SHARED_KEY_GROUPS[n.id] === group) n.blockKey = first.blockKey
-        }
     }
     entries = normalized
     await dbSet(KEY, entries)
@@ -78,12 +76,7 @@ export function getDefaultBlockKey(entryId: string): string {
 }
 
 export async function updateKeyMapEntry(entry: KeyMapEntry) {
-    let next = entries.map((e) => (e.id === entry.id ? { ...e, ...entry } : e))
-    const group = entry.blockKey !== undefined ? SHARED_KEY_GROUPS[entry.id] : undefined
-    if (group) {
-        next = next.map((e) => (SHARED_KEY_GROUPS[e.id] === group ? { ...e, blockKey: entry.blockKey } : e))
-    }
-    entries = next
+    entries = entries.map((e) => (e.id === entry.id ? { ...e, ...entry } : e))
     await dbSet(KEY, entries)
 }
 

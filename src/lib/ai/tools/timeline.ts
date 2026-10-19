@@ -50,7 +50,7 @@ const BLOCK_W = 60
 // 按键名规范化：id/中文/单字母 → 图标键（MouseLeft/SpaceBar/Q/E/R/F/T...）
 const BLOCK_KEY_ALIASES: Record<string, string> = {
     attack: 'MouseLeft',
-    heavypress: 'MouseLeft',
+    heavypress: 'MouseLeftHold',
     dodge: 'MouseRight',
     q: 'Q',
     e: 'E',
@@ -59,7 +59,7 @@ const BLOCK_KEY_ALIASES: Record<string, string> = {
     t: 'T',
     space: 'SpaceBar',
     普攻: 'MouseLeft',
-    重击: 'MouseLeft',
+    重击: 'MouseLeftHold',
     闪避: 'MouseRight',
     跳跃: 'SpaceBar',
     共鸣技能: 'E',
@@ -250,7 +250,7 @@ defineTool('get_timeline_damage_list', {
 
 defineTool('add_op_block', {
     description:
-        '在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“重击”“变奏入场”）。返回新块的**序号**（时间轴上的第几个操作块）。',
+        '在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“变奏入场”）。返回新块的**序号**（时间轴上的第几个操作块）。',
     parameters: {
         type: 'object',
         properties: {
@@ -272,9 +272,7 @@ defineTool('add_op_block', {
             throw new Error(
                 `无效按键名：${rawKey}（可用：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏 或 Q/E/R/F/T 等字母）`
             )
-        let desc = str(args.desc)
-        // 重击/普攻同键（MouseLeft），用描述区分
-        if (!desc && (rawKey === '重击' || rawKey === 'heavypress')) desc = '重击'
+        const desc = str(args.desc)
         const id = addOpBlock(track - 1, appendPos(), key, desc)
         if (!id) throw new Error('排轴已锁定或添加失败')
         await updateTimeline(getTimelineState())

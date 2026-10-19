@@ -43,6 +43,10 @@ const PHASE_ORDER: PhaseKey[] = ['team', 'timeline', 'calculation', 'config']
  *
  * 注意：工具早年确实存在过无版本号的导出文件，所以门槛之前仍按 0 处理（迁移链照跑），
  * 不能用「无版本号 = 最新版」一刀切。
+ *
+ * 另注：门槛之后新增的版本若也要作用于这些无版本号文件，必须做成**幂等且无条件执行**的结构性归一化
+ * （如 v5 的「旧备注重击块 → 独立重击块」，见 `migrateHeavyPressOpBlocks` 在 `migrateProject` 里的兜底调用），
+ * 否则会被本兜底判定直接跳过。
  */
 export const VERSIONLESS_ASSUME_CURRENT_AFTER = Date.UTC(2026, 9, 1, 0, 0, 0, 0)
 
@@ -438,6 +442,39 @@ export const splitDualGateBuffs = (
 
 // ── 工程迁移链 ──
 
+/**
+ * @desc 旧版「普攻块用备注标注重击」的两种备注形态：
+ * ① 纯标记「重击」—— 图标已能表达，升级后清空；
+ * ② `z` / `Z` 开头（可紧跟段数数字，数字为空也行，其后任意内容）—— 是用户手写的补充信息（如 z3 表示第 3 段），升级后**保留**。
+ */
+const HEAVY_NOTE = '重击'
+const HEAVY_NOTE_PATTERN = /^[zZ]\d*/
+
+/**
+ * @desc 把旧版靠备注区分重击的普攻块升级为独立重击块（key 换成 MouseLeftHold = 新重击图标）：
+ * - 备注恰好是「重击」：清空备注（图标已能区分，不再需要「重击」二字）；
+ * - 备注以 z/Z 开头（可紧跟数字，数字为空也匹配）：保留备注内容，只换图标。
+ *
+ * 只改「key 仍是普攻 MouseLeft」的块，其余块原样返回；
+ * 幂等（再跑一次不会命中），故也可作为结构性归一化在迁移链之外兜底（见 `migrateProject`）。
+ */
+export const migrateHeavyPressOpBlocks = (timeline: unknown): unknown => {
+    if (!isRecord(timeline) || !Array.isArray(timeline.opBlocks)) return timeline
+    let changed = false
+    const opBlocks = timeline.opBlocks.map((block) => {
+        if (!isRecord(block) || block.key !== 'MouseLeft') return block
+        const desc = typeof block.desc === 'string' ? block.desc : ''
+        if (desc === HEAVY_NOTE) {
+            changed = true
+            return { ...block, key: 'MouseLeftHold', desc: '' }
+        }
+        if (!HEAVY_NOTE_PATTERN.test(desc)) return block
+        changed = true
+        return { ...block, key: 'MouseLeftHold' }
+    })
+    return changed ? { ...timeline, opBlocks } : timeline
+}
+
 const normalizeTeam = (raw: unknown): [CharSlot, CharSlot, CharSlot] =>
     DEFAULT_SLOTS.map((i) => {
         const slot = asRecord(Array.isArray(raw) ? raw[i] : undefined)
@@ -585,7 +622,33 @@ const migrateV3toV4: Migration = {
     }
 }
 
-const PROJECT_MIGRATIONS: Migration[] = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4]
+/** @desc 迁移 v4 → v5（当前版本）：旧「备注即重击」的普攻块升级为独立重击图标块 */
+const migrateV4toV5: Migration = {
+    from: 4,
+    to: 5,
+    migrate(raw) {
+        const encounter = asRecord(raw.encounter)
+        const phases = asRecord(raw.phases)
+        // 真源 encounter 与兼容视图 phases 都可能承载四阶段数据（导出文件只写 phases），两处都洗一遍
+        const patchTimeline = (container: Record<string, unknown>): Record<string, unknown> => {
+            const phase = asRecord(container.timeline)
+            const data = migrateHeavyPressOpBlocks(phase.data)
+            if (data === phase.data) return container
+            return { ...container, timeline: { ...phase, data } }
+        }
+        const nextEncounter = patchTimeline(encounter)
+        const nextPhases = patchTimeline(phases)
+
+        return {
+            ...raw,
+            version: 5,
+            ...(nextEncounter === encounter ? {} : { encounter: nextEncounter }),
+            ...(nextPhases === phases ? {} : { phases: nextPhases })
+        }
+    }
+}
+
+const PROJECT_MIGRATIONS: Migration[] = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5]
 
 /**
  * @desc 读取数据的版本号：无版本号（老导出格式 / 老 IndexedDB）视为 0。
@@ -650,6 +713,14 @@ export const migrateProject = (raw: unknown): Project => {
     // 归一化拉表态（清理空全局 buff / [配置] 自动块 / 旧类型名）并落实「链阶条件二选一」拆分
     const normalizedCalc = migrateCalcState(phaseData('calculation'))
     const calcState = normalizeCalcState(normalizedCalc)
+    /**
+     * @desc 旧「备注即重击」的普攻块升级为独立重击块，**与版本无关地幂等兜底**。
+     *
+     * 为什么要兜底而不只依赖 v4→v5：工坊下载件的 `project.version` 会被中转站吃掉，`readVersion`
+     * 对「无版本号 + 产出时间晚于门槛」的文件直接断言为当前版本（见 VERSIONLESS_ASSUME_CURRENT_AFTER），
+     * 迁移链一步都不跑；只在链里做会让这些下载件永远停在旧形态。
+     */
+    const timelineData = migrateHeavyPressOpBlocks(phaseData('timeline'))
 
     const project: ProjectV2 = {
         version: PROJECT_VERSION,
@@ -661,7 +732,7 @@ export const migrateProject = (raw: unknown): Project => {
         encounter: {
             // 视图侧的队伍锁定标记在 `phases.team.locked`（与 migrateV0toV1 同口径），不是 `phases.teamLocked`
             teamLocked: teamLockedOf(encounter) || teamLockedOf(legacyPhases) || viewPhase('team').locked === true,
-            timeline: { locked: phaseLocked('timeline'), data: phaseData('timeline') as TimelineData | null },
+            timeline: { locked: phaseLocked('timeline'), data: timelineData as TimelineData | null },
             calculation: { locked: phaseLocked('calculation'), data: calcState },
             config: { locked: phaseLocked('config'), data: phaseData('config') as ConfigState | null }
         },

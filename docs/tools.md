@@ -767,14 +767,14 @@ _无参数_
 
 ### `set_keymap_entry`
 
-修改单个按键图标映射。id 为操作动作 id（如 attack/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseRight/Q/E/R/F/T/SpaceBar）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。传 reset=true 可恢复全部按键图标为默认（此时忽略 id 等其它参数）。
+修改单个按键图标映射。id 为操作动作 id（如 attack/heavypress/dodge/q/e/r/f/t/space 等）；blockKey 为显示的图标 key（如 MouseLeft/MouseLeftHold/MouseRight/Q/E/R/F/T/SpaceBar，重击默认使用独立的 MouseLeftHold）；physical 为物理按键（单个小写字母 a-z 或空格 " "）。传 reset=true 可恢复全部按键图标为默认（此时忽略 id 等其它参数）。
 
-| 参数       | 必填 | 类型    | 说明                                    |
-| ---------- | ---- | ------- | --------------------------------------- |
-| `id`       | 否   | string  | 操作动作 id（见 get_keymap 返回）       |
-| `blockKey` | 否   | string  | 图标 key（如 MouseLeft/Q/SpaceBar）     |
-| `physical` | 否   | string  | 物理按键（单个小写字母 a-z 或空格 " "） |
-| `reset`    | 否   | boolean | true = 恢复默认按键图标映射             |
+| 参数       | 必填 | 类型    | 说明                                              |
+| ---------- | ---- | ------- | ------------------------------------------------- |
+| `id`       | 否   | string  | 操作动作 id（见 get_keymap 返回）                 |
+| `blockKey` | 否   | string  | 图标 key（如 MouseLeft/MouseLeftHold/Q/SpaceBar） |
+| `physical` | 否   | string  | 物理按键（单个小写字母 a-z 或空格 " "）           |
+| `reset`    | 否   | boolean | true = 恢复默认按键图标映射                       |
 
 ### `get_shortcuts`
 
@@ -1045,7 +1045,7 @@ _无参数_
 
 ### `add_op_block`
 
-在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“重击”“变奏入场”）。返回新块的**序号**（时间轴上的第几个操作块）。
+在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“变奏入场”）。返回新块的**序号**（时间轴上的第几个操作块）。
 
 | 参数    | 必填   | 类型   | 说明                                                                      |
 | ------- | ------ | ------ | ------------------------------------------------------------------------- |

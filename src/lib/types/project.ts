@@ -53,9 +53,9 @@ export interface EncounterState {
     config: PhaseStateV2<ConfigState>
 }
 
-// ── 新工程结构（version 4：乘区改名 + 同名变体拍平为单层乘区条目）──
+// ── 新工程结构（version 5：在 v4 乘区改名/变体拍平之上，旧「备注即重击」的普攻块升级为独立重击图标块）──
 
-export const PROJECT_VERSION = 4
+export const PROJECT_VERSION = 5
 
 export interface ProjectV2 {
     version: number

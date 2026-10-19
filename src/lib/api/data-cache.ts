@@ -235,6 +235,7 @@ const WEAPON_TYPE_ICONS: Record<string, string> = {
 
 const UI_BTN_ICONS: Record<string, string> = {
     MouseLeft: '/icons/btn/MouseLeft.webp',
+    MouseLeftHold: '/icons/btn/MouseLeftHold.webp',
     MouseRight: '/icons/btn/MouseRight.webp',
     MouseMiddle: '/icons/btn/MouseMiddle.webp',
     SpaceBar: '/icons/btn/SpaceBar.webp',

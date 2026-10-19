@@ -725,9 +725,7 @@
                                                     style="border-color: color-mix(in srgb, var(--theme-accent-bg) 50%, transparent);"
                                                 />
                                             {:else}
-                                                <span class="text-(--theme-timeline-text)/60 max-w-24 truncate"
-                                                    >{block.desc}</span
-                                                >
+                                                <span class="text-(--theme-timeline-text)/60">{block.desc}</span>
                                             {/if}
                                         </div>
                                     </div>

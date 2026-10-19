@@ -379,8 +379,6 @@ function quickBlockWidth(key: string, desc: string): number {
 
 /** @desc 操作块文本用的字体（与 DOM 的 text-sm + 全局衬线字体一致） */
 const BLOCK_FONT = "14px 'FangXinShu', system-ui, sans-serif"
-/** @desc 备注在 DOM 上是 max-w-24 + truncate，宽度上限 96px */
-const NOTE_MAX_WIDTH = 96
 
 let _measureCtx: CanvasRenderingContext2D | null | undefined
 /** @desc 用 canvas 实测文本宽度（同字体），比「字符数 × 14px」的粗估准确（中英混排/数字尤甚） */
@@ -397,7 +395,7 @@ function estimateInnerWidth(key: string, desc: string, chips = 0): number {
     const hasIcon =
         _uiBtnIcons.some(([n, url]) => n === key && url) || GAMEPAD_BUTTONS.some((b) => b.id === key && b.icon)
     let inner = hasIcon ? 40 : measureTextWidth(key, BLOCK_FONT)
-    if (desc) inner += 4 + Math.min(measureTextWidth(desc, BLOCK_FONT), NOTE_MAX_WIDTH)
+    if (desc) inner += 4 + measureTextWidth(desc, BLOCK_FONT)
     inner += chips * 28
     return Math.max(56, inner + 22)
 }
@@ -442,15 +440,14 @@ export function quickInput(rawKey: string): string | null {
     const names = getTeamCharNames()
     if (names.length === 0 || _quickCharIndex >= names.length) return null
     const storedKey = getDefaultBlockKey(entry.id) || entry.blockKey
-    const desc = entry.id === 'heavypress' ? entry.label : ''
-    const newWidth = quickBlockWidth(storedKey, desc)
+    const newWidth = quickBlockWidth(storedKey, '')
     let maxRight = 0
     for (const b of _opBlocks) {
         const bw = _blockWidths[b.id] ?? 56
         maxRight = Math.max(maxRight, b.pos + bw / 2)
     }
     const pos = maxRight > 0 ? maxRight + newWidth / 2 : SIDE_PAD + newWidth / 2
-    const id = addOpBlock(_quickCharIndex, pos, storedKey, desc, 'none', true)
+    const id = addOpBlock(_quickCharIndex, pos, storedKey, '', 'none', true)
     if (id) _quickStack.push({ type: 'op', id })
     return id
 }
