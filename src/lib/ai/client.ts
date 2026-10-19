@@ -85,7 +85,14 @@ interface StreamChunk {
     choices?: Array<{
         delta?: {
             content?: string | null
+            /** @desc DeepSeek / 通义 等用 `reasoning_content` */
             reasoning_content?: string | null
+            /**
+             * @desc 思考内容的另一种写法（Ollama、OpenRouter 等）。
+             * 两种字段名在「OpenAI 兼容」阵营里并存，只认前一个会让本地模型
+             * 的思考链永远不显示（表现为「有思考但界面空白」）。
+             */
+            reasoning?: string | null
             tool_calls?: Array<{
                 index?: number
                 id?: string
@@ -245,9 +252,11 @@ export async function chatCompletionStream(
             content += delta.content
             options.onDelta?.({ content: delta.content })
         }
-        if (delta?.reasoning_content) {
-            reasoning += delta.reasoning_content
-            options.onDelta?.({ reasoning: delta.reasoning_content })
+        // 思考增量：字段名按 `reasoning_content` → `reasoning` 依次回退（见 StreamChunk 的说明）
+        const reasoningDelta = delta?.reasoning_content ?? delta?.reasoning
+        if (reasoningDelta) {
+            reasoning += reasoningDelta
+            options.onDelta?.({ reasoning: reasoningDelta })
         }
         if (delta?.tool_calls) {
             for (const tc of delta.tool_calls) {
