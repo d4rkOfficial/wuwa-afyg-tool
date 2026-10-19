@@ -2144,12 +2144,12 @@ export function removeDamageBlock(id: string) {
 }
 
 // 直接写入指定操作块绑定的技能命中列表（AI 排轴用；自动创建对应的伤害块）
-export function setDamageBlockSkillHits(blockId: string, hits: SkillHit[]) {
+export function setDamageBlockSkillHits(blockId: string, hits: SkillHit[], sourceType: 'op' | 'ref' = 'op') {
     if (!assertUnlocked()) return
     const lastTrackIdx = getTRACKS().length - 1
     let dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!dmg) {
-        addDamageBlock('op', blockId)
+        addDamageBlock(sourceType, blockId)
         dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     }
     if (!dmg) return
@@ -2183,12 +2183,16 @@ export function removeDamageBySource(sourceId: string, type: 'skillHits' | 'nonD
 }
 
 // 直接写入指定操作块绑定的非直伤条目（AI 排轴用；自动创建对应的伤害块）
-export function setDamageBlockNonDirectEntries(blockId: string, entries: NonDirectEntry[]) {
+export function setDamageBlockNonDirectEntries(
+    blockId: string,
+    entries: NonDirectEntry[],
+    sourceType: 'op' | 'ref' = 'op'
+) {
     if (!assertUnlocked()) return
     const lastTrackIdx = getTRACKS().length - 1
     let dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     if (!dmg) {
-        addDamageBlock('op', blockId)
+        addDamageBlock(sourceType, blockId)
         dmg = _damageBlocks.find((d) => d.sourceId === blockId && d.trackIndex === lastTrackIdx)
     }
     if (!dmg) return

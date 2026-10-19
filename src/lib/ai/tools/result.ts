@@ -1,5 +1,7 @@
 // 结果域工具（Phase 4）：读取当前配置下的伤害计算结果、单条目乘区溯源、数据分析
+import { tick } from 'svelte'
 import { defineTool } from './registry'
+import { summarizeDamageByCharacter } from '$lib/ai/result-summary'
 import { computeAll } from '$lib/calc/compute'
 import {
     getAllDamageEntries,
@@ -34,6 +36,9 @@ async function buildComputeContext(projectId?: string): Promise<{
     timeline: NonNullable<NonNullable<ReturnType<typeof getActiveProject>>['encounter']['timeline']['data']>
     damageEntries: ReturnType<typeof getAllDamageEntries>
 }> {
+    // 写工具刚改完 store 时，条目/派生状态可能还在同一微任务里待刷新；
+    // 先让 Svelte 处理完待办，避免结果工具读到上一帧而得出「改动无效」。
+    await tick()
     const p = projectId ? getProjects().find((item) => item.id === projectId) : getActiveProject()
     if (!p) throw new Error(projectId ? `未找到工程：${projectId}` : '当前没有活动工程')
     const calc = projectId
@@ -76,7 +81,9 @@ async function buildComputeContext(projectId?: string): Promise<{
               refinements: p.team.map((s) => s.refinement ?? 1)
           }
         : getConditionProfile()
-    const damageEntries = projectId ? buildDamageEntriesFromTimeline(timeline, p.team) : getAllDamageEntries()
+    const damageEntries = projectId
+        ? buildDamageEntriesFromTimeline(timeline, p.team, calc.damageEntryDisplayNames)
+        : getAllDamageEntries()
     const entries = computeAll(
         damageEntries,
         calc.buffSets,
@@ -134,30 +141,49 @@ function applyModes(
 
 defineTool('get_result_summary', {
     description:
-        '基于当前配装/Buff/条件配置计算并返回伤害结果摘要：每个伤害条目的期望伤害（含暴击）与全队总伤害。可用来回答“这套配置伤害多少”“哪个技能伤害最高”。',
+        '基于当前配装/Buff/条件配置计算并返回伤害结果摘要：每个伤害条目的期望伤害（含暴击）与全队总伤害。支持 summaryOnly 只取总计、groupBy:"character" 按角色汇总（带占比）、character 只统计单个角色，减少逐条目输出。可用来回答“这套配置伤害多少”“哪个技能伤害最高”“各角色伤害占比”。',
     parameters: {
         type: 'object',
         properties: {
-            projectId: { type: 'string', description: '可选：工程 id；传了则只读计算该工程，不切换活动工程' }
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读计算该工程，不切换活动工程' },
+            summaryOnly: {
+                type: 'boolean',
+                description: '只返回总计（以及 groupBy=character 时的角色汇总），省略逐条目明细'
+            },
+            groupBy: {
+                type: 'string',
+                enum: ['entry', 'character'],
+                description: '聚合方式：entry（默认，返回逐条目）或 character（按角色汇总）'
+            },
+            character: { type: 'string', description: '可选：只统计该角色（按显示名精确匹配）' }
         }
     },
     handler: async (args) => {
         const projectId = str(args.projectId)
         const { entries, project } = await buildComputeContext(projectId)
         const applied = applyModes(entries, project.analysis)
-        const total = applied.reduce((sum, e) => sum + (e.totalDamage ?? 0), 0)
+        const character = str(args.character)
+        const summaryOnly = args.summaryOnly === true
+        const groupBy = str(args.groupBy) === 'character' ? 'character' : 'entry'
+        const { filtered, total, characters } = summarizeDamageByCharacter(applied, character)
+
+        const entryItems = filtered.map((e) => ({
+            id: e.id,
+            displayName: e.displayName,
+            character: e.character,
+            element: e.element,
+            hits: e.hits,
+            totalDamage: e.totalDamage,
+            perHit: e.totalDamage > 0 && e.hits > 0 ? Math.round(e.totalDamage / e.hits) : 0
+        }))
+
         return {
             ...(projectId ? { projectId, projectName: project.name } : {}),
             total,
-            entries: applied.map((e) => ({
-                id: e.id,
-                displayName: e.displayName,
-                character: e.character,
-                element: e.element,
-                hits: e.hits,
-                totalDamage: e.totalDamage,
-                perHit: e.totalDamage > 0 && e.hits > 0 ? Math.round(e.totalDamage / e.hits) : 0
-            }))
+            entryCount: filtered.length,
+            ...(character ? { character } : {}),
+            ...(groupBy === 'character' ? { characters } : {}),
+            ...(groupBy === 'entry' && !summaryOnly ? { entries: entryItems } : {})
         }
     }
 })

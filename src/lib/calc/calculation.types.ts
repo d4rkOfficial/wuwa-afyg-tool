@@ -141,6 +141,8 @@ export interface CalcState {
     buffSets: BuffInstance[]
     damageEntryBuffSetIds: Record<string, string[]>
     damageEntryDamageTypes: Record<string, string[]>
+    /** @desc 伤害条目显示名覆盖（只改界面/AI 看到的 displayName，不改底层命中 id 与绑定关系） */
+    damageEntryDisplayNames?: Record<string, string>
 }
 
 /** @desc 工程 Buff 配置：使用统一 Buff 实例结构，与主页 Buff 集区分命名 */

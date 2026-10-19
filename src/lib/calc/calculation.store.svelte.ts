@@ -32,6 +32,8 @@ let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffConf[]>([])
 let _damageEntryBuffSetIds = $state<Record<string, string[]>>({})
 let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
+/** @desc 伤害条目显示名覆盖（不改底层 id / 绑定） */
+let _damageEntryDisplayNames = $state<Record<string, string>>({})
 let _showBuffModal = $state(false)
 let _showDamageTypeModal = $state(false)
 let _buffDiffMode = $state(false)
@@ -108,6 +110,7 @@ const applyTableSnapshot = (snap: CalcState): void => {
     _buffSets = JSON.parse(JSON.stringify(snap.buffSets ?? []))
     _damageEntryBuffSetIds = JSON.parse(JSON.stringify(snap.damageEntryBuffSetIds ?? {}))
     _damageEntryDamageTypes = JSON.parse(JSON.stringify(snap.damageEntryDamageTypes ?? {}))
+    _damageEntryDisplayNames = JSON.parse(JSON.stringify(snap.damageEntryDisplayNames ?? {}))
     _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
     if (_onupdate) {
         _updateInFlight = true
@@ -232,6 +235,7 @@ export function init(
 
     const names = team.map((s) => s.character).filter(Boolean) as string[]
     const haveAllElements = names.every((n) => getCharElementMap()[n])
+    _damageEntryDisplayNames = savedState?.damageEntryDisplayNames ?? {}
     _entries = buildDamageEntries(team, timelineData)
     /**
      * @desc 条目里「倍率还没拿到」的偏谐响应触发角色。
@@ -271,10 +275,12 @@ export function init(
                 types.map((t) => (t === '视为效应伤害' ? '效应伤害' : t))
             ])
         )
+        _damageEntryDisplayNames = saved.damageEntryDisplayNames ?? {}
     } else {
         _buffSets = []
         _damageEntryBuffSetIds = {}
         _damageEntryDamageTypes = {}
+        _damageEntryDisplayNames = {}
     }
     _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
     rebindGlobalBuffs()
@@ -319,7 +325,11 @@ function pruneOrphanedBindings(): boolean {
  * @desc 从一份**显式的时间线 + 队伍**推导伤害条目（不读任何全局活动工程状态）。
  * 跨工程只读工具直接用它：只要传入目标工程的持久化数据即可，无需切换活动工程。
  */
-export function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlot, CharSlot, CharSlot]): DamageEntry[] {
+export function buildDamageEntriesFromTimeline(
+    tl: TimelineData,
+    _team: [CharSlot, CharSlot, CharSlot],
+    displayNames: Record<string, string> = {}
+): DamageEntry[] {
     const temp: Array<{ item: DamageEntry; pos: number; order: number }> = []
     let order = 0
 
@@ -529,14 +539,14 @@ export function buildDamageEntriesFromTimeline(tl: TimelineData, _team: [CharSlo
     }
 
     temp.sort((a, b) => a.pos - b.pos || a.order - b.order)
-    return temp.map((t) => t.item)
+    return temp.map((t) => (displayNames[t.item.id] ? { ...t.item, displayName: displayNames[t.item.id] } : t.item))
 }
 
 /** @desc 伤害条目入口：无时间线时返回空数组 */
 function buildDamageEntries(_team: [CharSlot, CharSlot, CharSlot], _timelineData: TimelineData | null): DamageEntry[] {
     if (!_timelineData) return []
 
-    const items = buildDamageEntriesFromTimeline(_timelineData, _team)
+    const items = buildDamageEntriesFromTimeline(_timelineData, _team, _damageEntryDisplayNames)
 
     return items
 }
@@ -1203,6 +1213,21 @@ export function getDamageTypesForEntry(entryId: string): string[] {
     return _damageEntryDamageTypes[entryId] ?? []
 }
 
+/**
+ * @desc 设置伤害条目的**显示名**（只影响 displayName，不改底层命中 id / Buff 绑定）。
+ * 空串表示恢复默认显示名。
+ */
+export function setDamageEntryDisplayName(entryId: string, name: string): boolean {
+    if (!assertUnlocked()) return false
+    markTableDirty()
+    const trimmed = name.trim()
+    const next = { ..._damageEntryDisplayNames }
+    if (trimmed) next[entryId] = trimmed
+    else delete next[entryId]
+    _damageEntryDisplayNames = next
+    return true
+}
+
 /** @desc 切换条目↔伤害类型的绑定 */
 export function toggleDamageTypeForEntry(entryId: string, damageType: string) {
     if (!assertUnlocked()) return
@@ -1374,7 +1399,8 @@ export function getCalcState(): CalcState {
         JSON.stringify({
             buffSets: _buffSets,
             damageEntryBuffSetIds: _damageEntryBuffSetIds,
-            damageEntryDamageTypes: _damageEntryDamageTypes
+            damageEntryDamageTypes: _damageEntryDamageTypes,
+            damageEntryDisplayNames: _damageEntryDisplayNames
         })
     )
 }

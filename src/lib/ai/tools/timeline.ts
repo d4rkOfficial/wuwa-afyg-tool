@@ -1,4 +1,5 @@
 // 排轴域工具（Phase 3）：轴摘要、增删块、按键/变奏设置、撤销重做、格式化、参考线、伤害倍率绑定
+import { tick } from 'svelte'
 import { defineTool } from './registry'
 import {
     getOpBlocks,
@@ -20,6 +21,7 @@ import {
     getFullSkillGroups,
     setDamageBlockSkillHits,
     setDamageBlockNonDirectEntries,
+    removeDamageBySource,
     setOpBlockPos,
     setRefLinePos,
     getMaxPos,
@@ -36,13 +38,14 @@ import {
 } from '$lib/calc/timeline.store.svelte'
 import { getCharElementMap } from '$lib/data/char-elements.svelte'
 import { customHitRatio } from '$lib/calc/custom-hit'
+import { parseValueString } from '$lib/utils/parse-value-string'
 import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
 import { updateTimeline, updateResultAnalysis, getActiveProject, getProjects } from '$lib/data/project.svelte'
 import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/calc/timeline.consts'
 import { resolveRefLineSeconds, type RefLineLike } from '$lib/calc/ref-line-timing'
-import { renderDamageRatioList, renderTimelineDigest } from '$lib/ai/phase-digest'
+import { buildTimelineDigestData, renderDamageRatioList, renderTimelineDigest } from '$lib/ai/phase-digest'
 import { opBlocksInOrder, refLinesInOrder, resolveOpBlock, resolveRefLine } from '$lib/ai/refs'
-import type { CustomHit, SkillHit, NonDirectEntry } from '$lib/calc/timeline.types'
+import type { CustomHit, DamageBlock, SkillHit, NonDirectEntry, OpBlock, RefLine } from '$lib/calc/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 const BLOCK_W = 60
@@ -164,6 +167,29 @@ function resolvePosition(position: Record<string, unknown>): number {
     return side === 'before' ? anchor.pos - gap : anchor.pos + gap
 }
 
+/** @desc 伤害绑定的目标：操作块或参考线（两者都有独立序号） */
+interface DamageTarget {
+    sourceType: 'op' | 'ref'
+    sourceId: string
+    typeLabel: string
+    target: OpBlock | RefLine
+}
+
+const resolveDamageTarget = (args: Record<string, unknown>): DamageTarget => {
+    const typeLabel = str(args.targetType) === 'refLine' ? '参考线' : '操作块'
+    const ref = args.block ?? args.target
+    if (typeLabel === '参考线') {
+        const line = resolveRefLine(ref)
+        return { sourceType: 'ref', sourceId: line.id, typeLabel, target: line }
+    }
+    const block = resolveOpBlock(ref)
+    return { sourceType: 'op', sourceId: block.id, typeLabel, target: block }
+}
+
+/** @desc 找到目标（操作块 / 参考线）上「伤害绑定轨」的伤害块 */
+const findDamageBlock = (sourceId: string) =>
+    getDamageBlocks().find((d) => d.sourceId === sourceId && d.trackIndex === getTRACKS().length - 1)
+
 defineTool('get_timeline_summary', {
     description:
         '获取排轴：**按排轴顺序**列出所有操作块、参考线与已绑定的伤害。每行给出序号、轨道与角色、操作内容，其下缩进列出该块绑定的伤害命中（只给命中名，**不含倍率**——倍率用 get_timeline_damage_list 按需查）。排轴位置只是定位坐标，不代表秒数；参考线时间优先取数据分析配置的有效记点，没有有效记点时按“时间记点自动配置”规则从名称推导，并标为自动推导。**可跨工程只读**：传 projectId 读任意工程的持久化排轴且不切换当前工程（结构与绑定名；倍率明细用 get_timeline_damage_list 同样传 projectId 查）；省略则读活动工程。',
@@ -173,43 +199,63 @@ defineTool('get_timeline_summary', {
             projectId: {
                 type: 'string',
                 description: '可选：读取指定工程（用 list_projects 获取），不切换当前工程；省略 = 当前活动工程'
+            },
+            format: {
+                type: 'string',
+                enum: ['text', 'json'],
+                description: '输出格式：text（默认，便于阅读）或 json（结构化 items，便于解析）'
             }
         }
     },
-    handler: (args) => {
+    handler: async (args) => {
         const projectId = str(args.projectId)
+        const asJson = str(args.format) === 'json'
+        const build = (
+            data: { opBlocks: OpBlock[]; refLines: RefLine[]; damageBlocks: DamageBlock[] },
+            trackLabels: string[],
+            locked: boolean,
+            timings?: readonly { refLineId: string; seconds: number | null }[]
+        ) => {
+            const input = {
+                opBlocks: data.opBlocks,
+                refLines: data.refLines,
+                damageBlocks: data.damageBlocks,
+                trackLabels,
+                locked,
+                timings
+            }
+            return {
+                locked,
+                ...(asJson
+                    ? { items: buildTimelineDigestData(input).items }
+                    : { timeline: renderTimelineDigest(input) })
+            }
+        }
         if (projectId) {
             // 跨工程**只读**：直接读持久化工程数据，不切活动工程，也不动全局排轴 store
             const project = getProjects().find((p) => p.id === projectId)
             if (!project) throw new Error(`未找到工程：${projectId}`)
             const data = project.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] }
-            const locked = project.encounter.timeline.locked
             return {
                 projectId,
                 projectName: project.name,
-                locked,
-                timeline: renderTimelineDigest({
-                    opBlocks: data.opBlocks,
-                    refLines: data.refLines,
-                    damageBlocks: data.damageBlocks,
-                    trackLabels: project.team.map((s, i) => s.character ?? `轨${i + 1}`),
-                    locked,
-                    timings: project.analysis?.timings
-                })
+                ...build(
+                    data,
+                    project.team.map((s, i) => s.character ?? `轨${i + 1}`),
+                    project.encounter.timeline.locked,
+                    project.analysis?.timings
+                )
             }
         }
+        // 用户可能刚切工程：先等挂起的 store 重载完成，避免读到空排轴
+        await tick()
         const team = getTeam()
-        return {
-            locked: getLocked(),
-            timeline: renderTimelineDigest({
-                opBlocks: getOpBlocks(),
-                refLines: getRefLines(),
-                damageBlocks: getDamageBlocks(),
-                trackLabels: team.map((s, i) => s?.character ?? `轨${i + 1}`),
-                locked: getLocked(),
-                timings: getTimings()
-            })
-        }
+        return build(
+            { opBlocks: getOpBlocks(), refLines: getRefLines(), damageBlocks: getDamageBlocks() },
+            team.map((s, i) => s?.character ?? `轨${i + 1}`),
+            getLocked(),
+            getTimings()
+        )
     }
 })
 
@@ -219,11 +265,33 @@ defineTool('get_timeline_damage_list', {
     parameters: {
         type: 'object',
         properties: {
-            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' },
+            format: {
+                type: 'string',
+                enum: ['text', 'json'],
+                description: '输出格式：text（默认）或 json（结构化 items，每项一处已绑定倍率）'
+            }
         }
     },
     handler: async (args) => {
         const projectId = str(args.projectId)
+        const asJson = str(args.format) === 'json'
+        const wrap = (rows: ReturnType<typeof getDamageList>) =>
+            asJson
+                ? {
+                      items: [...rows]
+                          .sort((a, b) => a.pos - b.pos)
+                          .map((r, i) => ({
+                              no: i + 1,
+                              character: r.character,
+                              name: r.name,
+                              value: r.value,
+                              element: r.element,
+                              baseType: r.baseType,
+                              pos: r.pos
+                          }))
+                  }
+                : { ratios: renderDamageRatioList(rows) }
         if (projectId) {
             const project = getProjects().find((p) => p.id === projectId)
             if (!project) throw new Error(`未找到工程：${projectId}`)
@@ -242,9 +310,9 @@ defineTool('get_timeline_damage_list', {
                 elementOf: (name) => getCharElementMap()[name] ?? '',
                 trackCount: getTRACKS().length
             })
-            return { projectId, projectName: project.name, ratios: renderDamageRatioList(rows) }
+            return { projectId, projectName: project.name, ...wrap(rows) }
         }
-        return { ratios: renderDamageRatioList(getDamageList()) }
+        return wrap(getDamageList())
     }
 })
 
@@ -540,13 +608,18 @@ defineTool('remove_custom_hit', {
 
 defineTool('bind_damage_to_block', {
     description:
-        '把伤害倍率绑定到指定操作块：hits 为 [{character, hitName, hits?}]，hitName 用 get_char_skills 查询到的命中名（含角色技能、声骸技能、自定义直伤）；hits 为该命中次数（默认 1）。可一次绑定多条。',
+        '把伤害倍率绑定到指定**操作块或参考线**（targetType 选择）：hits 为 [{character, hitName, hits?}]，hitName 用 get_char_skills 查询到的命中名（含角色技能、声骸技能、自定义直伤）；hits 为该命中次数（默认 1）。整体覆盖该目标原有的直伤命中；可一次绑定多条。参考线编号与操作块编号各自从 1 开始，见 get_timeline_summary。',
     parameters: {
         type: 'object',
         properties: {
+            targetType: {
+                type: 'string',
+                enum: ['block', 'refLine'],
+                description: '目标类型：block=操作块（默认）/ refLine=参考线'
+            },
             block: {
                 type: 'number',
-                description: '操作块**序号**（时间轴上第几个，见 get_timeline_summary 的「[块N]」）'
+                description: '目标**序号**（targetType=block 时为操作块序号，refLine 时为参考线序号）'
             },
             hits: {
                 type: 'array',
@@ -565,8 +638,7 @@ defineTool('bind_damage_to_block', {
         required: ['block', 'hits']
     },
     handler: async (args) => {
-        const block = resolveOpBlock(args.block)
-        const blockId = block.id
+        const target = resolveDamageTarget(args)
         const raw = Array.isArray(args.hits) ? args.hits : []
         if (raw.length === 0) throw new Error('缺少命中列表')
 
@@ -613,9 +685,179 @@ defineTool('bind_damage_to_block', {
             skillHits.push(entry)
         }
 
-        setDamageBlockSkillHits(blockId, skillHits)
+        setDamageBlockSkillHits(target.sourceId, skillHits, target.sourceType)
         await updateTimeline(getTimelineState())
-        return { bound: skillHits.length, blockId }
+        return {
+            bound: skillHits.length,
+            targetType: target.sourceType === 'ref' ? 'refLine' : 'block',
+            target: args.block
+        }
+    }
+})
+
+defineTool('get_damage_bindings', {
+    description:
+        '列出当前排轴上每个**操作块 / 参考线**绑定的伤害：targetType、目标序号、伤害块 id、直伤命中（1 起的 hitIndex、角色、技能类型、命中名、倍率、属性、段数）与非直伤条目。用于定位要解绑/修改的具体一条命中。',
+    parameters: { type: 'object', properties: {} },
+    handler: () => {
+        const ops = opBlocksInOrder()
+        const refs = refLinesInOrder()
+        const lastTrack = getTRACKS().length - 1
+        const bindings = getDamageBlocks()
+            .filter((d) => d.trackIndex === lastTrack && (d.skillHits.length > 0 || d.nonDirectEntries.length > 0))
+            .map((d) => {
+                const targetType = d.sourceType === 'ref' ? 'refLine' : 'block'
+                const index =
+                    d.sourceType === 'ref'
+                        ? refs.findIndex((r) => r.id === d.sourceId) + 1
+                        : ops.findIndex((b) => b.id === d.sourceId) + 1
+                const label =
+                    d.sourceType === 'ref'
+                        ? refs.find((r) => r.id === d.sourceId)?.time || '未命名参考线'
+                        : ops.find((b) => b.id === d.sourceId)?.desc || ops.find((b) => b.id === d.sourceId)?.key || ''
+                return {
+                    targetType,
+                    target: index,
+                    label,
+                    damageBlockId: d.id,
+                    skillHits: d.skillHits.map((h, i) => ({
+                        hitIndex: i + 1,
+                        character: h.character,
+                        skillType: h.skillType,
+                        hitName: h.hitName,
+                        ratio: h.ratio,
+                        element: h.element,
+                        hits: h.hits ?? 1
+                    })),
+                    nonDirectEntries: d.nonDirectEntries
+                }
+            })
+        return {
+            bindings,
+            hint: '解绑单条直伤用 unbind_damage_hit；清空某个目标的全部伤害用 remove_damage_from_target'
+        }
+    }
+})
+
+defineTool('unbind_damage_hit', {
+    description:
+        '从指定操作块 / 参考线解绑**一条**直伤命中（保留该目标上的其它伤害）。先用 get_damage_bindings 查 hitIndex（1 起）。',
+    dangerous: true,
+    parameters: {
+        type: 'object',
+        properties: {
+            targetType: { type: 'string', enum: ['block', 'refLine'], description: '目标类型（默认 block）' },
+            block: { type: 'number', description: '目标序号（操作块或参考线）' },
+            hitIndex: { type: 'number', description: '该目标直伤命中列表里的序号（1 起）' }
+        },
+        required: ['block', 'hitIndex']
+    },
+    handler: async (args) => {
+        const target = resolveDamageTarget(args)
+        const dmg = findDamageBlock(target.sourceId)
+        if (!dmg) throw new Error('该目标没有绑定任何伤害')
+        const index = Number(args.hitIndex)
+        if (!Number.isInteger(index) || index < 1 || index > dmg.skillHits.length) {
+            throw new Error(`hitIndex 超出范围：1-${dmg.skillHits.length}`)
+        }
+        const removed = dmg.skillHits[index - 1]
+        setDamageBlockSkillHits(
+            target.sourceId,
+            dmg.skillHits.filter((_, i) => i !== index - 1),
+            target.sourceType
+        )
+        await updateTimeline(getTimelineState())
+        return {
+            unbound: true,
+            targetType: target.sourceType === 'ref' ? 'refLine' : 'block',
+            target: args.block,
+            removed
+        }
+    }
+})
+
+defineTool('update_damage_hit', {
+    description:
+        '修改某个操作块/参考线上**已有的一条直伤命中**的倍率、属性或段数（用 get_damage_bindings 查 hitIndex）。倍率的基础类型必须保持不变（只改数值/段数），否则会改变底层条目 id 并让 Buff 绑定失效 —— 这种情况会明确拒绝；改名请用 rename_damage_entry。',
+    dangerous: true,
+    parameters: {
+        type: 'object',
+        properties: {
+            targetType: { type: 'string', enum: ['block', 'refLine'], description: '目标类型（默认 block）' },
+            block: { type: 'number', description: '目标序号（操作块或参考线）' },
+            hitIndex: { type: 'number', description: '该目标直伤命中列表里的序号（1 起）' },
+            ratio: { type: 'string', description: '新的倍率串（如 "120%" / "80%攻击+20%生命"）；基础类型须与原来一致' },
+            element: {
+                type: 'string',
+                enum: ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭'],
+                description: '新的伤害属性'
+            },
+            hits: { type: 'number', description: '新的段数（整数 1-999）' }
+        },
+        required: ['block', 'hitIndex']
+    },
+    handler: async (args) => {
+        const target = resolveDamageTarget(args)
+        const dmg = findDamageBlock(target.sourceId)
+        if (!dmg) throw new Error('该目标没有绑定任何伤害')
+        const index = Number(args.hitIndex)
+        if (!Number.isInteger(index) || index < 1 || index > dmg.skillHits.length) {
+            throw new Error(`hitIndex 超出范围：1-${dmg.skillHits.length}`)
+        }
+        const source = dmg.skillHits[index - 1]
+        const ratio = args.ratio === undefined ? source.ratio : str(args.ratio)
+        if (!ratio) throw new Error('ratio 不能为空')
+        const shape = (text: string): string =>
+            parseValueString(text)
+                .map(
+                    (c) =>
+                        `${c.baseType}|${c.implicitSuffix ? 'implicit' : 'explicit'}|${c.flatValue !== undefined ? 'fixed' : 'pct'}`
+                )
+                .sort()
+                .join(',')
+        if (shape(source.ratio) !== shape(ratio)) {
+            throw new Error('新倍率的基础类型/固定值结构发生变化，会改变条目 id 并让 Buff 绑定失效；请先解绑后重新绑定')
+        }
+        const next: SkillHit = {
+            ...source,
+            ratio,
+            element: readElement(args.element) ?? source.element
+        }
+        const hits = readHits(args.hits)
+        if (hits !== undefined) next.hits = hits
+        setDamageBlockSkillHits(
+            target.sourceId,
+            dmg.skillHits.map((h, i) => (i === index - 1 ? next : h)),
+            target.sourceType
+        )
+        await updateTimeline(getTimelineState())
+        return {
+            updated: true,
+            targetType: target.sourceType === 'ref' ? 'refLine' : 'block',
+            target: args.block,
+            hitIndex: index,
+            hit: next
+        }
+    }
+})
+
+defineTool('remove_damage_from_target', {
+    description:
+        '清空指定操作块 / 参考线上的**全部伤害绑定**（直伤 + 非直伤），但保留操作块 / 参考线本身。等价于「删除该目标的伤害条目」。',
+    dangerous: true,
+    parameters: {
+        type: 'object',
+        properties: {
+            targetType: { type: 'string', enum: ['block', 'refLine'], description: '目标类型（默认 block）' },
+            block: { type: 'number', description: '目标序号（操作块或参考线）' }
+        },
+        required: ['block']
+    },
+    handler: async (args) => {
+        const target = resolveDamageTarget(args)
+        removeDamageBySource(target.sourceId, 'all')
+        await updateTimeline(getTimelineState())
+        return { removed: true, targetType: target.sourceType === 'ref' ? 'refLine' : 'block', target: args.block }
     }
 })
 
@@ -847,11 +1089,16 @@ defineTool('get_non_direct_options', {
 
 defineTool('bind_non_direct_to_block', {
     description:
-        '把非直伤绑定到指定操作块（可覆盖原有绑定）：entries 为 [{name, layers?, responders?}]，名称用 get_non_direct_options 获取。谐度破坏/震谐响应/骇破响应 可带 responders（触发角色名数组，响应必须有）；效应必须带 layers（1-上限）。',
+        '把非直伤绑定到指定**操作块或参考线**（可覆盖原有绑定）：entries 为 [{name, layers?, responders?}]，名称用 get_non_direct_options 获取。谐度破坏/震谐响应/骇破响应 可带 responders（触发角色名数组，响应必须有）；效应必须带 layers（1-上限）。',
     parameters: {
         type: 'object',
         properties: {
-            block: { type: 'number', description: '操作块**序号**（见 get_timeline_summary 的「[块N]」）' },
+            targetType: {
+                type: 'string',
+                enum: ['block', 'refLine'],
+                description: '目标类型：block=操作块（默认）/ refLine=参考线'
+            },
+            block: { type: 'number', description: '目标序号（操作块或参考线）' },
             entries: {
                 type: 'array',
                 description: '非直伤条目列表（整体覆盖该块）：处决/响应/效应',
@@ -869,8 +1116,7 @@ defineTool('bind_non_direct_to_block', {
         required: ['block', 'entries']
     },
     handler: async (args) => {
-        const block = resolveOpBlock(args.block)
-        const blockId = block.id
+        const target = resolveDamageTarget(args)
         const raw = Array.isArray(args.entries) ? args.entries : []
         if (raw.length === 0) throw new Error('缺少非直伤条目')
         const configMap = new Map<string, (typeof NON_DIRECT_CONFIGS)[number]>(
@@ -909,9 +1155,13 @@ defineTool('bind_non_direct_to_block', {
                 entries.push({ name, category: '效应', layers })
             }
         }
-        setDamageBlockNonDirectEntries(blockId, entries)
+        setDamageBlockNonDirectEntries(target.sourceId, entries, target.sourceType)
         await updateTimeline(getTimelineState())
-        return { bound: entries.length, blockId }
+        return {
+            bound: entries.length,
+            targetType: target.sourceType === 'ref' ? 'refLine' : 'block',
+            target: args.block
+        }
     }
 })
 

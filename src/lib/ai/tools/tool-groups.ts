@@ -32,11 +32,14 @@ const GROUP_RULES: { label: string; test: RegExp }[] = [
         label: '计算 · 工程 Buff 配置与条件',
         test: /buff_conf|^import_buff_set_entity_to_project$|condition|^toggle_damage_type$|^set_entry_damage_types$/
     },
-    { label: '计算 · 条目与档位', test: /^set_chain$|^set_refinement$|^get_damage_entries$|^set_buff_conf_scope$/ },
+    {
+        label: '计算 · 条目与档位',
+        test: /^set_chain$|^set_refinement$|^get_damage_entries$|^set_buff_conf_scope$|^rename_damage_entry$/
+    },
     { label: '配队', test: /^team|_team|member|recommended_weapon/ },
     {
         label: '时间轴',
-        test: /timeline|_block|_ref_line|^get_char_skills$|^reflow_track$|^get_non_direct_options$|custom_hit/
+        test: /timeline|_block|_ref_line|^get_char_skills$|^reflow_track$|^get_non_direct_options$|custom_hit|damage_binding|damage_hit|damage_from_target/
     },
     { label: '结果与图表', test: /^get_result|^get_data_analysis|breakdown/ },
     {

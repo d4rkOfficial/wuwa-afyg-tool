@@ -10,6 +10,7 @@ import {
     setBuffSetIdsForEntry as setBuffConfIdsForEntry,
     getDamageTypesForEntry,
     setDamageTypesForEntry,
+    setDamageEntryDisplayName,
     toggleDamageTypeForEntry,
     getConditionProfile,
     setConditionProfileChains,
@@ -32,7 +33,8 @@ import {
     redoTable,
     canUndoTable,
     canRedoTable,
-    buildDamageEntriesFromTimeline
+    buildDamageEntriesFromTimeline,
+    getCalcState
 } from '$lib/calc/calculation.store.svelte'
 import { loadCharSkills } from '$lib/calc/timeline.store.svelte'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
@@ -40,7 +42,7 @@ import { getActiveProject, getProjects } from '$lib/data/project.svelte'
 import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
 import { paneEffectSourcesOf } from '$lib/calc/pane-effects'
 import { getOpBlocks, getRefLines } from '$lib/calc/timeline.store.svelte'
-import { renderBuffConfList, renderCalculationDigest } from '$lib/ai/phase-digest'
+import { renderBuffConfList, renderCalculationDigest, scopeLabel } from '$lib/ai/phase-digest'
 import { asIndex, buffConfsInOrder, damageEntriesInOrder, resolveBuffConf, resolveDamageEntry } from '$lib/ai/refs'
 import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
@@ -123,15 +125,53 @@ function conditionSummary(c: Record<string, unknown> | undefined): string | unde
 
 defineTool('get_damage_entries', {
     description:
-        '获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「**序号** / 归属角色 / 名称 / 属性 / 伤害类型 / 已绑 Buff 名」。行首方括号里的数字就是序号，增删改（bind_buff_conf_to_entry / set_entry_damage_types / toggle_damage_type / get_damage_entry_buff_sources）填它。不含倍率与乘区数值——倍率用 get_timeline_damage_list，乘区与引用明细用 get_buff_conf_detail / get_damage_entry_buff_sources 按需查。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
+        '获取当前工程的伤害条目（拉表）：**按条目在时间轴上的顺序**逐条给出「**序号** / 归属角色 / 显示名 / **倍率** / 属性 / 伤害类型 / 已绑 Buff 名 / **稳定条目 id**」。行首方括号里的数字就是序号，增删改（bind_buff_conf_to_entry / set_entry_damage_types / toggle_damage_type / rename_damage_entry / get_damage_entry_buff_sources）填它。行尾 id 与 get_result_summary 的 entryId 同源，可用来在「伤害条目 ↔ 倍率 ↔ 计算结果」之间可靠关联；乘区与引用明细用 get_buff_conf_detail / get_damage_entry_buff_sources 按需查。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
     parameters: {
         type: 'object',
         properties: {
-            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' },
+            format: {
+                type: 'string',
+                enum: ['text', 'json'],
+                description: '输出格式：text（默认）或 json（结构化 items，字段含 no/id/ratioValue 等）'
+            }
         }
     },
     handler: async (args) => {
         const projectId = str(args.projectId)
+        const asJson = str(args.format) === 'json'
+        const build = (
+            entries: ReturnType<typeof damageEntriesInOrder>,
+            buffNamesOf: (entryId: string) => readonly string[],
+            damageTypesOf: (entryId: string) => readonly string[],
+            posOf: (entry: (typeof entries)[number]) => number | undefined
+        ) => {
+            const input = { entries, buffNamesOf, damageTypesOf, posOf, includeIds: true }
+            if (!asJson) return { calculation: renderCalculationDigest(input) }
+            const rows = entries
+                .map((entry, order) => ({ entry, order, pos: posOf(entry) }))
+                .sort(
+                    (a, b) =>
+                        (a.pos ?? Number.POSITIVE_INFINITY) - (b.pos ?? Number.POSITIVE_INFINITY) || a.order - b.order
+                )
+            return {
+                items: rows.map(({ entry }, i) => ({
+                    no: i + 1,
+                    id: entry.id,
+                    character: entry.character ?? '',
+                    displayName: entry.displayName,
+                    hitName: entry.hitName,
+                    ratioValue: entry.ratioValue,
+                    ratioUnit: entry.ratioUnit,
+                    damageElement: entry.damageElement,
+                    damageBaseType: entry.damageBaseType,
+                    damageTypes: [...damageTypesOf(entry.id)],
+                    kind: entry.isEffect ? '效应' : entry.isTuneBreak ? '处决' : entry.isTuneResponse ? '响应' : '直伤',
+                    buffs: [...buffNamesOf(entry.id)],
+                    pos: posOf(entry) ?? null
+                }))
+            }
+        }
         if (projectId) {
             const project = findProjectById(projectId)
             // 跨工程可能包含活动工程没加载过的角色：先补齐技能缓存，响应条目才推导得出来
@@ -140,80 +180,180 @@ defineTool('get_damage_entries', {
             )
             const timeline = storedTimeline(project)
             const calc = storedCalc(project)
-            const entries = buildDamageEntriesFromTimeline(timeline, project.team)
+            const entries = buildDamageEntriesFromTimeline(timeline, project.team, calc.damageEntryDisplayNames)
             const nameById = new Map(calc.buffSets.map((b) => [b.id, b.name]))
             const posOfSource = new Map([...timeline.opBlocks, ...timeline.refLines].map((s) => [s.id, s.pos]))
             return {
                 projectId,
                 projectName: project.name,
-                calculation: renderCalculationDigest({
+                ...build(
                     entries,
-                    buffNamesOf: (entryId) =>
-                        (calc.damageEntryBuffSetIds[entryId] ?? []).map((id) => nameById.get(id) ?? id),
-                    damageTypesOf: (entryId) => calc.damageEntryDamageTypes[entryId] ?? [],
-                    posOf: (e) => posOfSource.get(e.sourceTimelineBlockId)
-                })
+                    (entryId) => (calc.damageEntryBuffSetIds[entryId] ?? []).map((id) => nameById.get(id) ?? id),
+                    (entryId) => calc.damageEntryDamageTypes[entryId] ?? [],
+                    (e) => posOfSource.get(e.sourceTimelineBlockId)
+                )
             }
         }
         const nameById = new Map(getAllBuffConfs().map((b) => [b.id, b.name]))
         const buffNamesOf = (entryId: string): string[] =>
             getBuffConfIdsForEntry(entryId).map((id) => nameById.get(id) ?? id)
-        return {
-            calculation: renderCalculationDigest({
-                // 序号真源：与 resolveDamageEntry 用同一套排序
-                entries: damageEntriesInOrder(),
-                buffNamesOf,
-                damageTypesOf: (entryId) => getDamageTypesForEntry(entryId),
-                posOf: (e) => timelinePosOf(e.sourceTimelineBlockId)
-            })
-        }
+        return build(
+            // 序号真源：与 resolveDamageEntry 用同一套排序
+            damageEntriesInOrder(),
+            buffNamesOf,
+            (entryId) => getDamageTypesForEntry(entryId),
+            (e) => timelinePosOf(e.sourceTimelineBlockId)
+        )
+    }
+})
+
+defineTool('rename_damage_entry', {
+    description:
+        '修改伤害条目的显示名（按 get_damage_entries 的**序号**）。只改 AI/界面看到的 displayName，不改底层命中 id、倍率或 Buff 绑定；传空串恢复默认显示名。',
+    parameters: {
+        type: 'object',
+        properties: {
+            entry: { type: 'number', description: '伤害条目序号（见 get_damage_entries 的「[NN]」）' },
+            name: { type: 'string', description: '新显示名（空串=恢复默认）' }
+        },
+        required: ['entry', 'name']
+    },
+    handler: (args, ctx) => {
+        const entry = resolveDamageEntry(args.entry)
+        const name = String(args.name ?? '').trim()
+        const ok = setDamageEntryDisplayName(entry.id, name)
+        if (!ok) throw new Error('拉表环节已锁定，请先解锁')
+        ctx.notifyCalc?.()
+        return { entry: args.entry, displayName: name || entry.displayName, reset: !name }
     }
 })
 
 defineTool('get_buff_confs', {
     description:
-        '获取工程 Buff 配置清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_conf_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。',
+        '获取工程 Buff 配置清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_conf_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。可选 zoneId：只列出含该乘区的配置，并在每项附带命中乘区的数值/引用摘要；不传则保持原来的全量清单。',
     parameters: {
         type: 'object',
         properties: {
-            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' }
+            projectId: { type: 'string', description: '可选：工程 id；传了则只读该工程，不切换活动工程' },
+            zoneId: {
+                type: 'string',
+                description: '可选：乘区 id（如 atkPct / critRate，旧 id 会自动重映射）；只返回含该乘区的配置'
+            },
+            format: {
+                type: 'string',
+                enum: ['text', 'json'],
+                description: '输出格式：text（默认）或 json（结构化 items，字段含 no/id/scope/zoneCount 等）'
+            }
         }
     },
     handler: (args) => {
         const projectId = str(args.projectId)
+        const asJson = str(args.format) === 'json'
+        const rawZoneId = str(args.zoneId)
+        const zoneFilter = rawZoneId ? normalizeZoneId(rawZoneId) : null
+        const zoneId = zoneFilter?.zoneId
+        const zoneLabel = (id: string) => ZONE_MAP.get(id as never)?.label ?? id
+        const formatMatched = (z: {
+            zoneId: string
+            value: number
+            override?: boolean
+            ref?: { zoneId: string } | null
+            condition?: unknown
+        }) => {
+            const unit = ZONE_MAP.get(z.zoneId as never)?.unit === '%' ? '%' : ''
+            const value = z.ref ? `引用:${zoneLabel(z.ref.zoneId)}` : `${z.value}${unit}`
+            return `${zoneLabel(z.zoneId)}${z.override ? '(覆盖)' : ''}=${value}`
+        }
+        const build = (
+            items: {
+                id: string
+                name: string
+                scope: 'all' | number[]
+                global: boolean
+                starred: boolean
+                condition?: string
+                zoneCount: number
+                zoneSummary?: string
+                matchedZones?: { zoneId: string; value: number; override: boolean; ref: unknown; condition: unknown }[]
+            }[]
+        ) => ({
+            ...(zoneId ? { zoneId, zoneLabel: zoneLabel(zoneId) } : {}),
+            ...(asJson
+                ? {
+                      items: items.map((b, i) => ({
+                          no: i + 1,
+                          id: b.id,
+                          name: b.name,
+                          scope: b.scope,
+                          scopeLabel: scopeLabel(b.scope),
+                          global: b.global,
+                          starred: b.starred,
+                          condition: b.condition ?? '',
+                          zoneCount: b.zoneCount,
+                          ...(b.matchedZones ? { matchedZones: b.matchedZones } : {})
+                      }))
+                  }
+                : { buffConfs: renderBuffConfList(items) })
+        })
+        const toItem = (
+            bs: {
+                id: string
+                name: string
+                scope: 'all' | number[]
+                starred?: boolean
+                condition?: unknown
+                zones: readonly {
+                    zoneId: string
+                    value: number
+                    override?: boolean
+                    ref?: { zoneId: string } | null
+                    condition?: unknown
+                }[]
+            },
+            global: boolean
+        ) => {
+            const matched = zoneId ? bs.zones.filter((z) => z.zoneId === zoneId) : []
+            return {
+                id: bs.id,
+                name: bs.name,
+                scope: bs.scope,
+                global,
+                starred: !!bs.starred,
+                condition: conditionSummary(bs.condition as Record<string, unknown> | undefined),
+                zoneCount: bs.zones.length,
+                ...(zoneId
+                    ? {
+                          zoneSummary: matched.map((z) => formatMatched(z)).join('、'),
+                          matchedZones: matched.map((z) => ({
+                              zoneId: z.zoneId,
+                              value: z.value,
+                              override: !!z.override,
+                              ref: z.ref ?? null,
+                              condition: z.condition ?? null
+                          }))
+                      }
+                    : {})
+            }
+        }
         if (projectId) {
             const project = findProjectById(projectId)
             const buffs = storedCalc(project).buffSets
             return {
                 projectId,
                 projectName: project.name,
-                buffConfs: renderBuffConfList(
-                    buffs.map((bs) => ({
-                        id: bs.id,
-                        name: bs.name,
-                        scope: bs.scope,
-                        global: !!bs.global,
-                        starred: !!bs.starred,
-                        condition: conditionSummary(bs.condition as Record<string, unknown> | undefined),
-                        zoneCount: bs.zones.length
-                    }))
+                ...build(
+                    buffs
+                        .filter((bs) => !zoneId || bs.zones.some((z) => z.zoneId === zoneId))
+                        .map((bs) => toItem(bs, !!bs.global))
                 )
             }
         }
         const globalIds = new Set(getGlobalBuffConfIds())
-        return {
-            buffConfs: renderBuffConfList(
-                buffConfsInOrder().map((bs) => ({
-                    id: bs.id,
-                    name: bs.name,
-                    scope: bs.scope,
-                    global: globalIds.has(bs.id),
-                    starred: !!bs.starred,
-                    condition: conditionSummary(bs.condition as Record<string, unknown> | undefined),
-                    zoneCount: bs.zones.length
-                }))
-            )
-        }
+        return build(
+            buffConfsInOrder()
+                .filter((bs) => !zoneId || bs.zones.some((z) => z.zoneId === zoneId))
+                .map((bs) => toItem(bs, globalIds.has(bs.id)))
+        )
     }
 })
 
@@ -512,6 +652,24 @@ defineTool('get_buff_conf_detail', {
         }))
         const zoneCounts = new Map<string, number>()
         for (const z of zoneEntries) zoneCounts.set(z.zoneId, (zoneCounts.get(z.zoneId) ?? 0) + 1)
+        // 反向索引：这条 Buff 实际绑到了哪些伤害条目（与 get_damage_entries 的序号/ID 同源）
+        const calcState = project ? storedCalc(project) : getCalcState()
+        const entryList = project
+            ? buildDamageEntriesFromTimeline(
+                  storedTimeline(project),
+                  project.team,
+                  storedCalc(project).damageEntryDisplayNames
+              )
+            : damageEntriesInOrder()
+        const boundEntries = entryList
+            .map((entry, index) => ({ entry, index }))
+            .filter(({ entry }) => (calcState.damageEntryBuffSetIds[entry.id] ?? []).includes(set.id))
+            .map(({ entry, index }) => ({
+                entryIndex: index + 1,
+                entryId: entry.id,
+                displayName: entry.displayName,
+                character: entry.character ?? null
+            }))
         return {
             ...(projectId ? { projectId, projectName: project!.name } : {}),
             id: set.id,
@@ -525,7 +683,9 @@ defineTool('get_buff_conf_detail', {
                 'condition.chains/refinements 是整块 Buff 的硬门槛（乘区级不接受）；乘区级只接受 elements/damageTypes，用 set_buff_conf_zone_condition 设置',
             zones: zoneEntries,
             overrideZoneIds: [...new Set(zoneEntries.filter((z) => z.override).map((z) => z.zoneId))],
-            multiEntryZoneIds: [...zoneCounts.entries()].filter(([, n]) => n > 1).map(([k]) => k)
+            multiEntryZoneIds: [...zoneCounts.entries()].filter(([, n]) => n > 1).map(([k]) => k),
+            boundEntryCount: boundEntries.length,
+            boundEntries
         }
     }
 })
@@ -789,7 +949,7 @@ defineTool('get_damage_entry_buff_sources', {
             )
             const timeline = storedTimeline(project)
             const calc = storedCalc(project)
-            const entries = buildDamageEntriesFromTimeline(timeline, project.team)
+            const entries = buildDamageEntriesFromTimeline(timeline, project.team, calc.damageEntryDisplayNames)
             const index = asIndex(args.entry)
             const entry = index !== null ? entries[index - 1] : entries.find((e) => e.id === String(args.entry ?? ''))
             if (!entry) throw new Error(`未找到伤害条目：${String(args.entry ?? '')}（先用 get_damage_entries 查询）`)

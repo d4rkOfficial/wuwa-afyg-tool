@@ -243,7 +243,7 @@ history 段原文 + user 段原文 + 本轮新产生的 assistant / tool 消息
 | `remove_custom_hit` | 删除（已绑定到操作块的同名命中不会自动解绑）                           |
 
 倍率串格式化由 `$lib/calc/custom-hit` 的 `customHitRatio()` 统一提供，界面选择器与 AI 工具共用同一口径。
-创建后再用 `get_char_skills` 确认，并用 `bind_damage_to_block` 绑定到操作块。
+创建后再用 `get_char_skills` 确认，并用 `bind_damage_to_block` 绑定到操作块或参考线（targetType）。
 
 ## 1.6 跨工程只读
 
@@ -258,6 +258,18 @@ history 段原文 + user 段原文 + 本轮新产生的 assistant / tool 消息
 
 跨工程结果类工具用目标工程的持久化时间线重新推导伤害条目（`buildDamageEntriesFromTimeline()`），
 不读活动工程的全局 store。需要写入时先 `set_active_project`，完成后再切回并重读状态。
+
+## 1.7 写工具锁定守卫与伤害绑定
+
+- **锁定守卫**：所有改排轴 / 拉表 / 词条环境配置的写工具在 `executeTool()` 入口统一检查所属环节的
+  `isPhaseReadonly`；锁定时直接返回「XX 环节已锁定，请先解锁」，不再把 store 的静默 no-op 报成 `ok: true`。
+- **伤害目标**：`bind_damage_to_block` / `bind_non_direct_to_block` 支持 `targetType: block | refLine`，
+  参考线承载伤害的工程也能编辑；`get_damage_bindings` 按目标列出每条命中的 `hitIndex`。
+- **解绑 / 清空**：`unbind_damage_hit` 解绑单条直伤；`remove_damage_from_target` 清空目标上的全部伤害但保留
+  操作块/参考线本身。
+- **可对齐**：`get_damage_entries` 每行附倍率与稳定条目 id（与 `get_result_summary` 的 entryId 同源）；
+  `rename_damage_entry` 只改 displayName，不改底层命中 id / Buff 绑定。
+- **结果刷新**：结果类工具读取前会 `await tick()`，避免刚写完 Buff 就读到上一帧的派生状态。
 
 ## 2. 上下文装配顺序
 

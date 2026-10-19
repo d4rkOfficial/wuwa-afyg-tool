@@ -20,26 +20,16 @@
  */
 import { browser } from '$app/environment'
 import { ensureVersion, getWWVersion } from '$lib/api/client-version'
-import { clearCache, getCharacterInfo, getEchoInfo } from '$lib/api/data-cache'
+import { clearCache } from '$lib/api/data-cache'
 import { initToyEnvironmentBridge, isToyMobile, onToyEnter } from '$lib/bilibili-toy/environment.svelte'
 import { initToyProfileBridge } from '$lib/bilibili-toy/profile.svelte'
-import {
-    getCalcState,
-    init as initCalculation,
-    rebindGlobalBuffs,
-    setConditionProfile,
-    setShowBuffModal
-} from '$lib/calc/calculation.store.svelte'
-import type { CalcState } from '$lib/calc/calculation.types'
-import { getConfig, init as initConfig } from '$lib/calc/config.store.svelte'
-import type { ConfigState } from '$lib/calc/config.types'
-import { init as initTimeline, loadIcons } from '$lib/calc/timeline.store.svelte'
-import type { TimelineData } from '$lib/calc/timeline.types'
+import { getCalcState, rebindGlobalBuffs } from '$lib/calc/calculation.store.svelte'
+import { getConfig } from '$lib/calc/config.store.svelte'
+import { loadIcons } from '$lib/calc/timeline.store.svelte'
 import { loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
 import { setCalcViewMode } from '$lib/data/calc-view.svelte'
 import { setModalClosePosition } from '$lib/data/interaction-prefs.svelte'
 import { loadKeyMap } from '$lib/data/keymap.svelte'
-import { conditionProfileFromTeam } from '$lib/data/migration'
 import {
     getActiveProject,
     getPhaseOrder,
@@ -49,6 +39,9 @@ import {
     updateCalculation,
     updateConfig
 } from '$lib/data/project.svelte'
+import { reloadActiveProjectStores } from '$lib/data/project-reload'
+
+export { reloadActiveProjectStores }
 import { setMagneticPointer } from '$lib/data/render-prefs.svelte'
 import { checkShare, refreshShareCooldown } from '$lib/data/share.svelte'
 import { loadShortcuts } from '$lib/data/shortcuts.svelte'
@@ -81,30 +74,6 @@ export const syncPhaseLockSideEffects = (phase: PhaseKey): void => {
     if (phase === 'config') {
         updateConfig(getConfig())
     }
-}
-
-/** @desc 重载当前工程全部阶段数据（不改变视图状态）；切工程 / 链阶变动 / 刷新结果共用 */
-export const reloadActiveProjectStores = (): void => {
-    setShowBuffModal(false)
-    const p = getActiveProject()
-    if (!p) return
-    initTimeline(p.phases.timeline.data as TimelineData | null, () => {}, p.team, p.phases.timeline?.locked ?? false)
-    // 重建伤害条目（条目由队伍与时间线派生，条件数据随后由 setConditionProfile 注入）
-    initCalculation(
-        p.team,
-        p.phases.timeline.data as TimelineData | null,
-        p.phases.calculation.data as CalcState | null,
-        p.phases.calculation?.locked ?? false,
-        (state) => updateCalculation(state)
-    )
-    initConfig(p.phases.config.data as ConfigState | null, p.phases.config?.locked ?? false)
-    // 预热角色与声骸数据（IndexedDB 缓存）：减少排轴/拉表等阶段首次挂载的异步等待
-    for (const slot of p.team) {
-        if (slot.character) void getCharacterInfo(slot.character)
-        if (slot.echoes?.[0]?.name) void getEchoInfo(slot.echoes[0].name)
-    }
-    // 恢复工程携带的链/阶配置（链阶真源是工程 team 槽位，此处同步到条件系统的读入口）
-    setConditionProfile(conditionProfileFromTeam(p.team))
 }
 
 /**

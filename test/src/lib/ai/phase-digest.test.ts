@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+    buildTimelineDigestData,
     fmtSeconds,
     renderBuffConfList,
     renderCalculationDigest,
@@ -152,6 +153,58 @@ describe('排轴时间线渲染', () => {
     })
 })
 
+describe('排轴结构化数据（format:json 同源）', () => {
+    it('按 pos 输出 items，操作块/参考线带序号、时间与合并后的伤害', () => {
+        const data = buildTimelineDigestData({
+            opBlocks: [op('op-b', 1, 100, '共鸣技能'), op('op-a', 0, 0, '普攻')],
+            refLines: [refLine('rl-1', 50, '1m30s')],
+            damageBlocks: [
+                damageBlock('op-a', {
+                    skillHits: [hit('甲', '常态攻击', '普攻伤害', '100%'), hit('甲', '常态攻击', '普攻伤害', '100%')]
+                }),
+                damageBlock('rl-1', {
+                    nonDirectEntries: [{ name: '电磁效应', category: '效应', layers: 3, hits: 2 }]
+                })
+            ],
+            trackLabels: ['甲', '乙'],
+            locked: true,
+            timings: [{ refLineId: 'rl-1', seconds: 90 }]
+        })
+        assert.equal(data.locked, true)
+        assert.equal(data.damageBlockCount, 2)
+        assert.deepEqual(
+            data.items.map((i) => (i.kind === 'opBlock' ? `块${i.no}` : `线${i.no}`)),
+            ['块1', '线1', '块2']
+        )
+        const ref = data.items[1]
+        assert.equal(ref.kind, 'refLine')
+        if (ref.kind !== 'refLine') return
+        assert.equal(ref.seconds, 90)
+        assert.equal(ref.autoSeconds, null)
+        assert.equal(ref.damage.nonDirectEntries[0].name, '电磁效应')
+        assert.equal(ref.damage.nonDirectEntries[0].hits, 2)
+        const first = data.items[0]
+        assert.equal(first.kind, 'opBlock')
+        if (first.kind !== 'opBlock') return
+        assert.equal(first.character, '甲')
+        assert.deepEqual(first.damage.skillHits, [{ skillType: '常态攻击', hitName: '普攻伤害', count: 2 }])
+    })
+
+    it('未配置记点时把自动推导秒数放在 autoSeconds，不与真实记点混淆', () => {
+        const data = buildTimelineDigestData({
+            opBlocks: [op('op-a', 0, 200, '普攻')],
+            refLines: [refLine('rl-1', 100, '1m30s')],
+            damageBlocks: [damageBlock('op-a', { skillHits: [hit('甲', '常态攻击', '普攻伤害', '100%')] })],
+            trackLabels: ['甲'],
+            locked: false
+        })
+        const ref = data.items.find((i) => i.kind === 'refLine')
+        assert.ok(ref && ref.kind === 'refLine')
+        assert.equal(ref.seconds, null)
+        assert.equal(ref.autoSeconds, 90)
+    })
+})
+
 describe('绑定倍率（按需查询）', () => {
     it('一行一条、按排轴顺序给出倍率/属性/系数类型', () => {
         const out = renderDamageRatioList([
@@ -213,8 +266,10 @@ describe('拉表渲染', () => {
         })
         const lines = out.split('\n')
         assert.ok(lines[0].includes('拉表（2 条伤害条目'))
-        assert.ok(lines[1].includes('[01] 甲 · 普攻(常态攻击) · 冷凝 · 普攻伤害 · Buff: 无'))
-        assert.ok(lines[2].includes('[02] 乙 · 共鸣技能(共鸣技能) · 冷凝 · 共鸣技能伤害 · Buff(2): 攻击加成、暴击提升'))
+        assert.ok(lines[1].includes('[01] 甲 · 普攻(常态攻击) · 倍率'))
+        assert.ok(lines[1].includes('冷凝 · 普攻伤害 · Buff: 无'))
+        assert.ok(lines[2].includes('[02] 乙 · 共鸣技能(共鸣技能) · 倍率'))
+        assert.ok(lines[2].includes('冷凝 · 共鸣技能伤害 · Buff(2): 攻击加成、暴击提升'))
         assert.ok(lines[1].startsWith('[01]'), '条目序号在行首，不标伪秒数')
         assert.ok(!out.includes('(e1)') && !out.includes('(e2)'), '摘要只给序号，不出现条目 id')
     })

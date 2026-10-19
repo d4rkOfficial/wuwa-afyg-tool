@@ -1,4 +1,5 @@
 // 工程域工具（Phase 1）：直接操作 project store，无页面依赖
+import { tick } from 'svelte'
 import { defineTool } from './registry'
 import {
     getProjects,
@@ -16,6 +17,7 @@ import {
     getPhaseOrder
 } from '$lib/data/project.svelte'
 import { getBuffEntities, getBuffLibraryLoading as getBuffSetLoading } from '$lib/data/buff-library.svelte'
+import { reloadActiveProjectStores } from '$lib/data/project-reload'
 
 type PhaseKey = 'team' | 'timeline' | 'calculation' | 'config'
 
@@ -52,7 +54,9 @@ defineTool('get_project_state', {
             projectId: { type: 'string', description: '可选：工程 id（用 list_projects 获取）；省略 = 当前活动工程' }
         }
     },
-    handler: (args) => {
+    handler: async (args) => {
+        // 用户可能刚在界面切工程：先让 Svelte 处理完挂起的切换，避免读到上一帧活动工程
+        await tick()
         const id = str(args.projectId)
         const p = id ? getProjects().find((item) => item.id === id) : getActiveProject()
         if (!p) return { hasProject: false, missing: id || undefined }
@@ -81,7 +85,8 @@ defineTool('get_team', {
             projectId: { type: 'string', description: '可选：工程 id（用 list_projects 获取）；省略 = 当前活动工程' }
         }
     },
-    handler: (args) => {
+    handler: async (args) => {
+        await tick()
         const id = str(args.projectId)
         const p = id ? getProjects().find((item) => item.id === id) : getActiveProject()
         if (!p) return { error: id ? `未找到工程：${id}` : '当前没有活动工程' }
@@ -106,6 +111,8 @@ defineTool('create_project', {
         const name = str(args.name)
         if (!name) throw new Error('工程名称不能为空')
         const project = await createProject(name)
+        // 新建即切换活动工程：同步重载阶段 store，避免紧跟的查询读到旧工程数据
+        reloadActiveProjectStores()
         return { id: project.id, name: project.name }
     }
 })
@@ -142,6 +149,9 @@ defineTool('set_active_project', {
         if (typeof args.id !== 'string') throw new Error('缺少工程 id')
         if (id && !getProjects().some((p) => p.id === id)) throw new Error(`未找到工程：${id}`)
         await setActiveProject(id)
+        // 让挂起的视图更新先落地，再显式重载阶段 store；页面切换工程也走这同一个函数。
+        await tick()
+        reloadActiveProjectStores()
         return { active: id }
     }
 })
@@ -189,6 +199,8 @@ defineTool('delete_project', {
         const id = str(args.id)
         if (!id) throw new Error('缺少工程 id')
         await deleteProject(id)
+        // 删除活动工程会改变活动工程；重载一次让后续查询不再读到已删除工程的数据
+        reloadActiveProjectStores()
         return { deleted: id }
     }
 })

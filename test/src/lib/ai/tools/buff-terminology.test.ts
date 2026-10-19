@@ -66,6 +66,34 @@ test('AI 与 WS 共用新 Buff 工具名称，工程参数使用 buffConf', () =
     )
 })
 
+test('get_buff_confs 支持 format:json 结构化输出，text 输出保持兼容', async () => {
+    setup()
+    assert.equal((await run('create_buff_conf', { name: '结构化增益' })).ok, true)
+    assert.equal((await run('set_buff_conf_scope', { buffConf: 1, scope: [1, 2] })).ok, true)
+    const text = await run('get_buff_confs')
+    assert.ok(text.data.buffConfs.includes('工程 Buff 配置'))
+    const json = await run('get_buff_confs', { format: 'json' })
+    assert.equal(json.ok, true)
+    assert.equal(json.data.buffConfs, undefined)
+    assert.equal(json.data.items[0].no, 1)
+    assert.equal(json.data.items[0].name, '结构化增益')
+    assert.deepEqual(json.data.items[0].scope, [0, 1])
+    assert.equal(json.data.items[0].scopeLabel, '角色1/2')
+    assert.equal(json.data.items[0].zoneCount, 0)
+    assert.equal(typeof json.data.items[0].id, 'string')
+
+    assert.equal((await run('set_buff_conf_zone', { buffConf: 1, zoneId: 'atkPct', value: 15 })).ok, true)
+    const filtered = await run('get_buff_confs', { format: 'json', zoneId: 'atkPct' })
+    assert.equal(filtered.data.zoneId, 'atkPct')
+    assert.equal(filtered.data.items.length, 1)
+    assert.deepEqual(filtered.data.items[0].matchedZones, [
+        { zoneId: 'atkPct', value: 15, override: false, ref: null, condition: null }
+    ])
+    const textFiltered = await run('get_buff_confs', { zoneId: 'atkPct' })
+    assert.match(textFiltered.data.buffConfs, /命中: .*攻击/)
+    assert.equal((await run('delete_buff_conf', { buffConf: 1 })).ok, true)
+})
+
 test('工程 Buff 配置增删使用新参数和摘要，不写入主页 Buff 集', async () => {
     setup()
     const before = JSON.stringify(getBuffEntities())

@@ -3,6 +3,7 @@ import type { ChatToolCall } from '../client'
 import type { AskUserFn } from './ask-user.types'
 import type { WebFetchFn } from './web-fetch.types'
 import type { RunScriptFn } from '../sandbox/protocol'
+import { assertPhaseEditable, type GuardedPhase } from './phase-guard'
 
 export interface ToolDefinition {
     type: 'function'
@@ -68,6 +69,66 @@ export interface ToolHandler {
 
 const definitions: ToolDefinition[] = []
 const handlers = new Map<string, ToolHandler>()
+
+/**
+ * @desc 写工具 → 所属环节。执行前统一检查锁定态。
+ * 只登记**会改工程数据**的工具；读取工具与 UI 偏好开关不在此列。
+ */
+const WRITE_TOOL_PHASES: Record<string, GuardedPhase> = {
+    // 排轴
+    add_op_block: 'timeline',
+    remove_op_block: 'timeline',
+    set_block_key: 'timeline',
+    set_block_special: 'timeline',
+    undo_timeline: 'timeline',
+    redo_timeline: 'timeline',
+    format_timeline: 'timeline',
+    reflow_track: 'timeline',
+    move_op_block: 'timeline',
+    move_ref_line: 'timeline',
+    add_ref_line: 'timeline',
+    remove_ref_line: 'timeline',
+    bind_damage_to_block: 'timeline',
+    unbind_damage_hit: 'timeline',
+    update_damage_hit: 'timeline',
+    remove_damage_from_target: 'timeline',
+    bind_non_direct_to_block: 'timeline',
+    add_custom_hit: 'timeline',
+    update_custom_hit: 'timeline',
+    remove_custom_hit: 'timeline',
+    enable_ref_line_timing: 'timeline',
+    disable_ref_line_timing: 'timeline',
+    set_ref_line_timing_seconds: 'timeline',
+    // 拉表
+    create_buff_conf: 'calculation',
+    rename_buff_conf: 'calculation',
+    duplicate_buff_conf: 'calculation',
+    delete_buff_conf: 'calculation',
+    bind_buff_conf_to_entry: 'calculation',
+    unbind_buff_conf_from_entry: 'calculation',
+    set_entry_damage_types: 'calculation',
+    toggle_damage_type: 'calculation',
+    rename_damage_entry: 'calculation',
+    set_chain: 'calculation',
+    set_refinement: 'calculation',
+    import_buff_set_entity_to_project: 'calculation',
+    set_buff_conf_zone: 'calculation',
+    set_buff_conf_zone_ref: 'calculation',
+    remove_buff_conf_zone: 'calculation',
+    set_buff_conf_zone_condition: 'calculation',
+    set_buff_conf_scope: 'calculation',
+    set_buff_conf_condition: 'calculation',
+    undo_table: 'calculation',
+    redo_table: 'calculation',
+    // 词条 / 环境配置
+    set_echo_cost: 'config',
+    set_main_stat: 'config',
+    add_substat: 'config',
+    remove_substat: 'config',
+    update_substat_value: 'config',
+    update_enemy: 'config',
+    update_resistance: 'config'
+}
 
 export function defineTool(
     name: string,
@@ -136,6 +197,14 @@ export async function executeTool(ctx: ToolContext, name: string, args: Record<s
             ok: false,
             error: `当前上下文不支持工具 ${name}：缺少宿主能力 ${handler.requires}（该工具需要交互界面，远程接管通道无法调用）`
         })
+    }
+    const phase = WRITE_TOOL_PHASES[name]
+    if (phase) {
+        try {
+            assertPhaseEditable(phase)
+        } catch (e) {
+            return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) })
+        }
     }
     if (handler.dangerous) {
         if (ctx.onConfirm) {

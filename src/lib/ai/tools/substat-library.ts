@@ -114,7 +114,7 @@ const parseInputSlots = (raw: unknown): EchoSlotConfig[] | null => {
 
 defineTool('list_substat_plans', {
     description:
-        '列出词条集（快速词条方案）里的声骸词条方案。传 character 时列出该角色全部方案（第一项固定为「标准14词条」，其余为自定义）；不传时列出本地库里有方案的角色及数量。',
+        '列出词条集（快速词条方案）里的声骸词条方案。传 character 时列出该角色全部方案（第一项固定为「标准14词条」，其余为自定义）；不传时列出本地库里有方案的角色，并附带每个角色的标准方案来源、自定义方案名、cost 与副词条总数，便于直接挑选方案而不必逐角色再查。',
     parameters: {
         type: 'object',
         properties: {
@@ -135,18 +135,37 @@ defineTool('list_substat_plans', {
             }
         }
         const counts = new Map<string, { standard: boolean; custom: number }>()
+        const plansByCharacter = new Map<string, SubstatPlan[]>()
         for (const plan of getSubstatPlans()) {
             const entry = counts.get(plan.character) ?? { standard: false, custom: 0 }
             if (plan.standard) entry.standard = true
             else entry.custom += 1
             counts.set(plan.character, entry)
+            const list = plansByCharacter.get(plan.character) ?? []
+            list.push(plan)
+            plansByCharacter.set(plan.character, list)
         }
         const team =
             getActiveProject()
                 ?.team.map((s) => s.character)
                 .filter(Boolean) ?? []
+        const characters = [...counts.entries()].map(([name, c]) => ({
+            character: name,
+            ...c,
+            standardOrigin: c.standard ? standardOriginOf(name) : null,
+            planCount: c.custom,
+            plans: (plansByCharacter.get(name) ?? [])
+                .filter((p) => !p.standard)
+                .map((p) => ({
+                    name: p.name,
+                    cost: costString(p.slots),
+                    substatTotal: planSubstatTotal(p.slots)
+                }))
+        }))
         return {
-            characters: [...counts.entries()].map(([name, c]) => ({ character: name, ...c })),
+            characterCount: characters.length,
+            planCount: characters.reduce((sum, c) => sum + c.planCount, 0),
+            characters,
             team
         }
     }
@@ -317,6 +336,51 @@ defineTool('apply_substat_plan', {
             plan: plan?.name ?? STANDARD_PLAN_NAME,
             cost: costString(slots),
             substatTotal: planSubstatTotal(slots)
+        }
+    }
+})
+
+defineTool('export_substat_plan', {
+    description:
+        '把当前配队中某角色**正在使用的 5 个声骸与副词条**快照成一条自定义词条方案（用于「先存快照 → 改配装/套用其它方案 → 对比 → 回滚」）。默认生成不重名的时间戳方案名；显式传 name 且已存在同名方案时必须传 overwrite=true 才会覆盖。回滚用 apply_substat_plan 套用该快照。',
+    parameters: {
+        type: 'object',
+        properties: {
+            character: { type: 'string', description: '角色名（须在当前配队中）' },
+            name: { type: 'string', description: '可选：快照方案名；省略则自动生成时间戳名' },
+            overwrite: { type: 'boolean', description: '可选：同名方案已存在时是否覆盖（默认 false）' }
+        },
+        required: ['character']
+    },
+    handler: async (args) => {
+        const character = str(args.character)
+        if (!character) throw new Error('缺少 character')
+        await loadSubstatLibrary()
+        const idx = getActiveProject()?.team.findIndex((s) => s.character === character) ?? -1
+        if (idx < 0) throw new Error(`「${character}」不在当前配队中，无法导出快照`)
+        const slots = cloneSlots(getConfig().characters[idx].echoes)
+        const explicitName = str(args.name)
+        const baseName = explicitName || `快照 ${new Date().toLocaleString('zh-CN', { hour12: false })}`
+        let name = baseName
+        const exists = (candidate: string) => listPlansFor(character).some((p) => p.name === candidate)
+        const hadBaseName = exists(baseName)
+        if (hadBaseName) {
+            if (explicitName && args.overwrite !== true) {
+                throw new Error(`方案「${name}」已存在；换一个名字，或显式传 overwrite=true 覆盖`)
+            }
+            if (!explicitName) {
+                for (let i = 2; exists(name); i++) name = `${baseName} (${i})`
+            }
+        }
+        const id = await saveSubstatPlan({ character, name, standard: false, slots })
+        if (!id) throw new Error('导出失败：当前声骸结构非法')
+        return {
+            character,
+            name,
+            overwritten: Boolean(explicitName) && hadBaseName,
+            cost: costString(slots),
+            substatTotal: planSubstatTotal(slots),
+            slots: slotDetails(slots)
         }
     }
 })
