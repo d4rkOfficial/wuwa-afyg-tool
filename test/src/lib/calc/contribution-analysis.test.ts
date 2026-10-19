@@ -314,12 +314,15 @@ describe('多段数条目：单成分也提取「技能单段」', () => {
         // 界面在「因子数 > 1 或 段数 > 1」时渲染因子表，所以这里必须是 1 因子 + 4 段
         assert.equal(seg.factors.length, 1)
         assert.equal(seg.hits, 4)
-        assert.ok(Math.abs(seg.factors[0].damage - result.expectedPerHit) < 1e-6)
+        // 拆成技能单段后，不暴击 / 期望 / 暴击都必须是**单段**值，而不是 4 段合计
+        assert.ok(Math.abs(seg.factors[0].damage - result.expectedPerHit / 4) < 1e-6)
+        assert.ok(Math.abs(seg.factors[0].nonCrit - result.nonCritPerHit / 4) < 1e-6)
+        assert.ok(Math.abs(seg.factors[0].crit - result.critPerHit / 4) < 1e-6)
         assert.ok(Math.abs(seg.factors[0].share - 1) < 1e-12)
     })
 })
 
-describe('复合倍率因子：每一因子的伤害之和 = 条目期望', () => {
+describe('复合倍率因子：单段伤害 × 因子段数之和 = 条目期望', () => {
     // 倍率串 "20%+30%*2"（共 80% 每段，2 段 → ratioValue 160%）+ 额外倍率 50%
     const entry = makeEntry({
         id: ENTRY_ID,
@@ -390,17 +393,23 @@ describe('复合倍率因子：每一因子的伤害之和 = 条目期望', () =
         )
     })
 
-    it('溯源把额外倍率拆到来源 Buff 上，分摊后逐因子伤害之和 = 条目期望', () => {
+    it('溯源把额外倍率拆到来源 Buff 上，单段伤害 × 因子段数之和 = 条目期望', () => {
         assert.equal(seg.factors.length, 3)
         const extra = seg.factors.find((f) => f.kind === 'buff')!
         assert.equal(extra.label, '额外倍率 buff', '额外倍率应按来源 Buff 名拆分')
-        const sum = seg.factors.reduce((s, f) => s + f.damage, 0)
-        assert.ok(Math.abs(sum - result.expectedPerHit) < 1e-6, '逐因子伤害之和必须等于条目期望')
+        // 每个因子自身的段数 = weight / segmentRatio；单段伤害乘回段数才是条目合计
+        const segmentCount = (f: (typeof seg.factors)[number]) => (f.segmentRatio > 0 ? f.weight / f.segmentRatio : 0)
+        const sum = seg.factors.reduce((s, f) => s + f.damage * segmentCount(f), 0)
+        assert.ok(Math.abs(sum - result.expectedPerHit) < 1e-6, '单段伤害 × 因子段数之和必须等于条目期望')
         const shareSum = seg.factors.reduce((s, f) => s + f.share, 0)
         assert.ok(Math.abs(shareSum - 1) < 1e-9)
         // 20%/80% 与额外 50%：占比 40/260、120/260、100/260
         assert.ok(Math.abs(seg.factors[0].share - 40 / 260) < 1e-9)
         assert.ok(Math.abs(seg.factors[2].share - 100 / 260) < 1e-9)
+        // 单段伤害与「单段倍率」同口径：weight 260 对应条目期望，因此每 1 点倍率的伤害 = 期望 / 260
+        assert.ok(Math.abs(seg.factors[0].damage - (result.expectedPerHit / 260) * 20) < 1e-6)
+        assert.ok(Math.abs(seg.factors[1].damage - (result.expectedPerHit / 260) * 30) < 1e-6)
+        assert.ok(Math.abs(extra.damage - (result.expectedPerHit / 260) * 50) < 1e-6)
     })
 
     it('未命中时因子伤害全部归零（与条目归零一致）', () => {

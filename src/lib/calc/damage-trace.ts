@@ -84,7 +84,13 @@ export interface DamageSegments {
     factors: DamageFactorRow[]
 }
 
-/** @desc 一个倍率因子的展示数据（`damage` 为该条目总伤害中分摊到这个因子的部分） */
+/**
+ * @desc 一个倍率因子的展示数据。
+ *
+ * 伤害列（`damage` / `nonCrit` / `crit`）都是**单段值**：同一条目的单段总伤害按倍率占比
+ * 分摊到该因子，再把因子自身的成分乘数（`*N`）与条目段数归一到 1 段。
+ * 因此「单段倍率」与三列伤害始终同口径；条目的全部段数合计仍见上方溯源汇总。
+ */
 export interface DamageFactorRow {
     label: string
     /** 来源类别：技能成分 / 效应 / Buff（额外倍率） */
@@ -96,9 +102,9 @@ export interface DamageFactorRow {
     segmentRatio: number
     /** 占总权重的比例（0..1） */
     share: number
-    /** 每段伤害（当前展示口径） */
+    /** 每段伤害（当前展示口径，等同于 damage） */
     perHit: number
-    /** 该因子分摊到的总伤害（全部因子之和 = 条目期望） */
+    /** 该因子的**单段**伤害 */
     damage: number
     nonCrit: number
     crit: number
@@ -594,10 +600,16 @@ function seg(id: string, label: string, value: number, detail: string, parts: Tr
 }
 
 /**
- * @desc 倍率因子 → 伤害分摊。
+ * @desc 倍率因子 → **单段**伤害分摊。
  *
- * 「每一因子的伤害」按权重占比分摊：同一条目内所有因子都乘以同一份技能倍率基数
- * （% 条目是同一角色面板、系数条目是同一系数），所以按权重比例拆分是**精确的**，不是近似。
+ * 同一条目内所有因子都乘以同一份技能倍率基数（% 条目是同一角色面板、系数条目是同一系数），
+ * 所以按权重比例拆分是**精确的**，不是近似。再除以因子自身的段数
+ * （`weight / segmentRatio`，含成分乘数 `*N` 与条目段数）即得到该因子**单段**伤害：
+ * `damage × 因子段数` 之和 = 条目期望。
+ *
+ * 界面上的伤害列与「单段倍率」列因此同口径；用户看多段技能被拆成「技能单段」时，
+ * 看到的就是一段的伤害，而不是全部段数的总和。
+ *
  * 额外倍率若来自多条 Buff，则按各 Buff 的额外倍率值再拆一次（此处用溯源的来源列表做同口径拆分）。
  */
 const buildFactorRows = (entry: ResultEntry, extraRatioParts: TracePart[], missed: boolean): DamageFactorRow[] => {
@@ -631,9 +643,14 @@ const buildFactorRows = (entry: ResultEntry, extraRatioParts: TracePart[], misse
     const nonCrit = missed ? 0 : entry.nonCritPerHit
     const crit = missed ? 0 : entry.critPerHit
     const unit: '%' | 'flat' = entry.baseUnit === '固定' ? 'flat' : '%'
+    // 权重 → 单段伤害的换算系数：同一权重单位下，1 点倍率对应的伤害
+    const perWeight = totalWeight > 0 ? 1 / totalWeight : 0
 
     return factors.map((factor) => {
         const share = totalWeight > 0 ? factor.weight / totalWeight : 0
+        // 因子自身的段数：20%+30%*2 里的「30%」因子是「2 段 × 条目段数」段
+        const segments = factor.segmentRatio > 0 ? factor.weight / factor.segmentRatio : 0
+        const singleDamage = segments > 0 ? damage * perWeight * factor.segmentRatio : 0
         return {
             label: factor.label,
             kind: factor.kind,
@@ -641,10 +658,10 @@ const buildFactorRows = (entry: ResultEntry, extraRatioParts: TracePart[], misse
             weight: factor.weight,
             segmentRatio: factor.segmentRatio,
             share,
-            perHit: (damage * share) / hits,
-            damage: damage * share,
-            nonCrit: nonCrit * share,
-            crit: crit * share,
+            perHit: singleDamage,
+            damage: singleDamage,
+            nonCrit: segments > 0 ? nonCrit * perWeight * factor.segmentRatio : 0,
+            crit: segments > 0 ? crit * perWeight * factor.segmentRatio : 0,
             unit
         }
     })

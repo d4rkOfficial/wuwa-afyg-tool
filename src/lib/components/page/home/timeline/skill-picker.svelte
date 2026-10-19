@@ -20,6 +20,7 @@
         addCustomHit,
         removeCustomHit,
         duplicateCustomHit,
+        updateCustomHit,
         applySkillHits,
         switchSkillPickerTab,
         getLocked
@@ -47,6 +48,8 @@
     let hasFlat = $state(false)
     let hasPct = $state(false)
     let customHitsCount = $state(1)
+    /** @desc 正在编辑的自定义直伤 id；null = 新建（同一个弹窗复用两种模式） */
+    let editingHitId = $state<string | null>(null)
     /** @desc 上区域选中的现有倍率（含自定义）唯一键；空 = 未选 */
     let pickedKey = $state('')
     /** @desc 下区域逐段选中集合（索引对应 segmentHits） */
@@ -132,7 +135,14 @@
         )
     }
 
-    function openAddCustom(charName: string) {
+    /** @desc 关闭新建/编辑弹窗；清掉编辑目标，下次打开默认是「新建」 */
+    function closeCustomModal() {
+        showCustomModal = false
+        editingHitId = null
+    }
+
+    function openAddCustom() {
+        editingHitId = null
         customName = ''
         customFlat = ''
         customPct = ''
@@ -143,28 +153,61 @@
         customHitsCount = 1
         pickedKey = ''
         segmentSelected = new Set()
+        showUnitMenu = false
         showCustomModal = true
     }
 
-    function confirmAddCustom(charName: string) {
-        const flat = hasFlat ? parseFloat(customFlat) : 0
-        const pct = hasPct ? parseFloat(customPct) : 0
-        if (!customName.trim()) {
+    /** @desc 复用新建弹窗编辑已有自定义直伤：回填字段后确认走 `updateCustomHit` */
+    function openEditCustom(hit: CustomHit) {
+        editingHitId = hit.id
+        customName = hit.name
+        // 固定值 / 百分比其中一个为 0 时也要保持该字段可编辑；两个都为 0 时都打开，
+        // 避免编辑零值条目时因为「至少填写一个」的校验被挡住
+        hasFlat = hit.flatValue > 0 || hit.pctValue <= 0
+        hasPct = hit.pctValue > 0 || hit.flatValue <= 0
+        customFlat = hit.flatValue > 0 ? String(hit.flatValue) : ''
+        customPct = hit.pctValue > 0 ? String(hit.pctValue) : ''
+        customPctUnit = hit.pctUnit
+        customElement = hit.element
+        customHitsCount = hit.hits ?? 1
+        pickedKey = ''
+        segmentSelected = new Set()
+        showUnitMenu = false
+        showCustomModal = true
+    }
+
+    function confirmCustom(charName: string) {
+        const name = customName.trim()
+        if (!name) {
             addToast('请输入直伤名称', 'info')
             return
         }
-        if (!hasFlat && !hasPct) {
+        if (!editingHitId && !hasFlat && !hasPct) {
             addToast('请填写固定值或百分比值', 'info')
             return
         }
-        const hit: CustomHit = {
-            id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            name: customName.trim(),
+        const flat = hasFlat ? parseFloat(customFlat) : 0
+        const pct = hasPct ? parseFloat(customPct) : 0
+        const data = {
+            name,
             flatValue: isNaN(flat) || flat <= 0 ? 0 : flat,
             pctValue: isNaN(pct) || pct <= 0 ? 0 : pct,
             pctUnit: customPctUnit,
             element: customElement,
             hits: Math.max(1, Math.floor(customHitsCount) || 1)
+        }
+        if (editingHitId) {
+            if (!updateCustomHit(charName, editingHitId, data)) {
+                addToast('要编辑的自定义直伤已不存在', 'info')
+                return
+            }
+            addToast('已更新自定义直伤', 'success')
+            closeCustomModal()
+            return
+        }
+        const hit: CustomHit = {
+            id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            ...data
         }
         addCustomHit(charName, hit)
         // 新建后自动勾选并带上段数，省一次手动 ×N 输入
@@ -173,11 +216,11 @@
         nextSelected.add(key)
         setSkillPickerSelected(nextSelected)
         setSkillPickerHitHits({ ...getSkillPickerHitHits(), [key]: hit.hits ?? 1 })
-        showCustomModal = false
+        closeCustomModal()
     }
 
-    function openAddCustomWithName(name: string, charName: string) {
-        openAddCustom(charName)
+    function openAddCustomWithName(name: string) {
+        openAddCustom()
         customName = name
     }
 
@@ -262,7 +305,7 @@
                     </span>
                     {#if group.type === '自定义'}
                         <button
-                            onclick={() => openAddCustom(getSkillPickerCharacter())}
+                            onclick={() => openAddCustom()}
                             class="ml-auto flex items-center gap-0.5 text-[10px] text-(--theme-accent-text) transition-colors hover:brightness-110"
                         >
                             <Icon icon="mdi:plus" class="size-3" /> 添加
@@ -366,6 +409,14 @@
                             <button
                                 onclick={(e) => {
                                     e.stopPropagation()
+                                    if (customHit) openEditCustom(customHit)
+                                }}
+                                class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-accent-text)"
+                                title="编辑这条自定义直伤"><Icon icon="mdi:pencil" class="size-3.5" /></button
+                            >
+                            <button
+                                onclick={(e) => {
+                                    e.stopPropagation()
                                     const id = duplicateCustomHit(getSkillPickerCharacter(), hit.name)
                                     if (id) addToast('已复制该自定义直伤', 'success')
                                 }}
@@ -392,7 +443,7 @@
             <div class="flex items-center gap-1">
                 <button
                     class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
-                    onclick={() => openAddCustom(getSkillPickerCharacter())}
+                    onclick={() => openAddCustom()}
                 >
                     <Icon icon="mdi:plus-circle-outline" class="size-3.5" />
                     添加自定义直伤
@@ -432,10 +483,14 @@
 </Modal>
 
 <!-- Custom Hit Add Modal -->
-<Modal open={showCustomModal} onclose={() => (showCustomModal = false)} layer="deep" class="w-[52rem] max-w-[94vw]">
+<Modal open={showCustomModal} onclose={closeCustomModal} layer="deep" class="w-[52rem] max-w-[94vw]">
     {#snippet title()}
-        <Icon icon="mdi:plus-circle-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
-        <span>自定义直伤</span>
+        <Icon
+            icon={editingHitId ? 'mdi:pencil' : 'mdi:plus-circle-outline'}
+            class="size-4 shrink-0"
+            style="color: var(--theme-accent-text);"
+        />
+        <span>{editingHitId ? '编辑自定义直伤' : '自定义直伤'}</span>
     {/snippet}
 
     <!-- 左半：上区域选现有倍率（含自定义），下区域选伤害段；右半：编辑当前直伤 -->
@@ -728,12 +783,12 @@
         <div class="mt-4 flex items-center justify-end">
             <div class="flex items-center gap-2">
                 <button
-                    onclick={() => (showCustomModal = false)}
+                    onclick={closeCustomModal}
                     class="rounded-none px-3 py-1.5 text-xs text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/10"
                     >取消</button
                 >
                 <button
-                    onclick={() => confirmAddCustom(getSkillPickerCharacter())}
+                    onclick={() => confirmCustom(getSkillPickerCharacter())}
                     class="rounded-none px-4 py-1.5 text-xs transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                     >确认</button
@@ -748,6 +803,6 @@
     open={showLookup}
     team={getTeam()}
     showBuffOption={false}
-    onCreateCustomHit={(name) => openAddCustomWithName(name, getSkillPickerCharacter())}
+    onCreateCustomHit={(name) => openAddCustomWithName(name)}
     onclose={() => (showLookup = false)}
 />

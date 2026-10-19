@@ -1,7 +1,7 @@
 // 自定义倍率串的单一格式化口径（界面与 AI 工具共用）
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { customHitRatio } from '$lib/calc/custom-hit'
+import { customHitRatio, customHitRatioBase } from '$lib/calc/custom-hit'
 
 const hit = (patch: Partial<Parameters<typeof customHitRatio>[0]> = {}) => ({
     flatValue: 0,
@@ -25,7 +25,20 @@ test('customHitRatio：百分比单位与段数后缀', () => {
     assert.equal(customHitRatio(hit({ pctValue: 10, hits: 2 })), '10%*2')
 })
 
-test('customHitRatio：空值 / 0 / 负数不产生条目（没有可用值时为「」）', () => {
-    assert.equal(customHitRatio(hit()), '')
-    assert.equal(customHitRatio(hit({ flatValue: -1, pctValue: 0 })), '')
+test('customHitRatio：固定值或百分比为 0 时保留另一项', () => {
+    assert.equal(customHitRatio(hit({ flatValue: 0, pctValue: 25 })), '25%')
+    assert.equal(customHitRatio(hit({ flatValue: 200, pctValue: 0 })), '200')
+})
+
+test('customHitRatio：零值条目渲染为可解析的 0%（不吞掉倍率条目）', () => {
+    assert.equal(customHitRatio(hit()), '0%')
+    assert.equal(customHitRatio(hit({ pctUnit: '生命%' })), '0%生命')
+    assert.equal(customHitRatio(hit({ flatValue: -1, pctValue: 0 })), '0%')
+})
+
+test('customHitRatioBase：不带段数后缀（段数由 SkillHit.hits 单独携带）', () => {
+    assert.equal(customHitRatioBase(hit({ flatValue: 50, hits: 3 })), '50')
+    assert.equal(customHitRatioBase(hit({ pctValue: 10, hits: 2 })), '10%')
+    assert.equal(customHitRatioBase(hit({ flatValue: 50, pctValue: 10 })), '50+10%')
+    assert.equal(customHitRatioBase(hit()), '0%')
 })

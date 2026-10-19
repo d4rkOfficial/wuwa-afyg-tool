@@ -35,6 +35,7 @@ import {
 import { getEffectMultiplier, getEffectBurstMultiplier } from '$lib/consts/tune-data'
 import { SKILL_TYPE_TUNE_BREAK } from '$lib/consts/game-terms'
 import { parseValueString } from '$lib/utils/parse-value-string'
+import { customHitRatioBase as customHitRatio } from './custom-hit'
 import { addToast } from '$lib/data/toast.svelte'
 import { getCharElementMap as getSharedCharElementMap, setCharElements } from '$lib/data/char-elements.svelte'
 import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
@@ -849,6 +850,22 @@ export function updateCustomHit(
     const next: CustomHit = { ...source, ...patch, id: source.id }
     _customSkillHits = { ..._customSkillHits, [charName]: list.map((h) => (h.id === hitId ? next : h)) }
     updateCustomSkillHits(_customSkillHits)
+    // 已绑定到伤害块的直伤是「名称/倍率/属性」快照：改名或改数值后同步过去，
+    // 否则结果页要等用户重新打开倍率选择器确认一次才会更新
+    const boundName = source.name
+    let timelineChanged = false
+    _damageBlocks = _damageBlocks.map((db) => {
+        const matches = (h: SkillHit) => h.skillType === '自定义' && h.character === charName && h.hitName === boundName
+        if (!db.skillHits.some(matches)) return db
+        timelineChanged = true
+        return {
+            ...db,
+            skillHits: db.skillHits.map((h) =>
+                matches(h) ? { ...h, hitName: next.name, ratio: customHitRatio(next), element: next.element } : h
+            )
+        }
+    })
+    if (timelineChanged) save()
     refreshSkillPickerGroups()
     return next
 }
@@ -2389,17 +2406,6 @@ export async function openRefSkillPicker(blockId: string) {
     _refSkillPickerCache = {}
     _skillPickerCharacter = _team[0]?.character ?? ''
     await loadCharGroupsToCache(_refSkillPickerCache, _skillPickerCharacter)
-}
-
-function customHitRatio(ch: CustomHit): string {
-    const parts: string[] = []
-    if (ch.flatValue > 0) parts.push(ch.flatValue.toString())
-    if (ch.pctValue > 0) {
-        const suf =
-            ch.pctUnit === '攻击%' ? '' : ch.pctUnit === '生命%' ? '生命' : ch.pctUnit === '防御%' ? '防御' : ch.pctUnit
-        parts.push(ch.pctValue + '%' + suf)
-    }
-    return parts.join('+') || '0'
 }
 
 function appendCustomGroups(groups: SkillPickerGroup[], charName: string): SkillPickerGroup[] {
