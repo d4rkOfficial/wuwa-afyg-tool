@@ -729,18 +729,18 @@
         return html
     }
 
-    // 卡片尺寸：固定横屏形态（宽度 = 半个视口宽，高度随窗口占满）
+    // 卡片尺寸：固定横屏形态（宽度 = 视口宽的 2/3，高度随窗口占满）
     let winW = $state(typeof window !== 'undefined' ? window.innerWidth : 1200)
     let winH = $state(typeof window !== 'undefined' ? window.innerHeight : 800)
     /*
-     * 展开态宽度 = **半个窗口宽**（用户点名：展开后占半屏）。
-     * 这里刻意不设下限，也刻意不用 `50vw`：
-     *  - 不设下限：下限（如 480）在窄屏上会**大于**半屏，直接违背「半屏」这个诉求；
-     *  - 不用 `50vw`：`curW` 还要参与拖拽/收起的坐标钳制（`clampToViewport`、`moveDrag`）与
-     *    「以按钮中心向四周展开」的中心计算，那些全是 JS 数值。宽度统一由 JS 算（`window.innerWidth / 2`），
+     * 展开态宽度 = **视口宽的 2/3**（用户点名：最大占屏 2/3）。
+     * 这里刻意不设下限，也刻意不用 `66.67vw`：
+     *  - 不设下限：下限（如 480）在窄屏上会**大于** 2/3 屏，直接违背「占屏 2/3」这个诉求；
+     *  - 不用 `66.67vw`：`curW` 还要参与拖拽/收起的坐标钳制（`clampToViewport`、`moveDrag`）与
+     *    「以按钮中心向四周展开」的中心计算，那些全是 JS 数值。宽度统一由 JS 算（`window.innerWidth * 2 / 3`），
      *    动画中途与 JS 读到的 `curW` 才是同一个数，不会出现「过渡到 A、钳制按 B」的错位。
      */
-    const cardW = $derived(Math.round(winW / 2))
+    const cardW = $derived(Math.round((winW * 2) / 3))
     const cardH = $derived(winH - 24)
     // 默认展开的小卡片尺寸
     const smallW = 380
@@ -1091,8 +1091,20 @@
                                         <span class="min-w-0 flex-1 whitespace-pre-wrap">{act.text}</span>
                                     </div>
                                 {:else if act.kind === 'runResult'}
-                                    {@const expanded = act.expanded !== false}
-                                    <div class="flex items-start gap-1.5 text-(--theme-modal-text)/65">
+                                    {@const expanded = act.expanded === true}
+                                    <div
+                                        role="button"
+                                        tabindex="0"
+                                        aria-expanded={expanded}
+                                        onclick={() => (act.expanded = !expanded)}
+                                        onkeydown={(e) => {
+                                            if (e.key !== 'Enter' && e.key !== ' ') return
+                                            e.preventDefault()
+                                            act.expanded = !expanded
+                                        }}
+                                        title={expanded ? '收起运行结果' : '展开运行结果'}
+                                        class="flex cursor-pointer items-start gap-1.5 rounded-none px-1 py-0.5 text-(--theme-modal-text)/65 transition-colors hover:bg-(--theme-modal-text)/5"
+                                    >
                                         <Icon icon="mdi:check-circle" class="mt-0.5 size-3 shrink-0" />
                                         <span class="shrink-0 font-black">运行结果</span>
                                         <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
@@ -1100,21 +1112,26 @@
                                             class="theme-scrollbar min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/70 {expanded
                                                 ? 'max-h-64 overflow-auto'
                                                 : 'line-clamp-2 max-h-10 overflow-hidden'}">{act.text}</pre>
-                                        <button
-                                            type="button"
-                                            onclick={() => (act.expanded = !expanded)}
-                                            class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-modal-text)"
-                                            title={expanded ? '收起运行结果' : '展开运行结果'}
-                                        >
-                                            <Icon
-                                                icon={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-                                                class="size-3"
-                                            />
-                                        </button>
+                                        <Icon
+                                            icon={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                                            class="mt-0.5 size-3 shrink-0 text-(--theme-modal-text)/35"
+                                        />
                                     </div>
                                 {:else if act.kind === 'runError'}
-                                    {@const expanded = act.expanded !== false}
-                                    <div class="flex items-start gap-1.5 text-red-400">
+                                    {@const expanded = act.expanded === true}
+                                    <div
+                                        role="button"
+                                        tabindex="0"
+                                        aria-expanded={expanded}
+                                        onclick={() => (act.expanded = !expanded)}
+                                        onkeydown={(e) => {
+                                            if (e.key !== 'Enter' && e.key !== ' ') return
+                                            e.preventDefault()
+                                            act.expanded = !expanded
+                                        }}
+                                        title={expanded ? '收起运行报错' : '展开运行报错'}
+                                        class="flex cursor-pointer items-start gap-1.5 rounded-none px-1 py-0.5 text-red-400 transition-colors hover:bg-(--theme-modal-text)/5"
+                                    >
                                         <Icon icon="mdi:alert-circle-outline" class="mt-0.5 size-3 shrink-0" />
                                         <span class="shrink-0 font-black">运行报错</span>
                                         <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
@@ -1122,17 +1139,10 @@
                                             class="theme-scrollbar min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed {expanded
                                                 ? 'max-h-64 overflow-auto'
                                                 : 'line-clamp-2 max-h-10 overflow-hidden'}">{act.text}</pre>
-                                        <button
-                                            type="button"
-                                            onclick={() => (act.expanded = !expanded)}
-                                            class="shrink-0 rounded-none p-0.5 text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-modal-text)"
-                                            title={expanded ? '收起运行报错' : '展开运行报错'}
-                                        >
-                                            <Icon
-                                                icon={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-                                                class="size-3"
-                                            />
-                                        </button>
+                                        <Icon
+                                            icon={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                                            class="mt-0.5 size-3 shrink-0 text-(--theme-modal-text)/35"
+                                        />
                                     </div>
                                 {:else if act.kind === 'tool' && act.tool}
                                     {@const tool = act.tool}
