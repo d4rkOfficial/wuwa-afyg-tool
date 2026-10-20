@@ -1,7 +1,19 @@
 import vercelAdapter from '@sveltejs/adapter-vercel'
 import cloudflareAdapter from '@sveltejs/adapter-cloudflare'
+import staticAdapter from '@sveltejs/adapter-static'
 
 const deployTarget = process.env.DEPLOY_TARGET || 'vercel'
+
+/**
+ * @desc `static` 仅用于 Tauri 启动器 / GitHub Release 的纯静态产物。
+ * fallback 生成 200.html，保持 SPA 路由刷新可用；API 由本地 Rust 服务提供。
+ */
+const adapter =
+    deployTarget === 'cloudflare'
+        ? cloudflareAdapter()
+        : deployTarget === 'static'
+          ? staticAdapter({ pages: 'build', assets: 'build', fallback: '200.html', strict: false })
+          : vercelAdapter()
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -9,7 +21,7 @@ const config = {
         runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
     },
     kit: {
-        adapter: deployTarget === 'cloudflare' ? cloudflareAdapter() : vercelAdapter(),
+        adapter,
         /**
          * @desc 别名：`$lib` 是 SvelteKit 自带的（→ `src/lib`），这里补一个 `$src`（→ `src`）。
          *

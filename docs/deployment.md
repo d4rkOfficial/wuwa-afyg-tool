@@ -37,6 +37,35 @@ pnpm run preview
 
 构建时通过 `DEPLOY_TARGET` 环境变量切换适配器，因此同一份代码可同时部署到 Vercel 与 Cloudflare Pages。
 
+## GitHub Release 静态产物（Tauri 启动器）
+
+启动器不依赖独立的静态产物仓库，直接消费本仓库的 Release：
+
+```bash
+DEPLOY_TARGET=static pnpm run build
+node scripts/write-static-manifest.mjs
+tar -czf toolbox.tar.gz -C build .
+```
+
+产物：
+
+- `build/index.html` / `build/200.html` / `build/_app` 等 adapter-static 文件
+- `build/manifest.json`：version / commit / builtAt
+- `toolbox.tar.gz`：整个 `build/` 的归档
+
+push 到 `main` 后，`.github/workflows/release-toolbox.yml` 自动完成构建并创建 `toolbox-<sha>` Release，上传 `manifest.json` 与 `toolbox.tar.gz`。
+
+> 首次使用需在仓库 `Settings → Actions → General → Workflow permissions` 选择 `Read and write permissions`，否则创建 Release 会 403。
+
+启动器读取：
+
+```text
+https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/latest/download/manifest.json
+https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/latest/download/toolbox.tar.gz
+```
+
+本地手动验证时，也可以直接打开 `build/index.html` 所在目录起静态服务器，但 API 需要由启动器的 Rust 服务提供。
+
 ## 完成检查（改动代码后）
 
 ```bash

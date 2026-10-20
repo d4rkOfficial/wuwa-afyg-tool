@@ -5,6 +5,7 @@
   <img src="https://img.shields.io/badge/Build-Vite-646CFF?logo=vite&logoColor=white" alt="Vite">
   <img src="https://img.shields.io/badge/Deploy-Vercel-000000?logo=vercel&logoColor=white" alt="Vercel">
   <img src="https://img.shields.io/badge/Deploy-Cloudflare%20Pages-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare Pages">
+  <img src="https://img.shields.io/badge/Release-GitHub-181717?logo=github&logoColor=white" alt="GitHub Release">
 </p>
 
 <p style="width:100%;text-align:center;">
@@ -21,15 +22,15 @@
 
 ## 文档
 
-| 文档                                                           | 内容                                                         |
-| -------------------------------------------------------------- | ------------------------------------------------------------ |
-| [docs/deployment.md](docs/deployment.md)                       | 本地开发、构建预览、Vercel / Cloudflare Pages 部署、完成检查 |
-| [docs/buff-engine.md](docs/buff-engine.md)                     | 计算引擎：一切皆 Buff、乘区算子、条件系统、引用转模          |
-| [docs/agent-harness.md](docs/agent-harness.md)                 | AI 助手：回合结构、上下文装配、变化队列、自定义 Skill        |
-| [docs/upstream-integration.md](docs/upstream-integration.md)   | 接入新数据上游（`DataProvider` 适配器、数据质量验收）        |
-| [docs/damage-type-inference.md](docs/damage-type-inference.md) | 伤害类型推导算法（判定链与护栏）与 TDD 用例流程              |
-| [docs/tools.md](docs/tools.md)                                 | AI 助手与 WS 远程接管共用的工具清单（按源码自动生成）        |
-| [docs/ws-remote.md](docs/ws-remote.md)                         | WS 远程接管：工具分类表与接入方式                            |
+| 文档                                                           | 内容                                                                     |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [docs/deployment.md](docs/deployment.md)                       | 本地开发、构建预览、Vercel / Cloudflare Pages / GitHub Release、完成检查 |
+| [docs/buff-engine.md](docs/buff-engine.md)                     | 计算引擎：一切皆 Buff、乘区算子、条件系统、引用转模                      |
+| [docs/agent-harness.md](docs/agent-harness.md)                 | AI 助手：回合结构、上下文装配、变化队列、自定义 Skill                    |
+| [docs/upstream-integration.md](docs/upstream-integration.md)   | 接入新数据上游（`DataProvider` 适配器、数据质量验收）                    |
+| [docs/damage-type-inference.md](docs/damage-type-inference.md) | 伤害类型推导算法（判定链与护栏）与 TDD 用例流程                          |
+| [docs/tools.md](docs/tools.md)                                 | AI 助手与 WS 远程接管共用的工具清单（按源码自动生成）                    |
+| [docs/ws-remote.md](docs/ws-remote.md)                         | WS 远程接管：工具分类表与接入方式                                        |
 
 ### 另见：椰果工坊
 
