@@ -24,6 +24,16 @@ test('展开态占视口 2/3；运行结果/报错默认收起且整行可点击
     assert.match(source, /act\.kind === 'runError'[\s\S]*?onclick=\{\(\) => \(act\.expanded = !expanded\)\}/)
 })
 
+test('助手回复直接贴左侧渲染 Markdown，不再带图标 /「回复」前缀 / 缩进', () => {
+    const source = readFileSync(ASSISTANT, 'utf8')
+    assert.equal(source.includes('>回复</span>'), false, '回复前缀文本应已移除')
+    assert.equal(source.includes('icon="mdi:format-text"'), false, '回复前缀图标应已移除')
+    assert.match(
+        source,
+        /act\.kind === 'text'[\s\S]*?<div class="ai-md min-w-0 text-xs leading-relaxed">[\s\S]*?\{@html renderMd\(act\.text \?\? ''\)\}/
+    )
+})
+
 test('AI 输出是活动流，不再使用「聊天 / 思考 / 工具」tab 或气泡', () => {
     const source = readFileSync(ASSISTANT, 'utf8')
     assert.equal(source.includes('TabPanel'), false, '旧的 tab 容器应已移除')

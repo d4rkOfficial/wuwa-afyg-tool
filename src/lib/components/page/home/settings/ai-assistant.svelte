@@ -1055,16 +1055,8 @@
                                         </button>
                                     </div>
                                 {:else if act.kind === 'text'}
-                                    <div class="flex items-start gap-1.5">
-                                        <Icon
-                                            icon="mdi:format-text"
-                                            class="mt-0.5 size-3 shrink-0 text-(--theme-accent-text)"
-                                        />
-                                        <span class="shrink-0 font-black text-(--theme-modal-text)/70">回复</span>
-                                        <span class="shrink-0 text-(--theme-modal-text)/25">·</span>
-                                        <div class="ai-md min-w-0 flex-1 text-xs leading-relaxed">
-                                            {@html renderMd(act.text ?? '')}
-                                        </div>
+                                    <div class="ai-md min-w-0 text-xs leading-relaxed">
+                                        {@html renderMd(act.text ?? '')}
                                     </div>
                                 {:else if act.kind === 'longTask'}
                                     <div class="flex items-start gap-1.5 text-(--theme-accent-text)/75">
