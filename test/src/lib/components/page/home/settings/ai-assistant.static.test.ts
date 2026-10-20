@@ -24,14 +24,21 @@ test('展开态占视口 2/3；运行结果/报错默认收起且整行可点击
     assert.match(source, /act\.kind === 'runError'[\s\S]*?onclick=\{\(\) => \(act\.expanded = !expanded\)\}/)
 })
 
-test('助手回复直接贴左侧渲染 Markdown，不再带图标 /「回复」前缀 / 缩进', () => {
+test('助手回复直接贴左侧渲染 Markdown，放大 25% 且不再带前缀 / 缩进', () => {
     const source = readFileSync(ASSISTANT, 'utf8')
     assert.equal(source.includes('>回复</span>'), false, '回复前缀文本应已移除')
     assert.equal(source.includes('icon="mdi:format-text"'), false, '回复前缀图标应已移除')
     assert.match(
         source,
-        /act\.kind === 'text'[\s\S]*?<div class="ai-md min-w-0 text-xs leading-relaxed">[\s\S]*?\{@html renderMd\(act\.text \?\? ''\)\}/
+        /act\.kind === 'text'[\s\S]*?<div class="ai-md min-w-0 max-w-full pl-1\.5 text-\[15px\] leading-relaxed">[\s\S]*?\{@html renderMd\(act\.text \?\? ''\)\}/
     )
+})
+
+test('内容区不产生横向滚动，Markdown 代码块与表格自动换行', () => {
+    const source = readFileSync(ASSISTANT, 'utf8')
+    assert.ok(source.includes('overflow-x-hidden overflow-y-auto p-3 break-words'))
+    assert.match(source, /:global\(\.ai-md pre\)[\s\S]*?overflow-x: hidden;[\s\S]*?white-space: pre-wrap;/)
+    assert.match(source, /:global\(\.ai-md table\)[\s\S]*?table-layout: fixed;[\s\S]*?overflow-x: hidden;/)
 })
 
 test('AI 输出是活动流，不再使用「聊天 / 思考 / 工具」tab 或气泡', () => {

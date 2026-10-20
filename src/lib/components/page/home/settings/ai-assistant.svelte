@@ -927,7 +927,7 @@
             <!-- 消息区 -->
             <div
                 bind:this={bodyEl}
-                class="theme-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3"
+                class="theme-scrollbar min-h-0 min-w-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto p-3 break-words"
                 onscroll={onBodyScroll}
             >
                 {#if display.length === 0}
@@ -1019,7 +1019,7 @@
                         {@const activityLimit = m.activityLimit ?? ACTIVITY_PAGE_SIZE}
                         {@const activityStart = Math.max(0, allActivities.length - activityLimit)}
                         {@const visibleActivities = allActivities.slice(activityStart)}
-                        <div class="flex w-full flex-col gap-1 py-0.5 text-[11px] leading-relaxed">
+                        <div class="flex w-full min-w-0 flex-col gap-1 py-0.5 text-[11px] leading-relaxed">
                             {#if activityStart > 0}
                                 <div class="flex justify-center pb-0.5">
                                     <button
@@ -1055,7 +1055,7 @@
                                         </button>
                                     </div>
                                 {:else if act.kind === 'text'}
-                                    <div class="ai-md min-w-0 text-xs leading-relaxed">
+                                    <div class="ai-md min-w-0 max-w-full pl-1.5 text-[15px] leading-relaxed">
                                         {@html renderMd(act.text ?? '')}
                                     </div>
                                 {:else if act.kind === 'longTask'}
@@ -1329,6 +1329,10 @@
     }
     /* {@html} 注入的 Markdown 内容对 Svelte 作用域不可见，必须用 :global 才能匹配并保留 */
     :global(.ai-md) {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
         user-select: text;
         -webkit-user-select: text;
     }
@@ -1376,7 +1380,11 @@
         margin: 0.35em 0;
         padding: 0.5em 0.6em;
         border-radius: 0;
-        overflow-x: auto;
+        max-width: 100%;
+        overflow-x: hidden;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
         font-family: 'JetBrains Mono', ui-monospace, monospace;
         background: color-mix(in srgb, var(--theme-modal-bg) 80%, #000);
     }
@@ -1401,13 +1409,16 @@
         margin: 0.35em 0;
         border-collapse: collapse;
         width: 100%;
-        display: block;
-        overflow-x: auto;
+        max-width: 100%;
+        table-layout: fixed;
+        overflow-x: hidden;
     }
     :global(.ai-md th),
     :global(.ai-md td) {
         padding: 0.2em 0.5em;
         border: 1px solid var(--theme-divider-border);
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
     :global(.ai-md th) {
         font-weight: 600;
