@@ -1,69 +1,102 @@
 name: Release toolbox static
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'static/**'
-      - 'svelte.config.js'
-      - 'vite.config.ts'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-  workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - 'src/**'
+            - 'static/**'
+            - 'svelte.config.js'
+            - 'vite.config.ts'
+            - 'package.json'
+            - 'pnpm-lock.yaml'
+    workflow_dispatch:
+        inputs:
+            keep:
+                description: '保留最近多少个 Release'
+                required: false
+                default: '3'
 
 permissions:
-  contents: write
+    contents: write
 
 concurrency:
-  group: release-toolbox
-  cancel-in-progress: true
+    group: release-toolbox
+    cancel-in-progress: true
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    release:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.8.0
-          run_install: false
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 11.8.0
+                  run_install: false
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+            - run: pnpm install --frozen-lockfile
 
-      - name: Build static bundle
-        run: pnpm run build
-        env:
-          DEPLOY_TARGET: static
+            - name: Build static bundle
+              run: pnpm run build
+              env:
+                  DEPLOY_TARGET: static
 
-      - name: Package release assets
-        env:
-          GITHUB_SHA: ${{ github.sha }}
-        run: |
-          test -f build/index.html
-          node scripts/write-static-manifest.mjs
-          tar -czf toolbox.tar.gz -C build .
-          cp build/manifest.json manifest.json
+            - name: Package release assets
+              env:
+                  GITHUB_SHA: ${{ github.sha }}
+              run: |
+                  test -f build/index.html
+                  node scripts/write-static-manifest.mjs
+                  tar -czf toolbox.tar.gz -C build .
+                  cp build/manifest.json manifest.json
 
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: toolbox-${{ github.sha }}
-        run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" toolbox.tar.gz manifest.json --clobber
-            gh release edit "$TAG" --latest
-          else
-            gh release create "$TAG" toolbox.tar.gz manifest.json \
-              --title "Toolbox ${GITHUB_SHA::7}" \
-              --notes "Automated static build from ${GITHUB_SHA}" \
-              --latest
-          fi
+            - name: Publish GitHub Release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: toolbox-${{ github.sha }}
+              run: |
+                  if gh release view "$TAG" >/dev/null 2>&1; then
+                    gh release upload "$TAG" toolbox.tar.gz manifest.json --clobber
+                    gh release edit "$TAG" --latest
+                  else
+                    gh release create "$TAG" toolbox.tar.gz manifest.json \
+                      --title "Toolbox ${GITHUB_SHA::7}" \
+                      --notes "Automated static build from ${GITHUB_SHA}" \
+                      --latest
+                  fi
+
+            - name: Prune old toolbox releases
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  KEEP_RELEASES: ${{ github.event.inputs.keep || '3' }}
+                  CURRENT_TAG: toolbox-${{ github.sha }}
+              run: |
+                  case "$KEEP_RELEASES" in
+                    ''|*[!0-9]*) KEEP_RELEASES=3 ;;
+                  esac
+                  [ "$KEEP_RELEASES" -ge 1 ] || KEEP_RELEASES=1
+
+                  mapfile -t tags < <(
+                    gh release list --limit 1000 --json tagName,createdAt \
+                      --jq 'sort_by(.createdAt) | reverse | .[].tagName' \
+                      | grep '^toolbox-' || true
+                  )
+
+                  echo "Keep newest $KEEP_RELEASES releases; total=${#tags[@]}"
+                  for ((i = KEEP_RELEASES; i < ${#tags[@]}; i++)); do
+                    tag="${tags[$i]}"
+                    if [ "$tag" = "$CURRENT_TAG" ]; then
+                      echo "Skip current release: $tag"
+                      continue
+                    fi
+                    echo "Deleting old release: $tag"
+                    gh release delete "$tag" --yes --cleanup-tag
+                  done

@@ -55,6 +55,8 @@ tar -czf toolbox.tar.gz -C build .
 
 push 到 `main` 后，`.github/workflows/release-toolbox.yml` 自动完成构建并创建 `toolbox-<sha>` Release，上传 `manifest.json` 与 `toolbox.tar.gz`。
 
+默认保留最近 3 个 `toolbox-*` Release，更旧的 Release 连同 git tag 自动删除。手动运行 workflow 时可通过 `keep` 输入调整保留数量（设为 1 表示只保留当前版本）。
+
 > 首次使用需在仓库 `Settings → Actions → General → Workflow permissions` 选择 `Read and write permissions`，否则创建 Release 会 403。
 
 启动器读取：
