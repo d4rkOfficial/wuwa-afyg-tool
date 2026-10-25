@@ -521,6 +521,14 @@
                             class="size-4 shrink-0 text-(--theme-accent-text)"
                         />
                         <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)">{inst.url}</span>
+                        {#if inst.title}
+                            <span
+                                class="max-w-[42%] shrink-0 truncate rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] text-(--theme-accent-text)"
+                                title={`站点标题：${inst.title}`}
+                            >
+                                {inst.title}
+                            </span>
+                        {/if}
                         {#if workshopInstances.length > 1}
                             <Button
                                 variant="text"
