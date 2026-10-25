@@ -5,6 +5,7 @@ import {
     appendActivityNotice,
     appendActivityText,
     appendRunJsOutput,
+    applyGenerateEventToActivities,
     applyToolEvent,
     applyToolEventToActivities,
     applyToolProgress,
@@ -112,7 +113,7 @@ test('活动流：生成进度优先挂到最后一张未完成的工具行', ()
     const activities = [{ kind: 'tool' as const, tool: { name: 'generate_buff', args: {}, seq: 1 } }]
     const updated = applyToolProgressToActivities(activities, '解析中…')
     assert.equal(updated.length, 1)
-    assert.equal(updated[0].tool?.args.status, '解析中…')
+    assert.equal(updated[0].tool?.progress, '解析中…')
 })
 
 test('describeToolCard：run_js 展示脚本源码与「返回值 + 日志」', () => {
@@ -181,10 +182,10 @@ test('没有 seq 的结果事件不会污染已有卡（无法配对时不猜）
     assert.equal(cards[1].resultLen, 5)
 })
 
-test('进度：优先挂到正在跑的 generate_* 卡上（改它的 status）', () => {
+test('进度：优先挂到正在跑的 generate_* 卡上（改它的 progress）', () => {
     const cards = applyToolProgress([{ name: 'generate_entity_buffs', args: {}, seq: 1 }], '解析中…')
     assert.equal(cards.length, 1)
-    assert.equal(cards[0].args.status, '解析中…')
+    assert.equal(cards[0].progress, '解析中…')
 })
 
 test('进度：没有可挂的卡时追加**无 seq 的伪卡**，因此永远不会抢走真实调用的结果', () => {
@@ -203,4 +204,53 @@ test('进度：已结束的 generate_ 卡不再接收新进度（避免续写上
     const cards = applyToolProgress([{ name: 'generate_entity_buffs', args: {}, seq: 1, resultLen: 10 }], '新的生成')
     assert.equal(cards.length, 2)
     assert.equal(cards[1].name, 'buff生成')
+})
+
+test('实时生成：流式正文累积到正在跑的生成行（只留尾巴），状态事件刷新 progress', () => {
+    let activities = applyToolEventToActivities([], { toolName: 'generate_entity_buffs', toolArgs: {}, seq: 1 })
+
+    activities = applyGenerateEventToActivities(activities, { kind: 'content', delta: '{"buffs":', round: 1 })
+    activities = applyGenerateEventToActivities(activities, {
+        kind: 'content',
+        delta: '[{"buffName":"散 攻击"',
+        round: 1,
+        contentChars: 24
+    })
+    assert.equal(activities.length, 1, '流式增量不能新起一行')
+    assert.equal(activities[0].tool?.live, '{"buffs":[{"buffName":"散 攻击"')
+    assert.match(activities[0].tool?.progress ?? '', /第 1 轮/)
+
+    // 新的工具调用 → 上一轮流出的正文已过期，尾巴清空，状态行换成工具名
+    activities = applyGenerateEventToActivities(activities, {
+        kind: 'tool',
+        text: '工具调用（第 2 轮）：get_entity_info',
+        round: 2
+    })
+    assert.equal(activities[0].tool?.live, '')
+    assert.match(activities[0].tool?.progress ?? '', /get_entity_info/)
+})
+
+test('实时生成：流式尾巴按上限截尾（长输出不会把 DOM 撑爆）', () => {
+    let activities = applyToolEventToActivities([], { toolName: 'generate_project_buff_confs', toolArgs: {}, seq: 1 })
+    activities = applyGenerateEventToActivities(activities, { kind: 'content', delta: 'x'.repeat(3000), round: 1 })
+    assert.equal(activities[0].tool?.live?.length, 900)
+})
+
+test('实时生成：生成行已结束或不存在时退化成一条无 seq 的进度伪行', () => {
+    // 已结束的生成行不再被写
+    const finished = [
+        {
+            kind: 'tool' as const,
+            tool: { name: 'generate_entity_buffs', args: {}, seq: 1, resultLen: 10 }
+        }
+    ]
+    const afterFinish = applyGenerateEventToActivities(finished, { kind: 'status', text: '解析成功', round: 1 })
+    assert.equal(afterFinish.length, 2)
+    assert.equal(afterFinish[0].tool?.progress, undefined)
+    assert.equal(afterFinish[1].tool?.seq, undefined, '伪行不能有 seq')
+
+    // 没有任何工具行时也不会丢事件
+    const orphan = applyGenerateEventToActivities([], { kind: 'status', text: '开始生成：散华' })
+    assert.equal(orphan.length, 1)
+    assert.equal(orphan[0].tool?.progress, '开始生成：散华')
 })

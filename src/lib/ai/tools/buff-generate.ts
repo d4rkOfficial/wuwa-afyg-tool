@@ -41,7 +41,6 @@ function aiRuntime() {
         baseUrl: cfg.baseUrl,
         model: cfg.model,
         reasoningEffort: cfg.reasoningEffort as 'low' | 'medium' | 'high',
-        maxToolRounds: cfg.maxToolRounds,
         maxOutputTokens: cfg.maxOutputTokens,
         direct: cfg.directRequest
     }
@@ -154,7 +153,9 @@ defineTool('generate_buff_set_entity_buffs', {
             namingRule: rule,
             slangDict: getEnabledSkillBody(SKILL_IDS.slangDict),
             data: createBuffSetDataSource(),
-            onProgress: (t) => ctx.onGenerateProgress?.(t)
+            signal: ctx.signal,
+            onProgress: (t) => ctx.onGenerateProgress?.(t),
+            onEvent: (evt) => ctx.onGenerateEvent?.(evt)
         })
         if (!result.buffs) throw new Error(`生成失败：${result.parseError ?? '未知错误'}`)
 
@@ -214,8 +215,13 @@ defineTool('generate_project_buff_confs', {
         const succeeded: Array<{ entityType: string; entityName: string; buffs: GeneratedBuff[] }> = []
         const failed: Array<{ entityType: string; entityName: string; reason: string }> = []
         for (let i = 0; i < entities.length; i++) {
+            if (ctx.signal?.aborted) throw new Error('已停止生成')
             const e = entities[i]
             ctx.onGenerateProgress?.(`正在生成（${i + 1}/${entities.length}）：${e.entityName}`)
+            ctx.onGenerateEvent?.({
+                kind: 'status',
+                text: `正在生成（${i + 1}/${entities.length}）：${e.entityName}`
+            })
             const result = await generateBuffs({
                 ...cfg,
                 entityType: e.entityType,
@@ -223,7 +229,9 @@ defineTool('generate_project_buff_confs', {
                 namingRule: rule,
                 slangDict: getEnabledSkillBody(SKILL_IDS.slangDict),
                 data: createProjectDataSource(),
-                onProgress: (t) => ctx.onGenerateProgress?.(t)
+                signal: ctx.signal,
+                onProgress: (t) => ctx.onGenerateProgress?.(t),
+                onEvent: (evt) => ctx.onGenerateEvent?.(evt)
             })
             if (result.buffs) {
                 succeeded.push({ entityType: e.entityType, entityName: e.entityName, buffs: result.buffs })

@@ -20,6 +20,16 @@ export interface ToolCard {
     done?: boolean
     /** @desc 本次调用的序号（与 `session.ts` 的 emit 配对；纯进度伪卡片没有它） */
     seq?: number
+    /**
+     * @desc 长任务（`generate_*`）的**实时状态行**：一行人话，随生成过程不断刷新
+     *  （第几轮、在调哪个工具、模型已流出多少字），完成后保留最后一次。
+     */
+    progress?: string
+    /**
+     * @desc 长任务**正在流出的原始正文尾巴**（只留尾部若干字符，避免每 delta 都复制超长字符串）。
+     *  生成结束后仍保留，用户可展开看模型到底写了什么。
+     */
+    live?: string
     /** @desc 卡片是否展开（只影响展示，不是工具状态） */
     expanded?: boolean
 }
@@ -79,15 +89,15 @@ export const applyToolEvent = (cards: readonly ToolCard[], evt: ToolEventLike): 
 }
 
 /**
- * @desc 长任务进度（`generate_*`）：优先挂到正在跑的那张卡上（改它的 `status`），
+ * @desc 长任务进度（`generate_*`）：优先挂到正在跑的那张卡上（改它的 `progress`），
  * 否则追加一张**纯进度伪卡** —— 它没有 `seq`，因此永远不会抢走真实调用的结果配对。
  */
 export const applyToolProgress = (cards: readonly ToolCard[], status: string): ToolCard[] => {
     const last = cards[cards.length - 1]
     if (last && last.name.startsWith('generate_') && last.resultLen === undefined && !last.done) {
-        return cards.map((card, i) => (i === cards.length - 1 ? { ...card, args: { ...card.args, status } } : card))
+        return cards.map((card, i) => (i === cards.length - 1 ? { ...card, progress: status } : card))
     }
-    return [...cards, { name: 'buff生成', args: { status } }]
+    return [...cards, { name: 'buff生成', args: {}, progress: status }]
 }
 
 /** @desc 卡片详情区最多展示这么多字符（工具结果本身可达 4 万字符，全塞进 DOM 会卡） */
@@ -245,17 +255,100 @@ export const applyToolProgressToActivities = (
     activities: readonly AssistantActivity[],
     status: string
 ): AssistantActivity[] => {
+    const index = findRunningGenerateIndex(activities)
+    if (index >= 0) {
+        return activities.map((item, idx) =>
+            idx === index ? { ...item, tool: setToolProgress(item.tool, status) } : item
+        )
+    }
+    return [...activities, { kind: 'tool', tool: { name: 'buff生成', args: {}, progress: status } }]
+}
+
+/** @desc 正在运行的 `generate_*` 工具行下标（没有则 -1） */
+const findRunningGenerateIndex = (activities: readonly AssistantActivity[]): number => {
     for (let i = activities.length - 1; i >= 0; i--) {
         const activity = activities[i]
         if (activity.kind !== 'tool' || !activity.tool) continue
-        const updated = applyToolProgress([activity.tool], status)
-        if (updated.length === 1) {
-            return activities.map((item, idx) => (idx === i ? { ...item, tool: updated[0] } : item))
-        }
-        break
+        if (!activity.tool.name.startsWith('generate_')) continue
+        if (activity.tool.resultLen !== undefined || activity.tool.done) return -1
+        return i
     }
-    return [...activities, { kind: 'tool', tool: { name: 'buff生成', args: { status } } }]
+    return -1
 }
+
+const withToolProgress = (tool: ToolCard | undefined, patch: Partial<ToolCard>): ToolCard => ({
+    name: tool?.name ?? 'buff生成',
+    args: tool?.args ?? {},
+    ...tool,
+    ...patch
+})
+
+const setToolProgress = (tool: ToolCard | undefined, status: string): ToolCard =>
+    withToolProgress(tool, { progress: status })
+
+/** @desc 生成任务事件（`GenerateEvent` 的子集，便于测试构造） */
+export interface GenerateEventLike {
+    kind: 'status' | 'content' | 'reasoning' | 'tool' | 'tool-result' | 'result' | 'error'
+    text?: string
+    round?: number
+    toolCalls?: number
+    toolName?: string
+    /** @desc 流式增量正文（content / reasoning） */
+    delta?: string
+    contentChars?: number
+    reasoningChars?: number
+    buffCount?: number
+}
+
+/** @desc 生成正文尾巴最多留这么多字符（再长就截尾，只用于实时预览） */
+const GENERATE_LIVE_CHARS = 900
+
+/**
+ * @desc 生成任务的实时事件 → 活动流。
+ *
+ * 目标始终是**那张正在跑的 `generate_*` 工具行**：状态类事件刷它的 `progress`，
+ * 流式正文/思考累积到 `live`（只留尾部），于是用户能在不结束生成的前提下看到
+ * 「第几轮、在查什么、模型正在写什么」。
+ */
+export const applyGenerateEventToActivities = (
+    activities: readonly AssistantActivity[],
+    evt: GenerateEventLike
+): AssistantActivity[] => {
+    const index = findRunningGenerateIndex(activities)
+    const isStream = evt.kind === 'content' || evt.kind === 'reasoning'
+
+    if (index < 0) {
+        // 没有正在跑的生成行（例如状态先于工具事件到达）：退化成一条纯进度伪行
+        if (!evt.text) return activities as AssistantActivity[]
+        return [...activities, { kind: 'tool', tool: { name: 'buff生成', args: {}, progress: evt.text } }]
+    }
+
+    const activity = activities[index]
+    const tool = activity.tool
+    let patch: Partial<ToolCard>
+    if (isStream) {
+        const merged = `${tool?.live ?? ''}${evt.delta ?? ''}`
+        const live = merged.length > GENERATE_LIVE_CHARS ? merged.slice(-GENERATE_LIVE_CHARS) : merged
+        const parts: string[] = []
+        if (evt.round) parts.push(`第 ${evt.round} 轮`)
+        if (evt.contentChars) parts.push(`输出 ${formatCount(evt.contentChars)} 字`)
+        if (evt.reasoningChars) parts.push(`思考 ${formatCount(evt.reasoningChars)} 字`)
+        // 这一轮还没拿到工具名时，保留上一次的状态行更有信息量
+        patch = { live, progress: parts.length > 0 ? parts.join(' · ') : tool?.progress }
+    } else {
+        patch = {
+            ...(evt.text ? { progress: evt.text } : {}),
+            // 新工具调用开始 → 上一轮流出的正文已经过期，清掉尾巴
+            ...(evt.kind === 'tool' ? { live: '' } : {})
+        }
+    }
+    const nextTool = withToolProgress(tool, patch)
+    return activities.map((item, idx) => (idx === index ? { ...item, tool: nextTool } : item))
+}
+
+/** @desc 字符数 / 工具次数的紧凑写法（12 / 1.2k / 34k） */
+export const formatCount = (value: number): string =>
+    value >= 10_000 ? `${Math.round(value / 1000)}k` : value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
 
 /**
  * @desc `run_js` 的执行结果 → **顶层活动行**（与「代码」工具行分开）。

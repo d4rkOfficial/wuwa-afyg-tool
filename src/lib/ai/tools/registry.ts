@@ -3,6 +3,7 @@ import type { ChatToolCall } from '../client'
 import type { AskUserFn } from './ask-user.types'
 import type { WebFetchFn } from './web-fetch.types'
 import type { RunScriptFn } from '../sandbox/protocol'
+import type { GenerateEvent } from '../generate'
 import { assertPhaseEditable, type GuardedPhase } from './phase-guard'
 
 export interface ToolDefinition {
@@ -15,6 +16,12 @@ export interface ToolDefinition {
 }
 
 export interface ToolContext {
+    /**
+     * @desc 本回合的取消信号（用户按停止）。
+     *  需要长时间跑工具的处理器（如 Buff 生成的多轮循环）必须把它透传出去 ——
+     *  `runToolCall` 的 race 只是「不再等结果」，真正的 HTTP 流要靠这个 signal 才会断开。
+     */
+    signal?: AbortSignal
     onConfirm?: (toolName: string, message: string) => Promise<boolean>
     /**
      * @desc 向用户交互式提问（问题组）。**只有内置 AI 助手注入它** ——
@@ -38,8 +45,14 @@ export interface ToolContext {
     requestView?: (phase: string) => void
     // 修改计算态后通知宿主持久化
     notifyCalc?: () => void
-    // 长时间生成任务的进度回调（如 Buff 生成）
+    // 长时间生成任务的进度回调（如 Buff 生成；只有一行文本，WS 远程接管只有它）
     onGenerateProgress?: (text: string) => void
+    /**
+     * @desc 长时间生成任务的**实时事件**（如 Buff 生成：轮次 / 工具 / 流式正文）。
+     *  内置 AI 助手用它把「正在生成什么」画在任务行上；WS 远程接管没有该通道，
+     *  于是退化成 `onGenerateProgress` 的一行文本。
+     */
+    onGenerateEvent?: (evt: GenerateEvent) => void
     /**
      * @desc `run_js` 的**沙箱**运行器。**只有内置 AI 助手注入** ——
      *  脚本在 Worker 里执行：无 DOM / 网络 / 存储、拿不到密钥，工具调用经 `invoke` 桥回

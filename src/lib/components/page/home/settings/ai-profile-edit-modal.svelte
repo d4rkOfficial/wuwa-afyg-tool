@@ -349,6 +349,8 @@
                 <p class="mt-1 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
                     一个回合内最多「模型 → 工具 → 模型」循环多少次（默认 {DEFAULT_MAX_TOOL_ROUNDS}）。查数据 + 改配置 +
                     校验这类任务容易超过旧上限，到顶时助手会明确提示而不是静默停止。
+                    <br />
+                    注意：Buff 生成工具**内部的工具轮次不受此项限制**（可一直查下去），只有用户按「停止」才会中断。
                 </p>
             </label>
             <div>

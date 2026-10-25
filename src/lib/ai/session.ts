@@ -9,6 +9,7 @@ import {
     type ResponsesItem
 } from './responses'
 import { availableTools, executeTool, summarizeToolOutput, type ToolContext } from './tools'
+import type { GenerateEvent } from './generate'
 import { resolveAiConfig, type ResolvedAiConfig } from './session-overrides.svelte'
 import { toReasoningEffort } from './thinking'
 import { hasImageAttachments, toResponseContentParts } from './image-parts'
@@ -109,8 +110,13 @@ export interface RunTurnOptions {
     requestView?: (phase: string) => void
     // 修改计算态后通知宿主持久化
     onCalcUpdate?: () => void
-    // 长时间生成任务的进度回调（如 Buff 集生成）
+    // 长时间生成任务的进度回调（如 Buff 集生成；WS 远程接管只有这条一行文本通道）
     onGenerateProgress?: (text: string) => void
+    /**
+     * @desc 长时间生成任务的**实时事件**（轮次 / 工具 / 流式正文）。
+     *  只有内置 AI 助手会传它：界面把「这一轮在查什么、模型正在写什么」实时画在生成任务行上。
+     */
+    onGenerateEvent?: (evt: GenerateEvent) => void
     // 取消信号（停止生成）
     signal?: AbortSignal
     // 回传本次完整消息序列（不含 system），供下一轮继续上下文
@@ -302,6 +308,8 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
     const confirmHandler = options.onConfirm
     const askHandler = options.onAskUser
     const toolContext: ToolContext = {
+        // 回合取消信号：需要长跑的生成工具靠它真正断开请求（见 registry 的 ToolContext.signal）
+        signal: options.signal,
         // 危险操作确认期间属于「等待工具结果」
         onConfirm: confirmHandler
             ? async (toolName, summary) => {
@@ -334,6 +342,14 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
         onGenerateProgress: (text) => {
             markToolWaiting(text || '生成中…')
             options.onGenerateProgress?.(text)
+        },
+        // 生成任务的实时事件：状态行进状态条，逐字/逐轮事件交界面画在任务行上。
+        // 流式增量太密（一秒几十次），**不**逐条写实时状态条，只转发给界面。
+        onGenerateEvent: (evt) => {
+            if (evt.kind !== 'content' && evt.kind !== 'reasoning' && evt.text) {
+                markToolWaiting(evt.text)
+            }
+            options.onGenerateEvent?.(evt)
         },
         // run_js 的沙箱运行器：**只有内置 AI 助手有它**（WS 走 windowRun，见 ws-remote 的 wsCtx）
         sandboxRun: runInSandbox

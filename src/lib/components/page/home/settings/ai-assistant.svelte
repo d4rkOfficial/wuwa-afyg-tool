@@ -39,6 +39,7 @@
         appendActivityNotice,
         appendActivityText,
         appendRunJsOutput,
+        applyGenerateEventToActivities,
         applyToolEventToActivities,
         applyToolProgressToActivities,
         describeToolActivity,
@@ -562,6 +563,11 @@
                     // 生成任务进度：合并到正在执行的 generate_* 工具行上（否则追加纯进度伪行）。
                     // 伪行没有 seq，因此不会抢走真实调用的结果配对。
                     last().activities = applyToolProgressToActivities(last().activities ?? [], status)
+                    scrollToBottom()
+                },
+                // 生成任务的实时事件：轮次 / 工具 / 流式正文都画到那张生成行上（不等生成结束）
+                onGenerateEvent: (evt) => {
+                    last().activities = applyGenerateEventToActivities(last().activities ?? [], evt)
                     scrollToBottom()
                 },
                 onConfirm: (toolName, summary) =>
@@ -1139,6 +1145,7 @@
                                 {:else if act.kind === 'tool' && act.tool}
                                     {@const tool = act.tool}
                                     {@const meta = describeToolActivity(tool)}
+                                    {@const running = tool.resultLen === undefined && !tool.done}
                                     <div class="text-(--theme-modal-text)/40">
                                         <button
                                             type="button"
@@ -1152,13 +1159,15 @@
                                             <span class="min-w-0 flex-1 truncate text-(--theme-modal-text)/55">
                                                 {meta.summary}
                                             </span>
-                                            {#if tool.resultLen !== undefined}
+                                            {#if running && tool.progress}
+                                                <!-- 实时生成情况：替换掉无信息量的「执行中…」，直接显示第几轮 / 在调什么 -->
+                                                <span
+                                                    class="max-w-40 shrink-0 truncate text-(--theme-accent-text)/80"
+                                                    title={tool.progress}>{tool.progress}</span
+                                                >
+                                            {:else if tool.resultLen !== undefined}
                                                 <span class="shrink-0 text-(--theme-modal-text)/30"
                                                     >{tool.resultLen} 字符</span
-                                                >
-                                            {:else if typeof tool.args.status === 'string' && tool.args.status}
-                                                <span class="max-w-20 shrink-0 truncate text-(--theme-modal-text)/35"
-                                                    >{tool.args.status}</span
                                                 >
                                             {:else if tool.done}
                                                 <span class="shrink-0 text-(--theme-modal-text)/30">已完成</span>
@@ -1170,6 +1179,12 @@
                                                 class="size-3 shrink-0 opacity-50"
                                             />
                                         </button>
+                                        {#if running && tool.progress && tool.live}
+                                            <!-- 模型正在流出的正文尾巴：不展开也能看到「它在写什么」 -->
+                                            <pre
+                                                class="theme-scrollbar ml-4 max-h-16 overflow-hidden border-l py-0.5 pl-2 font-mono text-[10px] leading-relaxed whitespace-pre-wrap break-all text-(--theme-modal-text)/45"
+                                                style="border-color: var(--theme-divider-border);">{tool.live}</pre>
+                                        {/if}
                                         {#if tool.expanded}
                                             {@const detail = describeToolCard(tool)}
                                             <div
@@ -1194,6 +1209,22 @@
                                                         <pre
                                                             class="theme-scrollbar max-h-48 overflow-auto whitespace-pre-wrap break-all sf-radius rounded-none p-1.5 font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/70"
                                                             style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent);">{detail.response}</pre>
+                                                    </div>
+                                                {/if}
+                                                {#if tool.progress || tool.live}
+                                                    <!-- 生成任务的实时情况：状态行 + 模型正在流出的正文尾巴 -->
+                                                    <div>
+                                                        <div class="mb-0.5 text-(--theme-modal-text)/35">实时情况</div>
+                                                        {#if tool.progress}
+                                                            <div class="text-(--theme-accent-text)/80">
+                                                                {tool.progress}
+                                                            </div>
+                                                        {/if}
+                                                        {#if tool.live}
+                                                            <pre
+                                                                class="theme-scrollbar mt-0.5 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-none p-1.5 font-mono text-[10px] leading-relaxed text-(--theme-modal-text)/60"
+                                                                style="background: color-mix(in srgb, var(--theme-modal-bg) 70%, transparent);">{tool.live}</pre>
+                                                        {/if}
                                                     </div>
                                                 {/if}
                                             </div>
