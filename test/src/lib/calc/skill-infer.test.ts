@@ -45,6 +45,9 @@ const buildEntry = (skillType: string, hitName: string): DamageEntry =>
 const typeOf = (skillType: string, hitName: string, skills: RawSkill[]) =>
     inferDamageTypes(buildEntry(skillType, hitName), buildInfo(skills))[0]
 
+const typesOf = (skillType: string, hitName: string, skills: RawSkill[]) =>
+    inferDamageTypes(buildEntry(skillType, hitName), buildInfo(skills))
+
 // ── 嘉贝莉娜（1208）──
 const GABRIELINA_NA = `普攻进行最多4段的连续攻击，造成热熔伤害，普攻第1段、普攻第2段、普攻第3段伤害为重击伤害，普攻第4段伤害为声骸技能伤害。施放普攻第4段后一定时间内短按普攻，可施放普攻第2段。重击·燧发杀戮消耗耐力攻击目标，进行最多3段的连续攻击，造成热熔伤害，第3段伤害为声骸技能伤害。施放重击·燧发杀戮第1段后一定时间内短按普攻，可施放普攻第2段。施放重击·燧发杀戮第2、3段后一定时间内短按普攻，可施放普攻第3段。空中攻击·枪弹暴雨处于空中时，短按普攻消耗耐力进行空中下落攻击，造成热熔伤害，此次伤害为重击伤害。处于空中时，按住普攻可持续消耗耐力对正下方目标进行扫射，造成热熔伤害，此次伤害为重击伤害，技能被打断后若没有回到地面，无法再次施放。扫射期间松开普攻将施放空中下落攻击。空中下落攻击后，短按普攻可施放普攻第3段。闪避反击·血债将偿成功闪避后一定时间内短按普攻，将会攻击目标，造成热熔伤害，此次伤害为重击伤害。施放该技能后在一定时间内短按普攻，可施放普攻第4段。`
 const GABRIELINA_NA_ROWS = [
@@ -293,4 +296,95 @@ test('小节标题本身就是倍率行名时，整节共用的一句结论归�
     assert.equal(typeOf('常态攻击', '普攻·预求身第一段伤害', skills), '共鸣解放伤害')
     assert.equal(typeOf('常态攻击', '普攻·预求身第五段伤害', skills), '共鸣解放伤害')
     assert.equal(typeOf('常态攻击', '普攻·常世身第一段伤害', skills), '普攻伤害')
+})
+
+test('倍率是【部件名】的派生行时，按部件所在小节的结论结算（散华·冰绽）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣回路',
+            desc: `<size=40><color=Title>重击·爆裂</color></size>按住普攻时，若指针在【冰痕】区域时松开普攻，散华将施放重击爆裂攻击目标，造成冷凝伤害，此次伤害为重击伤害。<size=10> </size><size=40><color=Title>冰绽</color></size>重击爆裂会引爆攻击范围内的【冰棘】、【冰棱】和【冰川】，造成冷凝伤害，冰绽造成的伤害为共鸣技能伤害。<size=10> </size><size=40><color=Title>冰痕区域扩大规则</color></size>每拥有{0}层【透视】都会扩大【冰痕】区域，最多可拥有{1}层【透视】。`,
+            rows: ['爆裂伤害', '冰川爆炸伤害', '冰棱爆炸伤害', '冰棘爆炸伤害']
+        }
+    ]
+    assert.equal(typeOf('共鸣回路', '爆裂伤害', skills), '重击伤害')
+    assert.equal(typeOf('共鸣回路', '冰川爆炸伤害', skills), '共鸣技能伤害')
+    assert.equal(typeOf('共鸣回路', '冰棱爆炸伤害', skills), '共鸣技能伤害')
+    assert.equal(typeOf('共鸣回路', '冰棘爆炸伤害', skills), '共鸣技能伤害')
+})
+
+test('「A 替换为 B」时 B 继承 A 的明写结论（心·镇红尘/镇寰宇）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣回路',
+            desc: `<size=40><color=Title>重击·应世相·步红尘</color></size>处于应世相时，心的【应世心】达到{0}点时，重击·应世相替换为重击·应世相·步红尘。按住普攻，消耗耐力施放，对目标造成导电伤害，此次伤害为共鸣技能伤害。施放重击·应世相·步红尘时，心将获得了尘愿。此次重击·应世相·步红尘将消耗了尘愿替换为重击·应世相·镇红尘，造成更高的伤害。<size=40><color=Title>重击·照世相·临寰宇</color></size>按住普攻，消耗耐力施放，对目标造成导电伤害，此次伤害为共鸣技能伤害。施放重击·照世相·临寰宇时，心将获得承天则。此次重击·照世相·临寰宇将消耗承天则替换为重击·照世相·镇寰宇，造成更高的伤害。`,
+            rows: [
+                '重击·应世相·步红尘伤害',
+                '重击·应世相·镇红尘伤害',
+                '重击·照世相·临寰宇伤害',
+                '重击·照世相·镇寰宇伤害'
+            ]
+        }
+    ]
+    assert.equal(typeOf('共鸣回路', '重击·应世相·步红尘伤害', skills), '共鸣技能伤害')
+    assert.equal(typeOf('共鸣回路', '重击·应世相·镇红尘伤害', skills), '共鸣技能伤害')
+    assert.equal(typeOf('共鸣回路', '重击·照世相·临寰宇伤害', skills), '共鸣技能伤害')
+    assert.equal(typeOf('共鸣回路', '重击·照世相·镇寰宇伤害', skills), '共鸣技能伤害')
+})
+
+test('「同时视为【XX效应】伤害」追加效应类型（卡提希娅·空中攻击）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '常态攻击',
+            desc: `<size=40><color=Title>空中攻击·卡提希娅</color></size>空中松开普攻时，消耗耐力进行空中下落攻击，造成气动伤害，同时视为【风蚀效应】伤害。施放空中攻击·卡提希娅后，卡提希娅回收附近场上所有【剑之影】。`,
+            rows: ['空中攻击', '空中攻击回收一剑', '空中攻击回收二剑', '空中攻击回收三剑']
+        }
+    ]
+    assert.deepEqual(typesOf('常态攻击', '空中攻击', skills), ['普攻伤害', '效应伤害'])
+    assert.deepEqual(typesOf('常态攻击', '空中攻击回收一剑', skills), ['普攻伤害', '效应伤害'])
+    assert.deepEqual(typesOf('常态攻击', '空中攻击回收二剑', skills), ['普攻伤害', '效应伤害'])
+    assert.deepEqual(typesOf('常态攻击', '空中攻击回收三剑', skills), ['普攻伤害', '效应伤害'])
+})
+
+test('「为重击伤害，同时视为【光噪效应】伤害」→ 重击 + 效应双类型（赞妮）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣回路',
+            desc: `<size=40><color=Title>引燃明灯</color></size>赞妮处于灼焰形态时，解锁重斩·破晓、重斩·将明、重斩·终夜、重斩·闪裂，造成衍射伤害，此次伤害为重击伤害，同时视为【光噪效应】伤害。`,
+            rows: ['重斩·破晓伤害', '重斩·将明伤害', '重斩·终夜伤害', '重斩·闪裂伤害']
+        }
+    ]
+    assert.deepEqual(typesOf('共鸣回路', '重斩·闪裂伤害', skills), ['重击伤害', '效应伤害'])
+})
+
+test('只有「同时视为」时，主类型按规则1/技能类型补齐（赞妮·集中压制）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣技能',
+            desc: `准备架势期间松开共鸣技能或持续时间结束后，消耗全部【冗余动能】施放集中压制造成衍射伤害，此次伤害同时视为【光噪效应】伤害。`,
+            rows: ['集中压制伤害']
+        }
+    ]
+    assert.deepEqual(typesOf('共鸣技能', '集中压制伤害', skills), ['共鸣技能伤害', '效应伤害'])
+})
+
+test('非「同时」的【XX效应】括号写法仍按主类型覆盖（不带同时不追加）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣技能',
+            desc: `攻击目标，造成气动伤害，此次伤害视为【风蚀效应】伤害。`,
+            rows: ['测试伤害']
+        }
+    ]
+    assert.deepEqual(typesOf('共鸣技能', '测试伤害', skills), ['效应伤害'])
+})
+
+test('同时类型只取主类型所在小节，不串到候选里的别的小节（绯雪·普攻·居合）', () => {
+    const skills: RawSkill[] = [
+        {
+            type: '共鸣回路',
+            desc: `<size=40><color=Title>霜冻效应</color></size>【霜冻效应】伤害可同时视为【霜渐效应】伤害。预求我身·见心和普攻·居合命中目标时，造成一次【霜结】。<size=40><color=Title>普攻·居合</color></size>施放普攻·居合，造成冷凝伤害，此次伤害为共鸣解放伤害。`,
+            rows: ['普攻·居合伤害']
+        }
+    ]
+    assert.deepEqual(typesOf('共鸣回路', '普攻·居合伤害', skills), ['共鸣解放伤害'])
 })

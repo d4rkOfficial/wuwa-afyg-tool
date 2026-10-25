@@ -18,9 +18,9 @@ const NAME_PREFIX_TYPES: Array<[string, string]> = [
     ['延奏技能·', '延奏技能伤害']
 ]
 
-/** @desc 规则2：「视为/视作/算作/计为/为 XX 伤害」里的伤害名（含「XX效应」通配） */
+/** @desc 规则2：「视为/视作/算作/计为/为 XX 伤害」里的伤害名（含「XX效应」通配，允许【XX效应】的括号写法） */
 const VIEW_AS_SOURCE =
-    '(视为|视作|算作|计为|为)((?:[^，。；、！？,.\\s]{1,4}效应)|普攻|重击|共鸣技能|共鸣解放|声骸技能|变奏技能|延奏技能|协同攻击)伤害'
+    '(视为|视作|算作|计为|为)【?((?:[^，。；、！？,.\\s【】]{1,4}效应)|普攻|重击|共鸣技能|共鸣解放|声骸技能|变奏技能|延奏技能|协同攻击)(?:】)?伤害'
 
 /** @desc 句界：只用句号/分号/换行；感叹号与问号可能出现在技能名内（如「大嘭嘭！」），不能当句界 */
 const SENTENCE_SEPARATORS = /[。；;\n]/
@@ -84,6 +84,8 @@ interface Phrase {
     sentenceStart: number
     sentenceEnd: number
     clause: string
+    /** @desc 「同时视为/同时为」：在原有伤害类型之外追加该类型（双类型条件） */
+    simultaneous: boolean
 }
 
 function boundsAt(text: string, index: number, separators: RegExp): [number, number] {
@@ -110,7 +112,8 @@ function collectPhrases(plain: string): Phrase[] {
             index: m.index,
             sentenceStart,
             sentenceEnd,
-            clause: plain.slice(clauseStart, clauseEnd)
+            clause: plain.slice(clauseStart, clauseEnd),
+            simultaneous: /同时$/.test(plain.slice(Math.max(0, m.index - 2), m.index))
         })
     }
     return out
@@ -349,8 +352,13 @@ function ownedType(
 
     const usable = phrases.filter((phrase) => {
         const owner = ownerAt(phrase.index)
+        const isActionVariant =
+            owner !== null && owner.length >= 3 && GENERIC_ACTION_WORDS.includes(owner) && ownSibling.startsWith(owner)
         const owned =
-            owner === null || isSameSibling(owner, ownSibling) || (owner.includes('·') && ownSibling.startsWith(owner))
+            owner === null ||
+            isSameSibling(owner, ownSibling) ||
+            (owner.includes('·') && ownSibling.startsWith(owner)) ||
+            isActionVariant
         if (!owned) return false
         if (ownSegment === null) return true
         // 段号冲突只按**本分句**判断：「…第3段为空中下落攻击。」这类旁述不该否掉整节的结论
@@ -359,7 +367,48 @@ function ownedType(
         return segs.length === 0 || segs.includes(ownSegment)
     })
     const distinct = new Set(usable.map((p) => p.type))
-    return distinct.size === 1 ? [...distinct][0] : null
+    return distinct.size === 1 ? [...distinct][0]! : null
+}
+
+/** @desc 「A 替换为 B」：B 没有自己的结论时，继承被替换者 A 在小节里的明写结论（心·镇红尘/镇寰宇） */
+const REPLACEMENT_MARKERS = ['替换为', '替换成', '替换作']
+
+const replacementSource = (plain: string, ownSibling: string, siblings: string[]): string | null => {
+    if (!ownSibling) return null
+    for (let from = 0; ;) {
+        const at = plain.indexOf(ownSibling, from)
+        if (at < 0) return null
+        const before = plain.slice(Math.max(0, at - 32), at)
+        const marker = REPLACEMENT_MARKERS.find((candidate) => before.endsWith(candidate))
+        if (marker) {
+            const markerAt = at - marker.length
+            let best: { token: string; at: number } | null = null
+            for (const sibling of siblings) {
+                if (sibling === ownSibling) continue
+                const index = plain.lastIndexOf(sibling, markerAt - 1)
+                if (index >= 0 && (!best || index > best.at)) best = { token: sibling, at: index }
+            }
+            if (best) return best.token
+        }
+        from = at + 1
+    }
+}
+
+/** @desc 只认「归属就是指定行名」的结论（用于替换继承，避免把无归属的句子也继承过来） */
+function ownedByToken(plain: string, phrases: Phrase[], token: string, siblings: string[]): string | null {
+    const positions = nameRanges(plain, siblings)
+        .map((range) => ({ token: range.token, at: range.at }))
+        .sort((a, b) => a.at - b.at)
+    const ownerAt = (index: number): string | null => {
+        let owner: string | null = null
+        for (const position of positions) {
+            if (position.at >= index) break
+            owner = position.token
+        }
+        return owner
+    }
+    const types = new Set(phrases.filter((phrase) => ownerAt(phrase.index) === token).map((phrase) => phrase.type))
+    return types.size === 1 ? [...types][0]! : null
 }
 
 /**
@@ -468,10 +517,44 @@ function plainTextWithHeadings(raw: string): { plain: string; headings: NameRang
     return { plain, headings }
 }
 
+/** @desc 小节正文里的【部件名】（【冰棘】【冰棱】【冰川】），用于把「XX爆炸伤害」这类行名对到部件所在小节 */
+const BRACKET_NAME_RE = /【([^】]{1,12})】/g
+
+const bracketNamesOf = (text: string): string[] =>
+    [...stripRichTags(text).matchAll(BRACKET_NAME_RE)].map((match) => match[1] ?? '').filter(Boolean)
+
+/** @desc 行名按长度递减的短前缀（「冰川爆炸」→「冰川爆」「冰川」），用于在正文里找部件名 */
+const COMPONENT_SEPARATOR_RE = /[·【（(\-—]/
+
+const leadingCandidates = (token: string): string[] => {
+    const out: string[] = []
+    for (let length = token.length - 1; length >= 2; length--) {
+        const candidate = token.slice(0, length)
+        // 「暗流·普攻」里的「暗流」是资源/状态名，不是部件名：带分隔符的前缀不算
+        if (COMPONENT_SEPARATOR_RE.test(candidate) || COMPONENT_SEPARATOR_RE.test(token[length] ?? '')) continue
+        out.push(candidate)
+    }
+    return out
+}
+
+/** @desc 行名在正文里的「部件名」锚点：本行是【部件名】的派生行（「冰川爆炸伤害」↔【冰川】） */
+const componentNeedles = (plain: string, tokens: string[]): string[] => {
+    const brackets = bracketNamesOf(plain)
+    const out: string[] = []
+    for (const token of tokens) {
+        for (const candidate of leadingCandidates(token)) {
+            if (brackets.includes(candidate) && !out.includes(candidate)) out.push(candidate)
+        }
+    }
+    return out
+}
+
 /**
  * @desc 把匹配范围收窄到本次倍率所属的**大标题小节**，按可信度返回候选小节文案：
  * 1) 标题名与倍率名互相包含（标题「重击」↔倍率「重击」、标题「普攻·心眼·征」↔倍率「心眼·征伤害」），标题越长越具体，排在前；
- * 2) 小节正文里出现倍率名的小节（「热压弹伤害」的结论写在「共鸣技能·咔咔压制」小节里，而标题「热压弹获取规则」只是资源规则）。
+ * 2) 小节正文里出现倍率名的小节（「热压弹伤害」的结论写在「共鸣技能·咔咔压制」小节里，而标题「热压弹获取规则」只是资源规则）；
+ * 3) 倍率名是某个【部件名】的派生行（「冰川爆炸伤害」↔【冰川】），且该部件只出现在一个小节里——整节共用一句结论时据此归属；
+ * 4) 动作派生行以小节头的动作名开头（「空中攻击回收一剑」↔「空中攻击·卡提希娅」），正文里没有完整行名时据此归属。
  * 文案没有大标题、或没有任何小节提到该倍率时返回空数组（调用方按整段文案匹配，行为与从前一致）。
  */
 function sectionTextsForHit(raw: string, hitName: string, skillType?: string): string[] {
@@ -489,14 +572,45 @@ function sectionTextsForHit(raw: string, hitName: string, skillType?: string): s
     const byBody = needles.flatMap((needle) =>
         sections.filter((section) => !byHeading.includes(section) && stripRichTags(section.text).includes(needle))
     )
-    return [...byHeading, ...byBody].map((section) => section.text)
+    if (byHeading.length > 0 || byBody.length > 0) return [...byHeading, ...byBody].map((section) => section.text)
+    // 动作派生行：「空中攻击回收一剑」这类行名以小节头的动作名开头（「空中攻击·卡提希娅」），正文里没有完整行名
+    const byCore = needles.flatMap((needle) =>
+        sections.filter((section) => {
+            const core = section.heading.split('·')[0] ?? ''
+            const rest = needle.slice(core.length)
+            return (
+                core.length >= 3 &&
+                core !== skillType &&
+                rest.length > 0 &&
+                !rest.startsWith('·') &&
+                GENERIC_ACTION_WORDS.includes(core) &&
+                needle.startsWith(core)
+            )
+        })
+    )
+    if (byCore.length > 0) return [...new Set(byCore)].map((section) => section.text)
+    // 部件派生行：「冰川爆炸伤害」的「冰川」以【冰川】形式出现在「冰绽」小节，正文里没有完整行名
+    const componentCandidates = needles.flatMap((needle) =>
+        leadingCandidates(needle).flatMap((candidate) =>
+            sections.filter(
+                (section) => section.heading && bracketNamesOf(section.text).some((bracket) => bracket === candidate)
+            )
+        )
+    )
+    return [...new Set(componentCandidates)].map((section) => section.text)
 }
 
 /** @desc 在单段文案里做规则2匹配：先按技能名锚定「为 XX 伤害」，再看名称徽标，最后受约束的归属兜底 */
-function matchInText(text: string, options: MatchContext, allowBadge = true): string | null {
+function matchInText(
+    text: string,
+    options: MatchContext,
+    allowBadge = true,
+    isSection = false,
+    simultaneous = false
+): string | null {
     const { plain, headings } = plainTextWithHeadings(text)
     if (!plain) return null
-    const phrases = collectPhrases(plain)
+    const phrases = collectPhrases(plain).filter((phrase) => phrase.simultaneous === simultaneous)
 
     const ownSibling = siblingToken(normalizeNumerals(options.hitName ?? ''))
     const ownTokens = sectionTokens(
@@ -507,6 +621,8 @@ function matchInText(text: string, options: MatchContext, allowBadge = true): st
     // 本行行名（含去段号的小节头名）也要参与归属判定：整节共用一句结论时，结论的归属正是本行或本节
     const foreign = nameRanges(plain, ownTokens, ownSibling)
     const { byName, bySegment } = needlesForHit(options.hitName ?? '', options.skillType)
+    // 部件派生行（散华·冰绽：「冰川爆炸伤害」对应正文里的【冰川】）用部件名做同句锚定
+    const nameNeedles = isSection ? [...byName, ...componentNeedles(plain, ownTokens)] : byName
     const ownSegment = (() => {
         const seg = /第(\d+)段/.exec(normalizeNumerals(options.hitName ?? ''))
         return seg ? Number(seg[1]) : null
@@ -515,17 +631,31 @@ function matchInText(text: string, options: MatchContext, allowBadge = true): st
     // 先按技能名锚定（同一 desc 里可能并列多个技能/多段），再退到纯段号锚定
     const anchored =
         phrases.length > 0
-            ? (anchoredType(plain, phrases, { needles: byName, ownSegment, foreign }) ??
+            ? (anchoredType(plain, phrases, { needles: nameNeedles, ownSegment, foreign }) ??
               anchoredType(plain, phrases, { needles: bySegment, support: byName, ownSegment, foreign }))
             : null
     if (anchored) return anchored
     // 名称徽标不需要「为 XX 伤害」句式，所以放在句式收集的空判之前
     if (allowBadge) {
-        const adjacent = adjacentType(plain, byName, foreign, headings)
+        const adjacent = adjacentType(plain, nameNeedles, foreign, headings)
         if (adjacent) return adjacent
     }
     if (options.requireAnchor || phrases.length === 0) return null
-    return ownedType(plain, phrases, ownSibling, ownTokens, ownSegment)
+    const owned = ownedType(plain, phrases, ownSibling, ownTokens, ownSegment)
+    if (owned) return owned
+    // 「A 替换为 B」：B 继承 A 在小节里的明写结论（心·镇红尘/镇寰宇）
+    const source = isSection ? replacementSource(plain, ownSibling, ownTokens) : null
+    if (source) {
+        const inherited = ownedByToken(plain, phrases, source, ownTokens)
+        if (inherited) return inherited
+    }
+    return null
+}
+
+/** @desc 规则2 的匹配结果：`type` 是主类型（null = 文案只给了「同时」类型），`simultaneous` 是要追加的类型 */
+export interface SkillTextMatch {
+    type: string | null
+    simultaneous: string[]
 }
 
 /**
@@ -534,18 +664,39 @@ function matchInText(text: string, options: MatchContext, allowBadge = true): st
  * 分轮是因为徽标会被交叉引用骗到（「施放普攻凌霄·普攻第4段」里的「普攻」属于被引用技能名，
  * 而该技能自己写着「此次伤害为共鸣技能伤害」），明写结论必须优先。
  * 有候选小节时只在小节里找结论：一个都没有也不回退整段，否则会把别的小节的结论抄过来。
+ *
+ * 「同时视为 XX 伤害」是**追加**类型：先按普通结论（或规则1/技能类型兜底）得到主类型，再把同时类型并进去，
+ * 例如「此次伤害为重击伤害，同时视为【光噪效应】伤害」→ 重击伤害 + 效应伤害。
  */
-export function matchSkillTextOverride(text: string, ctx?: MatchContext | string, skillType = ''): string | null {
+export function matchSkillTextOverride(
+    text: string,
+    ctx?: MatchContext | string,
+    skillType = ''
+): SkillTextMatch | null {
     const options: MatchContext = typeof ctx === 'string' ? { hitName: ctx, skillType } : (ctx ?? { hitName: '' })
     const candidates = sectionTextsForHit(text, options.hitName ?? '', options.skillType)
-    const texts = candidates.length > 0 ? candidates : [text]
-    for (const allowBadge of [false, true]) {
-        for (const candidate of texts) {
-            const result = matchInText(candidate, options, allowBadge)
-            if (result) return result
+    const isSection = candidates.length > 0
+    const texts = isSection ? candidates : [text]
+    const findPrimary = (): { type: string; index: number } | null => {
+        for (const allowBadge of [false, true]) {
+            for (const [index, candidate] of texts.entries()) {
+                const result = matchInText(candidate, options, allowBadge, isSection)
+                if (result) return { type: result, index }
+            }
         }
+        return null
     }
-    return null
+    const primaryHit = findPrimary()
+    // 同时类型只认「为 XX 伤害」句式，不认名称徽标（徽标不是追加语义）；
+    // 有主类型时只在**主类型所在小节**里找同时类型，避免把候选里的别的小节结论（绯雪·霜冻效应）带过来
+    const simultaneous = new Set<string>()
+    const simTexts = primaryHit ? [texts[primaryHit.index]!] : texts
+    for (const candidate of simTexts) {
+        const result = matchInText(candidate, options, false, isSection, true)
+        if (result) simultaneous.add(result)
+    }
+    if (!primaryHit && simultaneous.size === 0) return null
+    return { type: primaryHit?.type ?? null, simultaneous: [...simultaneous] }
 }
 
 /** @desc 规则1：倍率名命中「普攻·/重击·/空中攻击/闪避反击/共鸣技能·/…」前缀时返回对应伤害类型 */
@@ -575,7 +726,10 @@ interface CandidateSkill {
     siblings: string[]
 }
 
-function matchInSkills(skills: CandidateSkill[], entry: Pick<DamageEntry, 'hitName' | 'skillType'>) {
+function matchInSkills(
+    skills: CandidateSkill[],
+    entry: Pick<DamageEntry, 'hitName' | 'skillType'>
+): SkillTextMatch | null {
     for (const skill of skills) {
         const hit = matchSkillTextOverride(skill.desc, {
             hitName: entry.hitName,
@@ -598,7 +752,7 @@ export function inferFromSkillText(
     info: CharacterInfo | null | undefined,
     entry: Pick<DamageEntry, 'hitName' | 'skillType'>,
     extraDescs: string[] = []
-): string | null {
+): SkillTextMatch | null {
     const skills = Array.isArray(info?.skills) ? info.skills : []
     const toCandidate = (s: (typeof skills)[number]): CandidateSkill => ({
         desc: s.desc ?? '',

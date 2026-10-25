@@ -9,36 +9,45 @@ import { inferFromSkillText, matchHitNamePrefix } from './skill-infer'
  * 2. 规则2：技能富文本「视为/为 XX 伤害」→ 直接顶替其它推导（角色技能文案取 charInfo，
  *    声骸技能文案由调用方通过 echoDesc 传入）；同一份文案里并列多个技能/多段时按技能名、段号锚定，
  *    只有确属本次命中小节的结论才会被采用，有歧义时放弃；
+ *    **「同时视为 XX 伤害」是追加类型**：主类型仍按普通结论/规则1/技能类型取，再把同时类型并进结果
+ *    （如「为重击伤害，同时视为【光噪效应】伤害」→ 重击伤害 + 效应伤害）；
  * 3. 规则1：倍率名含「普攻·/重击·/空中攻击/闪避反击/共鸣技能·/共鸣解放·/变奏技能·/延奏技能·」→ 对应类型
  *    （空中攻击、闪避反击默认按普攻伤害结算，文案写明重击的由上一步覆盖）；
  * 4. 按技能类型推断，常态攻击再按招式名分普攻/重击；无法推导归「其它类型伤害」。
  */
+const fallbackDamageType = (entry: DamageEntry): string => {
+    switch (entry.skillType) {
+        case '常态攻击':
+            return entry.hitName.includes('重击') ? '重击伤害' : '普攻伤害'
+        case '共鸣技能':
+            return '共鸣技能伤害'
+        case '共鸣解放':
+            return '共鸣解放伤害'
+        case '声骸技能':
+            return '声骸技能伤害'
+        case '变奏技能':
+            return '变奏技能伤害'
+        case '延奏技能':
+            return '延奏技能伤害'
+        default:
+            // 无法推导的类型统一归为「其它类型伤害」
+            return '其它类型伤害'
+    }
+}
+
 export function inferDamageTypes(entry: DamageEntry, charInfo?: CharacterInfo | null, echoDesc?: string): string[] {
     // 效应结算条目自动推导为「效应伤害」
     if (entry.isEffect) return ['效应伤害']
     // 规则2：技能文案「视为/为 XX 伤害」（富文本先剥标签再匹配）
     const fromText = inferFromSkillText(charInfo, entry, echoDesc ? [echoDesc] : [])
-    if (fromText) return [fromText]
-    // 规则1：倍率名里的类型前缀
     const fromName = matchHitNamePrefix(entry.hitName)
-    if (fromName) return [fromName]
-    switch (entry.skillType) {
-        case '常态攻击':
-            return entry.hitName.includes('重击') ? ['重击伤害'] : ['普攻伤害']
-        case '共鸣技能':
-            return ['共鸣技能伤害']
-        case '共鸣解放':
-            return ['共鸣解放伤害']
-        case '声骸技能':
-            return ['声骸技能伤害']
-        case '变奏技能':
-            return ['变奏技能伤害']
-        case '延奏技能':
-            return ['延奏技能伤害']
-        default:
-            // 无法推导的类型统一归为「其它类型伤害」
-            return ['其它类型伤害']
+    if (fromText) {
+        // 只有「同时视为」时，主类型交给规则1/技能类型兜底（「空中攻击」+「同时视为风蚀效应」→ 普攻 + 效应）
+        const primary = fromText.type ?? fromName ?? fallbackDamageType(entry)
+        return [...new Set([primary, ...fromText.simultaneous])]
     }
+    if (fromName) return [fromName]
+    return [fallbackDamageType(entry)]
 }
 
 export const DAMAGE_TYPE_CATEGORIES = [

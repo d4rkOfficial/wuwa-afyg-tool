@@ -173,12 +173,10 @@ export const inferDamageTypeOf = async (
         const suggestionText = suggestions.length > 0 ? `\n相近行名：${suggestions.join(' / ')}` : ''
         throw new Error(`角色「${characterName}」里没有倍率行「${ratioName}」。${hint}${suggestionText}`)
     }
-    const outcomes = candidates.map((skill) => ({
-        skillType: skill.type,
-        actual:
-            inferDamageTypes(buildEntry(info, characterName, skill.type, ratioName, isEffect), info)[0] ??
-            '其它类型伤害'
-    }))
+    const outcomes = candidates.map((skill) => {
+        const types = inferDamageTypes(buildEntry(info, characterName, skill.type, ratioName, isEffect), info)
+        return { skillType: skill.type, actual: types.length > 0 ? types.join(' / ') : '其它类型伤害' }
+    })
     const distinct = [...new Set(outcomes.map((outcome) => outcome.actual))]
     if (distinct.length > 1) {
         const detail = outcomes.map((outcome) => `  ${outcome.skillType} → ${outcome.actual}`).join('\n')
