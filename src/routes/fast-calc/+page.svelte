@@ -247,6 +247,9 @@
                 prevSeconds = anchor.seconds
             }
             segments = built
+            const duration = anchors.length
+                ? anchors[anchors.length - 1].seconds
+                : 0
             total = computed.reduce((sum, entry) => sum + entry.totalDamage, 0)
             // 报告页按「同一伤害块」聚合，块 id 与 catalogId 用来和鸣算屋逐技能对齐
             const catalogOf = (result: ResultEntry): string | null => {
@@ -286,6 +289,7 @@
             const payload = JSON.parse(JSON.stringify({
                 type: 'fast-calc:result',
                 total,
+                duration,
                 computeMs,
                 entries: computed.map(reportEntry),
                 segments: segments.map((segment) => ({
