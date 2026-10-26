@@ -325,8 +325,10 @@
             const loaded = getActiveProject()
             if (!loaded) throw new Error('工程加载失败')
             project = loaded
-            const initial = getConditionProfile()
+            // 工程自带的链/阶是准的；store 里可能还留着上一个工程的档位
+            const initial = loaded.conditionProfile ?? getConditionProfile()
             profile = normalizeCondition(initial)
+            setConditionProfile(profile)
             const timeline = loaded.phases.timeline.data as any
             const refLines = timeline?.refLines ?? []
             const blocks = timeline?.damageBlocks ?? []
@@ -436,6 +438,7 @@
         bootPromise ??= loadProjects()
         window.addEventListener('message', onMessage)
         window.addEventListener('hashchange', onHashChange)
+        parent.postMessage({ type: 'fast-calc:ready' }, '*')
         void openImporter()
     })
     onDestroy(() => {
