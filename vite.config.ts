@@ -35,6 +35,9 @@ export default defineConfig({
             workbox: {
                 globPatterns: ['**/*.{js,css,html,svg,png,woff2,webp}'],
                 maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+                // 不要把所有导航都回退到 "/"：旧 SW 会把 /fast-calc 导航
+                // 直接替换成首页缓存，导致新路由第一次进不去。
+                navigateFallback: null,
                 runtimeCaching: [
                     {
                         urlPattern: /^\/api\/v[12]\//,

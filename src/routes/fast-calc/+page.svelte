@@ -1,4 +1,5 @@
 <script lang="ts">
+    import Icon from '@iconify/svelte'
     import { onDestroy, onMount } from 'svelte'
     import { computeAll as computeAllDamage, type ConditionProfile } from '$lib/calc/compute'
     import { getAllDamageEntries, getCalcState, getConditionProfile, setConditionProfile } from '$lib/calc/calculation.store.svelte'
@@ -49,6 +50,7 @@
     let timings = $state<{ refLineId: string; label: string; seconds: number | null }[]>([])
     let bootPromise: Promise<void> | null = null
     let importingUrl = ''
+    let importing = $state(false)
 
     /** 无导入计时点时，走工具箱原生「参考线记点」自动启用 */
     const resolveTimings = (
@@ -417,6 +419,7 @@
         if (target) {
             if (target === importingUrl) return
             importingUrl = target
+            importing = true
             loading = true
             error = ''
             try {
@@ -427,6 +430,8 @@
                 importingUrl = ''
                 error = cause instanceof Error ? cause.message : String(cause)
                 loading = false
+            } finally {
+                importing = false
             }
             return
         }
@@ -467,6 +472,12 @@
         }}
     />
     {#if !project}
+        {#if importing}
+            <div class="import-mask" role="status" aria-live="polite">
+                <span class="import-spinner"><Icon icon="mdi:loading" /></span>
+                <span>正在导入工程…</span>
+            </div>
+        {:else}
         <div
             class:active={dragging}
             class="drop-zone"
@@ -484,6 +495,7 @@
             {#if error}<em>{error}</em>{/if}
             {#if loading}<em>正在计算…</em>{/if}
         </div>
+        {/if}
     {:else}
         <header class="fast-head">
             <div>
@@ -637,6 +649,9 @@
     .drop-zone { max-width: 720px; min-height: 380px; margin: 10vh auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border: 1.5px dashed var(--theme-divider-border, #39414d); background: var(--theme-input-bg, #1a1e24); cursor: pointer; transition: .2s ease; }
     .drop-zone.active, .drop-zone:hover { border-color: var(--theme-accent-text, #8fd0d7); background: color-mix(in srgb, var(--theme-accent-text, #8fd0d7) 8%, var(--theme-input-bg, #1a1e24)); }
     .file-input { display: none; }
+    .import-mask { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: color-mix(in srgb, var(--theme-modal-bg, #111418) 82%, transparent); backdrop-filter: blur(6px); color: var(--theme-modal-text, #e7edf5); font-size: 13px; }
+    .import-spinner { width: 30px; height: 30px; color: var(--theme-accent-text, #8fd0d7); animation: import-spin .9s linear infinite; }
+    @keyframes import-spin { to { transform: rotate(360deg); } }
     .eyebrow { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--theme-accent-text, #8fd0d7); }
     .drop-zone strong { font-size: 34px; font-weight: 800; }
     .drop-zone span:not(.eyebrow) { color: var(--theme-modal-text, #e7edf5); opacity: .6; }
