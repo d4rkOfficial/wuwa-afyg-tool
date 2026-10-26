@@ -40,7 +40,7 @@ const config = {
             // `pnpm run build` 退出码 1（构建产物其实已经生成，但会卡住任何部署流水线）。
             // 故显式把它列进 entries：保住「预渲染」的意图，而不是用
             // `handleUnseenRoutes: 'ignore'` 把这类不一致静默掉。
-            entries: ['/', '/shell-page']
+            entries: ['/', '/shell-page', '/fast-calc']
         }
     }
 }
