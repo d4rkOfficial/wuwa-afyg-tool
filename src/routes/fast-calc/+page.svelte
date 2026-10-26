@@ -187,6 +187,7 @@
             const entries = getAllDamageEntries()
             const calc = getCalcState()
             const config = getConfig()
+            const computeStarted = performance.now()
             const computed = computeAllDamage(
                 entries,
                 calc.buffSets,
@@ -198,8 +199,10 @@
                 weaponInfoMap,
                 normalizeCondition(profile)
             )
+            const computeMs = performance.now() - computeStarted
             const timeline = project.phases.timeline.data as any
             const blocks = timeline?.damageBlocks ?? []
+            const blockById = new Map<string, any>(blocks.map((block: any) => [block.id, block]))
             const refs = new Map<string, any>((timeline?.refLines ?? []).map((ref: any) => [ref.id, ref]))
             const blockToRef = new Map<string, string>(blocks.map((block: any) => [block.id, block.sourceId]))
             // 与工具箱数据分析一致：参考线和操作块都参与位置映射
@@ -245,21 +248,53 @@
             }
             segments = built
             total = computed.reduce((sum, entry) => sum + entry.totalDamage, 0)
+            // 报告页按「同一伤害块」聚合，块 id 与 catalogId 用来和鸣算屋逐技能对齐
+            const catalogOf = (result: ResultEntry): string | null => {
+                const byId = blockById.get(result.id.split('-')[0])
+                const bySource = blockById.get(result.sourceTimelineBlockId) ??
+                    blocks.find((block: any) => block.sourceId === result.sourceTimelineBlockId)
+                const block = byId ?? bySource
+                const catalogId = block?.skillHits?.find((hit: any) => hit.catalogId)?.catalogId
+                return catalogId ? String(catalogId) : null
+            }
+            const reportEntry = (result: ResultEntry) => ({
+                id: result.id,
+                blockId: result.sourceTimelineBlockId,
+                catalogId: catalogOf(result),
+                character: result.character,
+                name: result.displayName,
+                damage: result.totalDamage,
+                hits: result.hits,
+                fixed: result.baseUnit === '固定',
+                zones: {
+                    baseMult: result.ratioNum * result.hits,
+                    dmgBonus: 1 + result.dmgBonus,
+                    deepen: 1 + result.deepen,
+                    vulnerability: 1 + result.vulnerability,
+                    resistance: result.resMulti,
+                    defense: result.defMulti,
+                    critRate: result.critRate * 100,
+                    critDmg: result.critDmg * 100,
+                    critExpect: 1 + result.critRate * (result.critDmg - 1),
+                    multBoost: result.customMult,
+                    multAdd: result.extraRatio || 0,
+                    attack: result.totalAtk,
+                    hp: result.totalHp,
+                    def: result.totalDef
+                }
+            })
             const payload = JSON.parse(JSON.stringify({
                 type: 'fast-calc:result',
                 total,
+                computeMs,
+                entries: computed.map(reportEntry),
                 segments: segments.map((segment) => ({
                     time: segment.time,
                     start: segment.start,
                     end: segment.end,
                     total: segment.total,
                     dps: segment.dps,
-                    entries: segment.entries.map((result) => ({
-                        id: result.id,
-                        character: result.character,
-                        name: result.displayName,
-                        damage: result.totalDamage
-                    }))
+                    entries: segment.entries.map(reportEntry)
                 }))
             }))
             parent.postMessage(payload, '*')
