@@ -2,7 +2,12 @@
     import Icon from '@iconify/svelte'
     import { onDestroy, onMount, tick } from 'svelte'
     import { computeAll as computeAllDamage, type ConditionProfile } from '$lib/calc/compute'
-    import { getAllDamageEntries, getCalcState, getConditionProfile, setConditionProfile } from '$lib/calc/calculation.store.svelte'
+    import {
+        getAllDamageEntries,
+        getCalcState,
+        getConditionProfile,
+        setConditionProfile
+    } from '$lib/calc/calculation.store.svelte'
     import { getConfig } from '$lib/calc/config.store.svelte'
     import type { ResultEntry } from '$lib/calc/result.types'
     import type { CharSlot, Project } from '$lib/types/project'
@@ -73,9 +78,7 @@
         // 原工程有 analysis.timings 就原样保留；没有时才自动启用参考线记点
         const source = imported.length
             ? imported
-            : autoConfigureTimings(refLines, (pos) =>
-                blocks.some((block) => (posById.get(block.sourceId) ?? -1) > pos)
-            )
+            : autoConfigureTimings(refLines, (pos) => blocks.some((block) => (posById.get(block.sourceId) ?? -1) > pos))
         return source.map((timing, index) => ({
             refLineId: timing.refLineId,
             label: labelOf(timing.refLineId, index),
@@ -134,9 +137,7 @@
             }
         }
         return keys
-            .filter((key) =>
-                entries.some((entry) => Math.abs(zoneCell(entry, key).value - 1) > 1e-9)
-            )
+            .filter((key) => entries.some((entry) => Math.abs(zoneCell(entry, key).value - 1) > 1e-9))
             .sort((a, b) => {
                 const ai = ZONE_ORDER.indexOf(a)
                 const bi = ZONE_ORDER.indexOf(b)
@@ -145,8 +146,7 @@
             .map((key) => ({ key, label: key }))
     }
 
-    const segmentId = (refLineId: string): string =>
-        'segment-' + refLineId.replace(/[^\w-]/g, '_')
+    const segmentId = (refLineId: string): string => 'segment-' + refLineId.replace(/[^\w-]/g, '_')
 
     const jumpToSegment = (refLineId: string) => {
         document.getElementById(segmentId(refLineId))?.scrollIntoView({
@@ -154,16 +154,21 @@
             block: 'start'
         })
     }
-    const csvCell = (value: unknown): string =>
-        '"' + String(value ?? '').replace(/"/g, '""') + '"'
+    const csvCell = (value: unknown): string => '"' + String(value ?? '').replace(/"/g, '""') + '"'
 
-    const fileSafe = (value: string): string =>
-        value.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)
+    const fileSafe = (value: string): string => value.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)
 
     function exportSegmentCsv(segment: SegmentView, columns: { key: string; label: string }[]) {
         const header = [
-            '来源', '条目', '技能类型', '伤害类型', '倍率', '命中',
-            '期望伤害', '暴击伤害', '不暴击伤害',
+            '来源',
+            '条目',
+            '技能类型',
+            '伤害类型',
+            '倍率',
+            '命中',
+            '期望伤害',
+            '暴击伤害',
+            '不暴击伤害',
             ...columns.map((column) => column.label)
         ]
         const rows = segment.entries.map((result) => [
@@ -171,29 +176,22 @@
             result.displayName,
             result.skillType,
             result.damageTypes.join(' / '),
-            ((result.ratioNum / result.hits) * 100).toFixed(2) + '%' +
-                (result.hits > 1 ? ' ×' + result.hits : ''),
+            ((result.ratioNum / result.hits) * 100).toFixed(2) + '%' + (result.hits > 1 ? ' ×' + result.hits : ''),
             result.hits,
             Math.round(result.expectedPerHit),
             result.canCrit ? Math.round(result.critPerHit) : '',
             Math.round(result.nonCritPerHit),
             ...columns.map((column) => {
                 const cell = zoneCell(result, column.key)
-                return cell.detail === '—'
-                    ? ''
-                    : cell.value.toFixed(4) + ' ' + cell.detail
+                return cell.detail === '—' ? '' : cell.value.toFixed(4) + ' ' + cell.detail
             })
         ])
-        const csv = '\uFEFF' + [header, ...rows]
-            .map((row) => row.map(csvCell).join(','))
-            .join('\r\n')
+        const csv = '\uFEFF' + [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
-        link.download = fileSafe(
-            (project?.name || 'fast-calc') + ' ' + segment.time
-        ) + '.csv'
+        link.download = fileSafe((project?.name || 'fast-calc') + ' ' + segment.time) + '.csv'
         link.click()
         URL.revokeObjectURL(url)
     }
@@ -292,14 +290,13 @@
                 prevSeconds = anchor.seconds
             }
             segments = built
-            const duration = anchors.length
-                ? anchors[anchors.length - 1].seconds
-                : 0
+            const duration = anchors.length ? anchors[anchors.length - 1].seconds : 0
             total = computed.reduce((sum, entry) => sum + entry.totalDamage, 0)
             // 报告页按「同一伤害块」聚合，块 id 与 catalogId 用来和鸣算屋逐技能对齐
             const catalogOf = (result: ResultEntry): string | null => {
                 const byId = blockById.get(result.id.split('-')[0])
-                const bySource = blockById.get(result.sourceTimelineBlockId) ??
+                const bySource =
+                    blockById.get(result.sourceTimelineBlockId) ??
                     blocks.find((block: any) => block.sourceId === result.sourceTimelineBlockId)
                 const block = byId ?? bySource
                 const catalogId = block?.skillHits?.find((hit: any) => hit.catalogId)?.catalogId
@@ -331,21 +328,23 @@
                     def: result.totalDef
                 }
             })
-            const payload = JSON.parse(JSON.stringify({
-                type: 'fast-calc:result',
-                total,
-                duration,
-                computeMs,
-                entries: computed.map(reportEntry),
-                segments: segments.map((segment) => ({
-                    time: segment.time,
-                    start: segment.start,
-                    end: segment.end,
-                    total: segment.total,
-                    dps: segment.dps,
-                    entries: segment.entries.map(reportEntry)
-                }))
-            }))
+            const payload = JSON.parse(
+                JSON.stringify({
+                    type: 'fast-calc:result',
+                    total,
+                    duration,
+                    computeMs,
+                    entries: computed.map(reportEntry),
+                    segments: segments.map((segment) => ({
+                        time: segment.time,
+                        start: segment.start,
+                        end: segment.end,
+                        total: segment.total,
+                        dps: segment.dps,
+                        entries: segment.entries.map(reportEntry)
+                    }))
+                })
+            )
             parent.postMessage(payload, '*')
             ;(window as any).__FAST_CALC_RESULT__ = payload
         } catch (cause) {
@@ -366,9 +365,7 @@
             const all = getProjects()
             const active = all[all.length - 1]
             await setActiveProject(active.id)
-            const names = active.team
-                .map((slot) => slot.character)
-                .filter((name): name is string => !!name)
+            const names = active.team.map((slot) => slot.character).filter((name): name is string => !!name)
             await Promise.allSettled([ensureCharElements(names), ensureSkillCache(names)])
             reloadActiveProjectStores()
             const loaded = getActiveProject()
@@ -419,13 +416,13 @@
     }
 
     function setChain(index: number, value: number) {
-        profile = { ...profile, chains: profile.chains.map((n, i) => i === index ? value : n) }
+        profile = { ...profile, chains: profile.chains.map((n, i) => (i === index ? value : n)) }
         setConditionProfile(profile)
         void recalc()
     }
 
     function setRefinement(index: number, value: number) {
-        profile = { ...profile, refinements: profile.refinements.map((n, i) => i === index ? value : n) }
+        profile = { ...profile, refinements: profile.refinements.map((n, i) => (i === index ? value : n)) }
         setConditionProfile(profile)
         void recalc()
     }
@@ -433,9 +430,7 @@
     function setTiming(refLineId: string, value: string) {
         const seconds = value === '' ? null : Number(value)
         if (seconds !== null && !Number.isFinite(seconds)) return
-        timings = timings.map((timing) =>
-            timing.refLineId === refLineId ? { ...timing, seconds } : timing
-        )
+        timings = timings.map((timing) => (timing.refLineId === refLineId ? { ...timing, seconds } : timing))
         if (!project) return
         project = {
             ...project,
@@ -456,7 +451,7 @@
     /** 支持 ?import_project=url；无 URL 值时退回文件选择 */
     function importTarget(): string {
         const query = new URLSearchParams(location.search)
-        return query.has('import_project') ? query.get('import_project') ?? '' : ''
+        return query.has('import_project') ? (query.get('import_project') ?? '') : ''
     }
 
     async function openImporter() {
@@ -523,40 +518,48 @@
                 <span>正在导入工程…</span>
             </div>
         {:else}
-        <div
-            class:active={dragging}
-            class="drop-zone"
-            role="button"
-            tabindex="0"
-            onclick={() => fileInput?.click()}
-            onkeydown={(event) => event.key === 'Enter' && fileInput?.click()}
-            ondragover={(event) => { event.preventDefault(); dragging = true }}
-            ondragleave={() => (dragging = false)}
-            ondrop={onDrop}
-        >
-            <span class="eyebrow">FAST CALC</span>
-            <strong>拖入工程</strong>
-            <span>或点击导入椰果工具箱工程 JSON</span>
-            {#if error}<em>{error}</em>{/if}
-            {#if loading}<em>正在计算…</em>{/if}
-        </div>
+            <div
+                class:active={dragging}
+                class="drop-zone"
+                role="button"
+                tabindex="0"
+                onclick={() => fileInput?.click()}
+                onkeydown={(event) => event.key === 'Enter' && fileInput?.click()}
+                ondragover={(event) => {
+                    event.preventDefault()
+                    dragging = true
+                }}
+                ondragleave={() => (dragging = false)}
+                ondrop={onDrop}
+            >
+                <span class="eyebrow">FAST CALC</span>
+                <strong>拖入工程</strong>
+                <span>或点击导入椰果工具箱工程 JSON</span>
+                {#if error}<em>{error}</em>{/if}
+                {#if loading}<em>正在计算…</em>{/if}
+            </div>
         {/if}
     {:else}
         <header class="fast-head">
             <div>
                 <span class="eyebrow">FAST CALC / 快速计算</span>
                 <h1>{project.name}</h1>
-                <p>{loading ? '正在重算…' : `总伤 ${Math.round(total).toLocaleString()}`} {#if importMs > 0}<small>· 导入 {(importMs / 1000).toFixed(2)}s</small>{/if}</p>
+                <p>
+                    {loading ? '正在重算…' : `总伤 ${Math.round(total).toLocaleString()}`}
+                    {#if importMs > 0}<small>· 导入 {(importMs / 1000).toFixed(2)}s</small>{/if}
+                </p>
             </div>
             <div class="head-actions">
-                <button onclick={() => {
-                    project = null
-                    segments = []
-                    timings = []
-                    total = 0
-                    error = ''
-                    setTimeout(() => fileInput?.click(), 0)
-                }}>导入另一个工程</button>
+                <button
+                    onclick={() => {
+                        project = null
+                        segments = []
+                        timings = []
+                        total = 0
+                        error = ''
+                        setTimeout(() => fileInput?.click(), 0)
+                    }}>导入另一个工程</button
+                >
             </div>
         </header>
 
@@ -568,13 +571,19 @@
                         <div class="pill-row">
                             <span>链</span>
                             {#each [0, 1, 2, 3, 4, 5, 6] as value}
-                                <button class:active={profile.chains[index] === value} onclick={() => setChain(index, value)}>{value}</button>
+                                <button
+                                    class:active={profile.chains[index] === value}
+                                    onclick={() => setChain(index, value)}>{value}</button
+                                >
                             {/each}
                         </div>
                         <div class="pill-row">
                             <span>阶</span>
                             {#each [0, 1, 2, 3, 4, 5] as value}
-                                <button class:active={profile.refinements[index] === value} onclick={() => setRefinement(index, value)}>{value}</button>
+                                <button
+                                    class:active={profile.refinements[index] === value}
+                                    onclick={() => setRefinement(index, value)}>{value}</button
+                                >
                             {/each}
                         </div>
                     </div>
@@ -599,8 +608,8 @@
                                 onclick={(event) => {
                                     event.preventDefault()
                                     jumpToSegment(timing.refLineId)
-                                }}
-                            >{timing.label || `参考线 ${index + 1}`}</a>
+                                }}>{timing.label || `参考线 ${index + 1}`}</a
+                            >
                             <span class="timing-input">
                                 <input
                                     type="number"
@@ -623,7 +632,9 @@
         {#if error}<div class="error">{error}</div>{/if}
 
         <section class="segments">
-            {#if !segments.length}<p class="segments-empty">没有可切分的时间段：请在上方填写至少一个晚于 0s 的参考线计时。</p>{/if}
+            {#if !segments.length}<p class="segments-empty">
+                    没有可切分的时间段：请在上方填写至少一个晚于 0s 的参考线计时。
+                </p>{/if}
             {#each segments as segment (segment.key)}
                 {@const columns = zoneColumns(segment.entries)}
                 <article class="segment" id={segmentId(segment.key)}>
@@ -635,11 +646,9 @@
                         <div class="segment-meta">
                             <b>DPS {segment.dps === null ? '—' : Math.round(segment.dps).toLocaleString()}</b>
                             <small>{segment.seconds.toFixed(2)}s</small>
-                            <button
-                                class="csv-button"
-                                type="button"
-                                onclick={() => exportSegmentCsv(segment, columns)}
-                            >导出 CSV</button>
+                            <button class="csv-button" type="button" onclick={() => exportSegmentCsv(segment, columns)}
+                                >导出 CSV</button
+                            >
                         </div>
                     </header>
                     <div class="table-wrap">
@@ -666,10 +675,15 @@
                                             <strong>{result.displayName}</strong>
                                             <small>{result.skillType} · {result.damageTypes.join(' / ') || '—'}</small>
                                         </td>
-                                        <td class="num">{((result.ratioNum / result.hits) * 100).toFixed(2)}%{#if result.hits > 1} ×{result.hits}{/if}</td>
+                                        <td class="num"
+                                            >{((result.ratioNum / result.hits) * 100).toFixed(2)}%{#if result.hits > 1}
+                                                ×{result.hits}{/if}</td
+                                        >
                                         <td class="num">{result.hits}</td>
                                         <td class="num strong">{Math.round(result.expectedPerHit).toLocaleString()}</td>
-                                        <td class="num">{result.canCrit ? Math.round(result.critPerHit).toLocaleString() : '—'}</td>
+                                        <td class="num"
+                                            >{result.canCrit ? Math.round(result.critPerHit).toLocaleString() : '—'}</td
+                                        >
                                         <td class="num">{Math.round(result.nonCritPerHit).toLocaleString()}</td>
                                         {#each columns as column (column.key)}
                                             {@const cell = zoneCell(result, column.key)}
@@ -690,7 +704,6 @@
                 </article>
             {/each}
         </section>
-
     {/if}
 </div>
 
@@ -708,67 +721,355 @@
         padding: 28px;
         background: var(--fc-bg);
         color: var(--fc-text);
-        font-family: ui-sans-serif, "Microsoft YaHei", sans-serif;
+        font-family: ui-sans-serif, 'Microsoft YaHei', sans-serif;
         box-sizing: border-box;
     }
-    .drop-zone { max-width: 720px; min-height: 380px; margin: 10vh auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border: 1.5px dashed var(--fc-border, #39414d); background: var(--fc-panel, #1a1e24); cursor: pointer; transition: .2s ease; }
-    .drop-zone.active, .drop-zone:hover { border-color: var(--fc-accent, #8fd0d7); background: color-mix(in srgb, var(--fc-accent, #8fd0d7) 8%, var(--fc-panel, #1a1e24)); }
-    .file-input { display: none; }
-    .import-mask { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: color-mix(in srgb, var(--fc-bg, #111418) 82%, transparent); backdrop-filter: blur(6px); color: var(--fc-text, #e7edf5); font-size: 13px; }
-    .import-spinner { width: 30px; height: 30px; color: var(--fc-accent, #8fd0d7); animation: import-spin .9s linear infinite; }
-    @keyframes import-spin { to { transform: rotate(360deg); } }
-    .eyebrow { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--fc-accent, #8fd0d7); }
-    .drop-zone strong { font-size: 34px; font-weight: 800; }
-    .drop-zone span:not(.eyebrow) { color: var(--fc-text, #e7edf5); opacity: .6; }
-    .drop-zone em, .error { color: #f08a80; font-style: normal; font-size: 13px; }
-    .fast-head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-end; border-bottom: 2px solid var(--fc-accent-bg, #2a6b72); padding-bottom: 16px; }
-    .fast-head h1 { margin: 4px 0; font-size: clamp(34px, 5vw, 58px); line-height: 1; }
-    .fast-head p { margin: 0; color: var(--fc-text, #e7edf5); opacity: .65; }
-    .fast-head small { opacity: .7; }
-    .head-actions button, .pill-row button { border: 1px solid var(--fc-border, #39414d); background: var(--fc-panel, #1a1e24); color: inherit; cursor: pointer; }
-    .head-actions button { padding: 8px 12px; font-size: 12px; }
-    .profile { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
-    .profile-card { padding: 12px; border: 1px solid var(--fc-border, #39414d); background: var(--fc-panel, #1a1e24); }
-    .profile-name { font-weight: 700; margin-bottom: 8px; }
-    .pill-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
-    .pill-row > span { width: 22px; font-size: 11px; opacity: .5; }
-    .pill-row button { min-width: 26px; padding: 3px 6px; font-size: 11px; }
-    .pill-row button.active { background: var(--fc-accent-bg, #2a6b72); color: var(--fc-accent-on, #fff); border-color: var(--fc-accent-bg, #2a6b72); }
-    .timing-panel { margin: 0 0 18px; border: 1px solid var(--fc-border, #39414d); background: var(--fc-panel, #1a1e24); }
-    .timing-panel summary { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; cursor: pointer; list-style: none; }
-    .timing-panel summary::-webkit-details-marker { display: none; }
-    .timing-panel summary > span { font-size: 13px; font-weight: 700; }
-    .timing-panel summary > small { font-size: 11px; opacity: .5; }
-    .timing-panel summary::after { content: '▾'; margin-left: auto; opacity: .5; font-size: 11px; }
-    .timing-panel[open] summary::after { content: '▴'; }
-    .timing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px; border-top: 1px solid var(--fc-border, #39414d); background: var(--fc-border, #39414d); }
-    .timing-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) 76px; align-items: center; gap: 8px; padding: 7px 12px; background: var(--fc-panel, #1a1e24); }
-    .timing-index { font-size: 10px; opacity: .35; font-variant-numeric: tabular-nums; }
-    .timing-name { display: block; font-size: 12px; color: inherit; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px dashed transparent; }
-    .timing-name:hover { color: var(--fc-accent, #8fd0d7); border-bottom-color: currentColor; }
-    .timing-input { display: flex; align-items: center; gap: 2px; }
-    .timing-input input { width: 100%; min-width: 0; padding: 3px 6px; border: 1px solid var(--fc-border, #39414d); background: transparent; color: inherit; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; }
-    .timing-input input:focus { outline: none; border-color: var(--fc-accent-bg, #2a6b72); }
-    .timing-input em { font-size: 10px; font-style: normal; opacity: .4; }
-    .timing-empty { margin: 0; padding: 10px 14px; border-top: 1px solid var(--fc-border, #39414d); font-size: 12px; opacity: .5; }
-    .segments { display: flex; flex-direction: column; gap: 18px; }
-    .segments-empty { margin: 0; padding: 18px; border: 1px dashed var(--fc-border, #39414d); font-size: 12px; opacity: .6; }
-    .segment { border: 1px solid var(--fc-border, #39414d); background: var(--fc-panel, #1a1e24); scroll-margin-top: 20px; }
-    .segment > header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; padding: 14px 16px; border-bottom: 1px solid var(--fc-border, #39414d); }
-    .segment h2 { margin: 4px 0 0; font-size: 22px; }
-    .segment-meta { text-align: right; }
-    .segment-meta b { display: block; color: var(--fc-accent, #8fd0d7); font-size: 18px; }
-    .segment-meta small { opacity: .5; }
-    .csv-button { display: block; margin: 8px 0 0 auto; padding: 4px 9px; border: 1px solid var(--fc-border); background: var(--fc-panel); color: var(--fc-accent); font: inherit; font-size: 11px; cursor: pointer; }
-    .csv-button:hover { border-color: var(--fc-accent); }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 1080px; font-size: 12px; }
-    th { padding: 8px 10px; text-align: left; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .5; border-bottom: 1px solid var(--fc-border, #39414d); white-space: nowrap; }
-    td { padding: 8px 10px; border-bottom: 1px solid var(--fc-border, #39414d); vertical-align: top; }
-    td small { display: block; opacity: .5; margin-top: 2px; }
-    .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .strong { color: var(--fc-accent, #8fd0d7); font-weight: 700; }
-    .zone-cell b { color: var(--fc-accent, #8fd0d7); font-weight: 600; }
-    .zone-cell small { max-width: 180px; white-space: normal; line-height: 1.25; }
-    @media (max-width: 800px) { .fast-calc { padding: 14px; } .fast-head { align-items: flex-start; flex-direction: column; } .profile { grid-template-columns: 1fr; } }
+    .drop-zone {
+        max-width: 720px;
+        min-height: 380px;
+        margin: 10vh auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        border: 1.5px dashed var(--fc-border, #39414d);
+        background: var(--fc-panel, #1a1e24);
+        cursor: pointer;
+        transition: 0.2s ease;
+    }
+    .drop-zone.active,
+    .drop-zone:hover {
+        border-color: var(--fc-accent, #8fd0d7);
+        background: color-mix(in srgb, var(--fc-accent, #8fd0d7) 8%, var(--fc-panel, #1a1e24));
+    }
+    .file-input {
+        display: none;
+    }
+    .import-mask {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: color-mix(in srgb, var(--fc-bg, #111418) 82%, transparent);
+        backdrop-filter: blur(6px);
+        color: var(--fc-text, #e7edf5);
+        font-size: 13px;
+    }
+    .import-spinner {
+        width: 30px;
+        height: 30px;
+        color: var(--fc-accent, #8fd0d7);
+        animation: import-spin 0.9s linear infinite;
+    }
+    @keyframes import-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    .eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fc-accent, #8fd0d7);
+    }
+    .drop-zone strong {
+        font-size: 34px;
+        font-weight: 800;
+    }
+    .drop-zone span:not(.eyebrow) {
+        color: var(--fc-text, #e7edf5);
+        opacity: 0.6;
+    }
+    .drop-zone em,
+    .error {
+        color: #f08a80;
+        font-style: normal;
+        font-size: 13px;
+    }
+    .fast-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: flex-end;
+        border-bottom: 2px solid var(--fc-accent-bg, #2a6b72);
+        padding-bottom: 16px;
+    }
+    .fast-head h1 {
+        margin: 4px 0;
+        font-size: clamp(34px, 5vw, 58px);
+        line-height: 1;
+    }
+    .fast-head p {
+        margin: 0;
+        color: var(--fc-text, #e7edf5);
+        opacity: 0.65;
+    }
+    .fast-head small {
+        opacity: 0.7;
+    }
+    .head-actions button,
+    .pill-row button {
+        border: 1px solid var(--fc-border, #39414d);
+        background: var(--fc-panel, #1a1e24);
+        color: inherit;
+        cursor: pointer;
+    }
+    .head-actions button {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+    .profile {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin: 18px 0;
+    }
+    .profile-card {
+        padding: 12px;
+        border: 1px solid var(--fc-border, #39414d);
+        background: var(--fc-panel, #1a1e24);
+    }
+    .profile-name {
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        margin-top: 6px;
+    }
+    .pill-row > span {
+        width: 22px;
+        font-size: 11px;
+        opacity: 0.5;
+    }
+    .pill-row button {
+        min-width: 26px;
+        padding: 3px 6px;
+        font-size: 11px;
+    }
+    .pill-row button.active {
+        background: var(--fc-accent-bg, #2a6b72);
+        color: var(--fc-accent-on, #fff);
+        border-color: var(--fc-accent-bg, #2a6b72);
+    }
+    .timing-panel {
+        margin: 0 0 18px;
+        border: 1px solid var(--fc-border, #39414d);
+        background: var(--fc-panel, #1a1e24);
+    }
+    .timing-panel summary {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        list-style: none;
+    }
+    .timing-panel summary::-webkit-details-marker {
+        display: none;
+    }
+    .timing-panel summary > span {
+        font-size: 13px;
+        font-weight: 700;
+    }
+    .timing-panel summary > small {
+        font-size: 11px;
+        opacity: 0.5;
+    }
+    .timing-panel summary::after {
+        content: '▾';
+        margin-left: auto;
+        opacity: 0.5;
+        font-size: 11px;
+    }
+    .timing-panel[open] summary::after {
+        content: '▴';
+    }
+    .timing-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 1px;
+        border-top: 1px solid var(--fc-border, #39414d);
+        background: var(--fc-border, #39414d);
+    }
+    .timing-row {
+        display: grid;
+        grid-template-columns: 26px minmax(0, 1fr) 76px;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        background: var(--fc-panel, #1a1e24);
+    }
+    .timing-index {
+        font-size: 10px;
+        opacity: 0.35;
+        font-variant-numeric: tabular-nums;
+    }
+    .timing-name {
+        display: block;
+        font-size: 12px;
+        color: inherit;
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        border-bottom: 1px dashed transparent;
+    }
+    .timing-name:hover {
+        color: var(--fc-accent, #8fd0d7);
+        border-bottom-color: currentColor;
+    }
+    .timing-input {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+    .timing-input input {
+        width: 100%;
+        min-width: 0;
+        padding: 3px 6px;
+        border: 1px solid var(--fc-border, #39414d);
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+    }
+    .timing-input input:focus {
+        outline: none;
+        border-color: var(--fc-accent-bg, #2a6b72);
+    }
+    .timing-input em {
+        font-size: 10px;
+        font-style: normal;
+        opacity: 0.4;
+    }
+    .timing-empty {
+        margin: 0;
+        padding: 10px 14px;
+        border-top: 1px solid var(--fc-border, #39414d);
+        font-size: 12px;
+        opacity: 0.5;
+    }
+    .segments {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+    .segments-empty {
+        margin: 0;
+        padding: 18px;
+        border: 1px dashed var(--fc-border, #39414d);
+        font-size: 12px;
+        opacity: 0.6;
+    }
+    .segment {
+        border: 1px solid var(--fc-border, #39414d);
+        background: var(--fc-panel, #1a1e24);
+        scroll-margin-top: 20px;
+    }
+    .segment > header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 20px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--fc-border, #39414d);
+    }
+    .segment h2 {
+        margin: 4px 0 0;
+        font-size: 22px;
+    }
+    .segment-meta {
+        text-align: right;
+    }
+    .segment-meta b {
+        display: block;
+        color: var(--fc-accent, #8fd0d7);
+        font-size: 18px;
+    }
+    .segment-meta small {
+        opacity: 0.5;
+    }
+    .csv-button {
+        display: block;
+        margin: 8px 0 0 auto;
+        padding: 4px 9px;
+        border: 1px solid var(--fc-border);
+        background: var(--fc-panel);
+        color: var(--fc-accent);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+    }
+    .csv-button:hover {
+        border-color: var(--fc-accent);
+    }
+    .table-wrap {
+        overflow-x: auto;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1080px;
+        font-size: 12px;
+    }
+    th {
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        opacity: 0.5;
+        border-bottom: 1px solid var(--fc-border, #39414d);
+        white-space: nowrap;
+    }
+    td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--fc-border, #39414d);
+        vertical-align: top;
+    }
+    td small {
+        display: block;
+        opacity: 0.5;
+        margin-top: 2px;
+    }
+    .num {
+        text-align: right;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .strong {
+        color: var(--fc-accent, #8fd0d7);
+        font-weight: 700;
+    }
+    .zone-cell b {
+        color: var(--fc-accent, #8fd0d7);
+        font-weight: 600;
+    }
+    .zone-cell small {
+        max-width: 180px;
+        white-space: normal;
+        line-height: 1.25;
+    }
+    @media (max-width: 800px) {
+        .fast-calc {
+            padding: 14px;
+        }
+        .fast-head {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .profile {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
