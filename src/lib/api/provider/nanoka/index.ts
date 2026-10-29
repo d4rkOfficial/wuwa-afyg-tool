@@ -31,7 +31,14 @@ import {
     ECHO_PLACEHOLDER_NAMES,
     extractEchoNameFromSkill
 } from './utils'
-import { localizeCharacterInfo, localizeEchoInfo, localizeEchoSetInfo, localizeWeaponInfo } from './i18n'
+import {
+    localizeCharacterInfo,
+    localizeCharacterList,
+    localizeEchoInfo,
+    localizeEchoSetInfo,
+    localizeWeaponInfo,
+    localizeWeaponList
+} from './i18n'
 import type {
     NanokaCharacter,
     NanokaWeapon,
@@ -105,10 +112,14 @@ export const nanokaProvider: DataProvider = {
     getAvailableVersions: async () => fetchAvailableVersions(),
 
     // ── 列表 ──
-    getCharacterList: async (opts?: LangOptions): Promise<Character[]> =>
-        transformCharacterList(await fetchData<Record<string, NanokaCharacter>>('/character.json'), opts?.lang),
-    getWeaponList: async (opts?: LangOptions): Promise<Weapon[]> =>
-        transformWeaponList(await fetchData<Record<string, NanokaWeapon>>('/weapon.json'), opts?.lang),
+    getCharacterList: async (opts?: LangOptions): Promise<Character[]> => {
+        const data = await fetchData<Record<string, NanokaCharacter>>('/character.json')
+        return localizeCharacterList(transformCharacterList(data, opts?.lang), opts?.lang ?? 'zh')
+    },
+    getWeaponList: async (opts?: LangOptions): Promise<Weapon[]> => {
+        const data = await fetchData<Record<string, NanokaWeapon>>('/weapon.json')
+        return localizeWeaponList(transformWeaponList(data, opts?.lang), opts?.lang ?? 'zh')
+    },
     getEchoList: async (opts?: LangOptions): Promise<Echo[]> => {
         const [echoData, sonata] = await Promise.all([fetchData<Record<string, NanokaEcho>>('/echo.json'), getSonata()])
         return transformEchoList(await withResolvedEchoNames(echoData, opts?.lang), sonata, opts?.lang)

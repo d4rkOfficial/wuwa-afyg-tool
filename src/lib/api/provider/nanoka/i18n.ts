@@ -9,12 +9,53 @@
 // - 上游没有对应文案的合成标签（如「共鸣技能伤害」「伤害1」）走下方字典，
 //   字典缺失时保留中文原文。
 
-import type { CharacterInfo, EchoInfo, EchoSetInfo, SkillEntry, WeaponInfo } from '$lib/api/types'
+import type { Character, CharacterInfo, EchoInfo, EchoSetInfo, SkillEntry, Weapon, WeaponInfo } from '$lib/api/types'
 import type { ZhCharacterDetail, ZhEchoDetail, ZhSonataDetail, ZhWeaponDetail } from './types'
 import { interpolate, isSkillTreeNode, skillLevelKeys, strip } from './utils'
 
 /** 目标语言是否可覆盖（未知语言已由 fetchDetailPair 回退 zh） */
 const canTranslate = (lang: string): boolean => !!lang && lang !== 'zh'
+
+// ── 规范枚举的译文 ──
+// 契约里的 element / weaponType 是中文规范值；非中文请求在输出层换成对应语言。
+
+const ELEMENT_LABELS: Record<string, Record<string, string>> = {
+    冷凝: { en: 'Glacio', ja: '凝縮', ko: '응결' },
+    热熔: { en: 'Fusion', ja: '熱溶', ko: '융해' },
+    导电: { en: 'Electro', ja: '電導', ko: '전도' },
+    气动: { en: 'Aero', ja: '気動', ko: '기류' },
+    衍射: { en: 'Spectro', ja: '回折', ko: '회절' },
+    湮灭: { en: 'Havoc', ja: '湮滅', ko: '인멸' }
+}
+
+const WEAPON_TYPE_LABELS: Record<string, Record<string, string>> = {
+    长刃: { en: 'Broadblade', ja: '長刃', ko: '장검' },
+    迅刀: { en: 'Sword', ja: '迅刀', ko: '단검' },
+    佩枪: { en: 'Pistols', ja: '拳銃', ko: '권총' },
+    臂铠: { en: 'Gauntlets', ja: '臂鎧', ko: '건틀릿' },
+    音感仪: { en: 'Rectifier', ja: '音感儀', ko: '음감기' }
+}
+
+const translateElement = (element: string, lang: string): string => ELEMENT_LABELS[element]?.[lang] ?? element
+
+const translateWeaponType = (weaponType: string, lang: string): string =>
+    WEAPON_TYPE_LABELS[weaponType]?.[lang] ?? weaponType
+
+/** @desc 角色列表：名称已在 utils 按语言取好，这里只替换元素/武器类型枚举 */
+export const localizeCharacterList = (list: Character[], lang: string): Character[] =>
+    canTranslate(lang)
+        ? list.map((item) => ({
+              ...item,
+              element: translateElement(item.element, lang),
+              weaponType: translateWeaponType(item.weaponType, lang)
+          }))
+        : list
+
+/** @desc 武器列表：只替换武器类型枚举 */
+export const localizeWeaponList = (list: Weapon[], lang: string): Weapon[] =>
+    canTranslate(lang)
+        ? list.map((item) => ({ ...item, weaponType: translateWeaponType(item.weaponType, lang) }))
+        : list
 
 // ── 合成标签字典 ──
 // 这些文案由中文规则生成，上游没有逐条译文；按语言补一份固定映射。
@@ -122,6 +163,8 @@ export const localizeCharacterInfo = (
 
     return {
         ...info,
+        element: translateElement(info.element, lang) as CharacterInfo['element'],
+        weaponType: translateWeaponType(info.weaponType, lang) as CharacterInfo['weaponType'],
         tags: info.tags.map((tag) => {
             const localizedTag = localizedDetail.tag?.[tag.id]
             if (!localizedTag) return tag
@@ -140,7 +183,18 @@ export const localizeCharacterInfo = (
                 name: localizedSkill.name ?? skill.name,
                 type: (localizedSkill.type ?? skill.type) as SkillEntry['type'],
                 desc: localizedSkill.desc ? renderText(localizedSkill.desc, localizedSkill.param, rich) : skill.desc,
-                values: localizeSkillValues(skill.values, zhDetail.skill_trees[key].skill, localizedSkill, lang)
+                values: localizeSkillValues(skill.values, zhDetail.skill_trees[key].skill, localizedSkill, lang).map(
+                    (value) =>
+                        [
+                            value[0],
+                            value[1],
+                            translateElement(value[2], lang),
+                            value[3],
+                            value[4]
+                        ] as SkillEntry['values'][number]
+                ),
+                // 原始伤害字典同样是中文（related_property 等），非中文时用目标语言详情里的同名条目
+                damage: localizedSkill.damage ?? skill.damage
             }
         }),
         statNodes: info.statNodes.map((node, index) => {
@@ -182,6 +236,7 @@ export const localizeWeaponInfo = (info: WeaponInfo, localized: ZhWeaponDetail, 
 
     return {
         ...info,
+        type: translateWeaponType(info.type, lang) as WeaponInfo['type'],
         substat: {
             name: substat?.name || info.substat.name,
             value: info.substat.value
@@ -238,7 +293,11 @@ export const localizeEchoInfo = (
                     localizedSkill?.damage,
                     damageKeys[index]
                 )
-                return [translateSyntheticLabel(localizedValue[0], lang), localizedValue[1], localizedValue[2]]
+                return [
+                    translateSyntheticLabel(localizedValue[0], lang),
+                    localizedValue[1],
+                    translateElement(localizedValue[2], lang)
+                ]
             })
         },
         groups: info.groups.map((group, index) => {

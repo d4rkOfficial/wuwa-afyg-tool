@@ -105,18 +105,26 @@ describe('nanoka provider', () => {
         await assert.rejects(() => nanokaProvider.getEchoInfo('不存在的声骸'), /not found/i)
     })
 
-    it('serves list names in the requested language', async () => {
+    it('serves list names and enums in the requested language', async () => {
         const list = await nanokaProvider.getCharacterList({ lang: 'en' })
         assert.deepEqual(
             list.map((c) => c.name),
             ['Rover', 'Jiyan']
         )
+        assert.deepEqual(
+            list.map((c) => c.element),
+            ['Havoc', 'Electro']
+        )
+        assert.deepEqual(
+            list.map((c) => c.weaponType),
+            ['Broadblade', 'Sword']
+        )
     })
 
     it('computes in Chinese then overlays the requested language text', async () => {
         const info = await nanokaProvider.getCharacterInfo('Jiyan', { lang: 'en' })
-        assert.equal(info.element, '导电')
-        assert.equal(info.weaponType, '迅刀')
+        assert.equal(info.element, 'Electro')
+        assert.equal(info.weaponType, 'Sword')
         assert.equal(info.lv90BaseStats.tuneBreakBoost, 10)
         assert.equal(info.tags.find((t) => t.id === '33')?.name, 'Tune Rupture Response')
         assert.equal(info.skills.find((s) => s.name === 'Frosty Light')?.type, 'Normal Attack')

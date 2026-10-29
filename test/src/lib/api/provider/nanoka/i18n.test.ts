@@ -40,7 +40,8 @@ const localizedCharacter: ZhCharacterDetail = {
                 type: 'Normal Attack',
                 desc: 'Slash for {0}% DMG',
                 param: ['120'],
-                level: { '1': { name: 'Stage One', param: [['120.00%']], format: null } }
+                level: { '1': { name: 'Stage One', param: [['120.00%']], format: null } },
+                damage: { d1: { ...characterDetail.skill_trees.n1.skill.damage!.d1, related_property: 'ATK' } }
             }
         },
         n2: {
@@ -98,7 +99,8 @@ describe('localizeCharacterInfo', () => {
 
     it('keeps Chinese computation and overlays localized display text', () => {
         const out = localizeCharacterInfo(zhInfo, characterDetail, localizedCharacter, 'en', false)
-        assert.equal(out.element, '导电')
+        assert.equal(out.element, 'Electro')
+        assert.equal(out.weaponType, 'Sword')
         assert.equal(out.lv90BaseStats.tuneBreakBoost, 10)
         assert.equal(out.tags.find((t) => t.id === '33')?.name, 'Tune Rupture Response')
         assert.equal(out.tags.find((t) => t.id === '33')?.desc, 'Deals Tune Rupture DMG')
@@ -107,6 +109,8 @@ describe('localizeCharacterInfo', () => {
         assert.equal(normal?.type, 'Normal Attack')
         assert.equal(normal?.desc, 'Slash for 120% DMG')
         assert.equal(normal?.values[0][0], 'Stage One')
+        assert.equal(normal?.values[0][2], 'Electro')
+        assert.equal((normal?.damage as Record<string, { related_property: string }>).d1.related_property, 'ATK')
 
         const outro = out.skills.find((s) => s.name === 'Sea of Clouds')
         assert.equal(outro?.type, 'Outro Skill')
@@ -144,7 +148,7 @@ describe('localizeWeaponInfo', () => {
             }
         }
         const out = localizeWeaponInfo(transformWeaponInfo(weaponDetail), localizedWeapon, 'en')
-        assert.equal(out.type, '长刃')
+        assert.equal(out.type, 'Broadblade')
         assert.equal(out.lv90BaseAtk, 1000)
         assert.equal(out.substat.name, 'Crit Rate')
         assert.equal(out.substat.value, '0.24%')
@@ -175,7 +179,7 @@ describe('localizeEchoInfo', () => {
         assert.deepEqual(out.groups, ['Sinking Sun'])
         assert.equal(out.skill.values[0][0], 'DMG 1')
         assert.equal(out.skill.values[0][1], '250.00%')
-        assert.equal(out.skill.values[0][2], '热熔')
+        assert.equal(out.skill.values[0][2], 'Fusion')
     })
 })
 
