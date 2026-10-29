@@ -94,6 +94,15 @@ describe('nanoka provider', () => {
         assert.deepEqual(info.bonuses, { 2: '气动伤害提升10%', 5: '湮灭伤害提升10%' })
     })
 
+    it('getTagIcons scans character details into key → URL', async () => {
+        const icons = await nanokaProvider.getTagIcons()
+        assert.equal(
+            icons['SP_RoleLabelI2'],
+            'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelI2.webp'
+        )
+        assert.ok(icons['SP_RoleLabelA2'])
+    })
+
     it('reflects latest version from manifest', async () => {
         assert.equal(await nanokaProvider.getLatestVersion(), '3.5')
         assert.deepEqual(await nanokaProvider.getAvailableVersions(), ['3.5'])

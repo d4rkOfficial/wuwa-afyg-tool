@@ -329,6 +329,11 @@ export function getEchoSetIcons(): Promise<Record<string, string>> {
     return fetchBatchIcons('echo-set')
 }
 
+/** @desc 角色 tag 图标：短标识（SP_RoleLabelI8）→ 完整 URL */
+export function getTagIcons(): Promise<Record<string, string>> {
+    return fetchBatchIcons('tags')
+}
+
 export function getElementIcons(): Promise<Record<string, string>> {
     return Promise.resolve(ELEMENT_ICONS)
 }

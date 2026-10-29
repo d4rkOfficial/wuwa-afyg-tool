@@ -5,12 +5,16 @@ import type { DataProvider } from '$lib/api/provider/types'
 
 const HANDLERS: Record<
     string,
-    keyof Pick<DataProvider, 'getCharacterIcons' | 'getWeaponIcons' | 'getEchoIcons' | 'getEchoSetIcons'>
+    keyof Pick<
+        DataProvider,
+        'getCharacterIcons' | 'getWeaponIcons' | 'getEchoIcons' | 'getEchoSetIcons' | 'getTagIcons'
+    >
 > = {
     character: 'getCharacterIcons',
     weapon: 'getWeaponIcons',
     echo: 'getEchoIcons',
-    'echo-set': 'getEchoSetIcons'
+    'echo-set': 'getEchoSetIcons',
+    tags: 'getTagIcons'
 }
 
 export const GET = async ({ params, url }: { params: { entity: string }; url: URL }) => {

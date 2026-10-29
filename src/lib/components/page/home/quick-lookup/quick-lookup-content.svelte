@@ -7,6 +7,7 @@
         getWeaponIcons,
         getEchoIcons,
         getEchoSetIcons,
+        getTagIcons,
         getElementIcons,
         getWeaponTypeIcons
     } from '$lib/api/data-cache'
@@ -65,6 +66,7 @@
     let weaponIcons = $state<Record<string, string>>({})
     let echoIcons = $state<Record<string, string>>({})
     let setIcons = $state<Record<string, string>>({})
+    let tagIcons = $state<Record<string, string>>({})
     let elementIcons = $state<Record<string, string>>({})
     let weaponTypeIcons = $state<Record<string, string>>({})
     /** @desc 右键菜单（复制/创建BUFF/跳转）状态 */
@@ -172,21 +174,23 @@
         return attachSessionScroll(el, sessionProjectId, 'quick-lookup', `char:${name}`, { restore: false })
     })
 
-    /** @desc 并行加载六类图标映射 */
+    /** @desc 并行加载图标映射（角色 tag 图标走 batch-icons/tags） */
     async function loadIcons() {
         const results = await Promise.allSettled([
             getCharacterIcons(),
             getWeaponIcons(),
             getEchoIcons(),
             getEchoSetIcons(),
+            getTagIcons(),
             getElementIcons(),
             getWeaponTypeIcons()
         ])
-        const [ci, wi, ei, si, eli, wti] = results
+        const [ci, wi, ei, si, ti, eli, wti] = results
         if (ci.status === 'fulfilled') charIcons = ci.value
         if (wi.status === 'fulfilled') weaponIcons = wi.value
         if (ei.status === 'fulfilled') echoIcons = ei.value
         if (si.status === 'fulfilled') setIcons = si.value
+        if (ti.status === 'fulfilled') tagIcons = ti.value
         if (eli.status === 'fulfilled') elementIcons = eli.value
         if (wti.status === 'fulfilled') weaponTypeIcons = wti.value
     }
@@ -436,10 +440,14 @@
                                         )}; border-color: color-mix(in srgb, var(--tag-ink) 45%, transparent); background: color-mix(in srgb, var(--tag-ink) 12%, transparent);"
                                         title={tag.desc || tag.name}
                                     >
-                                        {#if tag.icon}
+                                        {#if img(tagIcons[tag.icon])}
                                             <span
                                                 class="tag-chip-icon size-3.5 shrink-0"
-                                                style="-webkit-mask: url('{tag.icon}') center / contain no-repeat; mask: url('{tag.icon}') center / contain no-repeat;"
+                                                style="-webkit-mask: url('{tagIcons[
+                                                    tag.icon
+                                                ]}') center / contain no-repeat; mask: url('{tagIcons[
+                                                    tag.icon
+                                                ]}') center / contain no-repeat;"
                                             ></span>
                                         {/if}
                                         {tag.name}

@@ -14,7 +14,14 @@ import type {
 } from '$lib/api/types'
 import type { DataProvider, InfoOptions, LangOptions } from '../types'
 import { fetchData, fetchDetailPair, fetchZhData } from './fetch'
-import { getWWVersion, ensureVersion, fetchLatestVersion, fetchAvailableVersions, resetVersionPromise } from './consts'
+import {
+    ASSET_BASE,
+    getWWVersion,
+    ensureVersion,
+    fetchLatestVersion,
+    fetchAvailableVersions,
+    resetVersionPromise
+} from './consts'
 import {
     transformCharacterList,
     transformWeaponList,
@@ -28,6 +35,7 @@ import {
     findEntryByName,
     findSonataListEntry,
     ueToCdn,
+    iconKey,
     ECHO_PLACEHOLDER_NAMES,
     extractEchoNameFromSkill
 } from './utils'
@@ -51,6 +59,7 @@ import type {
 } from './types'
 
 let sonataCache: NanokaSonata | null = null
+let tagIconsCache: Record<string, string> | null = null
 
 async function getSonata(): Promise<NanokaSonata> {
     if (sonataCache) return sonataCache
@@ -58,8 +67,39 @@ async function getSonata(): Promise<NanokaSonata> {
     return sonataCache
 }
 
+/**
+ * @desc 扫描全部角色详情，汇总 tag 短标识 → 图标 URL。
+ * 上游没有独立 tag 索引文件；tag 图标只存在于角色详情的 `tag[].icon` 路径里。
+ * 结果按实例缓存，版本切换时由 resetCaches 清空。
+ */
+async function getTagIcons(): Promise<Record<string, string>> {
+    if (tagIconsCache) return tagIconsCache
+    const list = await fetchData<Record<string, unknown>>('/character.json')
+    await ensureVersion()
+    const version = getWWVersion()
+    const ids = Object.keys(list)
+    const map: Record<string, string> = {}
+    const batchSize = 32
+    for (let start = 0; start < ids.length; start += batchSize) {
+        const details = await Promise.all(
+            ids
+                .slice(start, start + batchSize)
+                .map((id) => fetchZhData<ZhCharacterDetail>(`/character/${id}.json`, version).catch(() => null))
+        )
+        for (const detail of details) {
+            for (const tag of Object.values(detail?.tag ?? {})) {
+                const key = iconKey(tag.icon ?? '')
+                if (key && !map[key]) map[key] = `${ASSET_BASE}/UIResources/Common/Atlas/RoleLabel/${key}.webp`
+            }
+        }
+    }
+    tagIconsCache = map
+    return map
+}
+
 function resetCaches() {
     sonataCache = null
+    tagIconsCache = null
     resetVersionPromise()
 }
 
@@ -140,6 +180,8 @@ export const nanokaProvider: DataProvider = {
         }
         return map
     },
+    // 角色 tag 图标：扫描角色详情汇总短标识 → 上游图标 URL
+    getTagIcons,
 
     // ── 详情 ──
     getCharacterInfo: async (name: string, opts?: InfoOptions): Promise<CharacterInfo> => {

@@ -16,6 +16,7 @@ import {
     transformWeaponInfo,
     transformEchoInfo,
     transformEchoSetInfo,
+    iconKey,
     ueToCdn
 } from '$lib/api/provider/nanoka/utils'
 import {
@@ -39,6 +40,16 @@ describe('ueToCdn', () => {
 
     it('returns empty string for falsy path', () => {
         assert.equal(ueToCdn(''), '')
+    })
+})
+
+describe('iconKey', () => {
+    it('extracts the short icon identifier from a UE asset path', () => {
+        assert.equal(
+            iconKey('/Game/Aki/UI/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelI8.SP_RoleLabelI8'),
+            'SP_RoleLabelI8'
+        )
+        assert.equal(iconKey(''), '')
     })
 })
 
@@ -130,7 +141,7 @@ describe('transformCharacterInfo', () => {
 })
 
 describe('transformCharacterTags', () => {
-    it('normalizes real tag objects (color gets #, icon becomes a CDN webp URL)', () => {
+    it('normalizes real tag objects (color gets #, icon becomes the short identifier)', () => {
         const out = transformCharacterTags(characterDetail.tag)
         assert.deepEqual(out, [
             {
@@ -138,28 +149,28 @@ describe('transformCharacterTags', () => {
                 name: '主力输出',
                 desc: '拥有较强的输出能力',
                 color: '#ff8441',
-                icon: 'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelA2.webp'
+                icon: 'SP_RoleLabelA2'
             },
             {
                 id: '5',
                 name: '重击伤害',
                 desc: '重击伤害较高',
                 color: '#ffde73',
-                icon: 'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelB2.webp'
+                icon: 'SP_RoleLabelB2'
             },
             {
                 id: '8',
                 name: '牵引',
                 desc: '可以将一定范围内的目标牵引至特定位置',
                 color: '#77adff',
-                icon: 'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelC1.webp'
+                icon: 'SP_RoleLabelC1'
             },
             {
                 id: '33',
                 name: '震谐响应',
                 desc: '可以对目标造成震谐伤害',
                 color: '#ff7777',
-                icon: 'https://static.nanoka.cc/assets/ww/UIResources/Common/Atlas/RoleLabel/SP_RoleLabelI2.webp'
+                icon: 'SP_RoleLabelI2'
             }
         ])
     })

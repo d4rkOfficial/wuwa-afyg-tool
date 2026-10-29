@@ -46,6 +46,10 @@ export interface DataProvider {
     getEchoIcons(): Promise<Record<string, string>>
     getEchoSetIcons(): Promise<Record<string, string>>
 
+    // ── 角色 tag 图标 ──
+    // 角色详情只返回短标识（如 SP_RoleLabelI8），这里扫描角色详情汇总成短标识 → 完整 URL。
+    getTagIcons(): Promise<Record<string, string>>
+
     // ── 详情（规范化契约） ──
     // rich=true 时角色详情保留原始描述文本（statNodes/chains 不去标签），
     // 供 v2 富文本展示使用。

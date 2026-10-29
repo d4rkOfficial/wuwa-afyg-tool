@@ -57,6 +57,12 @@ export function ueToCdn(path: string): string {
     return `${ASSET_BASE}${name}.webp`
 }
 
+/** @desc 从 UE 资源路径取出短标识（如 …/SP_RoleLabelI8.SP_RoleLabelI8 → SP_RoleLabelI8） */
+export function iconKey(path: string): string {
+    if (!path) return ''
+    return (path.split('/').pop() ?? '').split('.')[0]
+}
+
 /** @desc 按名称查找列表条目：优先中文名（兼容旧调用），再按目标语言名匹配 */
 export function findEntryByName<T extends LocalizedText>(
     data: Record<string, T>,
@@ -459,7 +465,8 @@ export function transformCharacterTags(raw: Record<string, ZhCharacterTag> | und
             name: t.name.trim(),
             desc: (t.desc ?? '').trim(),
             color: /^[0-9a-f]{6}$/i.test(t.color ?? '') ? `#${t.color}` : '',
-            icon: ueToCdn(t.icon ?? '')
+            // 只存短标识（SP_RoleLabelI8），完整图标 URL 由 /api/v1/icon/tags 拼接返回
+            icon: iconKey(t.icon ?? '')
         }))
         .sort((a, b) => Number(a.id) - Number(b.id))
 }

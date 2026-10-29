@@ -59,7 +59,7 @@ export interface CharacterTag {
     desc: string
     /** @desc CSS 颜色（#RRGGBB；上游给的是不带 # 的 6 位 hex，缺失时为空串） */
     color: string
-    /** @desc 可直接渲染的图片 URL（白色蒙版图形，展示时按 color 上色）；缺失时为空串 */
+    /** @desc 图标短标识（如 SP_RoleLabelI8），完整 URL 由 /api/v1/icon/tags 拼接返回；缺失时为空串 */
     icon: string
 }
 

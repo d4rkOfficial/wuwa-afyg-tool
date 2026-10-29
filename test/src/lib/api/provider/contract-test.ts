@@ -81,8 +81,8 @@ export function runContractTests(provider: DataProvider): void {
                 assert.equal(typeof t.desc, 'string')
                 assert.equal(typeof t.color, 'string')
                 assert.equal(typeof t.icon, 'string')
-                // 有图标时必须是可直接渲染的 URL
-                if (t.icon) assert.ok(/^(https?:|\/)/.test(t.icon), `tag icon looks like a URL: ${t.icon}`)
+                // 有图标时是短标识（如 SP_RoleLabelI8），完整 URL 由 getTagIcons 提供
+                if (t.icon) assert.ok(isNonEmptyString(t.icon), `tag icon key: ${t.icon}`)
             }
             for (const s of info.skills) {
                 assert.ok(isNonEmptyString(s.name), 'skill name')
@@ -129,6 +129,13 @@ export function runContractTests(provider: DataProvider): void {
                     assert.ok(isNonEmptyString(url), 'icon url')
                     assert.ok(/^(https?:|\/)/.test(url), `icon url looks like a URL: ${url}`)
                 }
+            }
+            // 角色 tag 图标：短标识 → 完整 URL
+            const tagIcons = await provider.getTagIcons()
+            assert.ok(Object.keys(tagIcons).length > 0, 'tag icon map non-empty')
+            for (const [key, url] of Object.entries(tagIcons)) {
+                assert.ok(isNonEmptyString(key), 'tag icon key')
+                assert.ok(/^(https?:|\/)/.test(url), `tag icon url looks like a URL: ${url}`)
             }
             const setIcons = await provider.getEchoSetIcons()
             if (Object.keys(setIcons).length > 0) {
