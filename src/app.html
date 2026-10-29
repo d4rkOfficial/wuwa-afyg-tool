@@ -51,6 +51,7 @@
                 )
                 var shouldShell =
                     shellCtx.pathname !== '/shell-page' &&
+                    shellCtx.pathname !== '/fast-calc' &&
                     !shellCtx.inIframe &&
                     !shellCtx.standalone &&
                     shellCtx.canLockOrientation &&
