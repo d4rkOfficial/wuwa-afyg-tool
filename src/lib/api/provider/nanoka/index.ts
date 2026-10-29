@@ -12,8 +12,8 @@ import type {
     Weapon,
     WeaponInfo
 } from '$lib/api/types'
-import type { DataProvider } from '../types'
-import { fetchData, fetchZhData } from './fetch'
+import type { DataProvider, InfoOptions, LangOptions } from '../types'
+import { fetchData, fetchDetailPair, fetchZhData } from './fetch'
 import { getWWVersion, ensureVersion, fetchLatestVersion, fetchAvailableVersions, resetVersionPromise } from './consts'
 import {
     transformCharacterList,
@@ -26,11 +26,12 @@ import {
     transformEchoInfo,
     transformEchoSetInfo,
     findEntryByName,
-    findSonataSetEntry,
+    findSonataListEntry,
     ueToCdn,
     ECHO_PLACEHOLDER_NAMES,
     extractEchoNameFromSkill
 } from './utils'
+import { localizeCharacterInfo, localizeEchoInfo, localizeEchoSetInfo, localizeWeaponInfo } from './i18n'
 import type {
     NanokaCharacter,
     NanokaWeapon,
@@ -68,9 +69,14 @@ async function buildIconMap<T extends { zh: string; icon: string }>(
 /**
  * @desc 解析占位名声骸（如「敬请期待」）：拉取详情，从技能文案「召唤XXX」提取真实名称写回 zh。
  * 上游多个新声骸共用占位名，若不去重前解析会被 transformEchoList 按名称合并成一条。
- * 提取不到时回退为「占位名·id」以保证唯一。
+ * 提取不到时回退为「占位名·id」以保证唯一。占位名与文案解析规则只适用于中文，
+ * 其它语言直接返回原始数据（不做该修复）。
  */
-async function withResolvedEchoNames(data: Record<string, NanokaEcho>): Promise<Record<string, NanokaEcho>> {
+async function withResolvedEchoNames(
+    data: Record<string, NanokaEcho>,
+    lang = 'zh'
+): Promise<Record<string, NanokaEcho>> {
+    if (lang !== 'zh') return data
     const placeholders = Object.entries(data).filter(([, e]) => e.zh && ECHO_PLACEHOLDER_NAMES.has(e.zh))
     if (placeholders.length === 0) return data
     await ensureVersion()
@@ -99,15 +105,16 @@ export const nanokaProvider: DataProvider = {
     getAvailableVersions: async () => fetchAvailableVersions(),
 
     // ── 列表 ──
-    getCharacterList: async (): Promise<Character[]> =>
-        transformCharacterList(await fetchData<Record<string, NanokaCharacter>>('/character.json')),
-    getWeaponList: async (): Promise<Weapon[]> =>
-        transformWeaponList(await fetchData<Record<string, NanokaWeapon>>('/weapon.json')),
-    getEchoList: async (): Promise<Echo[]> => {
+    getCharacterList: async (opts?: LangOptions): Promise<Character[]> =>
+        transformCharacterList(await fetchData<Record<string, NanokaCharacter>>('/character.json'), opts?.lang),
+    getWeaponList: async (opts?: LangOptions): Promise<Weapon[]> =>
+        transformWeaponList(await fetchData<Record<string, NanokaWeapon>>('/weapon.json'), opts?.lang),
+    getEchoList: async (opts?: LangOptions): Promise<Echo[]> => {
         const [echoData, sonata] = await Promise.all([fetchData<Record<string, NanokaEcho>>('/echo.json'), getSonata()])
-        return transformEchoList(await withResolvedEchoNames(echoData), sonata)
+        return transformEchoList(await withResolvedEchoNames(echoData, opts?.lang), sonata, opts?.lang)
     },
-    getEchoSetList: async (): Promise<EchoSetItem[]> => transformEchoSetList(await getSonata()),
+    getEchoSetList: async (opts?: LangOptions): Promise<EchoSetItem[]> =>
+        transformEchoSetList(await getSonata(), opts?.lang),
 
     // ── 图标 ──
     getCharacterIcons: async () => buildIconMap(await fetchData<Record<string, NanokaCharacter>>('/character.json')),
@@ -124,38 +131,41 @@ export const nanokaProvider: DataProvider = {
     },
 
     // ── 详情 ──
-    getCharacterInfo: async (name: string, opts?: { rich?: boolean }): Promise<CharacterInfo> => {
+    getCharacterInfo: async (name: string, opts?: InfoOptions): Promise<CharacterInfo> => {
         const list = await fetchData<Record<string, NanokaCharacter>>('/character.json')
-        const found = findEntryByName(list, name)
+        const found = findEntryByName(list, name, opts?.lang)
         if (!found) throw new Error('Character not found')
-        await ensureVersion()
-        const data = await fetchZhData<ZhCharacterDetail>(`/character/${found[0]}.json`, getWWVersion())
-        return opts?.rich ? transformCharacterInfoRich(data) : transformCharacterInfo(data)
+        // 中文详情负责计算，目标语言详情只覆盖展示文本
+        const pair = await fetchDetailPair<ZhCharacterDetail>(`/character/${found[0]}.json`, opts?.lang)
+        const info = opts?.rich ? transformCharacterInfoRich(pair.base) : transformCharacterInfo(pair.base)
+        return localizeCharacterInfo(info, pair.base, pair.localized, pair.lang, opts?.rich ?? false)
     },
-    getWeaponInfo: async (name: string): Promise<WeaponInfo> => {
+    getWeaponInfo: async (name: string, opts?: LangOptions): Promise<WeaponInfo> => {
         const list = await fetchData<Record<string, NanokaWeapon>>('/weapon.json')
-        const found = findEntryByName(list, name)
+        const found = findEntryByName(list, name, opts?.lang)
         if (!found) throw new Error('Weapon not found')
-        await ensureVersion()
-        const data = await fetchZhData<ZhWeaponDetail>(`/weapon/${found[0]}.json`, getWWVersion())
-        return transformWeaponInfo(data)
+        const pair = await fetchDetailPair<ZhWeaponDetail>(`/weapon/${found[0]}.json`, opts?.lang)
+        const info = transformWeaponInfo(pair.base)
+        return localizeWeaponInfo(info, pair.localized, pair.lang)
     },
-    getEchoInfo: async (name: string): Promise<EchoInfo> => {
-        const list = await withResolvedEchoNames(await fetchData<Record<string, NanokaEcho>>('/echo.json'))
-        const found = findEntryByName(list, name)
+    getEchoInfo: async (name: string, opts?: LangOptions): Promise<EchoInfo> => {
+        const list = await withResolvedEchoNames(await fetchData<Record<string, NanokaEcho>>('/echo.json'), opts?.lang)
+        const found = findEntryByName(list, name, opts?.lang)
         if (!found) throw new Error('Echo not found')
-        await ensureVersion()
-        const data = await fetchZhData<ZhEchoDetail>(`/echo/${found[0]}.json`, getWWVersion())
-        return transformEchoInfo(data, found[1].intensity)
+        const pair = await fetchDetailPair<ZhEchoDetail>(`/echo/${found[0]}.json`, opts?.lang)
+        const info = transformEchoInfo(pair.base, found[1].intensity)
+        return localizeEchoInfo(info, pair.base, pair.localized, pair.lang)
     },
-    getEchoSetInfo: async (name: string): Promise<EchoSetInfo> => {
-        await ensureVersion()
-        const data = await fetchZhData<ZhSonataDetail>('/sonata.json', getWWVersion())
-        const found = findSonataSetEntry(data, name)
+    getEchoSetInfo: async (name: string, opts?: LangOptions): Promise<EchoSetInfo> => {
+        // 列表包含全部语言名，先用它把任一种语言的名字定位到套装 id，
+        // 再用中文详情计算、目标语言详情覆盖文案。
+        const list = await getSonata()
+        const found = findSonataListEntry(list, name, opts?.lang)
         if (!found) throw new Error('Set not found')
-        const result = transformEchoSetInfo(data, found[0])
-        if (!result) throw new Error('Set not found')
-        return result
+        const pair = await fetchDetailPair<ZhSonataDetail>('/sonata.json', opts?.lang)
+        const info = transformEchoSetInfo(pair.base, found[0])
+        if (!info) throw new Error('Set not found')
+        return localizeEchoSetInfo(info, found[0], pair.base, pair.localized, pair.lang)
     },
 
     // ── 推荐武器 ──

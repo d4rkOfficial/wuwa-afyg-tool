@@ -1,5 +1,6 @@
 import { CACHE_CONTROL } from '$lib/api/consts'
 import { createJsonResponse } from '$lib/api/fetch'
+import { langFromUrl } from '$lib/api/lang'
 import { getProvider, providerIdFromUrl } from '$lib/api/provider'
 import type { DataProvider } from '$lib/api/provider/types'
 
@@ -21,7 +22,7 @@ export const GET = async ({ params, url }: { params: { entity: string; name: str
     if (!method) return createJsonResponse({ error: 'Invalid entity' }, 400)
     try {
         const provider = getProvider(url ? providerIdFromUrl(url) : undefined)
-        const data = await provider[method](name)
+        const data = await provider[method](name, { lang: langFromUrl(url) })
         return createJsonResponse(data, 200, { 'Cache-Control': CACHE_CONTROL })
     } catch (e) {
         const msg = String(e)

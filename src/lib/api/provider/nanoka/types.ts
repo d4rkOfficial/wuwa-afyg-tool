@@ -2,36 +2,44 @@
 // 这些类型描述 nanoka.cc 上游文件的具体结构，仅由 nanoka 适配器内部使用。
 // 规范化的应用契约请见 $lib/api/types。
 
+// ── 多语言文本 ──
+// 列表文件里的名称字段直接按语言平铺（zh/en/ja/ko）；语言目录实际只有
+// zh/en/ja/ko 四种，其它值由适配器回退中文。
+
+export interface LocalizedText {
+    zh: string
+    en?: string
+    ja?: string
+    ko?: string
+}
+
 // ── List types ──
 
-export interface NanokaCharacter {
+export interface NanokaCharacter extends LocalizedText {
     icon: string
     rank: number
     weapon: number
     element: number
-    zh: string
 }
 
-export interface NanokaWeapon {
+export interface NanokaWeapon extends LocalizedText {
     icon: string
     rank: number
     type: number
-    zh: string
 }
 
-export interface NanokaEcho {
+export interface NanokaEcho extends LocalizedText {
     icon: string
     rank: number[]
     group: number[]
     intensity: number
-    zh: string
     phantom?: string
 }
 
 export interface NanokaSonataSet {
     id: number
     icon: string
-    name: { zh: string }
+    name: LocalizedText
     set: Record<string, unknown>
 }
 

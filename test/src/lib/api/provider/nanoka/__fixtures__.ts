@@ -14,8 +14,22 @@ import type {
 } from '$lib/api/provider/nanoka/types'
 
 export const characterList: Record<string, NanokaCharacter> = {
-    '1001': { icon: '/Game/Aki/UI/UI_Avatar/T1_DianZhu.UIIcon', rank: 5, weapon: 1, element: 6, zh: '漂泊者' },
-    '1105': { icon: '/Game/Aki/UI/UI_Avatar/T2_LiGe.UIIcon', rank: 5, weapon: 2, element: 3, zh: '忌炎' }
+    '1001': {
+        icon: '/Game/Aki/UI/UI_Avatar/T1_DianZhu.UIIcon',
+        rank: 5,
+        weapon: 1,
+        element: 6,
+        zh: '漂泊者',
+        en: 'Rover'
+    },
+    '1105': {
+        icon: '/Game/Aki/UI/UI_Avatar/T2_LiGe.UIIcon',
+        rank: 5,
+        weapon: 2,
+        element: 3,
+        zh: '忌炎',
+        en: 'Jiyan'
+    }
 }
 
 export const weaponList: Record<string, NanokaWeapon> = {
@@ -204,6 +218,58 @@ export const characterDetail: ZhCharacterDetail = {
         c1: { name: '止戈', desc: '共鸣技能伤害{0}%', param: ['30'], icon: '' }
     },
     recommend: { weapon: [2101] }
+}
+
+export const characterDetailEn: ZhCharacterDetail = {
+    ...characterDetail,
+    tag: {
+        ...characterDetail.tag,
+        '33': {
+            ...characterDetail.tag['33'],
+            name: 'Tune Rupture Response',
+            desc: 'Deals Tune Rupture DMG'
+        }
+    },
+    skill_trees: {
+        ...characterDetail.skill_trees,
+        n1: {
+            ...characterDetail.skill_trees.n1,
+            skill: {
+                ...characterDetail.skill_trees.n1.skill,
+                name: 'Frosty Light',
+                type: 'Normal Attack',
+                desc: 'Slash for {0}% DMG',
+                param: ['120']
+            }
+        },
+        n2: {
+            ...characterDetail.skill_trees.n2,
+            skill: { ...characterDetail.skill_trees.n2.skill, name: 'Forte Circuit Law', desc: 'Stacks up.' }
+        },
+        nb: {
+            ...characterDetail.skill_trees.nb,
+            skill: {
+                ...characterDetail.skill_trees.nb.skill,
+                name: 'Sea of Clouds',
+                type: 'Outro Skill',
+                desc: 'Deal {0}% Fusion DMG',
+                param: ['200']
+            }
+        },
+        n3: {
+            ...characterDetail.skill_trees.n3,
+            skill: {
+                ...characterDetail.skill_trees.n3.skill,
+                name: 'Multi Strike',
+                type: 'Resonance Skill',
+                desc: 'Deal {0}%+{1}% DMG',
+                param: ['60', '40']
+            }
+        }
+    },
+    chains: {
+        c1: { ...characterDetail.chains.c1, name: 'Cease Fire', desc: 'Resonance Skill DMG {0}%', param: ['30'] }
+    }
 }
 
 export const weaponDetail: ZhWeaponDetail = {

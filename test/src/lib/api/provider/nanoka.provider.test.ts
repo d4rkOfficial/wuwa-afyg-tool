@@ -13,6 +13,7 @@ import {
     echoList,
     sonata,
     characterDetail,
+    characterDetailEn,
     weaponDetail,
     echoDetail,
     sonataDetail
@@ -22,7 +23,8 @@ import {
 
 const ROUTES: Array<[matcher: RegExp, factory: () => unknown]> = [
     [/manifest\.json$/, () => ({ ww: { latest: '3.5', available: ['3.5'] } })],
-    // zh 详情路径优先于同名的列表路径（/ww/{v}/zh/… 才匹配）
+    // 语言详情路径优先于同名的列表路径（/ww/{v}/{lang}/… 才匹配）
+    [/\/ww\/.+\/en\/character\/.+\.json$/, () => characterDetailEn],
     [/\/ww\/.+\/zh\/sonata\.json$/, () => sonataDetail],
     [/\/ww\/.+\/zh\/character\/.+\.json$/, () => characterDetail],
     [/\/ww\/.+\/zh\/weapon\/.+\.json$/, () => weaponDetail],
@@ -101,5 +103,29 @@ describe('nanoka provider', () => {
         await assert.rejects(() => nanokaProvider.getCharacterInfo('不存在的角色'), /not found/i)
         await assert.rejects(() => nanokaProvider.getWeaponInfo('不存在的武器'), /not found/i)
         await assert.rejects(() => nanokaProvider.getEchoInfo('不存在的声骸'), /not found/i)
+    })
+
+    it('serves list names in the requested language', async () => {
+        const list = await nanokaProvider.getCharacterList({ lang: 'en' })
+        assert.deepEqual(
+            list.map((c) => c.name),
+            ['Rover', 'Jiyan']
+        )
+    })
+
+    it('computes in Chinese then overlays the requested language text', async () => {
+        const info = await nanokaProvider.getCharacterInfo('Jiyan', { lang: 'en' })
+        assert.equal(info.element, '导电')
+        assert.equal(info.weaponType, '迅刀')
+        assert.equal(info.lv90BaseStats.tuneBreakBoost, 10)
+        assert.equal(info.tags.find((t) => t.id === '33')?.name, 'Tune Rupture Response')
+        assert.equal(info.skills.find((s) => s.name === 'Frosty Light')?.type, 'Normal Attack')
+        assert.ok(info.skills.some((s) => s.name === 'Sea of Clouds'))
+    })
+
+    it('falls back to Chinese when the requested language is unavailable', async () => {
+        const info = await nanokaProvider.getCharacterInfo('忌炎', { lang: 'fr' })
+        assert.equal(info.skills[0].name, '轻云起')
+        assert.equal(info.chains[0].name, '止戈')
     })
 })

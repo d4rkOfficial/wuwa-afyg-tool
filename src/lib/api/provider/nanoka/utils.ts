@@ -23,6 +23,8 @@ import type {
     NanokaWeapon,
     NanokaEcho,
     NanokaSonata,
+    NanokaSonataSet,
+    LocalizedText,
     ZhCharacterDetail,
     ZhCharacterTag,
     ZhWeaponDetail,
@@ -30,6 +32,21 @@ import type {
     ZhSonataDetail,
     ZhDamageEntry
 } from './types'
+
+// ── 本地化 ──
+
+/**
+ * @desc 取多语言文本的目标语言值；lang 为 zh/空或该语言缺失时回退中文。
+ * 语言值不做归一化（调用方原样透传），这里只做「有则取、无则中文」。
+ */
+export const localizedText = (text: LocalizedText | undefined, lang = 'zh'): string => {
+    if (!text) return ''
+    if (lang && lang !== 'zh') {
+        const value = text[lang as keyof LocalizedText]
+        if (value) return value
+    }
+    return text.zh ?? ''
+}
 
 // ── Helpers ──
 
@@ -40,9 +57,19 @@ export function ueToCdn(path: string): string {
     return `${ASSET_BASE}${name}.webp`
 }
 
-export function findEntryByName<T extends { zh: string }>(data: Record<string, T>, name: string): [string, T] | null {
+/** @desc 按名称查找列表条目：优先中文名（兼容旧调用），再按目标语言名匹配 */
+export function findEntryByName<T extends LocalizedText>(
+    data: Record<string, T>,
+    name: string,
+    lang = 'zh'
+): [string, T] | null {
     for (const [key, entry] of Object.entries(data)) {
         if (entry.zh === name) return [key, entry]
+    }
+    if (lang && lang !== 'zh') {
+        for (const [key, entry] of Object.entries(data)) {
+            if ((entry as LocalizedText)[lang as keyof LocalizedText] === name) return [key, entry]
+        }
     }
     return null
 }
@@ -54,7 +81,20 @@ export function findSonataSetEntry(data: ZhSonataDetail, name: string): [string,
     return null
 }
 
-function strip(html: string): string {
+/** @desc 按名称在 sonata 列表里定位套装 id：先中文名，再目标语言名 */
+export function findSonataListEntry(data: NanokaSonata, name: string, lang = 'zh'): [string, NanokaSonataSet] | null {
+    for (const [key, entry] of Object.entries(data)) {
+        if (entry.name?.zh === name) return [key, entry]
+    }
+    if (lang && lang !== 'zh') {
+        for (const [key, entry] of Object.entries(data)) {
+            if (entry.name?.[lang as keyof LocalizedText] === name) return [key, entry]
+        }
+    }
+    return null
+}
+
+export function strip(html: string): string {
     return html
         .replace(/<color=\w+>/gi, '')
         .replace(/<\/color>/gi, '')
@@ -66,7 +106,7 @@ function strip(html: string): string {
         .replace(/<\/highlight>/gi, '')
 }
 
-function interpolate(text: string, params: string[]): string {
+export function interpolate(text: string, params: string[]): string {
     if (!text || !params.length) return text
     return text.replace(/\{(\d+)\}/g, (_, i) => params[Number(i)] ?? `{${i}}`)
 }
@@ -141,19 +181,31 @@ const matchRatioComponent = (part: string, damage: Record<string, ZhDamageEntry>
     return { entry: damage[matchedKey], hitFactor: mult * extraHits }
 }
 
+/** @desc 详情节点是否产出一条技能记录（其余为固有技能/属性节点） */
+export const isSkillTreeNode = (node: ZhCharacterDetail['skill_trees'][string]): boolean => {
+    const nodeType = node.node_type
+    const skillType = node.skill?.type ?? ''
+    return (
+        nodeType === 1 || nodeType === 2 || (nodeType === 3 && (skillType === '延奏技能' || skillType === '谐度破坏'))
+    )
+}
+
+/** @desc 技能等级键（升序且只保留有参数行的等级），用于对齐中文数值与目标语言文案 */
+export const skillLevelKeys = (skill: ZhCharacterDetail['skill_trees'][string]['skill']): string[] =>
+    Object.keys(skill.level ?? {})
+        .map(Number)
+        .filter((k) => !isNaN(k))
+        .sort((a, b) => a - b)
+        .map(String)
+        .filter((key) => (skill.level?.[key]?.param?.[0]?.length ?? 0) > 0)
+
 function makeSkillValues(
     skill: ZhCharacterDetail['skill_trees'][string]['skill']
 ): [name: string, value: string, element: string, energy?: string, tune?: string][] {
-    if (!skill.level) return []
-    const keys = Object.keys(skill.level)
-        .map(Number)
-        .filter((k) => !isNaN(k))
-    if (keys.length === 0) return []
-    const sorted = keys.sort((a, b) => a - b)
     const result: [string, string, string, string?, string?][] = []
 
-    for (const lvKey of sorted) {
-        const lvData = skill.level[String(lvKey)]
+    for (const lvKey of skillLevelKeys(skill)) {
+        const lvData = skill.level?.[lvKey]
         if (!lvData) continue
         const row = lvData.param[0]
         if (!row || row.length === 0) continue
@@ -208,34 +260,40 @@ function makeSkillValues(
 
 // ── List transforms ──
 
-export const transformCharacterList = (data: Record<string, NanokaCharacter>): Character[] => {
+export const transformCharacterList = (data: Record<string, NanokaCharacter>, lang = 'zh'): Character[] => {
     const seen = new Set<string>()
     return Object.values(data)
-        .filter((c) => c.zh && !seen.has(c.zh) && seen.add(c.zh))
+        .filter((c) => {
+            const name = localizedText(c, lang)
+            return name && !seen.has(name) && seen.add(name)
+        })
         .map((c) => ({
-            name: c.zh,
+            name: localizedText(c, lang),
             star: c.rank,
             element: ELEMENT_MAP[c.element] ?? '',
             weaponType: WEAPON_TYPE_MAP[c.weapon] ?? ''
         }))
 }
 
-export const transformWeaponList = (data: Record<string, NanokaWeapon>): Weapon[] =>
+export const transformWeaponList = (data: Record<string, NanokaWeapon>, lang = 'zh'): Weapon[] =>
     Object.values(data)
-        .filter((w) => w.zh)
+        .filter((w) => localizedText(w, lang))
         .map((w) => ({
-            name: w.zh,
+            name: localizedText(w, lang),
             star: w.rank,
             weaponType: WEAPON_TYPE_MAP[w.type] ?? ''
         }))
 
-export const transformEchoList = (data: Record<string, NanokaEcho>, sonata: NanokaSonata): Echo[] => {
+export const transformEchoList = (data: Record<string, NanokaEcho>, sonata: NanokaSonata, lang = 'zh'): Echo[] => {
     const seen = new Set<string>()
     return Object.values(data)
-        .filter((e) => e.zh && !seen.has(e.zh) && seen.add(e.zh))
+        .filter((e) => {
+            const name = localizedText(e, lang)
+            return name && !seen.has(name) && seen.add(name)
+        })
         .map((e) => ({
-            name: e.zh,
-            sets: e.group.map((gid) => sonata[String(gid)]?.name?.zh ?? '').filter(Boolean),
+            name: localizedText(e, lang),
+            sets: e.group.map((gid) => localizedText(sonata[String(gid)]?.name, lang)).filter(Boolean),
             cost: COST_MAP[e.intensity] ?? 1
         }))
 }
@@ -253,11 +311,11 @@ export const extractEchoNameFromSkill = (desc: string | null | undefined): strin
     return m ? m[1] : null
 }
 
-export const transformEchoSetList = (sonata: NanokaSonata): EchoSetItem[] =>
+export const transformEchoSetList = (sonata: NanokaSonata, lang = 'zh'): EchoSetItem[] =>
     Object.values(sonata)
-        .filter((s) => s.name?.zh)
+        .filter((s) => localizedText(s.name, lang))
         .map((s) => ({
-            name: s.name.zh,
+            name: localizedText(s.name, lang),
             pieces: Object.keys(s.set)
                 .map(Number)
                 .sort((a, b) => a - b)
@@ -306,6 +364,7 @@ export function preprocessSkills(skills: SkillEntry[], elementName: string) {
 }
 
 // ── Info transforms ──
+// 详情按目标语言直接计算；语言目录不存在时适配器已回退中文详情。
 
 export function transformCharacterInfo(data: ZhCharacterDetail): CharacterInfo {
     return transformCharacterInfoCommon(data, false)
@@ -341,25 +400,15 @@ function transformCharacterInfoCommon(data: ZhCharacterDetail, rich: boolean): C
     const skills: SkillEntry[] = []
     const statNodes: StatNode[] = []
     const elementName = (ELEMENT_MAP[data.element] ?? '') as '冷凝' | '热熔' | '导电' | '气动' | '衍射' | '湮灭'
-    const hasTune = Object.values(data.tag ?? {}).some(
-        (t) => t.name === '震谐响应' || t.name === '集谐响应' || t.name === '骇破响应'
-    )
+    // 谐度类响应标签用 id 判定：文案随语言变化，id 不随语言改变
+    const hasTune = Object.keys(data.tag ?? {}).some((id) => TUNE_RESPONSE_TAG_IDS.has(id))
     baseStats.tuneBreakBoost = hasTune ? 10 : 0
 
     for (const node of Object.values(data.skill_trees)) {
         const s = node.skill
-        const nt = node.node_type
         const st = s.type ?? ''
 
-        if (nt === 1 || nt === 2) {
-            skills.push({
-                name: s.name ?? '',
-                type: st as SkillEntry['type'],
-                desc: rich ? interpolate(s.desc ?? '', s.param ?? []) : strip(interpolate(s.desc ?? '', s.param ?? [])),
-                values: makeSkillValues(s),
-                damage: s.damage
-            })
-        } else if (nt === 3 && (st === '延奏技能' || st === '谐度破坏')) {
+        if (isSkillTreeNode(node)) {
             skills.push({
                 name: s.name ?? '',
                 type: st as SkillEntry['type'],
@@ -394,6 +443,9 @@ function transformCharacterInfoCommon(data: ZhCharacterDetail, rich: boolean): C
         chains
     }
 }
+
+/** @desc 谐度类响应标签 id：33 震谐响应 / 36 集谐响应 / 38 骇破响应 */
+const TUNE_RESPONSE_TAG_IDS = new Set(['33', '36', '38'])
 
 /**
  * @desc 角色定位标签归一化：按 id 升序（JS 对整数型 key 本就按升序枚举，这里显式排序以防手写 JSON 乱序）、

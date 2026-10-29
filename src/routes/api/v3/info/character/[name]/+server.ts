@@ -1,5 +1,6 @@
 import { CACHE_CONTROL } from '$lib/api/consts'
 import { createJsonResponse } from '$lib/api/fetch'
+import { langFromUrl } from '$lib/api/lang'
 import { getProvider, providerIdFromUrl } from '$lib/api/provider'
 
 export const GET = async ({ params, url }: { params: { name: string }; url?: URL }) => {
@@ -9,7 +10,7 @@ export const GET = async ({ params, url }: { params: { name: string }; url?: URL
     try {
         const provider = getProvider(url ? providerIdFromUrl(url) : undefined)
         // v3 在 v2 的富文本描述之上补角色定位标签（tags）；目前仅角色详情有这两类富数据。
-        const data = await provider.getCharacterInfo(name, { rich: true })
+        const data = await provider.getCharacterInfo(name, { rich: true, lang: langFromUrl(url) })
         return createJsonResponse(data, 200, { 'Cache-Control': CACHE_CONTROL })
     } catch (e) {
         const msg = String(e)
