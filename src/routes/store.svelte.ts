@@ -57,11 +57,18 @@ import { hideSplash } from '$lib/utils/splash'
 /** @desc 上游数据版本指纹的 localStorage 键（值 = 上次记录到的 `getWWVersion()`） */
 const VERSION_STORAGE_KEY = 'wuwa-afyg:version'
 
-/** @desc 上游数据版本变化则丢弃本地 IndexedDB 缓存，并记下本次版本 */
+/**
+ * @desc 上游数据版本变化则丢弃列表/详情缓存，并记下本次版本。
+ * 图标类缓存（batch-icons 及 data-cdn 图片）不随版本清空：URL 基本稳定，
+ * 且 tag 图标需要扫描全角色详情，重建成本高；tag 映射自身有独立短 TTL。
+ */
 export const syncUpstreamVersionCache = (): void => {
     if (!browser) return
     const prev = localStorage.getItem(VERSION_STORAGE_KEY)
-    if (prev && prev !== getWWVersion()) clearCache()
+    if (prev && prev !== getWWVersion()) {
+        clearCache('list')
+        clearCache('info')
+    }
     localStorage.setItem(VERSION_STORAGE_KEY, getWWVersion())
 }
 

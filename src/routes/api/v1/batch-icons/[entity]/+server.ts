@@ -1,4 +1,4 @@
-import { CACHE_CONTROL } from '$lib/api/consts'
+import { ICON_CACHE_CONTROL } from '$lib/api/consts'
 import { createJsonResponse } from '$lib/api/fetch'
 import { getProvider, providerIdFromUrl } from '$lib/api/provider'
 import type { DataProvider } from '$lib/api/provider/types'
@@ -24,7 +24,7 @@ export const GET = async ({ params, url }: { params: { entity: string }; url: UR
     try {
         const provider = getProvider(providerIdFromUrl(url))
         const data = await provider[method]()
-        return createJsonResponse(data, 200, { 'Cache-Control': CACHE_CONTROL })
+        return createJsonResponse(data, 200, { 'Cache-Control': ICON_CACHE_CONTROL })
     } catch (e) {
         return createJsonResponse({ error: 'Failed to fetch data: ' + String(e) }, 500)
     }

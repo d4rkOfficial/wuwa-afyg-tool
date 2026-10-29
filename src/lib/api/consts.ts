@@ -3,6 +3,9 @@ export const SHARE_BASE = 'https://wuwa-afyg-share.200503.xyz'
 
 export const CACHE_CONTROL = 'public, s-maxage=600, stale-while-revalidate=86400'
 
+/** 图标映射：内容基本不变，CDN 缓存 1 天并允许 7 天内回源校验前继续用旧值 */
+export const ICON_CACHE_CONTROL = 'public, s-maxage=86400, stale-while-revalidate=604800'
+
 /** PWA 运行时缓存数据上游 CDN 图片/静态资源的 Cache Storage 名称 */
 export const DATA_CDN_CACHE_NAME = 'data-cdn'
 

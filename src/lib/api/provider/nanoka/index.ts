@@ -60,6 +60,7 @@ import type {
 
 let sonataCache: NanokaSonata | null = null
 let tagIconsCache: Record<string, string> | null = null
+let tagIconsPromise: Promise<Record<string, string>> | null = null
 
 async function getSonata(): Promise<NanokaSonata> {
     if (sonataCache) return sonataCache
@@ -70,10 +71,24 @@ async function getSonata(): Promise<NanokaSonata> {
 /**
  * @desc 扫描全部角色详情，汇总 tag 短标识 → 图标 URL。
  * 上游没有独立 tag 索引文件；tag 图标只存在于角色详情的 `tag[].icon` 路径里。
- * 结果按实例缓存，版本切换时由 resetCaches 清空。
+ * 结果按实例缓存，并用同一个 in-flight Promise 合并并发请求，版本切换时由 resetCaches 清空。
  */
 async function getTagIcons(): Promise<Record<string, string>> {
     if (tagIconsCache) return tagIconsCache
+    if (!tagIconsPromise) {
+        tagIconsPromise = scanTagIcons()
+            .then((map) => {
+                tagIconsCache = map
+                return map
+            })
+            .finally(() => {
+                tagIconsPromise = null
+            })
+    }
+    return tagIconsPromise
+}
+
+async function scanTagIcons(): Promise<Record<string, string>> {
     const list = await fetchData<Record<string, unknown>>('/character.json')
     await ensureVersion()
     const version = getWWVersion()
@@ -93,13 +108,13 @@ async function getTagIcons(): Promise<Record<string, string>> {
             }
         }
     }
-    tagIconsCache = map
     return map
 }
 
 function resetCaches() {
     sonataCache = null
     tagIconsCache = null
+    tagIconsPromise = null
     resetVersionPromise()
 }
 

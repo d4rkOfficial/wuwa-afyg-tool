@@ -1,7 +1,7 @@
 <script lang="ts">
     import { browser } from '$app/environment'
     import { page } from '$app/state'
-    import { clearCache } from '$lib/api/data-cache'
+    import { clearCache, ensurePersistentStorage } from '$lib/api/data-cache'
     import { connectWs, disconnectWs, autoConnectWs } from '$lib/ws-remote/ws-remote.svelte'
     import {
         parseHashParams,
@@ -25,6 +25,8 @@
     const isFastCalc = $derived(page.url.pathname === '/fast-calc')
 
     if (browser) {
+        // 尽量让浏览器把图标/数据缓存当作持久存储，降低容量紧张时的自动清理
+        void ensurePersistentStorage()
         // 紧急 hash：必须在应用初始化前同步执行（清缓存后立即重载）
         if (parseHashParams(globalThis.location.hash).some((p) => p.key === 'reset-cache')) {
             clearCache()

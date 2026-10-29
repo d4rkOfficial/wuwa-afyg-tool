@@ -44,7 +44,7 @@ export default defineConfig({
                         handler: 'NetworkFirst',
                         options: {
                             cacheName: 'api-cache',
-                            expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 }
+                            expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 }
                         }
                     },
                     {
@@ -52,7 +52,7 @@ export default defineConfig({
                         handler: 'StaleWhileRevalidate',
                         options: {
                             cacheName: 'data-cdn',
-                            expiration: { maxEntries: 2000, maxAgeSeconds: 30 * 24 * 60 * 60 },
+                            expiration: { maxEntries: 2000, maxAgeSeconds: 365 * 24 * 60 * 60 },
                             cacheableResponse: { statuses: [0, 200] }
                         }
                     }

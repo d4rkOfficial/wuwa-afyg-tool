@@ -15,7 +15,10 @@ import type {
 const PREFIX = 'wuwa-afyg:v2:'
 const LIST_TTL = 7 * 24 * 60 * 60 * 1000
 const INFO_TTL = 7 * 24 * 60 * 60 * 1000
-const ICON_TTL = 7 * 24 * 60 * 60 * 1000
+/** 角色/武器/声骸/套装图标：名字与 URL 基本不随版本变化，尽量长留 */
+const ICON_TTL = 30 * 24 * 60 * 60 * 1000
+/** tag 图标映射会随新标签增长，保持较短 TTL 以便自动补全新标签 */
+const TAG_ICON_TTL = 24 * 60 * 60 * 1000
 
 const DEFAULT_PROVIDER = 'nanoka'
 
@@ -32,6 +35,17 @@ function withProviderUrl(path: string): string {
 
 const memoryCache = new Map<string, unknown>()
 const inFlight = new Map<string, Promise<unknown>>()
+
+/**
+ * @desc 申请持久化存储：降低浏览器在容量紧张时清理 IndexedDB / Cache Storage 的概率。
+ * 结果按页面生命周期缓存，重复调用不会重复弹授权。
+ */
+let persistentStorageRequest: Promise<boolean> | null = null
+export const ensurePersistentStorage = (): Promise<boolean> => {
+    if (typeof navigator === 'undefined' || !navigator.storage?.persist) return Promise.resolve(false)
+    if (!persistentStorageRequest) persistentStorageRequest = navigator.storage.persist().catch(() => false)
+    return persistentStorageRequest
+}
 
 function cacheKey(cat: string, entity: string, name?: string): string {
     return `${PREFIX}${providerScope()}${cat}:${entity}${name ? `:${name}` : ''}`
@@ -173,7 +187,8 @@ async function fetchJSON<T>(url: string, cacheK: string, ttl: number): Promise<T
 async function fetchBatchIcons(entity: string): Promise<Record<string, string>> {
     const k = cacheKey('batch-icons', entity)
     if (memoryCache.has(k)) return memoryCache.get(k) as Record<string, string>
-    const cached = await getLocal<Record<string, string>>(k, ICON_TTL)
+    const ttl = entity === 'tags' ? TAG_ICON_TTL : ICON_TTL
+    const cached = await getLocal<Record<string, string>>(k, ttl)
     if (cached) {
         memoryCache.set(k, cached)
         return cached
