@@ -23,7 +23,7 @@
 
 
 如果你需要比网页端更强大的椰果工具箱，另见椰果工具箱启动器：
-[启动器下载](https://wuwa-afyg-share.200503.xyz/launcher) | [启动器插件 SDK](https://github.com/D4rK6/coconut-app-plugin-sdk)
+[启动器下载](https://wuwa-afyg-share.200503.xyz/launcher) | [启动器插件 SDK](https://github.com/d4rkOfficial/coconut-app-plugin-sdk)
 
 **椰果工具箱的功能**：把一名角色的整场战斗拆成「队伍 → 排轴 → 拉表 → 词条/环境配置 → 结果」五步，逐段配置伤害与 Buff，算清楚每一段伤害是怎么来的、DPS 是多少、哪个词条更值，并把整套配置保存为可分享、可对比的工程。
 
