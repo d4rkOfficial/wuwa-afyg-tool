@@ -18,7 +18,14 @@
 
 主站：[凹分椰果](https://wuwa-afyg-tool.200503.xyz/) | 副站：[滑坡椰果](https://wuwa-hpyg-tool.200503.xyz/)
 
-**业务一句话**：把一名角色的整场战斗拆成「队伍 → 排轴 → 拉表 → 词条/环境 → 结果」五步，逐段配置伤害与 Buff，算清楚每一段伤害是怎么来的、DPS 是多少、哪个词条更值，并把整套配置保存为可分享、可对比的工程。
+配套仓库：[启动器](https://github.com/d4rkOfficial/coconut-app)（桌面端 / 插件宿主）·
+[工坊](https://github.com/d4rkOfficial/wuwa-afyg-share)
+
+
+如果你需要比网页端更强大的椰果工具箱，另见椰果工具箱启动器：
+[启动器下载](https://wuwa-afyg-share.200503.xyz/launcher) | [启动器插件 SDK](https://github.com/D4rK6/coconut-app-plugin-sdk)
+
+**椰果工具箱的功能**：把一名角色的整场战斗拆成「队伍 → 排轴 → 拉表 → 词条/环境配置 → 结果」五步，逐段配置伤害与 Buff，算清楚每一段伤害是怎么来的、DPS 是多少、哪个词条更值，并把整套配置保存为可分享、可对比的工程。
 
 ## 文档
 
@@ -31,15 +38,7 @@
 | [docs/damage-type-inference.md](docs/damage-type-inference.md) | 伤害类型推导算法（判定链与护栏）与 TDD 用例流程                          |
 | [docs/tools.md](docs/tools.md)                                 | AI 助手与 WS 远程接管共用的工具清单（按源码自动生成）                    |
 | [docs/ws-remote.md](docs/ws-remote.md)                         | WS 远程接管：工具分类表与接入方式                                        |
-
-### 另见：椰果工坊
-
-工程分享与共享数据（Buff 集 / 标准词条集）的配套服务：
-
-- 基于 Supabase：[d4rkOfficial/wuwa-afyg-share](https://github.com/d4rkOfficial/wuwa-afyg-share)
-- 基于 GitHub Issues：[CoconutToolBox/wuwa-afyg-share-github](https://github.com/CoconutToolBox/wuwa-afyg-share-github)
-
-工坊对外接口（含「接入工具箱必须实现的最小集」）见 [工坊 API 文档](https://github.com/d4rkOfficial/wuwa-afyg-share/blob/master/docs/api.md)。
+| [工坊 API 文档](https://github.com/d4rkOfficial/wuwa-afyg-share/blob/master/docs/api.md) | 工坊对外接口（含「接入工具箱必须实现的最小集」） |
 
 ## 业务功能
 
@@ -61,15 +60,6 @@
 - **链阶档位**：真源是角色槽位（`chain` / `refinement`），随工程保存，底部「角色详情配置」按钮实时显示 `链阶` 串
 - **跨角色引用影响源**：本段伤害引用了别的角色面板时，会改写该面板的 Buff 会作为可勾选条目出现在拉表里（平铺=该角色组内的列，下拉=该条目的 chip），勾上即参与被引用角色在这一段的面板计算；未被本段勾选的其它条目绑定不参与（伤害是当下的）
 - 伤害类型自动推导：按技能倍率名（「普攻·」「重击·」等前缀）与技能文案（「视为 XX 伤害」）自动判定，用户手动设置优先；详见 [docs/damage-type-inference.md](docs/damage-type-inference.md)
-
-### 数据与共享
-
-- **Buff 集（本地库 + 工坊同步）** — 按实体（角色/武器/声骸/套装）组织，可编辑、导出、一键导入工程；可从工坊同步，本地自定义不受覆盖
-- **标准词条集** — 一键把角色 5 个声骸套成「标准 14 词条」（主词条：4cost 按固有属性取暴击率/暴击伤害、3cost 取属性伤害加成、1cost 取攻击%/生命%/防御%，**数值固定为满级上限**；副主词条**按 cost 自动推导**；副词条 5 暴击 + 5 暴伤 + 2 百分比 + 2 固定值，**数值从档位中选择**；角色带「普攻/重击/共鸣技能/共鸣解放伤害」标签时，两条固定值换成对应的 8.6% 伤害加成）。cost 组合不锁死 43311，5 部位合计 ≤ 12 即可自由调整；特殊角色方案由工坊记录并同步；用户可另存多套方案在工程间快速覆盖
-- **工程** — 保存/克隆/归档；**导出为全阶段一次性导出（无需勾选）**，复制工程保持原样的勾选流程；经工坊生成分享链接，**分享有 10 分钟频率限制**（冷却中按钮显示剩余时间并禁用）；旧工程（version ≤ 4）载入时自动迁移到 v5（跨角色影响源补勾、乘区改名、同名变体拍平为单层乘区条目、旧「备注即重击」的普攻块升级为独立重击图标块，只加不减、幂等）
-- **一切皆「配置」** — 全部配置分成两大类：**设置**（外观 / 交互 / 数据源与性能 / AI 助手偏好）与**本地库**（Buff 集、词条方案与标准词条集、自定义技能）；入口是设置弹窗里独立的一级栏目「配置 → 配置导入导出」。可整体导出为 JSON 备份（顶层 `settings` / `libraries` 两类分开存放）、从 JSON 导入（先预览「文件里有什么 / 将导入什么」，可选合并或覆盖、可选是否包含 API Key），也可按分组重置；旧版（v1 扁平 `entries`）导出文件仍可导入，解析时按登记表自动归类到两类
-- **AI 助手** — 站内对话式操作：生成 Buff 集、查询计算结果与乘区溯源、数据分析、批量排轴/拉表配置；可接任意 OpenAI 兼容服务；**记录工程变化并自动带入下一轮对话**（静默，界面不提示）；支持**自定义 Skill**（在「设置 → AI助手 → 权限 / 提示词」里管理：主动技能按需激活、被动技能常驻生效）
-- **WS 远程接管** — 通过 WebSocket 让外部程序/脚本调用同一套工具能力（见 [docs/ws-remote.md](docs/ws-remote.md)）
 
 ## 技术栈
 
