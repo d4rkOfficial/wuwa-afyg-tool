@@ -34,7 +34,7 @@
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()
 
-    /** @desc 卡片表面（与 `config-section` / `archive` 的卡片同规格） */
+    /** @desc 卡片表面（与 `config-sync-modal` / `archive` 的卡片同规格） */
     const CARD_SURFACE = 'sf-radius rounded-none border'
     const CARD_STYLE = 'border-color: var(--theme-divider-border); background: var(--theme-input-bg);'
 

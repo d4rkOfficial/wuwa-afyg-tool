@@ -63,6 +63,8 @@
     } from '$lib/data/substat-library-ui.svelte'
     import BuffLibraryModal from '$lib/components/page/home/calculation/buff-library-modal.svelte'
     import SettingsModal from '$lib/components/page/home/settings/settings-modal.svelte'
+    import ConfigSyncModal from '$lib/components/page/home/settings/config-sync-modal.svelte'
+    import KeymapEditorModal from '$lib/components/page/home/settings/keymap-editor-modal.svelte'
     import CharacterDetailModal from '$lib/components/page/home/config/character-detail-modal.svelte'
     import AiAssistant from '$lib/components/page/home/settings/ai-assistant.svelte'
     import TeamConfig from '$lib/components/page/home/team/team-config.svelte'
@@ -98,6 +100,10 @@
     let showResult = $state(false)
     let showBuffLibrary = $state(false)
     let showSettings = $state(false)
+    /** @desc 独立「配置同步」弹窗（入口在设置标题栏；也可由 AI/WS 的 open_panel 打开） */
+    let showConfigSync = $state(false)
+    /** @desc 独立「排轴页按键图标」编辑弹窗（入口在 交互相关 → 界面显示） */
+    let showKeymapEditor = $state(false)
     /** @desc 「编辑伤害类型」弹窗开关（底部工具栏按钮 / AI、WS 面板工具共用，状态在 calculation store 里） */
     let showDamageTypeModal = $derived(getShowDamageTypeModal())
     let showWorkshopFrame = $state(false)
@@ -238,6 +244,8 @@
             ['substat-library', '快速词条方案', () => getSubstatLibraryOpen(), (v) => setSubstatLibraryOpen(v)],
             ['damage-type', '编辑伤害类型', () => getShowDamageTypeModal(), (v) => setShowDamageTypeModal(v)],
             ['settings', '设置', () => showSettings, (v) => (showSettings = v)],
+            ['config-sync', '配置同步', () => showConfigSync, (v) => (showConfigSync = v)],
+            ['keymap-editor', '排轴页按键图标', () => showKeymapEditor, (v) => (showKeymapEditor = v)],
             ['workshop', '工坊', () => showWorkshop, (v) => (showWorkshop = v)],
             [
                 'workshop-frame',
@@ -846,7 +854,16 @@
     />
 {/if}
 
-<SettingsModal open={showSettings} onclose={() => (showSettings = false)} />
+<SettingsModal
+    open={showSettings}
+    onclose={() => (showSettings = false)}
+    onConfigSync={() => (showConfigSync = true)}
+    onKeymapEdit={() => (showKeymapEditor = true)}
+/>
+
+<ConfigSyncModal open={showConfigSync} onclose={() => (showConfigSync = false)} />
+
+<KeymapEditorModal open={showKeymapEditor} onclose={() => (showKeymapEditor = false)} />
 
 <AiAssistant
     viewPhase={activePhase}

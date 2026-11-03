@@ -3,23 +3,22 @@
  * 存放**被抽出的 tab 独占**的状态与函数（仍被其余 tab 使用的状态留在外壳里，两边都要用的搬到这里、外壳 import）。
  * 风格对齐 `src/lib/data/*.svelte.ts`：模块级 `$state` + `get*` / `set*` 访问器。
  *
- * ⚠️ 5.1 第一增量（抽出 `performance` / `config` 两个 tab）实测**没有任何状态可搬**：
+ * ⚠️ 5.1 第一增量（抽出 `performance` / `config` 两个 tab；`config` 现已升级为独立的「配置同步」弹窗，
+ * 由设置标题栏入口打开，不再属于设置栏目）实测**没有任何状态可搬**：
  *   - `performance`：三个开关直连全局 store `$lib/data/render-prefs.svelte`（`getGpuAccel` 等），
  *     不读不写外壳的 `$state` / `$derived` / 函数 —— 若在这里再包一层只会造出重复状态。
- *   - `config`：只是一层标题 + 既有 `settings/config-section.svelte`（其状态本来就在那个组件内部）。
+ *   - `config`：当时只是一层标题 + 独立的配置区块组件（现已升级为独立「配置同步」弹窗，见 `config-sync-modal.svelte`）。
  *   - 外壳的 `tab`、`SETTING_TABS`、主题 / 背景图 / keymap / cache / archive / connection / ai 等状态
  *     仍被其余 tab 的 `{#if tab === …}` 分支使用，按迁移契约必须留在外壳。
  * 故第一增量只把「设置栏目」的公共类型 `SettingsTab`（原先内联在外壳的 `$state<…>` 上）落在这里。
  *
  * 5.1 第二增量（抽出 `shortcuts` / `keymap` / `cache` 三个 tab）迁入的**两边共用**状态：
- *   - `tab`：侧栏导航与仍留外壳的 tab 分支要读，keymap tab 的「界面快捷键设置」要切到 shortcuts → 共用。
+ *   - `tab`：侧栏导航与仍留外壳的 tab 分支要读 → 共用。
  *   - `shortcutCapture`：shortcuts tab 的「记录」按钮写、外壳的 window keydown 捕获（含 Esc 取消）读 → 共用。
- *   - `uiBtnIconList` / `keyPickerFor`：keymap tab 写 `keyPickerFor`；外壳根部的「选择按键与手柄键位」弹窗
- *     （必须留在外壳：外壳的毛玻璃 / 动画会为 `fixed` 建立包含块）读写两者 → 共用。
- *   - `entryById` / `updateEntry`：keymap tab 与上述弹窗都要读写按键条目 → 共用。
- *     （真正的数据仍在 `$lib/data/keymap.svelte`，这里只做「按 id 查 / 打补丁」的薄封装。）
  *   - `cacheEntries` + `refreshCacheEntries`：cache tab 用；外壳「打开设置」的 `$effect` 也要刷新一次 → 共用。
  * 同一增量迁入的**tab 独占**状态：`cacheBusy`、`expandedCache`。
+ * （`keymap` 后来迁成独立弹窗 `keymap-editor-modal.svelte`，其 `keyPickerFor` / `uiBtnIconList` /
+ *  `entryById` / `updateEntry` 都已随弹窗下沉到组件内部，本模块不再持有。）
  *
  * 5.1 第三增量（抽出 `ai` / `ai-conn`、`archive`、`interaction` 三个 tab）迁入的：
  *   - `ai` 与 `ai-conn` 在外壳里**共用同一个分支与同一个根节点**（内部再按 `tab` 细分），
@@ -73,21 +72,10 @@ import { getActiveId, getOverrides, type SurfaceKey } from '$lib/theme'
 import { deleteProfile, type AiProfile } from '$lib/ai/config.svelte'
 import { deleteProject } from '$lib/data/project.svelte'
 import { addToast } from '$lib/data/toast.svelte'
-import { getKeyMapEntries, updateKeyMapEntry, type KeyMapEntry } from '$lib/data/keymap.svelte'
 
 /** @desc 设置弹窗的栏目键（与外壳 `SETTING_TABS` 的 `key` 一一对应；外壳赋 `tab` 时由此类型校验） */
 export type SettingsTab =
-    | 'theme'
-    | 'interaction'
-    | 'keymap'
-    | 'shortcuts'
-    | 'performance'
-    | 'connection'
-    | 'cache'
-    | 'archive'
-    | 'ai'
-    | 'ai-conn'
-    | 'config'
+    'theme' | 'interaction' | 'shortcuts' | 'performance' | 'connection' | 'cache' | 'archive' | 'ai' | 'ai-conn'
 
 // ── 栏目切换：侧栏导航 + 仍在外壳的 tab 分支 + keymap tab 的「界面快捷键设置」跳转共用 ──
 let tab = $state<SettingsTab>('theme')
@@ -105,33 +93,6 @@ export const getShortcutCapture = () => shortcutCapture
 
 export const setShortcutCapture = (id: string | null) => {
     shortcutCapture = id
-}
-
-// ── 按键图标：keymap tab 的图标查询与外壳「选择按键与手柄键位」弹窗共用 ──
-let uiBtnIconList = $state<[string, string][]>([])
-
-export const getUiBtnIconList = () => uiBtnIconList
-
-export const setUiBtnIconList = (list: [string, string][]) => {
-    uiBtnIconList = list
-}
-
-/** @desc 正在选择按键的 keymap 条目 id（null = 弹窗关闭）；仅 keymap tab 会置位 */
-let keyPickerFor = $state<string | null>(null)
-
-export const getKeyPickerFor = () => keyPickerFor
-
-export const setKeyPickerFor = (id: string | null) => {
-    keyPickerFor = id
-}
-
-/** @desc 按 id 取按键条目（数据源 `$lib/data/keymap.svelte`；keymap tab 与外壳按键选择弹窗共用） */
-export const entryById = (id: string): KeyMapEntry | undefined => getKeyMapEntries().find((e) => e.id === id)
-
-/** @desc 局部更新按键条目（keymap tab 改名 / 外壳按键选择弹窗换图标共用） */
-export const updateEntry = (id: string, patch: Partial<KeyMapEntry>) => {
-    const e = entryById(id)
-    if (e) updateKeyMapEntry({ ...e, ...patch })
 }
 
 // ── 缓存清理：cache tab 独占，但 `cacheEntries` 的刷新被外壳「打开设置」的 $effect 共用 ──
@@ -294,8 +255,12 @@ export const syncThemeEditing = () => {
 }
 
 // ── 连接配置：connection tab 的状态（库街区登录表单 + 工坊实例输入）──
+/** @desc 库街区登录方式：短信验证码 / 直接粘贴 token（表单切换不丢输入） */
+export type KuroLoginMode = 'sms' | 'token'
+let kuroLoginMode = $state<KuroLoginMode>('sms')
 let kuroPhone = $state('')
 let kuroCode = $state('')
+let kuroToken = $state('')
 let kuroLoginBusy = $state(false)
 let kuroLoginInfo = $state<string | null>(null)
 let kuroLoginError = $state<string | null>(null)
@@ -303,6 +268,12 @@ let kuroCountdown = $state(0)
 /** @desc 倒计时定时器句柄（非响应式：只被 `startKuroCountdown` 读写） */
 let kuroTimer: ReturnType<typeof setInterval> | null = null
 let newWorkshopUrl = $state('')
+
+export const getKuroLoginMode = () => kuroLoginMode
+
+export const setKuroLoginMode = (mode: KuroLoginMode) => {
+    kuroLoginMode = mode
+}
 
 export const getKuroPhone = () => kuroPhone
 
@@ -314,6 +285,12 @@ export const getKuroCode = () => kuroCode
 
 export const setKuroCode = (code: string) => {
     kuroCode = code
+}
+
+export const getKuroToken = () => kuroToken
+
+export const setKuroToken = (token: string) => {
+    kuroToken = token
 }
 
 export const getKuroLoginBusy = () => kuroLoginBusy

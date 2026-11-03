@@ -1,11 +1,10 @@
 <script lang="ts">
     import Modal from '$lib/components/layout/modal.svelte'
     import Icon from '@iconify/svelte'
-    import { getUiBtnIcons, getWeaponIcons, getEchoIcons, getEchoSetIcons } from '$lib/api/data-cache'
+    import { getWeaponIcons, getEchoIcons, getEchoSetIcons } from '$lib/api/data-cache'
     import { addToast } from '$lib/data/toast.svelte'
     import { loadProviderVersions } from '$lib/data/provider-prefs.svelte'
     import { loadGenPrefs } from '$lib/data/ai-prefs.svelte'
-    import { GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
     import { consumeKuroSettingsRequest, getKuroSettingsRequest } from '$lib/kuro-app/kuro.svelte'
     import {
         applyLockedMods,
@@ -22,10 +21,8 @@
     import AiSection from './sections/ai.svelte'
     import ArchiveSection from './sections/archive.svelte'
     import CacheSection from './sections/cache.svelte'
-    import ConfigSection from './sections/config.svelte'
     import ConnectionSection from './sections/connection.svelte'
     import InteractionSection from './sections/interaction.svelte'
-    import KeymapSection from './sections/keymap.svelte'
     import PerformanceSection from './sections/performance.svelte'
     import ShortcutsSection from './sections/shortcuts.svelte'
     import ThemeSection from './sections/theme.svelte'
@@ -33,28 +30,22 @@
         closeArchiveDelete,
         doArchiveDelete,
         doDeleteAiProfile,
-        entryById,
         getAiDeleteTarget,
         getAiEditTarget,
         getArchiveDeleteTarget,
-        getKeyPickerFor,
         getPromptEditOpen,
         getShortcutCapture,
         getTab,
-        getUiBtnIconList,
         refreshCacheEntries,
         setAiDeleteTarget,
         setAiEditTarget,
         setArchiveEchoIcons,
         setArchiveEchoSetIcons,
         setArchiveWeaponIcons,
-        setKeyPickerFor,
         setPromptEditOpen,
         setShortcutCapture,
         setTab,
-        setUiBtnIconList,
-        syncThemeEditing,
-        updateEntry
+        syncThemeEditing
     } from './settings-ui.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
@@ -62,11 +53,15 @@
     interface Props extends ComponentsProps {
         open: boolean
         onclose: () => void
+        /** @desc 标题栏「配置同步」按钮：打开独立的配置同步弹窗（设置保持在后） */
+        onConfigSync?: () => void
+        /** @desc 「交互相关 → 界面显示 → 排轴页按键图标」的编辑按钮：打开独立编辑弹窗 */
+        onKeymapEdit?: () => void
     }
 
-    let { open, onclose, class: className, style: styleProp }: Props = $props()
+    let { open, onclose, onConfigSync, onKeymapEdit, class: className, style: styleProp }: Props = $props()
 
-    /** @desc 当前栏目：状态托管在 `settings-ui.svelte.ts`（keymap tab 也要切栏目），此处只读视图；赋值走 `setTab` */
+    /** @desc 当前栏目：状态托管在 `settings-ui.svelte.ts`（库街区登录请求会切到连接配置），此处只读视图；赋值走 `setTab` */
     let tab = $derived(getTab())
 
     // ── 抽出的 tab 与外壳次级弹窗共用的状态（都在 `settings-ui.svelte.ts`，此处只读；写入走对应 setter）──
@@ -87,19 +82,17 @@
         setTab('connection')
     })
 
-    /** @desc 设置栏目：按「界面 / 数据 / AI助手 / 配置」分组归类（配置导入导出是独立一级栏目，不再挂在「数据」下） */
+    /** @desc 设置栏目：按「界面 / 数据 / AI助手」分组归类（配置同步已是独立弹窗，入口在标题栏） */
     const SETTING_TABS = [
         { group: '界面', key: 'theme', label: '外观主题', icon: 'mdi:palette-outline' },
         { group: '界面', key: 'interaction', label: '交互相关', icon: 'mdi:gesture-tap' },
-        { group: '界面', key: 'keymap', label: '按键图标', icon: 'mdi:keyboard-outline' },
         { group: '界面', key: 'shortcuts', label: '快捷键位', icon: 'mdi:keyboard-settings-outline' },
         { group: '界面', key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
         { group: '数据', key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
         { group: 'AI助手', key: 'ai-conn', label: '启用 / 接入配置', icon: 'mdi:connection' },
-        { group: 'AI助手', key: 'ai', label: '权限 / 提示词', icon: 'mdi:shield-account-outline' },
-        { group: '配置', key: 'config', label: '配置导入导出', icon: 'mdi:cog-sync-outline' }
+        { group: 'AI助手', key: 'ai', label: '权限 / 提示词', icon: 'mdi:shield-account-outline' }
     ] as const
 
     /** @desc 按 group 聚合栏目（保持声明顺序） */
@@ -124,9 +117,7 @@
     })
 
     // ── Key mapping / 界面快捷键：跨组件共享的状态托管在 `settings-ui.svelte.ts`，
-    //    外壳只保留「按键图标加载」与「待录制快捷键的 window 捕获」两段监听 ──
-    let uiBtnIconList = $derived(getUiBtnIconList())
-    let keyPickerFor = $derived(getKeyPickerFor())
+    //    外壳只保留「待录制快捷键的 window 捕获」──
     let shortcutCapture = $derived(getShortcutCapture())
 
     $effect(() => {
@@ -158,14 +149,6 @@
         }
         window.addEventListener('keydown', onKey, true)
         return () => window.removeEventListener('keydown', onKey, true)
-    })
-
-    $effect(() => {
-        if (open && uiBtnIconList.length === 0) {
-            getUiBtnIcons().then((map) => {
-                setUiBtnIconList(Object.entries(map))
-            })
-        }
     })
 
     // ── 进入「连接配置」页时加载各上游最新版本（触发条件是外壳自己的 `tab`，故留在外壳；
@@ -217,6 +200,16 @@
     {#snippet title()}
         <Icon icon="mdi:cog-outline" class="size-4.5" style="color: var(--theme-accent-text);" />
         <span>设置</span>
+        <button
+            type="button"
+            onclick={onConfigSync}
+            class="ml-1 flex h-6 shrink-0 items-center gap-1 rounded-none border px-2 text-[11px] font-medium text-(--theme-modal-text)/60 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-accent-text)"
+            style="border-color: var(--theme-divider-border);"
+            title="导出 / 导入全部配置（独立弹窗）"
+        >
+            <Icon icon="mdi:swap-horizontal-bold" class="size-3.5" />
+            配置同步
+        </button>
     {/snippet}
 
     <div class="flex min-h-0 flex-1 flex-row">
@@ -254,10 +247,8 @@
             <TabPanel active={tab}>
                 {#if tab === 'theme'}
                     <ThemeSection />
-                {:else if tab === 'keymap'}
-                    <KeymapSection />
                 {:else if tab === 'interaction'}
-                    <InteractionSection />
+                    <InteractionSection {onKeymapEdit} />
                 {:else if tab === 'shortcuts'}
                     <ShortcutsSection />
                 {:else if tab === 'performance'}
@@ -268,8 +259,6 @@
                     <ArchiveSection />
                 {:else if tab === 'cache'}
                     <CacheSection />
-                {:else if tab === 'config'}
-                    <ConfigSection />
                 {:else if tab === 'ai' || tab === 'ai-conn'}
                     <!-- @desc 把外壳自己的 `tab` 传给 section：它用同一个值选标题 / 内容分支，不再回读 store
                          （回读会让「当前是哪个栏目」有两个真相源，见 `sections/ai.svelte` 的 `Props.tab`） -->
@@ -319,71 +308,4 @@
     {#if promptEditOpen}
         <AiPromptEditModal open onclose={() => setPromptEditOpen(false)} onsaved={() => setPromptEditOpen(false)} />
     {/if}
-
-    <!-- Key picker（键盘图标 + 手柄键位） -->
-    <Modal open={keyPickerFor !== null} onclose={() => setKeyPickerFor(null)} layer="deep" class="w-[min(92vw,32rem)]">
-        {#snippet title()}
-            <span>选择按键与手柄键位</span>
-        {/snippet}
-        {#if keyPickerFor}
-            <div class="mb-2 flex items-center gap-2 text-[10px] font-medium text-(--theme-modal-text)/60">
-                <Icon icon="mdi:keyboard-outline" class="size-3.5" />
-                键盘
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-                {#each uiBtnIconList as [name, url] (name)}
-                    <button
-                        onclick={() => {
-                            updateEntry(keyPickerFor!, { blockKey: name })
-                            setKeyPickerFor(null)
-                        }}
-                        class="flex size-10 items-center justify-center rounded-none border transition-colors {keyPickerFor &&
-                        entryById(keyPickerFor)?.blockKey === name
-                            ? 'border-(--theme-accent-bg)'
-                            : 'hover:bg-(--theme-modal-text)/10'}"
-                        style="border-color: {keyPickerFor && entryById(keyPickerFor)?.blockKey === name
-                            ? 'var(--theme-accent-bg)'
-                            : 'var(--theme-divider-border)'};"
-                        title={name}
-                    >
-                        <img src={url} alt={name} draggable="false" class="size-6 object-contain pointer-events-none" />
-                    </button>
-                {/each}
-            </div>
-            <div class="my-3 border-t" style="border-color: var(--theme-divider-border);"></div>
-            <div class="mb-2 flex items-center gap-2 text-[10px] font-medium text-(--theme-modal-text)/60">
-                <Icon icon="mdi:gamepad-variant-outline" class="size-3.5" />
-                手柄图标
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-                {#each GAMEPAD_BUTTONS as btn (btn.id)}
-                    <button
-                        onclick={() => {
-                            updateEntry(keyPickerFor!, { blockKey: btn.id })
-                            setKeyPickerFor(null)
-                        }}
-                        class="flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-none border px-2 transition-colors {keyPickerFor &&
-                        entryById(keyPickerFor)?.blockKey === btn.id
-                            ? 'border-(--theme-accent-bg)'
-                            : 'hover:bg-(--theme-modal-text)/10'}"
-                        style="border-color: {keyPickerFor && entryById(keyPickerFor)?.blockKey === btn.id
-                            ? 'var(--theme-accent-bg)'
-                            : 'var(--theme-divider-border)'};"
-                        title={btn.label}
-                    >
-                        {#if btn.icon}
-                            <img
-                                src={btn.icon}
-                                alt={btn.label}
-                                draggable="false"
-                                class="size-5 object-contain pointer-events-none"
-                            />
-                        {:else}
-                            <span class="text-[10px] font-bold text-(--theme-modal-text)/80">{btn.label}</span>
-                        {/if}
-                    </button>
-                {/each}
-            </div>
-        {/if}
-    </Modal>
 {/if}

@@ -15,9 +15,9 @@
     import FieldLabel from '$lib/components/ui/field-label.svelte'
     import SettingRow from '$lib/components/ui/setting-row.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
+    import Button from '$lib/components/ui/button.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
-    import { getMagneticPointer, setMagneticPointer } from '$lib/data/render-prefs.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import { getSimplifyContextMenu, setSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import {
@@ -44,8 +44,11 @@
     import type { ComponentsProps } from '$lib/types'
     import { ROW_TABS, TAB_ACCENT, pair, segBool, segValue } from '../utils'
 
-    interface Props extends ComponentsProps {}
-    let { class: className, style: styleProp }: Props = $props()
+    interface Props extends ComponentsProps {
+        /** @desc 「排轴页按键图标」的编辑按钮：打开独立的按键图标编辑弹窗 */
+        onKeymapEdit?: () => void
+    }
+    let { onKeymapEdit, class: className, style: styleProp }: Props = $props()
 
     /** @desc 卡片表面（与 theme / config / cache 的卡片同规格） */
     const CARD_SURFACE = 'sf-radius rounded-none border'
@@ -85,7 +88,6 @@
     const SIMPLIFY_TOOLBAR_TABS = pair('简化', '完整')
     const SIDEBAR_ACTIONS_TABS = pair('显示', '隐藏')
     const MULTI_ENTRY_TABS = pair('多个', '单个')
-    const MAGNETIC_POINTER_TABS = pair('磁吸', '原生')
     const CONFIRM_DELETES_TABS = pair('二次确认', '直接删除')
     const SIMPLIFY_CONTEXT_MENU_TABS = pair('精简', '完整')
     const LOCK_WATERMARK_TABS = pair('显示', '隐藏')
@@ -198,25 +200,26 @@
                 {...TAB_ACCENT}
             />
         </SettingRow>
-    </div>
-
-    <div class="mt-5">
-        <SectionTitle>
-            <Icon icon="mdi:gesture-tap" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
-            交互效果
-        </SectionTitle>
-        <SettingRow>
+        <SettingRow class="mt-2">
             <div class="min-w-0">
-                <FieldLabel label="磁力光标" hint="鼠标移到按钮等可点击元素上时，光标会框住它并轻微吸附" />
+                <FieldLabel
+                    label="排轴页按键图标"
+                    hint="设置排轴操作块显示的按键图标（键盘或手柄），点「编辑」打开独立编辑窗"
+                />
             </div>
-            <Tabs
-                items={MAGNETIC_POINTER_TABS}
-                value={segValue(getMagneticPointer())}
-                onchange={(v) => setMagneticPointer(segBool(v))}
-                compact
-                class={ROW_TABS}
-                {...TAB_ACCENT}
-            />
+            <Button
+                variant="icon-text"
+                size="none"
+                bare
+                keepDisabled
+                onclick={onKeymapEdit}
+                backgroundImage="color-mix(in srgb, var(--theme-accent-bg) 12%, transparent)"
+                textColor="var(--theme-accent-text)"
+                class="h-7 w-44 shrink-0 justify-center gap-1 text-xs transition-colors"
+            >
+                <Icon icon="mdi:keyboard-outline" class="size-3.5" />
+                编辑
+            </Button>
         </SettingRow>
     </div>
 
