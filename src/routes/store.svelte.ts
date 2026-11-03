@@ -21,7 +21,7 @@
 import { browser } from '$app/environment'
 import { ensureVersion, getWWVersion } from '$lib/api/client-version'
 import { clearCache } from '$lib/api/data-cache'
-import { initToyEnvironmentBridge, isToyMobile, onToyEnter } from '$lib/bilibili-toy/environment.svelte'
+import { initToyEnvironmentBridge, isToyMobile } from '$lib/bilibili-toy/environment.svelte'
 import { initToyProfileBridge } from '$lib/bilibili-toy/profile.svelte'
 import { getCalcState, rebindGlobalBuffs } from '$lib/calc/calculation.store.svelte'
 import { getConfig } from '$lib/calc/config.store.svelte'
@@ -42,11 +42,10 @@ import {
 import { reloadActiveProjectStores } from '$lib/data/project-reload'
 
 export { reloadActiveProjectStores }
-import { setMagneticPointer } from '$lib/data/render-prefs.svelte'
 import { checkShare, refreshShareCooldown } from '$lib/data/share.svelte'
 import { loadShortcuts } from '$lib/data/shortcuts.svelte'
 import { fetchSubstatPlansFromShare } from '$lib/data/substat-library.svelte'
-import { isFirstVisit, isMagneticToySet, markMagneticToySet, markVisited } from '$lib/data/toy-prefs.svelte'
+import { isFirstVisit, markVisited } from '$lib/data/toy-prefs.svelte'
 import { loadWorkshop } from '$lib/data/workshop.svelte'
 import { loadKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
 import { loadKuroPrefs, restoreKuroSession } from '$lib/kuro-app/kuro.svelte'
@@ -114,11 +113,10 @@ export const bootstrapRouteStores = async (): Promise<void> => {
     hideSplash()
     initToyProfileBridge()
     initToyEnvironmentBridge()
-    // 首次进入（任意端）：拉表默认平铺模式；禁用磁力光标；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
+    // 首次进入（任意端）：拉表默认平铺模式；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
     // 静默从工坊同步「标准词条集」（不再弹「同步工坊数据」弹窗；Buff 集不自动同步，由用户自行同步）
     if (isFirstVisit()) {
         setCalcViewMode('spread')
-        setMagneticPointer(false)
         // AI 助手默认隐藏（**持久化**保存：用户可在设置里重新开启）
         void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
         // B 站 Toy 平台首次进入：弹窗关闭按钮默认放左上角（其它平台保持右上角）
@@ -128,15 +126,6 @@ export const bootstrapRouteStores = async (): Promise<void> => {
         void fetchSubstatPlansFromShare()
         markVisited()
     }
-    // 进入 Toy 环境（消息异步到达，每会话首次触发）：
-    // - AI 助手不再按平台强制关闭：Toy 与普通浏览器共用同一份持久化开关
-    // - 首次在 Toy 手机环境进入 → 关闭磁力光标（一次性持久设定）
-    onToyEnter(() => {
-        if (isToyMobile() && !isMagneticToySet()) {
-            setMagneticPointer(false)
-            markMagneticToySet()
-        }
-    })
     // 本地数据不等待上游版本检查：版本端点是网络请求（实测可能十几秒），
     // 一旦放在 await 之后，刷新后会先长时间空列表 —— 工程/按键/快捷键/工坊都先在本地恢复
     loadProjects()

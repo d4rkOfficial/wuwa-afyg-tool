@@ -34,8 +34,7 @@ const EXEMPT = {
     backdrop: new Set(['src/lib/components/layout/modal.svelte']),
     /**
      * ④ 豁免：**无法用 Tailwind 表达的 `<style>`**（AGENTS §3 只说「尽量」用 Tailwind）。
-     * 逐个核对过，三者各有硬理由；其余 6 个文件已迁走（5 个进 layout.css、1 个转 Tailwind，
-     * 其中 magnetic-pointer 的 @keyframes 与 --animate-* 于 T11 迁入 layout.css 的 @theme）。
+     * 逐个核对过，三者各有硬理由；其余 6 个文件已迁走（5 个进 layout.css、1 个转 Tailwind）。
      */
     style: new Set([
         // `{@html}` 注入的 Markdown 内容对 Svelte 作用域不可见，必须 :global 才能匹配（~30 条 .ai-md 规则）
@@ -47,13 +46,12 @@ const EXEMPT = {
     ]),
     /**
      * ⑥ 豁免：**store 驱动的单例** —— 全局只实例化一次、可见性与位置全部来自 store、
-     * 调用处一律无 props（已核查：`<MagneticPointer />`、`<EnemyPanel />`、`<SkillPicker />`、
+     * 调用处一律无 props（已核查：`<EnemyPanel />`、`<SkillPicker />`、
      * `<NonDirectPicker />`、`<DamageList />`、`<ContextMenu />` 均无任何传参）。
      * 给它们加 `class`/`style` 只会造出**无人使用的死 API**，故按 AGENTS §3 的例外处理。
      * 判定标准：全项目实例化处均不传 props 且无合理定制点；新增豁免须在此注明理由。
      */
     noProps: new Set([
-        'src/lib/components/layout/magnetic-pointer.svelte',
         'src/lib/components/page/home/config/enemy-panel.svelte',
         'src/lib/components/page/home/timeline/timeline-menus.svelte',
         'src/lib/components/page/home/timeline/damage-list.svelte',

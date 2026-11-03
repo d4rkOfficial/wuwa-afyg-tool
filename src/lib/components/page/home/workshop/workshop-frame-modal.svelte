@@ -6,7 +6,6 @@
     import { mergeClass } from '$lib/utils/component-style'
     import { getShareBase } from '$lib/data/workshop.svelte'
     import { getDayNightScheme } from '$lib/theme/scheme'
-    import { setMagneticForcedOff } from '$lib/data/render-prefs.svelte'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -30,11 +29,6 @@
 
     /** @desc 工坊 iframe 地址：base + 目标路径（详情页等）+ 白天/黑夜主题 hash */
     let workshopFrameSrc = $derived(`${getShareBase()}${path ?? ''}#theme=${frameTheme}`)
-
-    // 工坊 iframe 弹窗打开时强制恢复系统光标（磁力光标瞬时抑制）
-    $effect(() => {
-        setMagneticForcedOff(open)
-    })
 </script>
 
 <Modal

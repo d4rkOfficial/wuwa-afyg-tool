@@ -13,7 +13,6 @@
     import favicon from '$lib/assets/favicon.svg'
     import Toast from '$lib/components/layout/toast.svelte'
     import HelpPanel from '$lib/components/ui/help-panel.svelte'
-    import MagneticPointer from '$lib/components/layout/magnetic-pointer.svelte'
     import { loadThemes } from '$lib/theme'
     import { registerIcons } from '$lib/utils/icons'
     import { initScrollbarAutoHide } from '$lib/utils/scrollbar-autohide'
@@ -21,7 +20,7 @@
     registerIcons()
 
     let { children } = $props()
-    /** fast-calc 是独立静态页：不加载全站主题、磁力光标、滚动条、WS、HelpPanel 等布局层 */
+    /** fast-calc 是独立静态页：不加载全站主题、滚动条、WS、HelpPanel 等布局层 */
     const isFastCalc = $derived(page.url.pathname === '/fast-calc')
 
     if (browser) {
@@ -72,5 +71,4 @@
 {#if !isFastCalc}
     <Toast />
     <HelpPanel />
-    <MagneticPointer />
 {/if}

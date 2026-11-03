@@ -45,15 +45,6 @@
     /* 落地页版块：错峰上浮淡入 + 图标弹入（自原 welcome-screen 的 <style> 迁入） */
     --animate-card-pop-in: card-pop-in 0.42s var(--ease-out) backwards; /* T18 保留：最近档 slow 260ms 差 160ms（首屏整块上浮，改短明显赶） */
     --animate-icon-pop: icon-pop 0.32s var(--ease-spring) backwards; /* T18 保留：差 60ms；与上面 card-pop-in 的过冲节奏成对 */
-    /* 磁力光标（自 magnetic-pointer.svelte 的 <style> 迁入）：四角旋转 / 吸附晃动 / 准星呼吸。
-       时长与缓动与原 CSS 逐字一致，故后两条沿用关键字 ease-out / ease-in-out，
-       而不是本项目重定义过的 --ease-out（那条曲线更陡，会改变手感）。
-       旋转时长走 var(--mp-spin)：该变量由组件写到 <html> 上（写在被驱动的元素上不生效——
-       自定义属性里的 var() 是在**声明它的元素**上求值的，此处即 :root）。 */
-    --animate-mp-spin: mp-spin var(--mp-spin, 12s) linear infinite;
-    --animate-mp-spin-reverse: mp-spin var(--mp-spin, 12s) linear infinite reverse;
-    --animate-mp-wobble: mp-wobble 0.4s ease-out 1;
-    --animate-mp-breathe: mp-breathe 2.6s ease-in-out infinite;
 
     @keyframes pop-in {
         0% {
@@ -134,47 +125,10 @@
             transform: scale(1);
         }
     }
-    /* 磁力光标：四角旋转（默认模式）/ 吸附晃动（框选新目标，幅度取自 --mp-wobble-amp）/ 准星呼吸 */
-    @keyframes mp-spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-    @keyframes mp-wobble {
-        0% {
-            transform: translate(0, 0);
-        }
-        25% {
-            transform: translate(var(--mp-wobble-amp, 0px), 0);
-        }
-        50% {
-            transform: translate(calc(var(--mp-wobble-amp, 0px) * -0.6), 0);
-        }
-        75% {
-            transform: translate(calc(var(--mp-wobble-amp, 0px) * 0.25), 0);
-        }
-        100% {
-            transform: translate(0, 0);
-        }
-    }
-    @keyframes mp-breathe {
-        0%,
-        100% {
-            transform: scale(1);
-        }
-        50% {
-            transform: scale(1.3);
-        }
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    /* T18 复核：本文件一共声明 12 个 --animate-*（8 个通用 + 4 个 mp-*），这里**刻意只列这 8 个**。
-       剩下 4 个 --animate-mp-*（磁力光标的四角旋转 / 吸附晃动 / 准星呼吸）不进本块，依据是实测的：
-       magnetic-pointer.svelte 的根节点带 Tailwind `motion-reduce:hidden`（:193），且 JS 侧另有
-       `active = enabled && !forcedOff && !coarsePointer && !reducedMotion`（:226）——
-       reduce 下整个指针根本不渲染，动画不可能播放；加进来就是永不命中的死规则。
-       若将来有别的组件复用 animate-mp-*，需同时在此登记（或组件自带 motion-reduce:）。 */
+    /* T18 复核：本文件共声明 8 个 --animate-*，全部在此登记（reduce 下直接关掉动画）。 */
     .animate-pop-in,
     .animate-fade-in,
     .animate-rise-in,
@@ -184,25 +138,6 @@
     .animate-card-pop-in,
     .animate-icon-pop {
         animation: none;
-    }
-}
-
-/* 磁力光标开启时隐藏原生鼠标（input/textarea 由磁力光标的 text 模式接管；减弱动态效果时恢复） */
-html.magnetic-cursor,
-html.magnetic-cursor * {
-    cursor: none !important;
-}
-
-/* number 输入框的上下步进按钮是伪元素，* 选择器不覆盖，需单独隐藏 */
-html.magnetic-cursor input::-webkit-outer-spin-button,
-html.magnetic-cursor input::-webkit-inner-spin-button {
-    cursor: none !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    html.magnetic-cursor,
-    html.magnetic-cursor * {
-        cursor: auto !important;
     }
 }
 
@@ -777,7 +712,7 @@ html.magnetic-cursor input::-webkit-inner-spin-button {
        · `.w-icon`            → 本文件里 `.w-icon { transition: filter … }` 那条（T16 §6c 点名）
        · `aside[data-sf='sidebar']` → project-sidebar.svelte:227-233 的宽度补间（全项目 data-sf="sidebar" 仅此一处）
        · `.simplified-toolbar` → toolbar.svelte:182-201 的位移/缩放/宽度（该 class 只在简化态存在，
-                                 也正是内联过渡存在的那一态；它已是跨模块钩子，见 magnetic-pointer.utils.ts:24） */
+                                 也正是内联过渡存在的那一态；它已是跨模块钩子） */
     .w-icon,
     aside[data-sf='sidebar'],
     .simplified-toolbar {

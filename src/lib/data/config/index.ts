@@ -143,7 +143,6 @@ const CONFIG_ENTRY_SPEC: Record<ConfigGroup, ConfigEntrySpec[]> = {
         { key: 'wuwa-afyg:render-prefs', store: 'local', label: 'GPU 合成加速' },
         { key: 'wuwa-afyg:render-prefs:reload-result', store: 'local', label: '刷新结果重载数据' },
         { key: 'wuwa-afyg:render-prefs:reload-profile', store: 'local', label: '链阶变动重载数据' },
-        { key: 'wuwa-afyg:render-prefs:magnetic', store: 'local', label: '磁力光标' },
         { key: 'wuwa-afyg:data-provider', store: 'local', label: '当前数据源' },
         { key: 'workshop', store: 'idb', label: '工坊地址' }
     ],

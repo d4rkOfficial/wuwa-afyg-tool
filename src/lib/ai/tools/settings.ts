@@ -30,9 +30,7 @@ import {
     getReloadOnResultRefresh,
     setGpuAccel,
     setReloadOnProfileChange,
-    setReloadOnResultRefresh,
-    setMagneticPointer,
-    getMagneticPointer
+    setReloadOnResultRefresh
 } from '$lib/data/render-prefs.svelte'
 import {
     addWorkshop,
@@ -266,14 +264,6 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
             return b
         }
     },
-    magnetic_pointer: {
-        label: '磁力光标',
-        apply: async (v) => {
-            const b = toBool(v, 'magnetic_pointer')
-            setMagneticPointer(b)
-            return b
-        }
-    },
     simplify_context_menu: {
         label: '简化右键菜单',
         apply: async (v) => {
@@ -451,15 +441,6 @@ const KEY_APPLYERS: Record<string, { label: string; apply: (v: unknown) => Promi
     }
 }
 
-/** 已固定不可调的参数 key：set_setting 调用静默忽略（不报错） */
-const FIXED_SETTING_KEYS = new Set([
-    'magnetic_follow',
-    'magnetic_sensitivity',
-    'magnetic_spin',
-    'magnetic_wobble',
-    'magnetic_border'
-])
-
 /** 已知但禁止修改的 key → 设置面板位置提示 */
 const DENIED_HINTS: Record<string, string> = {
     theme_add: '外观主题（自定义主题需手动创建）',
@@ -493,7 +474,6 @@ defineTool('get_settings_state', {
                 calcView: getCalcViewMode(),
                 simplifyToolbar: getSimplifyToolbar(),
                 simplifyContextMenu: getSimplifyContextMenu(),
-                magneticPointer: getMagneticPointer(),
                 confirmDeletes: getConfirmDeletes(),
                 sidebarActions: getSidebarActions(),
                 modalClosePosition: getModalClosePosition(),
@@ -566,7 +546,7 @@ defineTool('get_settings_state', {
  */
 defineTool('set_setting', {
     description:
-        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-200全黑~0原图~200极白, mode?:"light"|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存；card=卡片（卡片类容器：声骸/套装/方案卡、结果页伤害行、下拉拉表与平铺拉表的行与单元格）；modal=弹窗（所有弹窗外壳（设置、工坊、各类 picker、确认框）的面板本体）；sidebar=侧边栏（工程列表侧边栏，含其顶部标题栏与列表项）；content=主内容区（欢迎页、队伍配置、排轴、拉表、词条/环境配置、结果页各自的主内容区底色）；toolbar=工具栏（顶部工具栏、底部工具栏、底部悬浮工具栏、阶段页签栏）；widget=小部件（小控件，可出现在任意容器内部（故与上面五项正交）：卡片式小块及其行/格、图标按钮、picker 卡、声骸槽卡、词条卡、操作块、属性/抗性输入框等。成片逐行/逐格元素请叠加 data-sf-flat，避免每个元素都重算一次背景模糊。注：开关与滑块用语义色、下拉与菜单项走 --theme-context-menu-* 组件命名空间，均不归本区域）)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。',
+        '修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-200全黑~0原图~200极白, mode?:"light"|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card|modal|sidebar|content|toolbar|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"|"dark"}，按昼夜分别保存；card=卡片（卡片类容器：声骸/套装/方案卡、结果页伤害行、下拉拉表与平铺拉表的行与单元格）；modal=弹窗（所有弹窗外壳（设置、工坊、各类 picker、确认框）的面板本体）；sidebar=侧边栏（工程列表侧边栏，含其顶部标题栏与列表项）；content=主内容区（欢迎页、队伍配置、排轴、拉表、词条/环境配置、结果页各自的主内容区底色）；toolbar=工具栏（顶部工具栏、底部工具栏、底部悬浮工具栏、阶段页签栏）；widget=小部件（小控件，可出现在任意容器内部（故与上面五项正交）：卡片式小块及其行/格、图标按钮、picker 卡、声骸槽卡、词条卡、操作块、属性/抗性输入框等。成片逐行/逐格元素请叠加 data-sf-flat，避免每个元素都重算一次背景模糊。注：开关与滑块用语义色、下拉与菜单项走 --theme-context-menu-* 组件命名空间，均不归本区域）)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。',
     parameters: {
         type: 'object',
         properties: {
@@ -577,10 +557,6 @@ defineTool('set_setting', {
     },
     handler: async (args) => {
         const key = str(args.key)
-        // 磁力光标参数已固定（跟手性/旋转/灵敏度/描边/晃动）：调用静默忽略，不报错
-        if (FIXED_SETTING_KEYS.has(key)) {
-            return { key, ignored: true, message: '该设置已固定，无法修改' }
-        }
         const def = KEY_APPLYERS[key]
         if (!def) {
             // 已知被禁止的设置 → 给出具体位置；未知 key → 通用提示

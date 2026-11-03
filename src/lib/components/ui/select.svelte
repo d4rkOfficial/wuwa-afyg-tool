@@ -42,7 +42,7 @@
     /**
      * @desc 减弱动态效果跟随系统设置。
      * `layout.css` 的 `prefers-reduced-motion` 只关 CSS 动画/keyframes，管不到 JS 过渡，
-     * 故按仓库既有做法（`magnetic-pointer.svelte` / `ai-context-panel.svelte`）在这里自行判定。
+     * 故按仓库既有做法（`ai-context-panel.svelte`）在这里自行判定。
      */
     let reducedMotion = $state(false)
 

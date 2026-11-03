@@ -26,7 +26,7 @@
 - 大的布局结构 → 独立组件
 - 所有独立组件的 props 必须使用 `interface Props extends ComponentsProps {}` 声明（`ComponentsProps` 在 `$lib/types`）
 - 所有独立组件必须暴露 `style` 和 `class` prop，支持外部定制，参考`src/lib/types/component-props.ts`
-    - **例外：store 驱动单例**。全局只实例化一次、可见性与位置全部来自 store、调用处一律不传 props 的组件（如 `MagneticPointer`、`EnemyPanel`、`timeline-menus`、`SkillPicker`、`NonDirectPicker`、`DamageList`），加 `class`/`style` 只会造出无人使用的死 API，故豁免。新增豁免须在 `scripts/check-components.mjs` 的 `EXEMPT.noProps` 登记并注明理由
+    - **例外：store 驱动单例**。全局只实例化一次、可见性与位置全部来自 store、调用处一律不传 props 的组件（如 `EnemyPanel`、`timeline-menus`、`SkillPicker`、`NonDirectPicker`、`DamageList`），加 `class`/`style` 只会造出无人使用的死 API，故豁免。新增豁免须在 `scripts/check-components.mjs` 的 `EXEMPT.noProps` 登记并注明理由
 - 事件 handler prop 的命名约定（实测：单词型全小写 98 处 vs camelCase 23 处）：
     - **单词 → 全小写**：`onclose`、`onchange`、`onpick`、`onsaved`、`refresh`→`onrefresh`
     - **多词 → camelCase**：`onCreateBuff`、`onCharDetail`、`onToggleSidebarWidth`

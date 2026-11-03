@@ -699,7 +699,6 @@ function buildDoc() {
     lines.push('')
     lines.push('- 自定义主题的创建 / 删除（设置 → 外观主题；仅支持明暗切换与主色调）')
     lines.push('- 背景图本地文件上传（AI 仅可设置远程 URL / data:image 数据 / 清除）')
-    lines.push('- 磁力光标的跟手性 / 灵敏度 / 旋转 / 描边 / 晃动参数（已固定，调用静默忽略）')
     lines.push('')
     lines.push('以下设置虽不可直接用 `set_setting`，但有专用工具，**可以**由 AI/WS 修改：')
     lines.push('')
