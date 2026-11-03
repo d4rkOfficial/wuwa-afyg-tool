@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **159** 个工具。
+> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **161** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
@@ -18,6 +18,7 @@ AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注
 - `delete_buff_conf`
 - `remove_buff_conf_zone`
 - `remove_substat`
+- `kuro_login_with_token`
 - `kuro_logout`
 - `archive_project`
 - `delete_project`
@@ -579,6 +580,22 @@ _无参数_
 
 _无参数_
 
+### `kuro_login_with_token`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+用库街区 token 登录（用户在库街区 App / H5 里复制的登录凭据；可整段粘贴，服务端会自动提取 token 值）。
+
+| 参数    | 必填   | 类型   | 说明                                                         |
+| ------- | ------ | ------ | ------------------------------------------------------------ |
+| `token` | **是** | string | 库街区 token（可整段粘贴，含 token= 或 JSON 片段会自动提取） |
+
+### `kuro_export_token`
+
+导出当前库街区登录的 token（服务端从 httpOnly cookie 读回，即设置里的「导出 Token」）。
+
+_无参数_
+
 ### `kuro_logout`
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
@@ -591,13 +608,13 @@ _无参数_
 
 ### `get_panels_state`
 
-查看当前所有弹窗面板的开关状态（工程 Buff 配置/速查/主页 Buff 集/设置/工坊/角色详情配置/从 Buff 集导入工程 Buff 配置等）。
+查看当前所有弹窗面板的开关状态（工程 Buff 配置/速查/主页 Buff 集/设置/配置同步/排轴页按键图标/工坊/角色详情配置/从 Buff 集导入工程 Buff 配置等）。
 
 _无参数_
 
 ### `open_panel`
 
-打开或关闭指定弹窗面板：buff-set=主页 Buff 集（打开时先返回主页）；buff-conf=当前工程拉表的工程 Buff 配置；buff-conf-import=从 Buff 集导入工程 Buff 配置。两者是不同入口，用户说“打开 Buff 集”时用 buff-set，含义不清时先用 ask_user 确认。其它 panel 取 get_panels_state 返回的 name（quick-lookup/substat-library/settings/workshop/character-detail/damage-list 等）；open 默认 true。
+打开或关闭指定弹窗面板：buff-set=主页 Buff 集（打开时先返回主页）；buff-conf=当前工程拉表的工程 Buff 配置；buff-conf-import=从 Buff 集导入工程 Buff 配置。两者是不同入口，用户说“打开 Buff 集”时用 buff-set，含义不清时先用 ask_user 确认。其它 panel 取 get_panels_state 返回的 name（quick-lookup/substat-library/settings/config-sync/keymap-editor/workshop/character-detail/damage-list 等）；open 默认 true。
 
 | 参数    | 必填   | 类型    | 说明                                                                                                          |
 | ------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------- |
@@ -760,7 +777,7 @@ _无参数_
 
 ### `set_setting`
 
-修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-200全黑~~0原图~~200极白, mode?:"light"\|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card\|modal\|sidebar\|content\|toolbar\|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"\|"dark"}，按昼夜分别保存；card=卡片（卡片类容器：声骸/套装/方案卡、结果页伤害行、下拉拉表与平铺拉表的行与单元格）；modal=弹窗（所有弹窗外壳（设置、工坊、各类 picker、确认框）的面板本体）；sidebar=侧边栏（工程列表侧边栏，含其顶部标题栏与列表项）；content=主内容区（欢迎页、队伍配置、排轴、拉表、词条/环境配置、结果页各自的主内容区底色）；toolbar=工具栏（顶部工具栏、底部工具栏、底部悬浮工具栏、阶段页签栏）；widget=小部件（小控件，可出现在任意容器内部（故与上面五项正交）：卡片式小块及其行/格、图标按钮、picker 卡、声骸槽卡、词条卡、操作块、属性/抗性输入框等。成片逐行/逐格元素请叠加 data-sf-flat，避免每个元素都重算一次背景模糊。注：开关与滑块用语义色、下拉与菜单项走 --theme-context-menu-* 组件命名空间，均不归本区域）)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、magnetic_pointer、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。
+修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-200全黑~~0原图~~200极白, mode?:"light"\|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card\|modal\|sidebar\|content\|toolbar\|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"\|"dark"}，按昼夜分别保存；card=卡片（卡片类容器：声骸/套装/方案卡、结果页伤害行、下拉拉表与平铺拉表的行与单元格）；modal=弹窗（所有弹窗外壳（设置、工坊、各类 picker、确认框）的面板本体）；sidebar=侧边栏（工程列表侧边栏，含其顶部标题栏与列表项）；content=主内容区（欢迎页、队伍配置、排轴、拉表、词条/环境配置、结果页各自的主内容区底色）；toolbar=工具栏（顶部工具栏、底部工具栏、底部悬浮工具栏、阶段页签栏）；widget=小部件（小控件，可出现在任意容器内部（故与上面五项正交）：卡片式小块及其行/格、图标按钮、picker 卡、声骸槽卡、词条卡、操作块、属性/抗性输入框等。成片逐行/逐格元素请叠加 data-sf-flat，避免每个元素都重算一次背景模糊。注：开关与滑块用语义色、下拉与菜单项走 --theme-context-menu-* 组件命名空间，均不归本区域）)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。
 
 | 参数    | 必填   | 类型                      | 说明                           |
 | ------- | ------ | ------------------------- | ------------------------------ |
@@ -1476,7 +1493,6 @@ _无参数_
 
 - 自定义主题的创建 / 删除（设置 → 外观主题；仅支持明暗切换与主色调）
 - 背景图本地文件上传（AI 仅可设置远程 URL / data:image 数据 / 清除）
-- 磁力光标的跟手性 / 灵敏度 / 旋转 / 描边 / 晃动参数（已固定，调用静默忽略）
 
 以下设置虽不可直接用 `set_setting`，但有专用工具，**可以**由 AI/WS 修改：
 
