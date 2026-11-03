@@ -3,7 +3,7 @@
      * @desc 配置同步（独立弹窗）：由原「设置 → 配置导入导出」栏目升级而来，入口在设置弹窗标题栏。
      *
      * 与旧版面（纵向堆叠：范围 → 导出 → 导入）的区别，也是「更高效」的落点：
-     *   - 左栏只放**传输范围**：大类 / 分组两级，逐条选择收进分组内的紧凑 chip，默认不展开长列表；
+     *   - 左栏只放**勾选范围**：大类 / 分组 / 逐条全部展开为统一列表行，整行可点，选中态用半透明底色 + 右侧对勾表达；
      *   - 右栏一次只做一件事：`导出配置` / `导入配置` 分段切换，两者不再同时占滚动空间；
      *   - 导出侧把「文件名 / 版本 / 已选条数 / 两类占比」压成一张摘要行，主按钮紧邻其下；
      *   - 导入侧改为**拖放区 → 方式卡片 → 分组级预览 chip** 三步，仍保留「确认前不写任何配置」。
@@ -13,8 +13,6 @@
     import Modal from '$lib/components/layout/modal.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
     import Button from '$lib/components/ui/button.svelte'
-    import { slide } from 'svelte/transition'
-    import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         CONFIG_CATEGORIES,
@@ -28,10 +26,8 @@
         importConfig,
         listConfigEntries,
         parseConfigFile,
-        readConfigEntry,
         summarizeConfig,
         sumCountsByCategory,
-        writeConfigEntry,
         type ConfigGroup,
         type ParsedConfig
     } from '$lib/data/config'
@@ -39,19 +35,15 @@
     import type { ComponentsProps } from '$lib/types'
     import {
         IMPORT_MODES,
-        SCOPE_PRESETS,
         areAllSelected,
         countExportedEntries,
         countSelected,
         exportFileName,
-        isPartiallySelected,
-        keysOfPreset,
         parseImportMode,
         selectedCountOfCategory,
         withKeyToggled,
         withKeysSelected,
-        type ImportMode,
-        type ScopePreset
+        type ImportMode
     } from './config-sync.utils'
     import { TAB_ACCENT } from './utils'
 
@@ -69,6 +61,20 @@
     const CARD_STYLE = 'border-color: var(--theme-divider-border); background: var(--theme-input-bg);'
     const CHECKBOX = 'size-4 shrink-0 accent-(--theme-accent-bg)'
     const ACTIVE_SURFACE = 'background: color-mix(in srgb, var(--theme-accent-bg) 8%, transparent);'
+    /** @desc 侧栏统一的列表行：整行可点，勾选态只靠半透明底色 + 右侧对勾表达 */
+    const SCOPE_ROW =
+        'flex w-full items-center gap-2 sf-radius px-2 py-1.5 text-left transition-colors hover:bg-(--theme-modal-text)/5'
+    const CATEGORY_ICONS: Record<string, string> = {
+        settings: 'mdi:cog-outline',
+        libraries: 'mdi:database-outline'
+    }
+    const GROUP_ICONS: Record<ConfigGroup, string> = {
+        appearance: 'mdi:palette-outline',
+        interaction: 'mdi:gesture-tap',
+        data: 'mdi:database-outline',
+        assistant: 'mdi:robot-outline',
+        library: 'mdi:layers-outline'
+    }
 
     /** @desc 全部登记项与「分组 → 条目」静态索引（模板里不再反复 filter） */
     const ALL_ENTRIES = listConfigEntries()
@@ -96,9 +102,6 @@
     let pendingFileName = $state('')
     let importError = $state<string | null>(null)
     let dragActive = $state(false)
-    /** @desc 当前展开逐条 chip 的分组（同时缓存该组「哪些条目已保存」，懒读一次） */
-    let expandedGroup = $state<ConfigGroup | null>(null)
-    let savedKeys = $state<Set<string>>(new Set())
 
     const refreshCounts = async () => {
         counts = await countConfigEntriesByGroup()
@@ -148,10 +151,6 @@
         selectedKeys = withKeysSelected(selectedKeys, keys, !areAllSelected(keys, selectedKeys))
     }
 
-    const applyPreset = (preset: ScopePreset) => {
-        selectedKeys = new Set(keysOfPreset(preset))
-    }
-
     const pickMode = (value: string) => {
         if (value === 'export' || value === 'import') mode = value
     }
@@ -159,35 +158,6 @@
     const pickImportMode = (value: string) => {
         const next = parseImportMode(value)
         if (next) importMode = next
-    }
-
-    /** @desc 复选框三态：`indeterminate` 只能写 DOM 属性，用 action 而不是 `bind:` */
-    const triState = (node: HTMLInputElement, value: boolean) => {
-        node.indeterminate = value
-        return { update: (next: boolean) => (node.indeterminate = next) }
-    }
-
-    /** @desc 展开分组：懒读一次该组「哪些条目当前有值」（用于 chip 上的已保存圆点） */
-    const toggleGroupDetail = async (group: ConfigGroup) => {
-        if (expandedGroup === group) {
-            expandedGroup = null
-            return
-        }
-        const saved = new Set<string>()
-        for (const entry of ENTRIES_BY_GROUP.get(group) ?? []) {
-            if ((await readConfigEntry(entry)) !== undefined) saved.add(entry.key)
-        }
-        savedKeys = saved
-        expandedGroup = group
-    }
-
-    /** @desc 清空某分组的全部配置项（回到默认） */
-    const resetGroup = async (group: ConfigGroup) => {
-        for (const entry of ENTRIES_BY_GROUP.get(group) ?? []) await writeConfigEntry(entry, undefined)
-        await refreshCounts()
-        savedKeys = new Set()
-        expandedGroup = null
-        addToast(`已重置「${CONFIG_GROUPS.find((g) => g.id === group)?.label}」，刷新后生效`, 'info')
     }
 
     const handleExport = async () => {
@@ -255,7 +225,6 @@
         try {
             const result = await importConfig(pending, { mode: importMode, keys: [...selectedKeys] })
             await refreshCounts()
-            savedKeys = new Set()
             addToast(
                 `已导入 ${result.applied} 条配置${
                     result.unknownKeys.length ? `（忽略未登记项 ${result.unknownKeys.length} 个）` : ''
@@ -284,125 +253,98 @@
     {/snippet}
 
     <div class="flex h-full min-h-0">
-        <!-- ── 左：传输范围（大类 / 分组 / 逐条 chip）── -->
+        <!-- ── 左：勾选范围（大类 / 分组 / 逐条）── -->
         <aside
             class="flex w-72 shrink-0 flex-col border-r"
             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
         >
-            <div class="flex items-baseline justify-between gap-2 px-4 pt-4 pb-2">
-                <span class="text-[10px] font-black tracking-[0.25em] text-(--theme-muted-text)">传输范围</span>
-                <span class="shrink-0 text-[10px] tabular-nums text-(--theme-modal-text)/45">
-                    {selectedTotal}/{ALL_ENTRIES.length}
-                </span>
-            </div>
-            <div class="flex flex-wrap gap-1 px-4 pb-3">
-                {#each SCOPE_PRESETS as preset (preset.value)}
-                    <button
-                        type="button"
-                        onclick={() => applyPreset(preset.value)}
-                        class="rounded-none border px-1.5 py-0.5 text-[10px] text-(--theme-modal-text)/55 transition-colors hover:border-(--theme-accent-bg) hover:text-(--theme-modal-text)"
-                        style="border-color: var(--theme-divider-border);"
-                    >
-                        {preset.label}
-                    </button>
-                {/each}
-            </div>
-
-            <div class="theme-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+            <div class="theme-scrollbar flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pt-3 pb-4">
                 {#each CONFIG_CATEGORIES as cat (cat.id)}
                     {@const categoryKeys = configKeysOfCategory(cat.id)}
-                    <div class="mt-2">
-                        <div class="flex items-center gap-2 px-2 py-1">
-                            <input
-                                type="checkbox"
-                                use:triState={isPartiallySelected(categoryKeys, selectedKeys)}
-                                checked={areAllSelected(categoryKeys, selectedKeys)}
-                                onchange={() => toggleKeys(categoryKeys)}
-                                class={CHECKBOX}
+                    {@const categorySelected = countSelected(categoryKeys, selectedKeys)}
+                    <div class="flex flex-col gap-1">
+                        <button
+                            type="button"
+                            onclick={() => toggleKeys(categoryKeys)}
+                            class={SCOPE_ROW}
+                            style={categorySelected > 0 ? ACTIVE_SURFACE : ''}
+                        >
+                            <Icon
+                                icon={CATEGORY_ICONS[cat.id]}
+                                class="size-3.5 shrink-0 text-(--theme-modal-text)/55"
                             />
-                            <button
-                                type="button"
-                                onclick={() => toggleKeys(categoryKeys)}
-                                class="min-w-0 flex-1 truncate text-left text-xs font-black tracking-tight"
-                            >
-                                {cat.label}
-                            </button>
+                            <span class="min-w-0 flex-1 truncate text-xs font-black tracking-tight">{cat.label}</span>
                             <span class="shrink-0 text-[10px] tabular-nums text-(--theme-modal-text)/40">
-                                {countSelected(categoryKeys, selectedKeys)}/{categoryKeys.length}
+                                {categorySelected}/{categoryKeys.length}
                             </span>
-                        </div>
+                            {#if areAllSelected(categoryKeys, selectedKeys)}
+                                <Icon
+                                    icon="mdi:check"
+                                    class="size-3.5 shrink-0"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                            {/if}
+                        </button>
 
                         {#each groupsOfCategory(cat.id) as g (g.id)}
                             {@const groupKeys = configKeysOfGroup(g.id)}
-                            <div class="ml-5 border-l pl-2" style="border-color: var(--theme-divider-border);">
-                                <div
-                                    class="flex items-center gap-2 rounded-none px-1 py-1 hover:bg-(--theme-modal-text)/5"
+                            {@const groupSelected = selectedCountOfGroup(g.id)}
+                            <div class="ml-2 flex flex-col gap-1">
+                                <button
+                                    type="button"
+                                    onclick={() => toggleKeys(groupKeys)}
+                                    class={SCOPE_ROW}
+                                    style={groupSelected > 0 ? ACTIVE_SURFACE : ''}
+                                    title={`${g.desc} · 已存 ${counts[g.id]} 条`}
                                 >
-                                    <input
-                                        type="checkbox"
-                                        use:triState={isPartiallySelected(groupKeys, selectedKeys)}
-                                        checked={areAllSelected(groupKeys, selectedKeys)}
-                                        onchange={() => toggleKeys(groupKeys)}
-                                        class={CHECKBOX}
+                                    <Icon
+                                        icon={GROUP_ICONS[g.id]}
+                                        class="size-3.5 shrink-0 text-(--theme-modal-text)/45"
                                     />
-                                    <button
-                                        type="button"
-                                        onclick={() => toggleGroupDetail(g.id)}
-                                        class="flex min-w-0 flex-1 items-center gap-1 text-left text-xs text-(--theme-modal-text)/75 transition-colors hover:text-(--theme-modal-text)"
-                                        title={`${g.desc}（点击${expandedGroup === g.id ? '收起' : '展开'}逐条）`}
-                                    >
-                                        <span class="truncate">{g.label}</span>
-                                        <Icon
-                                            icon={expandedGroup === g.id ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-                                            class="size-3.5 shrink-0 text-(--theme-modal-text)/30"
-                                        />
-                                    </button>
-                                    <span class="shrink-0 text-[10px] tabular-nums text-(--theme-modal-text)/35">
-                                        {selectedCountOfGroup(g.id)}/{groupKeys.length}
-                                        · 已存 {counts[g.id]}
+                                    <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)/80">
+                                        {g.label}
                                     </span>
-                                </div>
+                                    <span class="shrink-0 text-[10px] tabular-nums text-(--theme-modal-text)/35">
+                                        {groupSelected}/{groupKeys.length}
+                                    </span>
+                                    {#if areAllSelected(groupKeys, selectedKeys)}
+                                        <Icon
+                                            icon="mdi:check"
+                                            class="size-3.5 shrink-0"
+                                            style="color: var(--theme-accent-text);"
+                                        />
+                                    {/if}
+                                </button>
 
-                                {#if expandedGroup === g.id}
-                                    <div
-                                        transition:slide|local={slideParams(MOTION_MS.base)}
-                                        class="flex flex-wrap items-center gap-1 px-1 pt-1 pb-2"
-                                    >
-                                        {#each ENTRIES_BY_GROUP.get(g.id) ?? [] as entry (entry.key)}
-                                            <button
-                                                type="button"
-                                                onclick={() => (selectedKeys = withKeyToggled(selectedKeys, entry.key))}
-                                                class={mergeClass([
-                                                    'flex max-w-full items-center gap-1 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors',
-                                                    selectedKeys.has(entry.key)
-                                                        ? 'border-(--theme-accent-bg)/45 text-(--theme-modal-text)/80'
-                                                        : 'border-(--theme-divider-border) text-(--theme-modal-text)/35 hover:text-(--theme-modal-text)/60'
-                                                ])}
-                                                style={selectedKeys.has(entry.key) ? ACTIVE_SURFACE : ''}
-                                                title={`${entry.key}${savedKeys.has(entry.key) ? ' · 已保存' : ''}`}
-                                            >
-                                                {#if selectedKeys.has(entry.key)}
-                                                    <Icon icon="mdi:check" class="size-3 shrink-0" />
-                                                {/if}
-                                                <span class="truncate">{entry.label}</span>
-                                                {#if savedKeys.has(entry.key)}
-                                                    <span
-                                                        class="size-1 shrink-0 rounded-full"
-                                                        style="background: var(--theme-accent-bg);"
-                                                    ></span>
-                                                {/if}
-                                            </button>
-                                        {/each}
+                                <div class="ml-4 flex flex-col gap-1">
+                                    {#each ENTRIES_BY_GROUP.get(g.id) ?? [] as entry (entry.key)}
                                         <button
                                             type="button"
-                                            onclick={() => resetGroup(g.id)}
-                                            class="ml-auto text-[10px] text-(--theme-modal-text)/30 transition-colors hover:text-red-400"
-                                            title="清空该分组的全部配置项（回到默认）"
+                                            onclick={() => (selectedKeys = withKeyToggled(selectedKeys, entry.key))}
+                                            class={SCOPE_ROW}
+                                            style={selectedKeys.has(entry.key) ? ACTIVE_SURFACE : ''}
+                                            title={entry.key}
                                         >
-                                            重置本组
+                                            <span
+                                                class="flex size-4 shrink-0 items-center justify-center border text-[9px] font-black text-(--theme-modal-text)/55"
+                                                style="border-color: var(--theme-divider-border);"
+                                                aria-hidden="true"
+                                            >
+                                                {entry.label.charAt(0)}
+                                            </span>
+                                            <span class="min-w-0 flex-1 truncate text-xs text-(--theme-modal-text)/70">
+                                                {entry.label}
+                                            </span>
+                                            {#if selectedKeys.has(entry.key)}
+                                                <Icon
+                                                    icon="mdi:check"
+                                                    class="size-3.5 shrink-0"
+                                                    style="color: var(--theme-accent-text);"
+                                                />
+                                            {/if}
                                         </button>
-                                    </div>
-                                {/if}
+                                    {/each}
+                                </div>
                             </div>
                         {/each}
                     </div>
@@ -672,16 +614,4 @@
             </div>
         </section>
     </div>
-
-    {#snippet footer()}
-        <div
-            class="flex items-center justify-between gap-3 border-t px-6 py-3"
-            style="border-color: var(--theme-divider-border);"
-        >
-            <span class="min-w-0 truncate text-[10px] text-(--theme-modal-text)/40">
-                已勾选 {selectedTotal}/{ALL_ENTRIES.length} 条 · 导入完成后建议刷新页面，让各 store 重新读取配置
-            </span>
-            <Button variant="text" size="none" bare keepDisabled onclick={onclose} class={ACTION_BTN}>关闭</Button>
-        </div>
-    {/snippet}
 </Modal>
