@@ -2,6 +2,13 @@
 export const ELEMENTS = ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭'] as const
 export type Element = (typeof ELEMENTS)[number]
 
+/** @desc 角色共鸣链上限（0 = 未点共鸣链 / 角色本体） */
+export const CHAIN_MAX = 6
+/** @desc 武器精炼上限（0 = 无专武精炼） */
+export const REFINE_MAX = 5
+/** @desc 每个角色的声骸槽位数 */
+export const ECHO_SLOT_COUNT = 5
+
 export const ELEMENT_MAP: Record<number, string> = {
     1: '冷凝',
     2: '热熔',

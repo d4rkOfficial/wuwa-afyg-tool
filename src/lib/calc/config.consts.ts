@@ -18,16 +18,17 @@ function emptyChar(): CharEchoConfig {
     return { echoes: [emptySlot(), emptySlot(), emptySlot(), emptySlot(), emptySlot()] }
 }
 
-export function defaultEnemy(): EnemyConfig {
-    return {
-        type: '精英怪',
-        level: 90,
-        defense: 792 + 8 * 90,
-        defenseLocked: false,
-        resistances: Object.fromEntries(RESISTANCE_KEYS.map((k) => [k, 0])),
-        dmgReduction: 0
-    }
-}
+/** @desc 敌人防御随等级的同源公式（工具箱敌人面板与 fast-calc 共用） */
+export const enemyDefenseForLevel = (level: number): number => 792 + 8 * level
+
+export const defaultEnemy = (): EnemyConfig => ({
+    type: '精英怪',
+    level: 90,
+    defense: enemyDefenseForLevel(90),
+    defenseLocked: false,
+    resistances: Object.fromEntries(RESISTANCE_KEYS.map((k) => [k, 0])),
+    dmgReduction: 0
+})
 
 export function defaultConfig(): ConfigState {
     return {

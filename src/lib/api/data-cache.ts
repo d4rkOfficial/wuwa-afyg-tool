@@ -28,9 +28,18 @@ function providerScope(): string {
     return id === DEFAULT_PROVIDER ? '' : `${id}/`
 }
 
+/** @desc 数据接口基址：空 = 同源（默认）；fast-calc 在静态/跨域 iframe 里可指到工具箱主站 */
+let apiBase = ''
+
+export const setApiBase = (base: string): void => {
+    apiBase = base.trim().replace(/\/+$/, '')
+}
+
+export const getApiBase = (): string => apiBase
+
 /** 在本地 API 路径后附加 ?provider= 查询参数（仅非默认上游时）。 */
 function withProviderUrl(path: string): string {
-    return path + providerQuery()
+    return apiBase + path + providerQuery()
 }
 
 const memoryCache = new Map<string, unknown>()

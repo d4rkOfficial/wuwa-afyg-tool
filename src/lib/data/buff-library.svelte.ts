@@ -4,13 +4,13 @@ import { getShareBase } from './workshop.svelte'
 import { ZONE_MAP, ZONE_NO_REF_IDS, resolveZoneId } from '$lib/calc/calculation.consts'
 import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$lib/calc/condition'
 import type { BuffCondition } from '$lib/calc/calculation.types'
+import { CHAIN_MAX, REFINE_MAX } from '$lib/consts/game-terms'
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
 
 export type BuffLibraryScope = 'self' | 'self_except' | 'team' | 'effect_only'
 
-export const CHAIN_MAX = 6
-export const REFINE_MAX = 5
+export { CHAIN_MAX, REFINE_MAX }
 
 /**
  * @desc 归一化实例级条件（链/阶硬门槛）：

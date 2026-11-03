@@ -1,6 +1,6 @@
 <script lang="ts">
     import { getConfig, updateEnemy, updateResistance } from '$lib/calc/config.store.svelte'
-    import { RESISTANCE_KEYS } from '$lib/calc/config.consts'
+    import { enemyDefenseForLevel, RESISTANCE_KEYS } from '$lib/calc/config.consts'
     import { getElementIcons } from '$lib/api/data-cache'
     import Icon from '@iconify/svelte'
 
@@ -14,7 +14,7 @@
     })
 
     function computeDefense(lv: number): number {
-        return 792 + 8 * lv
+        return enemyDefenseForLevel(lv)
     }
 
     function handleTypeChange(type: 'BOSS' | '精英怪' | '小怪') {

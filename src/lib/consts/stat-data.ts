@@ -19,6 +19,9 @@ export interface SubstatOption {
     unit: string
 }
 
+/** @desc 单个声骸最多可填写的副词条条数 */
+export const SUBSTAT_MAX = 5
+
 export const SUBSTAT_LABELS = [
     '生命',
     '攻击',
