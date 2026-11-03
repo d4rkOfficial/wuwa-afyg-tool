@@ -3,7 +3,9 @@ import { clearKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
 
 /**
  * @desc 库街区（实验性）同步：前端只调用应用自身的服务端路由 `/api/kuro-app/*`，
- *  由服务端去请求库街区 APP 端接口（避免浏览器直连的 CORS 问题），token 存 httpOnly cookie、不下发浏览器。
+ *  由服务端去请求库街区 APP 端接口（避免浏览器直连的 CORS 问题），token 存 httpOnly cookie、不下发浏览器；
+ *  唯一例外是用户主动「导出 Token」（`/api/kuro-app/token`）——那是一次显式的凭据导出，仅写入输入框/剪贴板。
+ *  登录支持短信验证码与直接粘贴 token 两种方式。
  *  所有调用失败只返回错误信息，不抛异常，由 UI 决定如何提示。
  */
 
@@ -200,6 +202,31 @@ export async function kuroVerifyLogin(phone: string, code: string): Promise<void
     _reason = null
     setLoggedMark(true)
     settleLoginWaiters(true)
+}
+
+/**
+ * @desc Token 登录：粘贴库街区 token（App/H5 里复制）即可登录，免短信验证码。
+ *  服务端会先向上游校验 token，无效则抛错且不会覆盖已有登录态。
+ */
+export async function kuroLoginWithToken(token: string): Promise<void> {
+    const res = await call<{ session: KuroSessionInfo }>('/login/token', {
+        method: 'POST',
+        body: { token },
+        timeout: 40000
+    })
+    _session = res.session ?? EMPTY_SESSION
+    _valid = true
+    _reason = null
+    setLoggedMark(true)
+    settleLoginWaiters(true)
+}
+
+/** @desc 导出当前登录 token（服务端从 httpOnly cookie 读回）；未登录时抛错 */
+export async function kuroExportToken(): Promise<string> {
+    const res = await call<{ token?: string }>('/token', { timeout: 20000 })
+    const token = String(res.token ?? '')
+    if (!token) throw new Error('未登录库街区，无法导出 Token')
+    return token
 }
 
 /**

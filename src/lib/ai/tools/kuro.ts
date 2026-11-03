@@ -1,6 +1,6 @@
 /**
  * @desc 库街区（实验性）与词条集同步相关的 AI/WS 工具：
- *  登录态/暂存查询、有效性校验、声骸数据强制刷新、打开同步预览弹窗、退出登录。
+ *  登录态/暂存查询、有效性校验、Token 登录、Token 导出、声骸数据强制刷新、打开同步预览弹窗、退出登录。
  *  取数走本地暂存优先的策略（有缓存不打上游、刷新 5 分钟限流），工具保持同一口径。
  */
 import { defineTool } from '$lib/ai/tools/registry'
@@ -9,6 +9,8 @@ import {
     getKuroReason,
     getKuroSession,
     getKuroValid,
+    kuroExportToken,
+    kuroLoginWithToken,
     kuroLogout,
     refreshKuroSession
 } from '$lib/kuro-app/kuro.svelte'
@@ -31,6 +33,8 @@ defineTool('get_kuro_state', {
             account: session.account,
             valid: getKuroValid(),
             reason: getKuroReason(),
+            loginHint:
+                '短信验证码登录需用户在「设置 → 连接配置」手动完成；AI 可用 kuro_login_with_token 直接登录，用 kuro_export_token 导出当前 token',
             roles: session.roles.map((r) => ({ roleId: r.roleId, nickname: r.nickname ?? null })),
             activeRole: role ? { roleId: role.roleId, nickname: role.nickname ?? null, serverId: role.serverId } : null,
             echoCache: cache
@@ -89,6 +93,44 @@ defineTool('open_kuro_sync_preview', {
         openPanel('substat-library', true)
         if (!requestKuroSyncPreview()) throw new Error('词条集面板打开失败，无法显示同步预览')
         return { opened: true, hint: '请在弹窗里勾选要写入的角色后点「写入 N 个方案」' }
+    }
+})
+
+defineTool('kuro_login_with_token', {
+    description:
+        '用库街区 token 登录（用户在库街区 App / H5 里复制的登录凭据；可整段粘贴，服务端会自动提取 token 值）。' +
+        '验证码登录必须由用户在设置里手动完成，AI 只有这一条登录路径；token 需先用 ask_user 向用户索要。' +
+        '服务端会先向上游校验 token，无效则报错且不会覆盖已有登录态；成功后返回账号与绑定角色。',
+    parameters: {
+        type: 'object',
+        properties: {
+            token: { type: 'string', description: '库街区 token（可整段粘贴，含 token= 或 JSON 片段会自动提取）' }
+        },
+        required: ['token']
+    },
+    dangerous: true,
+    handler: async (args) => {
+        const token = String(args.token ?? '').trim()
+        if (!token) throw new Error('缺少 token')
+        await kuroLoginWithToken(token)
+        const session = getKuroSession()
+        return {
+            loggedIn: session.loggedIn,
+            valid: getKuroValid(),
+            account: session.account,
+            roles: session.roles.map((r) => ({ roleId: r.roleId, nickname: r.nickname ?? null }))
+        }
+    }
+})
+
+defineTool('kuro_export_token', {
+    description:
+        '导出当前库街区登录的 token（服务端从 httpOnly cookie 读回，即设置里的「导出 Token」）。' +
+        '用于用户要把凭据迁移到其它工具/设备时复制；token 等同登录凭据，只应原样转给用户本人，不要写入工程数据或复述给第三方。',
+    parameters: { type: 'object', properties: {} },
+    handler: async () => {
+        const token = await kuroExportToken()
+        return { token, hint: '请把 token 交给用户本人复制，提醒其不要分享给他人' }
     }
 })
 

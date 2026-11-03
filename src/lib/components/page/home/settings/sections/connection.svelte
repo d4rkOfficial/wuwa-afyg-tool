@@ -53,6 +53,8 @@
         getKuroSession,
         getKuroValid,
         KuroGeetestRequiredError,
+        kuroExportToken,
+        kuroLoginWithToken,
         kuroLogout,
         kuroSendSms,
         kuroVerifyLogin,
@@ -66,14 +68,18 @@
         getKuroLoginBusy,
         getKuroLoginError,
         getKuroLoginInfo,
+        getKuroLoginMode,
         getKuroPhone,
+        getKuroToken,
         getNewWorkshopUrl,
         getWsServerInput,
         setKuroCode,
         setKuroLoginBusy,
         setKuroLoginError,
         setKuroLoginInfo,
+        setKuroLoginMode,
         setKuroPhone,
+        setKuroToken,
         setNewWorkshopUrl,
         setWsServerInput,
         startKuroCountdown
@@ -87,6 +93,11 @@
 
     /** @desc WS 远程接管的开关（原 `ui/switch`，统一为设置内唯一的分段 tab 形态） */
     const WS_ENABLED_TABS = pair('启用', '禁用')
+    /** @desc 库街区登录方式：短信验证码 / 直接粘贴 token */
+    const KURO_LOGIN_TABS = [
+        { value: 'sms', label: '短信验证码' },
+        { value: 'token', label: 'Token 登录' }
+    ]
 
     // ── 库街区（实验性）：登录态管理（接口走应用自身的 /api/kuro-app 服务端路由，无需配置地址）──
     let kuroSession = $derived(getKuroSession())
@@ -97,10 +108,14 @@
     /** @desc 内联登录表单（登录窗口已删除，验证码登录直接放在设置里） */
     let kuroPhone = $derived(getKuroPhone())
     let kuroCode = $derived(getKuroCode())
+    let kuroToken = $derived(getKuroToken())
+    let kuroLoginMode = $derived(getKuroLoginMode())
     let kuroLoginBusy = $derived(getKuroLoginBusy())
     let kuroLoginInfo = $derived(getKuroLoginInfo())
     let kuroLoginError = $derived(getKuroLoginError())
     let kuroCountdown = $derived(getKuroCountdown())
+    /** @desc 导出的 token 明文：只保留在组件内存里，点「隐藏」或退出登录即清空 */
+    let exportedToken = $state('')
 
     const clearKuroMessages = () => {
         setKuroLoginInfo(null)
@@ -144,6 +159,43 @@
         }
     }
 
+    /** @desc Token 登录：粘贴即可（服务端会先校验有效性，无效不会覆盖已有登录态） */
+    const handleKuroTokenLogin = async () => {
+        clearKuroMessages()
+        setKuroLoginBusy(true)
+        try {
+            await kuroLoginWithToken(kuroToken)
+            setKuroLoginInfo('Token 登录成功')
+            setKuroToken('')
+            exportedToken = ''
+        } catch (e) {
+            setKuroLoginError(e instanceof Error ? e.message : String(e))
+        } finally {
+            setKuroLoginBusy(false)
+        }
+    }
+
+    /** @desc 导出当前登录 token：填入只读框并顺手复制到剪贴板 */
+    const handleKuroExportToken = async () => {
+        clearKuroMessages()
+        setKuroLoginBusy(true)
+        try {
+            exportedToken = await kuroExportToken()
+            await navigator.clipboard.writeText(exportedToken).catch(() => {})
+            addToast('已导出 Token 并复制到剪贴板', 'success')
+        } catch (e) {
+            setKuroLoginError(e instanceof Error ? e.message : String(e))
+        } finally {
+            setKuroLoginBusy(false)
+        }
+    }
+
+    const handleKuroCopyToken = async () => {
+        if (!exportedToken) return
+        await navigator.clipboard.writeText(exportedToken).catch(() => {})
+        addToast('已复制 Token', 'success')
+    }
+
     /** @desc 检验登录有效性（登录窗口删除后，这是唯一的主动校验入口） */
     const handleKuroCheck = async () => {
         await refreshKuroSession(true)
@@ -154,6 +206,7 @@
     const handleKuroLogout = async () => {
         try {
             await kuroLogout()
+            exportedToken = ''
             addToast('已退出库街区登录', 'success')
         } catch (e) {
             addToast(`退出失败：${e instanceof Error ? e.message : String(e)}`, 'error')
@@ -304,57 +357,101 @@
                 {/if}
             </div>
 
-            <!-- 未登录：内联验证码登录（原独立登录窗口已删除） -->
+            <!-- 未登录：内联登录（短信验证码 / 直接粘贴 token） -->
             {#if !kuroSession.loggedIn}
-                <label class="mt-3 flex flex-col gap-1">
-                    <FieldLabel label="手机号" />
-                    <input
-                        type="tel"
-                        inputmode="numeric"
-                        autocomplete="tel"
-                        maxlength="11"
-                        placeholder="库街区绑定手机号"
-                        value={kuroPhone}
-                        oninput={(e) => setKuroPhone((e.target as HTMLInputElement).value)}
-                        class="w-full rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
-                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                <div class="mt-3">
+                    <Tabs
+                        items={KURO_LOGIN_TABS}
+                        value={kuroLoginMode}
+                        onchange={(v) => setKuroLoginMode(v === 'token' ? 'token' : 'sms')}
+                        compact
+                        class={ROW_TABS}
+                        {...TAB_ACCENT}
                     />
-                </label>
-                <div class="mt-2 flex items-end gap-2">
-                    <label class="flex min-w-0 flex-1 flex-col gap-1">
-                        <FieldLabel label="短信验证码" />
+                </div>
+                {#if kuroLoginMode === 'sms'}
+                    <label class="mt-3 flex flex-col gap-1">
+                        <FieldLabel label="手机号" />
                         <input
-                            type="text"
+                            type="tel"
                             inputmode="numeric"
-                            maxlength="8"
-                            placeholder="6 位验证码"
-                            value={kuroCode}
-                            oninput={(e) => setKuroCode((e.target as HTMLInputElement).value)}
+                            autocomplete="tel"
+                            maxlength="11"
+                            placeholder="库街区绑定手机号"
+                            value={kuroPhone}
+                            oninput={(e) => setKuroPhone((e.target as HTMLInputElement).value)}
                             class="w-full rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
                             style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                         />
                     </label>
+                    <div class="mt-2 flex items-end gap-2">
+                        <label class="flex min-w-0 flex-1 flex-col gap-1">
+                            <FieldLabel label="短信验证码" />
+                            <input
+                                type="text"
+                                inputmode="numeric"
+                                maxlength="8"
+                                placeholder="6 位验证码"
+                                value={kuroCode}
+                                oninput={(e) => setKuroCode((e.target as HTMLInputElement).value)}
+                                class="w-full rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text) outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
+                                style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                            />
+                        </label>
+                        <button
+                            onclick={handleKuroSendCode}
+                            disabled={kuroLoginBusy || kuroCountdown > 0 || !/^\d{6,15}$/.test(kuroPhone.trim())}
+                            class="h-[30px] shrink-0 rounded-none border px-2.5 text-xs font-medium text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:cursor-not-allowed disabled:opacity-40"
+                            style="border-color: var(--theme-divider-border);"
+                        >
+                            {kuroCountdown > 0 ? `${kuroCountdown}s` : '发送验证码'}
+                        </button>
+                    </div>
                     <button
-                        onclick={handleKuroSendCode}
-                        disabled={kuroLoginBusy || kuroCountdown > 0 || !/^\d{6,15}$/.test(kuroPhone.trim())}
-                        class="h-[30px] shrink-0 rounded-none border px-2.5 text-xs font-medium text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:cursor-not-allowed disabled:opacity-40"
-                        style="border-color: var(--theme-divider-border);"
+                        onclick={handleKuroLogin}
+                        disabled={kuroLoginBusy || !kuroPhone.trim() || !kuroCode.trim()}
+                        class="mt-2 flex h-[34px] w-full items-center justify-center gap-1.5 rounded-none border px-3 text-xs font-medium text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:cursor-not-allowed disabled:opacity-40"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                     >
-                        {kuroCountdown > 0 ? `${kuroCountdown}s` : '发送验证码'}
+                        <Icon
+                            icon={kuroLoginBusy ? 'mdi:loading' : 'mdi:login-variant'}
+                            class={kuroLoginBusy ? 'size-4 animate-spin' : 'size-4'}
+                        />
+                        登录
                     </button>
-                </div>
-                <button
-                    onclick={handleKuroLogin}
-                    disabled={kuroLoginBusy || !kuroPhone.trim() || !kuroCode.trim()}
-                    class="mt-2 flex h-[34px] w-full items-center justify-center gap-1.5 rounded-none border px-3 text-xs font-medium text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:cursor-not-allowed disabled:opacity-40"
-                    style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                >
-                    <Icon
-                        icon={kuroLoginBusy ? 'mdi:loading' : 'mdi:login-variant'}
-                        class={kuroLoginBusy ? 'size-4 animate-spin' : 'size-4'}
-                    />
-                    登录
-                </button>
+                {:else}
+                    <label class="mt-3 flex flex-col gap-1">
+                        <FieldLabel
+                            label="库街区 Token"
+                            hint="从库街区 App / H5 复制后整段粘贴即可；含 token= 或 JSON 片段会自动提取"
+                        />
+                        <textarea
+                            rows="3"
+                            spellcheck="false"
+                            placeholder="粘贴库街区 token"
+                            value={kuroToken}
+                            oninput={(e) => setKuroToken((e.target as HTMLTextAreaElement).value)}
+                            class="w-full resize-y rounded-none border px-2.5 py-1.5 font-mono text-[11px] leading-4 text-(--theme-modal-text) outline-none transition-colors placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)/50"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                        ></textarea>
+                    </label>
+                    <button
+                        onclick={handleKuroTokenLogin}
+                        disabled={kuroLoginBusy || !kuroToken.trim()}
+                        class="mt-2 flex h-[34px] w-full items-center justify-center gap-1.5 rounded-none border px-3 text-xs font-medium text-(--theme-accent-text) transition-colors hover:border-(--theme-accent-bg) disabled:cursor-not-allowed disabled:opacity-40"
+                        style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                    >
+                        <Icon
+                            icon={kuroLoginBusy ? 'mdi:loading' : 'mdi:key-variant'}
+                            class={kuroLoginBusy ? 'size-4 animate-spin' : 'size-4'}
+                        />
+                        Token 登录
+                    </button>
+                    <p class="mt-2 text-[10px] leading-4 text-(--theme-modal-text)/40">
+                        Token 等同登录凭据：只提交给应用自身的服务端，保存在 httpOnly cookie
+                        中；登录前会先向上游校验一次。
+                    </p>
+                {/if}
                 {#if kuroLoginError}
                     <div
                         class="mt-2 rounded-none border px-2.5 py-1.5 text-[10px] text-red-400"
@@ -366,9 +463,11 @@
                 {#if kuroLoginInfo}
                     <div class="mt-2 text-[10px] text-(--theme-accent-text)">✓ {kuroLoginInfo}</div>
                 {/if}
-                <p class="mt-2 text-[10px] leading-4 text-(--theme-modal-text)/40">
-                    需要人机验证时会按需加载极验脚本（static.geetest.com）
-                </p>
+                {#if kuroLoginMode === 'sms'}
+                    <p class="mt-2 text-[10px] leading-4 text-(--theme-modal-text)/40">
+                        需要人机验证时会按需加载极验脚本（static.geetest.com）
+                    </p>
+                {/if}
             {/if}
 
             <!-- 操作 -->
@@ -388,6 +487,16 @@
                         检验登录有效性
                     </button>
                     <button
+                        onclick={handleKuroExportToken}
+                        disabled={kuroBusy || kuroLoginBusy}
+                        class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-accent-text) disabled:opacity-40"
+                        style="border-color: var(--theme-divider-border);"
+                        title="导出当前登录 token（可复制到其它工具）"
+                    >
+                        <Icon icon="mdi:key-variant" class="size-4" />
+                        导出 Token
+                    </button>
+                    <button
                         onclick={handleKuroLogout}
                         disabled={kuroBusy}
                         class="flex items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-red-400 disabled:opacity-40"
@@ -398,6 +507,46 @@
                     </button>
                 {/if}
             </div>
+
+            <!-- 导出的 token：只读展示 + 复制（点「隐藏」或退出登录即清空） -->
+            {#if kuroSession.loggedIn && exportedToken}
+                <div class="mt-3 flex flex-col gap-1">
+                    <FieldLabel label="当前登录 Token" hint="等同登录凭据，请勿分享给他人" />
+                    <div class="flex gap-2">
+                        <input
+                            readonly
+                            value={exportedToken}
+                            onclick={(e) => (e.currentTarget as HTMLInputElement).select()}
+                            class="min-w-0 flex-1 rounded-none border px-2.5 py-1.5 font-mono text-[11px] text-(--theme-modal-text) outline-none focus:border-(--theme-accent-bg)/50"
+                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
+                        />
+                        <button
+                            onclick={handleKuroCopyToken}
+                            class="flex shrink-0 items-center gap-1 rounded-none px-2.5 py-1.5 text-xs font-medium transition-all hover:brightness-125"
+                            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
+                        >
+                            <Icon icon="mdi:content-copy" class="size-3.5" />
+                            复制
+                        </button>
+                        <button
+                            onclick={() => (exportedToken = '')}
+                            class="flex shrink-0 items-center gap-1 rounded-none border px-2.5 py-1.5 text-xs text-(--theme-modal-text)/60 transition-colors hover:text-(--theme-modal-text)"
+                            style="border-color: var(--theme-divider-border);"
+                        >
+                            隐藏
+                        </button>
+                    </div>
+                </div>
+            {/if}
+            <!-- 已登录时的操作错误（如导出 token 失败）也要可见 -->
+            {#if kuroSession.loggedIn && kuroLoginError}
+                <div
+                    class="mt-2 rounded-none border px-2.5 py-1.5 text-[10px] text-red-400"
+                    style="border-color: rgb(248 113 113 / 0.4);"
+                >
+                    ✗ {kuroLoginError}
+                </div>
+            {/if}
 
             <!-- 绑定角色：同步时使用选中的这个 -->
             {#if kuroSession.roles.length > 0}
