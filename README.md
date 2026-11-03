@@ -21,7 +21,6 @@
 配套仓库：[启动器](https://github.com/d4rkOfficial/coconut-app)（桌面端 / 插件宿主）·
 [工坊](https://github.com/d4rkOfficial/wuwa-afyg-share)
 
-
 如果你需要比网页端更强大的椰果工具箱，另见椰果工具箱启动器：
 [启动器下载](https://wuwa-afyg-share.200503.xyz/launcher) | [启动器插件 SDK](https://github.com/d4rkOfficial/coconut-app-plugin-sdk)
 
@@ -29,16 +28,17 @@
 
 ## 文档
 
-| 文档                                                           | 内容                                                                     |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [docs/deployment.md](docs/deployment.md)                       | 本地开发、构建预览、Vercel / Cloudflare Pages / GitHub Release、完成检查 |
-| [docs/buff-engine.md](docs/buff-engine.md)                     | 计算引擎：一切皆 Buff、乘区算子、条件系统、引用转模                      |
-| [docs/agent-harness.md](docs/agent-harness.md)                 | AI 助手：回合结构、上下文装配、变化队列、自定义 Skill                    |
-| [docs/upstream-integration.md](docs/upstream-integration.md)   | 接入新数据上游（`DataProvider` 适配器、数据质量验收）                    |
-| [docs/damage-type-inference.md](docs/damage-type-inference.md) | 伤害类型推导算法（判定链与护栏）与 TDD 用例流程                          |
-| [docs/tools.md](docs/tools.md)                                 | AI 助手与 WS 远程接管共用的工具清单（按源码自动生成）                    |
-| [docs/ws-remote.md](docs/ws-remote.md)                         | WS 远程接管：工具分类表与接入方式                                        |
-| [工坊 API 文档](https://github.com/d4rkOfficial/wuwa-afyg-share/blob/master/docs/api.md) | 工坊对外接口（含「接入工具箱必须实现的最小集」） |
+| 文档                                                                                     | 内容                                                                     |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [docs/deployment.md](docs/deployment.md)                                                 | 本地开发、构建预览、Vercel / Cloudflare Pages / GitHub Release、完成检查 |
+| [docs/buff-engine.md](docs/buff-engine.md)                                               | 计算引擎：一切皆 Buff、乘区算子、条件系统、引用转模                      |
+| [docs/agent-harness.md](docs/agent-harness.md)                                           | AI 助手：回合结构、上下文装配、变化队列、自定义 Skill                    |
+| [docs/upstream-integration.md](docs/upstream-integration.md)                             | 接入新数据上游（`DataProvider` 适配器、数据质量验收）                    |
+| [docs/damage-type-inference.md](docs/damage-type-inference.md)                           | 伤害类型推导算法（判定链与护栏）与 TDD 用例流程                          |
+| [docs/tools.md](docs/tools.md)                                                           | AI 助手与 WS 远程接管共用的工具清单（按源码自动生成）                    |
+| [docs/fast-calc.md](docs/fast-calc.md)                                                   | 简表 fast-calc：导入工程、编辑词条/敌怪、乘区溯源与 postMessage 协议     |
+| [docs/ws-remote.md](docs/ws-remote.md)                                                   | WS 远程接管：工具分类表与接入方式                                        |
+| [工坊 API 文档](https://github.com/d4rkOfficial/wuwa-afyg-share/blob/master/docs/api.md) | 工坊对外接口（含「接入工具箱必须实现的最小集」）                         |
 
 ## 业务功能
 
