@@ -369,7 +369,8 @@
         if (dialog instanceof HTMLDialogElement) dialog.showModal()
     }
 
-    const DETAIL_BASE_HEADERS = ['来源', '条目', '倍率', '命中', '期望伤害', '暴击伤害', '不暴击伤害']
+    const DETAIL_BASE_HEADERS = ['来源', '条目', '倍率', '命中']
+    const DETAIL_DAMAGE_HEADERS = ['期望伤害', '暴击伤害', '不暴击伤害']
 
     /** @desc 回传「各表头 + 逐条目 + 逐乘区溯源」的详细结果（供宿主做报告 / 对齐） */
     const postDetail = (requestId?: unknown) => {
@@ -409,7 +410,8 @@
             headers: {
                 base: DETAIL_BASE_HEADERS,
                 zones: zoneLabels,
-                columns: [...DETAIL_BASE_HEADERS, ...zoneLabels]
+                damage: DETAIL_DAMAGE_HEADERS,
+                columns: [...DETAIL_BASE_HEADERS, ...zoneLabels, ...DETAIL_DAMAGE_HEADERS]
             },
             total: allEntries.reduce((sum, entry) => sum + entry.totalDamage, 0),
             duration: segments.length ? segments[segments.length - 1].end : 0,
