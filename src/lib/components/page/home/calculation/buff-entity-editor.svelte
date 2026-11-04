@@ -23,7 +23,7 @@
     import { ZONE_MAP, ZONE_NO_OVERRIDE_IDS, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
     import type { BuffEntityType, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
     import { CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
-    import { buffLeafName } from '$lib/calc/buff-name'
+    import BuffPathInput from './buff-path-input.svelte'
     import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
@@ -126,12 +126,10 @@
     {#if buff}
         <div class="flex shrink-0 flex-col gap-2 border-b px-3 py-2" style="border-color: var(--theme-divider-border);">
             <div class="flex items-center gap-2">
-                <input
-                    value={buffLeafName(buff.buffName)}
-                    oninput={(e) => onrename?.(buffIndex, (e.currentTarget as HTMLInputElement).value)}
-                    placeholder="Buff 名"
-                    class="min-w-0 flex-1 rounded-none border bg-(--theme-input-bg) px-2 py-1 text-xs outline-none text-(--theme-modal-text) placeholder:text-(--theme-modal-text)/30 focus:border-(--theme-accent-bg)"
-                    style="border-color: var(--theme-divider-border);"
+                <BuffPathInput
+                    value={buff.buffName}
+                    oncommit={(value) => onrename?.(buffIndex, value)}
+                    class="flex-1"
                 />
                 <Button
                     variant="text"

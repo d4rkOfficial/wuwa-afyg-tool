@@ -20,20 +20,13 @@ import { addToast } from '$lib/data/toast.svelte'
 import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_NO_OVERRIDE_IDS, ZONE_REF_MAP } from './calculation.consts'
 import type { ZoneId } from './calculation.consts'
 import type { ConditionProfile } from './compute'
-import {
-    isConditionEmpty,
-    normalizeCondition,
-    normalizeConditionForScope,
-    normalizeZoneCondition,
-    withOwnerBodyGate
-} from './condition'
+import { isConditionEmpty, normalizeCondition, normalizeConditionForScope, normalizeZoneCondition } from './condition'
 import { paneEffectSourcesOf, type PaneEffectSource } from './pane-effects'
 import { rebuildGlobalBindings } from './global-bindings'
 import {
     appendBuffToTree,
     BUFF_TREE_VERSION,
     cloneBuffTree,
-    coarsePathOf,
     collectBuffIds,
     emptyBuffTree,
     findNode,
@@ -45,6 +38,7 @@ import {
 } from './buff-tree-state'
 import { buffFolderPath, buffLeafName, joinBuffPath, sanitizeLeafName, uniqueLeafName } from './buff-name'
 import { ownerIdxOfItem, rewriteOwnerInCondition } from './buff-owner'
+import { resolveImportTarget } from './buff-import-target'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffConf[]>([])
@@ -676,7 +670,10 @@ export interface ImportBuffZone {
 }
 
 export interface ImportBuffInput {
+    /** @desc 来源全名（保留工坊文件夹，供人工导入项直接使用） */
     name: string
+    /** @desc 已解析好的工程全名；存在时 store 不再二次解析，避免条件文件夹重复叠加 */
+    targetName?: string
     scope?: 'self' | 'self_except' | 'team' | 'effect_only'
     ownerIdx?: number
     condition?: BuffCondition
@@ -714,16 +711,14 @@ export function mapImportedScope(
     }
 }
 
-/** @desc 单批导入的冲突决议：同名冲突用 sameName（或逐条 perIndex）；内容一致的重命名询问用 renameIdentical */
+/** @desc 单批导入的同名策略：跳过 / 覆盖 / 自动补 #；自动补 # 用于无冲突弹窗的普通导入 */
 export interface ImportDecisions {
     /** @desc 同名（内容不同）时：'skip' 跳过 / 'overwrite' 覆盖已有；缺省 'skip' */
     sameName?: 'skip' | 'overwrite'
     /** @desc 逐条同名决议（导入批次下标 → 跳过/覆盖）；该下标优先于 sameName */
     sameNamePerIndex?: Record<number, 'skip' | 'overwrite'>
-    /** @desc 内容完全一致但名字不同时，是否把已有 buff 改成导入的名字；缺省不重命名 */
-    renameIdentical?: boolean
-    /** @desc 重命名清单（仅当 renameIdentical 为 true 时生效） */
-    identicalRenames?: { id: string; name: string }[]
+    /** @desc 同名时保留已有条目，把导入项短名补 # 后追加 */
+    autoRename?: boolean
 }
 
 export interface ImportReport {
@@ -733,8 +728,6 @@ export interface ImportReport {
     overwritten: number
     /** @desc 因同名冲突被跳过的条数 */
     skipped: number
-    /** @desc 按用户要求把已有 buff 改成导入名字的条数 */
-    renamed: number
     /** @desc 归属槽位重指过的条数（链/阶从 0 号位纠正到真实主人） */
     reowned: number
 }
@@ -754,7 +747,7 @@ export function importBuffSetsWithDecisions(
     ownerIdx = -1,
     teamSize = 3
 ): ImportReport {
-    const report: ImportReport = { added: 0, overwritten: 0, skipped: 0, renamed: 0, reowned: 0 }
+    const report: ImportReport = { added: 0, overwritten: 0, skipped: 0, reowned: 0 }
     if (!assertUnlocked()) return report
 
     const toRemove = new Set<string>()
@@ -762,7 +755,7 @@ export function importBuffSetsWithDecisions(
 
     for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
         const item = items[itemIndex]
-        const rawName = item.name.trim()
+        const rawName = (item.targetName ?? item.name).trim()
         if (!rawName) continue
         const owner = ownerIdxOfItem(item, ownerIdx)
         // 逐条决议优先于批量决议（冲突弹窗里可以单独改某一条）
@@ -805,19 +798,12 @@ export function importBuffSetsWithDecisions(
             if (hadGate) report.reowned++
         }
 
-        // ② 全名：丢掉来源路径，只取短名，再按工程条件粗分拼新路径
-        const leaf = buffLeafName(rawName)
-        const coarse = coarsePathOf(
-            {
-                id: itemIndex.toString(),
-                name: leaf,
-                zones,
-                scope: mapImportedScope(item.scope, owner, teamSize),
-                condition: item.condition
-            } as BuffConf,
-            _initTeam ?? []
-        )
-        const name = joinBuffPath(coarse.folder, leaf)
+        // ② 全名：已解析项直接用 targetName；手工/AI 项现场按真实归属解析
+        const target = item.targetName
+            ? { fullName: rawName, condition: item.condition ?? {} }
+            : resolveImportTarget(rawName, item.condition, owner, _initTeam ?? [])
+        const name = target.fullName
+        const condition = target.condition
         const mappedScope = mapImportedScope(item.scope, owner, teamSize)
 
         // ③ 同名冲突：同名 + 同作用域才算同一条（同实体多主人时允许同名、各自绑定）
@@ -825,20 +811,17 @@ export function importBuffSetsWithDecisions(
             (s) => s.name === name && JSON.stringify(s.scope) === JSON.stringify(mappedScope)
         )
         if (sameName.length > 0) {
-            if (!overwrite) {
+            if (decisions.autoRename) {
+                // 保留已有条目，交给 appendImportedBuffsToTree 给导入项补 #
+            } else if (!overwrite) {
                 report.skipped += sameName.length
                 continue
+            } else {
+                for (const s of sameName) toRemove.add(s.id)
+                report.overwritten += sameName.length
             }
-            for (const s of sameName) toRemove.add(s.id)
-            report.overwritten += sameName.length
         }
 
-        /**
-         * @desc 来源是某个角色的 buff（有归属角色槽位）且本身没有链/阶条件时，补一道「角色 ≥ 0 链」的
-         * **角色本体门**（0 链 = 角色本体，未点共鸣链）：既保留「挂在哪个角色身上」的归属
-         * （左侧列表按「角色名本体」归档），又不会因为档位把本体效果挡掉。
-         */
-        const condition = withOwnerBodyGate(normalizeCondition(reowned, 'buff', owner), owner)
         fresh.push({
             id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name,
@@ -847,16 +830,6 @@ export function importBuffSetsWithDecisions(
             ...(isConditionEmpty(condition) ? {} : { condition }),
             ...(owner >= 0 && !isConditionEmpty(condition) ? { conditionRefCharIdx: owner } : {})
         })
-    }
-
-    // ③ 内容一致的重命名询问（先改已有 buff 的名字，再走后面的删除/追加）
-    if (decisions.renameIdentical && decisions.identicalRenames?.length) {
-        for (const r of decisions.identicalRenames) {
-            if (_buffSets.some((s) => s.id === r.id && s.name !== r.name)) {
-                renameBuffSet(r.id, buffLeafName(r.name))
-                report.renamed++
-            }
-        }
     }
 
     if (toRemove.size > 0) {

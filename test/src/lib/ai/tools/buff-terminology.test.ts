@@ -204,7 +204,7 @@ test('从主页 Buff 集导入工程的描述与实际落点一致，保留实�
     assert.equal(out.ok, true)
     assert.equal(out.data.imported, 1)
     assert.deepEqual(getAllBuffConfs()[0].scope, [0])
-    assert.equal(getAllBuffConfs()[0].name, '新武器增益')
+    assert.equal(getAllBuffConfs()[0].name, '甲本体\\新武器增益')
     assert.equal(JSON.stringify(getBuffEntities()), before)
 })
 

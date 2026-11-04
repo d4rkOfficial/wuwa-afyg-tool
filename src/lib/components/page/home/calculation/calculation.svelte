@@ -82,10 +82,16 @@
         return () => cancelAnimationFrame(raf)
     })
 
-    /** @desc 关闭 Buff 弹窗并持久化最新状态 */
+    /** @desc 关闭 Buff 弹窗并持久化最新状态；先让弹窗真正卸载，再做全量快照，避免快照异常把关闭一起拖住 */
     function handleCloseBuffModal() {
         setShowBuffModal(false)
-        onupdate(getCalcState())
+        queueMicrotask(() => {
+            try {
+                onupdate(getCalcState())
+            } catch (err) {
+                console.error('[buff-modal] 关闭时持久化失败', err)
+            }
+        })
     }
 
     /** @desc 铺开表：切换某条目↔某 Buff 的绑定后持久化 */

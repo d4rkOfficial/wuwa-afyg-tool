@@ -25,7 +25,8 @@
         renameBuffTreeFolder,
         deleteBuffTreeFolder,
         moveBuffTreeNode,
-        moveBuffFolderSibling
+        moveBuffFolderSibling,
+        setShowBuffModal
     } from '$lib/calc/calculation.store.svelte'
     import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
     import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
@@ -83,6 +84,12 @@
     }
 
     let { open, team, onclose, class: className, style: styleProp }: Props = $props()
+
+    /** @desc 关闭时先直接落 store，避免父级持久化异常导致弹窗关不掉 */
+    const handleModalClose = () => {
+        setShowBuffModal(false)
+        onclose()
+    }
 
     let showLookup = $state(false)
     let showRefLookup = $state(false)
@@ -934,7 +941,13 @@
 </script>
 
 <!-- @desc BUFF 配置弹窗根容器：共享弹窗外壳 + 内容（标题栏入口/左侧列表/右侧编辑器/底部保存） -->
-<Modal {open} {onclose} noScroll class={mergeClass(['h-full w-[1180px]', className])} style={styleProp}>
+<Modal
+    {open}
+    onclose={handleModalClose}
+    noScroll
+    class={mergeClass(['h-full w-[1180px]', className])}
+    style={styleProp}
+>
     {#snippet title()}
         <Icon icon="mdi:widgets" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
         <span>BUFF 配置</span>
@@ -1056,7 +1069,7 @@
                 style="border-top: 1px solid var(--theme-divider-border);"
             >
                 <button
-                    onclick={onclose}
+                    onclick={handleModalClose}
                     class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
                     style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 >

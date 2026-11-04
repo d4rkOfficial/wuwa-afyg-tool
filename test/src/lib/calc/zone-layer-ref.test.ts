@@ -16,7 +16,7 @@ import {
 } from '$lib/calc/calculation.consts'
 import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
 import { paneEffectSourcesOf } from '$lib/calc/pane-effects'
-import { detectImportConflicts } from '$lib/calc/buff-import-utils'
+import { dedupeImportItems } from '$lib/calc/buff-import-utils'
 import { getAllBuffConfs, importBuffSetsWithDecisions } from '$lib/calc/calculation.store.svelte'
 import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
@@ -117,9 +117,9 @@ describe('层数类乘区的引用落库口径', () => {
                 zones: [{ zoneId, value: 0, ref: { targetZoneId: 'totalAtk', pct: 50 } }]
             }
         ]
-        const { deduped } = detectImportConflicts(items, [])
+        const deduped = dedupeImportItems(items)
         importBuffSetsWithDecisions(deduped, {}, -1, 3)
-        const stored = getAllBuffConfs().find((s) => s.name === name)
+        const stored = getAllBuffConfs().find((s) => s.name.endsWith(name))
         assert.ok(stored, `${zoneId} 的 buff 应已写入`)
         return stored.zones.find((z) => z.zoneId === zoneId)
     }

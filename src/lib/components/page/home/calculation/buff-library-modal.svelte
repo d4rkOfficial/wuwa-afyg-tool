@@ -666,7 +666,6 @@
         entityType={editTarget.entityType}
         entityName={editTarget.entityName}
         initialBuffs={editTarget.buffs}
-        initialFolders={editTarget.folders}
         onclose={() => (editTarget = null)}
     />
 {/if}

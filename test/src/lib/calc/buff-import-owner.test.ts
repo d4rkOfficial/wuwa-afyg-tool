@@ -2,11 +2,12 @@
 // 「同一套装 / 武器 / 首位声骸被多名角色装备时，buff 只导入给了一个角色」。
 //
 // 根因：`buildEntityImportItems` 会为**每个主人**各生成一条 self 条目（同名、同内容、只有归属槽位不同），
-// 而 `detectImportConflicts` 的批次内去重只按**名字**去重 → 除第一个主人外的条目全被丢弃。
+// 而 `dedupeImportItems` 的批次内去重只按**名字**去重 → 除第一个主人外的条目全被丢弃。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildEntityImportItems, detectImportConflicts } from '$lib/calc/buff-import-utils'
+import { buildEntityImportItems, dedupeImportItems } from '$lib/calc/buff-import-utils'
+import { resolveImportTarget } from '$lib/calc/buff-import-target'
 import { getAllBuffConfs, importBuffSetsWithDecisions, mapImportedScope } from '$lib/calc/calculation.store.svelte'
 import { classifyBuffScope } from '$lib/calc/calculation.consts'
 import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
@@ -67,9 +68,9 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
         assert.equal(buildEntityImportItems(entityWith('2set', '套装S', '套装效果', 'self'), TEAM).length, 2)
     })
 
-    it('detectImportConflicts 不能把「同名不同主人」当成批次内重复丢掉', () => {
+    it('dedupeImportItems 不能把「同名不同主人」当成批次内重复丢掉', () => {
         const items = buildEntityImportItems(entityWith('echo', '声骸X', '首位声骸效果A', 'self'), TEAM)
-        const { deduped } = detectImportConflicts(items, [])
+        const deduped = dedupeImportItems(items)
         assert.equal(deduped.length, 2, '同名但归属不同 → 两条都要留下（这就是曾经的 bug）')
         assert.deepEqual(
             deduped.map((i) => i.ownerIdx),
@@ -82,7 +83,7 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
             { name: '重复效果', scope: 'self' as const, ownerIdx: 0, zones: [] },
             { name: '重复效果', scope: 'self' as const, ownerIdx: 0, zones: [] }
         ]
-        const { deduped } = detectImportConflicts(dup, [])
+        const deduped = dedupeImportItems(dup)
         assert.equal(deduped.length, 1, '同名同主人确实是重复项')
     })
 
@@ -94,19 +95,21 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
 
     it('端到端：两条条目落库后分别作用到 0 号位与 1 号位', () => {
         const items = buildEntityImportItems(entityWith('echo', '声骸X', '首位声骸效果E2E', 'self'), TEAM)
-        const { deduped } = detectImportConflicts(items, [])
+        const deduped = dedupeImportItems(items)
         const report = importBuffSetsWithDecisions(deduped, {}, -1, TEAM.length)
 
         assert.equal(report.added, 2, '两个主人都应写入')
-        const written = getAllBuffConfs().filter((s) => s.name.startsWith('首位声骸效果E2E'))
+        const written = getAllBuffConfs().filter((s) => s.name.endsWith('首位声骸效果E2E'))
         assert.equal(written.length, 2, '库中应有两条同名但归属不同的 buff')
         assert.deepEqual(
-            written.map((s) => s.scope),
+            written
+                .map((s) => s.scope)
+                .sort((a, b) => (Array.isArray(a) ? (a[0] ?? 0) : -1) - (Array.isArray(b) ? (b[0] ?? 0) : -1)),
             [[0], [1]],
             'scope 应分别指向 0/1 号位'
         )
         assert.deepEqual(
-            written.map((s) => s.condition?.chains?.[0]?.charIdx),
+            written.map((s) => s.condition?.chains?.[0]?.charIdx).sort((a, b) => (a ?? 0) - (b ?? 0)),
             [0, 1],
             '角色本体门也要落到各自的主人身上'
         )
@@ -129,12 +132,38 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
     it('端到端：效应专属条目落库后 scope 为空数组（不再变成全队）', () => {
         const entity = entityWith('echo', '声骸X', '效应专属加深E2E', 'effect_only')
         const items = buildEntityImportItems(entity, TEAM)
-        const { deduped } = detectImportConflicts(items, [])
+        const deduped = dedupeImportItems(items)
         importBuffSetsWithDecisions(deduped, {}, -1, TEAM.length)
 
-        const written = getAllBuffConfs().filter((s) => s.name === '效应专属加深E2E')
+        const written = getAllBuffConfs().filter((s) => s.name.endsWith('效应专属加深E2E'))
         assert.equal(written.length, 1)
         assert.deepEqual(written[0].scope, [], '导入后必须仍是「效应专属」（scope 空数组）')
         assert.equal(classifyBuffScope(written[0].scope).kind, 'effect', '徽标也应显示「效应专属」')
+    })
+})
+
+describe('导入落点：条件文件夹在外，来源文件夹在内', () => {
+    it('按真实主人重指条件；工坊文件夹作为二级保留', () => {
+        const target = resolveImportTarget(
+            '千古洑流 共技时 攻击1层\\1阶',
+            { chains: [{ charIdx: 0, min: 0 }] },
+            1,
+            TEAM
+        )
+        assert.equal(target.conditionFolder, '乙本体')
+        assert.equal(target.sourceFolder, '千古洑流 共技时 攻击1层')
+        assert.equal(target.fullName, '乙本体\\千古洑流 共技时 攻击1层\\1阶')
+    })
+
+    it('无条件 self Buff 补本体门后落角色本体文件夹', () => {
+        const target = resolveImportTarget('普通效果', undefined, 0, TEAM)
+        assert.equal(target.conditionFolder, '甲本体')
+        assert.equal(target.fullName, '甲本体\\普通效果')
+    })
+
+    it('工坊根 Buff 没有来源文件夹时只拼条件文件夹', () => {
+        const target = resolveImportTarget('普通效果', { chains: [{ charIdx: 0, min: 2 }] }, 0, TEAM)
+        assert.equal(target.sourceFolder, null)
+        assert.equal(target.fullName, '甲2链\\普通效果')
     })
 })

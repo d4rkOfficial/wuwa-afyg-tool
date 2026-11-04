@@ -395,8 +395,7 @@ export async function updateEntityBuffs(
         ...(b.condition ? { condition: sanitizeConditionForEntity(entityType, b.condition) } : {})
     }))
     const exists = _entities.some((e) => entityKey(e.entityType, e.entityName) === key)
-    const current = _entities.find((e) => entityKey(e.entityType, e.entityName) === key)
-    const nextFolders = mergeFolders(folders ?? current?.folders ?? [], valid)
+    const nextFolders = mergeFolders(folders ?? [], valid)
     if (exists) {
         _entities = _entities.map((e) =>
             entityKey(e.entityType, e.entityName) === key
