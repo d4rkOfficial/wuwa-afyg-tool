@@ -81,24 +81,8 @@
                         'focus-visible:outline-none'
                     ].join(' ')}
                 >
-                    {#if item.icon === 'mdi:rename-outline'}
-                        <Icon icon="mdi:rename-outline" class="size-4 shrink-0" />
-                    {:else if item.icon === 'mdi:rename-box'}
-                        <Icon icon="mdi:rename-box" class="size-4 shrink-0" />
-                    {:else if item.icon === 'mdi:content-copy'}
-                        <Icon icon="mdi:content-copy" class="size-4 shrink-0" />
-                    {:else if item.icon === 'mdi:file-export'}
-                        <Icon icon="mdi:file-export" class="size-4 shrink-0" />
-                    {:else if item.icon === 'mdi:share-variant'}
-                        <Icon icon="mdi:share-variant" class="size-4 shrink-0" />
-                    {:else if item.icon === 'mdi:archive-outline'}
-                        <Icon icon="mdi:archive-outline" class="size-4 shrink-0" />
-                    {:else if item.icon === 'mdi:delete-outline'}
-                        <Icon icon="mdi:delete-outline" class="size-4 shrink-0" />
-                    {:else if item.icon === 'mdi:crown-outline'}
-                        <Icon icon="mdi:crown-outline" class="size-4 shrink-0" />
-                    {:else if item.icon === 'mdi:minus-circle-outline'}
-                        <Icon icon="mdi:minus-circle-outline" class="size-4 shrink-0" />
+                    {#if item.icon}
+                        <Icon icon={item.icon} class="size-4 shrink-0" />
                     {/if}
                     {item.label}
                 </button>
