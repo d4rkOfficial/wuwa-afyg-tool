@@ -9,10 +9,10 @@ export const REF_MODE_TABS = [
     { value: 'discrete', label: '离散地' }
 ]
 
-/** @desc 左栏可拖拽调宽范围（与主页 sidebar 拖动条一致的三态样式） */
+/** @desc 左栏可拖拽调宽范围（与主页 sidebar 拖动条一致的三态样式）；默认取最宽 */
 export const LEFT_WIDTH_MIN = 180
 export const LEFT_WIDTH_MAX = 480
-export const LEFT_WIDTH_DEFAULT = 256
+export const LEFT_WIDTH_DEFAULT = LEFT_WIDTH_MAX
 
 /** @desc 拖出列表判定的边缘余量（超出容器四周该距离即视为「拖出」，松手删除） */
 export const DRAG_OUTSIDE_MARGIN = 30

@@ -8,7 +8,8 @@
  * - 纯函数：不依赖任何 store / 浏览器 API，可在 Node 环境下直接单测。
  */
 
-import type { BuffCondition, BuffInstance, BuffZoneValue, CalcState } from '$lib/calc/calculation.types'
+import type { BuffCondition, BuffInstance, BuffTreeState, BuffZoneValue, CalcState } from '$lib/calc/calculation.types'
+import { normalizeBuffTree } from '$lib/calc/buff-tree-state'
 import { ZONE_MAP, resolveZoneId } from '$lib/calc/calculation.consts'
 import { isConditionEmpty, normalizeCondition, normalizeConditionForScope } from '$lib/calc/condition'
 import { bindPaneEffectSources, entryOwnersFromTimeline } from '$lib/calc/pane-effects'
@@ -334,11 +335,16 @@ export const migrateCalcState = (raw: unknown): CalcState => {
 
     // 链/阶条件二选一：同一 Buff 同时带链与阶时拆成两个 Buff（各自只保留一个条件）
     const split = splitDualGateBuffs(buffs, remapTable(src.damageEntryBuffSetIds))
+    const treeGlobalIds = split.buffs.filter((b) => b.global).map((b) => b.id)
+    const rawTree = isRecord(src.buffTree) ? (src.buffTree as unknown as BuffTreeState) : undefined
+    const buffTree = rawTree ? normalizeBuffTree(rawTree, split.buffs, treeGlobalIds) : undefined
 
     return {
         buffSets: split.buffs,
         damageEntryBuffSetIds: split.bindings,
-        damageEntryDamageTypes: types
+        damageEntryDamageTypes: types,
+        ...(buffTree ? { buffTree } : {}),
+        ...(typeof src.buffTreeVersion === 'number' ? { buffTreeVersion: src.buffTreeVersion } : {})
     }
 }
 

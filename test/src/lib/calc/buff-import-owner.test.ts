@@ -98,7 +98,7 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
         const report = importBuffSetsWithDecisions(deduped, {}, -1, TEAM.length)
 
         assert.equal(report.added, 2, '两个主人都应写入')
-        const written = getAllBuffConfs().filter((s) => s.name === '首位声骸效果E2E')
+        const written = getAllBuffConfs().filter((s) => s.name.startsWith('首位声骸效果E2E'))
         assert.equal(written.length, 2, '库中应有两条同名但归属不同的 buff')
         assert.deepEqual(
             written.map((s) => s.scope),

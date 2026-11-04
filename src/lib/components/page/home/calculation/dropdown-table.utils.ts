@@ -5,9 +5,11 @@
  * 与 `spread-table.utils.ts` 同一分工：只搬「输入 → 输出」的纯计算，交互与 store 写入留在组件里；
  * store 侧能力（条件判定口径）由调用方以函数参数注入。
  */
-import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffConf, BuffTreeState, BuffTreeNode, DamageEntry } from '$lib/calc/calculation.types'
 import type { PaneEffectSource } from '$lib/calc/pane-effects'
+import type { CharSlot } from '$lib/types/project'
 import { LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
+import { deriveFolderIcon, type FolderIconSpec } from '$lib/calc/buff-tree-state'
 import { buffScopeOk, buffUsableByEntry, isDirectDamage } from './damage-table.utils'
 
 /** @desc 叠层子项的显示名：只取「数字 + 后缀」（前缀已由文件夹行显示）；不匹配叠层命名时回落原名 */
@@ -20,7 +22,69 @@ export interface BuffDiffItem {
     type: 'added' | 'removed' | 'same' | 'global'
 }
 
-/** @desc 从 fromIndex 往**后**找第一个同角色直伤 */
+/** @desc 下拉卡片瀑布：根区 / 一级文件夹 / 二级文件夹 */
+export interface WaterfallGroup {
+    key: string
+    name: string
+    iconSpec?: FolderIconSpec
+    buffs: BuffConf[]
+}
+export interface WaterfallSection {
+    key: string
+    name: string
+    iconSpec?: FolderIconSpec
+    buffs: BuffConf[]
+    groups: WaterfallGroup[]
+}
+
+/**
+ * @desc 把显式非全局树转成「根 / 一级 / 二级」卡片瀑布。
+ * 只保留当前条目可见的 Buff；空文件夹不渲染。
+ */
+export const buildBuffWaterfall = (
+    tree: BuffTreeState,
+    allBuffs: readonly BuffConf[],
+    visibleIds: ReadonlySet<string>,
+    team: readonly CharSlot[]
+): WaterfallSection[] => {
+    const buffById = new Map(allBuffs.map((buff) => [buff.id, buff]))
+    const pick = (nodes: readonly BuffTreeNode[]): BuffConf[] =>
+        nodes
+            .filter((node): node is Extract<BuffTreeNode, { kind: 'buff' }> => node.kind === 'buff')
+            .map((node) => buffById.get(node.buffId))
+            .filter((buff): buff is BuffConf => !!buff && visibleIds.has(buff.id))
+
+    const sections: WaterfallSection[] = []
+    const rootBuffs = pick(tree.nonGlobal)
+    if (rootBuffs.length > 0) {
+        sections.push({ key: '__ungrouped__', name: '未归组', buffs: rootBuffs, groups: [] })
+    }
+
+    for (const node of tree.nonGlobal) {
+        if (node.kind !== 'folder') continue
+        const direct = pick(node.children)
+        const groups: WaterfallGroup[] = []
+        for (const child of node.children) {
+            if (child.kind !== 'folder') continue
+            const buffs = pick(child.children)
+            if (buffs.length === 0) continue
+            groups.push({ key: child.id, name: child.name, iconSpec: deriveFolderIcon(child, buffById, team), buffs })
+        }
+        if (direct.length === 0 && groups.length === 0) continue
+        sections.push({
+            key: node.id,
+            name: node.name,
+            iconSpec: deriveFolderIcon(node, buffById, team),
+            buffs: direct,
+            groups
+        })
+    }
+    return sections
+}
+
+/** @desc 文件夹图标展示用的简短文案（1-2 / 4） */
+export const rangeText = (range: { from: number; to: number }): string =>
+    range.from === range.to ? String(range.from) : `${range.from}-${range.to}`
 export const findNextDirectEntry = (
     entries: readonly DamageEntry[],
     fromIndex: number,

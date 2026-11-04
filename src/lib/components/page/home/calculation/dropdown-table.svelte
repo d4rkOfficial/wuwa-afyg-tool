@@ -3,6 +3,7 @@
     import { tick } from 'svelte'
     import { slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
+    import { buffLeafName } from '$lib/calc/buff-name'
     import {
         getBuffSetIdsForEntry,
         toggleBuffSetForEntry,
@@ -14,7 +15,8 @@
         setDamageTypesForEntry,
         syncDamageTypesToSameName,
         countSameNameEntries,
-        getPaneEffectSources
+        getPaneEffectSources,
+        getBuffTree
     } from '$lib/calc/calculation.store.svelte'
     import {
         buildCharToIdx,
@@ -30,12 +32,13 @@
         zoneLabelsOf
     } from './damage-table.utils'
     import {
+        buildBuffWaterfall,
         buildEntryBuffDiff,
         findNextDirectEntry,
         findNextEffectEntry,
         findPrevDirectEntry,
         findPrevEffectEntry,
-        layeredChildLabel,
+        rangeText,
         visibleBuffSetsOf,
         type BuffDiffItem
     } from './dropdown-table.utils'
@@ -46,12 +49,12 @@
     import { attachSessionScroll } from '$lib/data/view-session'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { mergeClass } from '$lib/utils/component-style'
-    import { DAMAGE_TYPES, groupBuffSets } from '$lib/calc/calculation.consts'
-    import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
+    import { DAMAGE_TYPES } from '$lib/calc/calculation.consts'
     import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
     import type { ConditionProfile } from '$lib/calc/compute'
     import type { CharSlot } from '$lib/types/project'
     import type { CalcState } from '$lib/calc/calculation.types'
+    import type { FolderIconSpec } from '$lib/calc/buff-tree-state'
     import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
     import Chip from '$lib/components/ui/chip.svelte'
@@ -164,9 +167,10 @@
             matches: buffMatches
         })
     )
-    let groupedVisibleSets = $derived(groupBuffSets(visibleBuffSets))
-    let groupedFolderItems = $derived(groupedVisibleSets.filter((g) => g.type === 'folder'))
-    let groupedStandaloneItems = $derived(groupedVisibleSets.filter((g) => g.type !== 'folder'))
+    /** @desc 显式树 → 卡片瀑布（根 / 一级 / 二级；只保留当前条目可见 Buff） */
+    let waterfallSections = $derived(
+        buildBuffWaterfall(getBuffTree(), buffSets, new Set(visibleBuffSets.map((buff) => buff.id)), team)
+    )
 
     /** @desc Buff 差异模式的数据：逐条目对比上一段（同角色直伤 / 同名效应），标出 新增/移除/不变/全局 */
     let entryBuffDiff = $derived(
@@ -201,19 +205,10 @@
         onupdate(getCalcState())
     }
 
-    /** @desc 叠层文件夹整体勾选/取消（子项全选则全部取消，否则全选） */
-    function handleToggleFolder(folder: GroupedBuffConfItem) {
-        if (!expandedEntryId || !folder.children) return
-        const childIds = folder.children.map((c) => c.id)
-        setBuffSetIdsForEntry(expandedEntryId, toggleAllIds(childIds, selectedEntrySetIds))
-        onupdate(getCalcState())
-    }
-
-    /** @desc 叠层文件夹按前缀段批量勾选：前 index+1 个（1层、2层…）全选或全取消 */
-    function handleToggleBuffPrefix(folder: GroupedBuffConfItem, index: number) {
-        if (!expandedEntryId || !folder.children) return
-        const prefixIds = folder.children.slice(0, index + 1).map((c) => c.id)
-        setBuffSetIdsForEntry(expandedEntryId, toggleAllIds(prefixIds, selectedEntrySetIds))
+    /** @desc 文件夹整体勾选/取消（显式树） */
+    function handleToggleIds(ids: readonly string[]) {
+        if (!expandedEntryId || ids.length === 0) return
+        setBuffSetIdsForEntry(expandedEntryId, toggleAllIds([...ids], selectedEntrySetIds))
         onupdate(getCalcState())
     }
 
@@ -399,7 +394,7 @@
         }
     }}
 >
-    <table class="w-full text-xs table-fixed">
+    <table class="w-full border-x border-(--theme-divider-border) text-xs table-fixed sf-radius">
         <!-- 表头：来源 / 条目 / 视为（伤害类型） / Buff 四列，吸顶毛玻璃 -->
         <thead>
             <tr
@@ -520,7 +515,7 @@
                                             variant="plain"
                                             style="background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); color: var(--theme-accent-text);"
                                         >
-                                            {buffSet.name}
+                                            {buffLeafName(buffSet.name)}
                                         </Chip>
                                     {/if}
                                 {/each}
@@ -643,128 +638,127 @@
                                                 下一条
                                             </button>
                                         </div>
-                                        {#if groupedFolderItems.length > 0}
-                                            <div class="flex flex-wrap gap-1 mb-2">
-                                                {#each groupedFolderItems as item (item.key)}
-                                                    {@const folderActive = item.children!.some((c) =>
-                                                        selectedEntrySetIds.includes(c.id)
-                                                    )}
-                                                    <div
-                                                        class="flex flex-wrap items-center gap-1 rounded-none border px-2 py-1 text-xs transition-colors"
-                                                        style={folderActive
-                                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
-                                                            : 'background: var(--theme-card-bg); border-color: var(--theme-divider-border);'}
+                                        {#if waterfallSections.length > 0}
+                                            <div class="columns-1 gap-3 md:columns-2 2xl:columns-3">
+                                                {#each waterfallSections as section (section.key)}
+                                                    {@const sectionIds = [
+                                                        ...section.buffs.map((b) => b.id),
+                                                        ...section.groups.flatMap((g) => g.buffs.map((b) => b.id))
+                                                    ]}
+                                                    {@const sectionAll =
+                                                        sectionIds.length > 0 &&
+                                                        sectionIds.every((id) => selectedEntrySetIds.includes(id))}
+                                                    <section
+                                                        class="mb-3 break-inside-avoid space-y-1.5 rounded border p-2 sf-radius"
+                                                        style="border-color: var(--theme-divider-border);"
                                                     >
-                                                        <button
-                                                            onclick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleToggleFolder(item)
-                                                            }}
-                                                            class="shrink-0 transition-colors"
-                                                            class:text-(--theme-accent-text)={item.children!.some((c) =>
-                                                                selectedEntrySetIds.includes(c.id)
-                                                            )}
-                                                        >
-                                                            <Icon
-                                                                icon={item.children!.some((c) =>
-                                                                    selectedEntrySetIds.includes(c.id)
-                                                                )
-                                                                    ? 'mdi:check'
-                                                                    : 'mdi:close'}
-                                                                class="size-3"
-                                                            />
-                                                        </button>
-                                                        <span class="text-(--theme-modal-text)/70 whitespace-nowrap"
-                                                            >{item.prefixText}</span
-                                                        >
-                                                        <div class="flex flex-wrap gap-0.5">
-                                                            {#each item.children! as child, ci (child.id)}
-                                                                {@const childChecked = selectedEntrySetIds.includes(
-                                                                    child.id
+                                                        {#if section.key === '__ungrouped__'}
+                                                            <button
+                                                                type="button"
+                                                                onclick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleToggleIds(sectionIds)
+                                                                }}
+                                                                class="flex w-full items-center gap-1.5 rounded-none px-0.5 py-0.5 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/35 transition-colors hover:text-(--theme-accent-text)"
+                                                                title={sectionAll ? '全不选本组' : '全选本组'}
+                                                            >
+                                                                <span class="min-w-0 flex-1 truncate">未归组</span>
+                                                                <span class="shrink-0 tabular-nums opacity-70"
+                                                                    >{sectionIds.length}</span
+                                                                >
+                                                                <Icon
+                                                                    icon={sectionAll
+                                                                        ? 'mdi:checkbox-marked'
+                                                                        : 'mdi:checkbox-blank-outline'}
+                                                                    class="size-3.5 shrink-0"
+                                                                />
+                                                            </button>
+                                                        {:else}
+                                                            <button
+                                                                type="button"
+                                                                onclick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleToggleIds(sectionIds)
+                                                                }}
+                                                                class="flex w-full items-center gap-1.5 rounded-none px-0.5 py-0.5 text-left transition-colors hover:text-(--theme-accent-text)"
+                                                                title={sectionAll ? '全不选本组' : '全选本组'}
+                                                            >
+                                                                {@render folderSpecIcon(section.iconSpec)}
+                                                                <span
+                                                                    class="min-w-0 flex-1 truncate text-xs font-medium text-(--theme-modal-text)/70"
+                                                                    >{section.name}</span
+                                                                >
+                                                                <span
+                                                                    class="shrink-0 text-[10px] tabular-nums text-(--theme-modal-text)/30"
+                                                                    >{sectionIds.length}</span
+                                                                >
+                                                                <Icon
+                                                                    icon={sectionAll
+                                                                        ? 'mdi:checkbox-marked'
+                                                                        : 'mdi:checkbox-blank-outline'}
+                                                                    class="size-3.5 shrink-0 text-(--theme-modal-text)/35"
+                                                                />
+                                                            </button>
+                                                        {/if}
+                                                        {#if section.buffs.length > 0}
+                                                            <div
+                                                                class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-1.5"
+                                                            >
+                                                                {#each section.buffs as buff (buff.id)}
+                                                                    {@render buffCard(buff)}
+                                                                {/each}
+                                                            </div>
+                                                        {/if}
+                                                        {#each section.groups as group (group.key)}
+                                                            {@const groupAll =
+                                                                group.buffs.length > 0 &&
+                                                                group.buffs.every((b) =>
+                                                                    selectedEntrySetIds.includes(b.id)
                                                                 )}
+                                                            <div class="ml-2 space-y-1.5">
                                                                 <button
+                                                                    type="button"
                                                                     onclick={(e) => {
                                                                         e.stopPropagation()
-                                                                        if (e.ctrlKey || e.metaKey) {
-                                                                            handleToggleBuffPrefix(item, ci)
-                                                                        } else {
-                                                                            handleToggleBuffSetForEntry(child.id)
-                                                                        }
+                                                                        handleToggleIds(group.buffs.map((b) => b.id))
                                                                     }}
-                                                                    class={[
-                                                                        'rounded-none px-2 py-1 text-[10px] font-medium tabular-nums transition-colors min-w-[1.2em] text-center',
-                                                                        childChecked
-                                                                            ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/30'
-                                                                            : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70 hover:bg-(--theme-accent-bg)/10'
-                                                                    ].join(' ')}
+                                                                    class="flex w-full items-center gap-1.5 rounded-none px-0.5 py-0.5 text-left transition-colors hover:text-(--theme-accent-text)"
+                                                                    title={groupAll ? '全不选本组' : '全选本组'}
                                                                 >
-                                                                    {layeredChildLabel(child.name)}
-                                                                    {#if entryPaneSources[child.id] !== undefined}
-                                                                        <!-- @desc 影响源（叠层子项） -->
-                                                                        <span
-                                                                            class="ml-0.5 inline-flex shrink-0 align-middle"
-                                                                            title={paneSourceTooltip(child.id)}
-                                                                            style="color: var(--theme-accent-text);"
-                                                                        >
-                                                                            <Icon
-                                                                                icon="mdi:transit-connection-variant"
-                                                                                class="size-2.5"
-                                                                            />
-                                                                        </span>
-                                                                    {/if}
+                                                                    {@render folderSpecIcon(group.iconSpec)}
+                                                                    <span
+                                                                        class="min-w-0 flex-1 truncate text-[11px] text-(--theme-modal-text)/60"
+                                                                        >{group.name}</span
+                                                                    >
+                                                                    <span
+                                                                        class="shrink-0 text-[10px] tabular-nums text-(--theme-modal-text)/30"
+                                                                        >{group.buffs.length}</span
+                                                                    >
+                                                                    <Icon
+                                                                        icon={groupAll
+                                                                            ? 'mdi:checkbox-marked'
+                                                                            : 'mdi:checkbox-blank-outline'}
+                                                                        class="size-3.5 shrink-0 text-(--theme-modal-text)/35"
+                                                                    />
                                                                 </button>
-                                                            {/each}
-                                                        </div>
-                                                    </div>
+                                                                <div
+                                                                    class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-1.5"
+                                                                >
+                                                                    {#each group.buffs as buff (buff.id)}
+                                                                        {@render buffCard(buff)}
+                                                                    {/each}
+                                                                </div>
+                                                            </div>
+                                                        {/each}
+                                                    </section>
                                                 {/each}
                                             </div>
                                         {/if}
-                                        {#if groupedStandaloneItems.length > 0}
-                                            <div class="flex flex-wrap gap-1">
-                                                {#each groupedStandaloneItems as item (item.key)}
-                                                    {@const checked = selectedEntrySetIds.includes(item.buffSet!.id)}
-                                                    {@const paneSrc = entryPaneSources[item.buffSet!.id] !== undefined}
-                                                    <button
-                                                        onclick={(e) => {
-                                                            e.stopPropagation()
-                                                            handleToggleBuffSetForEntry(item.buffSet!.id)
-                                                        }}
-                                                        class={[
-                                                            'px-2 py-1 text-xs rounded-none transition-colors inline-flex items-center gap-1 border',
-                                                            checked
-                                                                ? ''
-                                                                : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/10'
-                                                        ].join(' ')}
-                                                        style={checked
-                                                            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); color: var(--theme-accent-text); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
-                                                            : 'background: var(--theme-card-bg); border-color: var(--theme-divider-border);'}
-                                                    >
-                                                        <Icon
-                                                            icon={checked ? 'mdi:check' : 'mdi:close'}
-                                                            class="size-3 shrink-0"
-                                                        />
-                                                        {item.buffSet!.name}
-                                                        {#if paneSrc}
-                                                            <!-- @desc 影响源：作用于本段引用到的角色面板，勾上即参与该角色在这一段的面板 -->
-                                                            <span
-                                                                class="shrink-0"
-                                                                title={paneSourceTooltip(item.buffSet!.id)}
-                                                                style="color: var(--theme-accent-text);"
-                                                            >
-                                                                <Icon
-                                                                    icon="mdi:transit-connection-variant"
-                                                                    class="size-3"
-                                                                />
-                                                            </span>
-                                                        {/if}
-                                                    </button>
-                                                {/each}
+                                        {#if waterfallSections.length === 0}
+                                            <div class="text-xs text-(--theme-modal-text)/30">
+                                                无可用 BUFF 块，点击底栏【BUFF配置】按钮进行配置
                                             </div>
                                         {/if}
-                                    {:else}
-                                        <div class="text-xs text-(--theme-modal-text)/30">
-                                            无可用 BUFF 块，点击底栏【BUFF配置】按钮进行配置
-                                        </div>
                                     {/if}
                                 </div>
                             </div>
@@ -779,6 +773,63 @@
         <EmptyState size="lg" class="flex items-center justify-center">暂无伤害数据</EmptyState>
     {/if}
 </div>
+
+<!-- @desc 文件夹图标（显式树派生）：头像/武器用 mdi 兜底，范围角标并排 -->
+{#snippet folderSpecIcon(spec: FolderIconSpec | undefined)}
+    {#if spec?.kind === 'character'}
+        <Icon icon="mdi:account-outline" class="size-3.5 shrink-0" style="color: var(--theme-accent-text);" />
+        {#each spec.chainRanges as range (range.from + '-' + range.to)}
+            <span
+                class="flex h-3 min-w-3 items-center justify-center rounded-none px-0.5 text-[8px] font-black leading-none"
+                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                >{rangeText(range)}</span
+            >
+        {/each}
+    {:else if spec?.kind === 'weapon'}
+        <Icon icon="mdi:sword" class="size-3.5 shrink-0" style="color: var(--theme-accent-text);" />
+        {#each spec.refineRanges as range (range.from + '-' + range.to)}
+            <span
+                class="flex h-3 min-w-3 items-center justify-center rounded-none px-0.5 text-[8px] font-black leading-none"
+                style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);"
+                >{rangeText(range)}</span
+            >
+        {/each}
+    {:else if spec?.kind === 'effect'}
+        <Icon icon="mdi:auto-fix" class="size-3.5 shrink-0 opacity-60" />
+    {:else}
+        <Icon icon="mdi:folder" class="size-3.5 shrink-0 opacity-40" />
+    {/if}
+{/snippet}
+
+{#snippet buffCard(buff: BuffConf)}
+    {@const checked = selectedEntrySetIds.includes(buff.id)}
+    {@const paneSrc = entryPaneSources[buff.id] !== undefined}
+    <button
+        type="button"
+        onclick={(e) => {
+            e.stopPropagation()
+            handleToggleBuffSetForEntry(buff.id)
+        }}
+        class={[
+            'flex min-w-0 items-center gap-1.5 rounded-none border px-2 py-1.5 text-left text-xs transition-colors',
+            checked ? 'text-(--theme-accent-text)' : 'text-(--theme-modal-text)/55 hover:text-(--theme-modal-text)/80'
+        ].join(' ')}
+        style={checked
+            ? 'background: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent); border-color: color-mix(in srgb, var(--theme-accent-bg) 40%, transparent);'
+            : 'background: var(--theme-card-bg); border-color: var(--theme-divider-border);'}
+    >
+        <Icon icon={checked ? 'mdi:check' : 'mdi:close'} class="size-3 shrink-0" />
+        {#if Array.isArray(buff.scope) && buff.scope.length === 0}
+            <Icon icon="mdi:auto-fix" class="size-3 shrink-0 opacity-60" />
+        {/if}
+        <span class="min-w-0 flex-1 truncate">{buffLeafName(buff.name)}</span>
+        {#if paneSrc}
+            <span class="shrink-0" title={paneSourceTooltip(buff.id)} style="color: var(--theme-accent-text);">
+                <Icon icon="mdi:transit-connection-variant" class="size-3" />
+            </span>
+        {/if}
+    </button>
+{/snippet}
 
 <!-- @desc 展开面板的区块标题（伤害类型 / 增益选择）：同一壳在两处复用 -->
 {#snippet panelSectionHead(icon: string, label: string)}

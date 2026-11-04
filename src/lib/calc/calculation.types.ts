@@ -116,6 +116,7 @@ export type BuffSource = 'user' | 'builtin'
  */
 export interface BuffInstance {
     id: string
+    /** @desc 全名：`文件夹A\文件夹B\buff短名`；根 Buff 直接是短名（反斜杠是层级分隔符） */
     name: string
     /** @desc 乘区贡献条目列表（同一乘区可多条，每条各自带生效条件） */
     zones: BuffZoneValue[]
@@ -131,6 +132,19 @@ export interface BuffInstance {
     origin?: { entity?: string; kind?: string }
 }
 
+/** @desc Buff 文件夹树的节点：文件夹或 Buff 叶。
+ * 文件夹最多两级；Buff 可以挂在根、一级文件夹或二级文件夹下。
+ */
+export type BuffTreeNode =
+    | { kind: 'folder'; id: string; name: string; children: BuffTreeNode[] }
+    | { kind: 'buff'; id: string; buffId: string }
+
+/** @desc 显式 Buff 文件夹树：全局 / 非全局两个根（视图上就是两个受保护的根文件夹） */
+export interface BuffTreeState {
+    global: BuffTreeNode[]
+    nonGlobal: BuffTreeNode[]
+}
+
 /** @desc 拉表页「某段伤害」的配置：伤害类型（条件判定写在 Buff 乘区上，不在此） */
 export interface DamageEntryConfig {
     damageTypes?: string[]
@@ -143,6 +157,10 @@ export interface CalcState {
     damageEntryDamageTypes: Record<string, string[]>
     /** @desc 伤害条目显示名覆盖（只改界面/AI 看到的 displayName，不改底层命中 id 与绑定关系） */
     damageEntryDisplayNames?: Record<string, string>
+    /** @desc 显式 Buff 文件夹树（全局 / 非全局两个根；随工程导入导出） */
+    buffTree?: BuffTreeState
+    /** @desc 树迁移版本（旧无版本/0 的树会重跑一次数字前后缀迁移） */
+    buffTreeVersion?: number
 }
 
 /** @desc 工程 Buff 配置：使用统一 Buff 实例结构，与主页 Buff 集区分命名 */

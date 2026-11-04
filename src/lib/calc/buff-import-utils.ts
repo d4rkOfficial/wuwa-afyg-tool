@@ -6,16 +6,30 @@ import type { CharSlot } from '$lib/types/project'
 import type { ImportBuffInput } from './calculation.store.svelte'
 import type { BuffCondition, BuffConf, BuffZoneValue } from './calculation.types'
 import { ownerIdxFor, ownerIdxOfItem, rewriteOwnerInZones } from './buff-owner'
+import { buffLeafName, joinBuffPath } from './buff-name'
+import { coarsePathOf } from './buff-tree-state'
 
 export type { BuffLibraryEntity }
 export { ownerIdxFor, ownerIdxOfItem, primaryOwnerOf, rewriteOwnerInCondition, rewriteOwnerInZones } from './buff-owner'
 
 export function toImportItem(
     b: { name: string; scope?: BuffLibraryScope; condition?: BuffCondition; zones: ImportBuffInput['zones'] },
-    ownerIdx: number
+    ownerIdx: number,
+    team?: [CharSlot, CharSlot, CharSlot]
 ): ImportBuffInput {
+    const leaf = buffLeafName(b.name)
+    const coarse = coarsePathOf(
+        {
+            id: '',
+            name: leaf,
+            zones: [],
+            scope: 'all',
+            condition: b.condition
+        } as BuffConf,
+        team ?? []
+    )
     return {
-        name: b.name,
+        name: joinBuffPath(coarse.folder, leaf),
         scope: b.scope,
         ownerIdx,
         ...(b.condition ? { condition: b.condition } : {}),
@@ -32,24 +46,42 @@ export function buildEntityImportItems(
     entity: BuffLibraryEntity,
     team: [CharSlot, CharSlot, CharSlot] | undefined
 ): ImportBuffInput[] {
+    return buildBuffImportItems(entity, entity.buffs, team)
+}
+
+/** @desc 精细导入：只取实体中被勾选的 Buff，其余归属重指口径与整实体导入一致 */
+export function buildBuffImportItems(
+    entity: BuffLibraryEntity,
+    buffs: readonly BuffLibraryBuff[],
+    team: [CharSlot, CharSlot, CharSlot] | undefined
+): ImportBuffInput[] {
     const owners = ownerIdxFor(team, entity)
     const firstOwner = owners[0] ?? -1
-    const selfItemsFor = (owner: number): ImportBuffInput[] =>
-        entity.buffs
-            .filter((b) => b.scope === 'self')
-            .map((b) =>
-                toImportItem({ name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones }, owner)
-            )
     if (owners.length > 1) {
-        const otherItems = entity.buffs
+        const selfItems = owners.flatMap((owner) =>
+            buffs
+                .filter((b) => b.scope === 'self')
+                .map((b) =>
+                    toImportItem(
+                        { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
+                        owner,
+                        team
+                    )
+                )
+        )
+        const otherItems = buffs
             .filter((b) => b.scope !== 'self')
             .map((b) =>
-                toImportItem({ name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones }, firstOwner)
+                toImportItem(
+                    { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
+                    firstOwner,
+                    team
+                )
             )
-        return [...owners.flatMap(selfItemsFor), ...otherItems]
+        return [...selfItems, ...otherItems]
     }
-    return entity.buffs.map((b: BuffLibraryBuff) =>
-        toImportItem({ name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones }, firstOwner)
+    return buffs.map((b: BuffLibraryBuff) =>
+        toImportItem({ name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones }, firstOwner, team)
     )
 }
 

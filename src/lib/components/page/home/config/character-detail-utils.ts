@@ -159,19 +159,24 @@ export function computeCharStats(
     // 兼容旧工程：无任何全局 buff 时回退到原 global-角色名 匹配
     const fallbackGlobalBuffs = (calcState?.buffSets ?? []).filter((bs) => bs.id === charGlobalId)
     const effectiveGlobalBuffs = globalBuffs.length > 0 ? globalBuffs : fallbackGlobalBuffs
+    const conditionProfile = getConditionProfile()
     for (const bs of effectiveGlobalBuffs) {
-        // 链/阶门槛：角色共鸣链 / 武器精炼配置不满足则不计入该加成
+        // 链/阶门槛：与引擎 `evaluateCondition` 同口径（新结构 chains/refinements 与旧字段 chain/refinement 都认）
         const cond = bs.condition
-        if (cond && (cond.chain !== undefined || cond.refinement !== undefined)) {
-            const refIdx = bs.conditionRefCharIdx ?? idx
-            if (cond.chain !== undefined) {
-                if (refIdx < 0) continue
-                if ((getConditionProfile().chains[refIdx] ?? 0) < cond.chain) continue
-            }
-            if (cond.refinement !== undefined) {
-                if (refIdx < 0) continue
-                if ((getConditionProfile().refinements[refIdx] ?? 1) < cond.refinement) continue
-            }
+        const refIdx = bs.conditionRefCharIdx ?? idx
+        const chainClauses = [
+            ...(cond?.chains ?? []),
+            ...(cond?.chain !== undefined ? [{ charIdx: refIdx, min: cond.chain }] : [])
+        ]
+        const refineClauses = [
+            ...(cond?.refinements ?? []),
+            ...(cond?.refinement !== undefined ? [{ charIdx: refIdx, min: cond.refinement }] : [])
+        ]
+        // 链/阶二选一；同类子句内部为「与」（与引擎运行时护栏一致）
+        if (chainClauses.length > 0) {
+            if (!chainClauses.every((c) => (conditionProfile.chains[c.charIdx] ?? 0) >= c.min)) continue
+        } else if (refineClauses.length > 0) {
+            if (!refineClauses.every((c) => (conditionProfile.refinements[c.charIdx] ?? 1) >= c.min)) continue
         }
         // 软条件（伤害属性/伤害类型）语义：
         // - 面板数值（攻击/生命/防御/充能/偏谐/双暴等非加成项）：带任何软条件一律不计入面板

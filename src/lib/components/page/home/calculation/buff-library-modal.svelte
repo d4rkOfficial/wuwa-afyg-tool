@@ -290,6 +290,7 @@
             entityType: row.entityType,
             entityName: row.entityName,
             source: existing?.source ?? 'custom',
+            folders: existing?.folders ?? [],
             buffs: existing?.buffs ?? []
         }
     }
@@ -665,6 +666,7 @@
         entityType={editTarget.entityType}
         entityName={editTarget.entityName}
         initialBuffs={editTarget.buffs}
+        initialFolders={editTarget.folders}
         onclose={() => (editTarget = null)}
     />
 {/if}

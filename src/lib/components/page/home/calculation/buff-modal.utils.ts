@@ -402,6 +402,8 @@ export interface DragState {
     /** @desc 插入指示条位置：显示在 dropBeforeId 这一行上方 / dropAfterId 这一行下方 */
     dropBeforeId: string | null
     dropAfterId: string | null
+    /** @desc 手动模式下指针悬停的手动文件夹行 key（`manual:<id>`）；非空时松手 = 移入该文件夹 */
+    dropFolderKey: string | null
 }
 
 /** @desc 构造拖拽起始状态（落点即当前下标，未拖出） */
@@ -420,5 +422,6 @@ export const createDragState = (
     dropIdx: idx,
     outside: false,
     dropBeforeId: null,
-    dropAfterId: null
+    dropAfterId: null,
+    dropFolderKey: null
 })

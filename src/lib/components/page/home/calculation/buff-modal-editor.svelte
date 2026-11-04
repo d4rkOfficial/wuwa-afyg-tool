@@ -19,6 +19,7 @@
     import type { ComponentsProps } from '$lib/types'
     import type { CharSlot } from '$lib/types/project'
     import type { BuffCondition, BuffConf, BuffZoneValue } from '$lib/calc/calculation.types'
+    import { buffLeafName } from '$lib/calc/buff-name'
     import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
     import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import { fallbackIcon } from '$lib/utils/icons'
@@ -139,11 +140,11 @@
     }: Props = $props()
 
     /** @desc 名称编辑草稿 */
-    let renameValue = $state(selectedBuffSet.name)
+    let renameValue = $state(buffLeafName(selectedBuffSet.name))
     /** @desc 切换选中块时同步重命名输入框内容 */
     $effect(() => {
         selectedBuffSet.id
-        renameValue = selectedBuffSet.name
+        renameValue = buffLeafName(selectedBuffSet.name)
     })
     /** @desc 名称编辑保存（Enter/失焦触发；空名兜底） */
     const handleRenameInline = () => onrename(renameValue.trim() || '未命名BUFF块')
@@ -163,7 +164,7 @@
             {#if isDefaultGlobal}
                 <input
                     type="text"
-                    value={selectedBuffSet.name}
+                    value={buffLeafName(selectedBuffSet.name)}
                     readonly
                     class="flex-1 min-w-0 rounded-none border px-2 py-1.5 text-xs font-medium outline-none text-(--theme-modal-text) cursor-default"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"

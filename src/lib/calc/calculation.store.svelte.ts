@@ -2,6 +2,8 @@
 import type {
     BuffConf,
     BuffZoneValue,
+    BuffTreeState,
+    BuffTreeNode,
     CalcState,
     DamageEntry,
     DamageEntryConfig,
@@ -26,10 +28,28 @@ import {
     withOwnerBodyGate
 } from './condition'
 import { paneEffectSourcesOf, type PaneEffectSource } from './pane-effects'
+import { rebuildGlobalBindings } from './global-bindings'
+import {
+    appendBuffToTree,
+    BUFF_TREE_VERSION,
+    cloneBuffTree,
+    coarsePathOf,
+    collectBuffIds,
+    emptyBuffTree,
+    findNode,
+    migrateLegacyBuffTree,
+    normalizeBuffFullNames,
+    normalizeBuffTree,
+    pathNamesOf,
+    uniqueBuffFullName
+} from './buff-tree-state'
+import { buffFolderPath, buffLeafName, joinBuffPath, sanitizeLeafName, uniqueLeafName } from './buff-name'
 import { ownerIdxOfItem, rewriteOwnerInCondition } from './buff-owner'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffConf[]>([])
+/** @desc 显式 Buff 文件夹树（global / nonGlobal 两个根） */
+let _buffTree = $state<BuffTreeState>(emptyBuffTree())
 let _damageEntryBuffSetIds = $state<Record<string, string[]>>({})
 let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
 /** @desc 伤害条目显示名覆盖（不改底层 id / 绑定） */
@@ -111,6 +131,13 @@ const applyTableSnapshot = (snap: CalcState): void => {
     _damageEntryBuffSetIds = JSON.parse(JSON.stringify(snap.damageEntryBuffSetIds ?? {}))
     _damageEntryDamageTypes = JSON.parse(JSON.stringify(snap.damageEntryDamageTypes ?? {}))
     _damageEntryDisplayNames = JSON.parse(JSON.stringify(snap.damageEntryDisplayNames ?? {}))
+    _buffTree = snap.buffTree
+        ? normalizeBuffTree(
+              snap.buffTree,
+              _buffSets,
+              snap.buffSets.filter((b) => b.global).map((b) => b.id)
+          )
+        : emptyBuffTree()
     _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
     if (_onupdate) {
         _updateInFlight = true
@@ -283,6 +310,15 @@ export function init(
         _damageEntryDisplayNames = {}
     }
     _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
+    _buffSets = normalizeBuffFullNames(_buffSets)
+    if (savedState?.buffTree && (savedState.buffTreeVersion ?? 0) >= BUFF_TREE_VERSION) {
+        _buffTree = normalizeBuffTree(savedState.buffTree, _buffSets, _globalBuffSetIds)
+    } else {
+        const migrated = migrateLegacyBuffTree(_buffSets, _initTeam ?? [])
+        _buffSets = migrated.buffs
+        _globalBuffSetIds = _buffSets.filter((bs) => bs.global).map((bs) => bs.id)
+        _buffTree = migrated.tree
+    }
     rebindGlobalBuffs()
     if (identityChanged) {
         // 身份变化（换工程/换队伍/换锁定态）：清空历史，避免把上一个身份的表格状态撤销回来；
@@ -576,16 +612,46 @@ export function takePendingFocusBuffSetId(): string | null {
 }
 
 /** @desc 新建空 Buff 块（随机 id，默认全队作用域），返回新块 id */
-export function createBuffSet(name: string): string | undefined {
+export function createBuffSet(
+    name: string,
+    placement?: { tab: 'global' | 'nonGlobal'; folderId?: string | null }
+): string | undefined {
     if (!assertUnlocked()) return undefined
+    const tab = placement?.tab ?? 'nonGlobal'
+    const folderId = placement?.folderId ?? null
+    const tree = getBuffTree()
+    const targetChildren =
+        folderId !== null
+            ? (() => {
+                  const found = findNode(tree, folderId)
+                  return found?.node.kind === 'folder' ? found.node.children : tree[tab]
+              })()
+            : tree[tab]
+    const buffById = new Map(_buffSets.map((buff) => [buff.id, buff]))
+    const siblingNames = new Set(
+        targetChildren.map((node) =>
+            node.kind === 'folder' ? node.name : buffLeafName(buffById.get(node.buffId)?.name ?? '')
+        )
+    )
+    const folderPath = folderId !== null ? (pathNamesOf(tree, folderId, buffById) ?? []) : []
+    const finalLeaf = uniqueLeafName(sanitizeLeafName(name) || '未命名BUFF块', siblingNames)
+    const finalName = joinBuffPath(...folderPath, finalLeaf)
     const buffSet: BuffConf = {
         id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        name,
+        name: finalName,
         zones: [],
-        scope: 'all'
+        scope: 'all',
+        ...(tab === 'global' ? { global: true } : {})
     }
     markTableDirty()
     _buffSets = [..._buffSets, buffSet]
+    if (tab === 'global') _globalBuffSetIds = [..._globalBuffSetIds, buffSet.id]
+    targetChildren.push({ kind: 'buff', id: buffSet.id, buffId: buffSet.id })
+    _buffTree = normalizeBuffTree(
+        tree,
+        _buffSets,
+        _buffSets.filter((b) => b.global).map((b) => b.id)
+    )
     return buffSet.id
 }
 
@@ -696,8 +762,8 @@ export function importBuffSetsWithDecisions(
 
     for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
         const item = items[itemIndex]
-        const name = item.name.trim()
-        if (!name) continue
+        const rawName = item.name.trim()
+        if (!rawName) continue
         const owner = ownerIdxOfItem(item, ownerIdx)
         // 逐条决议优先于批量决议（冲突弹窗里可以单独改某一条）
         const overwrite = (decisions.sameNamePerIndex?.[itemIndex] ?? decisions.sameName) === 'overwrite'
@@ -739,8 +805,25 @@ export function importBuffSetsWithDecisions(
             if (hadGate) report.reowned++
         }
 
-        // ② 同名冲突：跳过 or 覆盖（覆盖 = 删掉旧的同一条，再写入新的）
-        const sameName = _buffSets.filter((s) => s.name === name)
+        // ② 全名：丢掉来源路径，只取短名，再按工程条件粗分拼新路径
+        const leaf = buffLeafName(rawName)
+        const coarse = coarsePathOf(
+            {
+                id: itemIndex.toString(),
+                name: leaf,
+                zones,
+                scope: mapImportedScope(item.scope, owner, teamSize),
+                condition: item.condition
+            } as BuffConf,
+            _initTeam ?? []
+        )
+        const name = joinBuffPath(coarse.folder, leaf)
+        const mappedScope = mapImportedScope(item.scope, owner, teamSize)
+
+        // ③ 同名冲突：同名 + 同作用域才算同一条（同实体多主人时允许同名、各自绑定）
+        const sameName = _buffSets.filter(
+            (s) => s.name === name && JSON.stringify(s.scope) === JSON.stringify(mappedScope)
+        )
         if (sameName.length > 0) {
             if (!overwrite) {
                 report.skipped += sameName.length
@@ -760,7 +843,7 @@ export function importBuffSetsWithDecisions(
             id: `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name,
             zones,
-            scope: mapImportedScope(item.scope, owner, teamSize),
+            scope: mappedScope,
             ...(isConditionEmpty(condition) ? {} : { condition }),
             ...(owner >= 0 && !isConditionEmpty(condition) ? { conditionRefCharIdx: owner } : {})
         })
@@ -770,7 +853,7 @@ export function importBuffSetsWithDecisions(
     if (decisions.renameIdentical && decisions.identicalRenames?.length) {
         for (const r of decisions.identicalRenames) {
             if (_buffSets.some((s) => s.id === r.id && s.name !== r.name)) {
-                renameBuffSet(r.id, r.name)
+                renameBuffSet(r.id, buffLeafName(r.name))
                 report.renamed++
             }
         }
@@ -784,6 +867,7 @@ export function importBuffSetsWithDecisions(
         fresh.sort((a, b) => compareNatural(a.name, b.name))
         markTableDirty()
         _buffSets = [..._buffSets, ...fresh]
+        appendImportedBuffsToTree(fresh.map((buff) => buff.id))
     } else if (toRemove.size > 0) {
         markTableDirty()
     }
@@ -823,15 +907,28 @@ export function compareNatural(a: string, b: string): number {
 }
 
 /** @desc 复制 Buff 块（插入到原块之后，返回新 id；复制品自动解除全局） */
-export function duplicateBuffSet(id: string, customName?: string): string | undefined {
+export function duplicateBuffSet(
+    id: string,
+    customName?: string,
+    placement?: { tab: 'global' | 'nonGlobal'; folderId: string | null; index: number }
+): string | undefined {
     if (!assertUnlocked()) return
     const source = _buffSets.find((s) => s.id === id)
     if (!source) return
     const newId = `buffSet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    const sourceTree = getBuffTree()
+    const buffById = new Map(_buffSets.map((buff) => [buff.id, buff]))
+    const folderPath = placement
+        ? placement.folderId !== null
+            ? (pathNamesOf(sourceTree, placement.folderId, buffById) ?? [])
+            : []
+        : buffFolderPath(source.name)
+    const requested = customName ? sanitizeLeafName(customName) : ''
+    const leaf = requested || `${buffLeafName(source.name)} 复制`
     const buffSet: BuffConf = {
         ...source,
         id: newId,
-        name: customName ?? source.name + ' 复制',
+        name: joinBuffPath(...folderPath, leaf),
         global: false
     }
     const idx = _buffSets.findIndex((s) => s.id === id)
@@ -839,6 +936,25 @@ export function duplicateBuffSet(id: string, customName?: string): string | unde
     next.splice(idx + 1, 0, buffSet)
     markTableDirty()
     _buffSets = next
+    if (placement) {
+        const tree = getBuffTree()
+        const located = placement.folderId !== null ? findNode(tree, placement.folderId) : null
+        const children =
+            located?.node.kind === 'folder'
+                ? located.node.children
+                : placement.folderId === null
+                  ? tree[placement.tab]
+                  : null
+        if (children) {
+            const insertAt = Math.min(placement.index + 1, children.length)
+            children.splice(insertAt, 0, { kind: 'buff', id: newId, buffId: newId })
+            _buffTree = normalizeBuffTree(
+                tree,
+                _buffSets,
+                _buffSets.filter((b) => b.global).map((b) => b.id)
+            )
+        }
+    }
     return newId
 }
 
@@ -1030,11 +1146,18 @@ export function setBuffSetGlobal(id: string, global: boolean): boolean {
     if (!assertUnlocked()) return false
     const bs = _buffSets.find((s) => s.id === id)
     if (!bs) return false
+    const buffById = new Map(_buffSets.map((buff) => [buff.id, buff]))
+    const movedTree =
+        bs.global === global
+            ? _buffTree
+            : moveBuffNodesToTabPath(_buffTree, [id], global ? 'global' : 'nonGlobal', buffById)
     markTableDirty()
     _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, global } : s))
     _globalBuffSetIds = global
         ? [..._globalBuffSetIds.filter((sid) => sid !== id), id]
         : _globalBuffSetIds.filter((sid) => sid !== id)
+    _buffTree = normalizeBuffTree(movedTree, _buffSets, _globalBuffSetIds)
+    syncBuffNamesFromTree(_buffTree)
 
     if (global) {
         const next: Record<string, string[]> = {}
@@ -1065,6 +1188,7 @@ export function deleteBuffSet(id: string) {
         if (filtered.length > 0) next[entryId] = filtered
     }
     _damageEntryBuffSetIds = next
+    removeBuffNodesFromTree([id])
 }
 
 /** @desc 批量删除 Buff 块（跳过全局 buff），同时清理所有条目上的绑定 */
@@ -1081,6 +1205,7 @@ export function deleteBuffSets(ids: string[]) {
         if (filtered.length > 0) next[entryId] = filtered
     }
     _damageEntryBuffSetIds = next
+    removeBuffNodesFromTree(targets)
 }
 
 /** @desc 批量并入/移出全局（跳过 global- 内置块），并入时清理条目绑定并重建全局自动绑定 */
@@ -1089,10 +1214,21 @@ export function setBuffSetsGlobal(ids: string[], global: boolean): boolean {
     const targets = ids.filter((id) => !id.startsWith('global-') && _buffSets.some((s) => s.id === id))
     if (targets.length === 0) return false
     const idSet = new Set(targets)
+    const buffById = new Map(_buffSets.map((buff) => [buff.id, buff]))
+    const treeMoving = targets.filter((id) => {
+        const buff = _buffSets.find((s) => s.id === id)
+        return buff ? buff.global !== global : false
+    })
+    const movedTree =
+        treeMoving.length > 0
+            ? moveBuffNodesToTabPath(_buffTree, treeMoving, global ? 'global' : 'nonGlobal', buffById)
+            : _buffTree
     _buffSets = _buffSets.map((s) => (idSet.has(s.id) ? { ...s, global } : s))
     _globalBuffSetIds = global
         ? [..._globalBuffSetIds.filter((sid) => !idSet.has(sid)), ...targets]
         : _globalBuffSetIds.filter((sid) => !idSet.has(sid))
+    _buffTree = normalizeBuffTree(movedTree, _buffSets, _globalBuffSetIds)
+    syncBuffNamesFromTree(_buffTree)
     if (global) {
         const next: Record<string, string[]> = {}
         for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
@@ -1109,11 +1245,19 @@ export function setBuffSetsGlobal(ids: string[], global: boolean): boolean {
     return true
 }
 
-/** @desc 重命名 Buff 块 */
+/** @desc 重命名 Buff 块（输入短名；按当前父文件夹路径拼全名） */
 export function renameBuffSet(id: string, name: string) {
     if (!assertUnlocked()) return
+    if (name.includes('\\')) return
+    const leaf = sanitizeLeafName(name)
+    if (!leaf) return
+    const tree = getBuffTree()
+    const located = findNode(tree, id)
+    const buffById = new Map(_buffSets.map((buff) => [buff.id, buff]))
+    const folderPath = located?.parentFolder != null ? (pathNamesOf(tree, located.parentFolder.id, buffById) ?? []) : []
+    const full = joinBuffPath(...folderPath, leaf)
     markTableDirty()
-    _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, name } : s))
+    _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, name: full } : s))
 }
 
 /** @desc 给 Buff 块新增一个乘区条目（默认值 0；同一乘区可添加多次） */
@@ -1393,14 +1537,271 @@ export function getGlobalBuffSetIds(): string[] {
     return _globalBuffSetIds
 }
 
+// ── 显式 Buff 文件夹树 ──
+
+/** @desc 读显式树（按当前 Buff/global 状态归一化） */
+export function getBuffTree(): BuffTreeState {
+    return normalizeBuffTree(_buffTree, _buffSets, _globalBuffSetIds)
+}
+
+/** @desc 读某个 tab 的根节点列表 */
+export function getBuffTreeRoot(tab: 'global' | 'nonGlobal'): BuffTreeNode[] {
+    return getBuffTree()[tab]
+}
+
+/** @desc 树是文件夹/排序真源：把每个 Buff 的全名同步成「树路径 + 短名」 */
+const syncBuffNamesFromTree = (tree: BuffTreeState): void => {
+    const buffById = new Map(_buffSets.map((buff) => [buff.id, buff]))
+    const names = new Map<string, string>()
+    const walk = (nodes: readonly BuffTreeNode[], folderPath: string[]): void => {
+        for (const node of nodes) {
+            if (node.kind === 'folder') {
+                walk(node.children, [...folderPath, node.name])
+                continue
+            }
+            const buff = buffById.get(node.buffId)
+            if (!buff) continue
+            names.set(buff.id, joinBuffPath(...folderPath, buffLeafName(buff.name)))
+        }
+    }
+    walk(tree.global, [])
+    walk(tree.nonGlobal, [])
+    if (names.size === 0) return
+    _buffSets = _buffSets.map((buff) => {
+        const name = names.get(buff.id)
+        return name && name !== buff.name ? { ...buff, name } : buff
+    })
+}
+
+const commitBuffTree = (next: BuffTreeState): void => {
+    markTableDirty()
+    // 改名/移动文件夹时先把后代全名改到新路径，再按名字归一化，避免被旧名字拉回旧文件夹
+    syncBuffNamesFromTree(next)
+    _buffTree = normalizeBuffTree(next, _buffSets, _globalBuffSetIds)
+    syncBuffNamesFromTree(_buffTree)
+    if (_onupdate) {
+        _updateInFlight = true
+        _onupdate(getCalcState())
+    }
+}
+
+/** @desc 从树里移除若干 Buff 节点（删除 Buff 后同步；不单独 mark） */
+const removeBuffNodesFromTree = (ids: readonly string[]): void => {
+    if (ids.length === 0) return
+    const idSet = new Set(ids)
+    const filter = (nodes: readonly BuffTreeNode[]): BuffTreeNode[] =>
+        nodes
+            .filter((node) => node.kind !== 'buff' || !idSet.has(node.buffId))
+            .map((node) => (node.kind === 'folder' ? { ...node, children: filter(node.children) } : node))
+    _buffTree = normalizeBuffTree(
+        { global: filter(_buffTree.global), nonGlobal: filter(_buffTree.nonGlobal) },
+        _buffSets,
+        _globalBuffSetIds
+    )
+}
+
+const makeTreeFolderId = (): string => `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+
+/** @desc 导入 Buff：按全名路径纯追加；同文件夹撞名 Buff 末尾补 `#` */
+const appendImportedBuffsToTree = (ids: readonly string[]): void => {
+    if (ids.length === 0) return
+    const buffById = new Map(_buffSets.map((buff) => [buff.id, buff]))
+    let tree = getBuffTree()
+    for (const id of ids) {
+        const buff = buffById.get(id)
+        if (!buff) continue
+        const desired = uniqueBuffFullName(tree, buff, buffById)
+        if (desired !== buff.name) {
+            const renamed = { ...buff, name: desired }
+            buffById.set(id, renamed)
+            _buffSets = _buffSets.map((item) => (item.id === id ? renamed : item))
+        }
+        tree = appendBuffToTree(tree, buffById.get(id)!, _initTeam ?? [], buffById)
+    }
+    _buffTree = normalizeBuffTree(tree, _buffSets, _globalBuffSetIds)
+}
+
+/** @desc 根目录或某文件夹的直接子节点 */
+const childrenOfContainer = (
+    tree: BuffTreeState,
+    containerId: string | null,
+    tab: 'global' | 'nonGlobal'
+): BuffTreeNode[] | null => {
+    if (containerId === null) return tree[tab]
+    const located = findNode(tree, containerId)
+    return located?.node.kind === 'folder' ? located.node.children : null
+}
+
+const folderDepthOf = (tree: BuffTreeState, folderId: string | null): number | null => {
+    if (folderId === null) return 0
+    const walk = (nodes: readonly BuffTreeNode[], depth: number): number | null => {
+        for (const node of nodes) {
+            if (node.kind !== 'folder') continue
+            if (node.id === folderId) return depth
+            const found = walk(node.children, depth + 1)
+            if (found !== null) return found
+        }
+        return null
+    }
+    return walk([...tree.global, ...tree.nonGlobal], 1)
+}
+
+/** @desc 新建文件夹（同级唯一；文件夹最多两级） */
+export function createBuffTreeFolder(
+    name: string,
+    tab: 'global' | 'nonGlobal',
+    parentId: string | null = null
+): string | undefined {
+    if (!assertUnlocked()) return
+    const tree = getBuffTree()
+    const parentDepth = folderDepthOf(tree, parentId)
+    if (parentDepth === null || parentDepth >= 2) return
+    const children = childrenOfContainer(tree, parentId, tab)
+    if (!children) return
+    if (name.includes('\\')) return
+    const folderName = name.trim().slice(0, 40)
+    if (!folderName) return
+    if (children.some((node) => node.kind === 'folder' && node.name === folderName)) return
+    const id = makeTreeFolderId()
+    children.push({ kind: 'folder', id, name: folderName, children: [] })
+    commitBuffTree(tree)
+    return id
+}
+
+/** @desc 重命名文件夹（同级唯一） */
+export function renameBuffTreeFolder(id: string, name: string): void {
+    if (!assertUnlocked()) return
+    const nextName = name.trim().slice(0, 40)
+    if (!nextName || nextName.includes('\\')) return
+    const tree = getBuffTree()
+    const located = findNode(tree, id)
+    if (!located || located.node.kind !== 'folder') return
+    const siblings = located.parent ?? []
+    if (siblings.some((node) => node.id !== id && node.kind === 'folder' && node.name === nextName)) return
+    located.node.name = nextName
+    commitBuffTree(tree)
+}
+
+/** @desc 删除非全局文件夹（递归删除文件夹与其中 Buff；全局树保护，不可删） */
+export function deleteBuffTreeFolder(id: string): boolean {
+    if (!assertUnlocked()) return false
+    const tree = getBuffTree()
+    const located = findNode(tree, id)
+    if (!located || located.node.kind !== 'folder') return false
+    if (located.tab === 'global') return false
+    const buffIds = collectBuffIds([located.node])
+    if (located.parent) {
+        const index = located.parent.indexOf(located.node)
+        if (index >= 0) located.parent.splice(index, 1)
+    }
+    if (buffIds.length > 0) deleteBuffSets(buffIds)
+    commitBuffTree(tree)
+    return true
+}
+
+/** @desc 移动文件夹 / Buff 到某个容器；保持同一 tab，检查深度与自嵌套 */
+export function moveBuffTreeNode(id: string, targetFolderId: string | null): boolean {
+    if (!assertUnlocked()) return false
+    const tree = getBuffTree()
+    const located = findNode(tree, id)
+    if (!located) return false
+    const targetChildren = childrenOfContainer(tree, targetFolderId, located.tab)
+    if (!targetChildren) return false
+    if (located.node.kind === 'folder') {
+        if (targetFolderId === id) return false
+        const targetDepth = folderDepthOf(tree, targetFolderId)
+        if (targetDepth === null || targetDepth >= 2) return false
+        // 把带子文件夹的一级塞进另一级会产生三级文件夹
+        if (targetFolderId && located.node.children.some((child) => child.kind === 'folder')) return false
+        // 不能把文件夹塞进自己的后代
+        const contains = (nodes: readonly BuffTreeNode[], target: string): boolean =>
+            nodes.some((node) => node.kind === 'folder' && (node.id === target || contains(node.children, target)))
+        if (targetFolderId && contains(located.node.children, targetFolderId)) return false
+    }
+    const source = located.parent
+    if (!source) return false
+    const index = source.indexOf(located.node)
+    if (index >= 0) source.splice(index, 1)
+    targetChildren.push(located.node)
+    commitBuffTree(tree)
+    return true
+}
+
+/** @desc 文件夹在同级上移/下移（全局树也允许） */
+export function moveBuffFolderSibling(id: string, delta: -1 | 1): void {
+    if (!assertUnlocked()) return
+    const tree = getBuffTree()
+    const located = findNode(tree, id)
+    if (!located || located.node.kind !== 'folder' || !located.parent) return
+    const index = located.parent.indexOf(located.node)
+    const target = index + delta
+    if (index < 0 || target < 0 || target >= located.parent.length) return
+    const [node] = located.parent.splice(index, 1)
+    located.parent.splice(target, 0, node)
+    commitBuffTree(tree)
+}
+
+/** @desc 重排某容器的直接子节点（parentKey=global/nonGlobal/文件夹 id） */
+export function reorderBuffTreeChildren(parentKey: string, orderedIds: readonly string[]): void {
+    if (!assertUnlocked()) return
+    const tree = getBuffTree()
+    const isRoot = parentKey === 'global' || parentKey === 'nonGlobal'
+    const children = isRoot
+        ? tree[parentKey as 'global' | 'nonGlobal']
+        : childrenOfContainer(tree, parentKey, 'nonGlobal')
+    if (!children) return
+    const byId = new Map(children.map((node) => [node.id, node] as const))
+    const reordered = orderedIds.map((id) => byId.get(id)).filter((node): node is BuffTreeNode => !!node)
+    const remaining = children.filter((node) => !orderedIds.includes(node.id))
+    children.splice(0, children.length, ...reordered, ...remaining)
+    commitBuffTree(tree)
+}
+
+/** @desc 切换 global 前按全名路径把 Buff 搬到目标 tab（源文件夹保留） */
+const moveBuffNodesToTabPath = (
+    tree: BuffTreeState,
+    buffIds: readonly string[],
+    toTab: 'global' | 'nonGlobal',
+    buffById: ReadonlyMap<string, BuffConf>
+): BuffTreeState => {
+    const next = cloneBuffTree(tree)
+    for (const buffId of buffIds) {
+        const path = pathNamesOf(next, buffId, buffById)
+        const located = findNode(next, buffId)
+        if (!path || !located || located.node.kind !== 'buff') continue
+        const source = located.parent
+        if (source) {
+            const index = source.indexOf(located.node)
+            if (index >= 0) source.splice(index, 1)
+        }
+        let container = next[toTab]
+        for (const folderName of path.slice(0, -1)) {
+            let folder = container.find(
+                (node): node is Extract<BuffTreeNode, { kind: 'folder' }> =>
+                    node.kind === 'folder' && node.name === folderName
+            )
+            if (!folder) {
+                folder = { kind: 'folder', id: makeTreeFolderId(), name: folderName, children: [] }
+                container.push(folder)
+            }
+            container = folder.children
+        }
+        container.push({ kind: 'buff', id: located.node.buffId, buffId: located.node.buffId })
+    }
+    return next
+}
+
 /** @desc 导出当前计算态深拷贝快照（供工程保存/导出） */
 export function getCalcState(): CalcState {
+    const normalizedTree = normalizeBuffTree(_buffTree, _buffSets, _globalBuffSetIds)
     return JSON.parse(
         JSON.stringify({
             buffSets: _buffSets,
             damageEntryBuffSetIds: _damageEntryBuffSetIds,
             damageEntryDamageTypes: _damageEntryDamageTypes,
-            damageEntryDisplayNames: _damageEntryDisplayNames
+            damageEntryDisplayNames: _damageEntryDisplayNames,
+            buffTree: normalizedTree,
+            buffTreeVersion: BUFF_TREE_VERSION
         })
     )
 }
@@ -1440,44 +1841,24 @@ export function remapDuplicatedDamageBuffs(damageMap: Record<string, string>) {
     }
 }
 
-/** @desc 重建全局 buff 绑定：把每个标记为 global 的 buff 按作用域挂到所有适用条目上。
+/** @desc 重建全局 buff 绑定：把每个标记为 global 的 buff 按作用域挂到适用条目上。
  *  工程不再自动创建「默认全局 buff」（原 global-{角色名} / global-all 空块已由 migration 清除），
- *  全局 buff 完全由用户按需并入。 */
+ *  全局 buff 完全由用户按需并入。
+ *
+ *  「适用条目」不止作用域命中的条目：跨角色引用（转模）会读「本条目可见的被引用角色面板」，
+ *  全局自作用域 Buff 还必须挂到**引用了该角色的条目**上，否则队友引用他的面板时会少算
+ *  （见 `global-bindings.rebuildGlobalBindings` 的说明）。 */
 export function rebindGlobalBuffs() {
     if (_globalBuffSetIds.length === 0) return
-
-    const globalIdSet = new Set(_globalBuffSetIds)
-    // 先清空所有全局 buff 的旧绑定，再按作用域规则重建（避免残留过期绑定）
-    const newBindings: Record<string, string[]> = {}
-    for (const entryId of Object.keys(_damageEntryBuffSetIds)) {
-        const filtered = (_damageEntryBuffSetIds[entryId] ?? []).filter((sid) => !globalIdSet.has(sid))
-        if (filtered.length > 0) newBindings[entryId] = filtered
-    }
-
-    const charIdxByName = new Map<string, number>()
-    for (const [i, s] of (_initTeam ?? []).entries()) {
-        if (s.character) charIdxByName.set(s.character, i)
-    }
-    const globalBuffs = _buffSets.filter((bs) => globalIdSet.has(bs.id))
-
-    for (const entry of _entries) {
-        const entryCharIdx = entry.character ? charIdxByName.get(entry.character) : undefined
-        const applicable: string[] = []
-        for (const gb of globalBuffs) {
-            if (gb.scope === 'all') {
-                applicable.push(gb.id)
-            } else if (Array.isArray(gb.scope)) {
-                if (gb.scope.length === 0) {
-                    if (entry.isEffect) applicable.push(gb.id)
-                } else if (entryCharIdx !== undefined && gb.scope.includes(entryCharIdx)) {
-                    applicable.push(gb.id)
-                }
-            }
-        }
-        if (applicable.length === 0) continue
-        const current = newBindings[entry.id] ?? []
-        newBindings[entry.id] = [...new Set([...current, ...applicable])]
-    }
-
-    _damageEntryBuffSetIds = newBindings
+    _damageEntryBuffSetIds = rebuildGlobalBindings({
+        entries: _entries.map((entry) => ({
+            id: entry.id,
+            character: entry.character ?? null,
+            isEffect: entry.isEffect
+        })),
+        team: _initTeam ?? [],
+        buffs: _buffSets,
+        globalIds: _globalBuffSetIds,
+        bindings: _damageEntryBuffSetIds
+    })
 }

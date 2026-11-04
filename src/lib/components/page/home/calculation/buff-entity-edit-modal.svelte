@@ -22,18 +22,31 @@
     import BuffEntityRefModal from './buff-entity-ref-modal.svelte'
     import { ZONE_NO_OVERRIDE_IDS, ZONE_SECTION_VIEWS } from '$lib/calc/calculation.consts'
     import type { BuffCondition } from '$lib/calc/calculation.types'
-    import type { BuffEntityType, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
-    import { ENTITY_TYPE_LABELS, updateEntityBuffs } from '$lib/data/buff-library.svelte'
+    import type {
+        BuffEntityType,
+        BuffLibraryBuff,
+        BuffLibraryFolder,
+        BuffLibraryScope
+    } from '$lib/data/buff-library.svelte'
+    import {
+        ENTITY_TYPE_LABELS,
+        buffNameInFolder,
+        mergeFolders,
+        updateEntityBuffs
+    } from '$lib/data/buff-library.svelte'
+    import { buffFolderPath, buffLeafName, joinBuffPath, sanitizeLeafName } from '$lib/calc/buff-name'
     import { describeZoneConditionBadge } from '$lib/calc/condition'
     import { addToast } from '$lib/data/toast.svelte'
     import { mergeComponentsStyle } from '$lib/utils/component-style'
     import { zoneLabel } from './buff-entity-utils'
+    import BuffFolderNameModal from './buff-folder-name-modal.svelte'
 
     interface Props extends ComponentsProps {
         open: boolean
         entityType: BuffEntityType
         entityName: string
         initialBuffs: BuffLibraryBuff[]
+        initialFolders?: BuffLibraryFolder[]
         onclose?: () => void
         onsaved?: () => void
     }
@@ -43,6 +56,7 @@
         entityType,
         entityName,
         initialBuffs,
+        initialFolders = [],
         onclose,
         onsaved,
         backgroundImage,
@@ -54,6 +68,8 @@
     let mergedStyle = $derived(mergeComponentsStyle({ backgroundImage, textColor, style: styleProp }))
 
     let buffs = $state<BuffLibraryBuff[]>([])
+    let folders = $state<BuffLibraryFolder[]>([])
+    let folderModal = $state<{ mode: 'create' | 'rename'; target?: string } | null>(null)
     let activeBuffIdx = $state(0)
     let flash = $state<string | null>(null)
     /** @desc 展开行内「乘区条件」面板的乘区下标（同一乘区可有多条，故用下标定位） */
@@ -94,6 +110,7 @@
                 }))
             }))
             activeBuffIdx = 0
+            folders = mergeFolders(initialFolders, buffs)
             expandedZoneIdx = null
             condPanelOpen = false
             flash = null
@@ -103,6 +120,22 @@
     const activeBuff = $derived(buffs[activeBuffIdx] ?? null)
     const activeZones = $derived(activeBuff?.zones ?? [])
     const canSave = $derived(buffs.some((b) => b.buffName.trim() && b.zones.length > 0))
+
+    const folderNames = $derived.by(() => {
+        const names = folders.map((folder) => folder.name)
+        for (const buff of buffs) {
+            const name = buffFolderPath(buff.buffName)[0]
+            if (name && !names.includes(name)) names.push(name)
+        }
+        return names
+    })
+
+    const rootBuffIndexes = $derived(
+        buffs.map((buff, index) => ({ buff, index })).filter((item) => !buffFolderPath(item.buff.buffName)[0])
+    )
+
+    const buffIndexesInFolder = (folder: string) =>
+        buffs.map((buff, index) => ({ buff, index })).filter((item) => buffFolderPath(item.buff.buffName)[0] === folder)
 
     /** @desc 各乘区当前条目数（右栏「添加乘区」计数徽标用） */
     const zoneCounts = $derived.by(() => {
@@ -163,7 +196,63 @@
     }
 
     function renameBuff(idx: number, value: string) {
-        buffs = buffs.map((b, i) => (i === idx ? { ...b, buffName: value } : b))
+        const leaf = sanitizeLeafName(value)
+        if (!leaf) return
+        buffs = buffs.map((b, i) => {
+            if (i !== idx) return b
+            const folder = buffFolderPath(b.buffName)[0] ?? null
+            return { ...b, buffName: buffNameInFolder(leaf, folder) }
+        })
+    }
+
+    /** @desc 把某条 Buff 移入一级文件夹（null = 移回根） */
+    function moveBuffToFolder(idx: number, folder: string | null) {
+        buffs = buffs.map((b, i) => (i === idx ? { ...b, buffName: buffNameInFolder(b.buffName, folder) } : b))
+    }
+
+    function createFolder(name: string) {
+        const clean = sanitizeLeafName(name)
+        if (!clean || folders.some((folder) => folder.name === clean)) return
+        folders = mergeFolders([...folders, { name: clean, sortOrder: folders.length }], buffs)
+        folderModal = null
+    }
+
+    function renameFolder(oldName: string, name: string) {
+        const clean = sanitizeLeafName(name)
+        if (!clean || clean === oldName) {
+            folderModal = null
+            return
+        }
+        buffs = buffs.map((b) =>
+            buffFolderPath(b.buffName)[0] === oldName
+                ? { ...b, buffName: joinBuffPath(clean, buffLeafName(b.buffName)) }
+                : b
+        )
+        folders = mergeFolders(
+            folders.map((folder) => (folder.name === oldName ? { ...folder, name: clean } : folder)),
+            buffs
+        )
+        folderModal = null
+    }
+
+    function deleteFolder(name: string) {
+        buffs = buffs.map((b) =>
+            buffFolderPath(b.buffName)[0] === name ? { ...b, buffName: buffLeafName(b.buffName) } : b
+        )
+        folders = mergeFolders(
+            folders.filter((folder) => folder.name !== name),
+            buffs
+        )
+    }
+
+    function moveFolder(name: string, delta: -1 | 1) {
+        const index = folders.findIndex((folder) => folder.name === name)
+        const target = index + delta
+        if (index < 0 || target < 0 || target >= folders.length) return
+        const next = [...folders]
+        const [item] = next.splice(index, 1)
+        next.splice(target, 0, item)
+        folders = next.map((folder, i) => ({ ...folder, sortOrder: i }))
     }
 
     function setBuffScope(idx: number, scope: BuffLibraryScope) {
@@ -233,7 +322,7 @@
             flash = '至少保留一条带名称的 Buff'
             return
         }
-        await updateEntityBuffs(entityType, entityName, buffs)
+        await updateEntityBuffs(entityType, entityName, buffs, folders)
         addToast('已保存预设', 'success')
         onsaved?.()
         onclose?.()
@@ -308,46 +397,80 @@
                     <span class="text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/40"
                         >Buff 条目（{buffs.length}）</span
                     >
-                    <button
-                        onclick={addBuff}
-                        class="inline-flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium"
-                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
-                    >
-                        <Icon icon="mdi:plus" class="size-3.5" />
-                        新增
-                    </button>
+                    <div class="flex items-center gap-1">
+                        <button
+                            onclick={() => (folderModal = { mode: 'create' })}
+                            class="inline-flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium text-(--theme-modal-text)/60 hover:text-(--theme-accent-text)"
+                            title="新建一级文件夹"
+                        >
+                            <Icon icon="mdi:folder-plus-outline" class="size-3.5" />
+                        </button>
+                        <button
+                            onclick={addBuff}
+                            class="inline-flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium"
+                            style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg);"
+                        >
+                            <Icon icon="mdi:plus" class="size-3.5" />
+                            新增
+                        </button>
+                    </div>
                 </div>
                 <div class="theme-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto p-1.5">
                     {#if buffs.length === 0}
                         <div class="py-6 text-center text-xs text-(--theme-modal-text)/30">暂无 Buff，点击上方新增</div>
                     {:else}
-                        {#each buffs as buff, i (i)}
-                            <button
-                                onclick={() => selectBuff(i)}
-                                class={[
-                                    'w-full rounded-none px-2 py-1.5 text-left transition-colors',
-                                    i === activeBuffIdx
-                                        ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
-                                        : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
-                                ].join(' ')}
+                        {#each folderNames as folder (folder)}
+                            <div
+                                class="flex items-center gap-1 px-1 pt-1 text-[10px] font-black text-(--theme-modal-text)/40"
                             >
-                                <span class="block truncate text-xs font-medium">
-                                    {buff.buffName.trim() || '（未命名）'}
-                                </span>
-                                <span class="block truncate text-[10px] text-(--theme-modal-text)/40">
-                                    {buff.zones
-                                        .map(
-                                            (z) =>
-                                                `${zoneLabel(z.zoneId)}+${z.ref ? '引用' : z.value}${
-                                                    describeZoneConditionBadge(z.condition)
-                                                        ? `[${describeZoneConditionBadge(z.condition)}]`
-                                                        : ''
-                                                }`
-                                        )
-                                        .join(' · ') || '无乘区'}
-                                </span>
-                            </button>
+                                <Icon icon="mdi:folder-outline" class="size-3.5 shrink-0" />
+                                <span class="min-w-0 flex-1 truncate">{folder}</span>
+                                <span class="shrink-0">{buffIndexesInFolder(folder).length}</span>
+                                <button
+                                    onclick={() => (folderModal = { mode: 'rename', target: folder })}
+                                    class="shrink-0 p-0.5 hover:text-(--theme-accent-text)"
+                                    title="重命名文件夹"
+                                >
+                                    <Icon icon="mdi:pencil-outline" class="size-3" />
+                                </button>
+                                <button
+                                    onclick={() => moveFolder(folder, -1)}
+                                    class="shrink-0 p-0.5 hover:text-(--theme-accent-text)"
+                                    title="上移文件夹"
+                                >
+                                    <Icon icon="mdi:arrow-up" class="size-3" />
+                                </button>
+                                <button
+                                    onclick={() => moveFolder(folder, 1)}
+                                    class="shrink-0 p-0.5 hover:text-(--theme-accent-text)"
+                                    title="下移文件夹"
+                                >
+                                    <Icon icon="mdi:arrow-down" class="size-3" />
+                                </button>
+                                <button
+                                    onclick={() => deleteFolder(folder)}
+                                    class="shrink-0 p-0.5 hover:text-red-500"
+                                    title="删除文件夹（成员移回根）"
+                                >
+                                    <Icon icon="mdi:delete-outline" class="size-3" />
+                                </button>
+                            </div>
+                            {#each buffIndexesInFolder(folder) as item (item.index)}
+                                {@render buffRow(item.buff, item.index)}
+                            {/each}
                         {/each}
+                        {#if rootBuffIndexes.length > 0}
+                            <div
+                                class="flex items-center gap-1 px-1 pt-1 text-[10px] font-black text-(--theme-modal-text)/40"
+                            >
+                                <Icon icon="mdi:format-list-bulleted" class="size-3.5 shrink-0" />
+                                <span class="min-w-0 flex-1 truncate">未归组</span>
+                                <span class="shrink-0">{rootBuffIndexes.length}</span>
+                            </div>
+                            {#each rootBuffIndexes as item (item.index)}
+                                {@render buffRow(item.buff, item.index)}
+                            {/each}
+                        {/if}
                     {/if}
                 </div>
             </div>
@@ -432,3 +555,56 @@
     onconfirm={(ref) => patchZoneAt(refZoneIndex, { ref, override: undefined })}
     onclear={() => patchZoneAt(refZoneIndex, { ref: undefined })}
 />
+
+{#snippet buffRow(buff: BuffLibraryBuff, i: number)}
+    <div
+        class={[
+            'flex items-center gap-1 rounded-none px-1.5 py-1 transition-colors',
+            i === activeBuffIdx
+                ? 'bg-(--theme-accent-bg)/15 text-(--theme-accent-text)'
+                : 'text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5'
+        ].join(' ')}
+    >
+        <button onclick={() => selectBuff(i)} class="min-w-0 flex-1 text-left">
+            <span class="block truncate text-xs font-medium">
+                {buffLeafName(buff.buffName) || '（未命名）'}
+            </span>
+            <span class="block truncate text-[10px] text-(--theme-modal-text)/40">
+                {buff.zones
+                    .map(
+                        (z) =>
+                            `${zoneLabel(z.zoneId)}+${z.ref ? '引用' : z.value}${
+                                describeZoneConditionBadge(z.condition)
+                                    ? `[${describeZoneConditionBadge(z.condition)}]`
+                                    : ''
+                            }`
+                    )
+                    .join(' · ') || '无乘区'}
+            </span>
+        </button>
+        <select
+            value={buffFolderPath(buff.buffName)[0] ?? ''}
+            onchange={(e) => moveBuffToFolder(i, e.currentTarget.value || null)}
+            class="w-16 shrink-0 rounded-none border bg-(--theme-input-bg) px-1 py-0.5 text-[10px] text-(--theme-modal-text)"
+            style="border-color: var(--theme-divider-border);"
+            title="移动到文件夹"
+        >
+            <option value="">未归组</option>
+            {#each folderNames as folder (folder)}
+                <option value={folder}>{folder}</option>
+            {/each}
+        </select>
+    </div>
+{/snippet}
+
+{#if folderModal}
+    <BuffFolderNameModal
+        title={folderModal.mode === 'create' ? '新建文件夹' : '重命名文件夹'}
+        initialName={folderModal.target ?? ''}
+        onclose={() => (folderModal = null)}
+        onconfirm={(name) => {
+            if (folderModal?.mode === 'create') createFolder(name)
+            else if (folderModal?.target) renameFolder(folderModal.target, name)
+        }}
+    />
+{/if}

@@ -12,6 +12,7 @@
     import { openHelp } from '$lib/data/help.svelte'
     import { BUFF_ALGORITHM_HELP } from '$lib/calc/result.consts'
     import { CARD_SURFACE_STYLE, SECTION_LABEL, STAT_VALUE_SM } from '$lib/calc/result.styles'
+    import { buffLeafName } from '$lib/calc/buff-name'
     import type { BuffContribution, CharBuffAnalysis } from '$lib/calc/result.types'
     import Chip from '$lib/components/ui/chip.svelte'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
@@ -146,7 +147,7 @@
                                     class="relative flex flex-wrap items-center gap-x-2 gap-y-0.5 px-2 py-1.5 text-[11px]"
                                 >
                                     <span class="min-w-0 max-w-[45%] truncate font-medium" title={buff.name}>
-                                        {buff.name}
+                                        {buffLeafName(buff.name)}
                                     </span>
                                     {#each buff.zones as zone, zi (zi)}
                                         <span class="shrink-0" title="{zone.label}：+{fmt(zone.contributionNorm)}">

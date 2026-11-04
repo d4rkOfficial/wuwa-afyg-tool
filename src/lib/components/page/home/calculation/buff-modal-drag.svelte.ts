@@ -27,7 +27,9 @@ import {
     deleteBuffSets,
     reorderNonGlobalBuffSets,
     getGlobalBuffSetIds,
-    getAllBuffConfs
+    getAllBuffConfs,
+    reorderBuffTreeChildren,
+    moveBuffTreeNode
 } from '$lib/calc/calculation.store.svelte'
 import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
 
@@ -44,6 +46,10 @@ export interface BuffDragDeps {
     setSelectedId: (id: string | null) => void
     /** @desc 删除目录确认弹窗的开关（宿主持有；「是否需要确认」读用户偏好） */
     setConfirmDeleteFolder: (v: boolean) => void
+    /** @desc 当前是否为手动整理模式（手动模式走 buffLayout 重排 / 跨文件夹移动） */
+    isManual: () => boolean
+    /** @desc 当前根 tab（根目录重排需要） */
+    getActiveTab: () => 'global' | 'nonGlobal'
 }
 
 /** @desc 列表滚动容器（拖拽的行序列与落点都从它里面读） */
@@ -64,6 +70,26 @@ const parentRowIdsOf = (container: HTMLElement, parentKey: string): string[] =>
     parentRowsOf(container, parentKey)
         .map((row) => row.dataset.buffsetId ?? '')
         .filter((id) => id.length > 0)
+
+/** @desc 显式树的 parentKey → store 容器 key（根 tab / 文件夹 id） */
+const manualContainerOf = (parentKey: string, activeTab: 'global' | 'nonGlobal'): string | null => {
+    if (parentKey === '__tree_root__') return activeTab
+    if (parentKey.startsWith('tree2:')) return parentKey.slice('tree2:'.length)
+    if (parentKey.startsWith('tree:')) return parentKey.slice('tree:'.length)
+    return null
+}
+
+/** @desc 手动模式下指针悬停的落点 key（`tree:<id>` / `tree2:<id>` / `__tree_root__`） */
+const folderDropKeyAt = (e: PointerEvent): string | null => {
+    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+    const folderEl = el?.closest<HTMLElement>('[data-folder-drop-key]')
+    const key = folderEl?.dataset.folderDropKey ?? ''
+    if (key === '__tree_root__') return key
+    return key.startsWith('tree:') || key.startsWith('tree2:') ? key : null
+}
+
+const folderIdOfDropKey = (key: string): string =>
+    key.startsWith('tree2:') ? key.slice('tree2:'.length) : key.slice('tree:'.length)
 
 export const createBuffDrag = (deps: BuffDragDeps) => {
     /** @desc 拖拽开始前的折叠态快照（松手/取消时还原） */
@@ -132,8 +158,30 @@ export const createBuffDrag = (deps: BuffDragDeps) => {
             e.clientY > cr.bottom + margin
 
         if (outside) {
-            deps.setState({ ...state, outside: true, dropIdx: -1, dropBeforeId: null, dropAfterId: null })
+            deps.setState({
+                ...state,
+                outside: true,
+                dropIdx: -1,
+                dropBeforeId: null,
+                dropAfterId: null,
+                dropFolderKey: null
+            })
             return
+        }
+
+        if (deps.isManual() && state.mode === 'item') {
+            const folderKey = folderDropKeyAt(e)
+            if (folderKey && folderKey !== state.parentKey) {
+                deps.setState({
+                    ...state,
+                    outside: false,
+                    dropIdx: -1,
+                    dropBeforeId: null,
+                    dropAfterId: null,
+                    dropFolderKey: folderKey
+                })
+                return
+            }
         }
 
         const rows = parentRowsOf(container, state.parentKey).filter(
@@ -152,7 +200,7 @@ export const createBuffDrag = (deps: BuffDragDeps) => {
         // 落在最后一行下方（或容器没有可作锚点的行）时，指示条画在最后一个锚点行下方
         const dropAfterId =
             dropBeforeId === null && rows.length > 0 ? (rows[rows.length - 1].dataset.buffsetId ?? null) : null
-        deps.setState({ ...state, outside: false, dropIdx, dropBeforeId, dropAfterId })
+        deps.setState({ ...state, outside: false, dropIdx, dropBeforeId, dropAfterId, dropFolderKey: null })
     }
 
     /** @desc 确认删除目录（拖出列表松手触发）：删除其全部子 Buff（全局 buff 由 store 跳过）并清空选中 */
@@ -184,7 +232,23 @@ export const createBuffDrag = (deps: BuffDragDeps) => {
                 deleteBuffSet(state.id)
                 if (deps.getSelectedId() === state.id) deps.setSelectedId(null)
             }
-        } else if (state.mode === 'folder' || state.dropIdx !== state.idx) {
+        } else if (deps.isManual() && state.mode === 'item' && state.dropFolderKey) {
+            const folderId = state.dropFolderKey === '__tree_root__' ? null : folderIdOfDropKey(state.dropFolderKey)
+            for (const buffId of state.unitIds) moveBuffTreeNode(buffId, folderId)
+        } else if (deps.isManual() && state.mode === 'item') {
+            const containerKey = manualContainerOf(state.parentKey, deps.getActiveTab())
+            const container = listContainerOf(e.currentTarget)
+            if (containerKey && container && state.dropIdx >= 0) {
+                const rowIds = parentRowIdsOf(container, state.parentKey)
+                const next = computeDraggedOrder({
+                    orderedIds: rowIds,
+                    parentRowIds: rowIds,
+                    unitIds: state.unitIds,
+                    dropIdx: state.dropIdx
+                })
+                if (next) reorderBuffTreeChildren(containerKey, next)
+            }
+        } else if (!deps.isManual() && (state.mode === 'folder' || state.dropIdx !== state.idx)) {
             const container = listContainerOf(e.currentTarget)
             if (container) {
                 const next = computeDraggedOrder({
@@ -196,6 +260,8 @@ export const createBuffDrag = (deps: BuffDragDeps) => {
                 })
                 if (next) reorderNonGlobalBuffSets(next)
             }
+        } else if (deps.isManual() && state.mode === 'folder') {
+            // 手动文件夹不支持整体拖动（用右键菜单上移/下移）；这里保持选中态不变
         } else {
             deps.setSelectedId(state.id)
         }

@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **161** 个工具。
+> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **173** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
@@ -13,8 +13,18 @@ AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注
 - `generate_project_buff_confs`
 - `sync_buff_set_from_share`
 - `update_buff_set_entity_buffs`
+- `create_buff_set_folder`
+- `rename_buff_set_folder`
+- `delete_buff_set_folder`
+- `move_buff_set_buff_to_folder`
+- `reorder_buff_set_folder`
 - `delete_buff_set_entity`
 - `clear_buff_set`
+- `create_buff_folder`
+- `rename_buff_folder`
+- `delete_buff_folder`
+- `move_buff_tree_node`
+- `reorder_buff_folder`
 - `delete_buff_conf`
 - `remove_buff_conf_zone`
 - `remove_substat`
@@ -195,13 +205,86 @@ _无参数_
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffs 结构：[{"buffName":"名称","scope":"self\|self_except\|team\|effect_only","exclusive":false,"condition":{...可选},"zones":[{"zoneId":"乘区id","value":数值,"override":false,"ref":{...可选}}]}]。
+整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffName 必须是全名（文件夹A\buff名，根 Buff 直接写短名）；folders 可传空文件夹/排序。buffs 结构：[{"buffName":"文件夹A\\buff名","scope":"self\|self_except\|team\|effect_only","exclusive":false,"condition":{...可选},"zones":[...]}]。
 
-| 参数         | 必填   | 类型   | 说明                                       |
-| ------------ | ------ | ------ | ------------------------------------------ |
-| `entityType` | **是** | string | 实体类型：character/weapon/echo/1set-5set  |
-| `entityName` | **是** | string | 实体名称（中文）                           |
-| `buffs`      | **是** | array  | 完整 Buff 列表（整体覆写，格式见工具描述） |
+| 参数         | 必填   | 类型   | 说明                                                            |
+| ------------ | ------ | ------ | --------------------------------------------------------------- |
+| `entityType` | **是** | string | 实体类型：character/weapon/echo/1set-5set                       |
+| `entityName` | **是** | string | 实体名称（中文）                                                |
+| `buffs`      | **是** | array  | 完整 Buff 列表（整体覆写，buffName 为全名，格式见工具描述）     |
+| `folders`    | 否     | array  | 可选：一级文件夹列表 [{name, sortOrder}]，用于保留空文件夹/排序 |
+
+### `list_buff_set_folders`
+
+列出本地 Buff 集某实体的一级文件夹（含空文件夹与排序）。
+
+| 参数         | 必填   | 类型   | 说明                                      |
+| ------------ | ------ | ------ | ----------------------------------------- |
+| `entityType` | **是** | string | 实体类型：character/weapon/echo/1set-5set |
+| `entityName` | **是** | string | 实体名称                                  |
+
+### `create_buff_set_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+在本地自定义 Buff 集实体中新建一级文件夹（工坊来源实体只读）。
+
+| 参数         | 必填   | 类型   | 说明                   |
+| ------------ | ------ | ------ | ---------------------- |
+| `entityType` | **是** | string | 实体类型               |
+| `entityName` | **是** | string | 实体名称               |
+| `name`       | **是** | string | 文件夹短名（不能含 \） |
+
+### `rename_buff_set_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+重命名本地自定义 Buff 集实体的文件夹；成员 Buff 的全名前缀会级联更新。
+
+| 参数         | 必填   | 类型   | 说明                     |
+| ------------ | ------ | ------ | ------------------------ |
+| `entityType` | **是** | string | 实体类型                 |
+| `entityName` | **是** | string | 实体名称                 |
+| `oldName`    | **是** | string | 原文件夹短名             |
+| `name`       | **是** | string | 新文件夹短名（不能含 \） |
+
+### `delete_buff_set_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+删除本地自定义 Buff 集实体的一级文件夹；成员 Buff 移回根目录，不删除 Buff。
+
+| 参数         | 必填   | 类型   | 说明       |
+| ------------ | ------ | ------ | ---------- |
+| `entityType` | **是** | string | 实体类型   |
+| `entityName` | **是** | string | 实体名称   |
+| `name`       | **是** | string | 文件夹短名 |
+
+### `move_buff_set_buff_to_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+把本地自定义 Buff 集实体的一条 Buff 移入一级文件夹（folder 省略/空 = 移回根）；短名不变，全名前缀级联更新。
+
+| 参数         | 必填   | 类型   | 说明                    |
+| ------------ | ------ | ------ | ----------------------- |
+| `entityType` | **是** | string | 实体类型                |
+| `entityName` | **是** | string | 实体名称                |
+| `buffName`   | **是** | string | 当前 Buff 全名          |
+| `folder`     | 否     | string | 目标文件夹短名；空 = 根 |
+
+### `reorder_buff_set_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+把本地自定义 Buff 集实体的一级文件夹上移/下移一位（delta=-1/1）。
+
+| 参数         | 必填   | 类型   | 说明             |
+| ------------ | ------ | ------ | ---------------- |
+| `entityType` | **是** | string | 实体类型         |
+| `entityName` | **是** | string | 实体名称         |
+| `name`       | **是** | string | 文件夹短名       |
+| `delta`      | **是** | number | -1 上移 / 1 下移 |
 
 ### `delete_buff_set_entity`
 
@@ -221,6 +304,69 @@ _无参数_
 清空整个本地 Buff 集（所有实体与 Buff，不可恢复）。
 
 _无参数_
+
+## buff-tree
+
+### `list_buff_tree`
+
+查看当前工程的两个 Buff 根（global / nonGlobal）的文件夹与 Buff 全名。文件夹有 id/name/path，Buff 有 id/full name/short name；用于定位后再调用文件夹管理工具。
+
+_无参数_
+
+### `create_buff_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+在当前工程 Buff 树新建文件夹（最多两级）。name 只能是短名，不能含反斜杠；parentFolderId 省略则建在根。
+
+| 参数             | 必填   | 类型   | 说明                               |
+| ---------------- | ------ | ------ | ---------------------------------- |
+| `name`           | **是** | string | 文件夹短名（不能含 \）             |
+| `tab`            | 否     | string | global / nonGlobal，默认 nonGlobal |
+| `parentFolderId` | 否     | string | 可选：父文件夹 id（最多两级）      |
+
+### `rename_buff_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+重命名当前工程 Buff 文件夹（只改短名；后代 Buff 全名会级联更新）。
+
+| 参数       | 必填   | 类型   | 说明                                |
+| ---------- | ------ | ------ | ----------------------------------- |
+| `folderId` | **是** | string | 文件夹 id（用 list_buff_tree 获取） |
+| `name`     | **是** | string | 新短名（不能含 \）                  |
+
+### `delete_buff_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+删除当前工程非全局 Buff 文件夹（含其中 Buff，递归删除；全局树受保护）。
+
+| 参数       | 必填   | 类型   | 说明      |
+| ---------- | ------ | ------ | --------- |
+| `folderId` | **是** | string | 文件夹 id |
+
+### `move_buff_tree_node`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+把当前工程的一个文件夹或 Buff 移到目标容器（targetFolderId 省略则移到所在根目录）。保持同一 global/nonGlobal 页签；移动后 Buff 全名级联更新。
+
+| 参数             | 必填   | 类型   | 说明                           |
+| ---------------- | ------ | ------ | ------------------------------ |
+| `nodeId`         | **是** | string | 文件夹 id 或 Buff id           |
+| `targetFolderId` | 否     | string | 可选：目标文件夹 id；省略 = 根 |
+
+### `reorder_buff_folder`
+
+> ⚠️ **危险工具**：执行后不可轻易撤销
+
+把当前工程某个文件夹在同级上移/下移一位（delta = -1 上移，1 下移）。
+
+| 参数       | 必填   | 类型   | 说明             |
+| ---------- | ------ | ------ | ---------------- |
+| `folderId` | **是** | string | 文件夹 id        |
+| `delta`    | **是** | number | -1 上移 / 1 下移 |
 
 ## 拉表
 

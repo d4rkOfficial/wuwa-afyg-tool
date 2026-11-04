@@ -10,6 +10,7 @@
     import { onMount, onDestroy } from 'svelte'
     import { fade, slide } from 'svelte/transition'
     import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+    import { buffLeafName } from '$lib/calc/buff-name'
     import type { CharSlot } from '$lib/types/project'
     import type { ConditionProfile } from '$lib/calc/compute'
     import {
@@ -25,13 +26,11 @@
         paneSourceText
     } from './damage-table.utils'
     import {
-        buildFolderGroups,
         buildSelectionStats,
         buildSourceTabs,
         buildSpreadTable,
         collectShownGlobalBuffs,
         columnHeadTitle,
-        orderColumns,
         resolveActiveSource,
         rowFingerprintOf,
         rowHeadTitle,
@@ -42,7 +41,8 @@
         type GroupData,
         type RowData
     } from './spread-table.utils'
-    import { getCalcElementMap, compareNatural, getPaneEffectSources } from '$lib/calc/calculation.store.svelte'
+    import { getCalcElementMap, getPaneEffectSources, getBuffTree } from '$lib/calc/calculation.store.svelte'
+    import { storedColumnLayout } from '$lib/calc/buff-tree-state'
     import { elementColor, getCharIconMap } from '$lib/calc/timeline.store.svelte'
     import {
         getGlobalBuffCollapsed,
@@ -96,16 +96,93 @@
         style: styleProp
     }: Props = $props()
 
-    /** @desc 普通 buff 列（非全局）与全局 buff 列（仅展示，不可勾选）；列序算法见 `spread-table.utils.orderColumns` */
-    const rawColumns = $derived(buffSets.filter((b) => !globalBuffSetIds.includes(b.id)))
-    const columns = $derived(orderColumns(rawColumns, compareNatural))
+    /** @desc 非全局树按存储顺序展开：列 + 每列的「一级/二级/Buff」路径 */
+    const columnLayout = $derived(storedColumnLayout(getBuffTree(), buffSets))
+    const columns = $derived(columnLayout.columns)
+    const columnPaths = $derived(columnLayout.paths)
     const globalBuffs = $derived(buffSets.filter((b) => globalBuffSetIds.includes(b.id)))
 
     /** @desc 列 id → 全局列序索引（勾选统计用，避免每格线性查找） */
     const colIndexById = $derived.by(() => new Map(columns.map((c, i) => [c.id, i] as const)))
 
-    /** @desc 叠层分组信息：buffId → 组（同「前缀+后缀」≥2 条成组；仅用于表头分组展示与分隔线，列本身仍每层一列） */
-    const folderGroupOf = $derived(buildFolderGroups(columns))
+    /** @desc 不再按名字叠层分组；表头路径由 columnPaths 提供 */
+    const folderGroupOf = $derived(new Map())
+
+    const pathAt = (ci: number): string[] => columnPaths.get(columns[ci]?.id ?? '') ?? [columns[ci]?.name ?? '']
+
+    /** @desc 顶级文件夹边界=实线；次级文件夹边界=虚线；同文件夹内/根 Buff 间=常规线 */
+    const sepClassAt = (group: GroupData, colPos: number): string => {
+        const ci = group.visibleColIdx[colPos]
+        const nextCi = group.visibleColIdx[colPos + 1]
+        if (ci === undefined || nextCi === undefined) return ''
+        const cur = pathAt(ci)
+        const next = pathAt(nextCi)
+        const topOf = (path: string[]) => (path.length > 1 ? path[0] : null)
+        const secondOf = (path: string[]) => (path.length > 2 ? path[1] : null)
+        const curTop = topOf(cur)
+        const nextTop = topOf(next)
+        if (curTop !== nextTop) {
+            return curTop === null && nextTop === null ? 'spread-sep' : 'spread-sep-solid'
+        }
+        return secondOf(cur) !== secondOf(next) ? 'spread-sep-dashed' : 'spread-sep'
+    }
+
+    /** @desc 表头层数 = 最深路径长度（根 Buff=1、一级文件夹=2、二级文件夹=3） */
+    const headerDepth = $derived(Math.max(1, ...columns.map((column) => columnPaths.get(column.id)?.length ?? 1)))
+
+    interface HeaderBandCell {
+        key: string
+        label: string
+        span: number
+        sepClass: string
+    }
+
+    /** @desc 顶级/中层表头按路径前缀合并为 colspan；根 Buff 的上级留空 */
+    const headerBandsOf = (group: GroupData): HeaderBandCell[][] => {
+        const bands = headerDepth - 1
+        if (bands <= 0) return []
+        const paths = group.visibleColIdx.map((ci) => pathAt(ci))
+        const rows: HeaderBandCell[][] = []
+        const keyOf = (path: string[], level: number): string => {
+            const top = path.length > 1 ? path[0] : ''
+            const second = path.length > 2 ? path[1] : ''
+            return level === 0 ? top : `${top}\u0000${second}`
+        }
+        const labelOf = (path: string[], level: number): string =>
+            level === 0 ? (path.length > 1 ? path[0] : '') : path.length > 2 ? path[1] : ''
+        for (let level = 0; level < bands; level++) {
+            const cells: HeaderBandCell[] = []
+            let i = 0
+            while (i < paths.length) {
+                const key = keyOf(paths[i], level)
+                let j = i + 1
+                while (j < paths.length && keyOf(paths[j], level) === key) j++
+                const next = paths[j]
+                let sepClass = ''
+                if (next) {
+                    const nextKey = keyOf(next, level)
+                    if (level === 0) sepClass = 'spread-sep-solid'
+                    else if (keyOf(paths[j], 0) !== keyOf(paths[i], 0)) sepClass = 'spread-sep-solid'
+                    else if (nextKey !== key) sepClass = 'spread-sep-dashed'
+                }
+                cells.push({
+                    key: `${level}:${i}:${key}`,
+                    label: labelOf(paths[i], level),
+                    span: j - i,
+                    sepClass
+                })
+                i = j
+            }
+            rows.push(cells)
+        }
+        return rows
+    }
+
+    const headerTopClass = (rowIndex: number, depth: number): string => {
+        if (depth === 1) return 'top-0'
+        if (depth === 2) return rowIndex === 0 ? 'top-0' : 'top-7'
+        return rowIndex === 0 ? 'top-0' : rowIndex === 1 ? 'top-7' : 'top-14'
+    }
 
     /** @desc 角色/声骸技能文案缓存（伤害类型规则2需要）：补齐后映射变化会让推导与可用性缓存自动重算 */
     const charInfoMap = $derived(getCharInfoMap())
@@ -794,7 +871,7 @@
         {#each shownGroupIdx as gi (tableData[gi].key)}
             {@const group = tableData[gi]}
             {@const charElement = getCalcElementMap()[group.charName] ?? ''}
-            {@const hasFolder = group.hasFolder}
+            {@const headerBands = headerBandsOf(group)}
             <div class="mx-3 my-3.5" data-group-wrap={gi}>
                 <!-- 列表（表体）底色跟随「卡片」透明度/深度；data-sf-flat 只取底色不用毛玻璃（逐格元素避免逐元素重算模糊） -->
                 <table
@@ -824,36 +901,39 @@
                             <span class="ml-auto text-[10px] text-(--theme-modal-text)/40">{group.rows.length} 条</span>
                         </div>
                     </caption>
-                    <!-- 表头（两级，仅含叠层组时）：第一行=叠层组名行（跨列合并，普通列占位）；第二行=列名行（folder 子列显示层数数字，普通列显示略名换行），吸顶 -->
+                    <!-- 表头：顶级/中层文件夹按路径前缀 colspan 合并，最后一行为每列 Buff 短名 -->
                     <thead>
-                        {#if hasFolder}
+                        {#each headerBands as band, rowIdx (rowIdx)}
                             <tr>
-                                <!-- 表头（含「条目」角格）底色 = 工具栏层叠一层卡片底（并取卡片的毛玻璃，吸顶时挡住滚过的行）；角格只叠这一套，不再额外叠行头卡片底 -->
-                                {@render entryCorner(2)}
-                                {#each group.headerGroups as hc, i (i)}
+                                {#if rowIdx === 0}
+                                    {@render entryCorner(headerDepth)}
+                                {/if}
+                                {#each band as cell (cell.key)}
                                     <th
                                         data-sf="toolbar"
                                         data-sf-under="card"
-                                        class="sticky top-0 z-30 h-6 p-0 text-center {hc.sepClass}"
+                                        class="sticky {headerTopClass(
+                                            rowIdx,
+                                            headerDepth
+                                        )} z-30 h-7 border-b border-(--theme-divider-border) p-0 text-center {cell.sepClass}"
                                         style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
-                                        colspan={hc.span}
+                                        colspan={cell.span}
                                     >
-                                        {#if hc.label}
+                                        {#if cell.label}
                                             <span
-                                                class="block truncate px-1.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/70"
-                                                title={hc.label}>{hc.label}</span
+                                                class="block truncate px-1.5 text-[10px] font-black tracking-[0.1em] text-(--theme-modal-text)/70"
+                                                title={cell.label}>{cell.label}</span
                                             >
                                         {/if}
                                     </th>
                                 {/each}
                             </tr>
-                        {/if}
+                        {/each}
                         <tr>
-                            {#if !hasFolder}
-                                <!-- 无叠层组时补「条目」占位列，避免第一个 buff 列错位到表头首列 -->
-                                {@render entryCorner(undefined)}
+                            {#if headerBands.length === 0}
+                                {@render entryCorner(headerDepth)}
                             {/if}
-                            {#each group.headerCols as hc (hc.ci)}
+                            {#each group.headerCols as hc, colPos (hc.ci)}
                                 {@const colHighlighted =
                                     highlight?.gi === gi && highlight.kind === 'col' && highlight.index === hc.ci}
                                 {@const selCount = selStats.colCounts[gi]?.get(hc.ci) ?? 0}
@@ -868,11 +948,13 @@
                                     data-colhead={hc.ci}
                                     data-sf="toolbar"
                                     data-sf-under="card"
-                                    class="sticky {hasFolder
-                                        ? 'top-6'
-                                        : 'top-0'} z-30 cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-top {hc.isLayer
-                                        ? 'w-[43px] min-w-[43px]'
-                                        : ''} {hc.sepClass}"
+                                    class="sticky {headerTopClass(
+                                        headerBands.length,
+                                        headerDepth
+                                    )} z-30 h-14 w-[108px] min-w-[108px] cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-middle {sepClassAt(
+                                        group,
+                                        colPos
+                                    )}"
                                     style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
                                     class:spread-head-hl={colHighlighted}
                                     title={headTitle}
@@ -880,31 +962,23 @@
                                     oncontextmenu={(e) => onColHeaderContextMenu(e, gi, hc.ci)}
                                 >
                                     <span
-                                        class="flex h-full w-full flex-col items-center justify-center gap-1 px-1.5 pt-1 pb-1.5 transition-colors hover:bg-(--theme-modal-text)/5 {hc.enabled ===
+                                        class="relative flex h-full w-full flex-col items-center justify-center px-1.5 py-1 transition-colors hover:bg-(--theme-modal-text)/5 {hc.enabled ===
                                         0
                                             ? 'opacity-30'
                                             : ''}"
                                     >
-                                        {#if hc.isLayer}
+                                        <span
+                                            class="flex min-h-0 w-full items-center justify-center overflow-hidden text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
+                                            title={hc.title}>{buffLeafName(columns[hc.ci]?.name ?? hc.label)}</span
+                                        >
+                                        {#if hc.paneSource}
                                             <span
-                                                class="text-[11px] font-black leading-none tabular-nums text-(--theme-modal-text)/70"
-                                                title={hc.title}>{hc.label}</span
+                                                class="absolute right-0.5 top-0.5 flex shrink-0 items-center"
+                                                style="color: var(--theme-accent-text);"
+                                                title={paneSourceTooltip(hc.paneSource)}
                                             >
-                                        {:else}
-                                            <span
-                                                class="line-clamp-2 w-max max-w-24 wrap-break-word text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
-                                                title={hc.title}>{hc.label}</span
-                                            >
-                                            <!-- @desc 影响源标记：该列作用于被本组引用的角色面板（勾上即参与该角色在这一段的面板） -->
-                                            {#if hc.paneSource}
-                                                <span
-                                                    class="flex shrink-0 items-center"
-                                                    style="color: var(--theme-accent-text);"
-                                                    title={paneSourceTooltip(hc.paneSource)}
-                                                >
-                                                    <Icon icon="mdi:transit-connection-variant" class="size-3" />
-                                                </span>
-                                            {/if}
+                                                <Icon icon="mdi:transit-connection-variant" class="size-3" />
+                                            </span>
                                         {/if}
                                     </span>
                                 </th>
@@ -977,8 +1051,10 @@
                                               ? head?.titleOn
                                               : head?.titleOff}
                                     <td
-                                        class="min-w-9 border-b border-(--theme-divider-border) p-0 text-center {head?.sepClass ??
-                                            ''}"
+                                        class="w-[108px] min-w-[108px] border-b border-(--theme-divider-border) p-0 text-center {sepClassAt(
+                                            group,
+                                            colPos
+                                        )}"
                                         class:spread-cell-hl={colHighlighted}
                                         data-group={gi}
                                         data-row={ri}
@@ -1005,7 +1081,7 @@
                                                         <span
                                                             class="w-full {head?.nameMaxClass ??
                                                                 'max-w-[106px]'} line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
-                                                            >{columns[ci].name}</span
+                                                            >{buffLeafName(columns[ci].name)}</span
                                                         >
                                                     {/if}
                                                 {:else if cell.pane}
@@ -1062,6 +1138,9 @@
     }
     .spread-sep-solid {
         border-right: 2px solid color-mix(in srgb, var(--theme-accent-bg) 25%, transparent);
+    }
+    .spread-sep-dashed {
+        border-right: 1px dashed color-mix(in srgb, var(--theme-accent-bg) 55%, transparent);
     }
     /* 高亮：只给目标行/列上主题色浅洗（不压暗其它行列）：行=行级背景、列=列内单元格背景，表头/行头另加主题色标记线 */
     .spread-rowhl-on {

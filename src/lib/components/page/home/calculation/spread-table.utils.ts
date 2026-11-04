@@ -21,6 +21,8 @@ export interface FolderGroup {
     prefix: string
     suffix: string
     buffs: BuffConf[]
+    /** @desc 手动文件夹的显示名（缺省时按叠层前缀+后缀渲染） */
+    label?: string
 }
 
 /** @desc 叠层命名键（前缀+后缀）；不匹配叠层命名返回 null */
@@ -267,7 +269,7 @@ export const buildSpreadTable = (deps: SpreadTableDeps): GroupData[] => {
                 : undefined
             headerCols.push({
                 ci,
-                label: grp ? (grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum) : bs.name,
+                label: grp ? (grp.label ?? (grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum)) : bs.name,
                 title: bs.name,
                 isLayer: grp !== undefined,
                 enabled: enabledCounts[ci],

@@ -36,6 +36,8 @@ export interface MultiSelectDeps extends ComponentsProps {
     setSelectedId: (id: string | null) => void
     /** @desc 批量删除确认弹窗的开关（宿主持有）。「是否需要确认」读用户偏好 `getConfirmDeletes()`，不从这里传 */
     setConfirmDelete: (v: boolean) => void
+    /** @desc 当前 active 的根页签：多选只允许在单一 tab 内进行 */
+    getActiveTab: () => 'global' | 'nonGlobal'
     /** @desc 退出多选时由宿主一并做的互斥清理（关右键菜单 / 清拖拽状态 / 还原折叠态） */
     onExit?: () => void
 }
@@ -50,11 +52,15 @@ export const createMultiSelect = (deps: MultiSelectDeps) => {
     /** @desc 内置默认全局块不可勾选（既不能删除也不能移出全局） */
     const isDisabled = (id: string): boolean => id.startsWith(DEFAULT_GLOBAL_PREFIX)
 
-    /** @desc 可勾选的全部 buff id（排除内置全局块） */
-    const selectableIds = (): string[] =>
-        getAllBuffConfs()
+    /** @desc 当前 tab 内可勾选的全部 buff id（排除内置全局块；多选不跨 tab） */
+    const selectableIds = (): string[] => {
+        const tab = deps.getActiveTab()
+        const globalIds = getGlobalBuffSetIds()
+        return getAllBuffConfs()
+            .filter((bs) => (tab === 'global' ? globalIds.includes(bs.id) : !globalIds.includes(bs.id)))
             .map((bs) => bs.id)
             .filter((id) => !isDisabled(id))
+    }
 
     /** @desc 是否已全选（可勾选条目全部选中） */
     const isAllSelected = (): boolean => {

@@ -18,7 +18,8 @@
         type ImportBuffInput
     } from '$lib/calc/calculation.store.svelte'
     import { ZONE_MAP } from '$lib/calc/calculation.consts'
-    import { buildEntityImportItems, detectImportConflicts } from '$lib/calc/buff-import-utils'
+    import { buildBuffImportItems, detectImportConflicts } from '$lib/calc/buff-import-utils'
+    import { buffFolderPath, buffLeafName } from '$lib/calc/buff-name'
     import BuffImportConflictModal from './buff-import-conflict-modal.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import type { CharSlot } from '$lib/types/project'
@@ -72,34 +73,92 @@
         return e.entityName.includes(q) || e.buffs.some((b) => b.buffName.includes(q))
     }
 
-    const TYPE_ICONS: Record<string, string> = {
-        character: 'mdi:account-outline',
-        weapon: 'mdi:sword-cross',
-        echo: 'mdi:ghost-outline',
-        set: 'mdi:layers-outline'
-    }
-
-    let selected = $state<Record<string, boolean>>({})
+    /** @desc 三级勾选：实体 / 文件夹 / 单 Buff 都落到 buffKey（实体 + 全名） */
+    let selectedBuffs = $state<Record<string, boolean>>({})
+    let expandedEntities = $state<Record<string, boolean>>({})
 
     // 「已下载 · 其它」默认折叠，点击展开（搜索时自动展开）
     let showOthers = $state(false)
 
-    const otherSelectedCount = $derived(otherEntities.filter((e) => selected[entityKey(e)]).length)
+    const buffKeyOf = (entity: BuffLibraryEntity, buffName: string) => `${entityKey(entity)}\u0000${buffName}`
+
+    const selectedBuffsOf = (entity: BuffLibraryEntity) =>
+        entity.buffs.filter((buff) => selectedBuffs[buffKeyOf(entity, buff.buffName)])
+
+    const isBuffChecked = (entity: BuffLibraryEntity, buffName: string) => !!selectedBuffs[buffKeyOf(entity, buffName)]
+
+    function toggleBuff(entity: BuffLibraryEntity, buffName: string) {
+        const key = buffKeyOf(entity, buffName)
+        selectedBuffs = { ...selectedBuffs, [key]: !selectedBuffs[key] }
+    }
+
+    const isEntityChecked = (entity: BuffLibraryEntity) =>
+        entity.buffs.length > 0 && entity.buffs.every((buff) => isBuffChecked(entity, buff.buffName))
+
+    const isEntityPartial = (entity: BuffLibraryEntity) =>
+        !isEntityChecked(entity) && selectedBuffsOf(entity).length > 0
+
+    function toggleEntity(entity: BuffLibraryEntity) {
+        const all = isEntityChecked(entity)
+        const patch: Record<string, boolean> = {}
+        for (const buff of entity.buffs) patch[buffKeyOf(entity, buff.buffName)] = !all
+        selectedBuffs = { ...selectedBuffs, ...patch }
+    }
+
+    function folderOfBuff(entity: BuffLibraryEntity, buffName: string): string {
+        void entity
+        return buffFolderPath(buffName)[0] ?? ''
+    }
+
+    function buffsInFolder(entity: BuffLibraryEntity, folder: string) {
+        return entity.buffs.filter((buff) => folderOfBuff(entity, buff.buffName) === folder)
+    }
+
+    function folderNamesOf(entity: BuffLibraryEntity): string[] {
+        const names = entity.folders.map((folder) => folder.name)
+        if (entity.buffs.some((buff) => !folderOfBuff(entity, buff.buffName))) names.push('')
+        return names
+    }
+
+    function isFolderChecked(entity: BuffLibraryEntity, folder: string) {
+        const list = buffsInFolder(entity, folder)
+        return list.length > 0 && list.every((buff) => isBuffChecked(entity, buff.buffName))
+    }
+
+    function isFolderPartial(entity: BuffLibraryEntity, folder: string) {
+        if (isFolderChecked(entity, folder)) return false
+        return buffsInFolder(entity, folder).some((buff) => isBuffChecked(entity, buff.buffName))
+    }
+
+    function toggleFolder(entity: BuffLibraryEntity, folder: string) {
+        const list = buffsInFolder(entity, folder)
+        const all = isFolderChecked(entity, folder)
+        const patch: Record<string, boolean> = {}
+        for (const buff of list) patch[buffKeyOf(entity, buff.buffName)] = !all
+        selectedBuffs = { ...selectedBuffs, ...patch }
+    }
+
+    const otherSelectedCount = $derived(otherEntities.reduce((sum, entity) => sum + selectedBuffsOf(entity).length, 0))
 
     const countSelectedBuffs = $derived(
-        [...recommendedEntities, ...otherEntities].reduce(
-            (sum, e) => sum + (selected[entityKey(e)] ? e.buffs.length : 0),
-            0
-        )
+        [...recommendedEntities, ...otherEntities].reduce((sum, entity) => sum + selectedBuffsOf(entity).length, 0)
     )
 
     function isChecked(entity: BuffLibraryEntity) {
-        return !!selected[entityKey(entity)]
+        return isEntityChecked(entity)
     }
 
     function toggle(entity: BuffLibraryEntity) {
+        toggleEntity(entity)
+    }
+
+    function toggleExpanded(entity: BuffLibraryEntity) {
         const key = entityKey(entity)
-        selected = { ...selected, [key]: !selected[key] }
+        expandedEntities = { ...expandedEntities, [key]: !expandedEntities[key] }
+    }
+
+    function isExpanded(entity: BuffLibraryEntity) {
+        return !!expandedEntities[entityKey(entity)] || !!query.trim()
     }
 
     function zoneText(zoneId: string) {
@@ -112,7 +171,7 @@
                 const zones = b.zones
                     .map((z) => `${zoneText(z.zoneId)} ${z.override ? '覆盖+' : '+'}${z.value}`)
                     .join(' · ')
-                return `${b.buffName}${zones ? `（${zones}）` : ''}`
+                return `${buffLeafName(b.buffName)}${zones ? `（${zones}）` : ''}`
             })
             .join(' / ')
     }
@@ -140,12 +199,12 @@
     }
 
     function handleImport() {
-        const picked = [...recommendedEntities, ...otherEntities].filter((e) => isChecked(e))
+        const picked = [...recommendedEntities, ...otherEntities].filter((e) => selectedBuffsOf(e).length > 0)
         if (!picked.length) {
-            addToast('请先勾选要导入的 Buff 集', 'info')
+            addToast('请先勾选要导入的 Buff', 'info')
             return
         }
-        const items = picked.flatMap((e) => buildEntityImportItems(e, team))
+        const items = picked.flatMap((e) => buildBuffImportItems(e, selectedBuffsOf(e), team))
         const { report, deduped } = detectImportConflicts(items, getAllBuffConfs())
         if (report.conflicts.length === 0 && report.identical.length === 0) {
             runImport(deduped)
@@ -201,7 +260,7 @@
     {/snippet}
 
     <p class="mb-3 text-[10px] leading-relaxed text-(--theme-modal-text)/40">
-        勾选对应角色/武器/首位声骸/套装即可全选其全部 Buff。上方为根据当前配装推荐的实体，下方为其它已下载的
+        勾选实体 = 全选；展开后可按文件夹整组勾选，也可单独挑某条 Buff。上方为根据当前配装推荐的实体，下方为其它已下载的
     </p>
 
     <div
@@ -321,43 +380,105 @@
 {/snippet}
 
 {#snippet EntityRow(entity: BuffLibraryEntity, checked: boolean)}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-        class={[
-            'flex cursor-pointer items-start gap-3 rounded-none border px-3 py-2 transition-colors',
-            checked
-                ? 'border-(--theme-accent-bg) bg-(--theme-accent-bg)/10'
-                : 'border-(--theme-divider-border) bg-(--theme-input-bg) hover:border-(--theme-accent-bg)'
-        ].join(' ')}
-        onclick={() => toggle(entity)}
-        title="点击选中"
-    >
-        <span
-            class="mt-0.5 flex size-5 shrink-0 items-center justify-center {checked
-                ? 'text-(--theme-accent-text)'
-                : 'text-(--theme-modal-text)/40'}"
+    <div class="rounded-none border" style="border-color: var(--theme-divider-border);">
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+            class={[
+                'flex cursor-pointer items-start gap-3 px-3 py-2 transition-colors',
+                checked ? 'bg-(--theme-accent-bg)/10' : 'bg-(--theme-input-bg) hover:bg-(--theme-accent-bg)/5'
+            ].join(' ')}
+            onclick={() => toggle(entity)}
+            title="点击全选 / 取消该实体"
         >
-            <Icon icon={TYPE_ICONS[categoryOfType(entity.entityType)]} class="size-5" />
-        </span>
-        <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-                <span class="truncate text-sm font-medium text-(--theme-modal-text)">{entity.entityName}</span>
-                <span
-                    class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] font-medium text-(--theme-accent-text)"
-                >
-                    {categoryOfType(entity.entityType) === 'set'
-                        ? `${setPiecesOf(entity.entityType)}件`
-                        : ENTITY_TYPE_LABELS[entity.entityType]}
-                </span>
-                <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40">{entity.buffs.length} 条</span>
+            <span
+                class="mt-0.5 flex size-5 shrink-0 items-center justify-center {checked
+                    ? 'text-(--theme-accent-text)'
+                    : 'text-(--theme-modal-text)/40'}"
+            >
+                <Icon
+                    icon={checked
+                        ? 'mdi:checkbox-marked'
+                        : isEntityPartial(entity)
+                          ? 'mdi:minus-box-outline'
+                          : 'mdi:checkbox-blank-outline'}
+                    class="size-5"
+                />
+            </span>
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                    <span class="truncate text-sm font-medium text-(--theme-modal-text)">{entity.entityName}</span>
+                    <span
+                        class="shrink-0 rounded-none bg-(--theme-accent-bg)/10 px-1.5 py-0.5 text-[10px] font-medium text-(--theme-accent-text)"
+                    >
+                        {categoryOfType(entity.entityType) === 'set'
+                            ? `${setPiecesOf(entity.entityType)}件`
+                            : ENTITY_TYPE_LABELS[entity.entityType]}
+                    </span>
+                    <span class="shrink-0 text-[10px] text-(--theme-modal-text)/40">
+                        {selectedBuffsOf(entity).length}/{entity.buffs.length} 条
+                    </span>
+                </div>
+                <div class="mt-0.5 truncate text-[10px] text-(--theme-modal-text)/40" title={buffDetail(entity)}>
+                    {buffDetail(entity)}
+                </div>
             </div>
-            <div class="mt-0.5 truncate text-[10px] text-(--theme-modal-text)/40" title={buffDetail(entity)}>
-                {buffDetail(entity)}
-            </div>
+            <button
+                onclick={(e) => {
+                    e.stopPropagation()
+                    toggleExpanded(entity)
+                }}
+                class="mt-0.5 shrink-0 p-1 text-(--theme-modal-text)/40 hover:text-(--theme-accent-text)"
+                title={isExpanded(entity) ? '收起 Buff 明细' : '展开 Buff 明细'}
+            >
+                <Icon icon={isExpanded(entity) ? 'mdi:chevron-up' : 'mdi:chevron-down'} class="size-4" />
+            </button>
         </div>
-        {#if checked}
-            <Icon icon="mdi:check-circle" class="mt-0.5 size-4 shrink-0 text-(--theme-accent-text)" />
+        {#if isExpanded(entity)}
+            <div class="space-y-1 border-t px-2 py-2" style="border-color: var(--theme-divider-border);">
+                {#each folderNamesOf(entity) as folder (folder)}
+                    <div>
+                        <button
+                            onclick={() => toggleFolder(entity, folder)}
+                            class="flex w-full items-center gap-1.5 rounded-none px-1 py-0.5 text-left text-[11px] font-medium text-(--theme-modal-text)/60 hover:text-(--theme-accent-text)"
+                        >
+                            <Icon
+                                icon={isFolderChecked(entity, folder)
+                                    ? 'mdi:checkbox-marked'
+                                    : isFolderPartial(entity, folder)
+                                      ? 'mdi:minus-box-outline'
+                                      : 'mdi:checkbox-blank-outline'}
+                                class="size-4 shrink-0"
+                            />
+                            <Icon icon="mdi:folder-outline" class="size-3.5 shrink-0" />
+                            <span class="min-w-0 flex-1 truncate">{folder || '未归组'}</span>
+                            <span class="shrink-0 text-[10px] opacity-60">{buffsInFolder(entity, folder).length}</span>
+                        </button>
+                        <div class="ml-6 space-y-0.5">
+                            {#each buffsInFolder(entity, folder) as buff (buff.buffName)}
+                                <button
+                                    onclick={() => toggleBuff(entity, buff.buffName)}
+                                    class="flex w-full items-center gap-1.5 rounded-none px-1 py-0.5 text-left text-[11px] text-(--theme-modal-text)/70 hover:bg-(--theme-modal-text)/5"
+                                    title={buff.buffName}
+                                >
+                                    <Icon
+                                        icon={isBuffChecked(entity, buff.buffName)
+                                            ? 'mdi:checkbox-marked'
+                                            : 'mdi:checkbox-blank-outline'}
+                                        class="size-3.5 shrink-0 {isBuffChecked(entity, buff.buffName)
+                                            ? 'text-(--theme-accent-text)'
+                                            : 'text-(--theme-modal-text)/30'}"
+                                    />
+                                    <span class="min-w-0 flex-1 truncate">{buffLeafName(buff.buffName)}</span>
+                                    <span class="shrink-0 text-[10px] text-(--theme-modal-text)/35"
+                                        >{buff.zones.length} 乘区</span
+                                    >
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+                {/each}
+            </div>
         {/if}
     </div>
 {/snippet}

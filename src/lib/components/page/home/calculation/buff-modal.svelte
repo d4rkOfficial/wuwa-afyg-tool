@@ -19,13 +19,21 @@
         getGlobalBuffSetIds,
         toggleBuffSetStarred,
         setBuffSetGlobal,
-        setBuffSetsGlobal
+        setBuffSetsGlobal,
+        getBuffTree,
+        createBuffTreeFolder,
+        renameBuffTreeFolder,
+        deleteBuffTreeFolder,
+        moveBuffTreeNode,
+        moveBuffFolderSibling
     } from '$lib/calc/calculation.store.svelte'
-    import { ZONE_REF_DEFS, LAYERED_BUFF_PATTERN } from '$lib/calc/calculation.consts'
+    import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
     import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
-    import { buildBuffTree } from '$lib/calc/buff-tree'
+    import { buildStoredBuffTree } from '$lib/calc/buff-tree'
+    import { findBuffPlacement, findNode } from '$lib/calc/buff-tree-state'
+    import { buffLeafName } from '$lib/calc/buff-name'
     import type { CharSlot } from '$lib/types/project'
-    import type { ZoneRef, BuffConf, BuffCondition } from '$lib/calc/calculation.types'
+    import type { ZoneRef, BuffConf, BuffCondition, BuffTreeNode } from '$lib/calc/calculation.types'
     import { getCharIconMap, elementColor, getLocked } from '$lib/calc/timeline.store.svelte'
     import { getWeaponIcons } from '$lib/api/data-cache'
     import { addToast } from '$lib/data/toast.svelte'
@@ -40,6 +48,8 @@
     import BuffModalZoneBar from './buff-modal-zone-bar.svelte'
     import BuffModalRefModal from './buff-modal-ref-modal.svelte'
     import BuffModalFolderRenameModal from './buff-modal-folder-rename-modal.svelte'
+    import BuffFolderNameModal from './buff-folder-name-modal.svelte'
+    import BuffFolderPickerModal from './buff-folder-picker-modal.svelte'
     import BuffModalCopyModal from './buff-modal-copy-modal.svelte'
     import { onMount } from 'svelte'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
@@ -120,9 +130,18 @@
     let itemMenuX = $state(0)
     let itemMenuY = $state(0)
     let itemMenuTargetId = $state<string | null>(null)
+    /** @desc 「移入文件夹」二级弹窗：目标 Buff + 当前文件夹 */
+    let showMovePicker = $state(false)
+    let movePickerTargetId = $state<string | null>(null)
     /** @desc 文件夹批量重命名弹窗 */
     let showFolderRename = $state(false)
     let folderRenameTarget = $state<GroupedBuffConfItem | null>(null)
+    /** @desc 手动文件夹的新建 / 重命名弹窗；null = 关闭 */
+    let folderNameRequest = $state<
+        | { mode: 'create'; parentId?: string | null; id?: string; name: string }
+        | { mode: 'rename'; id: string; name: string }
+        | null
+    >(null)
 
     /** @desc 多选模式：勾选集合 / 全选 / 批量删除·并入全局·排序，状态机在 `./buff-modal-multiselect.svelte` */
     let multiSelect = $state(false)
@@ -149,6 +168,7 @@
         setActive: (v) => (multiSelect = v),
         getSelectedId: () => selectedBuffSetId,
         setSelectedId: (id) => (selectedBuffSetId = id),
+        getActiveTab: () => activeTab,
         setConfirmDelete: (v) => (showMultiDeleteConfirm = v),
         onExit: () => {
             folderMenuOpen = false
@@ -198,6 +218,10 @@
     let buffSets = $derived(getAllBuffConfs())
     let globalBuffSetIds = $derived(getGlobalBuffSetIds())
     let charIconMap = $derived(getCharIconMap())
+    /** @desc 当前管理的根：全局 / 非全局（一次只看一个） */
+    let activeTab = $state<'global' | 'nonGlobal'>('nonGlobal')
+    const manualMode = true
+    let storedTree = $derived(getBuffTree())
 
     /** @desc 当前选中的 Buff 块、其作用域对应角色勾选态、是否效应专属 */
     let selectedBuffSet = $derived(buffSets.find((s) => s.id === selectedBuffSetId) ?? null)
@@ -207,14 +231,40 @@
         refModal.zoneIndex >= 0 ? (selectedBuffSet?.zones?.[refModal.zoneIndex]?.zoneId ?? '') : ''
     )
 
-    /**
-     * @desc 左侧列表的三级归类树：
-     * 一级=全局 Buff；二级=角色名X链 / 角色名的X阶（依据 Buff 的链/阶硬性条件，无条件的留在最外层）；
-     * 三级=名字里「前缀+数字+后缀」相同的 ≥2 条自动归档并按键数字升序。
-     * 目录是派生的，因此拖拽只改变同一父容器内的顺序（见 buckets）。
-     */
-    let buffTree = $derived(buildBuffTree(buffSets, globalBuffSetIds, team))
+    /** @desc 左栏：显式树按当前 tab 转成列表节点（一级/二级文件夹 + Buff） */
+    let buffTree = $derived(buildStoredBuffTree(storedTree, activeTab, buffSets, team))
     let listTree = $derived<BuffTree>({ nodes: buffTree.nodes, folderKeys: buffTree.folderKeys })
+
+    type MoveFolderOption = { id: string; name: string; path: string; depth: number }
+    /** @desc 「移入文件夹」弹窗的扁平文件夹清单（保留层级缩进与全路径） */
+    const moveFolderOptions = $derived.by(() => {
+        const out: MoveFolderOption[] = []
+        const walk = (nodes: readonly BuffTreeNode[], path: string[], depth: number): void => {
+            for (const node of nodes) {
+                if (node.kind !== 'folder') continue
+                const nextPath = [...path, node.name]
+                out.push({ id: node.id, name: node.name, path: nextPath.join('\\'), depth })
+                walk(node.children, nextPath, depth + 1)
+            }
+        }
+        walk(storedTree[activeTab], [], 1)
+        return out
+    })
+
+    const movePickerCurrentFolderId = $derived(
+        movePickerTargetId ? (findBuffPlacement(storedTree, movePickerTargetId)?.folderId ?? null) : null
+    )
+
+    const openMovePicker = (id: string) => {
+        movePickerTargetId = id
+        showMovePicker = true
+    }
+
+    const confirmMoveToFolder = (folderId: string | null) => {
+        if (movePickerTargetId) moveBuffTreeNode(movePickerTargetId, folderId)
+        movePickerTargetId = null
+        showMovePicker = false
+    }
 
     let scopeChars = $derived.by(() => {
         if (!selectedBuffSet || selectedBuffSet.scope === 'all') return [true, true, true]
@@ -231,7 +281,7 @@
 
     /** @desc 新建 Buff 块：先创建（默认名），选中后自动聚焦名称编辑框供用户填写 */
     function handleCreateBuffSet() {
-        const newId = createBuffSet('未命名BUFF块')
+        const newId = createBuffSet('未命名BUFF块', { tab: activeTab })
         if (!newId) return
         selectedBuffSetId = newId
         focusRenameInput()
@@ -250,6 +300,7 @@
         const isGlobal = globalBuffSetIds.includes(selectedBuffSetId)
         const ok = setBuffSetGlobal(selectedBuffSetId, !isGlobal)
         if (!ok) return
+        activeTab = isGlobal ? 'nonGlobal' : 'global'
         if (!isGlobal) {
             addToast(selectedBuffSet.scope === 'all' ? '已并入全局，全队生效' : '已并入全局', 'success')
         } else {
@@ -257,28 +308,39 @@
         }
     }
 
-    /** @desc 复制 Buff：在叠层文件夹内→层数+1 命名；名字带数字→列出递增命名选项；否则「名字 复制」 */
+    /** @desc 复制目标落点：非全局 Buff 复刻到原文件夹（全局复制品会解除全局，故不回到全局树） */
+    function copyPlacementOf(): { tab: 'global' | 'nonGlobal'; folderId: string | null; index: number } | null {
+        if (!selectedBuffSetId || !selectedBuffSet || selectedBuffSet.global) return null
+        return findBuffPlacement(storedTree, selectedBuffSetId)
+    }
+
+    /**
+     * @desc 复制 Buff：数字文件夹内→用文件夹名前缀 + 下一个数字 + 后缀命名；
+     * 其它情况→名字带数字时列出递增命名选项，否则「名字 复制」。新块插到原块之后。
+     */
     function handleCopyBuffSet() {
         if (!selectedBuffSetId || !selectedBuffSet) return
-        const folder = listTree.nodes.find(
-            (item) => item.type === 'folder' && folderMembers(item).some((c) => c.id === selectedBuffSetId)
-        )
-        if (folder) {
-            const nums = folderMembers(folder)
-                .map((c) => {
-                    const m = c.name.match(LAYERED_BUFF_PATTERN)
-                    return m ? parseInt(m[2]) : 0
-                })
-                .filter((n) => !isNaN(n))
-            const max = nums.length > 0 ? Math.max(...nums) : 0
-            const copyName = (folder.prefixText ?? '') + (max + 1) + (folder.suffixText ?? '')
-            const newId = duplicateBuffSet(selectedBuffSetId, copyName)
+        const placement = copyPlacementOf()
+        const folderNode = placement?.folderId ? findNode(storedTree, placement.folderId)?.node : null
+        const folder = folderNode?.kind === 'folder' ? folderNode : null
+        const folderBuffs = (folder?.children ?? [])
+            .filter((child) => child.kind === 'buff')
+            .map((child) => buffSets.find((buff) => buff.id === child.buffId))
+            .filter((buff): buff is BuffConf => !!buff)
+        const parsed = folderBuffs.map((buff) => buffLeafName(buff.name).match(/^(\d+)([^\d].*)?$/))
+        if (folder && folderBuffs.length > 0 && parsed.every((match) => match !== null)) {
+            const nums = parsed.map((match) => parseInt(match![1]))
+            const ownLeaf = buffLeafName(selectedBuffSet.name)
+            const ownSuffix = ownLeaf.match(/^\d+([^\d].*)?$/)?.[1] ?? ''
+            const suffix = ownSuffix || (parsed[0]?.[2] ?? '')
+            const copyName = folder.name + (Math.max(...nums) + 1) + suffix
+            const newId = duplicateBuffSet(selectedBuffSetId, copyName, placement ?? undefined)
             if (newId) selectedBuffSetId = newId
             return
         }
-        const options = copyNameOptions(selectedBuffSet.name)
+        const options = copyNameOptions(buffLeafName(selectedBuffSet.name))
         if (options.length === 1) {
-            const newId = duplicateBuffSet(selectedBuffSetId)
+            const newId = duplicateBuffSet(selectedBuffSetId, undefined, placement ?? undefined)
             if (newId) selectedBuffSetId = newId
             return
         }
@@ -289,7 +351,7 @@
     /** @desc 确认复制（选中新块） */
     function confirmCopyBuff(name: string) {
         if (!selectedBuffSetId) return
-        const newId = duplicateBuffSet(selectedBuffSetId, name)
+        const newId = duplicateBuffSet(selectedBuffSetId, name, copyPlacementOf() ?? undefined)
         if (newId) selectedBuffSetId = newId
         showCopyOptions = false
     }
@@ -520,7 +582,9 @@
         setDeleteFolderIds: (ids) => (deleteFolderMemberIds = ids),
         getSelectedId: () => selectedBuffSetId,
         setSelectedId: (id) => (selectedBuffSetId = id),
-        setConfirmDeleteFolder: (v) => (showDeleteFolderConfirm = v)
+        setConfirmDeleteFolder: (v) => (showDeleteFolderConfirm = v),
+        isManual: () => manualMode,
+        getActiveTab: () => activeTab
     })
     const listContext = drag.listContext
     const cancelBuffDrag = drag.cancel
@@ -533,6 +597,13 @@
     function openFolderMenu(e: MouseEvent, folder: GroupedBuffConfItem) {
         e.preventDefault()
         e.stopPropagation()
+        // 多选态：右键文件夹即把该组可勾选成员设为当前选中集合，菜单对整组生效
+        if (multiSelect) {
+            const ids = folderMembers(folder)
+                .map((item) => item.id)
+                .filter((id) => !isMultiSelectDisabled(id))
+            multi.selectedIds = new Set(ids)
+        }
         folderMenuTarget = folder
         folderMenuX = e.clientX
         folderMenuY = e.clientY
@@ -555,21 +626,120 @@
         else addToast(`已将「${folder.name}」的 ${n} 条 BUFF 移出全局`, 'info')
     }
 
-    /** @desc 文件夹右键菜单项：重命名 / 并入或移出全局 */
+    /** @desc 显式树文件夹节点 prefix = `tree:<folderId>` / `tree2:<folderId>` */
+    const manualFolderIdOf = (folder: GroupedBuffConfItem): string => {
+        const prefix = folder.prefix ?? ''
+        if (prefix.startsWith('tree2:')) return prefix.slice('tree2:'.length)
+        if (prefix.startsWith('tree:')) return prefix.slice('tree:'.length)
+        return ''
+    }
+
+    const openCreateManualFolder = (parentId: string | null = null) => {
+        folderNameRequest = { mode: 'create', parentId, name: '' }
+    }
+
+    const openRenameManualFolder = (folder: GroupedBuffConfItem) => {
+        folderNameRequest = { mode: 'rename', id: manualFolderIdOf(folder), name: folder.name ?? '' }
+    }
+
+    const confirmFolderName = (name: string) => {
+        const request = folderNameRequest
+        if (!request) return
+        if (request.mode === 'create') {
+            const id = createBuffTreeFolder(name, activeTab, request.parentId ?? null)
+            if (id) addToast(`已新建文件夹「${name}」`, 'success')
+        } else {
+            renameBuffTreeFolder(request.id, name)
+        }
+        folderNameRequest = null
+    }
+
+    const removeManualFolder = (folder: GroupedBuffConfItem) => {
+        const id = manualFolderIdOf(folder)
+        if (!id) return
+        const count = folderMembers(folder).length
+        if (!deleteBuffTreeFolder(id)) {
+            addToast('全局文件夹受保护，只能把 Buff 移出全局，不能删除', 'info')
+            return
+        }
+        addToast(`已删除文件夹「${folder.name ?? ''}」及其中 ${count} 条 BUFF`, 'info')
+    }
+
+    /** @desc 文件夹右键菜单项：多选态 → 整组批量操作；非多选 → 重命名 / 删除 / 全局 / 批量重命名 */
     let folderMenuItems = $derived.by(() => {
         const folder = folderMenuTarget
         if (!folder) return []
-        const hasGlobal = folderMembers(folder).some((c) => globalBuffSetIds.includes(c.id))
-        return [
-            { label: '批量重命名', icon: 'mdi:rename-box', action: () => openFolderRename(folder) },
-            hasGlobal
-                ? {
-                      label: '整体移出全局',
-                      icon: 'mdi:minus-circle-outline',
-                      action: () => moveFolderGlobal(folder, false)
-                  }
-                : { label: '整体并入全局', icon: 'mdi:crown-outline', action: () => moveFolderGlobal(folder, true) }
+        if (multiSelect) {
+            const count = multi.selectedIds.size
+            return [
+                {
+                    label: `并入全局${count > 0 ? `（${count} 项）` : ''}`,
+                    icon: 'mdi:crown-outline',
+                    disabled: !multiSelectionAllNonGlobal(),
+                    action: () => multiSetGlobal(true)
+                },
+                {
+                    label: `移出全局${count > 0 ? `（${count} 项）` : ''}`,
+                    icon: 'mdi:minus-circle-outline',
+                    disabled: !multiSelectionAllGlobal(),
+                    action: () => multiSetGlobal(false)
+                },
+                {
+                    label: '按名称排序',
+                    icon: 'mdi:sort-alphabetical-ascending',
+                    disabled: sortableCount() < 2,
+                    action: () => sortMultiSelected()
+                },
+                {
+                    label: `删除${count > 0 ? `（${count} 项）` : ''}`,
+                    icon: 'mdi:delete-outline',
+                    action: () => requestMultiDelete()
+                }
+            ]
+        }
+        const members = folderMembers(folder).filter((item) => !isMultiSelectDisabled(item.id))
+        const allGlobal = members.length > 0 && members.every((item) => globalBuffSetIds.includes(item.id))
+        const common = [
+            ...(members.length > 0
+                ? [
+                      {
+                          label: '批量重命名',
+                          icon: 'mdi:rename-box',
+                          action: () => openFolderRename(folder)
+                      }
+                  ]
+                : []),
+            {
+                label: allGlobal ? '整组移出全局' : '整组并入全局',
+                icon: allGlobal ? 'mdi:minus-circle-outline' : 'mdi:crown-outline',
+                disabled: members.length === 0,
+                action: () => moveFolderGlobal(folder, !allGlobal)
+            }
         ]
+        if (manualMode && (folder as { folderKind?: string }).folderKind === 'manual') {
+            const id = manualFolderIdOf(folder)
+            const items = [
+                { label: '重命名文件夹', icon: 'mdi:rename-box', action: () => openRenameManualFolder(folder) },
+                { label: '上移', icon: 'mdi:arrow-up', action: () => moveBuffFolderSibling(id, -1) },
+                { label: '下移', icon: 'mdi:arrow-down', action: () => moveBuffFolderSibling(id, 1) },
+                ...common,
+                {
+                    label: activeTab === 'global' ? '全局文件夹不可删' : '删除文件夹',
+                    icon: 'mdi:delete-outline',
+                    disabled: activeTab === 'global',
+                    action: () => removeManualFolder(folder)
+                }
+            ]
+            if (folder.prefix?.startsWith('tree:')) {
+                items.splice(1, 0, {
+                    label: '新建子文件夹',
+                    icon: 'mdi:folder',
+                    action: () => openCreateManualFolder(id)
+                })
+            }
+            return items
+        }
+        return common
     })
 
     /** @desc 打开文件夹批量重命名弹窗：按「新前缀 + 序号 + 新后缀」重新编号全部子 Buff */
@@ -617,6 +787,12 @@
                 icon: 'mdi:delete-outline',
                 action: () => requestMultiDelete()
             })
+            items.splice(2, 0, {
+                label: '按名称排序',
+                icon: 'mdi:sort-alphabetical-ascending',
+                disabled: sortableCount() < 2,
+                action: () => sortMultiSelected()
+            })
             return items
         }
         const bs = buffSets.find((b) => b.id === id)
@@ -635,6 +811,13 @@
                 }
             })
             items.push({ label: '复制', icon: 'mdi:content-copy', action: () => handleCopyFor(id) })
+            if (manualMode) {
+                items.push({
+                    label: '移入文件夹…',
+                    icon: 'mdi:folder-open',
+                    action: () => openMovePicker(id)
+                })
+            }
         }
         items.push(
             isGlobal
@@ -787,6 +970,9 @@
             derivedQueries={listDerived}
             context={listContext}
             {multiSelect}
+            {manualMode}
+            {activeTab}
+            onchangetab={(tab) => (activeTab = tab)}
             multiSelectedIds={multi.selectedIds}
             {resizingSidebar}
             {sidebarDividerHover}
@@ -809,6 +995,7 @@
             onmultiglobal={multiSetGlobal}
             onrequestmultidelete={requestMultiDelete}
             oncreatebuff={handleCreateBuffSet}
+            oncreatefolder={openCreateManualFolder}
         />
 
         <!-- @desc 右列：上（块编辑器 + 乘区清单）下（保存并关闭），sidebar 占满整高 -->
@@ -931,6 +1118,30 @@
         folder={folderRenameTarget}
         onclose={() => (showFolderRename = false)}
         onconfirm={confirmFolderRename}
+    />
+{/if}
+
+<!-- @desc 手动文件夹的新建 / 重命名弹窗 -->
+{#if folderNameRequest}
+    <BuffFolderNameModal
+        title={folderNameRequest.mode === 'create' ? '新建文件夹' : '重命名文件夹'}
+        initialName={folderNameRequest.name}
+        onclose={() => (folderNameRequest = null)}
+        onconfirm={confirmFolderName}
+    />
+{/if}
+
+<!-- @desc 「移入文件夹」二级弹窗：替代右键菜单里一长串移入项 -->
+{#if showMovePicker}
+    <BuffFolderPickerModal
+        open={showMovePicker}
+        folders={moveFolderOptions}
+        currentFolderId={movePickerCurrentFolderId}
+        onclose={() => {
+            showMovePicker = false
+            movePickerTargetId = null
+        }}
+        onpick={confirmMoveToFolder}
     />
 {/if}
 

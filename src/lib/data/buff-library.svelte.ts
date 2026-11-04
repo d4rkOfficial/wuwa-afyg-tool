@@ -5,6 +5,14 @@ import { ZONE_MAP, ZONE_NO_REF_IDS, resolveZoneId } from '$lib/calc/calculation.
 import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$lib/calc/condition'
 import type { BuffCondition } from '$lib/calc/calculation.types'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/consts/game-terms'
+import {
+    buffFolderPath,
+    buffLeafName,
+    clampBuffPathName,
+    isLeafNameValid,
+    joinBuffPath,
+    sanitizeLeafName
+} from '$lib/calc/buff-name'
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
 
@@ -91,10 +99,18 @@ export interface BuffLibraryBuff {
     zones: BuffLibraryZone[]
 }
 
+export interface BuffLibraryFolder {
+    /** @desc 一级文件夹短名（不含反斜杠） */
+    name: string
+    sortOrder: number
+}
+
 export interface BuffLibraryEntity {
     entityType: BuffEntityType
     entityName: string
     source: 'share' | 'custom'
+    /** @desc 一级文件夹（只负责空文件夹/排序；成员按 buffName 的 `A\短名` 前缀归属） */
+    folders: BuffLibraryFolder[]
     buffs: BuffLibraryBuff[]
 }
 
@@ -147,6 +163,50 @@ let _error = $state<string | null>(null)
 
 function entityKey(entityType: BuffEntityType, entityName: string) {
     return `${entityType}/${entityName}`
+}
+
+/** @desc 从 Buff 全名推导一级文件夹（只取第一段；保留空文件夹由 folders 参数提供） */
+export function deriveFoldersFromBuffs(buffs: readonly BuffLibraryBuff[]): BuffLibraryFolder[] {
+    const names = new Set<string>()
+    for (const buff of buffs) {
+        const folder = buffFolderPath(buff.buffName)[0]
+        if (folder) names.add(folder)
+    }
+    return [...names]
+        .sort((a, b) => a.localeCompare(b, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' }))
+        .map((name, sortOrder) => ({ name, sortOrder }))
+}
+
+/** @desc 归一化文件夹列表：去空/去反斜杠/去重/稳定排序 */
+export function normalizeFolderList(value: unknown): BuffLibraryFolder[] {
+    if (!Array.isArray(value)) return []
+    const map = new Map<string, BuffLibraryFolder>()
+    for (const raw of value) {
+        if (!raw || typeof raw !== 'object') continue
+        const item = raw as Record<string, unknown>
+        const name = sanitizeLeafName(String(item.name ?? ''))
+        if (!name || !isLeafNameValid(name) || map.has(name)) continue
+        const sortOrder = Number(item.sortOrder)
+        map.set(name, { name, sortOrder: Number.isFinite(sortOrder) ? sortOrder : map.size })
+    }
+    return [...map.values()]
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh-Hans-CN'))
+        .map((folder, index) => ({ ...folder, sortOrder: index }))
+}
+
+/** @desc 把「目录里已有但 Buff 前缀未覆盖」的文件夹并入列表（保留空文件夹） */
+export const mergeFolders = (
+    folders: readonly BuffLibraryFolder[],
+    buffs: readonly BuffLibraryBuff[]
+): BuffLibraryFolder[] => {
+    const map = new Map<string, BuffLibraryFolder>()
+    for (const folder of normalizeFolderList(folders)) map.set(folder.name, folder)
+    for (const folder of deriveFoldersFromBuffs(buffs)) {
+        if (!map.has(folder.name)) map.set(folder.name, { ...folder, sortOrder: map.size })
+    }
+    return [...map.values()]
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh-Hans-CN'))
+        .map((folder, index) => ({ ...folder, sortOrder: index }))
 }
 
 function buffKey(b: BuffLibraryBuff) {
@@ -207,7 +267,7 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
             for (const b of obj.buffs) {
                 if (!b || typeof b !== 'object') continue
                 const bb = b as Record<string, unknown>
-                const name = String(bb.buffName ?? '').trim()
+                const name = clampBuffPathName(String(bb.buffName ?? '').trim(), 1)
                 const zones = normalizeZones(bb.zones)
                 if (!name) continue
                 buffs.push({
@@ -221,6 +281,7 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
                 })
             }
             if (!buffs.length) continue
+            const folders = normalizeFolderList(obj.folders)
             const existing = map.get(key)
             if (existing) {
                 const seen = new Set(existing.buffs.map(buffKey))
@@ -231,16 +292,18 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
                         seen.add(k)
                     }
                 }
+                existing.folders = mergeFolders([...existing.folders, ...folders], existing.buffs)
             } else {
                 map.set(key, {
                     entityType: et as BuffEntityType,
                     entityName: en,
                     source: obj.source === 'custom' ? 'custom' : 'share',
+                    folders: mergeFolders(folders, buffs),
                     buffs
                 })
             }
         } else {
-            const name = String(obj.buffName ?? '').trim()
+            const name = clampBuffPathName(String(obj.buffName ?? '').trim(), 1)
             const zones = normalizeZones(obj.zones)
             if (!name) continue
             const buff = { buffName: name, zones }
@@ -248,11 +311,13 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
             if (existing) {
                 const k = buffKey(buff)
                 if (!existing.buffs.some((b) => buffKey(b) === k)) existing.buffs.push(buff)
+                existing.folders = mergeFolders(existing.folders, existing.buffs)
             } else {
                 map.set(key, {
                     entityType: et as BuffEntityType,
                     entityName: en,
                     source: 'share',
+                    folders: deriveFoldersFromBuffs([buff]),
                     buffs: [buff]
                 })
             }
@@ -318,22 +383,50 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
     return out
 }
 
-export async function updateEntityBuffs(entityType: BuffEntityType, entityName: string, buffs: BuffLibraryBuff[]) {
+export async function updateEntityBuffs(
+    entityType: BuffEntityType,
+    entityName: string,
+    buffs: BuffLibraryBuff[],
+    folders?: BuffLibraryFolder[]
+) {
     const key = entityKey(entityType, entityName)
     const valid = cloneBuffsValid(buffs).map((b) => ({
         ...b,
         ...(b.condition ? { condition: sanitizeConditionForEntity(entityType, b.condition) } : {})
     }))
     const exists = _entities.some((e) => entityKey(e.entityType, e.entityName) === key)
+    const current = _entities.find((e) => entityKey(e.entityType, e.entityName) === key)
+    const nextFolders = mergeFolders(folders ?? current?.folders ?? [], valid)
     if (exists) {
         _entities = _entities.map((e) =>
-            entityKey(e.entityType, e.entityName) === key ? { ...e, source: 'custom', buffs: valid } : e
+            entityKey(e.entityType, e.entityName) === key
+                ? { ...e, source: 'custom', buffs: valid, folders: nextFolders }
+                : e
         )
     } else {
-        _entities = [..._entities, { entityType, entityName, source: 'custom', buffs: valid }]
+        _entities = [..._entities, { entityType, entityName, source: 'custom', folders: nextFolders, buffs: valid }]
     }
     await persist()
 }
+
+/** @desc 只更新自定义实体的文件夹结构（空文件夹/排序） */
+export async function updateEntityFolders(
+    entityType: BuffEntityType,
+    entityName: string,
+    folders: BuffLibraryFolder[]
+) {
+    const key = entityKey(entityType, entityName)
+    _entities = _entities.map((e) =>
+        entityKey(e.entityType, e.entityName) === key && e.source === 'custom'
+            ? { ...e, folders: mergeFolders(folders, e.buffs) }
+            : e
+    )
+    await persist()
+}
+
+/** @desc 把 Buff 移入/移出一级文件夹（只改全名前缀；短名保持不变） */
+export const buffNameInFolder = (name: string, folder: string | null): string =>
+    joinBuffPath(folder, buffLeafName(name))
 
 export async function setEntitySource(entityType: BuffEntityType, entityName: string, source: 'share' | 'custom') {
     const key = entityKey(entityType, entityName)
@@ -375,19 +468,36 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
                 condition?: BuffCondition
                 buff_set?: BuffLibraryZone[]
             }>
+            folders?: Array<{
+                entity_type?: string
+                entity_name?: string
+                name?: string
+                sort_order?: number
+            }>
+        }
+        const foldersByKey = new Map<string, BuffLibraryFolder[]>()
+        for (const raw of json.folders ?? []) {
+            const et = raw.entity_type as BuffEntityType
+            const en = (raw.entity_name ?? '').trim()
+            const name = sanitizeLeafName(raw.name ?? '')
+            if (!ENTITY_TYPES.includes(et) || !en || !name) continue
+            const key = entityKey(et, en)
+            const list = foldersByKey.get(key) ?? []
+            list.push({ name, sortOrder: Number(raw.sort_order) || list.length })
+            foldersByKey.set(key, list)
         }
         const rows: BuffLibraryItem[] = (json.buffSets ?? [])
             .map((r) => ({
                 entityType: (r.entity_type ?? '') as BuffEntityType,
                 entityName: (r.entity_name ?? '').trim(),
-                buffName: (r.buff_name ?? '').trim(),
+                buffName: clampBuffPathName((r.buff_name ?? '').trim(), 1),
                 scope: r.scope,
                 exclusive: !!r.exclusive,
                 ...(normalizeGateCondition(r.condition) ? { condition: normalizeGateCondition(r.condition) } : {}),
                 zones: normalizeZones(r.buff_set)
             }))
             .filter((row) => ENTITY_TYPES.includes(row.entityType) && !!row.entityName && !!row.buffName)
-        mergeShareRows(rows)
+        mergeShareRows(rows, foldersByKey)
         await persist()
         return { ok: true, added: rows.length }
     } catch (e) {
@@ -398,7 +508,7 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
     }
 }
 
-function mergeShareRows(rows: BuffLibraryItem[]) {
+function mergeShareRows(rows: BuffLibraryItem[], foldersByKey: ReadonlyMap<string, BuffLibraryFolder[]>) {
     const byKey = new Map<string, { buffs: BuffLibraryBuff[] }>()
     const order: string[] = []
     for (const row of rows) {
@@ -425,15 +535,16 @@ function mergeShareRows(rows: BuffLibraryItem[]) {
     for (const key of order) {
         const group = byKey.get(key)!
         const [et, en] = key.split('/') as [BuffEntityType, string]
+        const folders = mergeFolders(foldersByKey.get(key) ?? [], group.buffs)
         const idx = next.findIndex((e) => e !== null && entityKey(e.entityType, e.entityName) === key)
         if (idx >= 0) {
             const e = next[idx] as BuffLibraryEntity
             if (e.source === 'share') {
-                next[idx] = { ...e, buffs: group.buffs }
+                next[idx] = { ...e, buffs: group.buffs, folders }
                 coveredKeys.add(key)
             }
         } else {
-            next.push({ entityType: et, entityName: en, source: 'share', buffs: group.buffs })
+            next.push({ entityType: et, entityName: en, source: 'share', buffs: group.buffs, folders })
             coveredKeys.add(key)
         }
     }
