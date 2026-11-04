@@ -8,6 +8,7 @@ import {
 } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
+import { sanitizeLeafName } from '$lib/calc/buff-name'
 import type { BuffCondition } from '$lib/calc/calculation.types'
 
 export const BUFF_SCOPES = ['self', 'self_except', 'team', 'effect_only'] as const
@@ -43,6 +44,7 @@ export interface GeneratedBuff {
 
 /**
  * @desc 只保留白名单乘区、合法数值，避免脏数据。
+ * 生成名一律压成单段短名：模型若把文件夹分隔符 `\` 写进 buffName，转成正斜杠而不是建文件夹。
  * 乘区是**贡献条目列表**：同一乘区可保留多条（各自带自己的条件），仅剔除完全重复的条目；
  * 同一乘区内只保留一个覆盖条目；百分比类 / 额外倍率不支持覆盖。
  */
@@ -50,7 +52,7 @@ export function sanitizeBuffs(buffs: GeneratedBuff[]): GeneratedBuff[] {
     const out: GeneratedBuff[] = []
     const seen = new Set<string>()
     for (const b of buffs) {
-        const name = b.buffName?.trim()
+        const name = sanitizeLeafName(b.buffName ?? '')
         if (!name || seen.has(name)) continue
         const zones = sanitizeZones(b.zones)
         if (!zones.length) continue

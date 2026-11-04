@@ -121,7 +121,11 @@ export const generateBuffs = async (options: GenerateBuffOptions): Promise<Gener
         emit({ kind: 'status', text, ...extra })
 
     const targetLabel = data.target === 'project' ? '工程 Buff 配置' : '主页 Buff 集'
-    const systemContent = `${renderSystemPrompt(systemTemplate, { entityType, namingRule })}\n当前生成目标：${targetLabel}。`
+    const targetHint =
+        data.target === 'project'
+            ? '工程导入时会按条件/来源自动建立文件夹；buffName 只写单段短名，不要带任何文件夹前缀或反斜杠。'
+            : 'buffName 只写单段短名，不要带任何文件夹前缀或反斜杠；文件夹由用户在编辑器中手动维护。'
+    const systemContent = `${renderSystemPrompt(systemTemplate, { entityType, namingRule })}\n当前生成目标：${targetLabel}。${targetHint}`
     const messages: ChatMessage[] = [{ role: 'system', content: systemContent }]
     const initialUser = renderInitialTaskPrompt(initialTaskTemplate, { entityType, entityName })
     messages.push({ role: 'user', content: initialUser })

@@ -4,6 +4,7 @@ import {
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_INITIAL_TASK_PROMPT,
     DEFAULT_NAMING_RULES_TEXT,
+    BUFF_NAME_LEAF_RULE_TEXT,
     CONDITION_CHAIN_RULES_TEXT,
     CONDITION_REFINE_RULES_TEXT,
     CONDITION_COMMON_RULES_TEXT
@@ -41,7 +42,7 @@ export function renderNamingRules(userRule: string): string {
   例：1/2/3 层效果为 20/40/80 → 1层=20、2层=20、3层=40；每层+5%可叠4层 → 各层都填 5。
 - 原因：工具箱把各层 buff 全部叠加计算，只有填增量才能得到正确累计值。
 - 武器精炼按阶拆分同理：1-5 阶各填该阶增量（见 get_condition_rules 的武器精炼规则）。`
-    return head + split
+    return `${head}${split}\n\n${BUFF_NAME_LEAF_RULE_TEXT}`
 }
 
 export interface RenderSystemContext {
@@ -50,11 +51,13 @@ export interface RenderSystemContext {
 }
 
 export function renderSystemPrompt(template: string, ctx: RenderSystemContext = {}): string {
-    return template
+    const rendered = template
         .replaceAll('{ZONE_LIST}', ZONE_LIST_TEXT)
         .replaceAll('{REF_ZONE_LIST}', REF_ZONE_LIST_TEXT)
         .replaceAll('{CONDITION_RULES}', renderConditionRules(ctx.entityType))
         .replaceAll('{NAMING_RULES}', renderNamingRules(ctx.namingRule?.trim() ?? ''))
+    // 自定义模板可能删掉 {NAMING_RULES} 占位符：硬性格式仍然强制附加，保证生成名永不带反斜杠
+    return template.includes('{NAMING_RULES}') ? rendered : `${rendered}\n\n${BUFF_NAME_LEAF_RULE_TEXT}`
 }
 
 export interface RenderUserContext {
