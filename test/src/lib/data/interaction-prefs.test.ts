@@ -1,6 +1,6 @@
 // 「弹窗关闭按钮位置」重进丢失配置的回归：
 // 该设置此前只有写入口（setModalClosePosition → localStorage），模块初始化时**没有读回**，
-// 于是刷新 / 重进后一律回到默认右上角（B 站 Toy 首次进入写入的 top-left 同样丢失）。
+// 于是刷新 / 重进后一律回到默认右上角。
 // 这里锁住「读回时的取值口径」：只认两个合法值，其余（含 null / 空串 / 历史脏值）回落默认。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'

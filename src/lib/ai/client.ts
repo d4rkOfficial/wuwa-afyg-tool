@@ -139,6 +139,9 @@ export interface StreamOptions {
 export const isOutputTruncated = (finishReason?: string): boolean => finishReason === 'length'
 
 function needsProxy(base: string, direct = false): boolean {
+    // 无服务端的独立静态包没有 /api/ai/stream 可转发：只能浏览器直连，
+    // 端点自身不支持 CORS 时会在预检阶段失败（错误会原样提示用户，不静默改道）
+    if (__OFFLINE_BUILD__) return false
     // 用户显式选择浏览器直连：无条件直连（本地 / 公网都走这条路）
     if (direct) return false
     try {

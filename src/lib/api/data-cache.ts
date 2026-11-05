@@ -1,5 +1,6 @@
 import { browser } from '$app/environment'
 import { DATA_CDN_CACHE_NAME } from '$lib/api/consts'
+import { fetchApiJson } from '$lib/api/local-api'
 import { getCurrentProviderId as getProviderId, providerQuery } from '$lib/api/provider'
 import type {
     Character,
@@ -39,7 +40,9 @@ export const getApiBase = (): string => apiBase
 
 /** 在本地 API 路径后附加 ?provider= 查询参数（仅非默认上游时）。 */
 function withProviderUrl(path: string): string {
-    return apiBase + path + providerQuery()
+    // 无服务端的独立静态包：接口在浏览器内就地解析（见 $lib/api/local-api），apiBase 无意义
+    const base = __OFFLINE_BUILD__ ? '' : apiBase
+    return base + path + providerQuery()
 }
 
 const memoryCache = new Map<string, unknown>()
@@ -177,9 +180,7 @@ async function fetchJSON<T>(url: string, cacheK: string, ttl: number): Promise<T
     if (inFlight.has(cacheK)) return inFlight.get(cacheK) as Promise<T>
 
     const promise = (async () => {
-        const res = await fetch(url)
-        if (!res.ok) throw new Error(`API ${res.status}: ${url}`)
-        const data: T = await res.json()
+        const data = await fetchApiJson<T>(url)
         memoryCache.set(cacheK, data)
         setLocal(cacheK, data)
         return data
@@ -206,9 +207,7 @@ async function fetchBatchIcons(entity: string): Promise<Record<string, string>> 
 
     const promise = (async () => {
         const url = withProviderUrl(`/api/v1/batch-icons/${entity}`)
-        const res = await fetch(url)
-        if (!res.ok) throw new Error(`API ${res.status}: ${url}`)
-        const data: Record<string, string> = await res.json()
+        const data = await fetchApiJson<Record<string, string>>(url)
         memoryCache.set(k, data)
         setLocal(k, data)
         warmImageCache(Object.values(data))

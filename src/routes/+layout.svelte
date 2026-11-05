@@ -21,7 +21,8 @@
 
     let { children } = $props()
     /** fast-calc 是独立静态页：不加载全站主题、滚动条、WS、HelpPanel 等布局层 */
-    const isFastCalc = $derived(page.url.pathname === '/fast-calc')
+    /** 归一掉尾斜杠：独立静态包用 `trailingSlash: 'always'`，pathname 会是 `/fast-calc/` */
+    const isFastCalc = $derived((page.url.pathname.replace(/\/+$/, '') || '/') === '/fast-calc')
 
     if (browser) {
         // 尽量让浏览器把图标/数据缓存当作持久存储，降低容量紧张时的自动清理

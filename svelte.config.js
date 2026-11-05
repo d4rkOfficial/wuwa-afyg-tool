@@ -5,15 +5,26 @@ import staticAdapter from '@sveltejs/adapter-static'
 const deployTarget = process.env.DEPLOY_TARGET || 'vercel'
 
 /**
- * @desc `static` 仅用于 Tauri 启动器 / GitHub Release 的纯静态产物。
- * fallback 生成 200.html，保持 SPA 路由刷新可用；API 由本地 Rust 服务提供。
+ * @desc `STANDALONE=1`：打「无服务端独立静态包」（zip 分发）。
+ * 与 `DEPLOY_TARGET=static` 的差别只有两点，都是为了让**任意静态文件服务器**直接吃这个目录：
+ *   1. `trailingSlash: 'always'` —— `/shell-page/`、`/fast-calc/` 落成「目录 + index.html」，
+ *      nginx / `python -m http.server` / 对象存储这类不认无扩展名路径的服务器也能直接进子页；
+ *   2. 数据接口在浏览器内就地解析（见 `src/lib/api/local-api.ts`），不依赖任何 `/api` 服务。
  */
-const adapter =
-    deployTarget === 'cloudflare'
-        ? cloudflareAdapter()
-        : deployTarget === 'static'
-          ? staticAdapter({ pages: 'build', assets: 'build', fallback: '200.html', strict: false })
-          : vercelAdapter()
+const standalone = process.env.STANDALONE === '1'
+
+/**
+ * @desc `static` 仅用于 Tauri 启动器 / GitHub Release 的纯静态产物。
+ * fallback 生成 200.html，保持 SPA 路由刷新可用；API 由本地 Rust 服务提供
+ * （`STANDALONE=1` 的独立包则不依赖该服务，数据在浏览器内取）。
+ */
+const adapter = standalone
+    ? staticAdapter({ pages: 'build', assets: 'build', fallback: '200.html', strict: false })
+    : deployTarget === 'cloudflare'
+      ? cloudflareAdapter()
+      : deployTarget === 'static'
+        ? staticAdapter({ pages: 'build', assets: 'build', fallback: '200.html', strict: false })
+        : vercelAdapter()
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {

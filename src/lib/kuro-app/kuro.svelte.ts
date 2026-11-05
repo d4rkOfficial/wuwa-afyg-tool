@@ -138,6 +138,9 @@ interface CallOptions {
 
 /** @desc 调用应用自身的库街区服务端路由；非 2xx 或 ok:false 一律抛出带后端 message 的 Error */
 async function call<T extends Record<string, unknown>>(path: string, opts: CallOptions = {}): Promise<T> {
+    // 库街区：token 必须留在服务端 httpOnly cookie 里，且上游 api.kurobbs.com 不开放 CORS，
+    // 浏览器直连既拿不到凭据也过不了预检 —— 无服务端的独立静态包只能明确报不支持
+    if (__OFFLINE_BUILD__) throw new Error('当前是无服务端的静态版：库街区同步需要服务端中转，暂不可用')
     const { method = 'GET', body, timeout = 60000 } = opts
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), timeout)

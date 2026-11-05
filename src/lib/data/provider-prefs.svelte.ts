@@ -4,6 +4,7 @@
 // server 端，server 端再据此取用对应适配器。
 
 import { browser } from '$app/environment'
+import { fetchApiJson } from '$lib/api/local-api'
 import { listProviders, getCurrentProviderId, setProvider, resetProvider, REGISTRY } from '$lib/api/provider'
 
 export interface ProviderOption {
@@ -26,18 +27,21 @@ export function getProviderVersions(): Record<string, string> {
     return _versions
 }
 
-/** 拉取各上游最新版本，通过本地端点 /api/v1/version/latest?provider= 转给 server。 */
+/**
+ * @desc 拉取各上游最新版本（badge 展示用）。
+ * 在线部署经本地端点 `/api/v1/version/latest?provider=` 转给 server；
+ * 无服务端的独立静态包由 `$lib/api/local-api` 在浏览器内直接问上游。
+ */
 export async function loadProviderVersions(): Promise<void> {
     if (!browser) return
     const options = _options
     await Promise.all(
         options.map(async (o) => {
             try {
-                const res = await fetch(`/api/v1/version/latest?provider=${encodeURIComponent(o.id)}`)
-                if (res.ok) {
-                    const text = (await res.text()).trim()
-                    if (text && text !== '""') _versions[o.id] = JSON.parse(text)
-                }
+                const version = await fetchApiJson<unknown>(
+                    `/api/v1/version/latest?provider=${encodeURIComponent(o.id)}`
+                )
+                if (typeof version === 'string' && version) _versions[o.id] = version
             } catch {
                 /* keep empty */
             }

@@ -23,7 +23,7 @@
              *   2. 处在 iframe 里 —— 壳页 iframe 加载的正是同一个 /，
              *      靠 window.self !== window.top 判定（比 document.referrer 可靠：
              *      严格 referrer-policy 下 referrer 可能为空，空值会导致无限循环）。
-             *      这条同时覆盖 B 站 Toy 容器（它也是用 iframe 引入本工具）；
+             *      这条同时覆盖任何用 iframe 引入本工具的宿主页面；
              *   3. 已安装的 PWA（standalone）—— 用户刻意装到桌面，不该被塞进浏览器全屏壳页；
              *   4. 非手机 UA / 不支持全屏方向锁的环境 —— 跳过去也切不了横屏，只会多一层遮罩。
              */
@@ -49,9 +49,14 @@
                 var isMobileDevice = /Android|iPhone|iPod|Windows Phone|HarmonyOS|Mobile Safari/i.test(
                     shellCtx.userAgent
                 )
+                /*
+                 * 尾斜杠口径：独立静态包用 `trailingSlash: 'always'`，此时 `/fast-calc/` 与
+                 * `/fast-calc` 是同一个页面，比较前必须先去掉尾斜杠，否则手机会被从 fast-calc 塞进壳页。
+                 */
+                var normPath = shellCtx.pathname.replace(/\/+$/, '') || '/'
                 var shouldShell =
-                    shellCtx.pathname !== '/shell-page' &&
-                    shellCtx.pathname !== '/fast-calc' &&
+                    normPath !== '/shell-page' &&
+                    normPath !== '/fast-calc' &&
                     !shellCtx.inIframe &&
                     !shellCtx.standalone &&
                     shellCtx.canLockOrientation &&

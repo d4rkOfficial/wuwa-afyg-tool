@@ -14,21 +14,18 @@
  * 路由级共享的响应式状态，直接加在这里。
  *
  * `wuwa-afyg:version` 为什么不放 `$lib/data/{状态集名}.svelte.ts`：仓库既有 localStorage 状态
- * （`toy-prefs` / `calc-view` / `render-prefs` …）都是**跨路由的偏好**，故按 AGENTS §2 末条进 `$lib/data/`；
+ * （`first-visit` / `calc-view` / `render-prefs` …）都是**跨路由的偏好**，故按 AGENTS §2 末条进 `$lib/data/`；
  * 而版本指纹只被本页启动序列读写、不参与任何跨路由复用，属「路由级 store 不得放 `$lib/`」的那一类。
  * 键名与读写它的 store 同文件，对齐 `$lib/data/*.svelte.ts` 各自持有 `STORAGE_KEY` 的既有做法。
  */
 import { browser } from '$app/environment'
 import { ensureVersion, getWWVersion } from '$lib/api/client-version'
 import { clearCache } from '$lib/api/data-cache'
-import { initToyEnvironmentBridge, isToyMobile } from '$lib/bilibili-toy/environment.svelte'
-import { initToyProfileBridge } from '$lib/bilibili-toy/profile.svelte'
 import { getCalcState, rebindGlobalBuffs } from '$lib/calc/calculation.store.svelte'
 import { getConfig } from '$lib/calc/config.store.svelte'
 import { loadIcons } from '$lib/calc/timeline.store.svelte'
 import { loadGenPrefs, updateGenPrefs } from '$lib/data/ai-prefs.svelte'
 import { setCalcViewMode } from '$lib/data/calc-view.svelte'
-import { setModalClosePosition } from '$lib/data/interaction-prefs.svelte'
 import { loadKeyMap } from '$lib/data/keymap.svelte'
 import {
     getActiveProject,
@@ -45,7 +42,7 @@ export { reloadActiveProjectStores }
 import { checkShare, refreshShareCooldown } from '$lib/data/share.svelte'
 import { loadShortcuts } from '$lib/data/shortcuts.svelte'
 import { fetchSubstatPlansFromShare } from '$lib/data/substat-library.svelte'
-import { isFirstVisit, markVisited } from '$lib/data/toy-prefs.svelte'
+import { isFirstVisit, markVisited } from '$lib/data/first-visit.svelte'
 import { loadWorkshop } from '$lib/data/workshop.svelte'
 import { loadKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
 import { loadKuroPrefs, restoreKuroSession } from '$lib/kuro-app/kuro.svelte'
@@ -111,16 +108,12 @@ export const relockAllPhases = async (): Promise<void> => {
  */
 export const bootstrapRouteStores = async (): Promise<void> => {
     hideSplash()
-    initToyProfileBridge()
-    initToyEnvironmentBridge()
-    // 首次进入（任意端）：拉表默认平铺模式；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
+    // 首次进入：拉表默认平铺模式；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
     // 静默从工坊同步「标准词条集」（不再弹「同步工坊数据」弹窗；Buff 集不自动同步，由用户自行同步）
     if (isFirstVisit()) {
         setCalcViewMode('spread')
         // AI 助手默认隐藏（**持久化**保存：用户可在设置里重新开启）
         void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
-        // B 站 Toy 平台首次进入：弹窗关闭按钮默认放左上角（其它平台保持右上角）
-        if (isToyMobile()) setModalClosePosition('top-left')
         void applyFirstRunAppearance()
         // 同步失败静默忽略（工坊不可达等）：用户可在「词条方案」面板随时手动同步
         void fetchSubstatPlansFromShare()

@@ -85,9 +85,11 @@ describe('shell-page 视口适配契约', () => {
         assert.equal(style.height, '1080px')
     })
 
-    it('iframe 指向同源主路由（相对路径，不硬编码域名）', () => {
+    it('iframe 指向同源主路由（站点根路径，不硬编码域名）', () => {
         const { frameSrc } = runShell(390, 844)
-        assert.equal(frameSrc, './')
+        // 用站点根 '/' 而不是 './'：独立静态包里壳页是目录式 URL（/shell-page/），
+        // './' 会解析成壳页自己，形成自引用 iframe。
+        assert.equal(frameSrc, '/')
         const frameTag = SHELL_HTML.match(/<iframe id="shell-frame"[^>]*>/)?.[0] ?? ''
         assert.ok(frameTag.length > 0, '未找到 shell-frame 标签')
         assert.ok(!/\ssrc=/.test(frameTag), 'iframe 不应带静态 src')

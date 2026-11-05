@@ -34,7 +34,8 @@ const titleJobs = new Map<string, Promise<string>>()
 const persist = (): Promise<void> => dbSet(KEY, { instances, activeId })
 
 const fetchWorkshopTitle = (url: string): Promise<string> => {
-    if (!browser) return Promise.resolve('')
+    // 无服务端的独立静态包没有跨域代理可用：标题抓不到就按「已尝试过」处理（''），不再重试
+    if (!browser || __OFFLINE_BUILD__) return Promise.resolve('')
     const existing = titleJobs.get(url)
     if (existing) return existing
     const job = (async () => {

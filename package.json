@@ -6,6 +6,8 @@
     "scripts": {
         "dev": "vite dev",
         "build": "vite build",
+        "build:standalone": "node scripts/build-standalone.mjs",
+        "package:standalone": "node scripts/build-standalone.mjs",
         "preview": "vite preview",
         "prepare": "svelte-kit sync || echo ''",
         "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && node scripts/check-mdi-icons.mjs && node scripts/check-surfaces.mjs && node scripts/check-components.mjs && node scripts/check-scrollbar.mjs && node scripts/generate-components-doc.mjs --check && node scripts/generate-tools-doc.mjs --check && node scripts/check-motion.mjs",

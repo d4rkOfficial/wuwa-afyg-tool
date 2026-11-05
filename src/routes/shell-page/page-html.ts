@@ -6,17 +6,17 @@
  *
  * 壳页做两件配套的事：
  *   1. 桌面视口适配：iframe 固定 1280px 宽渲染桌面布局，再等比缩放到屏幕宽度
- *      （窄屏缩小、宽屏 1:1），与参考项目 bilibili-toy-shell-page 的 applyViewport 一致。
+ *      （窄屏缩小、宽屏 1:1）。
  *   2. 竖屏遮罩层：竖屏时盖一层刊头式引导（仿 welcome-screen 的杂志排版：品牌图标 +
  *      细字距眉标 + 描边衬线大标题 + 双线分隔），主行动按钮「切换至横屏开始使用」。
  *      两者是配套的 —— 遮罩层承诺的「横屏后得到完整桌面布局」正是靠上面的 1280px 缩放兑现；
  *      没有缩放，横屏也只是窄屏布局，按钮就成了空头支票。
  *
- * 参考项目里还有横屏提示层的「切换横屏」按钮、身份透传等，其中强制横屏用的是 B 站 Toy SDK
- * （setContainerMode）。本壳页不用该 SDK，改为原生 Fullscreen API + Screen Orientation API；
- * 身份透传与壳页无关，不做。
+ * 壳页里强制横屏不用任何第三方 SDK，改用原生 Fullscreen API + Screen Orientation API。
  *
- * iframe 地址用相对路径 './'，同源指向本应用主路由（部署到哪就指向哪，无需硬编码域名）。
+ * iframe 地址用站点根路径 '/'（带上前后的 hash），同源指向本应用主路由，
+ * 部署到哪个域名就指向哪个域名。不要改用相对路径 './'：壳页在独立静态包里是目录式 URL
+ * （/shell-page/），'./' 会指向壳页自己。
  */
 
 /** @desc 桌面布局的设计宽度（px）：iframe 按它渲染，再缩放到实际屏幕 */
@@ -384,8 +384,10 @@ setTimeout(() => {
 
 applyViewport()
 updateControls()
-/* 壳页 URL 的 hash 随首次加载一并带上 */
-frame.src = './' + location.hash
+/* 壳页 URL 的 hash 随首次加载一并带上。
+   用站点根 '/' 而不是 './'：独立静态包里壳页是目录式 URL（/shell-page/），
+   './' 会解析成 /shell-page/ 自己，形成「壳页套壳页」的自引用 iframe。 */
+frame.src = '/' + location.hash
 
 /* 进来自动请求横屏，无需用户先点按钮（真锁不上时遮罩层仍在，用户可手动再试） */
 if (isTouchPortrait() && canLockOrientation) {

@@ -8,7 +8,15 @@ import { defineConfig } from 'vite'
 const DATA_CDN_ORIGIN = 'https://static.nanoka.cc'
 const dataCdnPattern = new RegExp('^' + DATA_CDN_ORIGIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 
+/**
+ * @desc `STANDALONE=1`：打「无服务端独立静态包」（zip 分发，见 scripts/build-standalone.mjs）。
+ * 编译期常量 `__OFFLINE_BUILD__` 让 `src/lib/api/local-api.ts` 把 `/api/**` 在浏览器内就地解析，
+ * 并让库街区 / AI 转发等必须服务端的能力给出明确提示。正常构建里这些分支会被整段删掉。
+ */
+const offlineBuild = process.env.STANDALONE === '1'
+
 export default defineConfig({
+    define: { __OFFLINE_BUILD__: JSON.stringify(offlineBuild) },
     plugins: [
         tailwindcss(),
         sveltekit(),

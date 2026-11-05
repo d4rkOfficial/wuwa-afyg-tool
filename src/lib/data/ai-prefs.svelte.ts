@@ -36,9 +36,7 @@ export function getGenPrefs(): AiGenPrefs {
 }
 
 /**
- * @desc AI 助手是否启用：只由持久化偏好决定。
- *
- * B 站 Toy 不再有「每会话强制隐藏」的平台限制；用户在 Toy 里同样可以开启 AI 助手。
+ * @desc AI 助手是否启用：只由持久化偏好决定，无任何会话级 / 平台级抑制。
  */
 export const isAiEnabled = (): boolean => _prefs.enabled
 

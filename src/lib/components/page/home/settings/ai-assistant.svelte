@@ -267,7 +267,7 @@
         return { x: Math.max(8, Math.min(pos.x, maxX)), y: Math.max(8, Math.min(pos.y, maxY)) }
     }
 
-    // AI 助手是否启用（悬浮窗显隐）：只取持久化偏好；B 站 Toy 与普通浏览器一致
+    // AI 助手是否启用（悬浮窗显隐）：只取持久化偏好
     const aiEnabled = $derived(isAiEnabled())
     // GPU 合成加速（设置 → 交互相关）：拖拽定位用 transform 走合成层
     const gpuAccel = $derived(getGpuAccel())
@@ -399,6 +399,7 @@
      * 代理侧顺带做 SSRF 校验与 HTML→正文提取（见该路由与 `web-fetch.utils.ts`）。
      */
     async function fetchWebPage(request: WebFetchRequest): Promise<WebFetchResult> {
+        if (__OFFLINE_BUILD__) throw new Error('当前是无服务端的静态版：网页抓取需要服务端代理出网，暂不可用')
         const res = await fetch('/api/ai/fetch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

@@ -60,7 +60,7 @@
 
     const aiProfiles = $derived(getAiProfiles())
     const aiActiveId = $derived(getActiveProfileId())
-    /** @desc 开关的显示态 = 持久化启用态（Toy 与普通浏览器一致） */
+    /** @desc 开关的显示态 = 持久化启用态 */
     const aiEnabled = $derived(isAiEnabled())
 
     async function toggleAiEnabled() {

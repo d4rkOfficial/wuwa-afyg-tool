@@ -26,3 +26,11 @@ if (typeof g.$effect === 'undefined') {
     // 模块加载期不应产生副作用；给出空实现，避免误用时报 ReferenceError
     g.$effect = () => {}
 }
+
+// ── 编译期常量 ──────────────────────────────────────────────────────────────
+// `__OFFLINE_BUILD__` 由 vite.config.ts 的 define 在打包时替换成字面量；node:test 没有打包期，
+// 这里补默认值 false（= 有服务端的常规构建，与生产默认一致）。
+// 想测「无服务端独立静态包」的分支，在单个测试里自行 `globalThis.__OFFLINE_BUILD__ = true`。
+if (typeof g.__OFFLINE_BUILD__ === 'undefined') {
+    g.__OFFLINE_BUILD__ = false
+}

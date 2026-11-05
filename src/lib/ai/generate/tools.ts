@@ -8,6 +8,7 @@ import {
     getEchoInfo,
     getEchoSetInfo
 } from '$lib/api/data-cache'
+import { ApiError, fetchApiJson } from '$lib/api/local-api'
 import { providerQuery } from '$lib/api/provider'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
@@ -64,15 +65,17 @@ function includesQuery(name: string, query: string): boolean {
 
 /** @desc 生成器角色信息统一走 v1 纯文本接口，避免把界面富文本带入模型上下文 */
 const getCharacterInfoForGeneration = async (entityName: string): Promise<unknown> => {
-    const res = await fetch(`/api/v1/info/character/${encodeURIComponent(entityName)}${providerQuery()}`, {
-        headers: { Accept: 'application/json' },
-        cache: 'no-store'
-    })
-    if (!res.ok)
-        return {
-            error: res.status === 404 ? `未找到角色「${entityName}」` : `v1 接口失败（HTTP ${res.status}）`
-        }
-    return res.json()
+    try {
+        return await fetchApiJson<unknown>(`/api/v1/info/character/${encodeURIComponent(entityName)}${providerQuery()}`)
+    } catch (e) {
+        // 在线部署抛 ApiError（带 HTTP 状态，文案与改造前一致）；静态包在浏览器内解析，
+        // 失败时是 provider 的原始错误，把它的 message 原样带上
+        if (e instanceof ApiError)
+            return {
+                error: e.status === 404 ? `未找到角色「${entityName}」` : `v1 接口失败（HTTP ${e.status}）`
+            }
+        return { error: `v1 接口失败（${e instanceof Error ? e.message : String(e)}）` }
+    }
 }
 
 /** @desc 两个生成目标共用实体信息查询；角色使用纯文本，其它实体沿用详情缓存 */

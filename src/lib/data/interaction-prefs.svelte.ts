@@ -51,7 +51,7 @@ let _lockWatermark = $state(true)
 let _lockWatermarkText = $state(DEFAULT_LOCK_WATERMARK_TEXT)
 /** @desc 侧边栏底部是否显示「新建 / 从本地导入 / 从工坊下载」操作区（默认关闭，可在设置-交互相关开启） */
 let _sidebarActions = $state(false)
-/** @desc 弹窗关闭按钮位置（默认右上角；B 站 Toy 平台首次进入默认左上角） */
+/** @desc 弹窗关闭按钮位置（默认右上角，可在设置-交互相关调整） */
 let _modalClosePosition = $state<ModalClosePosition>('top-right')
 /** @desc 结果页是否允许同时展开多个伤害条目（默认关闭 = 同时只展开一个） */
 let _multiEntryExpand = $state(false)
@@ -93,8 +93,7 @@ if (browser) {
     } catch {
         /* ignore */
     }
-    // 修复：该键此前只有写入口（setModalClosePosition）没有读入口，刷新后「弹窗关闭按钮位置」被重置为默认；
-    // B 站 Toy 首次进入写入的 top-left 同样会在重进时丢失
+    // 修复：该键此前只有写入口（setModalClosePosition）没有读入口，刷新后「弹窗关闭按钮位置」被重置为默认
     try {
         _modalClosePosition = parseModalClosePosition(localStorage.getItem(MODAL_CLOSE_KEY))
     } catch {

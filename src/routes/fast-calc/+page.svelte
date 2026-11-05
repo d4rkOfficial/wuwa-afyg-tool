@@ -78,6 +78,9 @@
      *  这样浏览器同源打开时零配置，静态/iframe 部署时也不需要宿主额外代理。
      */
     const resolveApiBase = async () => {
+        // 无服务端的独立静态包：数据接口在浏览器内就地解析（见 $lib/api/local-api），
+        // 既不需要探测、也不该退回主站（那会把离线包变成「在线包的壳」）
+        if (__OFFLINE_BUILD__) return
         const explicit =
             new URLSearchParams(location.search).get('api_base') ??
             (window as unknown as Record<string, unknown>).__FAST_CALC_API_BASE__ ??

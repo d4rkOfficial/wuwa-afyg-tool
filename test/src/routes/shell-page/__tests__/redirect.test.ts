@@ -5,7 +5,7 @@
 //
 // 重点防护三条会出人命的规则：
 //   1. 已经在 /shell-page 不能再跳（自跳自 = 无限循环）；
-//   2. iframe 内一律不跳（壳页 iframe 加载的正是同一个 /；这条同时覆盖 B 站 Toy 容器）；
+//   2. iframe 内一律不跳（壳页 iframe 加载的正是同一个 /；同时也覆盖任何 iframe 宿主）；
 //   3. 安装了 PWA 不跳。
 
 import { describe, it } from 'node:test'
@@ -122,7 +122,7 @@ describe('app.html 手机端重定向契约', () => {
         )
     })
 
-    it('iframe 内一律不跳（壳页 iframe 与 B 站 Toy 容器都靠这条）', () => {
+    it('iframe 内一律不跳（壳页 iframe 与任何 iframe 宿主都靠这条）', () => {
         assert.equal(
             run({
                 inIframe: true,

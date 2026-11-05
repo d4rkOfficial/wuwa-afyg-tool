@@ -15,6 +15,7 @@
         getElementIcons,
         getWeaponTypeIcons
     } from '$lib/api/data-cache'
+    import { fetchApiJson } from '$lib/api/local-api'
     import CharacterPicker from './pickers/character-picker.svelte'
     import WeaponPicker from './pickers/weapon-picker.svelte'
     import EchoPicker from './pickers/echo-picker.svelte'
@@ -169,11 +170,11 @@
             const controller = new AbortController()
             autoRecommendAbort = controller
             try {
-                const res = await fetch(`/api/v1/recommend-weapon/${encodeURIComponent(char.name)}`, {
-                    signal: controller.signal
-                })
-                if (res.ok && !controller.signal.aborted) {
-                    const weapons: string[] = await res.json()
+                const weapons = await fetchApiJson<string[]>(
+                    `/api/v1/recommend-weapon/${encodeURIComponent(char.name)}`,
+                    { signal: controller.signal }
+                )
+                if (!controller.signal.aborted) {
                     const recommended = weapons[0]
                     if (recommended && weaponMap.get(recommended)?.weaponType === char.weaponType) {
                         localTeam[slot].weapon = recommended

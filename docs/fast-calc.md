@@ -354,7 +354,9 @@ window.__FAST_CALC_RESULT__ = payload
 - 手工乘区覆盖只影响当前页面与 `fast-calc:result`，不写入 `project-updated`；
 - 链 / 阶、词条、敌怪、记点的修改都会进入 `fast-calc:project-updated`；
 - 页面不列出技能类型和伤害类型，需要时用 `fast-calc:request-detail` 取；
-- 当前没有离线单文件版本：数据仍来自 `/api` 或主站回退；
+- 当前没有离线单文件版本：数据仍来自 `/api` 或主站回退；不过在「无服务端独立静态包」
+  （`pnpm run package:standalone`，见 [deployment.md](deployment.md)）里，`/api/v1|v3/*`
+  由浏览器就地解析（直接读上游），fast-calc 不需要 `api_base` 也能出数据；
 - iframe 的 `sandbox` 必须允许脚本；若没有同源，数据接口会走绝对地址 + CORS。
 
 ---

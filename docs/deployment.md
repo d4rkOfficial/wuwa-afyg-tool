@@ -68,6 +68,40 @@ https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/latest/download/toolbox.
 
 本地手动验证时，也可以直接打开 `build/index.html` 所在目录起静态服务器，但 API 需要由启动器的 Rust 服务提供。
 
+## 无服务端独立静态包（zip 分发）
+
+给「下载一个 zip、自己找地方托管」这种分发方式用：产物是**纯前端**，没有任何后端，游戏数据由
+浏览器直接向上游（`static.nanoka.cc`，已开放 CORS）读取，工程/计算/排轴/分享等全部在本地完成。
+
+```bash
+pnpm run package:standalone     # 等价于 node scripts/build-standalone.mjs
+```
+
+产物：`dist/椰果工具箱.zip`
+
+- zip 根就是站点根（`index.html` 在根），解压后丢到任意静态服务器/对象存储即可，
+  打开 `<域名>/` 就是工具箱；
+- 附带 `使用说明.txt`、`本地预览.cmd` + `serve.mjs`（零依赖本地预览服务器，可选）；
+- **必须用 HTTP 服务器打开**：浏览器禁止 `file://` 页面加载 ES module，双击 `index.html` 只会白屏；
+- 所有资源都走站点根绝对路径（`/_app/...`、`/icons/...`），所以只能部署在**域名根**，
+  不能塞进 `https://example.com/toolbox/` 这样的子路径。
+
+与常规构建的差别（只在这个构建里生效，见 `scripts/build-standalone.mjs`）：
+
+| 方面     | 有服务端的部署                   | 独立静态包（`STANDALONE=1`）                                                         |
+| -------- | -------------------------------- | ------------------------------------------------------------------------------------ |
+| 适配器   | adapter-vercel / cloudflare      | adapter-static（`fallback: 200.html`）                                               |
+| 路由     | `trailingSlash: 'never'`         | `trailingSlash: 'always'`（目录 + index.html，nginx / `http.server` 也能直接进子页） |
+| 数据接口 | `/api/**` 由服务端转上游并做缓存 | `src/lib/api/local-api.ts` 在浏览器内就地解析同一批路径，直接调 provider 适配器      |
+
+静态版**不可用**（调用时会给出明确提示，不会静默算错）：
+
+- 库街区（实验性）同步 —— token 必须留在服务端 httpOnly cookie，且上游 `api.kurobbs.com` 不开放跨域；
+- AI 助手的「网页抓取」工具 —— 需要服务端代理出网；
+- 工坊站点标题抓取 —— 跨域限制，工坊名称显示为地址。
+
+AI 对话本身可用，但只能连**自身支持浏览器跨域**的 OpenAI 兼容端点（本地 Ollama / LM Studio 默认允许）。
+
 ## 完成检查（改动代码后）
 
 ```bash
