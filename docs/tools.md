@@ -533,7 +533,7 @@ _无参数_
 
 ### `set_buff_conf_zone_ref`
 
-设置工程 Buff 配置内指定乘区的引用（跟随某角色的属性按百分比折算），ref 为 null 时清除引用。ref 结构：{"targetZoneId":"引用目标","pct":百分比,"characterIdx":槽位 1-3,"threshold":阈值,"lower"/"upper"/"discrete"/"divisor"/"multiplier"可选}。targetZoneId 可选：baseAtk/totalAtk/baseHp/totalHp/baseDef/totalDef/recharge/tuneBreakBoost/offTuneBuildupRate/critRate/critDmg/unisonBoonLayer（最后一项是**按角色独立**的同奏增益层数：读该角色自己累计的层数，可用于「按层数折算」的转模；集谐干涉层数不属于角色，不能作为引用目标）。乘区 id 接受旧 id（customFinalDmg/customFinalDmgMul 会自动重映射）。**跨角色影响源**：引用他角色面板（characterIdx 与目标角色不同）后，作用域指向该角色的 Buff 必须用 bind_buff_conf_to_entry 勾到本段才会参与面板计算，可用 get_buff_conf_detail 或 get_damage_entry_buff_sources 查影响源清单。
+设置工程 Buff 配置内指定乘区的引用（跟随某角色的属性按百分比折算），ref 为 null 时清除引用。ref 结构：{"targetZoneId":"引用目标","pct":百分比(离散转模可不写),"characterIdx":槽位 1-3,"threshold":阈值,"lower"/"upper"/"discrete"/"divisor"/"multiplier"可选}。
 
 | 参数       | 必填   | 类型   | 说明                               |
 | ---------- | ------ | ------ | ---------------------------------- |

@@ -96,7 +96,8 @@ function resolveRefValue(ref: ZoneRef, panel: CharacterComputed | undefined): nu
         const steps = Math.floor(excess / divisor)
         value = steps * multiplier
     } else {
-        value = (excess * ref.pct) / 100
+        // 离散转模不写 pct（缺省 0）；这里兜一下，避免历史数据里 pct 缺失算出 NaN
+        value = (excess * (ref.pct ?? 0)) / 100
     }
     if (ref.lower !== undefined) value = Math.max(ref.lower, value)
     if (ref.upper !== undefined) value = Math.min(ref.upper, value)

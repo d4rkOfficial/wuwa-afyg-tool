@@ -48,6 +48,7 @@ export interface ZoneRef {
     characterIdx: number
     zoneId: string
     threshold: number
+    /** @desc 线性转模百分比；离散转模（discrete）用 divisor/multiplier，此值仅作参考（可缺省，缺省按 0） */
     pct: number
     lower?: number
     upper?: number

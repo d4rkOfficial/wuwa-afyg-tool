@@ -38,3 +38,71 @@ describe('AI 生成 Buff 名称', () => {
         assert.ok(text.includes('\\'))
     })
 })
+
+// 转模回归：离散转模按「每 divisor 转 multiplier」折算，本就不写 pct；
+// 曾经要求 pct 必须是数字，导致这类 ref 被整条丢掉（转模永远写不进去）。
+describe('AI 生成引用 / 转模（ref）', () => {
+    it('离散转模不写 pct 也能保留', () => {
+        const out = sanitizeBuffs([
+            {
+                buffName: '甲 暴击伤害(转模)',
+                scope: 'self',
+                zones: [
+                    {
+                        zoneId: 'critDmg',
+                        value: 0,
+                        ref: {
+                            targetZoneId: 'totalAtk',
+                            threshold: 2000,
+                            discrete: true,
+                            divisor: 100,
+                            multiplier: 5,
+                            upper: 30
+                        }
+                    }
+                ]
+            }
+        ])
+        assert.equal(out.length, 1)
+        const ref = out[0].zones?.[0]?.ref
+        assert.ok(ref, 'ref 不应被丢弃')
+        assert.equal(ref?.targetZoneId, 'totalAtk')
+        assert.equal(ref?.pct, 0)
+        assert.equal(ref?.discrete, true)
+        assert.equal(ref?.divisor, 100)
+        assert.equal(ref?.multiplier, 5)
+        assert.equal(ref?.upper, 30)
+    })
+
+    it('线性转模保留 pct', () => {
+        const out = sanitizeBuffs([
+            {
+                buffName: '甲 增伤(转模)',
+                scope: 'self',
+                zones: [
+                    {
+                        zoneId: 'bonusDmg',
+                        value: 0,
+                        ref: { targetZoneId: 'totalAtk', threshold: 1000, pct: 2, lower: 5 }
+                    }
+                ]
+            }
+        ])
+        const ref = out[0].zones?.[0]?.ref
+        assert.equal(ref?.pct, 2)
+        assert.equal(ref?.threshold, 1000)
+        assert.equal(ref?.lower, 5)
+    })
+
+    it('引用目标不在白名单时整条丢弃（value 也不会退化成普通乘区）', () => {
+        const out = sanitizeBuffs([
+            {
+                buffName: '甲 乱写引用',
+                scope: 'self',
+                zones: [{ zoneId: 'critDmg', value: 0, ref: { targetZoneId: 'notAStat', pct: 10 } }]
+            }
+        ])
+        // ref 被丢弃后 value=0 的普通条目仍在（与工具箱既有口径一致），但不能再带 ref
+        assert.equal(out[0]?.zones?.[0]?.ref, undefined)
+    })
+})

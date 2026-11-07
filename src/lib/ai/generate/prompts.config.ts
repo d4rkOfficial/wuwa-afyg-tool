@@ -176,7 +176,8 @@ export const REF_RULES_TEXT = `引用乘区（ref）的完整转模规则。ref 
 3. 只写"根据某属性"但没给比例/档位 → 无法量化，不输出该 buff。
 4. "超过/高于某值"才给 → threshold 填该值；未提基准 → 不写 threshold（按 0 处理）。
 5. "最高/最多/上限" → upper；"至少/保底" → lower。
-6. ref.targetZoneId 只能取系统提示中的引用乘区白名单；value 填 0（数值由转模计算得出）。`
+6. ref.targetZoneId 只能取系统提示中的引用乘区白名单；value 填 0（数值由转模计算得出）。
+7. pct 只对线性转模有意义：离散转模（discrete + divisor + multiplier）不要写 pct，省略即可（缺省按 0 处理）。`
 
 // ── few-shot 示例（get_examples 工具返回）────────────────────
 export const EXAMPLES_TEXT = `—— 示例1（角色固有属性合并）——

@@ -106,8 +106,14 @@ function sanitizeZones(zones: GeneratedZone[] | undefined): GeneratedZone[] {
 // 只保留白名单引用乘区、合法数值
 function sanitizeRef(ref: GeneratedZone['ref']): GeneratedZone['ref'] {
     if (!ref || !ZONE_REF_MAP.has(ref.targetZoneId as never)) return undefined
-    if (!Number.isFinite(ref.pct)) return undefined
-    const clean: NonNullable<GeneratedZone['ref']> = { targetZoneId: ref.targetZoneId, pct: ref.pct }
+    /**
+     * @desc pct 只对「线性转模」有意义。离散转模（discrete + divisor + multiplier）按
+     * 「每 divisor 转 multiplier」取整档，本来就不带 pct —— prompts 里的转模样例
+     * （暴击伤害(转模)）正是这种写法。这里曾要求 pct 必须是数字，于是这类转模在
+     * 「生成 → 应用」时被整条丢掉（表现为转模写不进去），缺省按 0。
+     */
+    const pct = Number.isFinite(ref.pct) ? (ref.pct as number) : 0
+    const clean: NonNullable<GeneratedZone['ref']> = { targetZoneId: ref.targetZoneId, pct }
     if (Number.isFinite(ref.threshold)) clean.threshold = ref.threshold
     if (Number.isFinite(ref.lower)) clean.lower = ref.lower
     if (Number.isFinite(ref.upper)) clean.upper = ref.upper
