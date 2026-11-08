@@ -75,7 +75,16 @@ import { addToast } from '$lib/data/toast.svelte'
 
 /** @desc 设置弹窗的栏目键（与外壳 `SETTING_TABS` 的 `key` 一一对应；外壳赋 `tab` 时由此类型校验） */
 export type SettingsTab =
-    'theme' | 'interaction' | 'shortcuts' | 'performance' | 'connection' | 'cache' | 'archive' | 'ai' | 'ai-conn'
+    | 'theme'
+    | 'interaction'
+    | 'shortcuts'
+    | 'performance'
+    | 'connection'
+    | 'workshop-sync'
+    | 'cache'
+    | 'archive'
+    | 'ai'
+    | 'ai-conn'
 
 // ── 栏目切换：侧栏导航 + 仍在外壳的 tab 分支 + keymap tab 的「界面快捷键设置」跳转共用 ──
 let tab = $state<SettingsTab>('theme')

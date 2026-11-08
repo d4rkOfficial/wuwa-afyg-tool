@@ -31,6 +31,8 @@
         getSubstatLibraryOpen
     } from '$lib/data/substat-library-ui.svelte'
     import { ensureCharInfo, getCharInfoMap } from '$lib/data/char-info.svelte'
+    // 手动同步成功后登记到「设置 → 工坊同步」的时机记录（与 buff 面板同一口径）
+    import { markWorkshopSynced } from '$lib/data/workshop-sync.svelte'
     import {
         buildBlankSlots,
         buildStandardSlots,
@@ -267,8 +269,11 @@
         syncing = true
         const result = await fetchSubstatPlansFromShare()
         syncing = false
-        if (result.ok) addToast(`已从工坊同步 ${result.added} 个角色的标准词条集`, 'success')
-        else addToast(`同步失败：${result.error ?? '未知错误'}`, 'error')
+        if (result.ok) {
+            // 登记到「设置 → 工坊同步」的时机记录（与 buff 面板同一口径）
+            markWorkshopSynced('substat')
+            addToast(`已从工坊同步 ${result.added} 个角色的标准词条集`, 'success')
+        } else addToast(`同步失败：${result.error ?? '未知错误'}`, 'error')
     }
 
     /** @desc 库街区同步：把账号下鸣潮角色「当前装配的声骸」存成自定义方案（同名覆盖，可重复同步）；

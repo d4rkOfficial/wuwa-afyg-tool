@@ -21,6 +21,9 @@
         type BuffCategory
     } from '$lib/data/buff-library.svelte'
     import { addToast } from '$lib/data/toast.svelte'
+    // 手动同步成功后登记到「设置 → 工坊同步」的时机记录：避免设置里显示「从未同步」，
+    // 也避免下次以「每天/每周一次」进入时白跑一次请求
+    import { markWorkshopSynced } from '$lib/data/workshop-sync.svelte'
     import {
         getCharacterList,
         getWeaponList,
@@ -278,6 +281,7 @@
     async function handleDownload() {
         const res = await fetchBuffSetsFromShare()
         if (res.ok) {
+            markWorkshopSynced('buff')
             addToast(res.added > 0 ? `已同步 ${res.added} 个实体` : '工坊 buff 集已是最新', 'success')
         } else {
             addToast(res.error ?? '下载失败', 'error')

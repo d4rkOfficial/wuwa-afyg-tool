@@ -44,6 +44,7 @@ import { loadShortcuts } from '$lib/data/shortcuts.svelte'
 import { fetchSubstatPlansFromShare } from '$lib/data/substat-library.svelte'
 import { isFirstVisit, markVisited } from '$lib/data/first-visit.svelte'
 import { loadWorkshop } from '$lib/data/workshop.svelte'
+import { runWorkshopAutoSync } from '$lib/data/workshop-sync.svelte'
 import { loadKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
 import { loadKuroPrefs, restoreKuroSession } from '$lib/kuro-app/kuro.svelte'
 import { applyFirstRunAppearance } from '$lib/theme'
@@ -133,6 +134,10 @@ export const bootstrapRouteStores = async (): Promise<void> => {
     void restoreKuroSession()
     await ensureVersion()
     syncUpstreamVersionCache()
+    // 工坊自动同步（设置 → 数据 → 工坊同步，默认关）：放在 `ensureVersion()` 之后，
+    // 「上游新版本」时机才有意义（该时机的判据就是 `getWWVersion()`）。
+    // 后台静默执行、不 await；到底跑哪几类由 store 的开关与时机决定，结果无论成败都弹 toast。
+    void runWorkshopAutoSync()
     loadIcons()
     checkShare()
     // 分享频率限制：恢复上次分享时间戳并启动倒计时（刷新页面后仍然生效）

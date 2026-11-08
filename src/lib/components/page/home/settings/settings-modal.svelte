@@ -26,6 +26,7 @@
     import PerformanceSection from './sections/performance.svelte'
     import ShortcutsSection from './sections/shortcuts.svelte'
     import ThemeSection from './sections/theme.svelte'
+    import WorkshopSyncSection from './sections/workshop-sync.svelte'
     import {
         closeArchiveDelete,
         doArchiveDelete,
@@ -89,6 +90,7 @@
         { group: '界面', key: 'shortcuts', label: '快捷键位', icon: 'mdi:keyboard-settings-outline' },
         { group: '界面', key: 'performance', label: '性能相关', icon: 'mdi:speedometer' },
         { group: '数据', key: 'connection', label: '连接配置', icon: 'mdi:link-variant' },
+        { group: '数据', key: 'workshop-sync', label: '工坊同步', icon: 'mdi:cog-sync-outline' },
         { group: '数据', key: 'cache', label: '缓存清理', icon: 'mdi:database-outline' },
         { group: '数据', key: 'archive', label: '归档管理', icon: 'mdi:archive-outline' },
         { group: 'AI助手', key: 'ai-conn', label: '启用 / 接入配置', icon: 'mdi:connection' },
@@ -255,6 +257,8 @@
                     <PerformanceSection />
                 {:else if tab === 'connection'}
                     <ConnectionSection />
+                {:else if tab === 'workshop-sync'}
+                    <WorkshopSyncSection />
                 {:else if tab === 'archive'}
                     <ArchiveSection />
                 {:else if tab === 'cache'}
