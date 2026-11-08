@@ -180,7 +180,9 @@ export const buildEntryBuffDiff = (args: {
         const e = damageEntries[i]
         const match = (sid: string) => matches(buffById.get(sid), e)
         const nameOf = (sid: string) => buffById.get(sid)?.name ?? ''
-        const boundIds = entryBuffSetIdMap[e.id] ?? []
+        // 去重：绑定表来自持久化工程数据，可能带重复 id（历史版本/外部导入）。
+        // 这里的输出直接当 `{#each}` 的 key 用（setId），重复项会让整个下拉表崩掉。
+        const boundIds = [...new Set(entryBuffSetIdMap[e.id] ?? [])]
 
         const globalItems = boundIds
             .filter((sid) => globalBuffSetIds.includes(sid) && match(sid))

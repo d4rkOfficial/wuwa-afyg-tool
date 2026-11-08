@@ -2143,6 +2143,21 @@ export function formatTimeline() {
 }
 
 // ── Damage Block Functions ──
+
+/**
+ * @desc 生成不重复的伤害块 id。
+ * 原来直接写 `d${Date.now()}`：同一毫秒内连建多块（AI 批量排轴、连续粘贴/录入）就会拿到同一个 id。
+ * 条目 id 由块 id 派生，块 id 撞车 ⇒ 条目 id 撞车 ⇒ 拉表 `{#each … (entry.id)}` 抛 each_key_duplicate，
+ * 并且两块的 Buff 绑定会互相覆盖。这里撞到已有 id 就追加 `-2`/`-3`。
+ */
+const makeDamageBlockId = (): string => {
+    const now = Date.now()
+    let id = `d${now}`
+    let n = 2
+    while (_damageBlocks.some((d) => d.id === id)) id = `d${now}-${n++}`
+    return id
+}
+
 export function addDamageBlock(sourceType: 'op' | 'ref', sourceId: string) {
     if (!assertUnlocked()) return
     const trackIndex = getTRACKS().length - 1
@@ -2150,7 +2165,7 @@ export function addDamageBlock(sourceType: 'op' | 'ref', sourceId: string) {
     if (exists) return
     _damageBlocks = [
         ..._damageBlocks,
-        { id: `d${Date.now()}`, trackIndex, sourceType, sourceId, skillHits: [], nonDirectEntries: [] }
+        { id: makeDamageBlockId(), trackIndex, sourceType, sourceId, skillHits: [], nonDirectEntries: [] }
     ]
 }
 

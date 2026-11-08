@@ -31,6 +31,11 @@
         buildSpreadTable,
         collectShownGlobalBuffs,
         columnHeadTitle,
+        headColumnWidthPx,
+        HEAD_BAND_LINES,
+        HEAD_BAND_TRACKING_PX,
+        HEAD_COL_MIN_PX,
+        HEAD_NAME_LINES,
         resolveActiveSource,
         rowFingerprintOf,
         rowHeadTitle,
@@ -133,7 +138,10 @@
     interface HeaderBandCell {
         key: string
         label: string
+        /** @desc 该横条覆盖的列数（colspan） */
         span: number
+        /** @desc 该横条在 `visibleColIdx` 里的起始列位（分配列宽时用） */
+        start: number
         sepClass: string
     }
 
@@ -169,6 +177,7 @@
                     key: `${level}:${i}:${key}`,
                     label: labelOf(paths[i], level),
                     span: j - i,
+                    start: i,
                     sepClass
                 })
                 i = j
@@ -178,10 +187,48 @@
         return rows
     }
 
+    /**
+     * @desc 每列宽度（px，按 `visibleColIdx` 的列位索引）。
+     * 取「列名行最多 2 行」与「各级文件夹横条最多 3 行、按 colspan 分摊」两者的较大需求，
+     * 于是长文案靠**列变宽**而不是靠无限折行消化（口径与常量见 `spread-table.utils` 的 `headColumnWidthPx`）。
+     * 横条带 `tracking-[0.1em]`：字距必须一起算进去，否则宽度算少一截，长文案会正好多折一行。
+     */
+    const columnWidthsOf = (group: GroupData, bands: readonly HeaderBandCell[][]): number[] => {
+        const widths = group.visibleColIdx.map((ci, colPos) => {
+            const hc = group.headerCols[colPos]
+            const label = hc ? buffLeafName(columns[ci]?.name ?? hc.label) : ''
+            return headColumnWidthPx(label, HEAD_NAME_LINES)
+        })
+        for (const band of bands) {
+            for (const cell of band) {
+                if (!cell.label) continue
+                const width = headColumnWidthPx(cell.label, HEAD_BAND_LINES, cell.span, HEAD_BAND_TRACKING_PX)
+                for (let k = 0; k < cell.span; k++) {
+                    const idx = cell.start + k
+                    if (idx < widths.length) widths[idx] = Math.max(widths[idx], width)
+                }
+            }
+        }
+        return widths
+    }
+
+    /** @desc 横条文字上限 = 它覆盖的那几列宽度之和（防止长文本把整组列撑宽） */
+    const bandLabelMaxWidth = (widths: readonly number[], start: number, span: number): number => {
+        let total = 0
+        for (let k = 0; k < span; k++) total += widths[start + k] ?? HEAD_COL_MIN_PX
+        return total
+    }
+
+    /**
+     * @desc 表头各行的 sticky 顶部偏移（入参是该行在 thead 里的下标，列名行也按同一套算）。
+     * 必须与模板里的两档高度逐项对齐（改高度就要同步改这里，否则吸顶表头会互相盖住）：
+     * 文件夹行 `h-12`(48px，3 行文字 + 4px 余量) → 列名行 `h-8`(32px，2 行文字)；
+     * 两级表头时列名行从 48 起 → `top-12`；三级表头时从 48×2=96 起 → `top-24`。
+     */
     const headerTopClass = (rowIndex: number, depth: number): string => {
-        if (depth === 1) return 'top-0'
-        if (depth === 2) return rowIndex === 0 ? 'top-0' : 'top-7'
-        return rowIndex === 0 ? 'top-0' : rowIndex === 1 ? 'top-7' : 'top-14'
+        if (rowIndex === 0) return 'top-0'
+        if (depth === 2) return 'top-12'
+        return rowIndex === 1 ? 'top-12' : 'top-24'
     }
 
     /** @desc 角色/声骸技能文案缓存（伤害类型规则2需要）：补齐后映射变化会让推导与可用性缓存自动重算 */
@@ -872,6 +919,7 @@
             {@const group = tableData[gi]}
             {@const charElement = getCalcElementMap()[group.charName] ?? ''}
             {@const headerBands = headerBandsOf(group)}
+            {@const colWidths = columnWidthsOf(group, headerBands)}
             <div class="mx-3 my-3.5" data-group-wrap={gi}>
                 <!-- 列表（表体）底色跟随「卡片」透明度/深度；data-sf-flat 只取底色不用毛玻璃（逐格元素避免逐元素重算模糊） -->
                 <table
@@ -909,19 +957,28 @@
                                     {@render entryCorner(headerDepth)}
                                 {/if}
                                 {#each band as cell (cell.key)}
+                                    <!-- 文件夹横条：固定 3 行高度（`h-12` = 3 × leading-3 12px + py-1 8px = 44px，另留 4px 余量），
+                                         文字放不下时靠**列变宽**消化（列宽由 `columnWidthsOf` 按文字量算），不再无限折行。 -->
                                     <th
                                         data-sf="toolbar"
                                         data-sf-under="card"
                                         class="sticky {headerTopClass(
                                             rowIdx,
                                             headerDepth
-                                        )} z-30 h-7 border-b border-(--theme-divider-border) p-0 text-center {cell.sepClass}"
+                                        )} z-30 h-12 overflow-hidden border-b border-(--theme-divider-border) p-0 text-center {cell.sepClass}"
                                         style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
                                         colspan={cell.span}
                                     >
                                         {#if cell.label}
+                                            <!-- 上限 = 该横条覆盖的那几列宽度之和：表格是 `w-auto` 自动布局，
+                                                 `max-content` 会把整组列撑宽，故必须给长文本一个包住它的上限。 -->
                                             <span
-                                                class="block truncate px-1.5 text-[10px] font-black tracking-[0.1em] text-(--theme-modal-text)/70"
+                                                class="line-clamp-3 max-w-full break-words px-1.5 py-1 text-center text-[10px] font-black leading-3 tracking-[0.1em] text-(--theme-modal-text)/70"
+                                                style="max-width: {bandLabelMaxWidth(
+                                                    colWidths,
+                                                    cell.start,
+                                                    cell.span
+                                                )}px;"
                                                 title={cell.label}>{cell.label}</span
                                             >
                                         {/if}
@@ -948,14 +1005,17 @@
                                     data-colhead={hc.ci}
                                     data-sf="toolbar"
                                     data-sf-under="card"
+                                    data-col-w={colWidths[colPos] ?? HEAD_COL_MIN_PX}
                                     class="sticky {headerTopClass(
                                         headerBands.length,
                                         headerDepth
-                                    )} z-30 h-14 w-[108px] min-w-[108px] cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-middle {sepClassAt(
+                                    )} z-30 h-8 min-w-[108px] cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-middle {sepClassAt(
                                         group,
                                         colPos
                                     )}"
-                                    style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
+                                    style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg); width: {colWidths[
+                                        colPos
+                                    ] ?? HEAD_COL_MIN_PX}px;"
                                     class:spread-head-hl={colHighlighted}
                                     title={headTitle}
                                     onclick={() => clickColHeader(gi, hc.ci)}
@@ -967,8 +1027,12 @@
                                             ? 'opacity-30'
                                             : ''}"
                                     >
+                                        <!-- 表头 Buff 名：最多 2 行（`h-8` 32px − `py-1` 8px = 24px = 2 × `leading-3`）。
+                                             列宽由 `columnWidthsOf` 按名字长度算好，故这里只需把文字上限钉在「列宽 − 内边距」，
+                                             免得 `max-content` 再把列撑宽；超长仍由 `line-clamp` 收尾（完整名字在 `title` 里）。 -->
                                         <span
-                                            class="flex min-h-0 w-full items-center justify-center overflow-hidden text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
+                                            class="line-clamp-2 w-full break-words text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
+                                            style="max-width: {(colWidths[colPos] ?? HEAD_COL_MIN_PX) - 12}px;"
                                             title={hc.title}>{buffLeafName(columns[hc.ci]?.name ?? hc.label)}</span
                                         >
                                         {#if hc.paneSource}
@@ -1025,7 +1089,8 @@
                                         <span class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
                                             >伤害类型：</span
                                         >
-                                        {#each entryDamageTypeMap[row.entry.id] ?? [] as dt (dt)}
+                                        <!-- 去重后渲染：历史工程/外部导入的伤害类型数组可能带重复项，重复 key 会抛 each_key_duplicate -->
+                                        {#each [...new Set(entryDamageTypeMap[row.entry.id] ?? [])] as dt (dt)}
                                             <Tag style="background: var(--theme-input-bg);">{damageTypeShort(dt)}</Tag>
                                         {/each}
                                         {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
@@ -1078,9 +1143,13 @@
                                                             : ''}"
                                                     />
                                                     {#if named}
+                                                        <!-- 名称宽度上限与表头列宽上限一致（同一份 `colWidths`），
+                                                             叠层子列沿用更窄的 43px：保证名称出现/消失不改变列 max-content（不触发整表重排） -->
                                                         <span
-                                                            class="w-full {head?.nameMaxClass ??
-                                                                'max-w-[106px]'} line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
+                                                            class="w-full line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
+                                                            style="max-width: {head?.isLayer
+                                                                ? 43
+                                                                : (colWidths[colPos] ?? HEAD_COL_MIN_PX) - 12}px;"
                                                             >{buffLeafName(columns[ci].name)}</span
                                                         >
                                                     {/if}

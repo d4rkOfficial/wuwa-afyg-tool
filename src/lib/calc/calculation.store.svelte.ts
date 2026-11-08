@@ -288,12 +288,14 @@ export function init(
         _buffSets = (saved.buffSets ?? []).filter((bs) => !bs.name.startsWith('[配置]'))
         _damageEntryBuffSetIds = saved.damageEntryBuffSetIds ?? {}
         for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
-            _damageEntryBuffSetIds[entryId] = setIds.filter((sid) => !autoIds.includes(sid))
+            // 去重：绑定表的重复 id 会让拉表里 `{#each … (setId)}` 直接抛 each_key_duplicate（整表白屏）
+            _damageEntryBuffSetIds[entryId] = [...new Set(setIds.filter((sid) => !autoIds.includes(sid)))]
         }
         _damageEntryDamageTypes = Object.fromEntries(
             Object.entries(saved.damageEntryDamageTypes ?? {}).map(([id, types]) => [
                 id,
-                types.map((t) => (t === '视为效应伤害' ? '效应伤害' : t))
+                // 同上：伤害类型数组里的重复项会让标签列表的 key 撞车
+                [...new Set(types.map((t) => (t === '视为效应伤害' ? '效应伤害' : t)))]
             ])
         )
         _damageEntryDisplayNames = saved.damageEntryDisplayNames ?? {}
@@ -363,6 +365,26 @@ export function buildDamageEntriesFromTimeline(
     const temp: Array<{ item: DamageEntry; pos: number; order: number }> = []
     let order = 0
 
+    /**
+     * @desc 条目 id 由「块 id + 技能/命中/基础类型」拼成。撞车有两条来源：
+     *   ① 历史数据里两个伤害块共用同一个 `d<时间戳>` id（`addDamageBlock` 曾按毫秒取 id，同毫秒连建多块就重了）；
+     *   ② 同一块内出现两条完全相同的命中行。
+     * 撞车的后果是拉表的 `{#each … (entry.id)}` 抛 `each_key_duplicate` 整表白屏。
+     * 这里给「第二次及以后」的同名 id 追加 `#2`/`#3`（首个保持原 id），保证条目 id 恒唯一。
+     */
+    const usedEntryIds = new Set<string>()
+    const takeEntryId = (base: string): string => {
+        if (!usedEntryIds.has(base)) {
+            usedEntryIds.add(base)
+            return base
+        }
+        let n = 2
+        while (usedEntryIds.has(`${base}#${n}`)) n++
+        const id = `${base}#${n}`
+        usedEntryIds.add(id)
+        return id
+    }
+
     for (const db of tl.damageBlocks) {
         let pos = 0
         if (db.sourceType === 'op') {
@@ -417,7 +439,7 @@ export function buildDamageEntriesFromTimeline(
                     ? echoName + '·' + hit.hitName.replace('伤害', '') + '(' + hit.skillType + ')'
                     : hit.hitName.replace('伤害', '') + '(' + hit.skillType + ')'
             for (const [baseType, ratioSum] of pctMap) {
-                const id = `${db.id}-${hit.skillType}|${hit.hitName}#${baseType}`
+                const id = takeEntryId(`${db.id}-${hit.skillType}|${hit.hitName}#${baseType}`)
                 temp.push({
                     item: {
                         id,
@@ -442,7 +464,7 @@ export function buildDamageEntriesFromTimeline(
             }
 
             if (flatTotal > 0) {
-                const id = `${db.id}-${hit.skillType}|${hit.hitName}#固定`
+                const id = takeEntryId(`${db.id}-${hit.skillType}|${hit.hitName}#固定`)
                 temp.push({
                     item: {
                         id,
@@ -488,7 +510,7 @@ export function buildDamageEntriesFromTimeline(
                         }
                     }
                     if (!element) element = getCharElementMap()[responder] ?? ''
-                    const id = `${db.id}-nd|${nd.name}#${responder}`
+                    const id = takeEntryId(`${db.id}-nd|${nd.name}#${responder}`)
                     temp.push({
                         item: {
                             id,
@@ -512,7 +534,7 @@ export function buildDamageEntriesFromTimeline(
                 }
             } else if (nd.category === '处决') {
                 const char = nd.responders?.[0] ?? ''
-                const id = `${db.id}-nd|${nd.name}`
+                const id = takeEntryId(`${db.id}-nd|${nd.name}`)
                 temp.push({
                     item: {
                         id,
@@ -539,7 +561,7 @@ export function buildDamageEntriesFromTimeline(
                 const burstLayers = isDianci
                     ? (db.nonDirectEntries.find((n) => n.name === '电磁爆发' && n.category === '效应')?.layers ?? 0)
                     : 0
-                const id = `${db.id}-nd|${nd.name}`
+                const id = takeEntryId(`${db.id}-nd|${nd.name}`)
                 temp.push({
                     item: {
                         id,
@@ -1291,11 +1313,11 @@ export function getBuffSetIdsForEntry(entryId: string): string[] {
     return _damageEntryBuffSetIds[entryId] ?? []
 }
 
-/** @desc 覆写条目绑定的 Buff 集合（框选/行列头批量用） */
+/** @desc 覆写条目绑定的 Buff 集合（框选/行列头批量用）。**写入即去重**：重复 id 会让拉表的 `{#each … (setId)}` 崩掉 */
 export function setBuffSetIdsForEntry(entryId: string, setIds: string[]): boolean {
     if (!assertUnlocked()) return false
     markTableDirty()
-    _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: [...setIds] }
+    _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: [...new Set(setIds)] }
     return true
 }
 
@@ -1305,7 +1327,7 @@ export function setBuffSetIdsForEntries(map: Record<string, string[]>): boolean 
     if (Object.keys(map).length === 0) return false
     const next = { ..._damageEntryBuffSetIds }
     for (const [entryId, setIds] of Object.entries(map)) {
-        next[entryId] = [...setIds]
+        next[entryId] = [...new Set(setIds)]
     }
     markTableDirty()
     _damageEntryBuffSetIds = next
@@ -1357,10 +1379,10 @@ export function toggleDamageTypeForEntry(entryId: string, damageType: string) {
     }
 }
 
-/** @desc 覆写条目的伤害类型集合（复制到下段直伤等用） */
+/** @desc 覆写条目的伤害类型集合（复制到下段直伤等用）。**写入即去重**：重复项会让标签列表的 key 撞车 */
 export function setDamageTypesForEntry(entryId: string, types: string[]) {
     markTableDirty()
-    _damageEntryDamageTypes = { ..._damageEntryDamageTypes, [entryId]: types }
+    _damageEntryDamageTypes = { ..._damageEntryDamageTypes, [entryId]: [...new Set(types)] }
 }
 
 /** @desc 同名伤害的范围：同一角色 + 同一技能类型 + 同名（避免不同技能类型下重名条目互相覆盖） */

@@ -31,6 +31,56 @@ export const layeredKeyOf = (name: string): string | null => {
     return m ? m[1] + m[3] : null
 }
 
+// ── 表头列宽：字多就长宽，而不是无限折行 ─────────────────────────────────
+/**
+ * @desc 表头列宽口径（`spread-table.svelte` 的表头/表体列宽都从这里推导）。
+ *
+ * 为什么不再用「固定 108px + 省略号」：工坊 Buff 名/文件夹名常是整句游戏文案，
+ * 固定窄列下 3 行也放不完，截断后信息全丢。改为**按文字量反推列宽**：
+ * 先假定「最多 `lines` 行」，把文字摊到这几行上需要多宽，就把列加多宽（上限 `HEAD_COL_MAX_PX`）。
+ *
+ * 宽度是估算而非测量（不做 DOM 测量，见文件头「不搬 DOM 测量」）。估算必须与模板里的字体规格一致，
+ * 否则「算出来刚好 3 行、实际溢到第 4 行」——实测就踩到过：文件夹横条带 `tracking-[0.1em]`
+ * （10px 字号下每字多占 1px），漏算后长文案正好多折一行。故字距作为参数单独计入。
+ */
+export const HEAD_COL_MIN_PX = 108
+/** @desc 上限：再长就由 `line-clamp` 收尾（完整文本仍在 `title` 里），避免单个病态长名把整表拉爆 */
+export const HEAD_COL_MAX_PX = 420
+/** @desc 表头单元格左右内边距合计（`px-1.5` × 2） */
+export const HEAD_CELL_PAD_PX = 12
+/**
+ * @desc 估算余量（px）。实测（无头 Edge + 真产物 CSS，见 `.tmp/hdr-probe/fit.mjs`）：
+ * 纯「字宽 ÷ 行数」算出来的宽度会比「3 行真实放得下」的最小宽度**少 1~2px** ——
+ * 因为断行不能在「，」。】」前断开，实际每行比按字数均分的更短。留 10px 兜住这个损失。
+ */
+export const HEAD_WIDTH_SLACK_PX = 10
+/** @desc 文件夹横条最多几行 */
+export const HEAD_BAND_LINES = 3
+/** @desc 列名行最多几行 */
+export const HEAD_NAME_LINES = 2
+/** @desc 文件夹横条的 `tracking-[0.1em]` 在 10px 字号下的额外字宽 */
+export const HEAD_BAND_TRACKING_PX = 1
+
+const CJK_RE = /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/
+
+/** @desc 文本估算宽度（px）：CJK 10、其它 5.5（对齐 `text-[10px]`），另加 `trackingPx` 字距 */
+export const headTextWidthPx = (text: string, trackingPx = 0): number => {
+    let width = 0
+    for (const ch of text) width += (CJK_RE.test(ch) ? 10 : 5.5) + trackingPx
+    return width
+}
+
+/**
+ * @desc 一段表头文字在 `span` 列内、最多 `lines` 行时，**每列**需要的宽度（px，含内边距）。
+ * 结果夹在 `[HEAD_COL_MIN_PX, HEAD_COL_MAX_PX]`：低于下限没必要缩，高于上限就靠 `line-clamp` 收尾。
+ */
+export const headColumnWidthPx = (text: string, lines: number, span = 1, trackingPx = 0): number => {
+    const perLine = Math.ceil(headTextWidthPx(text, trackingPx) / Math.max(1, lines))
+    const total = Math.ceil(perLine * 1.02) + HEAD_CELL_PAD_PX + HEAD_WIDTH_SLACK_PX
+    const clamped = Math.min(HEAD_COL_MAX_PX, Math.max(HEAD_COL_MIN_PX, total))
+    return Math.ceil(clamped / Math.max(1, span))
+}
+
 /** @desc 单元格结构数据：只含「该格是否可用」——勾选态在模板里直接读 entryBuffSetIdMap，避免勾选触发整表结构重建 */
 export interface CellData {
     buffId: string
@@ -46,7 +96,7 @@ export interface RowData {
     splitBefore: boolean
 }
 
-/** @desc 表头单元格（第二行=列名行）：标签、分隔线、高亮时单元格内名称的宽度上限都在结构派生里一次算好 */
+/** @desc 表头单元格（第二行=列名行）：标签、分隔线、可用数都在结构派生里一次算好 */
 export interface HeadCell {
     ci: number
     label: string
@@ -54,8 +104,6 @@ export interface HeadCell {
     isLayer: boolean
     enabled: number
     sepClass: string
-    /** @desc 高亮时单元格内显示 buff 名的宽度上限：与表头一致，避免名称出现/消失改变列的 max-content 触发整表重排 */
-    nameMaxClass: string
     /** @desc 单元格 tooltip 预算好，避免每次渲染为每格拼字符串 */
     titleOn: string
     titleOff: string
@@ -274,8 +322,6 @@ export const buildSpreadTable = (deps: SpreadTableDeps): GroupData[] => {
                 isLayer: grp !== undefined,
                 enabled: enabledCounts[ci],
                 sepClass: sep,
-                // 与表头列宽上限对齐（叠层子列 43px、普通列 max-w-24 同宽 96px→106px）
-                nameMaxClass: grp ? 'max-w-[43px]' : 'max-w-[106px]',
                 titleOn: `取消勾选：${bs.name}`,
                 titleOff: `勾选：${bs.name}`,
                 ...(paneSource ? { paneSource } : {})

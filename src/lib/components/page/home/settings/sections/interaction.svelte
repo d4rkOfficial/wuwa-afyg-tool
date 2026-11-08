@@ -100,8 +100,8 @@
 
     /** @desc 拉表视图（互斥取值，值域与 `calc-view` 的 `CalcViewMode` 一致） */
     const CALC_VIEW_TABS = [
-        { value: 'dropdown', label: 'buff 下拉模式' },
-        { value: 'spread', label: 'buff 平铺模式' }
+        { value: 'dropdown', label: '下拉' },
+        { value: 'spread', label: '平铺' }
     ]
 
     /** @desc 消息提示位置：7 段，逐段 `title` 沿用原来的 `TOAST_POSITION_HINTS` 悬浮说明 */

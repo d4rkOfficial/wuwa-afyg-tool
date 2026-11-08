@@ -465,7 +465,7 @@
                         style="border-color: var(--theme-divider-border);"
                     >
                         <div class="flex flex-wrap gap-0.5">
-                            {#each entryDamageTypeMap[damageEntry.id] ?? [] as dt (dt)}
+                            {#each [...new Set(entryDamageTypeMap[damageEntry.id] ?? [])] as dt (dt)}
                                 <Tag style="background: var(--theme-input-bg);">{damageTypeShort(dt)}</Tag>
                             {:else}
                                 {@const inferred = inferredDamageTypeMap[damageEntry.id] ?? []}
@@ -481,7 +481,9 @@
                     <td class="py-1.5 px-3">
                         <div class="flex flex-wrap gap-1">
                             {#if buffDiffMode}
-                                {#each entryBuffDiff[damageEntry.id] ?? [] as diff (diff.name)}
+                                <!-- key 用 setId（而不是 diff.name）：同名的两个 Buff 是完全合法的数据，
+                                    用显示名当 key 会抛 each_key_duplicate -->
+                                {#each entryBuffDiff[damageEntry.id] ?? [] as diff (diff.setId)}
                                     {#if diff.type === 'global'}
                                         <Chip
                                             style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);"
@@ -508,7 +510,9 @@
                                     {/if}
                                 {/each}
                             {:else}
-                                {#each (entryBuffSetIdMap[damageEntry.id] ?? []).filter( (sid) => buffMatches(buffById.get(sid), damageEntry) ) as setId (setId)}
+                                <!-- 绑定表去重后再渲染：历史工程/外部导入的数据里可能带重复 id，
+                                     重复 key 会让整张下拉表抛 each_key_duplicate（store 侧写入与载入已同步去重，此处兜底） -->
+                                {#each [...new Set(entryBuffSetIdMap[damageEntry.id] ?? [])].filter( (sid) => buffMatches(buffById.get(sid), damageEntry) ) as setId (setId)}
                                     {@const buffSet = buffById.get(setId)}
                                     {#if buffSet && !globalBuffSetIds.includes(setId)}
                                         <Chip
