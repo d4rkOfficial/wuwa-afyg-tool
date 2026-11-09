@@ -881,6 +881,13 @@
         if (part.unit === 'mult') return `×${part.value.toFixed(3)}`
         return String(part.value)
     }
+
+    /**
+     * @desc 溯源来源明细的贡献合计（`contribution` 是折算到该区/面板后的值）。
+     * 只用于「基础面板」那张表底部的合计行 —— 与上方汇总里的 `totalStat` 对照，能直接看出有没有漏项。
+     */
+    const sumContribution = (parts: readonly TracePart[]): number =>
+        parts.reduce((sum, part) => sum + (part.contribution ?? 0), 0)
 </script>
 
 <svelte:head>
@@ -1249,6 +1256,14 @@
                                                                 {Math.round(trace.totalStat).toLocaleString()} · 倍率
                                                                 {trace.ratioPct.toFixed(2)}% × {trace.hits} 段 · 基础伤害
                                                                 {Math.round(trace.baseValue).toLocaleString()}
+                                                                <!-- 基础面板（攻击/生命/防御）的来源明细：白值 + 武器 + 声骸固定/百分比 + Buff 各占多少，
+                                                                     合计≈面板才能核对得上（数据来自 trace.baseParts，引擎侧本来就有） -->
+                                                                {#if trace.baseParts.length > 0}
+                                                                    {@render partsTable(trace.baseParts, {
+                                                                        value: sumContribution(trace.baseParts),
+                                                                        panel: trace.totalStat
+                                                                    })}
+                                                                {/if}
                                                             </td>
                                                         </tr>
                                                         {#each trace.segments as seg, segIndex (segIndex)}
@@ -1257,26 +1272,7 @@
                                                                 <td>
                                                                     ×{seg.value.toFixed(4)} <small>{seg.detail}</small>
                                                                     {#if seg.parts.length > 0}
-                                                                        <table class="nested">
-                                                                            <tbody>
-                                                                                {#each seg.parts as part, partIndex (partIndex)}
-                                                                                    <tr>
-                                                                                        <td>
-                                                                                            {part.source} · {part.label}
-                                                                                        </td>
-                                                                                        <td>{formatPartValue(part)}</td>
-                                                                                        <td>
-                                                                                            {part.contribution !==
-                                                                                            undefined
-                                                                                                ? part.contribution.toFixed(
-                                                                                                      4
-                                                                                                  )
-                                                                                                : ''}
-                                                                                        </td>
-                                                                                    </tr>
-                                                                                {/each}
-                                                                            </tbody>
-                                                                        </table>
+                                                                        {@render partsTable(seg.parts)}
                                                                     {/if}
                                                                 </td>
                                                             </tr>
@@ -1324,11 +1320,59 @@
     {/if}
 </div>
 
+<!-- @desc 溯源来源明细。基础面板（攻/生/防）用三列：来源·词条 / 数值 / **贡献**（折算到面板的值，
+     合计≈面板才核对得上）；各乘区（加深/增伤/抗性…）只要两列——那里的「数值」本身就是该区的组成，
+     再列一遍贡献是重复信息，故只在传了 `total`（基础面板）时才出贡献列与合计行 -->
+{#snippet partsTable(parts: TracePart[], total?: { value: number; panel: number })}
+    <table class="nested">
+        <thead>
+            <tr>
+                <th>来源 · 词条</th>
+                <th class="num">数值</th>
+                {#if total}<th class="num">贡献</th>{/if}
+            </tr>
+        </thead>
+        <tbody>
+            {#each parts as part, partIndex (partIndex)}
+                <tr>
+                    <td>{part.source} · {part.label}</td>
+                    <td>{formatPartValue(part)}</td>
+                    {#if total}
+                        <td class="num">
+                            {part.contribution !== undefined ? part.contribution.toFixed(4) : ''}
+                        </td>
+                    {/if}
+                </tr>
+            {/each}
+            {#if total}
+                <tr>
+                    <th>合计</th>
+                    <td></td>
+                    <td class="num">
+                        {total.value.toFixed(4)}
+                        <small>/ 面板 {Math.round(total.panel).toLocaleString()}</small>
+                    </td>
+                </tr>
+            {/if}
+        </tbody>
+    </table>
+{/snippet}
+
 <style>
     :global(body) {
         margin: 0;
         background: #fff;
         color: #000;
+    }
+    /**
+     * 全站 `layout.css` 给 `<html>` 设了主题底色 `var(--theme-layout-bg, #0e0e10)`；
+     * fast-calc 是纯白独立页、不加载主题，于是回落到兜底的深色 —— 内容不满一屏 / 触底回弹时
+     * 就会从内容下面露出一条**黑底**。这里把 html 一起改白，并改 `color-scheme`（否则滚动条与
+     * 原生控件仍是深色）。用 `html:root` 提一级特异性，不依赖样式注入顺序。
+     */
+    :global(html:root) {
+        background: #fff;
+        color-scheme: light;
     }
     .fast-calc {
         background: #fff;
@@ -1339,6 +1383,24 @@
             Menlo,
             Consolas,
             monospace;
+    }
+    /**
+     * 三个 h2 级标题：角色名 / 敌怪配置 / 每个时间段的汇总行。
+     * 必须显式写样式：Tailwind preflight 把 h1~h6 归零成 `font-size: inherit; font-weight: inherit`，
+     * 不写的话 <h2> 和正文一模一样（看上去「没生效」，实测就是因为这个才显得很小）。
+     * 正文 13px，标题给到 17px（≈1.3 倍）+ 700 字重 + 下划线，层级一眼看得出。
+     */
+    .fast-calc h2 {
+        margin: 20px 0 8px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #000;
+        font-size: 17px;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+    /* 第一个角色标题贴着页面上沿时不要多出一截留白 */
+    .fast-calc h2:first-child {
+        margin-top: 8px;
     }
     .loading {
         display: flex;
