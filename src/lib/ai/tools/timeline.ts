@@ -7,7 +7,7 @@ import {
     getDamageBlocks,
     getLocked,
     getTeam,
-    addOpBlock,
+    appendOpBlock,
     removeBlock,
     setBlockKey,
     setBlockSpecial,
@@ -15,7 +15,7 @@ import {
     formatTimeline,
     undo,
     redo,
-    addRefLineAt,
+    appendRefLine,
     removeLine,
     getDamageList,
     getFullSkillGroups,
@@ -42,7 +42,7 @@ import { customHitRatio } from '$lib/calc/custom-hit'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
 import { updateTimeline, updateResultAnalysis, getActiveProject, getProjects } from '$lib/data/project.svelte'
-import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD } from '$lib/calc/timeline.consts'
+import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS } from '$lib/calc/timeline.consts'
 import { resolveRefLineSeconds, type RefLineLike } from '$lib/calc/ref-line-timing'
 import { buildTimelineDigestData, renderDamageRatioList, renderTimelineDigest } from '$lib/ai/phase-digest'
 import { opBlockKey, opBlocksInOrder, refLineKey, refLinesInOrder, resolveOpBlock, resolveRefLine } from '$lib/ai/refs'
@@ -141,15 +141,6 @@ const customHitView = (hit: CustomHit) => ({
     hits: hit.hits ?? 1,
     ratio: customHitRatio(hit)
 })
-
-// 追加位置：三行（所有轨道）最右空白位置，保证按顺序排轴
-function appendPos(): number {
-    let maxRight = 0
-    for (const b of getOpBlocks()) {
-        maxRight = Math.max(maxRight, b.pos + BLOCK_W / 2)
-    }
-    return maxRight > 0 ? maxRight + BLOCK_W / 2 : 40 + BLOCK_W / 2
-}
 
 // 解析位置参数：{pos: 排轴坐标} 绝对位置，或 {anchor: 块短索引, side?: before/after, offset?: 坐标偏移} 相对块。
 // 排轴统一用 pos 定位（像素坐标，与摘要里的 pos 同一坐标系、与秒数无关）；旧的 {time: 秒} 已废除。
@@ -318,7 +309,7 @@ defineTool('get_timeline_damage_list', {
 
 defineTool('add_op_block', {
     description:
-        '在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“变奏入场”）。返回新块的**短索引**（后续操作用它定位，永不改变）。',
+        '在当前排轴指定轨道（1-3）追加一个操作块。新块排在现有操作块和普通参考线之后，空间不足时自动右移结束线。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“变奏入场”）。返回新块的**短索引**（后续操作用它定位，永不改变）。',
     parameters: {
         type: 'object',
         properties: {
@@ -341,7 +332,7 @@ defineTool('add_op_block', {
                 `无效按键名：${rawKey}（可用：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏 或 Q/E/R/F/T 等字母）`
             )
         const desc = str(args.desc)
-        const id = addOpBlock(track - 1, appendPos(), key, desc)
+        const id = appendOpBlock(track - 1, key, desc)
         if (!id) throw new Error('排轴已锁定或添加失败')
         await updateTimeline(getTimelineState())
         return { block: shortKeyOf(id), blockId: id, track, key, desc }
@@ -1034,21 +1025,13 @@ defineTool('move_ref_line', {
 
 defineTool('add_ref_line', {
     description:
-        '在当前排轴最右空白位置添加参考线（按顺序排轴：参考线落在所有操作块之后），用于标记时间节点（如启动轴/循环轴）。返回新参考线的**短索引**（后续操作用它定位，永不改变）。',
+        '在现有操作块和普通参考线之后追加参考线，用于标记时间节点（如启动轴/循环轴）。新线会与相邻参考线保持最小间距，空间不足时自动右移结束线。返回新参考线的**短索引**（后续操作用它定位，永不改变）。',
     parameters: { type: 'object', properties: {} },
     handler: async () => {
-        let maxRight = 0
-        for (const b of getOpBlocks()) {
-            maxRight = Math.max(maxRight, b.pos + BLOCK_W / 2)
-        }
-        const x = Math.max(SIDE_PAD, Math.min(getMaxPos(), maxRight > 0 ? maxRight : SIDE_PAD))
-        const before = new Set(getRefLines().map((r) => r.id))
-        const ok = addRefLineAt(x)
-        if (!ok) throw new Error('空间不足，无法创建参考线（与相邻参考线过近）')
+        const id = appendRefLine()
+        if (!id) throw new Error('排轴已锁定或添加失败')
         await updateTimeline(getTimelineState())
-        const added = refLinesInOrder().find((r) => !before.has(r.id))
-        if (!added) throw new Error('参考线已创建但未能定位（请重读 get_timeline_summary）')
-        return { added: true, line: refLineKey(added), lineId: added.id }
+        return { added: true, line: shortKeyOf(id), lineId: id }
     }
 })
 

@@ -982,6 +982,32 @@ export function getMaxPos(): number {
     return Math.max(SIDE_PAD, endPos)
 }
 
+/** @desc 找到所有操作块右沿与最后一条非结束参考线之后的追加起点 */
+const getAppendStart = (refGap: number): number => {
+    let start = SIDE_PAD
+    for (const block of _opBlocks) {
+        start = Math.max(start, block.pos + estimateOpBlockWidth(block) / 2)
+    }
+    for (const ref of _refLines) {
+        if (ref.id !== 'right') start = Math.max(start, ref.pos + refGap)
+    }
+    return start
+}
+
+/** @desc 按需扩展结束线，留出后续追加空间。由新增条目的 save 一并提交，撤销时一起还原。 */
+const ensureAppendSpace = (minEndPos: number) => {
+    const end = _refLines.find((ref) => ref.id === 'right') ?? {
+        id: 'right',
+        name: '结束',
+        pos: SIDE_PAD + MAX_TIME * PPS
+    }
+    if (end === _refLines.at(-1) && end.pos >= minEndPos) return
+
+    const pos = end.pos < minEndPos ? minEndPos + RIGHT_EXTRA : end.pos
+    _refLines = [..._refLines.filter((ref) => ref.id !== 'right'), { ...end, pos }]
+    _dragVisualPositions = { ..._dragVisualPositions, [end.id]: pos }
+}
+
 export function getTableWidth() {
     const last = _refLines[_refLines.length - 1]
     return 80 + (_dragVisualPositions[last?.id] ?? last?.pos ?? SIDE_PAD + MAX_TIME * PPS) + RIGHT_EXTRA
@@ -1205,13 +1231,26 @@ export function addRefLineAt(x: number): boolean {
         addToast('空间不足，无法创建参考线', 'error')
         return false
     }
+    insertRefLine(cx, insertIdx)
+    return true
+}
+
+const insertRefLine = (pos: number, index: number): string => {
     const nid = newEntryId('c')
-    _dragVisualPositions = { ..._dragVisualPositions, [nid]: cx }
-    _refLines = [..._refLines.slice(0, insertIdx), { id: nid, name: '', pos: cx }, ..._refLines.slice(insertIdx)]
+    _dragVisualPositions = { ..._dragVisualPositions, [nid]: pos }
+    _refLines = [..._refLines.slice(0, index), { id: nid, name: '', pos }, ..._refLines.slice(index)]
     _trackMenu = null
     save()
     startEdit(nid, '')
-    return true
+    return nid
+}
+
+/** @desc 在排轴末尾追加参考线，与已有参考线及结束线保持最小间距。 */
+export const appendRefLine = (): string | null => {
+    if (!assertUnlocked()) return null
+    const pos = getAppendStart(MIN_GAP)
+    ensureAppendSpace(pos + MIN_GAP)
+    return insertRefLine(pos, _refLines.length - 1)
 }
 
 export function removeLine(id: string) {
@@ -1414,6 +1453,15 @@ function resetGroupDrag() {
 }
 
 // ── Op Block Functions ──
+/** @desc 在排轴末尾追加操作块，确保整个块都位于结束线以内。 */
+export const appendOpBlock = (trackIndex: number, key: string, desc: string): string | null => {
+    if (!assertUnlocked()) return null
+    const start = getAppendStart(0)
+    const width = quickBlockWidth(key, desc)
+    ensureAppendSpace(start + width)
+    return addOpBlock(trackIndex, start + width / 2, key, desc)
+}
+
 export function addOpBlock(
     trackIndex: number,
     pos: number,
