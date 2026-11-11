@@ -12,7 +12,7 @@ export interface RefLineLike {
     /** 参考线在时间轴上的像素位置（用于排序） */
     pos: number
     /** 参考线名称（含时间片段，如 "1m30s"、"起手"、"right"=结束线） */
-    time: string
+    name: string
 }
 
 export interface TimingEntry {
@@ -84,12 +84,12 @@ export const parseRefLineSeconds = (raw: string): { relative: boolean; seconds: 
  * - 名称无时间片段返回 null（未解析，不参与分段）
  * - 相对片段（前缀 +）→ 上一记点秒数 + 片段值；绝对片段但早于上一记点 → 改走相对追加
  * @param id 参考线 id
- * @param refLines 全部参考线（含 id/pos/time）
+ * @param refLines 全部参考线（含 id/pos/name）
  * @param timings 现有时间记点（用于推算「上一有效记点」）
  */
 export const resolveRefLineSeconds = (id: string, refLines: RefLineLike[], timings: TimingEntry[]): number | null => {
     const rl = refLines.find((r) => r.id === id)
-    const raw = rl?.time ?? ''
+    const raw = rl?.name ?? ''
     // 候选集合 = 现有记点 + 新记点（秒数置 null），按参考线位置排序
     const candidate = [...timings, { refLineId: id, seconds: null }]
         .filter((t) => refLines.some((r) => r.id === t.refLineId))
@@ -169,7 +169,7 @@ export const autoConfigureTimings = (
         return timings
     }
 
-    const lastParsed = [...middleLines].reverse().find((rl) => parseRefLineSeconds(rl.time) !== null)
+    const lastParsed = [...middleLines].reverse().find((rl) => parseRefLineSeconds(rl.name) !== null)
     const lastSeconds = lastParsed
         ? (timings.find((t) => t.refLineId === lastParsed.id)?.seconds ?? 0)
         : (timings[timings.length - 1]?.seconds ?? 0)

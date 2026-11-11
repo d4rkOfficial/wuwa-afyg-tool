@@ -44,13 +44,31 @@ import { registerDragCancel } from '$lib/utils/drag-guard'
 
 // ── Core Data ──
 let _refLines = $state<RefLine[]>([
-    { id: 'left', time: '', pos: 0 },
-    { id: 'c1', time: '临时参考线', pos: SIDE_PAD + 12.5 * PPS },
-    { id: 'right', time: '结束', pos: SIDE_PAD + MAX_TIME * PPS }
+    { id: 'left', name: '', pos: 0 },
+    { id: 'c1', name: '临时参考线', pos: SIDE_PAD + 12.5 * PPS },
+    { id: 'right', name: '结束', pos: SIDE_PAD + MAX_TIME * PPS }
 ])
 let _opBlocks = $state<OpBlock[]>([])
 let _damageBlocks = $state<DamageBlock[]>([])
 let _locked = $state(false)
+
+/** @desc 进程内自增序号（配合毫秒时间戳生成不重复的条目 id） */
+let _entryIdSeq = 0
+
+/**
+ * @desc 生成排轴条目的唯一 id（操作块用 `b`、参考线用 `c`）。
+ *
+ * 原先 `addOpBlock` 是裸 `b${Date.now()}`、参考线是裸 `c${Date.now()}` —— **同一毫秒内创建两个就撞 id**。
+ * 而 id 有两个下游：① `damageBlocks.sourceId` 的外键（撞了就绑错块）；② AI 工具短索引的派生源
+ * （撞了短索引一起撞）。所以这里用「毫秒 + 自增」并再避开已存在 id，保证既不重也不改既有数据。
+ */
+const newEntryId = (prefix: 'b' | 'c'): string => {
+    let id = `${prefix}${Date.now()}-${_entryIdSeq++}`
+    while (_opBlocks.some((b) => b.id === id) || _refLines.some((r) => r.id === id)) {
+        id = `${prefix}${Date.now()}-${_entryIdSeq++}`
+    }
+    return id
+}
 
 function assertUnlocked(): boolean {
     if (_locked) {
@@ -101,12 +119,18 @@ export function init(
     if (data && key === _lastInitKey) return
     _lastInitKey = key
     if (data) {
-        _refLines = data.refLines.map((rl) => ({
-            ...rl,
-            time: typeof rl.time === 'number' ? String(rl.time) : rl.time,
-            pos:
-                (rl as { pos?: number }).pos ?? (typeof rl.time === 'number' ? SIDE_PAD + (rl.time as number) * PPS : 0)
-        }))
+        // 读盘垫片：旧版工程把参考线名字存在 `time`、参考线/操作块位置存成数字 `time`（秒）。
+        // 加载时一次性归一成 `name` / `pos`（像素），此后全链路只有 pos 语义。
+        _refLines = data.refLines.map((rl) => {
+            const legacy = rl as { name?: string; time?: string | number; pos?: number }
+            const rawName = legacy.name ?? legacy.time
+            const legacySeconds = typeof rawName === 'number' ? rawName : null
+            return {
+                id: rl.id,
+                name: typeof rawName === 'number' ? String(rawName) : (rawName ?? ''),
+                pos: legacy.pos ?? (legacySeconds !== null ? SIDE_PAD + legacySeconds * PPS : 0)
+            }
+        })
         _opBlocks = data.opBlocks.map((op) => {
             const b = op as OpBlock & { time?: number }
             if (b.time !== undefined && b.pos === undefined) {
@@ -117,9 +141,9 @@ export function init(
         _damageBlocks = data.damageBlocks
     } else {
         _refLines = [
-            { id: 'left', time: '', pos: 0 },
-            { id: 'c1', time: '临时参考线', pos: SIDE_PAD + 12.5 * PPS },
-            { id: 'right', time: '结束', pos: SIDE_PAD + MAX_TIME * PPS }
+            { id: 'left', name: '', pos: 0 },
+            { id: 'c1', name: '临时参考线', pos: SIDE_PAD + 12.5 * PPS },
+            { id: 'right', name: '结束', pos: SIDE_PAD + MAX_TIME * PPS }
         ]
         _opBlocks = []
         _damageBlocks = []
@@ -470,9 +494,9 @@ export function quickAddRefLine(openEdit: boolean): boolean {
         addToast('空间不足，无法创建参考线', 'error')
         return false
     }
-    const nid = `c${Date.now()}`
+    const nid = newEntryId('c')
     _dragVisualPositions = { ..._dragVisualPositions, [nid]: cx }
-    _refLines = [..._refLines.slice(0, insertIdx), { id: nid, time: '', pos: cx }, ..._refLines.slice(insertIdx)]
+    _refLines = [..._refLines.slice(0, insertIdx), { id: nid, name: '', pos: cx }, ..._refLines.slice(insertIdx)]
     _quickStack.push({ type: 'ref', id: nid })
     save()
     if (openEdit) startEdit(nid, '')
@@ -1149,10 +1173,10 @@ export function addBefore(id: string) {
     const prevX = vx(_refLines[idx - 1].id, _refLines[idx - 1].pos)
     const thisX = vx(id, _refLines[idx].pos)
     if (thisX - prevX < MIN_GAP * 2) return
-    const nid = `c${Date.now()}`
+    const nid = newEntryId('c')
     const midX = Math.max(thisX - ADD_OFFSET, (prevX + thisX) / 2)
     _dragVisualPositions = { ..._dragVisualPositions, [nid]: midX }
-    _refLines = [..._refLines.slice(0, idx), { id: nid, time: '', pos: midX }, ..._refLines.slice(idx)]
+    _refLines = [..._refLines.slice(0, idx), { id: nid, name: '', pos: midX }, ..._refLines.slice(idx)]
     startEdit(nid, '')
 }
 
@@ -1163,10 +1187,10 @@ export function addAfter(id: string) {
     const parentX = vx(id, _refLines[idx].pos)
     const nextX = vx(_refLines[idx + 1].id, _refLines[idx + 1].pos)
     if (nextX - parentX < MIN_GAP * 2) return
-    const nid = `c${Date.now()}`
+    const nid = newEntryId('c')
     const midX = Math.min(parentX + ADD_OFFSET, (parentX + nextX) / 2)
     _dragVisualPositions = { ..._dragVisualPositions, [nid]: midX }
-    _refLines = [..._refLines.slice(0, idx + 1), { id: nid, time: '', pos: midX }, ..._refLines.slice(idx + 1)]
+    _refLines = [..._refLines.slice(0, idx + 1), { id: nid, name: '', pos: midX }, ..._refLines.slice(idx + 1)]
     startEdit(nid, '')
 }
 
@@ -1181,9 +1205,9 @@ export function addRefLineAt(x: number): boolean {
         addToast('空间不足，无法创建参考线', 'error')
         return false
     }
-    const nid = `c${Date.now()}`
+    const nid = newEntryId('c')
     _dragVisualPositions = { ..._dragVisualPositions, [nid]: cx }
-    _refLines = [..._refLines.slice(0, insertIdx), { id: nid, time: '', pos: cx }, ..._refLines.slice(insertIdx)]
+    _refLines = [..._refLines.slice(0, insertIdx), { id: nid, name: '', pos: cx }, ..._refLines.slice(insertIdx)]
     _trackMenu = null
     save()
     startEdit(nid, '')
@@ -1250,7 +1274,7 @@ export function confirmEdit() {
     if (idx < 0) return
     const currentX = vx(_editingId, _refLines[idx].pos)
     _dragVisualPositions = { ..._dragVisualPositions, [_editingId]: currentX }
-    _refLines = _refLines.map((r) => (r.id === _editingId ? { ...r, time: _editValue } : r))
+    _refLines = _refLines.map((r) => (r.id === _editingId ? { ...r, name: _editValue } : r))
     save()
     _editingId = null
 }
@@ -1264,12 +1288,15 @@ export function clampDragPos(cx: number, id: string): number {
 }
 
 // 直接设置参考线位置（AI 工具用；与相邻参考线保持 MIN_GAP，不满足返回 null）
+// 只有 `left`（排轴起点）不可移动；`right`（结束线）可以左右移动 —— 它就是时间轴右边界本身，
+// 所以不能拿 `getMaxPos()`（取末条线的 pos）当自己的上界，否则只能往左移。与 UI 拖拽的
+// `clampDragPos` 口径保持一致：结束线右移无上限，只受前一条线的 MIN_GAP 约束。
 export function setRefLinePos(id: string, pos: number): number | null {
     if (!assertUnlocked()) return null
-    if (isBoundary(id)) return null
+    if (id === 'left') return null
     const idx = _refLines.findIndex((r) => r.id === id)
     if (idx < 0) return null
-    const cx = Math.max(SIDE_PAD, Math.min(getMaxPos(), pos))
+    const cx = id === 'right' ? Math.max(SIDE_PAD, pos) : Math.max(SIDE_PAD, Math.min(getMaxPos(), pos))
     const minX = idx > 0 ? vx(_refLines[idx - 1].id, _refLines[idx - 1].pos) + MIN_GAP : -Infinity
     const maxX = idx < _refLines.length - 1 ? vx(_refLines[idx + 1].id, _refLines[idx + 1].pos) - MIN_GAP : Infinity
     if (cx < minX || cx > maxX) return null
@@ -1397,7 +1424,7 @@ export function addOpBlock(
 ) {
     if (!assertUnlocked()) return null
     const block = {
-        id: `b${Date.now()}`,
+        id: newEntryId('b'),
         trackIndex,
         pos,
         key,

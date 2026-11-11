@@ -796,7 +796,7 @@
                                 }}
                                 oncontextmenu={(e) => onRefContextMenu(e, rl.id)}
                                 role="button"
-                                tabindex="-1">{rl.time || ''}</span
+                                tabindex="-1">{rl.name || ''}</span
                             >
                         {/if}
                     </div>

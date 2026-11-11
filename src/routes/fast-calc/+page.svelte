@@ -466,7 +466,7 @@
         if (round) return `第 ${round[1]} 轮结束`
         if (refLineId === 'end') return '结束'
         const ref = (timelineOf(project!)?.refLines ?? []).find((line) => line.id === refLineId)
-        return ref?.time || '参考线'
+        return ref?.name || '参考线'
     }
 
     const addTiming = (refLineId: string, seconds: number | null) => {

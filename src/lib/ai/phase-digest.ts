@@ -15,6 +15,7 @@
 import type { DamageBlock, OpBlock, RefLine } from '$lib/calc/timeline.types'
 import type { DamageEntry } from '$lib/calc/calculation.types'
 import { autoConfigureTimings } from '$lib/calc/ref-line-timing'
+import { shortKeyOf } from '$lib/ai/short-key'
 
 /** @desc 秒数显示：保留两位（只用于配置或名称推导的参考线时间） */
 export const fmtSeconds = (seconds: number): string => `${seconds.toFixed(2)}s`
@@ -42,14 +43,18 @@ export interface TimelineDigestDamage {
     nonDirectEntries: { category: string; name: string; layers: number; hits: number; responders: string[] }[]
 }
 
-/** @desc 结构化排轴的一行（操作块或参考线），按 pos 排序 */
+/** @desc 结构化排轴的一行（操作块或参考线），按 pos 排序展示 */
 export type TimelineDigestItem =
     | {
           kind: 'opBlock'
-          no: number
+          /** @desc 稳定短索引（id 的纯函数投影，永不随移动/删除改变；工具参数填它） */
+          shortKey: string
+          /** @desc 内部 id（WS / 脚本要精确寻址时可直接传，与 shortKey 等价） */
+          id: string
           pos: number
           trackIndex: number
           character: string
+          /** @desc 按键名（普攻/共鸣技能/Q/E…）；与 shortKey 无关 */
           key: string
           desc: string
           intro: boolean
@@ -58,9 +63,16 @@ export type TimelineDigestItem =
       }
     | {
           kind: 'refLine'
-          no: number
+          shortKey: string
+          id: string
           pos: number
           name: string
+          /**
+           * @desc 边界锚点角色：`start` = 左边界起点（position 0，不可移动、不可删除）、
+           *  `end` = 结束线（时间轴右边界，可左右移动、不可删除）、`line` = 普通参考线。
+           * 锚点由 store 的 `isBoundary` / `canDelete` 判定，与工具拒绝规则同源。
+           */
+          role: 'start' | 'end' | 'line'
           /** @desc 分析里是否配置了该线的记点（即使值为 null / 非法） */
           hasTiming: boolean
           /** @desc 分析记点秒数；未配置为 null */
@@ -122,8 +134,9 @@ const damageChildrenOf = (damage: TimelineDigestDamage): string[] => [
 ]
 
 /**
- * @desc 把排轴整理成结构化数据：按 pos 排序，操作块 / 参考线各自带序号与已绑定伤害。
- * 序号与 `$lib/ai/refs` 的定位器完全同源（操作块按 pos、轨道编号，参考线按 pos 编号）。
+ * @desc 把排轴整理成结构化数据：按 pos 排序**展示**，操作块 / 参考线各自带短索引与已绑定伤害。
+ * 短索引是 id 的纯函数投影（见 `$lib/ai/short-key`），与展示顺序无关 —— 移动/删除都不会让它失效，
+ * 与 `$lib/ai/refs` 的定位器完全同源。
  * 文本渲染与 `format:json` 共用这一份数据，避免两种输出口径漂移。
  */
 export const buildTimelineDigestData = (input: TimelineDigestInput): TimelineDigestData => {
@@ -150,16 +163,16 @@ export const buildTimelineDigestData = (input: TimelineDigestInput): TimelineDig
               )
         ).map((t) => [t.refLineId, t.seconds])
     )
-    // 序号按时间先后分配（不依赖调用方传入顺序，保证与定位器一致）
+    // 展示顺序按时间先后（不依赖调用方传入顺序）；寻址用 shortKey，与此顺序无关
     const orderedOps = [...input.opBlocks].sort((a, b) => a.pos - b.pos || a.trackIndex - b.trackIndex)
     const orderedRefs = [...input.refLines].sort((a, b) => a.pos - b.pos)
-    const opNo = new Map(orderedOps.map((op, i) => [op.id, i + 1]))
 
     const items: TimelineDigestItem[] = []
     for (const op of orderedOps) {
         items.push({
             kind: 'opBlock',
-            no: opNo.get(op.id) ?? 0,
+            shortKey: shortKeyOf(op.id),
+            id: op.id,
             pos: op.pos,
             trackIndex: op.trackIndex,
             character: input.trackLabels[op.trackIndex] ?? `轨${op.trackIndex + 1}`,
@@ -178,14 +191,16 @@ export const buildTimelineDigestData = (input: TimelineDigestInput): TimelineDig
             )
         })
     }
-    orderedRefs.forEach((rl, i) => {
+    orderedRefs.forEach((rl) => {
         const seconds = timingOf.get(rl.id)
         const inferredSeconds = inferredTimingOf.get(rl.id)
         items.push({
             kind: 'refLine',
-            no: i + 1,
+            shortKey: shortKeyOf(rl.id),
+            id: rl.id,
             pos: rl.pos,
-            name: rl.time || '未命名',
+            name: rl.name || '未命名',
+            role: rl.id === 'left' ? 'start' : rl.id === 'right' ? 'end' : 'line',
             hasTiming: timingOf.has(rl.id),
             seconds: isValidSeconds(seconds) ? seconds : null,
             autoSeconds: !isValidSeconds(seconds) && isValidSeconds(inferredSeconds) ? inferredSeconds : null,
@@ -210,12 +225,13 @@ export const buildTimelineDigestData = (input: TimelineDigestInput): TimelineDig
     }
 }
 
-/** @desc 渲染排轴文本：**按 pos 顺序**的一条时间线（不含倍率） */
+/** @desc 渲染排轴文本：**按 pos 顺序**的一条时间线（不含倍率），行首方括号是**短索引** */
 export const renderTimelineDigest = (input: TimelineDigestInput): string => {
     const data = buildTimelineDigestData(input)
     const header =
         `时间线（${input.opBlocks.length} 操作块 / ${data.damageBlockCount} 伤害块 / ${input.refLines.length} 参考线；` +
-        `${input.locked ? '已锁定' : '未锁定'}）；按排轴顺序，方括号里是**序号**（增删改就用它）；` +
+        `${input.locked ? '已锁定' : '未锁定'}）；按排轴顺序，方括号里的 5 位 token 是**短索引**（增删改用它；` +
+        `它是 id 的投影，移动/删除都不会变）；` +
         `排轴位置不代表秒数，参考线时间优先取分析记点，无有效记点时自动推导；` +
         `倍率用 get_timeline_damage_list 按需查`
     if (data.items.length === 0) return `${header}\n（时间线为空）`
@@ -224,11 +240,18 @@ export const renderTimelineDigest = (input: TimelineDigestInput): string => {
             const timing =
                 item.seconds !== null ? `[记点 ${fmtSeconds(item.seconds)}]` : item.hasTiming ? '[记点 未填写]' : ''
             const inferred = item.autoSeconds !== null ? `[自动推导 ${fmtSeconds(item.autoSeconds)}]` : ''
-            return [`[线${item.no}] ── 参考线「${item.name}」${timing}${inferred}`, ...damageChildrenOf(item.damage)]
+            // 边界锚点标注放在**行尾**：行首 `[线 xxxxx]` 的形状与其它行完全一致（短索引仍是唯一实参），
+            // 已有的「参考线「名」[记点 …]」相邻关系也不被打断。
+            const anchor =
+                item.role === 'start' ? '[边界·起点·不可移动]' : item.role === 'end' ? '[边界·结束线·可左右移动]' : ''
+            return [
+                `[线 ${item.shortKey}] ── 参考线「${item.name}」${timing}${inferred}${anchor}`,
+                ...damageChildrenOf(item.damage)
+            ]
         }
         const flags = [item.intro ? '变奏入场' : '', item.switchback ? '切回' : ''].filter(Boolean)
         const text =
-            `[块${item.no}] 轨${item.trackIndex + 1} ${item.character} · ${item.key}` +
+            `[块 ${item.shortKey}] 轨${item.trackIndex + 1} ${item.character} · ${item.key}` +
             (item.desc ? `「${item.desc}」` : '') +
             (flags.length ? `[${flags.join('·')}]` : '')
         return [text, ...damageChildrenOf(item.damage)]

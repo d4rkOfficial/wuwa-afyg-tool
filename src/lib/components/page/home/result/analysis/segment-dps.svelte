@@ -210,7 +210,7 @@
                                 role="button"
                                 tabindex="0"
                             >
-                                <span class="truncate opacity-60">{rl.time || '—'}</span>
+                                <span class="truncate opacity-60">{rl.name || '—'}</span>
                                 {#if isSelected}
                                     <input
                                         type="number"

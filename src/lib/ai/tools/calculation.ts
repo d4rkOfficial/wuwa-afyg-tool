@@ -65,6 +65,8 @@ const findProjectById = (projectId: string) => {
 
 /** @desc 持久化工程里的排轴数据（老工程可能为空） */
 const storedTimeline = (project: ReturnType<typeof findProjectById>) =>
+    // 注意：跨工程直读持久化数据，绕过 `timeline.store` 的读盘垫片（旧工程的 name/pos 可能是 `time` 形态）。
+    // 已确认可接受，不做修复：该工程被激活一次即会归一化并落盘。
     project.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] }
 
 /** @desc 持久化工程里的拉表状态 */

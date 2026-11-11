@@ -1,6 +1,6 @@
 export interface RefLine {
     id: string
-    time: string
+    name: string
     pos: number
 }
 

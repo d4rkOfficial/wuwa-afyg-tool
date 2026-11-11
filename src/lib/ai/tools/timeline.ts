@@ -34,21 +34,24 @@ import {
     getTRACKS,
     loadCharSkills,
     loadEchoSkill,
-    getTimelineState
+    getTimelineState,
+    canDelete
 } from '$lib/calc/timeline.store.svelte'
 import { getCharElementMap } from '$lib/data/char-elements.svelte'
 import { customHitRatio } from '$lib/calc/custom-hit'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
 import { updateTimeline, updateResultAnalysis, getActiveProject, getProjects } from '$lib/data/project.svelte'
-import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD, PPS } from '$lib/calc/timeline.consts'
+import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS, SIDE_PAD } from '$lib/calc/timeline.consts'
 import { resolveRefLineSeconds, type RefLineLike } from '$lib/calc/ref-line-timing'
 import { buildTimelineDigestData, renderDamageRatioList, renderTimelineDigest } from '$lib/ai/phase-digest'
-import { opBlocksInOrder, refLinesInOrder, resolveOpBlock, resolveRefLine } from '$lib/ai/refs'
+import { opBlockKey, opBlocksInOrder, refLineKey, refLinesInOrder, resolveOpBlock, resolveRefLine } from '$lib/ai/refs'
+import { shortKeyOf } from '$lib/ai/short-key'
+import { damageHitKeys, resolveDamageHitKey } from '$lib/ai/damage-hit-key'
+import { BLOCK_W, parsePositionArgs } from '$lib/ai/timeline-position'
 import type { CustomHit, DamageBlock, SkillHit, NonDirectEntry, OpBlock, RefLine } from '$lib/calc/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
-const BLOCK_W = 60
 
 // 按键名规范化：id/中文/单字母 → 图标键（MouseLeft/SpaceBar/Q/E/R/F/T...）
 const BLOCK_KEY_ALIASES: Record<string, string> = {
@@ -148,29 +151,21 @@ function appendPos(): number {
     return maxRight > 0 ? maxRight + BLOCK_W / 2 : 40 + BLOCK_W / 2
 }
 
-// 解析位置参数：{time: 秒} 绝对时间，或 {anchor: 块序号, side?: before/after, offset?: 秒} 相对块
-function resolvePosition(position: Record<string, unknown>): number {
-    if (position.time !== undefined) {
-        const t = Number(position.time)
-        const maxT = Math.floor((getMaxPos() - SIDE_PAD) / PPS)
-        if (!Number.isFinite(t) || t < 0 || t > maxT) throw new Error(`time 须为 0-${maxT} 秒`)
-        return SIDE_PAD + t * PPS
-    }
-    const anchorRef = position.anchor
-    if (anchorRef === undefined || anchorRef === null || String(anchorRef).trim() === '')
-        throw new Error('需要 time（秒）或 anchor（目标操作块序号）')
-    const anchor = resolveOpBlock(anchorRef)
-    const side = str(position.side) === 'before' ? 'before' : 'after'
-    const offset = Number(position.offset ?? 0)
-    if (!Number.isFinite(offset) || offset < 0) throw new Error('offset 须为非负数字（秒）')
-    const gap = BLOCK_W / 2 + offset * PPS
-    return side === 'before' ? anchor.pos - gap : anchor.pos + gap
-}
+// 解析位置参数：{pos: 排轴坐标} 绝对位置，或 {anchor: 块短索引, side?: before/after, offset?: 坐标偏移} 相对块。
+// 排轴统一用 pos 定位（像素坐标，与摘要里的 pos 同一坐标系、与秒数无关）；旧的 {time: 秒} 已废除。
+const resolvePosition = (position: Record<string, unknown>): number =>
+    parsePositionArgs(position, {
+        maxPos: getMaxPos(),
+        blockWidth: BLOCK_W,
+        anchorPos: (ref) => resolveOpBlock(ref).pos
+    })
 
-/** @desc 伤害绑定的目标：操作块或参考线（两者都有独立序号） */
+/** @desc 伤害绑定的目标：操作块或参考线（两者都有独立短索引） */
 interface DamageTarget {
     sourceType: 'op' | 'ref'
     sourceId: string
+    /** @desc 目标的稳定短索引（返回值与报错都用它，不用位置序号） */
+    key: string
     typeLabel: string
     target: OpBlock | RefLine
 }
@@ -180,10 +175,10 @@ const resolveDamageTarget = (args: Record<string, unknown>): DamageTarget => {
     const ref = args.block ?? args.target
     if (typeLabel === '参考线') {
         const line = resolveRefLine(ref)
-        return { sourceType: 'ref', sourceId: line.id, typeLabel, target: line }
+        return { sourceType: 'ref', sourceId: line.id, key: refLineKey(line), typeLabel, target: line }
     }
     const block = resolveOpBlock(ref)
-    return { sourceType: 'op', sourceId: block.id, typeLabel, target: block }
+    return { sourceType: 'op', sourceId: block.id, key: opBlockKey(block), typeLabel, target: block }
 }
 
 /** @desc 找到目标（操作块 / 参考线）上「伤害绑定轨」的伤害块 */
@@ -192,7 +187,7 @@ const findDamageBlock = (sourceId: string) =>
 
 defineTool('get_timeline_summary', {
     description:
-        '获取排轴：**按排轴顺序**列出所有操作块、参考线与已绑定的伤害。每行给出序号、轨道与角色、操作内容，其下缩进列出该块绑定的伤害命中（只给命中名，**不含倍率**——倍率用 get_timeline_damage_list 按需查）。排轴位置只是定位坐标，不代表秒数；参考线时间优先取数据分析配置的有效记点，没有有效记点时按“时间记点自动配置”规则从名称推导，并标为自动推导。**可跨工程只读**：传 projectId 读任意工程的持久化排轴且不切换当前工程（结构与绑定名；倍率明细用 get_timeline_damage_list 同样传 projectId 查）；省略则读活动工程。',
+        '获取排轴：**按排轴顺序**列出所有操作块、参考线与已绑定的伤害。每行行首方括号里是 5 位**短索引**（如 `[块 xlm8n]`、`[线 jidwl]`），它是内部 id 的派生投影，**移动 / 删除都不会改变**，所有排轴写工具的 block / line 参数就填它；其后是轨道与角色、操作内容，其下缩进列出该块绑定的伤害命中（只给命中名，**不含倍率**——倍率用 get_timeline_damage_list 按需查）。参考线行尾可能带 `[边界·起点·不可移动]`（左边界锚点）或 `[边界·结束线·可左右移动]`（时间轴右边界）：两者都不可删除，起点不可移动；行首短索引的写法与普通参考线完全一致。排轴位置只是定位坐标，不代表秒数；参考线时间优先取数据分析配置的有效记点，没有有效记点时按“时间记点自动配置”规则从名称推导，并标为自动推导。**可跨工程只读**：传 projectId 读任意工程的持久化排轴且不切换当前工程（结构与绑定名；倍率明细用 get_timeline_damage_list 同样传 projectId 查）；省略则读活动工程。',
     parameters: {
         type: 'object',
         properties: {
@@ -203,7 +198,8 @@ defineTool('get_timeline_summary', {
             format: {
                 type: 'string',
                 enum: ['text', 'json'],
-                description: '输出格式：text（默认，便于阅读）或 json（结构化 items，便于解析）'
+                description:
+                    '输出格式：text（默认，便于阅读）或 json（结构化 items，每项另带 shortKey 短索引与内部 id）'
             }
         }
     },
@@ -235,6 +231,9 @@ defineTool('get_timeline_summary', {
             // 跨工程**只读**：直接读持久化工程数据，不切活动工程，也不动全局排轴 store
             const project = getProjects().find((p) => p.id === projectId)
             if (!project) throw new Error(`未找到工程：${projectId}`)
+            // 注意：跨工程读取直读持久化数据，**绕过** `timeline.store` 的读盘垫片（旧工程把名字存在
+            // `time`、位置存成数字秒）。极旧的工程若从未被激活过，这里的 `pos` / `name` 可能缺失 ——
+            // 已确认可接受，不做修复：激活一次即会被归一化并落盘。
             const data = project.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] }
             return {
                 projectId,
@@ -261,7 +260,7 @@ defineTool('get_timeline_summary', {
 
 defineTool('get_timeline_damage_list', {
     description:
-        '**按需**查询排轴里每个已绑定伤害的**倍率明细**（命中名、倍率、属性、系数类型；含效应/处决/响应的折算结果），按排轴顺序编号，每行一条；序号与排轴位置不代表秒数。只想看排轴结构（哪些块、绑了什么）请用 get_timeline_summary —— 那里不含倍率，避免无谓的 token 开销。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
+        '**按需**查询排轴里每个已绑定伤害的**倍率明细**（命中名、倍率、属性、系数类型；含效应/处决/响应的折算结果），按排轴顺序排列，每行一条（行首编号仅用于本清单，不能用于定位）。只想看排轴结构（哪些块、绑了什么）请用 get_timeline_summary —— 那里不含倍率，避免无谓的 token 开销。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
     parameters: {
         type: 'object',
         properties: {
@@ -299,6 +298,7 @@ defineTool('get_timeline_damage_list', {
             await Promise.all(
                 project.team.map((s) => (s.character ? loadCharSkills(s.character) : Promise.resolve(null)))
             )
+            // 同上：跨工程直读持久化数据，绕过读盘垫片；见 get_timeline_summary 里的说明。
             const timeline = project.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] }
             const rows = buildDamageListFrom({
                 damageBlocks: timeline.damageBlocks,
@@ -318,7 +318,7 @@ defineTool('get_timeline_damage_list', {
 
 defineTool('add_op_block', {
     description:
-        '在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“变奏入场”）。返回新块的**序号**（时间轴上的第几个操作块）。',
+        '在当前排轴指定轨道（1-3）追加一个操作块，位置为三行最右空白位置（按顺序排轴：新块总是落在所有操作块之后）。key 支持：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏，或 Q/E/R/F/T 等字母。desc 为描述文本（如“变奏入场”）。返回新块的**短索引**（后续操作用它定位，永不改变）。',
     parameters: {
         type: 'object',
         properties: {
@@ -344,8 +344,7 @@ defineTool('add_op_block', {
         const id = addOpBlock(track - 1, appendPos(), key, desc)
         if (!id) throw new Error('排轴已锁定或添加失败')
         await updateTimeline(getTimelineState())
-        const index = opBlocksInOrder().findIndex((b) => b.id === id) + 1
-        return { block: index, track, key, desc }
+        return { block: shortKeyOf(id), blockId: id, track, key, desc }
     }
 })
 
@@ -618,8 +617,8 @@ defineTool('bind_damage_to_block', {
                 description: '目标类型：block=操作块（默认）/ refLine=参考线'
             },
             block: {
-                type: 'number',
-                description: '目标**序号**（targetType=block 时为操作块序号，refLine 时为参考线序号）'
+                type: 'string',
+                description: '目标**短索引**（5 位 token，targetType=block 时取操作块、refLine 时取参考线）'
             },
             hits: {
                 type: 'array',
@@ -690,14 +689,14 @@ defineTool('bind_damage_to_block', {
         return {
             bound: skillHits.length,
             targetType: target.sourceType === 'ref' ? 'refLine' : 'block',
-            target: args.block
+            target: target.key
         }
     }
 })
 
 defineTool('get_damage_bindings', {
     description:
-        '列出当前排轴上每个**操作块 / 参考线**绑定的伤害：targetType、目标序号、伤害块 id、直伤命中（1 起的 hitIndex、角色、技能类型、命中名、倍率、属性、段数）与非直伤条目。用于定位要解绑/修改的具体一条命中。',
+        '列出当前排轴上每个**操作块 / 参考线**绑定的伤害：targetType、目标短索引、目标内部 id、伤害块 id、直伤命中（每条的 hitKey、角色、技能类型、命中名、倍率、属性、段数）与非直伤条目。用于定位要解绑/修改的具体一条命中；hitKey 由命中身份派生，其它命中增删、或改倍率/属性/段数之后都**不变**。',
     parameters: { type: 'object', properties: {} },
     handler: () => {
         const ops = opBlocksInOrder()
@@ -707,21 +706,20 @@ defineTool('get_damage_bindings', {
             .filter((d) => d.trackIndex === lastTrack && (d.skillHits.length > 0 || d.nonDirectEntries.length > 0))
             .map((d) => {
                 const targetType = d.sourceType === 'ref' ? 'refLine' : 'block'
-                const index =
-                    d.sourceType === 'ref'
-                        ? refs.findIndex((r) => r.id === d.sourceId) + 1
-                        : ops.findIndex((b) => b.id === d.sourceId) + 1
+                const key = shortKeyOf(d.sourceId)
                 const label =
                     d.sourceType === 'ref'
-                        ? refs.find((r) => r.id === d.sourceId)?.time || '未命名参考线'
+                        ? refs.find((r) => r.id === d.sourceId)?.name || '未命名参考线'
                         : ops.find((b) => b.id === d.sourceId)?.desc || ops.find((b) => b.id === d.sourceId)?.key || ''
+                const hitKeys = damageHitKeys(d.skillHits)
                 return {
                     targetType,
-                    target: index,
+                    target: key,
+                    targetId: d.sourceId,
                     label,
                     damageBlockId: d.id,
                     skillHits: d.skillHits.map((h, i) => ({
-                        hitIndex: i + 1,
+                        hitKey: hitKeys[i],
                         character: h.character,
                         skillType: h.skillType,
                         hitName: h.hitName,
@@ -741,36 +739,34 @@ defineTool('get_damage_bindings', {
 
 defineTool('unbind_damage_hit', {
     description:
-        '从指定操作块 / 参考线解绑**一条**直伤命中（保留该目标上的其它伤害）。先用 get_damage_bindings 查 hitIndex（1 起）。',
+        '从指定操作块 / 参考线解绑**一条**直伤命中（保留该目标上的其它伤害）。先用 get_damage_bindings 查该条命中的 hitKey。',
     dangerous: true,
     parameters: {
         type: 'object',
         properties: {
             targetType: { type: 'string', enum: ['block', 'refLine'], description: '目标类型（默认 block）' },
-            block: { type: 'number', description: '目标序号（操作块或参考线）' },
-            hitIndex: { type: 'number', description: '该目标直伤命中列表里的序号（1 起）' }
+            block: { type: 'string', description: '目标短索引（操作块或参考线，取值见 get_timeline_summary）' },
+            hit: { type: 'string', description: '该条命中的 hitKey（见 get_damage_bindings）' }
         },
-        required: ['block', 'hitIndex']
+        required: ['block', 'hit']
     },
     handler: async (args) => {
         const target = resolveDamageTarget(args)
         const dmg = findDamageBlock(target.sourceId)
         if (!dmg) throw new Error('该目标没有绑定任何伤害')
-        const index = Number(args.hitIndex)
-        if (!Number.isInteger(index) || index < 1 || index > dmg.skillHits.length) {
-            throw new Error(`hitIndex 超出范围：1-${dmg.skillHits.length}`)
-        }
-        const removed = dmg.skillHits[index - 1]
+        const index = resolveDamageHitKey(dmg.skillHits, args.hit)
+        const removed = dmg.skillHits[index]
         setDamageBlockSkillHits(
             target.sourceId,
-            dmg.skillHits.filter((_, i) => i !== index - 1),
+            dmg.skillHits.filter((_, i) => i !== index),
             target.sourceType
         )
         await updateTimeline(getTimelineState())
         return {
             unbound: true,
             targetType: target.sourceType === 'ref' ? 'refLine' : 'block',
-            target: args.block,
+            target: target.key,
+            hit: damageHitKeys(dmg.skillHits)[index],
             removed
         }
     }
@@ -778,14 +774,14 @@ defineTool('unbind_damage_hit', {
 
 defineTool('update_damage_hit', {
     description:
-        '修改某个操作块/参考线上**已有的一条直伤命中**的倍率、属性或段数（用 get_damage_bindings 查 hitIndex）。倍率的基础类型必须保持不变（只改数值/段数），否则会改变底层条目 id 并让 Buff 绑定失效 —— 这种情况会明确拒绝；改名请用 rename_damage_entry。',
+        '修改某个操作块/参考线上**已有的一条直伤命中**的倍率、属性或段数（用 get_damage_bindings 查 hitKey）。倍率的基础类型必须保持不变（只改数值/段数），否则会改变底层条目 id 并让 Buff 绑定失效 —— 这种情况会明确拒绝；改名请用 rename_damage_entry。hitKey 不含倍率/属性/段数，所以改完仍可用同一个 hitKey 再次操作。',
     dangerous: true,
     parameters: {
         type: 'object',
         properties: {
             targetType: { type: 'string', enum: ['block', 'refLine'], description: '目标类型（默认 block）' },
-            block: { type: 'number', description: '目标序号（操作块或参考线）' },
-            hitIndex: { type: 'number', description: '该目标直伤命中列表里的序号（1 起）' },
+            block: { type: 'string', description: '目标短索引（操作块或参考线，取值见 get_timeline_summary）' },
+            hit: { type: 'string', description: '该条命中的 hitKey（见 get_damage_bindings）' },
             ratio: { type: 'string', description: '新的倍率串（如 "120%" / "80%攻击+20%生命"）；基础类型须与原来一致' },
             element: {
                 type: 'string',
@@ -794,17 +790,14 @@ defineTool('update_damage_hit', {
             },
             hits: { type: 'number', description: '新的段数（整数 1-999）' }
         },
-        required: ['block', 'hitIndex']
+        required: ['block', 'hit']
     },
     handler: async (args) => {
         const target = resolveDamageTarget(args)
         const dmg = findDamageBlock(target.sourceId)
         if (!dmg) throw new Error('该目标没有绑定任何伤害')
-        const index = Number(args.hitIndex)
-        if (!Number.isInteger(index) || index < 1 || index > dmg.skillHits.length) {
-            throw new Error(`hitIndex 超出范围：1-${dmg.skillHits.length}`)
-        }
-        const source = dmg.skillHits[index - 1]
+        const index = resolveDamageHitKey(dmg.skillHits, args.hit)
+        const source = dmg.skillHits[index]
         const ratio = args.ratio === undefined ? source.ratio : str(args.ratio)
         if (!ratio) throw new Error('ratio 不能为空')
         const shape = (text: string): string =>
@@ -827,16 +820,16 @@ defineTool('update_damage_hit', {
         if (hits !== undefined) next.hits = hits
         setDamageBlockSkillHits(
             target.sourceId,
-            dmg.skillHits.map((h, i) => (i === index - 1 ? next : h)),
+            dmg.skillHits.map((h, i) => (i === index ? next : h)),
             target.sourceType
         )
         await updateTimeline(getTimelineState())
         return {
             updated: true,
             targetType: target.sourceType === 'ref' ? 'refLine' : 'block',
-            target: args.block,
-            hitIndex: index,
-            hit: next
+            target: target.key,
+            hit: damageHitKeys(dmg.skillHits.map((h, i) => (i === index ? next : h)))[index],
+            hitData: next
         }
     }
 })
@@ -849,7 +842,7 @@ defineTool('remove_damage_from_target', {
         type: 'object',
         properties: {
             targetType: { type: 'string', enum: ['block', 'refLine'], description: '目标类型（默认 block）' },
-            block: { type: 'number', description: '目标序号（操作块或参考线）' }
+            block: { type: 'string', description: '目标短索引（操作块或参考线，取值见 get_timeline_summary）' }
         },
         required: ['block']
     },
@@ -857,16 +850,18 @@ defineTool('remove_damage_from_target', {
         const target = resolveDamageTarget(args)
         removeDamageBySource(target.sourceId, 'all')
         await updateTimeline(getTimelineState())
-        return { removed: true, targetType: target.sourceType === 'ref' ? 'refLine' : 'block', target: args.block }
+        return { removed: true, targetType: target.sourceType === 'ref' ? 'refLine' : 'block', target: target.key }
     }
 })
 
 defineTool('remove_op_block', {
-    description: '删除指定操作块（按**序号**）。删除后其余块的序号会前移，后续操作请重新读 get_timeline_summary。',
+    description: '删除指定操作块（按**短索引**）。其它块的短索引不受影响（由内部 id 派生，永不改变），无需重读摘要。',
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { block: { type: 'number', description: '操作块序号（见 get_timeline_summary 的「[块N]」）' } },
+        properties: {
+            block: { type: 'string', description: '操作块短索引（见 get_timeline_summary 的「[块 xxxx]」）' }
+        },
         required: ['block']
     },
     handler: async (args) => {
@@ -879,11 +874,11 @@ defineTool('remove_op_block', {
 
 defineTool('set_block_key', {
     description:
-        '修改指定操作块的按键（按**序号**）。key 可用：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏 或字母。',
+        '修改指定操作块的按键（按**短索引**）。key 可用：普攻/重击/闪避/跳跃/共鸣技能/共鸣解放/声骸技能/谐度破坏 或字母。',
     parameters: {
         type: 'object',
         properties: {
-            block: { type: 'number', description: '操作块序号' },
+            block: { type: 'string', description: '操作块短索引' },
             key: { type: 'string', description: '新按键名' }
         },
         required: ['block', 'key']
@@ -899,11 +894,11 @@ defineTool('set_block_key', {
 })
 
 defineTool('set_block_special', {
-    description: '设置指定操作块的变奏标记（按**序号**）：intro=变奏入场、switchback=切回、none=取消。',
+    description: '设置指定操作块的变奏标记（按**短索引**）：intro=变奏入场、switchback=切回、none=取消。',
     parameters: {
         type: 'object',
         properties: {
-            block: { type: 'number', description: '操作块序号' },
+            block: { type: 'string', description: '操作块短索引' },
             kind: {
                 type: 'string',
                 enum: ['none', 'intro', 'switchback'],
@@ -971,20 +966,20 @@ defineTool('reflow_track', {
 
 defineTool('move_op_block', {
     description:
-        '把已有操作块移动到指定位置（按**序号**）：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块序号, side: before/after（默认 after）, offset?: 秒}（相对某块）。移动后自动消除同轨道重叠。',
+        '把已有操作块移动到指定位置（按**短索引**）：position 为 {pos: 排轴坐标}（取值见 get_timeline_summary 的 format=json 输出 items[].pos，0 至当前结束线）或 {anchor: 块短索引, side: before/after（默认 after）, offset?: 坐标偏移}（相对某块）。排轴位置只是定位坐标，与秒数无关。移动后自动消除同轨道重叠。',
     parameters: {
         type: 'object',
         properties: {
-            block: { type: 'number', description: '要移动的操作块序号' },
+            block: { type: 'string', description: '要移动的操作块短索引' },
             position: {
                 type: 'object',
                 description:
-                    '把操作块移动到哪个时间位置：{time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块序号, side, offset}（相对某块）',
+                    '把操作块移动到哪个位置：{pos: 排轴坐标}（绝对位置，0 至当前结束线）或 {anchor: 块短索引, side, offset}（相对某块）',
                 properties: {
-                    time: { type: 'number', description: '绝对时间（秒，0 至当前结束线）' },
-                    anchor: { type: 'number', description: '目标操作块序号（相对它移动）' },
+                    pos: { type: 'number', description: '排轴坐标（与摘要里的 pos 同坐标系，0 至当前结束线）' },
+                    anchor: { type: 'number', description: '目标操作块短索引（相对它移动）' },
                     side: { type: 'string', enum: ['before', 'after'] },
-                    offset: { type: 'number', description: '相对偏移（秒，默认 0）' }
+                    offset: { type: 'number', description: '相对偏移（坐标，默认 0）' }
                 }
             }
         },
@@ -1004,20 +999,20 @@ defineTool('move_op_block', {
 
 defineTool('move_ref_line', {
     description:
-        '把已有参考线移动到指定位置（按**序号**）：position 为 {time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块序号, side: before/after, offset?: 秒}（相对某块）。与相邻参考线保持最小间距，过近会报错。',
+        '把已有参考线移动到指定位置（按**短索引**）：position 为 {pos: 排轴坐标}（取值见 get_timeline_summary 的 format=json 输出 items[].pos，0 至当前结束线）或 {anchor: 块短索引, side: before/after, offset?: 坐标偏移}（相对某块）。排轴位置只是定位坐标，与秒数无关。**结束线（right）可以左右移动**，它就是时间轴右边界、右移无上限；左边界起点（left）不可移动；与相邻参考线保持最小间距，过近会报错。',
     parameters: {
         type: 'object',
         properties: {
-            line: { type: 'number', description: '参考线序号（见 get_timeline_summary 的「[线N]」）' },
+            line: { type: 'string', description: '参考线短索引（见 get_timeline_summary 的「[线 xxxx]」）' },
             position: {
                 type: 'object',
                 description:
-                    '把参考线移动到哪个时间位置：{time: 秒}（绝对时间 0 至当前结束线）或 {anchor: 块序号, side, offset}（相对某块）',
+                    '把参考线移动到哪个位置：{pos: 排轴坐标}（绝对位置，0 至当前结束线）或 {anchor: 块短索引, side, offset}（相对某块）',
                 properties: {
-                    time: { type: 'number', description: '绝对时间（秒，0 至当前结束线）' },
-                    anchor: { type: 'number', description: '目标操作块序号（相对它移动）' },
+                    pos: { type: 'number', description: '排轴坐标（与摘要里的 pos 同坐标系，0 至当前结束线）' },
+                    anchor: { type: 'number', description: '目标操作块短索引（相对它移动）' },
                     side: { type: 'string', enum: ['before', 'after'] },
-                    offset: { type: 'number', description: '相对偏移（秒，默认 0）' }
+                    offset: { type: 'number', description: '相对偏移（坐标，默认 0）' }
                 }
             }
         },
@@ -1025,18 +1020,21 @@ defineTool('move_ref_line', {
     },
     handler: async (args) => {
         const ref = resolveRefLine(args.line)
+        if (ref.id === 'left') {
+            throw new Error('参考线「起点」是排轴左边界锚点（position 0），不可移动')
+        }
         const raw = (args.position ?? {}) as Record<string, unknown>
         const pos = resolvePosition(raw)
         const set = setRefLinePos(ref.id, pos)
         if (set === null) throw new Error('目标位置与相邻参考线间距不足或超出范围')
         await updateTimeline(getTimelineState())
-        return { moved: true, pos: set }
+        return { moved: true, line: refLineKey(ref), lineId: ref.id, pos: set }
     }
 })
 
 defineTool('add_ref_line', {
     description:
-        '在当前排轴最右空白位置添加参考线（按顺序排轴：参考线落在所有操作块之后），用于标记时间节点（如启动轴/循环轴）。返回新参考线的**序号**。',
+        '在当前排轴最右空白位置添加参考线（按顺序排轴：参考线落在所有操作块之后），用于标记时间节点（如启动轴/循环轴）。返回新参考线的**短索引**（后续操作用它定位，永不改变）。',
     parameters: { type: 'object', properties: {} },
     handler: async () => {
         let maxRight = 0
@@ -1048,25 +1046,31 @@ defineTool('add_ref_line', {
         const ok = addRefLineAt(x)
         if (!ok) throw new Error('空间不足，无法创建参考线（与相邻参考线过近）')
         await updateTimeline(getTimelineState())
-        const ordered = refLinesInOrder()
-        const line = ordered.findIndex((r) => !before.has(r.id)) + 1
-        return { added: true, line }
+        const added = refLinesInOrder().find((r) => !before.has(r.id))
+        if (!added) throw new Error('参考线已创建但未能定位（请重读 get_timeline_summary）')
+        return { added: true, line: refLineKey(added), lineId: added.id }
     }
 })
 
 defineTool('remove_ref_line', {
-    description: '删除指定参考线（按**序号**）。删除后其余参考线的序号会前移，后续操作请重新读 get_timeline_summary。',
+    description:
+        '删除指定参考线（按**短索引**）。左/右边界锚点（起点与结束线）不可删除，会明确报错。其它参考线的短索引不受影响（由内部 id 派生，永不改变），无需重读摘要。',
     dangerous: true,
     parameters: {
         type: 'object',
-        properties: { line: { type: 'number', description: '参考线序号' } },
+        properties: { line: { type: 'string', description: '参考线短索引' } },
         required: ['line']
     },
     handler: async (args) => {
         const ref = resolveRefLine(args.line)
+        if (!canDelete(ref.id)) {
+            throw new Error(
+                `参考线「${ref.name || ref.id}」是排轴${ref.id === 'left' ? '起点' : '结束线'}锚点，不可删除`
+            )
+        }
         removeLine(ref.id)
         await updateTimeline(getTimelineState())
-        return { removed: true, name: ref.time || '未命名' }
+        return { removed: true, line: refLineKey(ref), lineId: ref.id, name: ref.name || '未命名' }
     }
 })
 
@@ -1098,7 +1102,7 @@ defineTool('bind_non_direct_to_block', {
                 enum: ['block', 'refLine'],
                 description: '目标类型：block=操作块（默认）/ refLine=参考线'
             },
-            block: { type: 'number', description: '目标序号（操作块或参考线）' },
+            block: { type: 'string', description: '目标短索引（操作块或参考线，取值见 get_timeline_summary）' },
             entries: {
                 type: 'array',
                 description: '非直伤条目列表（整体覆盖该块）：处决/响应/效应',
@@ -1160,7 +1164,7 @@ defineTool('bind_non_direct_to_block', {
         return {
             bound: entries.length,
             targetType: target.sourceType === 'ref' ? 'refLine' : 'block',
-            target: args.block
+            target: target.key
         }
     }
 })
@@ -1175,7 +1179,7 @@ const getTimings = (): { refLineId: string; seconds: number | null }[] => {
 
 defineTool('get_ref_line_timings', {
     description:
-        '查询时间参考线记点状态：哪些参考线已启用为时间记点、各自的秒数（null=未填写/未解析，不参与 DPS 分段）。秒数来源：自动推导（从参考线命名解析）或自定义覆盖。结果按参考线在时间轴上的位置排序，并给出**序号**。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
+        '查询时间参考线记点状态：哪些参考线已启用为时间记点、各自的秒数（null=未填写/未解析，不参与 DPS 分段）。秒数来源：自动推导（从参考线命名解析）或自定义覆盖。结果按参考线在时间轴上的位置排序，并给出**短索引**与内部 id。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程。',
     parameters: {
         type: 'object',
         properties: {
@@ -1187,18 +1191,20 @@ defineTool('get_ref_line_timings', {
         const project = projectId ? getProjects().find((p) => p.id === projectId) : null
         if (projectId && !project) throw new Error(`未找到工程：${projectId}`)
         const timings = project ? (project.analysis?.timings ?? []) : getTimings()
+        // 跨工程直读持久化数据，绕过读盘垫片（同 get_timeline_summary 的说明）；这里只用 id 派生短索引，
+        // 不依赖 pos 是否存在。
         const ordered = project
             ? [...(project.encounter.timeline.data?.refLines ?? [])].sort((a, b) => a.pos - b.pos)
             : refLinesInOrder()
         const enabled = new Map(timings.map((t) => [t.refLineId, t.seconds]))
         const rows = ordered
-            .map((rl, i) => ({ rl, line: i + 1 }))
-            .filter(({ rl }) => enabled.has(rl.id))
-            .map(({ rl, line }) => {
+            .filter((rl) => enabled.has(rl.id))
+            .map((rl) => {
                 const seconds = enabled.get(rl.id) ?? null
                 return {
-                    line,
-                    name: rl.time || '未命名',
+                    line: shortKeyOf(rl.id),
+                    lineId: rl.id,
+                    name: rl.name || '未命名',
                     seconds,
                     status: seconds === null ? '未填写（不参与分段）' : '已填写'
                 }
@@ -1208,17 +1214,19 @@ defineTool('get_ref_line_timings', {
             timings: rows,
             totalEnabled: rows.length,
             validCount: rows.filter((r) => r.seconds !== null).length,
-            hint: 'seconds=null 表示「未填写」（名称无时间片段）；用 enable_ref_line_timing 启用、disable_ref_line_timing 禁用、set_ref_line_timing_seconds 设自定义秒数；参数里的 line 就是这里的序号。'
+            hint: 'seconds=null 表示「未填写」（名称无时间片段）；用 enable_ref_line_timing 启用、disable_ref_line_timing 禁用、set_ref_line_timing_seconds 设自定义秒数；参数里的 line 就是这里的短索引。'
         }
     }
 })
 
 defineTool('enable_ref_line_timing', {
     description:
-        '启用某条参考线作为时间记点（按**序号**）。启用时秒数自动推导：按参考线命名解析时间片段（如 "1m30s"→90、"起手"→null 未解析）；结束线（最后一条）默认 120s。若该参考线已启用则幂等返回当前状态。',
+        '启用某条参考线作为时间记点（按**短索引**）。启用时秒数自动推导：按参考线命名解析时间片段（如 "1m30s"→90、"起手"→null 未解析）；结束线（最后一条）默认 120s。若该参考线已启用则幂等返回当前状态。',
     parameters: {
         type: 'object',
-        properties: { line: { type: 'number', description: '参考线序号（见 get_timeline_summary 的「[线N]」）' } },
+        properties: {
+            line: { type: 'string', description: '参考线短索引（见 get_timeline_summary 的「[线 xxxx]」）' }
+        },
         required: ['line']
     },
     handler: async (args) => {
@@ -1229,7 +1237,7 @@ defineTool('enable_ref_line_timing', {
         if (!project) throw new Error('当前没有活动工程')
         const timings = getTimings()
         if (timings.some((t) => t.refLineId === id)) {
-            return { line: args.line, alreadyEnabled: true, timings }
+            return { line: refLineKey(ref), alreadyEnabled: true, timings }
         }
         const seconds = resolveRefLineSeconds(id, refLines as RefLineLike[], timings)
         const next = [...timings, { refLineId: id, seconds }]
@@ -1238,8 +1246,8 @@ defineTool('enable_ref_line_timing', {
             timings: next
         })
         return {
-            line: args.line,
-            name: ref.time || '未命名',
+            line: refLineKey(ref),
+            name: ref.name || '未命名',
             enabled: true,
             seconds,
             status: seconds === null ? '未填写（名称无时间片段，需手动设秒数）' : '自动推导',
@@ -1250,36 +1258,37 @@ defineTool('enable_ref_line_timing', {
 
 defineTool('disable_ref_line_timing', {
     description:
-        '禁用某条参考线的时间记点（按**序号**，从 timings 移除，不再参与 DPS 分段）。若该参考线未启用则幂等返回。',
+        '禁用某条参考线的时间记点（按**短索引**，从 timings 移除，不再参与 DPS 分段）。若该参考线未启用则幂等返回。',
     parameters: {
         type: 'object',
-        properties: { line: { type: 'number', description: '参考线序号' } },
+        properties: { line: { type: 'string', description: '参考线短索引' } },
         required: ['line']
     },
     handler: async (args) => {
-        const id = resolveRefLine(args.line).id
+        const ref = resolveRefLine(args.line)
+        const id = ref.id
         const project = getActiveProject()
         if (!project) throw new Error('当前没有活动工程')
         const timings = getTimings()
         if (!timings.some((t) => t.refLineId === id)) {
-            return { line: args.line, alreadyDisabled: true, timings }
+            return { line: refLineKey(ref), alreadyDisabled: true, timings }
         }
         const next = timings.filter((t) => t.refLineId !== id)
         await updateResultAnalysis({
             ...project.analysis,
             timings: next
         })
-        return { line: args.line, disabled: true, timings: next }
+        return { line: refLineKey(ref), disabled: true, timings: next }
     }
 })
 
 defineTool('set_ref_line_timing_seconds', {
     description:
-        '设置已启用记点的秒数（按**序号**）。mode=auto：按参考线命名自动推导（清空自定义覆盖，回到自动解析值；命名无时间片段则秒数为 null「未填写」）；mode=custom：手动填秒数（须 ≥ 0，负数/空串视为清除→null「未填写」）。若该参考线尚未启用，会先自动启用再设秒数。',
+        '设置已启用记点的秒数（按**短索引**）。mode=auto：按参考线命名自动推导（清空自定义覆盖，回到自动解析值；命名无时间片段则秒数为 null「未填写」）；mode=custom：手动填秒数（须 ≥ 0，负数/空串视为清除→null「未填写」）。若该参考线尚未启用，会先自动启用再设秒数。',
     parameters: {
         type: 'object',
         properties: {
-            line: { type: 'number', description: '参考线序号' },
+            line: { type: 'string', description: '参考线短索引' },
             mode: {
                 type: 'string',
                 enum: ['auto', 'custom'],
@@ -1290,7 +1299,8 @@ defineTool('set_ref_line_timing_seconds', {
         required: ['line', 'mode']
     },
     handler: async (args) => {
-        const id = resolveRefLine(args.line).id
+        const ref = resolveRefLine(args.line)
+        const id = ref.id
         const mode = str(args.mode)
         const refLines = getRefLines()
         const project = getActiveProject()
@@ -1320,7 +1330,7 @@ defineTool('set_ref_line_timing_seconds', {
             timings: next
         })
         return {
-            line: args.line,
+            line: refLineKey(ref),
             mode,
             seconds,
             status: seconds === null ? '未填写（不参与分段）' : '已填写',

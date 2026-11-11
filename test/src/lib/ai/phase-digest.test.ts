@@ -3,6 +3,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
+import { shortKeyOf } from '$lib/ai/short-key'
+
 import {
     buildTimelineDigestData,
     fmtSeconds,
@@ -25,10 +27,10 @@ const op = (id: string, trackIndex: number, pos: number, key: string, extra: Par
     ...extra
 })
 
-const refLine = (id: string, pos: number, time: string): RefLine => ({
+const refLine = (id: string, pos: number, name: string): RefLine => ({
     id,
     pos,
-    time
+    name
 })
 
 const hit = (character: string, skillType: string, hitName: string, ratio: string, hits = 1) => ({
@@ -70,17 +72,49 @@ describe('排轴时间线渲染', () => {
             .filter((l) => l.includes('轨') || l.includes('参考线'))
             .map((l) => l.trim())
         assert.deepEqual(order, [
-            '[块1] 轨1 甲 · 普攻',
-            '[块2] 轨2 乙 · 共鸣技能',
-            '[线1] ── 参考线「1m30s」[自动推导 90.00s]',
-            '[块3] 轨3 丙 · 共鸣解放'
+            `[块 ${shortKeyOf('op-a')}] 轨1 甲 · 普攻`,
+            `[块 ${shortKeyOf('op-b')}] 轨2 乙 · 共鸣技能`,
+            `[线 ${shortKeyOf('rl-1')}] ── 参考线「1m30s」[自动推导 90.00s]`,
+            `[块 ${shortKeyOf('op-c')}] 轨3 丙 · 共鸣解放`
         ])
-        assert.ok(!out.includes('op-a') && !out.includes('rl-1'), '摘要只给序号，不出现内部 id')
+        assert.ok(!out.includes('op-a') && !out.includes('rl-1'), '摘要只给短索引，不出现内部 id')
         // 伤害缩进挂在各自块下，且顺序正确
-        const a = lines.findIndex((l) => l.includes('[块1]'))
+        const a = lines.findIndex((l) => l.includes(`[块 ${shortKeyOf('op-a')}]`))
         assert.match(lines[a + 1], /└ 伤害: 普攻\(常态攻击\)/)
-        const b = lines.findIndex((l) => l.includes('[块2]'))
+        const b = lines.findIndex((l) => l.includes(`[块 ${shortKeyOf('op-b')}]`))
         assert.match(lines[b + 1], /└ 伤害: 共鸣技能\(共鸣技能\)/)
+    })
+
+    it('边界锚点只在行尾加标注，行首短索引形状与普通参考线完全一致', () => {
+        const out = renderTimelineDigest({
+            opBlocks: [],
+            refLines: [refLine('left', 0, ''), refLine('rl-1', 100, '1m30s'), refLine('right', 300, '结束')],
+            damageBlocks: [],
+            trackLabels: ['甲'],
+            locked: false
+        })
+        const lines = out.split('\n')
+        const lineOf = (id: string) => lines.find((l) => l.startsWith(`[线 ${shortKeyOf(id)}]`))
+        assert.ok(lineOf('left')?.endsWith('[边界·起点·不可移动]'), '起点锚点标注在行尾')
+        assert.ok(lineOf('right')?.endsWith('[边界·结束线·可左右移动]'), '结束线标注在行尾')
+        assert.ok(!lineOf('rl-1')?.includes('[边界'), '普通参考线不加边界标注')
+        // 行首仍是「[线 短索引] ── 参考线「名」」：可复制进 line 参数的 token 只有那 5 位，位置不变
+        assert.ok(lineOf('rl-1')?.startsWith(`[线 ${shortKeyOf('rl-1')}] ── 参考线「1m30s」`))
+        assert.ok(lineOf('left')?.startsWith(`[线 ${shortKeyOf('left')}] ── `))
+    })
+
+    it('json items 带 role，供脚本区分边界锚点（text/json 同源）', () => {
+        const data = buildTimelineDigestData({
+            opBlocks: [],
+            refLines: [refLine('left', 0, ''), refLine('rl-1', 100, '1m30s'), refLine('right', 300, '结束')],
+            damageBlocks: [],
+            trackLabels: ['甲'],
+            locked: false
+        })
+        assert.deepEqual(
+            data.items.map((i) => (i.kind === 'refLine' ? `${i.role}:${i.shortKey}` : 'op')),
+            [`start:${shortKeyOf('left')}`, `line:${shortKeyOf('rl-1')}`, `end:${shortKeyOf('right')}`]
+        )
     })
 
     it('默认不列倍率（倍率是按需查询的），只给命中名与技能类型', () => {
@@ -154,7 +188,7 @@ describe('排轴时间线渲染', () => {
 })
 
 describe('排轴结构化数据（format:json 同源）', () => {
-    it('按 pos 输出 items，操作块/参考线带序号、时间与合并后的伤害', () => {
+    it('按 pos 输出 items，操作块/参考线带短索引/id、时间与合并后的伤害', () => {
         const data = buildTimelineDigestData({
             opBlocks: [op('op-b', 1, 100, '共鸣技能'), op('op-a', 0, 0, '普攻')],
             refLines: [refLine('rl-1', 50, '1m30s')],
@@ -173,9 +207,12 @@ describe('排轴结构化数据（format:json 同源）', () => {
         assert.equal(data.locked, true)
         assert.equal(data.damageBlockCount, 2)
         assert.deepEqual(
-            data.items.map((i) => (i.kind === 'opBlock' ? `块${i.no}` : `线${i.no}`)),
-            ['块1', '线1', '块2']
+            data.items.map((i) => `${i.kind === 'opBlock' ? '块' : '线'}${i.shortKey}`),
+            [`块${shortKeyOf('op-a')}`, `线${shortKeyOf('rl-1')}`, `块${shortKeyOf('op-b')}`]
         )
+        // 每项都同时给出内部 id（WS / 脚本精确寻址用），且 shortKey 就是它的派生投影
+        assert.equal(data.items[0].id, 'op-a')
+        for (const item of data.items) assert.equal(item.shortKey, shortKeyOf(item.id))
         const ref = data.items[1]
         assert.equal(ref.kind, 'refLine')
         if (ref.kind !== 'refLine') return
@@ -335,7 +372,7 @@ describe('AI 时间口径（Issue #11）', () => {
         const out = renderTimelineDigest(timelineInput({ timings: [{ refLineId: 'rl-1', seconds: 80 }] }))
         assert.ok(out.includes('参考线「+25s」[记点 80.00s]'))
         assert.ok(!out.includes('[自动推导'), '配置有效时不混入另一套自动时间')
-        assert.ok(out.split('\n').find((line) => line.startsWith('[块1]')))
+        assert.ok(out.split('\n').find((line) => line.startsWith(`[块 ${shortKeyOf('op-a')}]`)))
     })
 
     it('零秒也是有效配置，不被名称推导覆盖', () => {
@@ -399,7 +436,7 @@ describe('AI 时间口径（Issue #11）', () => {
     it('没有记点且名称无法解析时，操作块也不会获得伪秒数', () => {
         const out = renderTimelineDigest(timelineInput({ refLines: [refLine('rl-1', 100, '起手')] }))
         assert.ok(!/\d+\.\d+s/.test(out))
-        assert.ok(out.includes('[块1]'))
+        assert.ok(out.includes(`[块 ${shortKeyOf('op-a')}]`))
     })
 
     it('位置平移、缩放只保持顺序，不改变摘要中的时间信息', () => {

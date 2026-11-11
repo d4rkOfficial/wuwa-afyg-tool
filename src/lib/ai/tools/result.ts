@@ -49,6 +49,8 @@ async function buildComputeContext(projectId?: string): Promise<{
           })
         : getCalcState()
     const config = projectId ? (p.encounter.config.data ?? defaultConfig()) : getConfig()
+    // 注意：跨工程直读持久化数据，绕过 `timeline.store` 的读盘垫片（旧工程的名字/位置可能是 `time` 形态）。
+    // 已确认可接受，不做修复：该工程被激活一次即会归一化并落盘。
     const timeline = projectId
         ? (p.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] })
         : { opBlocks: getOpBlocks(), refLines: getRefLines(), damageBlocks: [] }

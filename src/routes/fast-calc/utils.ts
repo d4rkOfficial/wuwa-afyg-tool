@@ -135,7 +135,7 @@ export const SUBSTAT_LIMIT = SUBSTAT_MAX
 
 /** @desc 时间线数据（只声明切分时段 / 报告协议用到的字段） */
 export interface TimelineLike {
-    refLines?: { id: string; pos: number; time: string }[]
+    refLines?: { id: string; pos: number; name: string }[]
     damageBlocks?: {
         id: string
         sourceId: string
@@ -166,7 +166,7 @@ export const timingsOf = (project: EditableProject): FastCalcTiming[] => {
         const round = /^round(\d+)$/.exec(id)
         if (round) return `第 ${round[1]} 轮结束`
         if (id === 'end') return '结束'
-        return refById.get(id)?.time || `参考线 ${index + 1}`
+        return refById.get(id)?.name || `参考线 ${index + 1}`
     }
     const imported = project.analysis?.timings ?? []
     const source = imported.length

@@ -264,7 +264,9 @@ history 段原文 + user 段原文 + 本轮新产生的 assistant / tool 消息
 - **锁定守卫**：所有改排轴 / 拉表 / 词条环境配置的写工具在 `executeTool()` 入口统一检查所属环节的
   `isPhaseReadonly`；锁定时直接返回「XX 环节已锁定，请先解锁」，不再把 store 的静默 no-op 报成 `ok: true`。
 - **伤害目标**：`bind_damage_to_block` / `bind_non_direct_to_block` 支持 `targetType: block | refLine`，
-  参考线承载伤害的工程也能编辑；`get_damage_bindings` 按目标列出每条命中的 `hitIndex`。
+  参考线承载伤害的工程也能编辑；`get_damage_bindings` 按目标列出每条命中的稳定 `hitKey`
+  （由 `角色+技能类型+命中名`（同名重复再加序号）派生，不含倍率/属性/段数，故 `update_damage_hit`
+  改完仍可用同一个 `hitKey`；取代了会因其它命中增删而错位的 `hitIndex`）。
 - **解绑 / 清空**：`unbind_damage_hit` 解绑单条直伤；`remove_damage_from_target` 清空目标上的全部伤害但保留
   操作块/参考线本身。
 - **可对齐**：`get_damage_entries` 每行附倍率与稳定条目 id（与 `get_result_summary` 的 entryId 同源）；

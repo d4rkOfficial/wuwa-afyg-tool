@@ -10,7 +10,7 @@ import {
 } from '$lib/calc/ref-line-timing'
 
 const END = 'right'
-const mk = (id: string, time: string, pos: number): RefLineLike => ({ id, time, pos })
+const mk = (id: string, name: string, pos: number): RefLineLike => ({ id, name, pos })
 const end = (pos = 9999) => mk(END, '结束', pos)
 
 /** @desc 便捷断言：自动配置结果 → [[refLineId, seconds], ...] */

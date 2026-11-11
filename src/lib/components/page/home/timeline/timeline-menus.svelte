@@ -245,7 +245,7 @@
                 data-press="none"
                 onclick={() => {
                     const r = getRefLines().find((rl) => rl.id === cm.id)
-                    if (r) startEdit(cm.id, r.time)
+                    if (r) startEdit(cm.id, r.name)
                 }}
                 class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-(--theme-context-menu-text) hover:bg-(--theme-context-menu-bg-focused) transition-colors"
             >
