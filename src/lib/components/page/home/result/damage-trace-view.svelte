@@ -8,7 +8,10 @@
     } from '$lib/calc/damage-trace'
     import type { ResultEntry } from '$lib/calc/result.types'
     import type { ComponentsProps } from '$lib/types'
+    import Icon from '@iconify/svelte'
     import DamageFactorList from './damage-factor-list.svelte'
+    import { buildTracePartRows } from './trace-part-tree'
+    import type { TracePartRow } from './trace-part-tree'
 
     interface Props extends ComponentsProps {
         entry: ResultEntry
@@ -136,6 +139,10 @@
     }
     let tip = $state<{ anchor: TipAnchor; chip: Chip } | null>(null)
     let pinned = $state(false)
+    /** @desc 收起的来源文件夹（空 = 全部展开；切到另一个 chip 时重置） */
+    let collapsedTraceFolders = $state<ReadonlySet<string>>(new Set())
+    let lastTraceTipId = ''
+    let traceRows = $derived(tip ? buildTracePartRows(tip.chip.parts, collapsedTraceFolders) : [])
     let closeTimer: ReturnType<typeof setTimeout> | null = null
     let rootEl = $state<HTMLElement | null>(null)
     let tipEl = $state<HTMLElement | null>(null)
@@ -247,6 +254,21 @@
         pinned = false
         tip = null
         tipTrigger = null
+    }
+
+    /** @desc 换 chip 时恢复默认展开（同一文件夹的折叠状态不跨 chip 记忆） */
+    $effect(() => {
+        const id = tip?.chip.id ?? ''
+        if (id === lastTraceTipId) return
+        lastTraceTipId = id
+        collapsedTraceFolders = new Set()
+    })
+
+    const toggleTraceFolder = (key: string) => {
+        const next = new Set(collapsedTraceFolders)
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        collapsedTraceFolders = next
     }
 
     /** @desc 滚动（含结果页/弹窗内部的滚动容器，故用捕获阶段）时：固定的浮窗不会跟着 badge 走，
@@ -372,20 +394,51 @@
                 </span>
             </div>
             <div class="theme-scrollbar max-h-56 space-y-1 overflow-y-auto px-3 py-2">
-                {#each tip.chip.parts as p, pi (pi)}
-                    <div class="flex items-center gap-1.5">
-                        <span class="size-2 shrink-0 rounded-full" style="background: {SRC_COLOR[p.sourceType]};"
-                        ></span>
-                        <span class="truncate" style="color: var(--theme-modal-text);">{p.source}</span>
-                        <span class="shrink-0" style="opacity: 0.5;">{p.label}</span>
-                        <span class="ml-auto shrink-0 tabular-nums" style="color: var(--theme-accent-text);">
-                            {partValue(p)}{#if p.contribution !== undefined && p.unit === 'mult'}
-                                <span style="opacity: 0.5;">（× {p.contribution.toFixed(3)}）</span>
-                            {/if}
-                        </span>
-                    </div>
+                {#each traceRows as row (row.key)}
+                    {#if row.kind === 'folder'}
+                        <div
+                            class="relative flex items-center gap-1.5"
+                            style="padding-left: {(row.depth + 1) * 14 + 6}px;"
+                        >
+                            {@render traceGuides(row)}
+                            <button
+                                type="button"
+                                onclick={() => toggleTraceFolder(row.key)}
+                                aria-expanded={!collapsedTraceFolders.has(row.key)}
+                                class="flex size-4 shrink-0 items-center justify-center rounded-none transition-colors hover:bg-(--theme-modal-text)/10"
+                                title={row.path.join('\\')}
+                            >
+                                <Icon
+                                    icon={collapsedTraceFolders.has(row.key) ? 'mdi:circle-outline' : 'mdi:circle'}
+                                    class="size-2.5"
+                                    style="color: var(--theme-accent-text);"
+                                />
+                            </button>
+                            <span class="truncate" style="color: var(--theme-modal-text);">{row.name}</span>
+                        </div>
+                    {:else}
+                        <div
+                            class="relative flex items-center gap-1.5"
+                            style="padding-left: {(row.depth + 1) * 14 + 6}px;"
+                        >
+                            {@render traceGuides(row)}
+                            <span
+                                class="size-2 shrink-0 rounded-full"
+                                style="background: {SRC_COLOR[row.part.sourceType]};"
+                            ></span>
+                            <span class="truncate" style="color: var(--theme-modal-text);">{row.name}</span>
+                            <span class="shrink-0" style="opacity: 0.5;">{row.part.label}</span>
+                            <span class="ml-auto shrink-0 tabular-nums" style="color: var(--theme-accent-text);">
+                                {partValue(
+                                    row.part
+                                )}{#if row.part.contribution !== undefined && row.part.unit === 'mult'}
+                                    <span style="opacity: 0.5;">（× {row.part.contribution.toFixed(3)}）</span>
+                                {/if}
+                            </span>
+                        </div>
+                    {/if}
                 {/each}
-                {#if !tip.chip.parts.length}
+                {#if !traceRows.length}
                     <div class="text-[10px]" style="opacity: 0.5;">无细分来源</div>
                 {/if}
             </div>
@@ -400,3 +453,28 @@
         </div>
     {/if}
 </div>
+
+{#snippet traceGuides(row: TracePartRow)}
+    <div class="pointer-events-none absolute inset-y-0 left-0" style="width: {(row.depth + 1) * 14 + 6}px;">
+        {#each row.ancestorHasNext as hasNext, i (i)}
+            {#if hasNext}
+                <span
+                    class="absolute inset-y-0 border-l"
+                    style="left: {i * 14 +
+                        6}px; border-color: color-mix(in srgb, var(--theme-modal-text) 32%, transparent);"
+                ></span>
+            {/if}
+        {/each}
+        <span
+            class="absolute border-l"
+            style="left: {row.depth * 14 + 6}px; top: 0; bottom: {row.lastSibling
+                ? '50%'
+                : '0'}; border-color: color-mix(in srgb, var(--theme-modal-text) 32%, transparent);"
+        ></span>
+        <span
+            class="absolute border-t"
+            style="left: {row.depth * 14 +
+                6}px; top: 50%; width: 7px; border-color: color-mix(in srgb, var(--theme-modal-text) 32%, transparent);"
+        ></span>
+    </div>
+{/snippet}

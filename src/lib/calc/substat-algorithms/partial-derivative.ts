@@ -54,7 +54,8 @@ export const analyzeCharacterSubstats = (ctx: CharacterDamageContext): CharSubst
                     contribution: {
                         norm: (slope.norm / epsilon) * sub.value,
                         rig: (slope.rig / epsilon) * sub.value,
-                        noCrit: (slope.noCrit / epsilon) * sub.value
+                        noCrit: (slope.noCrit / epsilon) * sub.value,
+                        actual: (slope.actual / epsilon) * sub.value
                     },
                     baseline: ctx.baseline
                 })

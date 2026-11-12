@@ -99,9 +99,8 @@ export interface RatioFactor {
 export interface BuffZoneContribution {
     zoneId: string
     label: string
-    contributionNorm: number
-    contributionRig: number
-    contributionNoCrit: number
+    /** 只移除该乘区后的伤害损失（当前配置口径） */
+    contribution: number
 }
 
 /** @desc 单条 Buff 对某角色直伤的贡献（口径：移除该 Buff 后该角色伤害的损失量） */
@@ -112,34 +111,37 @@ export interface BuffContribution {
     entryCount: number
     /** 生效乘区（多乘区时逐乘区给出移除损失；顺序 = Buff.zones 顺序） */
     zones: BuffZoneContribution[]
-    contributionNorm: number
-    contributionRig: number
-    contributionNoCrit: number
-    contribPctNorm: number
-    contribPctRig: number
-    contribPctNoCrit: number
+    /** 当前配置（凹暴 / 不暴 / 未命中已生效）下移除该 Buff 的伤害损失 */
+    contribution: number
+    contribPct: number
     /** 来源标注（角色 / 武器 / 声骸 / 套装 / 内置域），用于列表分组与图标 */
     origin?: { entity?: string; kind?: string }
     starred?: boolean
 }
 
+/**
+ * @desc 文件夹贡献：把该文件夹（含子文件夹）内**全部生效 Buff 一起移除**的伤害损失。
+ * 文件夹来自 Buff 全名 `文件夹A\文件夹B\短名`，与左侧 Buff 列表同一套层级。
+ */
+export interface BuffFolderContribution {
+    /** 文件夹路径分段（不含 Buff 短名），如 `['套装', '焚羽']` */
+    path: string[]
+    contribution: number
+    contribPct: number
+}
+
 /** @desc 单角色 Buff 贡献分析：基线 + 全部 Buff 移除后的伤害 + 逐条 Buff 贡献 */
 export interface CharBuffAnalysis {
     character: string
-    totalDamageNorm: number
-    totalDamageRig: number
-    totalDamageNoCrit: number
+    /** 当前配置（凹暴 / 不暴 / 未命中已生效）下的角色总伤 */
+    totalDamage: number
     /** 移除该角色条目上**全部生效 Buff** 后的伤害 */
-    noBuffDamageNorm: number
-    noBuffDamageRig: number
-    noBuffDamageNoCrit: number
-    buffTotalNorm: number
-    buffTotalRig: number
-    buffTotalNoCrit: number
-    buffTotalPctNorm: number
-    buffTotalPctRig: number
-    buffTotalPctNoCrit: number
+    noBuffDamage: number
+    buffTotal: number
+    buffTotalPct: number
     buffs: BuffContribution[]
+    /** 各文件夹的整组移除损失（含中间层级，便于树状展示） */
+    folders: BuffFolderContribution[]
 }
 
 export interface CharSummary {

@@ -31,11 +31,13 @@ export interface AnalysisInputs {
     conditionProfile: ConditionProfile
 }
 
-/** @desc 三口径伤害（期望 / 凹暴 / 不暴）：分析里所有贡献都用这一组数表达 */
+/** @desc 三口径伤害（期望 / 凹暴 / 不暴）+ 当前配置实际伤害：分析里所有贡献都用这一组数表达 */
 export interface DamageTotals {
     norm: number
     rig: number
     noCrit: number
+    /** @desc 当前配置（凹暴 / 不暴 / 未命中已生效）下的实际伤害，与结果页表格同口径 */
+    actual: number
 }
 
 /** @desc 重算时的改动：只给需要换的那一项，其余沿用原配置 */
@@ -73,14 +75,28 @@ export interface StandardScore {
     totalNorm: number
 }
 
-export const zeroTotals = (): DamageTotals => ({ norm: 0, rig: 0, noCrit: 0 })
+export const zeroTotals = (): DamageTotals => ({ norm: 0, rig: 0, noCrit: 0, actual: 0 })
 
 /** @desc 两个口径相减（按字段逐个减，供「移除前后损失」共用） */
 export const diffTotals = (a: DamageTotals, b: DamageTotals): DamageTotals => ({
     norm: a.norm - b.norm,
     rig: a.rig - b.rig,
-    noCrit: a.noCrit - b.noCrit
+    noCrit: a.noCrit - b.noCrit,
+    actual: a.actual - b.actual
 })
+
+/**
+ * @desc 单条伤害的「当前配置」值：与结果页 `applyModes` 同序（未命中 > 凹暴 > 不暴 > 期望）。
+ * 贡献分析只看这一个口径，不再分别展示凹暴 / 不暴两列。
+ */
+const actualOf = (entry: ResultEntry, inputs: AnalysisInputs): number =>
+    inputs.missEntryIds.has(entry.id)
+        ? 0
+        : inputs.rigCritEntryIds.has(entry.id)
+          ? entry.critPerHit
+          : inputs.noCritEntryIds.has(entry.id)
+            ? entry.nonCritPerHit
+            : entry.totalDamageRaw
 
 /** @desc 把引擎结果条目按「凹暴/不暴」勾选折算成三口径合计（口径与结果页 applyModes 前的原始期望一致） */
 const totalsOf = (entries: ResultEntry[], inputs: AnalysisInputs): DamageTotals =>
@@ -88,7 +104,8 @@ const totalsOf = (entries: ResultEntry[], inputs: AnalysisInputs): DamageTotals 
         (acc, e) => ({
             norm: acc.norm + e.totalDamageRaw,
             rig: acc.rig + (inputs.rigCritEntryIds.has(e.id) ? e.critPerHit : e.totalDamageRaw),
-            noCrit: acc.noCrit + (inputs.noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw)
+            noCrit: acc.noCrit + (inputs.noCritEntryIds.has(e.id) ? e.nonCritPerHit : e.totalDamageRaw),
+            actual: acc.actual + actualOf(e, inputs)
         }),
         zeroTotals()
     )
@@ -148,7 +165,8 @@ export const prepareAnalysis = (inputs: AnalysisInputs): CharacterDamageContext[
                 totals = {
                     norm: totals.norm + re.totalDamageRaw,
                     rig: totals.rig + (inputs.rigCritEntryIds.has(re.id) ? re.critPerHit : re.totalDamageRaw),
-                    noCrit: totals.noCrit + (inputs.noCritEntryIds.has(re.id) ? re.nonCritPerHit : re.totalDamageRaw)
+                    noCrit: totals.noCrit + (inputs.noCritEntryIds.has(re.id) ? re.nonCritPerHit : re.totalDamageRaw),
+                    actual: totals.actual + actualOf(re, inputs)
                 }
             }
             return totals

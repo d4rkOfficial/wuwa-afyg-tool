@@ -71,7 +71,7 @@
 </script>
 
 <section
-    class={mergeClass(['flex min-w-0 flex-col rounded-none border', className])}
+    class={mergeClass(['@container flex min-w-0 flex-col rounded-none border', className])}
     style={joinStyle([CARD_SURFACE_STYLE, styleProp])}
 >
     <div
@@ -125,9 +125,12 @@
                 {computing ? '计算中…' : '暂无数据'}
             </div>
         {:else}
-            <!-- 统计头：角色总伤 / 副词条总贡献 / 总分 -->
-            <div class="grid grid-cols-3 gap-2">
-                <div class="rounded-none border px-3 py-2" style="border-color: var(--theme-divider-border);">
+            <!-- 统计头：角色总伤 / 副词条总贡献 / 总分（容器过窄时隐藏角色总伤，给后两张卡留出宽度） -->
+            <div class="grid grid-cols-2 gap-2 @[700px]:grid-cols-3">
+                <div
+                    class="hidden rounded-none border px-3 py-2 @[700px]:block"
+                    style="border-color: var(--theme-divider-border);"
+                >
                     <div class="{SECTION_LABEL} text-(--theme-modal-text)/45">角色总伤</div>
                     <div class="mt-1 {STAT_VALUE_SM} text-(--theme-modal-text)">
                         {Math.round(analysis.totalDamageNorm).toLocaleString()}

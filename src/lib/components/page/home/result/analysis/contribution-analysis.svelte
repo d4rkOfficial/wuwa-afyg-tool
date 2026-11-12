@@ -4,8 +4,10 @@
      *
      * 左栏副词条（三种算法可切换）、右栏 Buff（按移除损失计算）。把「角色」提到页签上，
      * 是因为 Buff 清单动辄几十条：三角色并排的窄栏放不下，逐角色看才有足够宽度。
-     * 右栏高度跟随左栏（等高 + 内部滚动），两栏底边对齐。
+     * 宽屏并排（宽度 382:618）时右栏高度跟随左栏（等高 + 内部滚动），两栏底边对齐；
+     * 窄屏上下堆叠时右栏不固定高度，跟随父容器一起滚动。
      */
+    import { onMount } from 'svelte'
     import Icon from '@iconify/svelte'
     import { getCharElementMap, getCharIconMap } from '$lib/calc/timeline.store.svelte'
     import type { CharBuffAnalysis, CharSubstatAnalysis } from '$lib/calc/result.types'
@@ -70,7 +72,7 @@
     /** @desc 默认选中「当前总伤最高」的角色（结果未齐 / 没有结果时回落到队伍首位） */
     let defaultCharacter = $derived.by(() => {
         if (!allDone) return characters[0] ?? ''
-        const best = [...buffAnalysis].sort((a, b) => b.totalDamageNorm - a.totalDamageNorm)[0]
+        const best = [...buffAnalysis].sort((a, b) => b.totalDamage - a.totalDamage)[0]
         return best?.character ?? characters[0] ?? ''
     })
 
@@ -83,6 +85,16 @@
 
     /** @desc 左栏实测高度：右栏（Buff）按它定高并内部滚动，两栏底边对齐 */
     let leftHeight = $state(0)
+    /** @desc 两栏是否并排（= 布局的 xl 断点）：堆叠时右栏不再固定高度 */
+    let sideBySide = $state(false)
+
+    onMount(() => {
+        const query = window.matchMedia('(min-width: 1280px)')
+        const sync = () => (sideBySide = query.matches)
+        sync()
+        query.addEventListener('change', sync)
+        return () => query.removeEventListener('change', sync)
+    })
 </script>
 
 <section class={mergeClass(['space-y-3', className])} style={styleProp}>
@@ -136,8 +148,8 @@
             {substatComputing || buffComputing ? '计算中…' : '暂无数据'}
         </div>
     {:else}
-        <!-- 宽屏并排两栏（右栏等高滚动）；窄屏上下堆叠 -->
-        <div class="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+        <!-- 宽屏并排两栏（宽度 382:618，右栏等高滚动）；窄屏上下堆叠 -->
+        <div class="grid grid-cols-1 items-start gap-3 xl:grid-cols-[382fr_618fr]">
             <div class="min-w-0" bind:clientHeight={leftHeight}>
                 <SubstatContribution
                     analysis={activeSubstat}
@@ -147,7 +159,7 @@
                     {onSelectAlgorithm}
                 />
             </div>
-            <BuffContribution analysis={activeBuff} computing={buffComputing} height={leftHeight} />
+            <BuffContribution analysis={activeBuff} computing={buffComputing} height={sideBySide ? leftHeight : 0} />
         </div>
     {/if}
 </section>

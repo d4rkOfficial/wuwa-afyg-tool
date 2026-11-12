@@ -58,7 +58,7 @@ export const analyzeCharacterSubstats = (ctx: CharacterDamageContext): CharSubst
 
         const substats = echo.substats
             .map((sub, si) => {
-                let shapley = { norm: 0, rig: 0, noCrit: 0 }
+                let shapley = { norm: 0, rig: 0, noCrit: 0, actual: 0 }
                 for (let mask = 0; mask < 1 << k; mask++) {
                     if (mask & (1 << si)) continue
                     const s = popcount(mask)
@@ -68,7 +68,8 @@ export const analyzeCharacterSubstats = (ctx: CharacterDamageContext): CharSubst
                     shapley = {
                         norm: shapley.norm + weights[s] * delta.norm,
                         rig: shapley.rig + weights[s] * delta.rig,
-                        noCrit: shapley.noCrit + weights[s] * delta.noCrit
+                        noCrit: shapley.noCrit + weights[s] * delta.noCrit,
+                        actual: shapley.actual + weights[s] * delta.actual
                     }
                 }
                 return makeSubstatContribution({

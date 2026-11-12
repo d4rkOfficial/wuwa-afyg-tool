@@ -154,33 +154,33 @@ describe('Buff 贡献：移除损失口径', () => {
             buffs.buffs.map((b) => b.id),
             ['b-atk', 'b-bonus']
         )
-        assert.ok(buffs.buffs[0].contributionNorm > 0)
-        assert.ok(buffs.buffs[1].contributionNorm > 0)
-        assert.ok(buffs.buffs[0].contribPctNorm > 0)
+        assert.ok(buffs.buffs[0].contribution > 0)
+        assert.ok(buffs.buffs[1].contribution > 0)
+        assert.ok(buffs.buffs[0].contribPct > 0)
     })
 
     it('逐条损失之和 > 移除全部的总损失（乘算叠加，不可相加）', () => {
-        const sum = buffs.buffs.reduce((s, b) => s + b.contributionNorm, 0)
+        const sum = buffs.buffs.reduce((s, b) => s + b.contribution, 0)
         assert.ok(
-            sum > buffs.buffTotalNorm,
-            '逐条损失之和(' + sum + ') 应大于总贡献(' + buffs.buffTotalNorm + ')，这是口径差异而非 bug'
+            sum > buffs.buffTotal,
+            '逐条损失之和(' + sum + ') 应大于总贡献(' + buffs.buffTotal + ')，这是口径差异而非 bug'
         )
-        assert.ok(buffs.buffTotalNorm > 0)
-        assert.ok(Math.abs(buffs.totalDamageNorm - buffs.noBuffDamageNorm - buffs.buffTotalNorm) < 1e-6)
+        assert.ok(buffs.buffTotal > 0)
+        assert.ok(Math.abs(buffs.totalDamage - buffs.noBuffDamage - buffs.buffTotal) < 1e-6)
     })
 
     it('单乘区 Buff 的逐乘区贡献 = 该条总贡献', () => {
         const target = buffs.buffs.find((b) => b.id === 'b-atk')!
         assert.equal(target.zones.length, 1)
         assert.equal(target.zones[0].zoneId, 'atkPct')
-        assert.ok(Math.abs(target.zones[0].contributionNorm - target.contributionNorm) < 1e-6)
+        assert.ok(Math.abs(target.zones[0].contribution - target.contribution) < 1e-6)
     })
 
     it('未绑定到该角色的 Buff 不出现在结果里', () => {
         const unbound = buff('b-unbound', '没绑', [{ zoneId: 'bonusDmg', value: 100 }])
         const res = runContributionAnalysis(makeRequest(entry, [unbound], config, {}), ['single-loss'])
         assert.equal(res.buff[0].buffs.length, 0)
-        assert.equal(res.buff[0].buffTotalNorm, 0)
+        assert.equal(res.buff[0].buffTotal, 0)
     })
 
     it('作用域指向别的角色、但被转模引用借走面板的 Buff 也计入', () => {
@@ -219,7 +219,7 @@ describe('Buff 贡献：移除损失口径', () => {
         )
         const owner = res.buff[0].buffs.find((b) => b.id === 'b-owner')
         assert.ok(owner, '经转模引用影响本角色的 Buff 必须计入（按作用域判定会漏掉）')
-        assert.ok(owner.contributionNorm > 0)
+        assert.ok(owner.contribution > 0)
     })
 
     it('目标侧乘区（集谐·干涉层数）也按「移除该 Buff」计入', () => {
@@ -234,8 +234,109 @@ describe('Buff 贡献：移除损失口径', () => {
         assert.ok(strain, '目标侧 Buff 必须出现在该角色的贡献列表里')
         assert.equal(strain.zones[0].zoneId, 'tuneStrainLayer')
         // 移除 2 层：集谐区从 1.24 掉回 1，损失 = 基线 × (1 - 1/1.24)
-        const expected = res.buff[0].totalDamageNorm * (1 - 1 / (1 + 0.0012 * 100 * 2))
-        assert.ok(Math.abs(strain.contributionNorm - expected) < 1e-6, '损失应等于集谐区消失带来的差值')
+        const expected = res.buff[0].totalDamage * (1 - 1 / (1 + 0.0012 * 100 * 2))
+        assert.ok(Math.abs(strain.contribution - expected) < 1e-6, '损失应等于集谐区消失带来的差值')
+    })
+})
+
+describe('Buff 贡献：只看凹暴 / 不暴 / 未命中生效后的实际伤害', () => {
+    const entry = makeEntry()
+    const config = configWith(emptyEcho())
+    const bAtk = buff('b-atk', '攻击提升', [{ zoneId: 'atkPct', value: 50 }])
+    const bindings = { [ENTRY_ID]: ['b-atk'] }
+    const req = makeRequest(entry, [bAtk], config, bindings)
+
+    /** @desc 直接走引擎算同一条目，用来钉住「分析面板 = 结果页 applyModes 后」的口径 */
+    const engineEntry = () =>
+        computeOneEntry(
+            entry,
+            0,
+            config.characters[0].echoes,
+            [bAtk],
+            bindings,
+            {},
+            config,
+            team,
+            charInfoMap,
+            weaponInfoMap,
+            DEFAULT_CONDITION_PROFILE
+        )
+
+    it('凹暴条目：角色总伤与贡献都按暴击值算', () => {
+        const critPerHit = engineEntry().critPerHit
+        const res = runContributionAnalysis({ ...req, rigCritEntryIds: [ENTRY_ID] }, ['single-loss']).buff[0]
+        assert.ok(Math.abs(res.totalDamage - critPerHit) < 1e-6, '基线必须是凹暴后的实际伤害')
+        assert.ok(Math.abs(res.totalDamage - res.noBuffDamage - res.buffTotal) < 1e-6)
+        assert.equal(res.buffs.length, 1)
+        assert.ok(Math.abs(res.buffs[0].contribPct - (res.buffs[0].contribution / res.totalDamage) * 100) < 1e-9)
+    })
+
+    it('不暴条目：角色总伤与贡献都按不暴值算', () => {
+        const nonCritPerHit = engineEntry().nonCritPerHit
+        const res = runContributionAnalysis({ ...req, noCritEntryIds: [ENTRY_ID] }, ['single-loss']).buff[0]
+        assert.ok(Math.abs(res.totalDamage - nonCritPerHit) < 1e-6, '基线必须是不暴后的实际伤害')
+        assert.ok(res.buffTotal > 0)
+    })
+
+    it('未命中条目：伤害归零，没有 Buff 贡献', () => {
+        const res = runContributionAnalysis({ ...req, missEntryIds: [ENTRY_ID] }, ['single-loss']).buff[0]
+        assert.equal(res.totalDamage, 0)
+        assert.equal(res.noBuffDamage, 0)
+        assert.equal(res.buffTotal, 0)
+        assert.deepEqual(res.buffs, [])
+        assert.deepEqual(res.folders, [])
+    })
+})
+
+describe('Buff 贡献：文件夹整组移除', () => {
+    const entry = makeEntry()
+    const config = configWith(emptyEcho())
+    const bAtk = buff('f1', '甲\\攻击', [{ zoneId: 'atkPct', value: 20 }])
+    const bBonus = buff('f2', '甲\\增伤', [{ zoneId: 'bonusDmg', value: 20 }])
+    const bCrit = buff('f3', '甲\\子\\暴伤', [{ zoneId: 'critDmg', value: 20 }])
+    const bRoot = buff('f4', '根 Buff', [{ zoneId: 'atkPct', value: 10 }])
+    const allBuffs = [bAtk, bBonus, bCrit, bRoot]
+    const bindings = { [ENTRY_ID]: ['f1', 'f2', 'f3', 'f4'] }
+    const res = runContributionAnalysis(makeRequest(entry, allBuffs, config, bindings), ['single-loss']).buff[0]
+
+    const folderOf = (path: string) => res.folders.find((folder) => folder.path.join('\\') === path)
+
+    it('按全名的文件夹前缀给出每一层文件夹（根目录 Buff 不产生文件夹）', () => {
+        assert.deepEqual(res.folders.map((folder) => folder.path.join('\\')).sort(), ['甲', '甲\\子'])
+    })
+
+    it('文件夹贡献 = 把该文件夹内全部 Buff 一起移除后的损失', () => {
+        const withoutFolder = computeOneEntry(
+            entry,
+            0,
+            config.characters[0].echoes,
+            allBuffs,
+            { [ENTRY_ID]: ['f4'] },
+            {},
+            config,
+            team,
+            charInfoMap,
+            weaponInfoMap,
+            DEFAULT_CONDITION_PROFILE
+        ).totalDamageRaw
+        const folder = folderOf('甲')
+        assert.ok(folder, '必须存在「甲」文件夹')
+        assert.ok(Math.abs(folder.contribution - (res.totalDamage - withoutFolder)) < 1e-6)
+        assert.ok(Math.abs(folder.contribPct - (folder.contribution / res.totalDamage) * 100) < 1e-9)
+    })
+
+    it('只有一条 Buff 的嵌套文件夹直接复用该条贡献', () => {
+        const sub = folderOf('甲\\子')
+        const crit = res.buffs.find((b) => b.id === 'f3')
+        assert.ok(sub && crit)
+        assert.ok(Math.abs(sub.contribution - crit.contribution) < 1e-6)
+    })
+
+    it('整组损失与逐条之和不是一个数（乘算叠加）', () => {
+        const folder = folderOf('甲')
+        const sum = res.buffs.filter((b) => ['f1', 'f2', 'f3'].includes(b.id)).reduce((s, b) => s + b.contribution, 0)
+        assert.ok(folder && folder.contribution > 0)
+        assert.ok(sum > folder.contribution, '逐条之和应大于整组移除，这是口径差异而非 bug')
     })
 })
 
