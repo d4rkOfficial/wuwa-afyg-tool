@@ -43,7 +43,10 @@ export interface ExistingBuffRow {
     buffName: string
     scope?: string
     exclusive?: boolean
+    /** @desc 旧格式实例级链/阶门槛（库内数据） */
     condition?: unknown
+    /** @desc 新格式 Buff 级规则（工程内数据） */
+    rules?: unknown
     zones?: Array<{ zoneId?: string; value?: number; override?: boolean; condition?: unknown }>
 }
 
@@ -132,6 +135,7 @@ export const createBuffSetDataSource = (): GenerateDataSource => ({
                     scope: b.scope,
                     exclusive: b.exclusive,
                     condition: b.condition,
+                    ...(b.rules ? { rules: b.rules } : {}),
                     zones: b.zones.map((z) => ({
                         zoneId: z.zoneId,
                         value: z.value,
@@ -163,7 +167,7 @@ export const createProjectDataSource = (): GenerateDataSource => ({
             .map((bs) => ({
                 buffName: bs.name,
                 scope: bs.scope === 'all' ? 'all' : JSON.stringify(bs.scope),
-                condition: bs.condition,
+                ...(bs.rules ? { rules: bs.rules } : {}),
                 zones: bs.zones.map((z) => ({
                     zoneId: z.zoneId,
                     value: z.value,
@@ -468,6 +472,7 @@ interface ProposedBuff {
     scope?: string
     exclusive?: boolean
     condition?: Record<string, unknown>
+    rules?: unknown
     zones?: Array<{ zoneId?: string; value?: number; override?: boolean }>
 }
 
@@ -544,6 +549,8 @@ function sameBuff(existing: ExistingBuffRow, p: ProposedBuff): boolean {
         return parts.join('|')
     }
     if (normCond(existing.condition) !== normCond(p.condition)) return false
+    const normRules = (rules: unknown): string => (Array.isArray(rules) ? JSON.stringify(rules) : '')
+    if (normRules(existing.rules) !== normRules(p.rules)) return false
     const eZones = existing.zones ?? []
     const pZones = p.zones ?? []
     if (eZones.length !== pZones.length) return false

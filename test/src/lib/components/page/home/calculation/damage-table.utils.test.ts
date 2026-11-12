@@ -19,7 +19,7 @@ import {
     zoneUsableByNonDirect
 } from '$lib/components/page/home/calculation/damage-table.utils'
 import { buffContributesToEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
-import type { BuffCondition, BuffInstance, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffCondition, BuffInstance, BuffRule, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
 
 const effectEntry: DamageEntry = {
     id: 'eff',
@@ -148,7 +148,7 @@ describe('非直伤条目的可用性门槛：其余乘区口径不变', () => {
 
 describe('非直伤条目也要带条目上下文判乘区条件（含属性/类型条件的 buff 不再被误藏）', () => {
     /** @desc 用户实例：武器 1 阶 + 乘区「加深(条件 导电/效应)」的 buff 挂不上电磁效应 */
-    const weaponGate: BuffCondition = { refinements: [{ charIdx: 0, min: 1 }] }
+    const weaponGate: BuffRule[] = [{ kind: 'refinement', charIdx: 0, min: 1 }]
     const conductiveEffectEntry: DamageEntry = {
         ...effectEntry,
         id: 'dianci',
@@ -159,7 +159,7 @@ describe('非直伤条目也要带条目上下文判乘区条件（含属性/类
     it('效应条目 + 加深(条件 导电/效应伤害)：可见性判定与引擎一致，均可吃', () => {
         const bs: BuffInstance = {
             ...buff([condZone('deepenDmg', 15, { elements: ['导电'], damageTypes: ['效应伤害'] })]),
-            condition: weaponGate
+            rules: weaponGate
         }
         assert.deepEqual(conditionAgrees(bs, conductiveEffectEntry), { ui: true, engine: true })
         assert.equal(buffUsableByEntry(bs, conductiveEffectEntry), true)

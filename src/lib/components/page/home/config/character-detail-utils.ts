@@ -10,6 +10,7 @@ import {
 } from '$lib/consts/game-terms'
 import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
 import { getConditionProfile } from '$lib/calc/calculation.store.svelte'
+import { buffRulesMet } from '$lib/calc/compute'
 
 export interface CharStats {
     name: string
@@ -161,41 +162,31 @@ export function computeCharStats(
     const effectiveGlobalBuffs = globalBuffs.length > 0 ? globalBuffs : fallbackGlobalBuffs
     const conditionProfile = getConditionProfile()
     for (const bs of effectiveGlobalBuffs) {
-        // 链/阶门槛：与引擎 `evaluateCondition` 同口径（新结构 chains/refinements 与旧字段 chain/refinement 都认）
-        const cond = bs.condition
-        const refIdx = bs.conditionRefCharIdx ?? idx
-        const chainClauses = [
-            ...(cond?.chains ?? []),
-            ...(cond?.chain !== undefined ? [{ charIdx: refIdx, min: cond.chain }] : [])
-        ]
-        const refineClauses = [
-            ...(cond?.refinements ?? []),
-            ...(cond?.refinement !== undefined ? [{ charIdx: refIdx, min: cond.refinement }] : [])
-        ]
-        // 链/阶二选一；同类子句内部为「与」（与引擎运行时护栏一致）
-        if (chainClauses.length > 0) {
-            if (!chainClauses.every((c) => (conditionProfile.chains[c.charIdx] ?? 0) >= c.min)) continue
-        } else if (refineClauses.length > 0) {
-            if (!refineClauses.every((c) => (conditionProfile.refinements[c.charIdx] ?? 1) >= c.min)) continue
-        }
-        // 软条件（伤害属性/伤害类型）语义：
-        // - 面板数值（攻击/生命/防御/充能/偏谐/双暴等非加成项）：带任何软条件一律不计入面板
-        // - bonusDmg（加成）：仅「单一属性条件」或「单一类型条件」时分流计入对应属性/类型加成；
-        //   属性与类型条件并存时不进入任何加成；无软条件时计入全伤害加成
-        const hasElementCond = Array.isArray(cond?.elements) && cond.elements.length > 0
-        const hasTypeCond = Array.isArray(cond?.damageTypes) && cond.damageTypes.length > 0
-        const hasSoftCond = hasElementCond || hasTypeCond
+        /**
+         * @desc Buff 级门槛：与引擎 `buffRulesMet` 同口径 —— 链/阶按条件配置判定，
+         * 这里拿不到面板 / 敌人类型 / 伤害名，因此这些规则「不构成否定」；
+         * `buffActive` 视为引用项存活（面板预览不展示依赖关系）。
+         */
+        const rulesOk = buffRulesMet(bs.rules, conditionProfile, idx, {}, {}, () => true)
+        if (!rulesOk) continue
         for (const z of bs.zones) {
             const zoneId = z.zoneId
+            // 软条件（伤害属性/伤害类型）挂在**乘区条目**上：
+            // - bonusDmg（加成）：仅「单一属性条件」或「单一类型条件」时分流计入对应属性/类型加成；
+            //   属性与类型条件并存时不进入任何加成；无软条件时计入全伤害加成
+            // - 面板数值（攻击/生命/防御/充能/偏谐/双暴等非加成项）：带任何软条件一律不计入面板
+            const hasElementCond = Array.isArray(z.condition?.elements) && z.condition.elements.length > 0
+            const hasTypeCond = Array.isArray(z.condition?.damageTypes) && z.condition.damageTypes.length > 0
+            const hasSoftCond = hasElementCond || hasTypeCond
             if (zoneId === 'bonusDmg') {
                 if (hasElementCond && hasTypeCond) continue
                 if (hasElementCond) {
-                    for (const el of cond.elements ?? []) {
+                    for (const el of z.condition?.elements ?? []) {
                         elementDmg[el] = (elementDmg[el] ?? 0) + z.value
                     }
                 } else if (hasTypeCond) {
                     // 与计算引擎同源键（「共鸣解放伤害」→「共鸣解放」），并入声骸/武器副属性的同类型加成
-                    for (const dt of cond.damageTypes ?? []) {
+                    for (const dt of z.condition?.damageTypes ?? []) {
                         const key = dt.replace('伤害', '')
                         typeDmg[key] = (typeDmg[key] ?? 0) + z.value
                     }

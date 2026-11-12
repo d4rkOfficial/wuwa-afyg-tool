@@ -1,5 +1,5 @@
 /**
- * @desc Buff 归属重指纯函数：把一份 buff 的链/阶条件与引用归属，落到「该实体在当前配队里真正的主人槽位」。
+ * @desc Buff 归属重指纯函数：把一份 buff 的链/阶规则与引用归属，落到「该实体在当前配队里真正的主人槽位」。
  *
  * 背景（曾经的 bug）：工坊落库与 AI 生成结果里的链/阶条件 `charIdx` 一律是 0
  * （share 迁移与 `sanitizeCondition` 的默认值），而导入时不做重指，于是
@@ -9,7 +9,7 @@
  * 放在任一侧都会造成 store ↔ utils 的循环依赖。
  */
 
-import type { BuffCondition, BuffZoneValue } from './calculation.types'
+import type { BuffRule, BuffZoneValue } from './calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
 /** @desc 定位实体归属的角色槽位（0/1/2）：character 按实体名匹配；武器/声骸/套装找配装里用它的角色（可能多人共用） */
@@ -43,26 +43,28 @@ export const primaryOwnerOf = (
 export const ownerIdxOfItem = (item: { ownerIdx?: number }, fallback = -1): number => item.ownerIdx ?? fallback
 
 /**
- * @desc 把条件里的角色归属重指到目标槽位。
- * - `target < 0`（该实体不在配队里）→ **丢弃**链/阶条件，避免显示成某个角色的门槛；
- * - 否则 chains / refinements 以及旧单值 `chain` / `refinement` 的归属全部改成 target。
+ * @desc 把规则里的角色归属重指到目标槽位。
+ * - `target < 0`（该实体不在配队里）→ **丢弃**链/阶规则与面板规则，避免显示成某个角色的门槛；
+ * - 否则 `chain` / `refinement` 规则的 charIdx 全部改成 target；
+ * - `zoneCompare` 规则的 `-1`（= 伤害条目的角色）保持不变，其余槽位同样重指。
  */
-export const rewriteOwnerInCondition = (
-    condition: BuffCondition | undefined,
-    target: number
-): BuffCondition | undefined => {
-    if (!condition) return condition
-    const next: BuffCondition = { ...condition }
-    if (target < 0) {
-        delete next.chains
-        delete next.refinements
-        delete next.chain
-        delete next.refinement
-        return next
+export const rewriteOwnerInRules = (rules: BuffRule[] | undefined, target: number): BuffRule[] | undefined => {
+    if (!rules?.length) return rules
+    const out: BuffRule[] = []
+    for (const rule of rules) {
+        if (rule.kind === 'chain' || rule.kind === 'refinement') {
+            if (target < 0) continue
+            out.push({ ...rule, charIdx: target })
+            continue
+        }
+        if (rule.kind === 'zoneCompare') {
+            if (target < 0) continue
+            out.push(rule.charIdx < 0 ? rule : { ...rule, charIdx: target })
+            continue
+        }
+        out.push(rule)
     }
-    if (next.chains?.length) next.chains = next.chains.map((c) => ({ ...c, charIdx: target }))
-    if (next.refinements?.length) next.refinements = next.refinements.map((c) => ({ ...c, charIdx: target }))
-    return next
+    return out.length > 0 ? out : undefined
 }
 
 /** @desc 把乘区条目里的引用归属重指到目标槽位；target < 0 时保持原样（由引擎按无归属处理） */

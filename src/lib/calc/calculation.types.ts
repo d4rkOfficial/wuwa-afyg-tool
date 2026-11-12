@@ -70,37 +70,71 @@ export interface BuffZoneValue {
     override?: boolean
     /**
      * @desc ── 乘区级生效条件（条件挂在具体乘区上）──
-     * 可挂：伤害类型条件、伤害属性条件
-     * 不可挂：链条件、阶条件 —— 二者是**整个 Buff 的硬性条件**，只能设在 Buff 实例级（`BuffInstance.condition`）。
+     * 可挂：伤害类型条件、伤害属性条件。
+     * 链/阶/伤害名/敌人类型/角色面板/Buff 依赖等**Buff 级规则**不在这里，见 `BuffInstance.rules`。
      * 不满足时仅该乘区不计入，同一条目的其它乘区照常生效。
      */
     condition?: BuffCondition
 }
 
-// ── 一切皆 buff：生效条件（链条件 / 阶条件 / 伤害类型 / 伤害属性）──
+// ── 乘区级生效条件（伤害属性 / 伤害类型）──
 
 /**
- * @desc 生效条件。按「挂载位置」区分能力：
- * - **Buff 实例级**（`BuffInstance.condition`）：链条件、阶条件是硬性条件只能挂这里；也可挂类型/属性条件
- * - **乘区级**（`BuffZoneValue.condition`）：只允许类型 / 属性条件（链阶由实例级统一把关）
+ * @desc 乘区级生效条件：**只挂伤害属性 / 伤害类型**。
  *
  * 组合口径固定为：**类内「或」、类间「与」**——
- * 伤害类型多选内部为或、伤害属性多选内部为或，而类型条件 / 属性条件 / 链阶门条件之间必须同时满足。
+ * 伤害类型多选内部为或、伤害属性多选内部为或，而类型条件与属性条件之间必须同时满足。
+ *
+ * Buff 级的条件（链/阶/伤害名/角色面板/敌人类型/Buff 依赖）已整体迁到 `BuffInstance.rules`，
+ * 本类型不再承载链/阶字段（`chain` / `refinement` / `chains` / `refinements` 一律不认）。
  */
 export interface BuffCondition {
-    /** @desc 链条件：角色共鸣链档位 ≥ min（硬性条件，仅 Buff 实例级） */
-    chains?: { charIdx: number; min: number }[]
-    /** @desc 阶条件：武器精炼档位 ≥ min（硬性条件，仅 Buff 实例级） */
-    refinements?: { charIdx: number; min: number }[]
-    /** @desc 兼容旧结构：等价于 chains=[{ charIdx: conditionRefCharIdx, min: chain }] */
-    chain?: number
-    /** @desc 兼容旧结构：等价于 refinements=[{ charIdx: conditionRefCharIdx, min: refinement }] */
-    refinement?: number
     /** @desc 伤害属性条件（多选，任一匹配即满足） */
     elements?: string[]
     /** @desc 伤害类型条件（多选，任一匹配即满足） */
     damageTypes?: string[]
 }
+
+// ── Buff 级规则（discriminated union，全部 AND）──
+
+/** @desc 敌人类型档位（与工程敌人配置 `EnemyConfig.type` 逐字一致，避免再引入一层映射） */
+export type EnemyTypeKind = 'BOSS' | '精英怪' | '小怪'
+
+/** @desc 角色面板比较运算符 */
+export type ZoneCompareOp = 'gt' | 'ge' | 'lt' | 'le' | 'eq'
+
+/** @desc 可参与「面板数值」条件的属性（单位与面板显示一致：攻/生/防/谐度/同奏层数为整数，其余为百分比） */
+export type ZoneCompareId =
+    | 'atk'
+    | 'hp'
+    | 'def'
+    | 'recharge'
+    | 'offTuneBuildupRate'
+    | 'tuneBreakBoost'
+    | 'unisonBoonLayer'
+    | 'critRate'
+    | 'critDmg'
+
+/**
+ * @desc Buff 级规则（一条 Buff 可挂多条，**规则之间全部 AND**）。
+ *
+ * - `chain` / `refinement`：某角色共鸣链 ≥ min / 武器精炼 ≥ min（取代旧实例级 `condition.chains/refinements`）
+ * - `damageNameRegex`：本次伤害条目的 `displayName` **正则包含匹配**
+ * - `damageNameEquals`：本次伤害条目的 `displayName` 全等
+ * - `zoneCompare`：某角色「无条件部分」面板数值比较（`charIdx = -1` 表示伤害条目的角色）
+ * - `enemyType`：当前工程敌人类型
+ * - `buffActive`：被引用的 Buff 在**本次伤害**是否生效（all=全部 / any=至少一个）
+ *
+ * 规则只在 Buff 级生效；乘区级条件继续走 `BuffZoneValue.condition`。
+ */
+export type BuffRule =
+    | { kind: 'chain'; charIdx: number; min: number }
+    | { kind: 'refinement'; charIdx: number; min: number }
+    | { kind: 'damageNameRegex'; pattern: string }
+    | { kind: 'damageNameEquals'; value: string }
+    | { kind: 'zoneCompare'; charIdx: number; zone: ZoneCompareId; op: ZoneCompareOp; value: number }
+    | { kind: 'enemyType'; type: EnemyTypeKind }
+    | { kind: 'buffActive'; mode: 'all' | 'any'; buffIds: string[] }
 
 /** @desc Buff 实例来源：user=用户创建/迁移，builtin=引擎内置源（角色/武器/声骸/敌人/公式域） */
 export type BuffSource = 'user' | 'builtin'
@@ -110,10 +144,11 @@ export type BuffSource = 'user' | 'builtin'
  *
  * 乘区语义（核心口径）：`zones` 是**贡献条目列表**，不是「乘区种类的集合」——
  * 同一个乘区可以出现多次，每次是一个独立贡献单元（各带数值 / 引用 / 覆盖 / **自己的生效条件**）。
- * 判定：`if (链阶硬门槛满足) { 同乘区各条目各自 add if 自身条件满足 }`，满足的全部相加；
+ * 判定：`if (Buff 级规则全满足) { 同乘区各条目各自 add if 自身条件满足 }`，满足的全部相加；
  * 标了覆盖的条目在最后**替换**该乘区合计（覆盖优先于一切；同一 Buff 内每个乘区只允许一个覆盖条目，
  * 跨 Buff 出现多个覆盖时按 Buff 进入计算的顺序，后进入者最终生效）。
- * `scope` 决定作用范围：'all'=全队 / 角色槽位数组 / 空数组=仅效应伤害。
+ * `scope` 决定作用范围：'all'=全队（三角色 + 效应通用）/ 角色槽位数组（`[0,1,2]` = 仅角色全选，不含效应）/
+ * 空数组=仅效应伤害。
  */
 export interface BuffInstance {
     id: string
@@ -122,12 +157,9 @@ export interface BuffInstance {
     /** @desc 乘区贡献条目列表（同一乘区可多条，每条各自带生效条件） */
     zones: BuffZoneValue[]
     scope: 'all' | number[]
-    starred?: boolean
     global?: boolean
-    /** @desc 生效条件（整块外部门，满足后才逐条目判定各自的乘区条件） */
-    condition?: BuffCondition
-    /** @desc 兼容旧结构：链/精炼条件的参考角色槽位 */
-    conditionRefCharIdx?: number
+    /** @desc Buff 级规则（全部 AND；旧实例级 chain/refinement 条件已迁到这里） */
+    rules?: BuffRule[]
     source?: BuffSource
     /** @desc 来源标注（角色 / 武器 / 声骸 / 套装 / 内置域），用于界面溯源与分组 */
     origin?: { entity?: string; kind?: string }

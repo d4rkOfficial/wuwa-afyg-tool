@@ -1,19 +1,15 @@
 <script lang="ts">
     /**
-     * @desc BUFF 配置弹窗的**左栏列表**（自 `buff-modal.svelte` **原样抽出**，标记与行为未改）：
+     * @desc BUFF 配置弹窗的**左栏列表**：
      * 叠层文件夹（可折叠 / 整体拖拽）+ 独立 buff 块（可拖拽 / 拖出删除），插入位置显示指示条；
-     * 底部是多选工具栏与「新建 BUFF」栏。
+     * 底部是单排工具栏（多选开关 / 批量操作 / **新建 BUFF** / **上下文全局操作**）。
      *
      * 职责边界（受控区，无自有数据状态）：
-     * - 折叠集合 `collapsedFolders`、拖拽状态 `dragState`、选中项**全部归父组件所有**并双向绑定：
-     *   父组件在「打开弹窗 / 关闭弹窗 / 拖拽取消 / 退出多选」等路径上都要重置它们（例如拖拽取消时要还原
-     *   拖动前的折叠快照），状态留在父组件才能保持这些重置逐句不变。
+     * - 折叠集合 `collapsedFolders`、拖拽状态 `dragState`、选中项**全部归父组件所有**并双向绑定。
      * - 树 `tree`、条目数 `buffCount`、队伍与派生查询由父组件注入；本组件**不回读**父组件状态，
      *   所有数据写入与菜单打开都经回调交回父组件（父组件是 store 的唯一调用方）。
-     * - 五个 `{#snippet}`（`dropLine` / `scopeBadges` / `buffRow` / `buffContainer` / `gateFolderHead`）
-     *   随本区域整体搬入：它们只被本区域的 markup 调用。
-     * - 拖拽的**落点计算**仍在父组件（`onstartdrag` / `ondragmove` / `ondragend`）：本组件只负责识别
-     *   `.drag-handle` 起手并把事件交回，父组件通过 `context` 注入容器/行序查询。
+     * - 全局/非全局的切换胶囊 tab 在**弹窗标题栏**（父组件），本组件不再自绘 tab。
+     * - 星标已彻底移除：行首改为**作用域徽标**（全队 / 三角色 / 效应专属 / 角色名）。
      */
     import Icon from '@iconify/svelte'
     import Button from '$lib/components/ui/button.svelte'
@@ -27,10 +23,9 @@
     import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
     import type { BuffDerived, BuffListContext, BuffTree } from './buff-modal.types'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
+    import { mergeClass } from '$lib/utils/component-style'
     import { registerDragCancel } from '$lib/utils/drag-guard'
     import {
-        buffItemIcon,
-        buffItemIconClass,
         folderIconClass,
         folderMembersOf,
         foldersOf,
@@ -57,14 +52,8 @@
         context: BuffListContext
         /** @desc 多选模式是否开启 */
         multiSelect: boolean
-        /** @desc 手动整理模式（显示「新建文件夹」入口，并允许手动文件夹渲染） */
+        /** @desc 手动整理模式（允许手动文件夹渲染与右键菜单） */
         manualMode: boolean
-        /** @desc 当前根 tab */
-        activeTab: 'global' | 'nonGlobal'
-        /** @desc 切换全局/非全局根 */
-        onchangetab: (tab: 'global' | 'nonGlobal') => void
-        /** @desc 新建手动文件夹 */
-        oncreatefolder: () => void
         /** @desc 多选已勾选的 Buff id 集合 */
         multiSelectedIds: Set<string>
         /** @desc 折叠的目录 key 集合（绑定自父组件） */
@@ -75,6 +64,8 @@
         resizingSidebar: boolean
         /** @desc 左栏宽度调宽把手是否悬停 */
         sidebarDividerHover: boolean
+        /** @desc 底部**上下文全局按钮**的文案 / 图标 / 可用性（父组件按当前 tab 与选中集合算） */
+        globalAction: { label: string; icon: string; disabled: boolean; title: string }
         /** @desc 选中某个条目（非多选态） */
         onselect: (id: string) => void
         /** @desc 多选态切换单个条目勾选 */
@@ -105,8 +96,8 @@
         onselectall: () => void
         /** @desc 已选项按名称排序 */
         onsortselected: () => void
-        /** @desc 批量并入 / 移出全局 */
-        onmultiglobal: (global: boolean) => void
+        /** @desc 底部上下文全局按钮（多选作用勾选集合，非多选作用当前选中 Buff） */
+        onContextGlobal: () => void
         /** @desc 请求批量删除（按偏好决定是否二次确认） */
         onrequestmultidelete: () => void
         /** @desc 新建 BUFF 块 */
@@ -131,13 +122,12 @@
         context,
         multiSelect,
         manualMode,
-        activeTab,
-        onchangetab,
         multiSelectedIds,
         collapsedFolders = $bindable(),
         dragState = $bindable(),
         resizingSidebar,
         sidebarDividerHover,
+        globalAction,
         onselect,
         ontogglemultiid,
         ontogglemultifolder,
@@ -153,47 +143,15 @@
         onToggleMultiSelect,
         onselectall,
         onsortselected,
-        onmultiglobal,
+        onContextGlobal,
         onrequestmultidelete,
         oncreatebuff,
-        oncreatefolder,
         selection,
         class: className,
         style: styleProp
     }: Props = $props()
 
-    /** @desc 星标筛选：只保留收藏 Buff；文件夹仅在还有收藏后代时保留 */
-    let starOnly = $state(false)
-
-    const filterStarredNodes = (nodes: readonly BuffTreeNode[]): BuffTreeNode[] => {
-        const out: BuffTreeNode[] = []
-        for (const node of nodes) {
-            if (node.type === 'item') {
-                if (node.buffSet?.starred) out.push(node)
-                continue
-            }
-            const children = (node.children ?? []).filter((child) => !!child.starred)
-            const gateChildren = filterStarredNodes(node.gateChildren ?? [])
-            if (children.length === 0 && gateChildren.length === 0) continue
-            out.push({
-                ...node,
-                children,
-                ...(gateChildren.length > 0 ? { gateChildren } : { gateChildren: [] }),
-                memberIds: [
-                    ...children.map((child) => child.id),
-                    ...gateChildren.flatMap((child) => child.memberIds ?? [])
-                ]
-            })
-        }
-        return out
-    }
-
-    const groupedBuffSets = $derived(starOnly ? filterStarredNodes(tree.nodes) : tree.nodes)
-
-    /** @desc 移出全局：全选全局且至少包含一条可移动的非内置块 */
-    const canMoveOutGlobal = $derived(
-        selection.allGlobal && [...multiSelectedIds].some((id) => !id.startsWith('global-'))
-    )
+    const groupedBuffSets = $derived(tree.nodes)
 
     /** @desc 文件夹角标范围文案（1-2 / 4） */
     const rangeText = (range: { from: number; to: number }): string =>
@@ -220,49 +178,9 @@
 </script>
 
 <div
-    class="shrink-0 border-r flex flex-col"
-    style="width: {leftWidth}px; border-right: 1px solid var(--theme-divider-border);"
+    class={mergeClass(['shrink-0 border-r flex flex-col', className])}
+    style="width: {leftWidth}px; border-right: 1px solid var(--theme-divider-border); {styleProp || ''}"
 >
-    <!-- @desc 全局 / 非全局两个受保护的根；多选时改为批量并入/移出全局，不跨 tab 选择 -->
-    <div class="shrink-0 flex border-b" style="border-color: var(--theme-divider-border);">
-        {#if multiSelect}
-            <button
-                type="button"
-                disabled={!selection.allNonGlobal}
-                onclick={() => onmultiglobal(true)}
-                class="flex flex-1 items-center justify-center gap-1 border-r px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-30"
-                style="border-color: var(--theme-divider-border); color: var(--theme-accent-text);"
-                title={selection.allNonGlobal ? '把选中的非全局 BUFF 并入全局' : '仅选中非全局 BUFF 时可并入'}
-            >
-                <Icon icon="mdi:crown-outline" class="size-3.5" />
-                并入全局
-            </button>
-            <button
-                type="button"
-                disabled={!canMoveOutGlobal}
-                onclick={() => onmultiglobal(false)}
-                class="flex flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-30"
-                style="color: var(--theme-accent-text);"
-                title={canMoveOutGlobal ? '把选中的全局 BUFF 移出全局' : '仅选中全局 BUFF 时可移出'}
-            >
-                <Icon icon="mdi:minus-circle-outline" class="size-3.5" />
-                移出全局
-            </button>
-        {:else}
-            {#each [{ value: 'nonGlobal' as const, label: '非全局' }, { value: 'global' as const, label: '全局' }] as tab (tab.value)}
-                <button
-                    type="button"
-                    onclick={() => onchangetab(tab.value)}
-                    class="flex-1 border-r px-2 py-1.5 text-xs font-medium transition-colors last:border-r-0"
-                    style="border-color: var(--theme-divider-border); {activeTab === tab.value
-                        ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);'
-                        : 'color: var(--theme-modal-text); opacity: 0.65;'}"
-                >
-                    {tab.label}
-                </button>
-            {/each}
-        {/if}
-    </div>
     <!-- @desc 左侧列表：叠层文件夹（可折叠/整体拖拽）+ 独立 buff
             块（可拖拽/拖出删除），插入位置显示指示条。
             容器不设 padding：sticky 头的 top-0 吸附位 = 容器顶，贴顶时无缝隙；
@@ -346,7 +264,7 @@
                                         class="size-4 shrink-0 text-(--theme-accent-text)"
                                     />
                                 {:else if isGlobalFolder}
-                                    <Icon icon="mdi:crown" class={folderIconClass(item, 'size-4 shrink-0')} />
+                                    <Icon icon="mdi:crown" class={folderIconClass('size-4 shrink-0')} />
                                 {:else if isManualFolder}
                                     {@render treeFolderIcon(item)}
                                 {:else}
@@ -356,7 +274,6 @@
                                             ? 'mdi:folder-account-outline'
                                             : 'mdi:folder-account'}
                                         class={folderIconClass(
-                                            item,
                                             'drag-handle touch-none select-none cursor-grab active:cursor-grabbing size-4 shrink-0'
                                         )}
                                     />
@@ -489,126 +406,109 @@
                             class="size-4 shrink-0 text-(--theme-accent-text)"
                         />
                     {:else}
-                        <Icon
-                            icon={buffItemIcon(item.buffSet!.starred)}
-                            class={buffItemIconClass(item.buffSet!.starred, !isGlobal)}
-                        />
+                        <!-- @desc 行首改为作用域徽标（星标已移除） -->
+                        {@render scopeBadges(item.buffSet!)}
                     {/if}
                     <span class="truncate flex-1">{buffLeafName(item.buffSet!.name)}</span>
-                    {@render scopeBadges(item.buffSet!)}
                 </button>
                 {@render dropLine(item.buffSet!.id, 'after', 'mx-2')}
             {/if}
         {/each}
         {#if buffCount === 0}
             <div class="text-xs text-(--theme-modal-text)/30 text-center py-4">暂无 BUFF 块</div>
-        {:else if starOnly && groupedBuffSets.length === 0}
-            <div class="text-xs text-(--theme-modal-text)/30 text-center py-4">当前没有星标 BUFF</div>
         {/if}
     </div>
-    <!-- @desc 底部操作栏：单排多选工具栏（多选开关 + 全选 + 批量操作），窄宽度时按钮文本压缩为仅图标；再往下是新建栏 -->
-    <div class="shrink-0 border-t p-2 flex flex-col gap-1.5" style="border-top: 1px solid var(--theme-divider-border);">
-        <div class="flex items-center gap-1">
+    <!-- @desc 底部操作栏（单排）：多选开关 ·（多选时）全选/排序/删除 · 右侧「上下文全局操作」+「新建 BUFF」。
+             「新建 BUFF」在多选开启时隐藏；全局按钮多选时作用于勾选集合、非多选时作用于当前选中 Buff，无选中禁用。 -->
+    <div
+        class="shrink-0 border-t p-2 flex items-center gap-1"
+        style="border-top: 1px solid var(--theme-divider-border);"
+    >
+        <button
+            type="button"
+            onclick={onToggleMultiSelect}
+            class={[
+                'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] font-medium transition-colors',
+                multiSelect
+                    ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
+                    : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
+            ].join(' ')}
+            title={multiSelect ? '退出多选' : '进入多选'}
+        >
+            <Icon icon={multiSelect ? 'mdi:check-decagram' : 'mdi:checkbox-multiple-marked-outline'} class="size-3.5" />
+            {#if leftWidth >= 280}<span>多选</span>{/if}
+        </button>
+        {#if multiSelect}
             <button
                 type="button"
-                onclick={onToggleMultiSelect}
-                class={[
-                    'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] font-medium transition-colors',
-                    multiSelect
-                        ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/12'
-                        : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
-                ].join(' ')}
-                title={multiSelect ? '退出多选' : '进入多选'}
+                onclick={onselectall}
+                class="flex items-center gap-1 rounded-none px-2 py-1 text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/5"
+                title={selection.allSelected ? '取消全选' : '全选'}
             >
                 <Icon
-                    icon={multiSelect ? 'mdi:check-decagram' : 'mdi:checkbox-multiple-marked-outline'}
+                    icon={selection.allSelected ? 'mdi:checkbox-multiple-blank-outline' : 'mdi:select-all'}
                     class="size-3.5"
                 />
-                {#if leftWidth >= 280}<span>多选</span>{/if}
+                {#if leftWidth >= 280}
+                    <span>{selection.allSelected ? '取消全选' : '全选'}</span>
+                {/if}
             </button>
-            <button
-                type="button"
-                onclick={() => (starOnly = !starOnly)}
-                class={[
-                    'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] font-medium transition-colors',
-                    starOnly
-                        ? 'text-amber-400 bg-amber-400/10'
-                        : 'text-(--theme-modal-text)/50 hover:bg-(--theme-modal-text)/5'
-                ].join(' ')}
-                title={starOnly ? '显示全部 BUFF' : '只看星标 BUFF'}
-            >
-                <Icon icon={starOnly ? 'mdi:star' : 'mdi:star-outline'} class="size-3.5" />
-                {#if leftWidth >= 280}<span>星标</span>{/if}
-            </button>
-            {#if multiSelect}
+            {#if multiSelectedIds.size > 0}
                 <button
                     type="button"
-                    onclick={onselectall}
-                    class="flex items-center gap-1 rounded-none px-2 py-1 text-[11px] text-(--theme-modal-text)/50 transition-colors hover:bg-(--theme-modal-text)/5"
-                    title={selection.allSelected ? '取消全选' : '全选'}
+                    disabled={selection.sortableCount < 2}
+                    onclick={onsortselected}
+                    class={[
+                        'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] transition-colors',
+                        selection.sortableCount >= 2
+                            ? 'text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
+                            : 'text-(--theme-modal-text)/25 cursor-not-allowed'
+                    ].join(' ')}
+                    title="按名称排序已选 BUFF（连续数字按数值大小，其它字符按 unicode；只重排已选项，位置不变）"
                 >
-                    <Icon
-                        icon={selection.allSelected ? 'mdi:checkbox-multiple-blank-outline' : 'mdi:select-all'}
-                        class="size-3.5"
-                    />
-                    {#if leftWidth >= 280}
-                        <span>{selection.allSelected ? '取消全选' : '全选'}</span>
-                    {/if}
+                    <Icon icon="mdi:sort-alphabetical-ascending" class="size-3.5" />
+                    {#if leftWidth >= 360}<span>按名称排序</span>{/if}
                 </button>
-                {#if multiSelectedIds.size > 0}
-                    <button
-                        type="button"
-                        disabled={selection.sortableCount < 2}
-                        onclick={onsortselected}
-                        class={[
-                            'flex items-center gap-1 rounded-none px-2 py-1 text-[11px] transition-colors',
-                            selection.sortableCount >= 2
-                                ? 'text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
-                                : 'text-(--theme-modal-text)/25 cursor-not-allowed'
-                        ].join(' ')}
-                        title="按名称排序已选 BUFF（连续数字按数值大小，其它字符按 unicode；只重排已选项，位置不变）"
-                    >
-                        <Icon icon="mdi:sort-alphabetical-ascending" class="size-3.5" />
-                        {#if leftWidth >= 360}<span>按名称排序</span>{/if}
-                    </button>
-                    <button
-                        type="button"
-                        onclick={onrequestmultidelete}
-                        class="ml-auto flex items-center gap-1 rounded-none px-2 py-1 text-[11px] text-red-400 transition-colors hover:bg-red-500/10"
-                        title="删除"
-                    >
-                        <Icon icon="mdi:delete-outline" class="size-3.5" />
-                        {#if leftWidth >= 280}<span>删除</span>{/if}
-                    </button>
-                {/if}
+                <button
+                    type="button"
+                    onclick={onrequestmultidelete}
+                    class="flex items-center gap-1 rounded-none px-2 py-1 text-[11px] text-red-400 transition-colors hover:bg-red-500/10"
+                    title="删除"
+                >
+                    <Icon icon="mdi:delete-outline" class="size-3.5" />
+                    {#if leftWidth >= 280}<span>删除</span>{/if}
+                </button>
             {/if}
-        </div>
-        <div class="flex gap-1">
+        {/if}
+        <!-- @desc 上下文全局操作：当前在「全局」= 移出全局；在「非全局」= 并入全局 -->
+        <button
+            type="button"
+            disabled={globalAction.disabled}
+            onclick={onContextGlobal}
+            class={[
+                'ml-auto flex items-center gap-1 rounded-none border px-2 py-1 text-[11px] transition-colors',
+                globalAction.disabled
+                    ? 'cursor-not-allowed border-transparent text-(--theme-modal-text)/25'
+                    : 'border-(--theme-divider-border) text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
+            ].join(' ')}
+            title={globalAction.title}
+        >
+            <Icon icon={globalAction.icon} class="size-3.5" />
+            {#if leftWidth >= 300}<span>{globalAction.label}</span>{/if}
+        </button>
+        {#if !multiSelect}
             <button
                 type="button"
                 data-press="none"
                 onclick={oncreatebuff}
-                class="flex flex-1 items-center justify-center gap-1 rounded-none border px-2 py-1.5 text-xs font-medium transition-all hover:brightness-125"
+                class="flex items-center justify-center gap-1 rounded-none border px-2 py-1 text-[11px] font-medium transition-all hover:brightness-125"
                 style="border-color: var(--theme-divider-border); background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 title="新建 BUFF 块"
             >
                 <Icon icon="mdi:plus" class="size-3.5" />
-                <span>新建 BUFF</span>
+                {#if leftWidth >= 300}<span>新建 BUFF</span>{/if}
             </button>
-            {#if manualMode}
-                <button
-                    type="button"
-                    data-press="none"
-                    onclick={oncreatefolder}
-                    class="flex items-center justify-center gap-1 rounded-none border px-2 py-1.5 text-xs font-medium transition-all hover:brightness-110"
-                    style="border-color: color-mix(in srgb, var(--theme-accent-bg) 55%, transparent); background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent); color: var(--theme-accent-text);"
-                    title="新建手动文件夹"
-                >
-                    <Icon icon="mdi:folder" class="size-3.5" />
-                    <span>新建文件夹</span>
-                </button>
-            {/if}
-        </div>
+        {/if}
     </div>
 </div>
 <!-- @desc 左栏宽度调节把手（与主页 sidebar 拖动条一致的三态样式） -->
@@ -685,10 +585,10 @@
                 class="size-4 shrink-0 text-(--theme-accent-text)"
             />
         {:else}
-            <Icon icon={buffItemIcon(child.starred)} class={buffItemIconClass(child.starred, draggable)} />
+            <!-- @desc 行首改为作用域徽标（星标已移除） -->
+            {@render scopeBadges(child)}
         {/if}
         <span class="truncate flex-1">{buffLeafName(child.name)}</span>
-        {@render scopeBadges(child)}
     </button>
     {@render dropLine(child.id, 'after', 'mx-1')}
 {/snippet}
@@ -735,7 +635,6 @@
                     <Icon
                         icon={collapsedFolders.has(subKey) ? 'mdi:folder' : 'mdi:folder-open'}
                         class={folderIconClass(
-                            sub,
                             subDraggable
                                 ? 'size-3.5 shrink-0 drag-handle touch-none select-none cursor-grab active:cursor-grabbing'
                                 : 'size-3.5 shrink-0'
@@ -806,13 +705,13 @@
             {/each}
         </span>
     {:else if spec?.kind === 'effect'}
-        <Icon icon="mdi:auto-fix" class={folderIconClass(node, 'size-4 shrink-0')} />
+        <Icon icon="mdi:auto-fix" class={folderIconClass('size-4 shrink-0')} />
     {:else if spec?.kind === 'empty'}
         <Icon icon="mdi:folder" class="size-4 shrink-0 opacity-30" />
     {:else}
         <Icon
             icon={collapsedFolders.has(node.prefix!) ? 'mdi:folder' : 'mdi:folder-open'}
-            class={folderIconClass(node, 'size-4 shrink-0')}
+            class={folderIconClass('size-4 shrink-0')}
         />
     {/if}
 {/snippet}
@@ -881,7 +780,7 @@
             {:else}
                 <Icon
                     icon={collapsedFolders.has(node.prefix!) ? 'mdi:folder-account-outline' : 'mdi:folder-account'}
-                    class={folderIconClass(node, 'size-4 shrink-0')}
+                    class={folderIconClass('size-4 shrink-0')}
                 />
             {/if}
             <span class="truncate flex-1">{node.name}</span>

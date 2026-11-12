@@ -2,8 +2,8 @@ import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { getShareBase } from './workshop.svelte'
 import { ZONE_MAP, ZONE_NO_REF_IDS, resolveZoneId } from '$lib/calc/calculation.consts'
-import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$lib/calc/condition'
-import type { BuffCondition } from '$lib/calc/calculation.types'
+import { normalizeZoneCondition } from '$lib/calc/condition'
+import type { BuffCondition, BuffRule } from '$lib/calc/calculation.types'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/consts/game-terms'
 import {
     buffFolderPath,
@@ -21,41 +21,84 @@ export type BuffLibraryScope = 'self' | 'self_except' | 'team' | 'effect_only'
 export { CHAIN_MAX, REFINE_MAX }
 
 /**
- * @desc 归一化实例级条件（链/阶硬门槛）：
- * 复用工程侧 `normalizeCondition`（旧 `chain`/`refinement` 单值 → `chains`/`refinements` 数组、
- * 参考角色取 refCharIdx、链阶互斥由运行时护栏保证），只保留链/阶子句。
+ * @desc Buff 库（本地库 / 工坊 share）的**实例级条件**：只有链/阶硬门槛。
+ *
+ * 这是**导入源格式**，与工程的 `BuffInstance.rules` 不是同一层：导入工程时由
+ * `rulesFromLegacyCondition` 升级为 `chain` / `refinement` 规则（见 `buff-import-target`）。
+ * 之所以不直接把库里也改成 `rules`：share 接口与既有 localStorage 数据都还按这个形状存。
  */
-function normalizeGateCondition(value: unknown): BuffCondition | undefined {
-    if (!value || typeof value !== 'object') return undefined
-    const full = normalizeCondition(value as BuffCondition, 'buff', 0)
-    const gate: BuffCondition = {
-        ...(full.chains?.length ? { chains: full.chains } : {}),
-        // 链 / 阶互斥：同时存在时只保留链（与引擎运行时护栏一致）
-        ...(!full.chains?.length && full.refinements?.length ? { refinements: full.refinements } : {})
-    }
-    return isConditionEmpty(gate) ? undefined : gate
+export interface BuffLibraryGateCondition {
+    chains?: { charIdx: number; min: number }[]
+    refinements?: { charIdx: number; min: number }[]
+    /** @desc 兼容旧结构：单值链（参考角色按 0 号位） */
+    chain?: number
+    /** @desc 兼容旧结构：单值阶 */
+    refinement?: number
 }
 
-function cloneCondition(cond: BuffCondition): BuffCondition {
+const clampClauses = (value: unknown, max: number, minFloor: number): { charIdx: number; min: number }[] => {
+    if (!Array.isArray(value)) return []
+    const out: { charIdx: number; min: number }[] = []
+    for (const item of value) {
+        if (!item || typeof item !== 'object') continue
+        const raw = item as Record<string, unknown>
+        const charIdx = typeof raw.charIdx === 'number' && Number.isFinite(raw.charIdx) ? Math.floor(raw.charIdx) : 0
+        const min = typeof raw.min === 'number' && Number.isFinite(raw.min) ? Math.floor(raw.min) : NaN
+        if (!Number.isFinite(min) || min < minFloor || min > max) continue
+        if (charIdx < 0 || charIdx > 2) continue
+        if (out.some((x) => x.charIdx === charIdx && x.min === min)) continue
+        out.push({ charIdx, min })
+    }
+    return out
+}
+
+/** @desc 归一化实例级条件：只保留链/阶（旧单值字段升级为数组；链与阶可以并存） */
+function normalizeGateCondition(value: unknown): BuffLibraryGateCondition | undefined {
+    if (!value || typeof value !== 'object') return undefined
+    const raw = value as Record<string, unknown>
+    const chains = clampClauses(raw.chains, CHAIN_MAX, 0)
+    const refinements = clampClauses(raw.refinements, REFINE_MAX, 1)
+    if (chains.length === 0 && typeof raw.chain === 'number' && Number.isFinite(raw.chain)) {
+        const min = Math.floor(raw.chain)
+        if (min >= 0 && min <= CHAIN_MAX) chains.push({ charIdx: 0, min })
+    }
+    if (refinements.length === 0 && typeof raw.refinement === 'number' && Number.isFinite(raw.refinement)) {
+        const min = Math.floor(raw.refinement)
+        if (min >= 1 && min <= REFINE_MAX) refinements.push({ charIdx: 0, min })
+    }
+    const out: BuffLibraryGateCondition = {
+        ...(chains.length > 0 ? { chains } : {}),
+        ...(refinements.length > 0 ? { refinements } : {})
+    }
+    return Object.keys(out).length > 0 ? out : undefined
+}
+
+function cloneZoneCondition(cond: BuffCondition): BuffCondition {
     return {
-        ...(cond.chains ? { chains: cond.chains.map((c) => ({ ...c })) } : {}),
-        ...(cond.refinements ? { refinements: cond.refinements.map((c) => ({ ...c })) } : {}),
         ...(cond.elements ? { elements: [...cond.elements] } : {}),
         ...(cond.damageTypes ? { damageTypes: [...cond.damageTypes] } : {})
     }
 }
 
+function cloneCondition(cond: BuffLibraryGateCondition): BuffLibraryGateCondition {
+    return {
+        ...(cond.chains ? { chains: cond.chains.map((c) => ({ ...c })) } : {}),
+        ...(cond.refinements ? { refinements: cond.refinements.map((c) => ({ ...c })) } : {})
+    }
+}
+
 /**
  * @desc 按实体类型裁剪条件（工坊预设库口径）：
- * 链条件只属于角色实体、阶条件只属于武器实体；声骸 / 套装的属性·类型条件由乘区级承载，实例级一律清空。
+ * 链条件只属于角色实体、阶条件只属于武器实体；声骸 / 套装一律清空实例级条件
+ * （它们的生效条件由乘区级 / 导入时的角色本体门承担）。
  */
-function sanitizeConditionForEntity(entityType: BuffEntityType, cond: BuffCondition): BuffCondition | undefined {
+function sanitizeConditionForEntity(
+    entityType: BuffEntityType,
+    cond: BuffLibraryGateCondition
+): BuffLibraryGateCondition | undefined {
     const out = cloneCondition(cond)
     if (entityType !== 'character') delete out.chains
     if (entityType !== 'weapon') delete out.refinements
-    // 实例级不承载属性/类型条件（它们挂在具体乘区上）
-    delete out.elements
-    delete out.damageTypes
     return Object.keys(out).length > 0 ? out : undefined
 }
 
@@ -87,7 +130,9 @@ export interface BuffLibraryItem {
     buffName: string
     scope?: BuffLibraryScope
     exclusive?: boolean
-    condition?: BuffCondition
+    condition?: BuffLibraryGateCondition
+    /** @desc 新版 Buff 级规则（导入工程时直接带入；库里其它条目仍可能是旧的 `condition`） */
+    rules?: BuffRule[]
     zones: BuffLibraryZone[]
 }
 
@@ -95,7 +140,9 @@ export interface BuffLibraryBuff {
     buffName: string
     scope?: BuffLibraryScope
     exclusive?: boolean
-    condition?: BuffCondition
+    condition?: BuffLibraryGateCondition
+    /** @desc 新版 Buff 级规则（与 `condition` 二选一，优先 `rules`） */
+    rules?: BuffRule[]
     zones: BuffLibraryZone[]
 }
 
@@ -370,11 +417,12 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
             scope: b.scope,
             exclusive: b.exclusive,
             ...(b.condition ? { condition: cloneCondition(b.condition) } : {}),
+            ...(b.rules ? { rules: b.rules.map((rule) => ({ ...rule })) } : {}),
             zones: b.zones.map((z) => {
                 const copy: BuffLibraryZone = { ...z }
                 // 层数类乘区（集谐干涉/同奏增益等）只填固定层数，持久化前清除历史遗留引用
                 if (ZONE_NO_REF_IDS.has(z.zoneId)) delete copy.ref
-                if (copy.condition) copy.condition = cloneCondition(copy.condition)
+                if (copy.condition) copy.condition = cloneZoneCondition(copy.condition)
                 if (copy.ref) copy.ref = { ...copy.ref }
                 return copy
             })
@@ -464,7 +512,7 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
                 buff_name?: string
                 scope?: BuffLibraryScope
                 exclusive?: boolean
-                condition?: BuffCondition
+                condition?: BuffLibraryGateCondition
                 buff_set?: BuffLibraryZone[]
             }>
             folders?: Array<{

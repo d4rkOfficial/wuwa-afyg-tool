@@ -8,9 +8,8 @@
 import { ZONE_REF_DEFS, ZONE_REF_MAP, ZONE_MAP, classifyBuffScope, groupBuffSets } from '$lib/calc/calculation.consts'
 import type { GroupedBuffConfItem, ZoneId } from '$lib/calc/calculation.consts'
 import type { BuffTreeNode } from '$lib/calc/buff-tree'
-import type { BuffCondition, BuffConf, ZoneRef } from '$lib/calc/calculation.types'
+import type { BuffConf, ZoneRef } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
-import { mergeClass } from '$lib/utils/component-style'
 
 /** @desc 右栏「添加乘区」清单的固定宽度（不再支持拖拽调宽） */
 export const ZONE_BAR_WIDTH = 208
@@ -125,115 +124,57 @@ export const createRefModalState = (baseZoneId: string): RefModalState => ({
     ...defaultRefDraft(baseZoneId)
 })
 
-// ── 生效条件 ──
+// ── 生效成员（作用域四态状态机）──
 
-/** @desc 链门槛（chains 数组形式；兼容旧 chain 字段） */
-export const chainMinOf = (cond: BuffCondition | undefined): number | undefined => cond?.chains?.[0]?.min ?? cond?.chain
+/** @desc 作用域里勾选的效应卡：`'all'` 与空数组（仅效应）都算勾上 */
+export const effectCheckedIn = (scope: 'all' | number[]): boolean => !Array.isArray(scope) || scope.length === 0
 
-/** @desc 阶门槛（refinements 数组形式；兼容旧 refinement 字段） */
-export const refineMinOf = (cond: BuffCondition | undefined): number | undefined =>
-    cond?.refinements?.[0]?.min ?? cond?.refinement
-
-/** @desc 生效条件摘要文案（仅链/阶：它们是整个 BUFF 的硬性条件；属性/类型挂在乘区上） */
-export const conditionSummaryOf = (bs: BuffConf | null | undefined, team: readonly CharSlot[]): string => {
-    const cond = bs?.condition
-    if (!cond) return ''
-    const refIdx = bs?.conditionRefCharIdx ?? 0
-    const name = team[refIdx]?.character ?? `角色 ${refIdx + 1}`
-    const chainMin = chainMinOf(cond)
-    const refineMin = refineMinOf(cond)
-    // 链 = 角色共鸣链：0 链 = 未点共鸣链的角色本体；阶 = 武器精炼阶数，一律按 ≥N 阶描述
-    if (chainMin !== undefined) return chainMin > 0 ? `${name} ≥${chainMin}链` : `${name}本体`
-    if (refineMin !== undefined) return `${name}的武器 ≥${refineMin}阶`
-    return ''
-}
-
-/** @desc 链/阶档位按钮提示（当前档位说明「再次点击取消」，另一类已设置时说明「链阶互斥、点击替换」） */
-export const gateOptionTitle = (
-    kind: 'chain' | 'refinement',
-    n: number,
-    current: { chain: number | undefined; refine: number | undefined }
-): string => {
-    const label = kind === 'chain' ? (n === 0 ? '本体（0链）' : `${n}链`) : `${n}阶`
-    const selected = kind === 'chain' ? current.chain === n : current.refine === n
-    if (selected) return `≥${label}：再次点击取消`
-    const conflict = kind === 'chain' ? current.refine !== undefined : current.chain !== undefined
-    if (!conflict) return `≥${label}`
-    return kind === 'chain'
-        ? '已设置阶条件：链与阶只能生效其一，点击会替换为链条件'
-        : '已设置链条件：链与阶只能生效其一，点击会替换为阶条件'
+/** @desc 作用域里勾选的角色槽位（`'all'` = 全部槽位；空数组 = 一个都没有） */
+export const checkedCharsIn = (scope: 'all' | number[], teamSize = 3): number[] => {
+    if (scope === 'all') return Array.from({ length: teamSize }, (_, i) => i)
+    return [...new Set(scope)].filter((i) => i >= 0 && i < teamSize).sort((a, b) => a - b)
 }
 
 /**
- * @desc 设置链门槛（再次点击取消）。
- * 链条件与阶条件**只能生效其中一个**：设置链会清空全部阶条件。
+ * @desc 点击某张角色卡后的作用域（四态状态机，已与产品逐条对齐）：
+ * - 勾着效应时**再勾角色 = 全队**（`'all'`）；
+ * - 全队状态下取消一个角色 = 取消效应、保留剩余角色；
+ * - 只勾部分角色时勾满三个 = **仅角色全选**（`[0,1,2]`），不是全队（效应仍是关的）；
+ * - 取消最后一个角色 = **仅效应**（`[]`）；永远不会产生「一个成员都没有」。
  */
-export const nextConditionForChain = (
-    cond: BuffCondition,
-    min: number,
-    oddChain: number | undefined,
-    refCharIdx: number
-): { next: BuffCondition; clearing: boolean } => {
-    const clearing = oddChain === min
-    return {
-        clearing,
-        next: {
-            ...cond,
-            chain: undefined,
-            chains: clearing ? undefined : [{ charIdx: refCharIdx, min }],
-            ...(clearing ? {} : { refinement: undefined, refinements: undefined })
-        }
+export const nextScopeAfterCharToggle = (scope: 'all' | number[], idx: number, teamSize = 3): 'all' | number[] => {
+    const chars = checkedCharsIn(scope, teamSize)
+    const hasEffect = effectCheckedIn(scope)
+    const checked = chars.includes(idx)
+    if (hasEffect) {
+        if (!checked) return 'all'
+        const rest = chars.filter((i) => i !== idx)
+        return rest.length === 0 ? [] : rest
     }
+    const next = checked ? chars.filter((i) => i !== idx) : [...chars, idx].sort((a, b) => a - b)
+    return next.length === 0 ? [] : next
 }
-
-/** @desc 设置阶门槛（再次点击取消）；设置阶会清空全部链条件 */
-export const nextConditionForRefinement = (
-    cond: BuffCondition,
-    min: number,
-    oddRefine: number | undefined,
-    refCharIdx: number
-): { next: BuffCondition; clearing: boolean } => {
-    const clearing = oddRefine === min
-    return {
-        clearing,
-        next: {
-            ...cond,
-            refinement: undefined,
-            refinements: clearing ? undefined : [{ charIdx: refCharIdx, min }],
-            ...(clearing ? {} : { chain: undefined, chains: undefined })
-        }
-    }
-}
-
-/** @desc 切换参考角色槽位：已有链/阶门槛同步迁移到新槽位 */
-export const conditionWithRefCharIdx = (cond: BuffCondition, charIdx: number): BuffCondition => {
-    const next: BuffCondition = { ...cond }
-    if (cond.chains?.length) next.chains = cond.chains.map(() => ({ charIdx, min: cond.chains![0].min }))
-    if (cond.refinements?.length) {
-        next.refinements = cond.refinements.map(() => ({ charIdx, min: cond.refinements![0].min }))
-    }
-    return next
-}
-
-// ── 列表展示派生（图标 / 徽标 / 分组）──
-
-/** @desc 最低一层 buff 条目的统一图标：未收藏 = 灰色空心星，已收藏 = 黄色实心星 */
-export const buffItemIcon = (starred: boolean | undefined): string => (starred ? 'mdi:star' : 'mdi:star-outline')
-
-/** @desc 条目图标类名（可拖拽时附带把手样式） */
-export const buffItemIconClass = (starred: boolean | undefined, draggable = false): string =>
-    mergeClass([
-        'size-4 shrink-0',
-        starred ? 'text-amber-400' : 'text-(--theme-modal-text)/35',
-        draggable ? 'drag-handle touch-none select-none cursor-grab active:cursor-grabbing' : ''
-    ])
 
 /**
- * @desc 条目作用域徽标（名称右侧）：
- * - 全队 → 只出一个「全队」，主题色实心
- * - 效应专属（scope 空数组）→ 主题色空心
+ * @desc 点击效应卡后的作用域；返回 null 表示**禁止**这次操作（仅效应取消效应 = 空成员）。
+ * - 勾效应 = 全队（`'all'`）；
+ * - 从全队取消效应 = **仅角色全选**（`[0,1,2]`）；
+ * - 仅效应（`[]`）取消效应 → 禁止。
+ */
+export const nextScopeAfterEffectToggle = (scope: 'all' | number[], teamSize = 3): 'all' | number[] | null => {
+    if (!effectCheckedIn(scope)) return 'all'
+    if (scope === 'all') return Array.from({ length: teamSize }, (_, i) => i)
+    return null
+}
+
+// ── 列表展示派生（徽标 / 分组）──
+
+/**
+ * @desc 条目作用域徽标（**行首**，取代原星标图标）：
+ * - 全队 → 主题色实心「全队」
+ * - 仅角色全选（`[0,1,2]`）→ 主题色描边「三角色」
+ * - 仅效应（空数组）→ 主题色描边「效应专属」
  * - 指定角色（1~2 个槽位）→ 逐个出角色名，用该角色属性色做空心 + 半透明底
- * 三个角色都能吃到时归类为「全队」，不再逐个列角色名（口径见 classifyBuffScope）。
  * `elementColor` 由调用方注入（它是 store 能力，不进本模块）。
  */
 export const scopeBadgesOf = (
@@ -248,6 +189,15 @@ export const scopeBadgesOf = (
                 key: 'all',
                 label: '全队',
                 style: 'border-color: transparent; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);'
+            }
+        ]
+    }
+    if (cls.kind === 'charsAll') {
+        return [
+            {
+                key: 'chars-all',
+                label: '三角色',
+                style: 'border-color: var(--theme-accent-bg); background: transparent; color: var(--theme-accent-text);'
             }
         ]
     }
@@ -281,18 +231,8 @@ export const folderMembersOf = (folder: GroupedBuffConfItem): BuffConf[] => [
     ...((folder as BuffTreeNode).gateChildren ?? []).flatMap((gate) => folderMembersOf(gate))
 ]
 
-/**
- * @desc 目录（含**嵌套子目录**）内是否存在收藏条目。
- * 数字目录只会出现在 `children` 里（界面就地派生，不是独立节点），
- * 而二级目录走 `gateChildren`，所以这里按节点递归即可覆盖全部层级。
- */
-export const folderHasStar = (folder: GroupedBuffConfItem): boolean =>
-    (folder.children ?? []).some((c) => c.starred) ||
-    ((folder as BuffTreeNode).gateChildren ?? []).some((g) => folderHasStar(g))
-
-/** @desc 普通目录图标配色：内部有收藏条目才标黄，否则灰色（特殊图标目录——链/武器头像——不受影响） */
-export const folderIconClass = (folder: GroupedBuffConfItem, base: string): string =>
-    folderHasStar(folder) ? `${base} text-amber-400` : `${base} opacity-60`
+/** @desc 目录图标配色：一律半透明灰（星标已移除，不再有「内部有收藏条目」的标黄口径） */
+export const folderIconClass = (base: string): string => `${base} opacity-60`
 
 /** @desc 非全局容器（角色链 / 武器目录）下未被数字归并的散条目（数字目录由 foldersOf 分支渲染） */
 export const looseChildrenOf = (children: BuffConf[] | undefined): BuffConf[] =>
@@ -362,23 +302,6 @@ export const sortedSelectionOrder = (
         next[slot] = sorted[k]
     })
     return { order: next, count: sorted.length }
-}
-
-// ── 复制命名选项 ──
-
-/**
- * @desc 名字带数字时的复制命名候选：第一条恒为「原名 （复制）」，
- * 其余把**每一处**连续数字 +1 并保持原位数（前导零不丢），逐个生成。
- */
-export const copyNameOptions = (name: string): string[] => {
-    const digits = [...name.matchAll(/\d+/g)]
-    return [
-        `${name} （复制）`,
-        ...digits.map((m) => {
-            const inc = String(parseInt(m[0]) + 1).padStart(m[0].length, '0')
-            return name.slice(0, m.index) + inc + name.slice((m.index ?? 0) + m[0].length)
-        })
-    ]
 }
 
 // ── 拖拽状态装配 ──

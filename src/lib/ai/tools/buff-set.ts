@@ -137,6 +137,7 @@ defineTool('update_buff_set_entity_buffs', {
                 scope,
                 exclusive: !!b.exclusive,
                 ...(b.condition && typeof b.condition === 'object' ? { condition: b.condition as never } : {}),
+                ...(b.rules && Array.isArray(b.rules) ? { rules: b.rules as never } : {}),
                 zones
             }
         })

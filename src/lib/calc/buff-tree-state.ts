@@ -51,18 +51,9 @@ export const characterSetFolderName = (character: string, setName: string, piece
 /** @desc 某 Buff 的粗分类落点：本体 / 单链 / 单阶武器；其它一律根目录 */
 export const coarsePathOf = (buff: BuffInstance, team: readonly CharSlot[]): CoarsePath => {
     const tab = buff.global ? 'global' : 'nonGlobal'
-    const chains = [
-        ...(buff.condition?.chains ?? []),
-        ...(buff.condition?.chain !== undefined
-            ? [{ charIdx: buff.conditionRefCharIdx ?? 0, min: buff.condition.chain }]
-            : [])
-    ]
-    const refines = [
-        ...(buff.condition?.refinements ?? []),
-        ...(buff.condition?.refinement !== undefined
-            ? [{ charIdx: buff.conditionRefCharIdx ?? 0, min: buff.condition.refinement }]
-            : [])
-    ]
+    const rules = buff.rules ?? []
+    const chains = rules.flatMap((rule) => (rule.kind === 'chain' ? [rule] : []))
+    const refines = rules.flatMap((rule) => (rule.kind === 'refinement' ? [rule] : []))
     const charNameOf = (idx: number): string => team[idx]?.character ?? `角色${idx + 1}`
 
     if (chains.length === 1 && refines.length === 0) {
@@ -655,13 +646,14 @@ export const deriveFolderIcon = (
             if (!buff) continue
             hasAny = true
             if (Array.isArray(buff.scope) && buff.scope.length === 0) hasEffect = true
-            for (const chain of buff.condition?.chains ?? []) {
-                chars.add(chain.charIdx)
-                chainMins.push(chain.min)
-            }
-            for (const refine of buff.condition?.refinements ?? []) {
-                chars.add(refine.charIdx)
-                refineMins.push(refine.min)
+            for (const rule of buff.rules ?? []) {
+                if (rule.kind === 'chain') {
+                    chars.add(rule.charIdx)
+                    chainMins.push(rule.min)
+                } else if (rule.kind === 'refinement') {
+                    chars.add(rule.charIdx)
+                    refineMins.push(rule.min)
+                }
             }
         }
     }
@@ -767,3 +759,44 @@ export const pathNamesOf = (
 
 /** @desc 条件文本（测试/调试用；不参与计算） */
 export const conditionTextOf = (condition: BuffCondition | undefined): string => JSON.stringify(condition ?? null)
+
+// ── 空文件夹清理 ──
+
+export interface PruneEmptyResult {
+    tree: BuffTreeState
+    /** @desc 被清掉的文件夹 id（倒序：深的在前，便于调用方按需回滚/提示） */
+    removedIds: string[]
+}
+
+/**
+ * @desc 清理**空文件夹**（递归：子文件夹被清空后父文件夹也会跟着变空）。
+ *
+ * 口径（已对齐）：
+ * - 只在 Buff 弹窗**关闭 / 保存**时调用，不做即时清理 —— 否则「新建 Buff 的文件夹选择器」
+ *   临时建出来的空文件夹会在用户真正落盘前被删掉；
+ * - 全局树与非全局树都清（两棵树用的是同一套 `BuffTreeNode`，不存在只清一侧的理由）；
+ * - **根是受保护的**：返回的树永远是 `{ global, nonGlobal }` 两个数组，清理只发生在数组内部；
+ * - 纯函数，入参不被改写（返回新节点）。
+ */
+export const pruneEmptyFolders = (tree: BuffTreeState): PruneEmptyResult => {
+    const removedIds: string[] = []
+    const prune = (nodes: readonly BuffTreeNode[]): BuffTreeNode[] => {
+        const out: BuffTreeNode[] = []
+        for (const node of nodes) {
+            if (node.kind !== 'folder') {
+                out.push(node)
+                continue
+            }
+            const children = prune(node.children)
+            if (children.length === 0) {
+                removedIds.push(node.id)
+                continue
+            }
+            out.push({ ...node, children })
+        }
+        return out
+    }
+    const global = prune(tree.global)
+    const nonGlobal = prune(tree.nonGlobal)
+    return { tree: { global, nonGlobal }, removedIds }
+}

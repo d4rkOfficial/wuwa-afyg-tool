@@ -1,14 +1,16 @@
-// 角色详情面板的链/阶门槛：必须与引擎一样识别新结构 chains/refinements。
+// 角色详情面板的链/阶门槛：必须与引擎一样识别 Buff 级规则（`BuffInstance.rules`）。
 //
 // 回归背景：面板里曾只认旧字段 condition.chain / condition.refinement，
 // 仇远 1 链的「暴击率 +20%」放入全局后，即使链档位是 0 也会被算进面板，
 // 面板因此恒为 81.6%，与伤害结算（引擎按 0 链不生效）对不上。
+//
+// v7 起链/阶不再是「字段」而是规则（可并存、全部 AND），因此这里的用例也改成规则形态。
 import { beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { computeCharStats } from '$lib/components/page/home/config/character-detail-utils'
 import { setConditionProfile } from '$lib/calc/calculation.store.svelte'
-import type { BuffCondition, BuffInstance, CalcState } from '$lib/calc/calculation.types'
+import type { BuffInstance, BuffRule, CalcState } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
@@ -38,12 +40,12 @@ const configState: ConfigState = {
 }
 const slot: CharSlot = { character: CHAR, weapon: null, triggerSets: [], echoes: [] as unknown as CharSlot['echoes'] }
 
-const globalBuff = (id: string, condition: BuffCondition, value: number): BuffInstance => ({
+const globalBuff = (id: string, rules: BuffRule[], value: number): BuffInstance => ({
     id,
     name: id,
     scope: [0],
     global: true,
-    condition,
+    rules,
     zones: [{ zoneId: 'critRate', value }]
 })
 const calcState = (buff: BuffInstance): CalcState => ({
@@ -59,8 +61,8 @@ const critRateOf = (buff: BuffInstance): number => {
 
 beforeEach(() => setConditionProfile({ chains: [0, 0, 0], refinements: [1, 1, 1] }))
 
-describe('角色详情面板：链条件（新结构 chains）', () => {
-    const buff = globalBuff('1链暴击', { chains: [{ charIdx: 0, min: 1 }] }, 20)
+describe('角色详情面板：链规则', () => {
+    const buff = globalBuff('1链暴击', [{ kind: 'chain', charIdx: 0, min: 1 }], 20)
 
     it('0 链不计入 +20%', () => {
         assert.equal(critRateOf(buff), 5)
@@ -71,16 +73,14 @@ describe('角色详情面板：链条件（新结构 chains）', () => {
         assert.equal(critRateOf(buff), 25)
     })
 
-    it('旧字段 chain 仍按 conditionRefCharIdx 判定', () => {
-        const legacy = globalBuff('旧链暴击', { chain: 1 }, 20)
-        assert.equal(critRateOf(legacy), 5)
-        setConditionProfile({ chains: [1, 0, 0], refinements: [1, 1, 1] })
-        assert.equal(critRateOf(legacy), 25)
+    it('0 链本体门恒成立', () => {
+        const body = globalBuff('本体暴击', [{ kind: 'chain', charIdx: 0, min: 0 }], 20)
+        assert.equal(critRateOf(body), 25)
     })
 })
 
-describe('角色详情面板：阶条件（新结构 refinements）', () => {
-    const buff = globalBuff('2阶暴击', { refinements: [{ charIdx: 0, min: 2 }] }, 10)
+describe('角色详情面板：阶规则', () => {
+    const buff = globalBuff('2阶暴击', [{ kind: 'refinement', charIdx: 0, min: 2 }], 10)
 
     it('1 阶不计入 +10%', () => {
         assert.equal(critRateOf(buff), 5)
@@ -91,15 +91,18 @@ describe('角色详情面板：阶条件（新结构 refinements）', () => {
         assert.equal(critRateOf(buff), 15)
     })
 
-    it('链阶并存时只判定链（与引擎运行时护栏一致）', () => {
+    it('链阶并存时全部 AND（与引擎同口径）', () => {
         const both = globalBuff(
             '链阶并存',
-            { chains: [{ charIdx: 0, min: 1 }], refinements: [{ charIdx: 0, min: 2 }] },
+            [
+                { kind: 'chain', charIdx: 0, min: 1 },
+                { kind: 'refinement', charIdx: 0, min: 2 }
+            ],
             10
         )
         setConditionProfile({ chains: [0, 0, 0], refinements: [2, 1, 1] })
-        assert.equal(critRateOf(both), 5, '链不满足 → 整体不生效，阶被忽略')
-        setConditionProfile({ chains: [1, 0, 0], refinements: [1, 1, 1] })
-        assert.equal(critRateOf(both), 15, '链满足 → 生效，阶不参与')
+        assert.equal(critRateOf(both), 5, '链不满足 → 整体不生效')
+        setConditionProfile({ chains: [1, 0, 0], refinements: [2, 1, 1] })
+        assert.equal(critRateOf(both), 15, '链与阶都满足 → 生效')
     })
 })

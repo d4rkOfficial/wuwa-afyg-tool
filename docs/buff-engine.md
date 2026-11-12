@@ -4,14 +4,15 @@
 
 > 相关源码
 >
-> | 文件                                   | 职责                                                            |
-> | -------------------------------------- | --------------------------------------------------------------- |
-> | `src/lib/calc/calculation.types.ts`    | Buff / 乘区 / 条件的类型定义                                    |
-> | `src/lib/calc/zone-ops.ts`             | **乘区算子唯一维护点**（`ZONE_OPS`）                            |
-> | `src/lib/calc/builtin-buff-sources.ts` | 内置 Buff 源清单（角色/武器/声骸/敌人 + 公式固有乘区）          |
-> | `src/lib/calc/condition.ts`            | 条件求值与分层裁剪                                              |
-> | `src/lib/calc/compute.ts`              | 贡献聚合与逐条目计算                                            |
-> | `src/migration/`                       | 历史数据迁移（版本链、拉表态、Buff 文件夹命名；含链阶互斥拆分） |
+> | 文件                                   | 职责                                                           |
+> | -------------------------------------- | -------------------------------------------------------------- |
+> | `src/lib/calc/calculation.types.ts`    | Buff / 乘区 / 条件的类型定义                                   |
+> | `src/lib/calc/zone-ops.ts`             | **乘区算子唯一维护点**（`ZONE_OPS`）                           |
+> | `src/lib/calc/builtin-buff-sources.ts` | 内置 Buff 源清单（角色/武器/声骸/敌人 + 公式固有乘区）         |
+> | `src/lib/calc/condition.ts`            | 乘区级条件（属性 / 类型）求值与归一化                          |
+> | `src/lib/calc/rules.ts`                | Buff 级规则（求值 / 依赖 / 级联 / 文案）                       |
+> | `src/lib/calc/compute.ts`              | 贡献聚合与逐条目计算                                           |
+> | `src/migration/`                       | 历史数据迁移（版本链、拉表态、Buff 文件夹命名、v7 规则化改造） |
 
 ## 1. 统一模型
 
@@ -125,33 +126,55 @@ if (链阶硬门槛满足 && 作用域匹配) {
 
 ## 2. 条件系统
 
-条件按**挂载位置**分层，能力不同：
+条件按**挂载位置**分层，能力不同（v7 起）：
 
-| 层级        | 字段                      | 可配置条件                                       |
-| ----------- | ------------------------- | ------------------------------------------------ |
-| Buff 实例级 | `BuffInstance.condition`  | **链条件、阶条件（硬性，且二选一）** + 类型/属性 |
-| 乘区级      | `BuffZoneValue.condition` | 伤害类型、伤害属性                               |
+| 层级    | 字段                      | 可配置条件                                                         |
+| ------- | ------------------------- | ------------------------------------------------------------------ |
+| Buff 级 | `BuffInstance.rules`      | 链 / 阶 / 伤害名 / 角色面板 / 敌人类型 / Buff 依赖（**全部 AND**） |
+| 乘区级  | `BuffZoneValue.condition` | 伤害类型、伤害属性                                                 |
 
 ```ts
+// 乘区级：只有伤害属性 / 伤害类型（链/阶等已整体上移到 Buff 级规则）
 interface BuffCondition {
-    chains?: { charIdx: number; min: number }[]
-    refinements?: { charIdx: number; min: number }[]
     elements?: string[]
     damageTypes?: string[]
 }
+
+// Buff 级：discriminated union，一条 Buff 可挂多条，**规则之间全部 AND**
+type BuffRule =
+    | { kind: 'chain'; charIdx: number; min: number }
+    | { kind: 'refinement'; charIdx: number; min: number }
+    | { kind: 'damageNameRegex'; pattern: string } // 对条目 displayName 做正则**包含**匹配
+    | { kind: 'damageNameEquals'; value: string }
+    | { kind: 'zoneCompare'; charIdx: number; zone: ZoneCompareId; op: ZoneCompareOp; value: number }
+    | { kind: 'enemyType'; type: 'BOSS' | '精英怪' | '小怪' }
+    | { kind: 'buffActive'; mode: 'all' | 'any'; buffIds: string[] }
 ```
+
+- **链与阶可以并存**（v7 取消了「二选一」互斥、不再拆分 Buff；历史被拆开的双条件 Buff 也不回并）。
+- `zoneCompare` 的 `charIdx = -1` 表示「伤害条目的角色」；数值单位与面板显示一致
+  （攻/生/防/谐度增幅/同奏层数为整数，充能/偏谐效率/暴击率/暴伤为百分比）。
+  **只读「无条件部分」面板**：排除带属性/类型条件的乘区条目、排除带 rules 的 Buff、排除本 Buff 自身
+  （带引用的条目也一并排除 —— 保守取舍，见 §7 风险）。
+- `buffActive` 按**最小不动点**求值（`resolveActiveBuffIds`）：从「全部未生效」出发反复激活，
+  只有 AND 与正极性引用，所以最小不动点即唯一解；脏数据里的循环引用会稳定落在「都不生效」上。
+  创建期禁止直接自引用与间接循环（`cyclePathOf`，界面 toast 拒绝）。
+- 删除被依赖的 Buff：先用 `buffDeleteCascadeOf` 列出将级联删除的依赖方并二次确认，
+  确认后递归删除；`all` 规则引用任一被删即级联，`any` 规则在引用集合仍有存活项时保留依赖方
+  （并把已删项从 `buffIds` 里剪掉，`pruneRuleDependencies`）。
 
 ### 组合口径（固定，无可选项）
 
-**类内「或」、类间「与」**：
+**类内「或」、类间「与」**（仅乘区级；Buff 级规则一律 AND）：
 
-| 类别             | 内部                   | 类别之间                    |
-| ---------------- | ---------------------- | --------------------------- |
-| 伤害类型（多选） | 或（任一命中）         | 与                          |
-| 伤害属性（多选） | 或（任一命中）         | 与                          |
-| 链 / 阶门条件    | 与（同类子句全部满足） | 与（且与类型/属性同时满足） |
+| 类别             | 内部           | 类别之间               |
+| ---------------- | -------------- | ---------------------- |
+| 伤害类型（多选） | 或（任一命中） | 与                     |
+| 伤害属性（多选） | 或（任一命中） | 与                     |
+| Buff 级规则      | —（每条独立）  | 与（全部规则同时满足） |
 
-- 链条件与阶条件**二选一**（见下）；需要条目上下文的子句在角色级聚合（无条目上下文）时视为不满足。
+- 需要条目上下文的子句（伤害名 / 属性 / 类型）在角色级聚合（无条目上下文）时**不构成否定**；
+  `buffActive` 缺 `activeOf` 时视为「不生效」（只有引擎会提供存活集合）。
 - 乘区级条件不满足时只有该乘区不计入，同一条目其它乘区照常生效。
 - **溯源同口径**：来源列表里的乘区标签会带上该乘区自己的条件前缀（`加成` → `冷凝加成` / `声骸加成` /
   `共技·冷凝加成`，文案与乘区徽标 `describeZoneConditionBadge` 完全一致，伤害类型简称在前、属性在后），
@@ -164,22 +187,38 @@ interface BuffCondition {
 
 ### 分层裁剪
 
-`normalizeConditionForScope(cond, scope)` 保证约束不被绕过：
+乘区级条件由 `normalizeCondition(cond)` 统一裁剪：**只保留 `elements` / `damageTypes`**，
+历史字段（`chains` / `refinements` / `chain` / `refinement` / `logic`）一律丢弃。
+Buff 级规则由 `normalizeRules()` 归一化（非法正则、空引用集合、越界槽位直接丢弃）。
 
-- `scope='buff'`：链/阶保留
-- `scope='zone'`：链/阶**强制剥离**（`normalizeCondition` + `isConditionEmpty` 清理空条件）
+### 旧格式升级（工程迁移 v7）
 
-### 链 / 阶互斥
-
-- **编辑器**：选中链条件会清空全部阶条件，反之亦然，另一个下拉置灰
-- **迁移**：若历史数据的同一个 Buff 同时带链与阶，`splitDualGateBuffs()` 拆成两个 Buff
-  （名字加 `（链N）` / `（阶N）` 后缀避免重名，同名再加 `·2` 序号），两条都继承原绑定，**幂等**
-- **运行时**：`evaluateCondition` 再做一道护栏 —— 若数据被其它途径写成了链阶并存，只判定链条件
+- 旧实例级 `condition.chains/refinements` 与单值 `chain/refinement`（配合 `conditionRefCharIdx`）
+  升级为 `chain` / `refinement` 规则（`rulesFromLegacyCondition`）；链阶并存、多条件 AND。
+- 旧实例级 `elements` / `damageTypes` 本来就属乘区级条件，**不转 rules**，由 `normalizeZones` 下放到乘区条目。
+- `starred`、`condition`、`conditionRefCharIdx` 等已移除字段在迁移里抹除（`normalizeBuff` 只输出白名单字段）。
+- 工坊 share / 本地 Buff 库仍以旧实例级条件（`BuffLibraryGateCondition`）作为**导入源格式**，
+  导入工程时由 `rulesFromLegacyCondition` 升级为规则。
 
 ### 链 / 阶档位真源
 
 角色共鸣链与武器精炼档位的**真源是角色槽位**（`CharSlot.chain` / `CharSlot.refinement`），由「角色详情配置」
 编辑；`conditionProfileFromTeam(team)` 把它派生成条件系统读取的 `ConditionProfile`，不参与任何变量机制。
+
+### 生效成员（作用域四态）
+
+`BuffInstance.scope` 有四种语义（`classifyBuffScope` 归类，界面「生效成员」tab 编辑）：
+
+| 取值      | 含义                           | 效应伤害 | 勾选的角色 |
+| --------- | ------------------------------ | -------- | ---------- |
+| `'all'`   | 全队（三角色 + 效应）          | ✅       | 全部       |
+| `[0,1,2]` | 仅角色全选（**不含**效应伤害） | ❌       | 全部       |
+| `[]`      | 仅效应                         | ✅       | 无         |
+| 子集数组  | 指定角色                       | ❌       | 子集       |
+
+状态迁移（`nextScopeAfterCharToggle` / `nextScopeAfterEffectToggle`）：勾效应 = 全队；
+从全队取消效应 = 仅角色全选；仅效应取消效应 = **禁止**（至少保留一个成员）；
+全队取消一个角色 = 取消效应 + 保留剩余；取消最后一个角色 = 仅效应。新建 Buff 默认全队。
 
 ## 3. 引用转模与跨角色「影响源」
 

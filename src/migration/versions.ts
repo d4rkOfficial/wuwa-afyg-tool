@@ -200,11 +200,45 @@ const migrateV5toV6: Migration = {
     }
 }
 
+/**
+ * @desc 迁移 v6 → v7：Buff 级条件改版（`rules`）+ 移除星标。
+ *
+ * - 旧实例级 `condition` 的链/阶子句升级为 `chain` / `refinement` 规则（**链与阶可以并存**，
+ *   历史被拆开的双条件 Buff **不合并**）；
+ * - 旧实例级 `elements` / `damageTypes` 本就属乘区级条件，原样下放到乘区条目（`normalizeZones` 负责）；
+ * - `starred` 与 `conditionRefCharIdx` 等已移除字段一律抹除（`normalizeBuff` 只输出白名单字段）。
+ *
+ * 真源 `encounter` 与兼容视图 `phases` 都可能承载拉表态数据（导出文件只写 phases），两处都洗一遍。
+ * 本步骤完全由幂等的 `migrateCalcState` 完成：重跑不会二次改写已迁移的数据。
+ */
+const migrateV6toV7: Migration = {
+    from: 6,
+    to: 7,
+    migrate(raw) {
+        const encounter = asRecord(raw.encounter)
+        const phases = asRecord(raw.phases)
+        const encounterCalc = asRecord(encounter.calculation)
+        const phasesCalc = asRecord(phases.calculation)
+        const source = encounterCalc.data !== undefined ? encounterCalc.data : (phasesCalc.data ?? asRecord(raw.calc))
+        const calcState = migrateCalcState(source)
+        return {
+            ...raw,
+            version: 7,
+            buffs: calcState.buffSets,
+            encounter: { ...encounter, calculation: { ...encounterCalc, data: calcState } },
+            ...(phasesCalc.data !== undefined
+                ? { phases: { ...phases, calculation: { ...phasesCalc, data: calcState } } }
+                : {})
+        }
+    }
+}
+
 export const PROJECT_MIGRATIONS: Migration[] = [
     migrateV0toV1,
     migrateV1toV2,
     migrateV2toV3,
     migrateV3toV4,
     migrateV4toV5,
-    migrateV5toV6
+    migrateV5toV6,
+    migrateV6toV7
 ]

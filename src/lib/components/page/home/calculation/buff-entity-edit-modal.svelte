@@ -21,8 +21,12 @@
     import BuffEntityEditor from './buff-entity-editor.svelte'
     import BuffEntityRefModal from './buff-entity-ref-modal.svelte'
     import { ZONE_NO_OVERRIDE_IDS, ZONE_SECTION_VIEWS } from '$lib/calc/calculation.consts'
-    import type { BuffCondition } from '$lib/calc/calculation.types'
-    import type { BuffEntityType, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
+    import type {
+        BuffEntityType,
+        BuffLibraryBuff,
+        BuffLibraryGateCondition,
+        BuffLibraryScope
+    } from '$lib/data/buff-library.svelte'
     import { ENTITY_TYPE_LABELS, updateEntityBuffs } from '$lib/data/buff-library.svelte'
     import { buffFolderPath, buffLeafName } from '$lib/calc/buff-name'
     import { describeZoneConditionBadge } from '$lib/calc/condition'
@@ -70,13 +74,10 @@
                 ...(b.condition
                     ? {
                           condition: {
-                              ...b.condition,
                               ...(b.condition.chains ? { chains: b.condition.chains.map((c) => ({ ...c })) } : {}),
                               ...(b.condition.refinements
                                   ? { refinements: b.condition.refinements.map((c) => ({ ...c })) }
-                                  : {}),
-                              ...(b.condition.elements ? { elements: [...b.condition.elements] } : {}),
-                              ...(b.condition.damageTypes ? { damageTypes: [...b.condition.damageTypes] } : {})
+                                  : {})
                           }
                       }
                     : {}),
@@ -136,7 +137,7 @@
     function setBuffChain(min: number) {
         const cond = activeBuff?.condition ?? {}
         const clearing = (cond.chains?.[0]?.min ?? cond.chain) === min
-        const next: BuffCondition = { ...cond }
+        const next: BuffLibraryGateCondition = { ...cond }
         delete next.chain
         delete next.refinement
         delete next.refinements
@@ -149,7 +150,7 @@
     function setBuffRefinement(min: number) {
         const cond = activeBuff?.condition ?? {}
         const clearing = (cond.refinements?.[0]?.min ?? cond.refinement) === min
-        const next: BuffCondition = { ...cond }
+        const next: BuffLibraryGateCondition = { ...cond }
         delete next.chain
         delete next.chains
         delete next.refinement

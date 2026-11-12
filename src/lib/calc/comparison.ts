@@ -1,6 +1,6 @@
-// 共鸣链 / 武器精炼对比：团队级资格判定（扁平，不按 conditionRefCharIdx 归属去重）。
+// 共鸣链 / 武器精炼对比：团队级资格判定（扁平，不按条件里的 charIdx 归属去重）。
 // 「生效（挂载）」= buff id ∈ 全局绑定 或 任一伤害条目绑定（见 calculation.store）。
-// 队友的条件 buff 即便 refIdx 指向他人，也可能通过 scope 影响本角色，故可设值取全队并集。
+// 队友的条件 buff 即便 charIdx 指向他人，也可能通过 scope 影响本角色，故可设值取全队并集。
 import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
 
 /** @desc 链/阶对比与数据分析弹窗共用的直伤类型色板（7 色循环，保证同组内不重复） */
@@ -41,17 +41,12 @@ export function getComparisonEligibility(
     const chains = new Set<number>()
     const refinements = new Set<number>()
     for (const bs of buffSets) {
-        if (!bs.condition || !mounted.has(bs.id)) continue
-        // 条件已归一化为 arrays（chains / refinements）；旧字段 chain / refinement 作兼容读取
-        for (const clause of bs.condition.chains ?? []) {
-            if (typeof clause?.min === 'number' && clause.min >= 0) chains.add(clause.min)
+        if (!bs.rules?.length || !mounted.has(bs.id)) continue
+        // 链/阶门槛现在是 Buff 级规则（可并存，不再二选一）
+        for (const rule of bs.rules) {
+            if (rule.kind === 'chain' && rule.min >= 0) chains.add(rule.min)
+            if (rule.kind === 'refinement' && rule.min >= 0) refinements.add(rule.min)
         }
-        for (const clause of bs.condition.refinements ?? []) {
-            if (typeof clause?.min === 'number' && clause.min >= 0) refinements.add(clause.min)
-        }
-        if (bs.condition.chain !== undefined && bs.condition.chain >= 0) chains.add(bs.condition.chain)
-        if (bs.condition.refinement !== undefined && bs.condition.refinement >= 0)
-            refinements.add(bs.condition.refinement)
     }
 
     const cs = [...chains].sort((a, b) => a - b)

@@ -802,7 +802,6 @@
     locked={getLocked()}
     open={showLookup}
     team={getTeam()}
-    showBuffOption={false}
     onCreateCustomHit={(name) => openAddCustomWithName(name)}
     onclose={() => (showLookup = false)}
 />

@@ -2,12 +2,12 @@
 // 拉表平铺模式里，属性/类型不满足生效条件的 buff 不能被勾选（隐藏条件不匹配开启时该格应禁用）。
 //
 // 关键点：条件分层之后，属性/类型条件挂在**乘区条目**上（BuffZoneValue.condition），
-// 只有链/阶硬门槛留在实例级（BuffInstance.condition）。
+// Buff 级门槛（链/阶/伤害名/面板/敌人类型/Buff 依赖）走 `BuffInstance.rules`。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { buffContributesToEntry, resolveDamageTypes, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
-import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
+import type { BuffInstance, BuffRule, DamageEntry } from '$lib/calc/calculation.types'
 
 const entryWith = (element: string, damageTypes: string[]): DamageEntry =>
     ({
@@ -25,13 +25,13 @@ const entryWith = (element: string, damageTypes: string[]): DamageEntry =>
         hits: 1
     }) as unknown as DamageEntry
 
-const buffWith = (zones: BuffInstance['zones'], condition?: BuffInstance['condition']): BuffInstance =>
+const buffWith = (zones: BuffInstance['zones'], rules?: BuffRule[]): BuffInstance =>
     ({
         id: 'buff1',
         name: '测试buff',
         scope: 'all',
         zones,
-        ...(condition ? { condition } : {})
+        ...(rules ? { rules } : {})
     }) as unknown as BuffInstance
 
 const PROF = DEFAULT_CONDITION_PROFILE
@@ -96,10 +96,8 @@ describe('buffContributesToEntry：乘区级（属性/类型）条件必须参�
         assert.equal(met(buff, ['共鸣技能伤害']), false, 'value=0 的乘区对引擎无贡献')
     })
 
-    it('链/阶硬门槛仍然只认实例级条件', () => {
-        const buff = buffWith([{ zoneId: 'bonusDmg', value: 20 } as never], {
-            chains: [{ charIdx: 0, min: 3 }]
-        })
+    it('链/阶门槛来自 Buff 级规则', () => {
+        const buff = buffWith([{ zoneId: 'bonusDmg', value: 20 } as never], [{ kind: 'chain', charIdx: 0, min: 3 }])
         assert.equal(
             met(buff, ['共鸣技能伤害'], { chains: [1, 0, 0], refinements: [1, 1, 1] }),
             false,

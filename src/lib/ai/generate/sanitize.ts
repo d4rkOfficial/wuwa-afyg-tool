@@ -10,6 +10,13 @@ import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
 import { sanitizeLeafName } from '$lib/calc/buff-name'
 import type { BuffCondition } from '$lib/calc/calculation.types'
+import { normalizeRules, type LegacyGateCondition } from '$lib/calc/rules'
+
+/** @desc 生成结果里的旧格式实例级条件（链/阶 + 可能残留的旧属性/类型字段） */
+export type SanitizedGateCondition = LegacyGateCondition & {
+    elements?: string[]
+    damageTypes?: string[]
+}
 
 export const BUFF_SCOPES = ['self', 'self_except', 'team', 'effect_only'] as const
 export type BuffScope = (typeof BUFF_SCOPES)[number]
@@ -37,8 +44,10 @@ export interface GeneratedBuff {
     buffName?: string
     scope?: string
     exclusive?: boolean
-    /** @desc 实例级生效条件（链/阶硬门槛，链阶互斥） */
+    /** @desc 旧格式：实例级链/阶硬门槛（导入时升级为 `rules`；链与阶可以并存） */
     condition?: unknown
+    /** @desc 新格式：Buff 级规则列表（discriminated union，全部 AND） */
+    rules?: unknown
     zones?: GeneratedZone[]
 }
 
@@ -59,8 +68,16 @@ export function sanitizeBuffs(buffs: GeneratedBuff[]): GeneratedBuff[] {
         const scope: BuffScope = b.scope && BUFF_SCOPES.includes(b.scope as BuffScope) ? (b.scope as BuffScope) : 'team'
         const exclusive = scope === 'effect_only' || !!b.exclusive
         const condition = sanitizeCondition(b.condition)
+        const rules = normalizeRules(b.rules)
         seen.add(name)
-        out.push({ buffName: name, scope, exclusive, ...(condition ? { condition } : {}), zones })
+        out.push({
+            buffName: name,
+            scope,
+            exclusive,
+            ...(condition ? { condition } : {}),
+            ...(rules ? { rules } : {}),
+            zones
+        })
     }
     return out
 }
@@ -141,15 +158,15 @@ const normClauses = (value: unknown, max: number, minFloor: number) => {
 }
 
 /**
- * @desc 清洗实例级生效条件：白名单校验 + 数值归一化。
- * - 兼容旧格式 `{ type:'chain'|'refinement', min }` 与单值 `{ chain } / { refinement }`，统一升级为数组形式
- * - 链与阶**互斥**：同时出现时只保留链（阶条件整体丢弃）
- * - 乘区级（elements / damageTypes）保留，读取时会下放到具体乘区
+ * @desc 清洗**旧格式**的实例级生效条件：白名单校验 + 数值归一化。
+ * - 兼容 `{ type:'chain'|'refinement', min }` 与单值 `{ chain } / { refinement }`，统一升级为数组形式
+ * - 链与阶**不再互斥**（v7 起两者可以同时作为规则存在）
+ * - 旧的 `elements` / `damageTypes` 仍按原样回传（导入时它们本就属于乘区级，由乘区条目承载）
  */
-export function sanitizeCondition(cond: unknown): BuffCondition | undefined {
+export function sanitizeCondition(cond: unknown): SanitizedGateCondition | undefined {
     if (!cond || typeof cond !== 'object') return undefined
     const c = cond as Record<string, unknown>
-    const out: BuffCondition = {}
+    const out: SanitizedGateCondition = {}
 
     const chains = normClauses(c.chains, CHAIN_MAX, 0)
     const refinements = normClauses(c.refinements, REFINE_MAX, 1)
@@ -175,9 +192,6 @@ export function sanitizeCondition(cond: unknown): BuffCondition | undefined {
         const min = Math.floor(c.refinement)
         if (min >= 1 && min <= REFINE_MAX) out.refinements = [{ charIdx: 0, min }]
     }
-    // 链 / 阶互斥：只判定链
-    if (out.chains?.length) delete out.refinements
-
     if (Array.isArray(c.elements)) {
         const elements = c.elements.filter(
             (e): e is string => typeof e === 'string' && (ELEMENTS as readonly string[]).includes(e)

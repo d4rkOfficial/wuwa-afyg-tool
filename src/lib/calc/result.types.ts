@@ -116,7 +116,6 @@ export interface BuffContribution {
     contribPct: number
     /** 来源标注（角色 / 武器 / 声骸 / 套装 / 内置域），用于列表分组与图标 */
     origin?: { entity?: string; kind?: string }
-    starred?: boolean
 }
 
 /**

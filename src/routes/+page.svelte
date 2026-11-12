@@ -35,13 +35,10 @@
     import { preloadCharElements } from '$lib/data/char-elements.svelte'
     import { loadCustomHits } from '$lib/calc/timeline.store.svelte'
     import {
-        setShowBuffModal,
         setShowDamageTypeModal,
         getShowDamageTypeModal,
         setProfileChangeListener,
-        getCalcState,
-        createBuffSet,
-        setPendingFocusBuffSetId
+        getCalcState
     } from '$lib/calc/calculation.store.svelte'
     import { getReloadOnResultRefresh, getReloadOnProfileChange } from '$lib/data/render-prefs.svelte'
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
@@ -622,14 +619,6 @@
         onToggleSidebarWidth={toggleSidebarWidth}
         team={activeProject?.team}
         locked={phaseLocked}
-        onCreateBuff={(name) => {
-            // 新建后记下 id，buff 弹窗打开时自动滚动定位到这条
-            const id = createBuffSet(name)
-            if (id) setPendingFocusBuffSetId(id)
-            sidebarLookupOpen = false
-            setShowBuffModal(true)
-        }}
-        showBuffOption={activePhase === 'calculation' && !showResult}
         oncreate={() => {
             newName = ''
             showNewModal = true

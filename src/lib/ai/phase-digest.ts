@@ -347,16 +347,18 @@ export interface BuffConfDigestItem {
     name: string
     scope: 'all' | number[]
     global: boolean
-    starred: boolean
-    condition?: string
+    /** @desc Buff 级规则摘要（链/阶/伤害名/面板/敌人类型/Buff 依赖；无条件时省略） */
+    rules?: string
     zoneCount: number
     /** @desc 按乘区过滤时附加的命中乘区摘要（未过滤时省略） */
     zoneSummary?: string
 }
 
+/** @desc 作用域文案（四态口径见 `classifyBuffScope`） */
 export const scopeLabel = (scope: 'all' | number[]): string => {
     if (scope === 'all') return '全队'
     if (scope.length === 0) return '效应专属'
+    if (scope.length >= 3) return '三角色'
     return `角色${scope.map((i) => i + 1).join('/')}`
 }
 
@@ -367,10 +369,10 @@ export const renderBuffConfList = (items: readonly BuffConfDigestItem[]): string
         `乘区明细用 get_buff_conf_detail，绑定关系见 get_damage_entries`
     if (items.length === 0) return `${header}\n（还没有任何 工程 Buff 配置）`
     const lines = items.map((b, i) => {
-        const tags = [b.global ? '全局' : '', b.starred ? '★' : ''].filter(Boolean)
+        const tags = [b.global ? '全局' : ''].filter(Boolean)
         return (
             `[${String(i + 1).padStart(2, '0')}] ${b.name}${tags.length ? `[${tags.join('')}]` : ''} · ${scopeLabel(b.scope)} · ${b.zoneCount} 乘区` +
-            (b.condition ? ` · 条件: ${b.condition}` : '') +
+            (b.rules ? ` · 条件: ${b.rules}` : '') +
             (b.zoneSummary ? ` · 命中: ${b.zoneSummary}` : '')
         )
     })

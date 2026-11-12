@@ -7,8 +7,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
-import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
+import { computeOneEntry, DEFAULT_CONDITION_PROFILE, type ConditionProfile } from '$lib/calc/compute'
+import type { BuffInstance, BuffRule, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
@@ -65,7 +65,11 @@ const entry: DamageEntry = {
  * @desc 跑一次完整引擎：buff 已绑定到该条目（模拟「已经勾选」），伤害类型显式配置。
  * 乘区用 specialFinal1（终伤乘区，乘 1+value/100），能直接看出加成有没有被计入。
  */
-const damageWith = (damageTypes: string[], buffs: BuffInstance[]): number => {
+const damageWith = (
+    damageTypes: string[],
+    buffs: BuffInstance[],
+    profile: ConditionProfile = DEFAULT_CONDITION_PROFILE
+): number => {
     const damageEntryDamageTypes: Record<string, string[]> = damageTypes.length > 0 ? { [ENTRY_ID]: damageTypes } : {}
     const damageEntryBuffSetIds: Record<string, string[]> =
         buffs.length > 0 ? { [ENTRY_ID]: buffs.map((b) => b.id) } : {}
@@ -80,18 +84,18 @@ const damageWith = (damageTypes: string[], buffs: BuffInstance[]): number => {
         team,
         charInfoMap,
         weaponInfoMap,
-        DEFAULT_CONDITION_PROFILE
+        profile
     )
     return result.totalDamage
 }
 
-const buff = (zones: BuffInstance['zones'], condition?: BuffInstance['condition']): BuffInstance =>
+const buff = (zones: BuffInstance['zones'], rules?: BuffRule[]): BuffInstance =>
     ({
         id: 'buff1',
         name: '测试buff',
         scope: 'all',
         zones,
-        ...(condition ? { condition } : {})
+        ...(rules ? { rules } : {})
     }) as unknown as BuffInstance
 
 const ZONE = { zoneId: 'specialFinal1', value: 20 } as never
@@ -128,12 +132,28 @@ describe('引擎：已勾选的 buff 遇到不匹配的伤害条目时不得生�
         assert.equal(damageWith([], [conditioned]), damageWith([], []), '属性条件的加成被异属性伤害吃掉了')
     })
 
-    it('实例级条件是「普攻」时，共鸣技能类型伤害同样吃不到（实例级也参与条目判定）', () => {
-        const conditioned = buff([ZONE], { damageTypes: ['普攻伤害'] })
+    it('Buff 级规则（链门槛）同样参与条目判定：未达门槛时整块加成不生效', () => {
+        const gated = buff([ZONE], [{ kind: 'chain', charIdx: 0, min: 3 }])
         assert.equal(
-            damageWith(['共鸣技能伤害'], [conditioned]),
+            damageWith(['共鸣技能伤害'], [gated], { chains: [1, 0, 0], refinements: [1, 1, 1] }),
+            damageWith(['共鸣技能伤害'], [], { chains: [1, 0, 0], refinements: [1, 1, 1] }),
+            '未达链门槛的 Buff 不应生效'
+        )
+        assert.ok(
+            damageWith(['共鸣技能伤害'], [gated], { chains: [3, 0, 0], refinements: [1, 1, 1] }) >
+                damageWith(['共鸣技能伤害'], [], { chains: [3, 0, 0], refinements: [1, 1, 1] }),
+            '达到链门槛后加成必须生效'
+        )
+    })
+
+    it('Buff 级规则（伤害名全等）按条目 displayName 判定', () => {
+        const matched = buff([ZONE], [{ kind: 'damageNameEquals', value: '测试伤害' }])
+        const mismatched = buff([ZONE], [{ kind: 'damageNameEquals', value: '别的伤害' }])
+        assert.ok(damageWith(['共鸣技能伤害'], [matched]) > damageWith(['共鸣技能伤害'], []), '显示名一致时应生效')
+        assert.equal(
+            damageWith(['共鸣技能伤害'], [mismatched]),
             damageWith(['共鸣技能伤害'], []),
-            '实例级类型条件未参与条目判定'
+            '显示名不一致时不应生效'
         )
     })
 

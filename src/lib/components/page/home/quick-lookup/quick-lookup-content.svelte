@@ -32,9 +32,7 @@
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]
-        onCreateBuff?: (name: string) => void
         onCreateCustomHit?: (name: string) => void
-        showBuffOption?: boolean
         showCustomHitOption?: boolean
         /** @desc 当前阶段是否锁定（锁定时创建类菜单项禁用） */
         locked?: boolean
@@ -44,9 +42,7 @@
 
     let {
         team,
-        onCreateBuff,
         onCreateCustomHit,
-        showBuffOption = true,
         showCustomHitOption = true,
         locked = false,
         tabBarPosition = 'top',
@@ -69,7 +65,7 @@
     let tagIcons = $state<Record<string, string>>({})
     let elementIcons = $state<Record<string, string>>({})
     let weaponTypeIcons = $state<Record<string, string>>({})
-    /** @desc 右键菜单（复制/创建BUFF/跳转）状态 */
+    /** @desc 右键菜单（复制 / 创建自定义直伤 / 跳转）状态 */
     let ctxShow = $state(false)
     /** @desc 右键时的原始鼠标位置（视口坐标） */
     let ctxRaw = $state({ x: 0, y: 0 })
@@ -274,16 +270,6 @@
     function handleCopy() {
         const s = window.getSelection()?.toString()
         if (s) navigator.clipboard.writeText(s).catch(() => {})
-        ctxShow = false
-    }
-
-    /** @desc 用选中文本创建 Buff 块并关闭速查 */
-    function handleCreateBuffFromSel() {
-        const s = window.getSelection()?.toString()
-        if (s) {
-            onCreateBuff?.(s.trim())
-            onclose?.()
-        }
         ctxShow = false
     }
 
@@ -900,7 +886,7 @@
     {/if}
 </div>
 
-<!-- @desc 右键菜单：复制选中文本 / 创建BUFF / 创建自定义直伤 / 快速跳转（武器/首位声骸/技能/固有属性/共鸣链）（点击遮罩关闭） -->
+<!-- @desc 右键菜单：复制选中文本 / 创建自定义直伤 / 快速跳转（武器/首位声骸/技能/固有属性/共鸣链）（点击遮罩关闭） -->
 {#if ctxShow}
     <!-- @desc 退场动效：挂在遮罩这一层，菜单面板的进场 `animate-pop-in` 保持原样（同节点再挂过渡会双重动画）；
          本层淡出即连菜单一起淡出（opacity 分组作用于整棵子树）。--motion-fast 档（120ms）：浮层菜单短促退场，
@@ -931,23 +917,8 @@
                 class="w-full justify-start gap-2 px-3 py-1.5 text-sm text-left text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                 ><Icon icon="mdi:content-copy" class="size-3.5 shrink-0" /> 复制</Button
             >
-            {#if showBuffOption || showCustomHitOption}
+            {#if showCustomHitOption}
                 <div class="border-t my-1" style="border-color: var(--theme-divider-border);"></div>
-            {/if}
-            <!-- @desc 「以此为名创建BUFF」：排轴锁定时禁用（置灰不可点），不隐藏 -->
-            {#if showBuffOption}
-                <Button
-                    data-press="none"
-                    variant="text"
-                    size="none"
-                    bare
-                    disabled={locked}
-                    onclick={handleCreateBuffFromSel}
-                    backgroundImage="transparent"
-                    class="w-full justify-start gap-2 px-3 py-1.5 text-sm text-left text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                    title={locked ? '已锁定，无法创建 BUFF' : undefined}
-                    ><Icon icon="mdi:plus" class="size-3.5 shrink-0" /> 以此为名创建BUFF</Button
-                >
             {/if}
             {#if showCustomHitOption}
                 <Button

@@ -21,7 +21,7 @@ import {
     getGlobalBuffSetIds as getGlobalBuffConfIds,
     getPaneEffectSources,
     setBuffSetScope as setBuffConfScope,
-    setBuffSetCondition as setBuffConfCondition,
+    setBuffSetRules as setBuffConfRules,
     setBuffSetZoneRef as setBuffConfZoneRef,
     setBuffSetZoneOverride as setBuffConfZoneOverride,
     setBuffSetZoneCondition as setBuffConfZoneCondition,
@@ -46,7 +46,8 @@ import { renderBuffConfList, renderCalculationDigest, scopeLabel } from '$lib/ai
 import { asIndex, buffConfsInOrder, damageEntriesInOrder, resolveBuffConf, resolveDamageEntry } from '$lib/ai/refs'
 import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
-import type { ZoneRef } from '$lib/calc/calculation.types'
+import { cyclePathOf, isRuleDraft, normalizeRule } from '$lib/calc/rules'
+import type { BuffRule, ZoneRef } from '$lib/calc/calculation.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -272,8 +273,7 @@ defineTool('get_buff_confs', {
                 name: string
                 scope: 'all' | number[]
                 global: boolean
-                starred: boolean
-                condition?: string
+                rules?: string
                 zoneCount: number
                 zoneSummary?: string
                 matchedZones?: { zoneId: string; value: number; override: boolean; ref: unknown; condition: unknown }[]
@@ -289,8 +289,7 @@ defineTool('get_buff_confs', {
                           scope: b.scope,
                           scopeLabel: scopeLabel(b.scope),
                           global: b.global,
-                          starred: b.starred,
-                          condition: b.condition ?? '',
+                          rules: b.rules ?? '',
                           zoneCount: b.zoneCount,
                           ...(b.matchedZones ? { matchedZones: b.matchedZones } : {})
                       }))
@@ -302,8 +301,7 @@ defineTool('get_buff_confs', {
                 id: string
                 name: string
                 scope: 'all' | number[]
-                starred?: boolean
-                condition?: unknown
+                rules?: BuffRule[]
                 zones: readonly {
                     zoneId: string
                     value: number
@@ -320,8 +318,7 @@ defineTool('get_buff_confs', {
                 name: bs.name,
                 scope: bs.scope,
                 global,
-                starred: !!bs.starred,
-                condition: conditionSummary(bs.condition as Record<string, unknown> | undefined),
+                rules: conditionSummary(bs.rules as unknown as Record<string, unknown> | undefined),
                 zoneCount: bs.zones.length,
                 ...(zoneId
                     ? {
@@ -678,11 +675,9 @@ defineTool('get_buff_conf_detail', {
             name: set.name,
             scope: set.scope,
             global: project ? !!set.global : getGlobalBuffConfIds().includes(set.id),
-            starred: !!set.starred,
-            condition: set.condition ?? null,
-            conditionRefCharIdx: set.conditionRefCharIdx ?? null,
+            rules: set.rules ?? [],
             conditionHint:
-                'condition.chains/refinements 是整块 Buff 的硬门槛（乘区级不接受）；乘区级只接受 elements/damageTypes，用 set_buff_conf_zone_condition 设置',
+                'rules 是整块 Buff 的规则（chain/refinement/damageNameRegex/damageNameEquals/zoneCompare/enemyType/buffActive，全部 AND，用 set_buff_conf_rules 设置）；乘区级只接受 elements/damageTypes，用 set_buff_conf_zone_condition 设置',
             zones: zoneEntries,
             overrideZoneIds: [...new Set(zoneEntries.filter((z) => z.override).map((z) => z.zoneId))],
             multiEntryZoneIds: [...zoneCounts.entries()].filter(([, n]) => n > 1).map(([k]) => k),
@@ -858,7 +853,7 @@ defineTool('get_buff_conf_zone_condition', {
 
 defineTool('set_buff_conf_zone_condition', {
     description:
-        '设置某条工程 Buff 配置内指定乘区的**乘区级生效条件**，传 null 清除。只接受 elements（伤害属性）与 damageTypes（伤害类型）两类，可只给其中一类；condition 对象形如 {"elements":["冷凝","热熔"],"damageTypes":["普攻伤害","重击伤害"]}。取值边界：属性取自 game-terms 的 ELEMENTS、伤害类型取自 DAMAGE_TYPES（见参数说明里的完整可选值）。判定口径为**类内「或」、类间「与」**——同类多选任一命中即满足，两类都给了则必须同时满足。链条件（chains）与阶条件（refinements）是整个 Buff 的硬门槛，不允许挂到乘区上（传了会被忽略并回传 strippedKeys），请用 set_buff_conf_condition 设置。生效效果：不满足时仅该乘区不计入，同一条目的其它乘区照常生效。',
+        '设置某条工程 Buff 配置内指定乘区的**乘区级生效条件**，传 null 清除。只接受 elements（伤害属性）与 damageTypes（伤害类型）两类，可只给其中一类；condition 对象形如 {"elements":["冷凝","热熔"],"damageTypes":["普攻伤害","重击伤害"]}。取值边界：属性取自 game-terms 的 ELEMENTS、伤害类型取自 DAMAGE_TYPES（见参数说明里的完整可选值）。判定口径为**类内「或」、类间「与」**——同类多选任一命中即满足，两类都给了则必须同时满足。链条件（chains）与阶条件（refinements）是整个 Buff 的硬门槛，不允许挂到乘区上（传了会被忽略并回传 strippedKeys），请用 set_buff_conf_rules 设置。生效效果：不满足时仅该乘区不计入，同一条目的其它乘区照常生效。',
     parameters: {
         type: 'object',
         properties: {
@@ -917,7 +912,7 @@ defineTool('set_buff_conf_zone_condition', {
         }
         if (Object.keys(condition).length === 0) {
             throw new Error(
-                `须至少提供 elements 或 damageTypes${stripped.length > 0 ? `（${stripped.join('/')} 不能挂在乘区上，请用 set_buff_conf_condition 设置整块 Buff 条件）` : ''}`
+                `须至少提供 elements 或 damageTypes${stripped.length > 0 ? `（${stripped.join('/')} 不能挂在乘区上，请用 set_buff_conf_rules 设置整块 Buff 规则）` : ''}`
             )
         }
         setBuffConfZoneCondition(setId, zoneId, condition as never)
@@ -1051,63 +1046,44 @@ defineTool('set_buff_conf_scope', {
     }
 })
 
-defineTool('set_buff_conf_condition', {
+defineTool('set_buff_conf_rules', {
     description:
-        '设置工程 Buff 配置生效条件（全部满足才生效），传 null 清除。condition 结构：{"chain":共鸣链要求 0-6,"refinement":精炼要求 1-5,"elements":["伤害属性..."],"damageTypes":["伤害类型..."]}。全局工程 Buff 配置不可设置链/阶条件。',
+        '设置工程 Buff 配置的**规则列表**（全部 AND，同时满足才生效），传 null 清除。' +
+        'rules 结构：[{"kind":"chain","charIdx":0-2,"min":0-6} | {"kind":"refinement","charIdx":0-2,"min":1-5} | {"kind":"damageNameRegex","pattern":"…"}（对伤害条目 displayName 做正则包含匹配） | {"kind":"damageNameEquals","value":"…"} | {"kind":"zoneCompare","charIdx":-1或0-2,"zone":"atk/hp/def/recharge/offTuneBuildupRate/tuneBreakBoost/unisonBoonLayer/critRate/critDmg","op":"gt/ge/lt/le/eq","value":数字}（charIdx=-1 表示「伤害条目的角色」；只读「无条件部分」面板） | {"kind":"enemyType","type":"BOSS/精英怪/小怪"} | {"kind":"buffActive","mode":"all/any","buffIds":["…"]}]。' +
+        '默认全局 Buff 配置不可设置规则；buffActive 引用成环（含自引用）会被拒绝。属性/伤害类型条件不属于 Buff 级，请用 set_buff_conf_zone_condition 挂到乘区。',
     parameters: {
         type: 'object',
         properties: {
             buffConf: { type: 'number', description: '工程 Buff 配置序号' },
-            condition: {
-                type: 'object',
-                description: '条件定义或 null 清除',
-                properties: {
-                    chain: { type: 'number' },
-                    refinement: { type: 'number' },
-                    elements: { type: 'array', items: { type: 'string' } },
-                    damageTypes: { type: 'array', items: { type: 'string' } }
-                }
+            rules: {
+                type: 'array',
+                description: '规则数组或 null 清除',
+                items: { type: 'object' }
             }
         },
         required: ['buffConf']
     },
     handler: (args, ctx) => {
         const setId = resolveBuffConf(args.buffConf).id
-        const raw = args.condition
-        if (!raw || typeof raw !== 'object') {
-            setBuffConfCondition(setId, null)
+        const raw = args.rules
+        if (raw === null || raw === undefined) {
+            setBuffConfRules(setId, null)
             ctx.notifyCalc?.()
             return { cleared: true }
         }
-        const o = raw as Record<string, unknown>
-        const condition: Record<string, unknown> = {}
-        if (o.chain !== undefined) {
-            const chain = Number(o.chain)
-            if (!Number.isInteger(chain) || chain < 0 || chain > 6) throw new Error('chain 须为 0-6')
-            condition.chain = chain
+        if (!Array.isArray(raw)) throw new Error('rules 须为数组或 null')
+        const rules: BuffRule[] = []
+        for (const item of raw) {
+            const normalized = normalizeRule(item)
+            if (!normalized) throw new Error(`无法识别的规则：${JSON.stringify(item)}`)
+            if (isRuleDraft(normalized)) throw new Error(`规则未填写完整：${JSON.stringify(item)}`)
+            rules.push(normalized)
         }
-        if (o.refinement !== undefined) {
-            const refinement = Number(o.refinement)
-            if (!Number.isInteger(refinement) || refinement < 1 || refinement > 5)
-                throw new Error('refinement 须为 1-5')
-            condition.refinement = refinement
-        }
-        if (o.elements !== undefined) {
-            const elements = (Array.isArray(o.elements) ? o.elements : []).map((e) => str(e)).filter(Boolean)
-            const invalid = elements.filter((e) => !ELEMENTS.includes(e as never))
-            if (invalid.length > 0)
-                throw new Error(`无效伤害属性：${invalid.join('、')}（可选：${ELEMENTS.join('、')}）`)
-            if (elements.length > 0) condition.elements = elements
-        }
-        if (o.damageTypes !== undefined) {
-            const types = (Array.isArray(o.damageTypes) ? o.damageTypes : []).map((t) => str(t)).filter(Boolean)
-            const invalid = types.filter((t) => !DAMAGE_TYPES.includes(t as never))
-            if (invalid.length > 0) throw new Error(`无效伤害类型：${invalid.join('、')}`)
-            if (types.length > 0) condition.damageTypes = types
-        }
-        setBuffConfCondition(setId, condition as never)
+        const cycle = cyclePathOf(getAllBuffConfs(), setId, rules)
+        if (cycle) throw new Error(`规则引用成环：${cycle.join(' → ')}`)
+        setBuffConfRules(setId, rules)
         ctx.notifyCalc?.()
-        return { buffConf: args.buffConf, condition }
+        return { buffConf: args.buffConf, rules }
     }
 })
 

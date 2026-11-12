@@ -24,8 +24,6 @@
         sidebarLookupOpen?: boolean
         sidebarWide?: boolean
         team?: [CharSlot, CharSlot, CharSlot]
-        onCreateBuff?: (name: string) => void
-        showBuffOption?: boolean
         /** @desc 当前阶段是否锁定（透传给速查右键菜单） */
         locked?: boolean
         onToggleSidebarLookup?: () => void
@@ -52,8 +50,6 @@
         sidebarLookupOpen = false,
         sidebarWide = false,
         team,
-        onCreateBuff,
-        showBuffOption = false,
         locked = false,
         onToggleSidebarLookup,
         onToggleSidebarWidth,
@@ -297,9 +293,7 @@
         <div class="flex min-h-0 flex-1 flex-col">
             <QuickLookupContent
                 {team}
-                {onCreateBuff}
                 {locked}
-                {showBuffOption}
                 showCustomHitOption={false}
                 tabBarPosition="bottom"
                 onclose={onToggleSidebarLookup}

@@ -172,26 +172,38 @@ export interface GroupedBuffConfItem {
     children?: BuffConf[]
 }
 
-/** @desc Buff 作用域归类：全队=三个角色都能吃到 / 效应专属=仅效应伤害（空数组）/ 指定角色槽位 */
+/** @desc Buff 作用域归类（四态）：全队 / 仅角色全选 / 仅效应 / 指定角色子集 */
 export interface BuffScopeClass {
-    kind: 'all' | 'effect' | 'chars'
+    kind: 'all' | 'charsAll' | 'effect' | 'chars'
     /** @desc kind='chars' 时的角色槽位（去重升序） */
     idxs: number[]
 }
 
 /**
- * @desc 归类一个 Buff 的作用域（列表作用域徽标共用口径）：
- * - `'all'` → 全队
- * - 空数组 → 效应专属（只对效应伤害生效）
- * - 槽位数组 → 指定角色；**槽位覆盖全部角色时等价于全队**（只显示「全队」，不再逐个列角色名）
+ * @desc 归类一个 Buff 的作用域（列表作用域徽标 / 生效成员卡共用口径），四态一一对应：
+ * - `'all'` → **全队**（三角色 + 效应通用）
+ * - `[0,1,2]`（槽位覆盖全部角色）→ **仅角色全选**（三角色，但**不含**效应伤害）
+ * - `[]` → **仅效应**
+ * - 其余槽位数组 → 指定角色子集
+ *
+ * 注意 `[0,1,2]` 与 `'all'` 是**不同**状态：引擎里 `'all'` 连效应条目一起生效，
+ * 而 `[0,1,2]` 只对三个角色槽位生效（效应条目没有角色槽位）。
  */
 export const classifyBuffScope = (scope: 'all' | number[] | undefined, teamSize = 3): BuffScopeClass => {
     if (!Array.isArray(scope)) return { kind: 'all', idxs: [] }
     const idxs = [...new Set(scope)].filter((i) => Number.isInteger(i) && i >= 0 && i < teamSize).sort((a, b) => a - b)
     if (idxs.length === 0) return { kind: 'effect', idxs: [] }
-    if (idxs.length >= teamSize) return { kind: 'all', idxs: [] }
+    if (idxs.length >= teamSize) return { kind: 'charsAll', idxs: [] }
     return { kind: 'chars', idxs }
 }
+
+/** @desc 作用域是否命中效应伤害（`'all'` 与 `[]` 命中；`[0,1,2]` 及其它角色子集不命中） */
+export const scopeIncludesEffect = (scope: 'all' | number[] | undefined): boolean =>
+    !Array.isArray(scope) || scope.length === 0
+
+/** @desc 作用域命中的角色槽位（去重升序；`'all'` 与 `[0,1,2]` 都是全部槽位；`[]` 为空） */
+export const scopeCharIdxs = (scope: 'all' | number[] | undefined, teamSize = 3): number[] =>
+    Array.isArray(scope) ? classifyBuffScope(scope, teamSize).idxs : Array.from({ length: teamSize }, (_, i) => i)
 
 /** @desc 自然序比较（数字段按数值比较），用于最低一级数字目录排序 */
 const compareNaturalKey = (a: string, b: string): number =>

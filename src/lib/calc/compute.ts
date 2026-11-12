@@ -1,11 +1,20 @@
-import type { DamageEntry, BuffInstance, BuffZoneValue, BuffCondition, ZoneRef } from './calculation.types'
+import type {
+    DamageEntry,
+    BuffInstance,
+    BuffZoneValue,
+    BuffCondition,
+    BuffRule,
+    EnemyTypeKind,
+    ZoneRef
+} from './calculation.types'
 import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone, RatioFactor } from './result.types'
 import type { CharSlot } from '$lib/types/project'
 import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS, zoneAppliesToCoeffEntry } from './calculation.consts'
 import { applyZone, recomputeTotals, type CharacterComputed } from './zone-ops'
-import { evaluateCondition, type ConditionContext } from './condition'
+import { evaluateCondition } from './condition'
+import { evaluateRules, resolveActiveBuffIds, type RuleContext, type RuleStats } from './rules'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
     NON_DIRECT_ELEMENT,
@@ -249,53 +258,124 @@ export interface ConditionProfile {
 
 export const DEFAULT_CONDITION_PROFILE: ConditionProfile = { chains: [0, 0, 0], refinements: [1, 1, 1] }
 
-/** @desc 判定某个 Buff 的生效条件（引擎与「隐藏条件不匹配」筛选共用同一口径） */
-export function buffConditionMet(
-    condition: BuffInstance['condition'],
-    profile: ConditionProfile,
-    charIndex: number,
-    ctx: Partial<ConditionContext> = {},
-    refCharIdx?: number
-): boolean {
-    const chains = ctx.chains ?? profile.chains
-    const refinements = ctx.refinements ?? profile.refinements
-    return evaluateCondition(condition, {
-        chains,
-        refinements,
-        refCharIdx: refCharIdx ?? (charIndex >= 0 ? charIndex : undefined),
-        ...(ctx.element !== undefined ? { element: ctx.element } : {}),
-        ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
-    })
+/**
+ * @desc Buff 级**规则**求值的固定装置：面板（`zoneCompare`）与敌人类型是「本次伤害」级别的输入，
+ * 由引擎按条目现算并缓存在这一个对象上（同一条目的多次判定复用同一份面板）。
+ */
+export interface RuleEvalDeps {
+    team: CharSlot[]
+    configState: ConfigState
+    charInfoMap: Record<string, CharacterInfo>
+    weaponInfoMap: Record<string, WeaponInfo>
+    /** @desc 工程敌人类型（缺省 = 未知，敌人类型规则不构成否定） */
+    enemyType?: EnemyTypeKind
 }
 
+/** @desc 单条目规则求值装置（面板懒算 + 缓存；`statsOf` 缺省表示调用方拿不到面板） */
+interface EntryRuleDeps {
+    enemyType?: EnemyTypeKind
+    statsOf?: (charIdx: number) => RuleStats | undefined
+}
+
+/** @desc 把角色面板压成规则可读的「无条件部分」数值（单位与面板显示一致） */
+const ruleStatsOf = (stats: CharacterComputed): RuleStats => ({
+    atk: Math.round(stats.totalAtk),
+    hp: Math.round(stats.totalHp),
+    def: Math.round(stats.totalDef),
+    recharge: stats.recharge,
+    offTuneBuildupRate: stats.offTuneBuildupRate,
+    tuneBreakBoost: Math.round(stats.totalTuneBreakBoost),
+    unisonBoonLayer: stats.unisonBoonLayer,
+    critRate: stats.critRate,
+    critDmg: stats.critDmg
+})
+
 /**
- * @desc 兼容旧口径的条件判定（表格「隐藏条件不匹配」筛选复用）：
- * 同时支持新条件结构（chains/refinements）与旧字段（chain/refinement/elements/damageTypes）。
- * 传入 entry 时按条目属性/伤害类型判定；不传时忽略条目级子条件（角色级聚合）。
+ * @desc 某角色槽位的「**无条件部分**」面板：只累加
+ * ① 装备（武器 + 声骸）、② **没有 rules 的 Buff** 里 **不带属性/类型条件、也不带引用** 的乘区条目。
+ *
+ * 口径来由（已对齐）：`zoneCompare` 规则不得自引用，也不得依赖「哪些 Buff 生效」这个结论
+ * —— 否则「规则 → 面板 → 规则」形成循环。因此这里刻意只读与规则无关的那部分累计值。
+ * 带引用的条目一并排除（引用要读别人的面板，可能再触发规则判定）；这是**保守**取舍，已在报告里登记。
  */
-export function conditionMet(
-    bs: BuffInstance,
+const computeUnconditionalStats = (
+    charIdx: number,
+    entry: DamageEntry,
+    candidates: readonly BuffInstance[],
+    deps: RuleEvalDeps,
+    coeffEntry: boolean
+): RuleStats | undefined => {
+    const slot = deps.team[charIdx]
+    const charInfo = slot?.character ? deps.charInfoMap[slot.character] : undefined
+    if (!slot || !charInfo) return undefined
+    const plain = candidates
+        .filter((buff) => (buff.rules?.length ?? 0) === 0 && scopeMatches(buff, charIdx, entry.isEffect))
+        .map((buff) => ({ ...buff, zones: buff.zones.filter((z) => !z.condition && !z.ref) }))
+    const stats = computeCharacterStats(
+        charInfo,
+        slot.weapon,
+        deps.weaponInfoMap[slot.weapon ?? ''] ?? null,
+        deps.configState.characters[charIdx]?.echoes ?? [],
+        plain,
+        undefined,
+        coeffEntry
+    )
+    for (const z of overrideZonesOf(plain, undefined)) applyZone(stats, z.zoneId, z.value, 'override')
+    recomputeTotals(stats)
+    return ruleStatsOf(stats)
+}
+
+/** @desc 为一条伤害条目装配规则求值装置（面板按槽位懒算并缓存） */
+const entryRuleDepsOf = (
+    entry: DamageEntry,
+    candidates: readonly BuffInstance[],
+    deps: RuleEvalDeps | undefined,
+    coeffEntry: boolean
+): EntryRuleDeps => {
+    if (!deps) return {}
+    const cache = new Map<number, RuleStats | undefined>()
+    return {
+        ...(deps.enemyType !== undefined ? { enemyType: deps.enemyType } : {}),
+        statsOf: (charIdx: number): RuleStats | undefined => {
+            if (!cache.has(charIdx)) {
+                cache.set(charIdx, computeUnconditionalStats(charIdx, entry, candidates, deps, coeffEntry))
+            }
+            return cache.get(charIdx)
+        }
+    }
+}
+
+/** @desc 组装规则求值上下文（链阶来自生效配置，条目上下文来自 `zoneCtx`） */
+const ruleContextOf = (
+    profile: ConditionProfile,
+    charIdx: number,
+    zoneCtx: { damageName?: string },
+    deps: EntryRuleDeps
+): RuleContext => ({
+    chains: profile.chains,
+    refinements: profile.refinements,
+    activeCharIdx: charIdx,
+    ...(zoneCtx.damageName !== undefined ? { damageName: zoneCtx.damageName } : {}),
+    ...(deps.enemyType !== undefined ? { enemyType: deps.enemyType } : {}),
+    ...(deps.statsOf ? { statsOf: deps.statsOf } : {})
+})
+
+/**
+ * @desc 判定某个 Buff 的规则是否全部满足（引擎与「隐藏条件不匹配」筛选共用同一口径）。
+ * `deps` 缺省（拿不到面板/敌人类型）时相关规则「不构成否定」，只有 `buffActive` 仍需 `activeOf`。
+ */
+export function buffRulesMet(
+    rules: BuffRule[] | undefined,
     profile: ConditionProfile,
     charIndex: number,
-    entry?: DamageEntry,
-    damageEntryDamageTypes?: Record<string, string[]>,
-    charInfoMap?: Record<string, CharacterInfo>,
-    echoDescByEntry?: Record<string, string>
+    ctx: { damageName?: string } = {},
+    deps: EntryRuleDeps = {},
+    activeOf?: (buffId: string) => boolean
 ): boolean {
-    const element = entry?.damageElement
-    const damageTypes = entry
-        ? resolveDamageTypes(entry, damageEntryDamageTypes ?? {}, charInfoMap, echoDescByEntry)
-        : undefined
-    return buffConditionMet(
-        bs.condition,
-        profile,
-        charIndex,
-        {
-            ...(element !== undefined ? { element } : {}),
-            ...(damageTypes !== undefined ? { damageTypes } : {})
-        },
-        bs.conditionRefCharIdx
-    )
+    return evaluateRules(rules, {
+        ...ruleContextOf(profile, charIndex, ctx, deps),
+        ...(activeOf ? { activeOf } : {})
+    })
 }
 
 /** @desc 条目是否绑定该 Buff（scope 按作用域匹配） */
@@ -306,7 +386,7 @@ const scopeMatches = (buff: BuffInstance, charIndex: number, isEffect: boolean):
 }
 
 /**
- * @desc 返回某伤害条目实际生效的 Buff 集（按范围 + 整块硬性条件过滤），溯源模块复用同一口径。
+ * @desc 返回某伤害条目实际生效的 Buff 集（按范围 + Buff 级规则过滤），溯源模块复用同一口径。
  * `matchEntry=false` 时忽略条目级的属性/类型条件（用于角色级聚合面板，与旧行为一致）。
  */
 export function getBoundBuffSets(
@@ -318,7 +398,8 @@ export function getBoundBuffSets(
     profile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
     charInfoMap?: Record<string, CharacterInfo>,
     echoDescByEntry?: Record<string, string>,
-    matchEntry = true
+    matchEntry = true,
+    rulesDeps?: RuleEvalDeps
 ): BuffInstance[] {
     return boundBuffs(
         entry,
@@ -329,7 +410,8 @@ export function getBoundBuffSets(
         profile,
         charInfoMap,
         echoDescByEntry,
-        matchEntry
+        matchEntry,
+        rulesDeps
     )
 }
 
@@ -345,28 +427,28 @@ const entryCandidateBuffs = (
 }
 
 /**
- * @desc 某角色槽位在「本条目」下真正生效的 Buff：作用域匹配 + 整块硬性条件（链/阶硬门槛）。
- * 条件里的链/阶以**该角色槽位**为参考（作用域指向谁，就按谁的链阶判定）。
+ * @desc 某角色槽位在「本条目」下真正生效的 Buff：作用域匹配 + Buff 级规则（链/阶/伤害名/面板/敌人类型/依赖）。
+ *
+ * `buffActive` 依赖按**最小不动点**求值（`resolveActiveBuffIds`）：从一个都未生效出发反复激活，
+ * 因此「A 需要 B、B 需要 A」这类脏数据会稳定落在「都不生效」上（创建期已禁止成环）。
  * 乘区条目自身的条件不在这里过滤 —— 由 activeZonesOf / refZonesOf / overrideZonesOf 逐条判定。
  *
  * `ignoreScope=true` 用于**目标侧乘区**的聚合（见 targetSideZonesOf）：层数挂在目标身上，
  * 不区分角色槽位，但仍然区分「特效专属」（空作用域只在特效条目上生效）。
  */
 const activeBoundForChar = (
-    candidates: BuffInstance[],
+    candidates: readonly BuffInstance[],
     charIdx: number,
     isEffect: boolean,
     profile: ConditionProfile,
-    ctx: Partial<ConditionContext>,
+    ctx: { damageName?: string },
+    deps: EntryRuleDeps,
     ignoreScope = false
 ): BuffInstance[] => {
-    const out: BuffInstance[] = []
-    for (const buff of candidates) {
-        if (ignoreScope ? !scopeMatchesTargetSide(buff, isEffect) : !scopeMatches(buff, charIdx, isEffect)) continue
-        if (!buffConditionMet(buff.condition, profile, charIdx, ctx, buff.conditionRefCharIdx)) continue
-        out.push(buff)
-    }
-    return out
+    const scopeOk = (buff: BuffInstance): boolean =>
+        ignoreScope ? scopeMatchesTargetSide(buff, isEffect) : scopeMatches(buff, charIdx, isEffect)
+    const active = resolveActiveBuffIds(candidates, scopeOk, ruleContextOf(profile, charIdx, ctx, deps))
+    return candidates.filter((buff) => active.has(buff.id))
 }
 
 /** @desc 目标侧聚合的作用域口径：只区分「特效专属 / 其余」，不区分具体角色槽位 */
@@ -383,20 +465,19 @@ function boundBuffs(
     profile: ConditionProfile,
     charInfoMap?: Record<string, CharacterInfo>,
     echoDescByEntry?: Record<string, string>,
-    matchEntry = true
+    matchEntry = true,
+    rulesDeps?: RuleEvalDeps
 ): BuffInstance[] {
-    const ctx: Partial<ConditionContext> = matchEntry
-        ? {
-              element: entry.damageElement,
-              damageTypes: resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
-          }
-        : {}
+    const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
+    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, usesCoefficientFormula(entry))
     return activeBoundForChar(
-        entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds),
+        candidates,
         charIndex,
         entry.isEffect,
         profile,
-        ctx
+        // matchEntry=false 时没有条目上下文：伤害名规则不构成否定（角色级聚合口径）
+        matchEntry ? { damageName: entry.displayName } : {},
+        deps
     )
 }
 
@@ -462,23 +543,25 @@ function computeCharacterStats(
 /** @desc 生效 Buff 的全部乘区条目（引擎逐条写入累加器的唯一出口） */
 const collectZones = (buffs: BuffInstance[]): BuffZoneValue[] => buffs.flatMap((b) => b.zones)
 
-/** @desc 乘区级条件求值上下文：伤害段上下文 + 链阶档位 */
+/** @desc 乘区级条件求值上下文：伤害段上下文 + 链阶档位（`isEffect` / `damageName` 供 Buff 级规则使用） */
 export interface ZoneCtx {
     chains: number[]
     refinements: number[]
     element?: string
     damageTypes?: string[]
+    /** @desc 本条目是否效应伤害（目标侧规则的作用域口径） */
+    isEffect?: boolean
+    /** @desc 本条目显示名（伤害名规则用） */
+    damageName?: string
 }
 
 /**
- * @desc 乘区自身条件是否满足（乘区级只允许 伤害类型/属性；链阶由实例级把关）。
+ * @desc 乘区自身条件是否满足（乘区级只允许 伤害类型/属性；Buff 级规则由 `buffRulesMet` 统一把关）。
  * 除引擎逐条写入外，**溯源**（`damage-trace` 的来源列表）也复用同一判据：条件不满足的乘区既不计入数值，
  * 也不得列为来源（否则「来源之和 = 乘区数值」这条不变式会被破坏）。
  */
 export const zoneConditionMet = (zone: { condition?: BuffCondition }, ctx: ZoneCtx): boolean =>
     evaluateCondition(zone.condition, {
-        chains: ctx.chains,
-        refinements: ctx.refinements,
         ...(ctx.element !== undefined ? { element: ctx.element } : {}),
         ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
     })
@@ -520,19 +603,24 @@ const refZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx, coeffEntry = false): {
  *
  * 与 `activeZonesOf` 的区别只有作用域：目标侧不看 buff 指向哪个角色槽位 ——
  * 一条「作用域=角色1」的集谐 buff 也照样给全队提供层数，因此不存在「某某角色的集谐干涉层数」。
- * 其余口径完全一致：实例级链/阶门槛按条件自带的 charIdx 判定（与攻击者是谁无关）、
+ * 其余口径完全一致：Buff 级规则按 `charIdx = -1`（无角色上下文）判定、
  * 乘区级条件按本条目属性/类型判定；覆盖条目取最后一条覆盖值（同 applyZone 的覆盖语义）。
  */
 export function targetSideZonesOf(
     candidates: readonly BuffInstance[],
     profile: ConditionProfile,
-    zoneCtx: ZoneCtx
+    zoneCtx: ZoneCtx,
+    deps: EntryRuleDeps = {}
 ): { zoneId: string; value: number }[] {
     const sums = new Map<string, number>()
     const overrides = new Map<string, number>()
+    const active = resolveActiveBuffIds(
+        candidates,
+        (buff) => scopeMatchesTargetSide(buff, zoneCtx.isEffect ?? false),
+        ruleContextOf(profile, -1, zoneCtx, deps)
+    )
     for (const buff of candidates) {
-        // charIdx 传 -1：目标侧与攻击者无关；legacy chain/refinement 回落到 0 号位（与旧口径一致）
-        if (!buffConditionMet(buff.condition, profile, -1, zoneCtx, buff.conditionRefCharIdx)) continue
+        if (!active.has(buff.id)) continue
         for (const z of buff.zones) {
             if (!TARGET_SIDE_ZONE_IDS.has(z.zoneId) || z.ref) continue
             if (!zoneConditionMet(z, zoneCtx)) continue
@@ -554,8 +642,9 @@ export const targetSideValueOf = (
     candidates: readonly BuffInstance[],
     profile: ConditionProfile,
     zoneCtx: ZoneCtx,
-    zoneId: string
-): number => targetSideZonesOf(candidates, profile, zoneCtx).find((z) => z.zoneId === zoneId)?.value ?? 0
+    zoneId: string,
+    deps: EntryRuleDeps = {}
+): number => targetSideZonesOf(candidates, profile, zoneCtx, deps).find((z) => z.zoneId === zoneId)?.value ?? 0
 
 /**
  * @desc 目标侧乘区的来源 Buff（溯源用）：不做作用域过滤，其余口径与 `getBoundBuffSets` 一致。
@@ -569,20 +658,18 @@ export function getTargetSideSourceBuffs(
     profile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
     charInfoMap?: Record<string, CharacterInfo>,
     echoDescByEntry?: Record<string, string>,
-    matchEntry = true
+    matchEntry = true,
+    rulesDeps?: RuleEvalDeps
 ): BuffInstance[] {
-    const ctx: Partial<ConditionContext> = matchEntry
-        ? {
-              element: entry.damageElement,
-              damageTypes: resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
-          }
-        : {}
+    const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
+    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, usesCoefficientFormula(entry))
     return activeBoundForChar(
-        entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds),
+        candidates,
         -1,
         entry.isEffect,
         profile,
-        ctx,
+        matchEntry ? { damageName: entry.displayName } : {},
+        deps,
         true
     )
 }
@@ -590,29 +677,32 @@ export function getTargetSideSourceBuffs(
 /**
  * @desc 该 Buff 对某个伤害条目**是否还有任何贡献**（表格「隐藏条件不匹配」筛选用）。
  *
- * 为什么不能用实例级条件代替：条件分层之后，**属性/类型条件挂在乘区条目上**（`BuffZoneValue.condition`），
- * 实例级只剩链/阶硬门槛。表格若只看实例级条件，就会出现「乘区条件不满足、格子却仍可勾选」的 bug。
+ * 条件分层之后，**属性/类型条件挂在乘区条目上**（`BuffZoneValue.condition`），Buff 级规则在 `rules`。
+ * 表格若只看其中一层，就会出现「条件不满足、格子却仍可勾选」的 bug。
  *
  * 口径与引擎 `activeZonesOf` / `refZonesOf` 完全一致（同一套 zoneConditionMet）：
  * 只要**存在至少一条**乘区条目「自身条件满足 且 值/引用/覆盖能生效」，就算有贡献。
  * 因此「一条不匹配 + 一条无条件」仍然算有贡献（引擎确实会把无条件那条计入），不会误判为不可用。
  *
- * 注意：`element` 必须一并传入（引擎的 ZoneCtx 也带 element）—— evaluateCondition 对
- * `damageTypes` 子句要求同时具备条目上下文，只给 damageTypes 会让条件恒判不满足。
+ * 本函数只用于**界面过滤**（拿不到队伍/配置面板）：`buffActive` 规则按「引用项视为存活」判定，
+ * 面板 / 敌人类型 / 伤害名规则缺上下文时「不构成否定」—— 宁可多显示，也不误判成不可用。
  */
 export const buffContributesToEntry = (
     buff: BuffInstance,
-    ctx: { element?: string; damageTypes?: string[] },
+    ctx: { element?: string; damageTypes?: string[]; damageName?: string },
     profile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
-    charIndex = -1
+    charIndex = -1,
+    deps: EntryRuleDeps = {}
 ): boolean => {
-    const ctxForCondition: Partial<ConditionContext> = {
-        ...(ctx.element !== undefined ? { element: ctx.element } : {}),
-        ...(ctx.damageTypes !== undefined ? { damageTypes: ctx.damageTypes } : {})
-    }
-    if (!buffConditionMet(buff.condition, profile, charIndex, ctxForCondition, buff.conditionRefCharIdx)) {
-        return false
-    }
+    const rulesOk = buffRulesMet(
+        buff.rules,
+        profile,
+        charIndex,
+        ctx.damageName !== undefined ? { damageName: ctx.damageName } : {},
+        deps,
+        () => true
+    )
+    if (!rulesOk) return false
     const zoneCtx: ZoneCtx = {
         chains: profile.chains,
         refinements: profile.refinements,
@@ -1391,12 +1481,13 @@ function buildEntryPanel(
     configState: ConfigState,
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
-    coeffEntry = false
+    coeffEntry = false,
+    deps: EntryRuleDeps = {}
 ): CharacterComputed {
     if (refIdx === charIndex) return ownStats
     const slot = team[refIdx]
     if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats(coeffEntry)
-    const bound = activeBoundForChar(candidates, refIdx, entry.isEffect, profile, ctx)
+    const bound = activeBoundForChar(candidates, refIdx, entry.isEffect, profile, ctx, deps)
     const panel = computeCharacterStats(
         charInfoMap[slot.character],
         slot.weapon,
@@ -1425,6 +1516,14 @@ export function computeAll(
     conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
 ): ResultEntry[] {
     const enemy = configState.enemy
+    /** @desc Buff 级规则的固定装置（敌人类型来自工程配置；面板按条目现算） */
+    const ruleDeps: RuleEvalDeps = {
+        team,
+        configState,
+        charInfoMap,
+        weaponInfoMap,
+        ...(enemy?.type ? { enemyType: enemy.type } : {})
+    }
 
     // 逐条目计算：条目面板 = 装备 + 绑定到本条目的 Buff；被引用角色的面板同样只看本条目勾选的 Buff
     /** @desc 声骸技能文案索引（伤害类型规则2：声骸技能条目的「视为/为 XX 伤害」） */
@@ -1436,18 +1535,28 @@ export function computeAll(
         const weaponInfo = weaponInfoMap[weaponName ?? ''] ?? null
         const echoes = charIndex >= 0 ? (configState.characters[charIndex]?.echoes ?? []) : []
         const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
-        /** @desc 乘区级条件上下文（伤害段属性/类型 + 链阶档位） */
+        /** @desc 乘区级条件上下文（伤害段属性/类型 + 链阶档位 + Buff 级规则所需的条目上下文） */
         const zoneCtx: ZoneCtx = {
             chains: conditionProfile.chains,
             refinements: conditionProfile.refinements,
             element: entry.damageElement,
-            damageTypes
+            damageTypes,
+            isEffect: entry.isEffect,
+            damageName: entry.displayName
         }
         const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
-        const entryBound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx)
+        const coeffEntry = usesCoefficientFormula(entry)
+        const entryRuleDeps = entryRuleDepsOf(entry, candidates, ruleDeps, coeffEntry)
+        const entryBound = activeBoundForChar(
+            candidates,
+            charIndex,
+            entry.isEffect,
+            conditionProfile,
+            zoneCtx,
+            entryRuleDeps
+        )
         const charInfo = charName ? charInfoMap[charName] : undefined
         /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴（基准 0% / 100%），双暴只有覆盖生效 */
-        const coeffEntry = usesCoefficientFormula(entry)
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
         let partialStats: CharacterComputed
@@ -1487,7 +1596,8 @@ export function computeAll(
                 configState,
                 charInfoMap,
                 weaponInfoMap,
-                coeffEntry
+                coeffEntry,
+                entryRuleDeps
             )
             panelCache.set(refIdx, built)
             return built
@@ -1519,7 +1629,7 @@ export function computeAll(
             stats,
             enemy,
             damageTypes,
-            targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer')
+            targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer', entryRuleDeps)
         )
     })
 }
@@ -1548,17 +1658,31 @@ export function computeOneEntry(
 
     // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
     const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
-    /** @desc 乘区级条件上下文 */
+    /** @desc 乘区级条件上下文（含 Buff 级规则所需的条目上下文） */
     const zoneCtx: ZoneCtx = {
         chains: conditionProfile.chains,
         refinements: conditionProfile.refinements,
         element: entry.damageElement,
-        damageTypes
+        damageTypes,
+        isEffect: entry.isEffect,
+        damageName: entry.displayName
     }
     const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
-    const bound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx)
     /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴（基准 0% / 100%），双暴只有覆盖生效 */
     const coeffEntry = usesCoefficientFormula(entry)
+    const entryRuleDeps = entryRuleDepsOf(
+        entry,
+        candidates,
+        {
+            team,
+            configState,
+            charInfoMap,
+            weaponInfoMap,
+            ...(enemy?.type ? { enemyType: enemy.type } : {})
+        },
+        coeffEntry
+    )
+    const bound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx, entryRuleDeps)
 
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo
@@ -1583,7 +1707,8 @@ export function computeOneEntry(
             configState,
             charInfoMap,
             weaponInfoMap,
-            coeffEntry
+            coeffEntry,
+            entryRuleDeps
         )
         panelCache.set(refIdx, built)
         return built
@@ -1608,7 +1733,7 @@ export function computeOneEntry(
         stats,
         enemy,
         damageTypes,
-        targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer')
+        targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer', entryRuleDeps)
     )
 }
 
@@ -1644,12 +1769,22 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
         chains: ctx.conditionProfile.chains,
         refinements: ctx.conditionProfile.refinements,
         element: entry.damageElement,
-        damageTypes
+        damageTypes,
+        isEffect: entry.isEffect,
+        damageName: entry.displayName
     }
     const candidates = entryCandidateBuffs(entry, ctx.buffSets, ctx.damageEntryBuffSetIds)
-    const entryBound = activeBoundForChar(candidates, charIndex, entry.isEffect, ctx.conditionProfile, zoneCtx)
-    const charInfo = charName ? ctx.charInfoMap[charName] : undefined
     const coeffEntry = usesCoefficientFormula(entry)
+    const ruleDeps = entryRuleDepsOf(entry, candidates, ctx, coeffEntry)
+    const entryBound = activeBoundForChar(
+        candidates,
+        charIndex,
+        entry.isEffect,
+        ctx.conditionProfile,
+        zoneCtx,
+        ruleDeps
+    )
+    const charInfo = charName ? ctx.charInfoMap[charName] : undefined
 
     let partialStats: CharacterComputed
     if (charInfo) {

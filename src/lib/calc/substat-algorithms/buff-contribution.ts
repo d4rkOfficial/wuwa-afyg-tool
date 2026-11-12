@@ -1,6 +1,6 @@
 import type { BuffConf } from '../calculation.types'
 import type { BuffContribution, BuffFolderContribution, BuffZoneContribution, CharBuffAnalysis } from '../result.types'
-import { getBoundBuffSets, getTargetSideSourceBuffs } from '../compute'
+import { getBoundBuffSets, getTargetSideSourceBuffs, type RuleEvalDeps } from '../compute'
 import { ZONE_MAP } from '../calculation.consts'
 import { BUFF_PATH_SEP, buffFolderPath } from '../buff-name'
 import { diffTotals, pctOf, type AnalysisInputs, type CharacterDamageContext } from './shared'
@@ -46,6 +46,14 @@ const candidateBuffsOf = (
     echoDescByEntry: Record<string, string>
 ): EffectiveBuff[] => {
     const map = new Map<string, EffectiveBuff>()
+    /** @desc Buff 级规则求值装置（与引擎同口径：面板现算 + 敌人类型取工程配置） */
+    const rulesDeps: RuleEvalDeps = {
+        team: inputs.team,
+        configState: inputs.configState,
+        charInfoMap: inputs.charInfoMap,
+        weaponInfoMap: inputs.weaponInfoMap,
+        ...(inputs.configState.enemy?.type ? { enemyType: inputs.configState.enemy.type } : {})
+    }
     for (const entry of ctx.damageEntries) {
         /** @desc 本条目上的并集（同一 Buff 只计一次；entryCount 表达「绑定到几条条目」） */
         const perEntry = new Map<string, BuffConf>()
@@ -57,7 +65,9 @@ const candidateBuffsOf = (
             inputs.damageEntryDamageTypes,
             inputs.conditionProfile,
             inputs.charInfoMap,
-            echoDescByEntry
+            echoDescByEntry,
+            true,
+            rulesDeps
         )) {
             perEntry.set(buff.id, buff)
         }
@@ -68,7 +78,9 @@ const candidateBuffsOf = (
             inputs.damageEntryDamageTypes,
             inputs.conditionProfile,
             inputs.charInfoMap,
-            echoDescByEntry
+            echoDescByEntry,
+            true,
+            rulesDeps
         )) {
             if (!perEntry.has(buff.id)) perEntry.set(buff.id, buff)
         }
@@ -232,8 +244,7 @@ export const analyzeCharacterBuffs = (
                     zones: zoneContributionsOf(ctx, inputs, buff, loss.actual),
                     contribution: loss.actual,
                     contribPct: pctOf(loss.actual, ctx.baseline.actual),
-                    ...(buff.origin ? { origin: buff.origin } : {}),
-                    ...(buff.starred ? { starred: true } : {})
+                    ...(buff.origin ? { origin: buff.origin } : {})
                 }
             ]
         })

@@ -4,26 +4,33 @@
 import type { BuffLibraryEntity, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
 import type { CharSlot } from '$lib/types/project'
 import type { ImportBuffInput } from './calculation.store.svelte'
-import type { BuffCondition } from './calculation.types'
+import type { BuffRule } from './calculation.types'
+import type { LegacyGateCondition } from './rules'
 import { ownerIdxFor, ownerIdxOfItem } from './buff-owner'
 import { resolveImportTarget, type ImportOrigin } from './buff-import-target'
 
 export type { BuffLibraryEntity }
-export { ownerIdxFor, ownerIdxOfItem, primaryOwnerOf, rewriteOwnerInCondition, rewriteOwnerInZones } from './buff-owner'
+export { ownerIdxFor, ownerIdxOfItem, primaryOwnerOf, rewriteOwnerInRules, rewriteOwnerInZones } from './buff-owner'
 
 export function toImportItem(
-    b: { name: string; scope?: BuffLibraryScope; condition?: BuffCondition; zones: ImportBuffInput['zones'] },
+    b: {
+        name: string
+        scope?: BuffLibraryScope
+        condition?: LegacyGateCondition
+        rules?: BuffRule[]
+        zones: ImportBuffInput['zones']
+    },
     ownerIdx: number,
     team?: [CharSlot, CharSlot, CharSlot],
     origin?: ImportOrigin
 ): ImportBuffInput {
-    const target = resolveImportTarget(b.name, b.condition, ownerIdx, team ?? [], origin)
+    const target = resolveImportTarget(b.name, b.condition, ownerIdx, team ?? [], origin, b.rules)
     return {
         name: b.name,
         targetName: target.fullName,
         scope: b.scope,
         ownerIdx,
-        condition: target.condition,
+        ...(target.rules ? { rules: target.rules } : {}),
         // 乘区条目（含乘区级生效条件 condition）原样带入，导入时不丢条件
         zones: b.zones
     }
@@ -31,7 +38,7 @@ export function toImportItem(
 
 /**
  * @desc 实体全部 Buff → 导入条目：多主人时 self（主人专属）按每个主人生成独立条目，其它 scope 单条（引用第一主人）。
- * 每条都带上**该实体在当前配队里的真实归属槽位**，供导入时重指链阶条件与引用。
+ * 每条都带上**该实体在当前配队里的真实归属槽位**，供导入时重指链阶规则与引用。
  */
 export function buildEntityImportItems(
     entity: BuffLibraryEntity,
@@ -48,41 +55,25 @@ export function buildBuffImportItems(
 ): ImportBuffInput[] {
     const owners = ownerIdxFor(team, entity)
     const firstOwner = owners[0] ?? -1
-    /** @desc 实体来源决定归属文件夹（声骸 / 套装 / 武器）；条件仍按角色本体门走 */
+    /** @desc 实体来源决定归属文件夹（声骸 / 套装 / 武器）；规则仍按角色本体门走 */
     const origin: ImportOrigin = { entityType: entity.entityType, entityName: entity.entityName }
+    const asSource = (b: BuffLibraryBuff) => ({
+        name: b.buffName,
+        scope: b.scope,
+        ...(b.condition ? { condition: b.condition } : {}),
+        ...(b.rules ? { rules: b.rules } : {}),
+        zones: b.zones
+    })
     if (owners.length > 1) {
         const selfItems = owners.flatMap((owner) =>
-            buffs
-                .filter((b) => b.scope === 'self')
-                .map((b) =>
-                    toImportItem(
-                        { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
-                        owner,
-                        team,
-                        origin
-                    )
-                )
+            buffs.filter((b) => b.scope === 'self').map((b) => toImportItem(asSource(b), owner, team, origin))
         )
         const otherItems = buffs
             .filter((b) => b.scope !== 'self')
-            .map((b) =>
-                toImportItem(
-                    { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
-                    firstOwner,
-                    team,
-                    origin
-                )
-            )
+            .map((b) => toImportItem(asSource(b), firstOwner, team, origin))
         return [...selfItems, ...otherItems]
     }
-    return buffs.map((b: BuffLibraryBuff) =>
-        toImportItem(
-            { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
-            firstOwner,
-            team,
-            origin
-        )
-    )
+    return buffs.map((b: BuffLibraryBuff) => toImportItem(asSource(b), firstOwner, team, origin))
 }
 
 // ── 冲突检测：同名（内容不同）与完全一致 ────────────────────────────────────

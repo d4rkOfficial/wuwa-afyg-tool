@@ -1,6 +1,7 @@
 /** @desc 拉表页状态 store：持有伤害条目/Buff 块/条目绑定/生效配置等全局响应式状态，提供 CRUD 与持久化快照接口 */
 import type {
     BuffConf,
+    BuffRule,
     BuffZoneValue,
     BuffTreeState,
     BuffTreeNode,
@@ -20,7 +21,14 @@ import { addToast } from '$lib/data/toast.svelte'
 import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_NO_OVERRIDE_IDS, ZONE_REF_MAP } from './calculation.consts'
 import type { ZoneId } from './calculation.consts'
 import type { ConditionProfile } from './compute'
-import { isConditionEmpty, normalizeCondition, normalizeConditionForScope, normalizeZoneCondition } from './condition'
+import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from './condition'
+import {
+    cascadeDeleteIdsOf,
+    normalizeRules,
+    pruneRuleDependencies,
+    rulesFromLegacyCondition,
+    type LegacyGateCondition
+} from './rules'
 import { paneEffectSourcesOf, type PaneEffectSource } from './pane-effects'
 import { rebuildGlobalBindings } from './global-bindings'
 import {
@@ -34,10 +42,18 @@ import {
     normalizeBuffFullNames,
     normalizeBuffTree,
     pathNamesOf,
+    pruneEmptyFolders,
     uniqueBuffFullName
 } from './buff-tree-state'
-import { buffFolderPath, buffLeafName, joinBuffPath, sanitizeLeafName, uniqueLeafName } from './buff-name'
-import { ownerIdxOfItem, rewriteOwnerInCondition } from './buff-owner'
+import {
+    BUFF_PATH_SEP,
+    buffFolderPath,
+    buffLeafName,
+    joinBuffPath,
+    sanitizeLeafName,
+    uniqueLeafName
+} from './buff-name'
+import { ownerIdxOfItem, rewriteOwnerInRules } from './buff-owner'
 import { resolveImportTarget } from './buff-import-target'
 
 let _entries = $state<DamageEntry[]>([])
@@ -613,20 +629,6 @@ export function getAllBuffConfs(): BuffConf[] {
     return _buffSets
 }
 
-/** @desc 待定位的 BUFF 集 id（由「以此为名创建BUFF」写入；buff-modal 打开后消费一次并滚动到它） */
-let _pendingFocusBuffSetId = $state<string | null>(null)
-
-export function setPendingFocusBuffSetId(id: string | null) {
-    _pendingFocusBuffSetId = id
-}
-
-/** @desc 取出并清空待定位 id（只消费一次） */
-export function takePendingFocusBuffSetId(): string | null {
-    const id = _pendingFocusBuffSetId
-    _pendingFocusBuffSetId = null
-    return id
-}
-
 /** @desc 新建空 Buff 块（随机 id，默认全队作用域），返回新块 id */
 export function createBuffSet(
     name: string,
@@ -698,7 +700,10 @@ export interface ImportBuffInput {
     targetName?: string
     scope?: 'self' | 'self_except' | 'team' | 'effect_only'
     ownerIdx?: number
-    condition?: BuffCondition
+    /** @desc 旧链/阶条件（工坊 share / AI 生成仍按这个字段产出）：导入时升级为 `rules` */
+    condition?: LegacyGateCondition
+    /** @desc 新版 Buff 级规则；存在时优先于 `condition` */
+    rules?: BuffRule[]
     zones: ImportBuffZone[]
 }
 
@@ -809,23 +814,21 @@ export function importBuffSetsWithDecisions(
             zones.push(zone)
         }
 
-        // ① 链/阶条件重指到真实归属（工坊/生成产物是 0 号位）
-        const reowned = rewriteOwnerInCondition(item.condition, owner)
-        if (JSON.stringify(reowned) !== JSON.stringify(item.condition ?? undefined)) {
-            const hadGate =
-                (item.condition?.chains?.length ?? 0) > 0 ||
-                (item.condition?.refinements?.length ?? 0) > 0 ||
-                item.condition?.chain !== undefined ||
-                item.condition?.refinement !== undefined
-            if (hadGate) report.reowned++
+        // ① 旧链/阶条件升级为规则，并重指到真实归属（工坊/生成产物是 0 号位）
+        const baseRules = normalizeRules(item.rules) ?? rulesFromLegacyCondition(item.condition, owner)
+        const reowned = rewriteOwnerInRules(baseRules, owner)
+        if (JSON.stringify(reowned) !== JSON.stringify(baseRules ?? undefined)) {
+            if ((baseRules ?? []).some((rule) => rule.kind === 'chain' || rule.kind === 'refinement')) {
+                report.reowned++
+            }
         }
 
         // ② 全名：已解析项直接用 targetName；手工/AI 项现场按真实归属解析
         const target = item.targetName
-            ? { fullName: rawName, condition: item.condition ?? {} }
-            : resolveImportTarget(rawName, item.condition, owner, _initTeam ?? [])
+            ? { fullName: rawName, rules: reowned }
+            : resolveImportTarget(rawName, item.condition, owner, _initTeam ?? [], undefined, reowned)
         const name = target.fullName
-        const condition = target.condition
+        const rules = target.rules
         const mappedScope = mapImportedScope(item.scope, owner, teamSize)
 
         // ③ 同名冲突：同名 + 同作用域才算同一条（同实体多主人时允许同名、各自绑定）
@@ -849,8 +852,7 @@ export function importBuffSetsWithDecisions(
             name,
             zones,
             scope: mappedScope,
-            ...(isConditionEmpty(condition) ? {} : { condition }),
-            ...(owner >= 0 && !isConditionEmpty(condition) ? { conditionRefCharIdx: owner } : {})
+            ...(rules?.length ? { rules } : {})
         })
     }
 
@@ -918,8 +920,30 @@ export function duplicateBuffSet(
             ? (pathNamesOf(sourceTree, placement.folderId, buffById) ?? [])
             : []
         : buffFolderPath(source.name)
+    /** @desc 目标同级名字（文件夹 + Buff 短名）：复制名撞车时继续补 `#` */
+    const siblingNames = new Set<string>()
+    let targetChildren: BuffTreeNode[] | null = null
+    if (placement) {
+        if (placement.folderId !== null) {
+            const located = findNode(sourceTree, placement.folderId)
+            targetChildren = located?.node.kind === 'folder' ? located.node.children : null
+        } else {
+            targetChildren = sourceTree[placement.tab]
+        }
+    }
+    if (targetChildren) {
+        for (const node of targetChildren) {
+            siblingNames.add(node.kind === 'folder' ? node.name : buffLeafName(buffById.get(node.buffId)?.name ?? ''))
+        }
+    } else {
+        const folderKey = folderPath.join(BUFF_PATH_SEP)
+        for (const buff of _buffSets) {
+            if (buff.id === id) continue
+            if (buffFolderPath(buff.name).join(BUFF_PATH_SEP) === folderKey) siblingNames.add(buffLeafName(buff.name))
+        }
+    }
     const requested = customName ? sanitizeLeafName(customName) : ''
-    const leaf = requested || `${buffLeafName(source.name)} 复制`
+    const leaf = uniqueLeafName(requested || `${buffLeafName(source.name)} 复制`, siblingNames)
     const buffSet: BuffConf = {
         ...source,
         id: newId,
@@ -961,32 +985,27 @@ export function setBuffSetScope(setId: string, scope: 'all' | number[]) {
     _buffSets = _buffSets.map((s) => (s.id === setId ? { ...s, scope } : s))
 }
 
-/** @desc 设置 Buff 实例级生效条件（链条件 / 阶条件等硬性条件挂这里） */
-export function setBuffSetCondition(setId: string, condition: BuffCondition | null) {
+/**
+ * @desc 设置 Buff 级规则（全部 AND；空数组 = 无条件，字段一并清除）。
+ *
+ * `_buffSets` 里只保留合法规则（`normalizeRules`）。`buffActive` 的成环校验在界面层完成
+ * （`cyclePathOf` 用于创建/编辑时给 toast）；这里只做结构归一化，保证任何写入路径都不会留下脏规则。
+ */
+export function setBuffSetRules(setId: string, rules: BuffRule[] | null) {
     if (!assertUnlocked()) return
-    const normalized = condition ? normalizeCondition(condition, 'buff') : null
+    const normalized = normalizeRules(rules ?? undefined)
     markTableDirty()
     _buffSets = _buffSets.map((s) =>
-        s.id === setId
-            ? {
-                  ...s,
-                  ...(normalized && !isConditionEmpty(normalized)
-                      ? { condition: normalized }
-                      : { condition: undefined })
-              }
-            : s
+        s.id === setId ? { ...s, ...(normalized ? { rules: normalized } : { rules: undefined }) } : s
     )
 }
 
-/** @desc 设置条件参考角色槽位（链/精炼条件的参考角色） */
-export function setBuffSetConditionRef(setId: string, charIdx: number | null) {
+/** @desc 把某角色的槽位从规则里换掉（链/阶/面板规则的角色归属整体重指） */
+export function rewriteBuffRuleOwner(setId: string, charIdx: number) {
     if (!assertUnlocked()) return
-    markTableDirty()
-    _buffSets = _buffSets.map((s) =>
-        s.id === setId
-            ? { ...s, ...(charIdx !== null ? { conditionRefCharIdx: charIdx } : { conditionRefCharIdx: undefined }) }
-            : s
-    )
+    const buff = _buffSets.find((s) => s.id === setId)
+    if (!buff) return
+    setBuffSetRules(setId, rewriteOwnerInRules(buff.rules, charIdx) ?? null)
 }
 
 /** @desc 对某个 Buff 的乘区条目列表做不可变变换 */
@@ -1023,7 +1042,7 @@ export function setZoneValueAt(setId: string, zoneIndex: number, value: number):
 
 /** @desc 按下标设置某乘区条目的生效条件（链/阶会被强制剥离，属整块硬性条件） */
 export function setZoneConditionAt(setId: string, zoneIndex: number, condition: BuffCondition | null): void {
-    const normalized = condition ? normalizeConditionForScope(normalizeCondition(condition, 'zone'), 'zone') : null
+    const normalized = condition ? normalizeCondition(condition) : null
     const isEmpty = !normalized || isConditionEmpty(normalized)
     updateZoneAt(setId, zoneIndex, (z) => ({
         ...z,
@@ -1077,7 +1096,7 @@ export function getBuffSetZoneCondition(setId: string, zoneId: string): BuffCond
  */
 export function setBuffSetZoneCondition(setId: string, zoneId: string, condition: BuffCondition | null): void {
     if (!assertUnlocked()) return
-    const normalized = condition ? normalizeConditionForScope(normalizeCondition(condition, 'zone'), 'zone') : null
+    const normalized = condition ? normalizeCondition(condition) : null
     const isEmpty = !normalized || isConditionEmpty(normalized)
     markTableDirty()
     _buffSets = _buffSets.map((s) => {
@@ -1129,13 +1148,6 @@ export function setBuffSetZoneOverride(setId: string, zoneId: string, override: 
     })
 }
 
-/** @desc 切换收藏标记 */
-export function toggleBuffSetStarred(id: string) {
-    if (!assertUnlocked()) return
-    markTableDirty()
-    _buffSets = _buffSets.map((s) => (s.id === id ? { ...s, starred: !s.starred } : s))
-}
-
 /** @desc 并入/移出全局：并入时清理该 buff 在全部条目上的绑定并加入全局列表，随后重建全局绑定 */
 export function setBuffSetGlobal(id: string, global: boolean): boolean {
     if (!assertUnlocked()) return false
@@ -1171,36 +1183,48 @@ export function setBuffSetGlobal(id: string, global: boolean): boolean {
     return true
 }
 
-/** @desc 删除 Buff 块（全局 buff 不可删），同时清理所有条目上的绑定 */
-export function deleteBuffSet(id: string) {
-    if (!assertUnlocked()) return
-    if (_globalBuffSetIds.includes(id)) return
-    markTableDirty()
-    _buffSets = _buffSets.filter((s) => s.id !== id)
-    const next: Record<string, string[]> = {}
-    for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
-        const filtered = setIds.filter((sid) => sid !== id)
-        if (filtered.length > 0) next[entryId] = filtered
-    }
-    _damageEntryBuffSetIds = next
-    removeBuffNodesFromTree([id])
+/** @desc 删除前预览：删除这些 Buff 会**级联**带走哪些依赖方（含传入项自身；不含受保护的全局 Buff） */
+export function buffDeleteCascadeOf(ids: readonly string[]): string[] {
+    const deletable = _buffSets.filter((b) => !_globalBuffSetIds.includes(b.id))
+    const roots = ids.filter((id) => !_globalBuffSetIds.includes(id))
+    const cascade = cascadeDeleteIdsOf(deletable, roots)
+    return cascade.filter((id) => deletable.some((b) => b.id === id))
 }
 
-/** @desc 批量删除 Buff 块（跳过全局 buff），同时清理所有条目上的绑定 */
+/** @desc 删除 Buff 块（全局 buff 不可删），级联删除依赖它的 Buff 并清理所有条目上的绑定 */
+export function deleteBuffSet(id: string) {
+    deleteBuffSets([id])
+}
+
+/**
+ * @desc 批量删除 Buff 块（跳过全局 buff），同时清理所有条目上的绑定。
+ *
+ * **级联语义**：某个 Buff 的 `buffActive` 规则引用了被删项时，它自己也就永远无法生效 ——
+ * 因此级联删除这些依赖方（`all` 规则引用任一被删即删；`any` 规则引用全部被删才删）。
+ * 界面上由调用方先用 `buffDeleteCascadeOf` 列出将级联删除的项并二次确认。
+ * 存活的 Buff 上，被删项的引用会被从 `buffActive` 里剪掉（`any` 规则因此继续按存活项判定）。
+ */
 export function deleteBuffSets(ids: string[]) {
     if (!assertUnlocked()) return
-    const targets = ids.filter((id) => !_globalBuffSetIds.includes(id))
-    if (targets.length === 0) return
-    const idSet = new Set(targets)
+    const roots = ids.filter((id) => !_globalBuffSetIds.includes(id))
+    if (roots.length === 0) return
+    const cascade = buffDeleteCascadeOf(roots)
+    const removed = new Set(cascade)
+    if (removed.size === 0) return
     markTableDirty()
-    _buffSets = _buffSets.filter((s) => !idSet.has(s.id))
+    _buffSets = _buffSets.flatMap((s) => {
+        if (removed.has(s.id)) return []
+        const pruned = pruneRuleDependencies(s.rules, cascade)
+        if (pruned === s.rules) return [s]
+        return [{ ...s, ...(pruned ? { rules: pruned } : { rules: undefined }) }]
+    })
     const next: Record<string, string[]> = {}
     for (const [entryId, setIds] of Object.entries(_damageEntryBuffSetIds)) {
-        const filtered = setIds.filter((sid) => !idSet.has(sid))
+        const filtered = setIds.filter((sid) => !removed.has(sid))
         if (filtered.length > 0) next[entryId] = filtered
     }
     _damageEntryBuffSetIds = next
-    removeBuffNodesFromTree(targets)
+    removeBuffNodesFromTree([...removed])
 }
 
 /** @desc 批量并入/移出全局（跳过 global- 内置块），并入时清理条目绑定并重建全局自动绑定 */
@@ -1542,6 +1566,20 @@ export function getBuffTree(): BuffTreeState {
 /** @desc 读某个 tab 的根节点列表 */
 export function getBuffTreeRoot(tab: 'global' | 'nonGlobal'): BuffTreeNode[] {
     return getBuffTree()[tab]
+}
+
+/**
+ * @desc 清理空文件夹（**只在 Buff 弹窗关闭 / 保存时调用**）：全局与非全局两棵树都清，根节点受保护。
+ *
+ * 时机是刻意选的：新建 Buff 的文件夹选择器会临时建出空文件夹，即时清理会把用户刚建的文件夹删掉
+ * （见 requirements.md A1）；放到关闭/保存时清理，用户看不到「自己刚建就被删」。
+ * 返回被清掉的文件夹数量（0 = 无变化，不写状态）。
+ */
+export function pruneEmptyBuffFolders(): number {
+    const { tree, removedIds } = pruneEmptyFolders(normalizeBuffTree(_buffTree, _buffSets, _globalBuffSetIds))
+    if (removedIds.length === 0) return 0
+    commitBuffTree(tree)
+    return removedIds.length
 }
 
 /** @desc 树是文件夹/排序真源：把每个 Buff 的全名同步成「树路径 + 短名」 */

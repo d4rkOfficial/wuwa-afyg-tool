@@ -20,14 +20,12 @@ export {
     type Migration
 } from './shared'
 export {
-    gateKindsOf,
     isEmptyBuff,
     migrateCalcState,
     normalizeBuff,
     normalizeCalcState,
     normalizeZoneList,
-    normalizeZones,
-    splitDualGateBuffs
+    normalizeZones
 } from './buff'
 export { migrateHeavyPressOpBlocks, dedupeDamageBlockIds } from './timeline'
 export { migrateBuffFolderNaming } from './buff-folders'

@@ -109,7 +109,9 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
             'scope 应分别指向 0/1 号位'
         )
         assert.deepEqual(
-            written.map((s) => s.condition?.chains?.[0]?.charIdx).sort((a, b) => (a ?? 0) - (b ?? 0)),
+            written
+                .map((s) => s.rules?.find((rule) => rule.kind === 'chain')?.charIdx)
+                .sort((a, b) => (a ?? 0) - (b ?? 0)),
             [0, 1],
             '角色本体门也要落到各自的主人身上'
         )
@@ -173,7 +175,7 @@ describe('导入落点：实体来源决定归属文件夹', () => {
         const items = buildEntityImportItems(entityWith('echo', '声骸X', '首位声骸效果', 'self'), TEAM)
         const item = items[0]
         assert.equal(item.targetName, '甲-声骸X\\首位声骸效果')
-        assert.deepEqual(item.condition?.chains, [{ charIdx: 0, min: 0 }], '条件仍是角色本体，不是声骸条件')
+        assert.deepEqual(item.rules, [{ kind: 'chain', charIdx: 0, min: 0 }], '规则仍是角色本体门，不是声骸条件')
     })
 
     it('套装：进 角色-套装名-x件', () => {

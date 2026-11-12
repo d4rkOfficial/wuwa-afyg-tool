@@ -25,14 +25,6 @@ const TEAM = [
     { character: null, weapon: null, triggerSets: [], echoes: [] }
 ] as unknown as [CharSlot, CharSlot, CharSlot]
 
-const buff = (id: string, name: string, condition: BuffInstance['condition']): BuffInstance => ({
-    id,
-    name,
-    zones: [{ zoneId: 'atkPct', value: 10 }],
-    scope: 'all',
-    ...(condition ? { condition } : {})
-})
-
 const tree: BuffTreeState = {
     global: [],
     nonGlobal: [
@@ -101,13 +93,20 @@ const projectOf = (buffs: BuffInstance[], buffTree: BuffTreeState = tree): Recor
     }
 })
 
+/**
+ * @desc v6 及更早的工程数据：**实例级 condition**（chains / refinements）。
+ * 迁移到 v7 时必须升级为 `rules`，因此这里刻意保留旧形状（不能直接用新 helper 构造）。
+ */
+const legacyBuff = (id: string, name: string, condition: Record<string, unknown>): BuffInstance =>
+    ({ id, name, zones: [{ zoneId: 'atkPct', value: 10 }], scope: 'all', condition }) as unknown as BuffInstance
+
 const BUFFS = [
-    buff('b-body', '甲本体\\本体效果', { chains: [{ charIdx: 0, min: 0 }] }),
-    buff('b-chain', '甲2链\\链效果', { chains: [{ charIdx: 0, min: 2 }] }),
-    buff('b-weapon', '甲的武器A\\武器效果', { refinements: [{ charIdx: 0, min: 1 }] }),
-    buff('b-echo', '甲本体\\声骸X\\声骸效果', { chains: [{ charIdx: 0, min: 0 }] }),
-    buff('b-set', '甲本体\\套装S\\套装效果', { chains: [{ charIdx: 0, min: 0 }] }),
-    buff('b-unknown', '甲本体\\未知来源\\普通效果', { chains: [{ charIdx: 0, min: 0 }] })
+    legacyBuff('b-body', '甲本体\\本体效果', { chains: [{ charIdx: 0, min: 0 }] }),
+    legacyBuff('b-chain', '甲2链\\链效果', { chains: [{ charIdx: 0, min: 2 }] }),
+    legacyBuff('b-weapon', '甲的武器A\\武器效果', { refinements: [{ charIdx: 0, min: 1 }] }),
+    legacyBuff('b-echo', '甲本体\\声骸X\\声骸效果', { chains: [{ charIdx: 0, min: 0 }] }),
+    legacyBuff('b-set', '甲本体\\套装S\\套装效果', { chains: [{ charIdx: 0, min: 0 }] }),
+    legacyBuff('b-unknown', '甲本体\\未知来源\\普通效果', { chains: [{ charIdx: 0, min: 0 }] })
 ]
 
 const migrate = (buffs: BuffInstance[] = BUFFS) => {
@@ -144,12 +143,12 @@ describe('Buff 文件夹命名迁移', () => {
         assert.ok(names.includes('甲-本体\\未知来源\\普通效果'), '认不出来源的 Buff 留在本体')
     })
 
-    it('条件不变：声骸 / 套装仍是角色本体门，武器仍是原阶条件', () => {
+    it('规则不变：声骸 / 套装仍是角色本体门，武器仍是原阶条件', () => {
         const calc = migrate()
         const byName = new Map(calc.buffSets.map((b) => [b.name, b]))
-        assert.deepEqual(byName.get('甲-声骸X\\声骸效果')?.condition?.chains, [{ charIdx: 0, min: 0 }])
-        assert.deepEqual(byName.get('甲-套装S-2件\\套装效果')?.condition?.chains, [{ charIdx: 0, min: 0 }])
-        assert.deepEqual(byName.get('甲-武器A\\武器效果')?.condition?.refinements, [{ charIdx: 0, min: 1 }])
+        assert.deepEqual(byName.get('甲-声骸X\\声骸效果')?.rules, [{ kind: 'chain', charIdx: 0, min: 0 }])
+        assert.deepEqual(byName.get('甲-套装S-2件\\套装效果')?.rules, [{ kind: 'chain', charIdx: 0, min: 0 }])
+        assert.deepEqual(byName.get('甲-武器A\\武器效果')?.rules, [{ kind: 'refinement', charIdx: 0, min: 1 }])
     })
 
     it('显式树同步改名并删掉被搬空的来源文件夹，新归属文件夹由树归一化补出', () => {

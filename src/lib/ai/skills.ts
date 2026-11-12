@@ -152,15 +152,20 @@ export const BUILTIN_SKILLS: AiSkill[] = [
     {
         id: SKILL_IDS.buffConditions,
         name: '条件与链阶',
-        description: '配置 Buff 生效条件（乘区级伤害类型/属性、实例级链/阶硬性条件）时的规则与口径',
+        description: '配置 Buff 生效条件（乘区级伤害类型/属性、Buff 级 rules 规则）时的规则与口径',
         enabled: true,
         mode: 'passive',
         builtin: true,
         body: `本工具的条件系统口径（回答用户或写配置时严格遵守）：
 1. 伤害类型条件、伤害属性条件挂在**具体乘区**上（BuffZoneValue.condition）：不满足时只有该乘区不计入，同一条目其它乘区照常生效。
-2. 链条件与阶条件是**整个 BUFF 的硬性条件**，只能设在 BUFF 实例级（BuffInstance.condition），且同一个 BUFF 只能生效其中一个（链与阶互斥）。
-3. 链/阶档位的真源是角色槽位 team[i].chain / team[i].refinement，由「角色详情配置」设置，不是可编辑变量。
-4. 同一个 BUFF 允许存在多个同名变体（variants），每个变体有自己的乘区与子条件，满足者全部叠加。`
+2. Buff 级条件是**规则列表**（BuffInstance.rules，用 set_buff_conf_rules 设置），规则之间**全部 AND**；种类：
+   chain（某角色共鸣链 ≥ N） / refinement（武器精炼 ≥ N） / damageNameRegex（伤害条目 displayName 正则包含匹配） /
+   damageNameEquals（displayName 全等） / zoneCompare（某角色面板数值比较，charIdx=-1 表示伤害条目的角色，
+   只读「无条件部分」面板） / enemyType（BOSS / 精英怪 / 小怪） / buffActive（all=全部生效 / any=至少一个生效，引用其它 BUFF）。
+3. **链与阶可以并存**（不再互斥、也不会拆分 Buff）；旧字段 condition.chain / condition.refinement / chains / refinements 已废弃。
+4. 链/阶档位的真源是角色槽位 team[i].chain / team[i].refinement，由「角色详情配置」设置，不是可编辑变量。
+5. buffActive 引用**禁止成环**（含直接自引用），会被工具拒绝；删除被引用的 BUFF 会级联删除依赖它的 BUFF。
+6. 生效成员（scope）：'all'=全队（三角色+效应）/ [0,1,2]=仅角色全选 / []=仅效应 / 子集=指定角色。`
     }
 ]
 

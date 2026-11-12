@@ -30,32 +30,30 @@ const buff = (id: string, patch: Partial<BuffInstance> = {}): BuffInstance => ({
     ...patch
 })
 
-const chain = (charIdx: number, min: number): BuffInstance['condition'] => ({ chains: [{ charIdx, min }] })
-const refine = (charIdx: number, min: number): BuffInstance['condition'] => ({ refinements: [{ charIdx, min }] })
+const chain = (charIdx: number, min: number): BuffInstance['rules'] => [{ kind: 'chain', charIdx, min }]
+const refine = (charIdx: number, min: number): BuffInstance['rules'] => [{ kind: 'refinement', charIdx, min }]
 
 describe('粗分类落点', () => {
     it('本体 / 单链 / 单阶武器 / 其它', () => {
-        assert.deepEqual(coarsePathOf(buff('a', { condition: chain(1, 0) }), TEAM), {
+        assert.deepEqual(coarsePathOf(buff('a', { rules: chain(1, 0) }), TEAM), {
             tab: 'nonGlobal',
             folder: '乙-本体'
         })
-        assert.deepEqual(coarsePathOf(buff('b', { condition: chain(1, 2) }), TEAM), {
+        assert.deepEqual(coarsePathOf(buff('b', { rules: chain(1, 2) }), TEAM), {
             tab: 'nonGlobal',
             folder: '乙-2链'
         })
-        assert.deepEqual(coarsePathOf(buff('c', { condition: refine(0, 1) }), TEAM), {
+        assert.deepEqual(coarsePathOf(buff('c', { rules: refine(0, 1) }), TEAM), {
             tab: 'nonGlobal',
             folder: '甲-武器甲'
         })
         assert.deepEqual(
             coarsePathOf(
                 buff('d', {
-                    condition: {
-                        chains: [
-                            { charIdx: 0, min: 1 },
-                            { charIdx: 1, min: 2 }
-                        ]
-                    }
+                    rules: [
+                        { kind: 'chain', charIdx: 0, min: 1 },
+                        { kind: 'chain', charIdx: 1, min: 2 }
+                    ]
                 }),
                 TEAM
             ),
@@ -74,10 +72,10 @@ describe('粗分类落点', () => {
 describe('迁移：数字前后缀建二级文件夹并改短名', () => {
     it('同前缀数字成员收进数字文件夹、升序、改短名', () => {
         const buffs = [
-            buff('a1', { name: '火光1层', condition: chain(0, 0) }),
-            buff('b', { name: '普通Buff', condition: chain(0, 0) }),
-            buff('a10', { name: '火光10层', condition: chain(0, 0) }),
-            buff('a2', { name: '火光2层', condition: chain(0, 0) })
+            buff('a1', { name: '火光1层', rules: chain(0, 0) }),
+            buff('b', { name: '普通Buff', rules: chain(0, 0) }),
+            buff('a10', { name: '火光10层', rules: chain(0, 0) }),
+            buff('a2', { name: '火光2层', rules: chain(0, 0) })
         ]
         const migrated = migrateLegacyBuffTree(buffs, TEAM)
         assert.equal(migrated.tree.nonGlobal.length, 1)
@@ -114,10 +112,10 @@ describe('迁移：数字前后缀建二级文件夹并改短名', () => {
 
     it('前缀相同但后缀不同不合并；全名带条件路径', () => {
         const buffs = [
-            buff('a', { name: '锁3链 共鸣解放时 增伤', condition: chain(0, 0) }),
-            buff('b', { name: '锁3链 同奏增益', condition: chain(0, 0) }),
-            buff('c', { name: '火光1层', condition: chain(0, 0) }),
-            buff('d', { name: '火光2层', condition: chain(0, 0) })
+            buff('a', { name: '锁3链 共鸣解放时 增伤', rules: chain(0, 0) }),
+            buff('b', { name: '锁3链 同奏增益', rules: chain(0, 0) }),
+            buff('c', { name: '火光1层', rules: chain(0, 0) }),
+            buff('d', { name: '火光2层', rules: chain(0, 0) })
         ]
         const migrated = migrateLegacyBuffTree(buffs, TEAM)
         assert.deepEqual(
@@ -135,10 +133,10 @@ describe('迁移：数字前后缀建二级文件夹并改短名', () => {
 
     it('同前缀不同后缀两组都 ≥2 时用 （后缀） 区分文件夹', () => {
         const buffs = [
-            buff('a', { name: '火光1层', condition: chain(0, 0) }),
-            buff('b', { name: '火光2层', condition: chain(0, 0) }),
-            buff('c', { name: '火光1阶', condition: chain(0, 0) }),
-            buff('d', { name: '火光2阶', condition: chain(0, 0) })
+            buff('a', { name: '火光1层', rules: chain(0, 0) }),
+            buff('b', { name: '火光2层', rules: chain(0, 0) }),
+            buff('c', { name: '火光1阶', rules: chain(0, 0) }),
+            buff('d', { name: '火光2阶', rules: chain(0, 0) })
         ]
         const migrated = migrateLegacyBuffTree(buffs, TEAM)
         const body = migrated.tree.nonGlobal[0]
@@ -204,11 +202,11 @@ describe('导入追加与撞名 #', () => {
     it('本体/单链建一级文件夹，同路径追加，撞名 Buff 加 #', () => {
         const buffs = new Map<string, BuffInstance>()
         let tree = emptyBuffTree()
-        const b1 = buff('a', { name: '甲-本体\\暴击', condition: chain(0, 0) })
+        const b1 = buff('a', { name: '甲-本体\\暴击', rules: chain(0, 0) })
         buffs.set(b1.id, b1)
         tree = appendBuffToTree(tree, b1, TEAM, buffs)
 
-        const b2 = buff('b', { name: '暴击', condition: chain(0, 0) })
+        const b2 = buff('b', { name: '暴击', rules: chain(0, 0) })
         buffs.set(b2.id, b2)
         const name = importedBuffName('暴击', tree.nonGlobal, '甲-本体', buffs)
         assert.equal(name, '甲-本体\\暴击#')
@@ -289,10 +287,10 @@ describe('文件夹图标', () => {
 
     it('同角色纯链：头像 + 范围（本体 0 不出现在角标）', () => {
         const icon = iconOf([
-            buff('a', { condition: chain(1, 0) }),
-            buff('b', { condition: chain(1, 1) }),
-            buff('c', { condition: chain(1, 2) }),
-            buff('d', { condition: chain(1, 4) })
+            buff('a', { rules: chain(1, 0) }),
+            buff('b', { rules: chain(1, 1) }),
+            buff('c', { rules: chain(1, 2) }),
+            buff('d', { rules: chain(1, 4) })
         ])
         assert.equal(icon.kind, 'character')
         assert.equal(icon.charIdx, 1)
@@ -303,21 +301,15 @@ describe('文件夹图标', () => {
     })
 
     it('同角色纯阶：武器图标 + 阶范围', () => {
-        const icon = iconOf([buff('a', { condition: refine(0, 1) }), buff('b', { condition: refine(0, 2) })])
+        const icon = iconOf([buff('a', { rules: refine(0, 1) }), buff('b', { rules: refine(0, 2) })])
         assert.equal(icon.kind, 'weapon')
         assert.equal(icon.weapon, '武器甲')
         assert.deepEqual(icon.refineRanges, [{ from: 1, to: 2 }])
     })
 
     it('跨角色 / 链阶混合 → generic；空 → empty；纯效应 → effect', () => {
-        assert.equal(
-            iconOf([buff('a', { condition: chain(0, 1) }), buff('b', { condition: chain(1, 1) })]).kind,
-            'generic'
-        )
-        assert.equal(
-            iconOf([buff('a', { condition: chain(0, 1) }), buff('b', { condition: refine(0, 1) })]).kind,
-            'generic'
-        )
+        assert.equal(iconOf([buff('a', { rules: chain(0, 1) }), buff('b', { rules: chain(1, 1) })]).kind, 'generic')
+        assert.equal(iconOf([buff('a', { rules: chain(0, 1) }), buff('b', { rules: refine(0, 1) })]).kind, 'generic')
         assert.equal(iconOf([]).kind, 'empty')
         assert.equal(iconOf([buff('a', { scope: [] })]).kind, 'effect')
     })

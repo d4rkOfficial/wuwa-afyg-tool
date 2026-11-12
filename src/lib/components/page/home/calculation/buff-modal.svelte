@@ -1,10 +1,13 @@
 <script lang="ts">
-    /** @desc BUFF 配置弹窗：左侧 Buff 块列表（叠层文件夹/拖拽排序/拖出删除）、右侧块编辑器（作用域/生效条件/乘区数值与引用/追加覆盖）、右栏乘区清单，含速查与导入入口 */
+    /**
+     * @desc BUFF 配置弹窗：标题栏「BUFF 配置」+ 全局/非全局胶囊 tab + 导入入口；
+     * 左侧 Buff 块列表（文件夹/拖拽排序/拖出删除/多选/上下文全局操作）；
+     * 右侧块编辑器三个 tab（具体效果 / 生效成员 / 门槛条件），仅「具体效果」展开右栏乘区清单。
+     */
     import {
         getAllBuffConfs,
         createBuffSet,
-        takePendingFocusBuffSetId,
-        deleteBuffSet,
+        deleteBuffSets,
         duplicateBuffSet,
         renameBuffSet,
         addZoneToBuffSet,
@@ -14,10 +17,9 @@
         setZoneRefAt,
         setZoneConditionAt,
         setBuffSetScope,
-        setBuffSetCondition,
-        setBuffSetConditionRef,
+        setBuffSetRules,
+        buffDeleteCascadeOf,
         getGlobalBuffSetIds,
-        toggleBuffSetStarred,
         setBuffSetGlobal,
         setBuffSetsGlobal,
         getBuffTree,
@@ -26,6 +28,7 @@
         deleteBuffTreeFolder,
         moveBuffTreeNode,
         moveBuffFolderSibling,
+        pruneEmptyBuffFolders,
         setShowBuffModal
     } from '$lib/calc/calculation.store.svelte'
     import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
@@ -34,7 +37,11 @@
     import { findBuffPlacement, findNode } from '$lib/calc/buff-tree-state'
     import { buffLeafName } from '$lib/calc/buff-name'
     import type { CharSlot } from '$lib/types/project'
-    import type { ZoneRef, BuffConf, BuffCondition, BuffTreeNode } from '$lib/calc/calculation.types'
+    import type { BuffRule, ZoneRef, BuffConf, BuffCondition, BuffTreeNode } from '$lib/calc/calculation.types'
+    import { cyclePathOf } from '$lib/calc/rules'
+    import { slide } from 'svelte/transition'
+    import { MOTION_MS, slideParams } from '$lib/utils/motion'
+    import type { BuffEditorTab } from './buff-modal-editor.svelte'
     import { getCharIconMap, elementColor, getLocked } from '$lib/calc/timeline.store.svelte'
     import { getWeaponIcons } from '$lib/api/data-cache'
     import { addToast } from '$lib/data/toast.svelte'
@@ -51,7 +58,6 @@
     import BuffModalFolderRenameModal from './buff-modal-folder-rename-modal.svelte'
     import BuffFolderNameModal from './buff-folder-name-modal.svelte'
     import BuffFolderPickerModal from './buff-folder-picker-modal.svelte'
-    import BuffModalCopyModal from './buff-modal-copy-modal.svelte'
     import { onMount } from 'svelte'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
@@ -61,13 +67,8 @@
     import type { DragState, RefModalState } from './buff-modal.utils'
     import {
         ZONE_BAR_WIDTH,
-        conditionSummaryOf,
-        conditionWithRefCharIdx,
-        copyNameOptions,
         createRefModalState,
         folderMembersOf,
-        nextConditionForChain,
-        nextConditionForRefinement,
         pctOfFraction,
         simplifyPct,
         toggledSet
@@ -85,13 +86,16 @@
 
     let { open, team, onclose, class: className, style: styleProp }: Props = $props()
 
-    /** @desc 关闭时先直接落 store，避免父级持久化异常导致弹窗关不掉 */
+    /**
+     * @desc 关闭弹窗：**先清理空文件夹**再落 store（清理只在关闭/保存时做，见 requirements.md A1）。
+     * 清理会走 `commitBuffTree` 一并持久化，所以不需要在这里额外落一次快照。
+     */
     const handleModalClose = () => {
+        pruneEmptyBuffFolders()
         setShowBuffModal(false)
         onclose()
     }
 
-    let showLookup = $state(false)
     let showRefLookup = $state(false)
     let showImport = $state(false)
 
@@ -124,8 +128,10 @@
     /** @desc 将被整目录删除的 Buff id（拖出列表松手后确认删除；按数据算，折叠状态也能删） */
     let deleteFolderMemberIds = $state<string[]>([])
     let deleteFolderCount = $derived(deleteFolderMemberIds.length)
-    let showCopyOptions = $state(false)
-    let copyOptions = $state<string[]>([])
+    /** @desc 删除该文件夹时会**级联**带走多少条依赖方（条件里引用了将被删 BUFF 的 Buff） */
+    const deleteFolderCascadeExtra = $derived(
+        Math.max(0, buffDeleteCascadeOf(deleteFolderMemberIds).length - deleteFolderMemberIds.length)
+    )
 
     /** @desc 文件夹右键菜单：菜单位置/开关/当前目标 folder（普通与全局文件夹共用） */
     let folderMenuOpen = $state(false)
@@ -140,6 +146,9 @@
     /** @desc 「移入文件夹」二级弹窗：目标 Buff + 当前文件夹 */
     let showMovePicker = $state(false)
     let movePickerTargetId = $state<string | null>(null)
+    /** @desc 新建 BUFF 前的文件夹选择弹窗；取消时回滚本次新建的文件夹 */
+    let showCreateBuffPicker = $state(false)
+    let pendingCreatedFolderIds = $state<string[]>([])
     /** @desc 文件夹批量重命名弹窗 */
     let showFolderRename = $state(false)
     let folderRenameTarget = $state<GroupedBuffConfItem | null>(null)
@@ -188,25 +197,10 @@
         }
     })
 
-    /**
-     * @desc 从速查右键菜单「以此为名创建BUFF」进来时：自动选中并滚动到刚新建的那条
-     * （id 由 createBuffSet 返回后写入 pending，这里消费一次）
-     */
-    $effect(() => {
-        if (!open) return
-        const id = takePendingFocusBuffSetId()
-        if (!id) return
-        selectedBuffSetId = id
-        requestAnimationFrame(() => {
-            document
-                .querySelector<HTMLElement>(`[data-buffset-id="${id}"]`)
-                ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-        })
-    })
-
-    /** @desc 名称编辑输入框（在编辑器组件内），父组件在「新建 / 右键重命名」后调用它聚焦 */
     let renameInputEl = $state<HTMLInputElement | null>(null)
-    /** @desc 新建 / 右键重命名后，等 DOM 更新再聚焦并全选名称（原来散在 3 处，收敛为一处） */
+    /**
+     * @desc 名称编辑输入框（在编辑器组件内），父组件在「新建 / 右键重命名」后调用它聚焦
+     */
     const focusRenameInput = () => {
         requestAnimationFrame(() => {
             renameInputEl?.focus()
@@ -273,33 +267,98 @@
         showMovePicker = false
     }
 
-    let scopeChars = $derived.by(() => {
-        if (!selectedBuffSet || selectedBuffSet.scope === 'all') return [true, true, true]
-        const s = selectedBuffSet.scope
-        return team.map((_, i) => s.includes(i))
-    })
-
-    let isNonCharBuff = $derived(
-        !!selectedBuffSet &&
-            selectedBuffSet.scope !== 'all' &&
-            Array.isArray(selectedBuffSet.scope) &&
-            selectedBuffSet.scope.length === 0
-    )
-
-    /** @desc 新建 Buff 块：先创建（默认名），选中后自动聚焦名称编辑框供用户填写 */
+    /** @desc 新建 Buff 块：先选文件夹（可在选择器里新建子文件夹），确认后才创建并聚焦改名 */
     function handleCreateBuffSet() {
-        const newId = createBuffSet('未命名BUFF块', { tab: activeTab })
-        if (!newId) return
+        pendingCreatedFolderIds = []
+        showCreateBuffPicker = true
+    }
+
+    /** @desc 选择器内新建文件夹：记下 id 供取消时回滚（全局树不可回滚，调用方已禁用） */
+    function createFolderForNewBuff(parentId: string | null, name: string): string | undefined {
+        const id = createBuffTreeFolder(name, activeTab, parentId)
+        if (id) pendingCreatedFolderIds = [...pendingCreatedFolderIds, id]
+        return id
+    }
+
+    /** @desc 回滚本次选择器里新建的文件夹（倒序，只删空文件夹，不碰用户已有内容） */
+    function rollbackCreatedFolders() {
+        const ids = [...pendingCreatedFolderIds].reverse()
+        pendingCreatedFolderIds = []
+        for (const id of ids) {
+            const located = findNode(getBuffTree(), id)
+            if (located?.node.kind === 'folder' && located.node.children.length === 0) deleteBuffTreeFolder(id)
+        }
+    }
+
+    function cancelCreateBuffPicker() {
+        showCreateBuffPicker = false
+        rollbackCreatedFolders()
+    }
+
+    /** @desc 确认落点后创建 Buff；创建失败（锁定等）同样回滚新文件夹 */
+    function confirmCreateBuff(folderId: string | null) {
+        const newId = createBuffSet('未命名BUFF块', { tab: activeTab, folderId })
+        if (!newId) {
+            showCreateBuffPicker = false
+            rollbackCreatedFolders()
+            return
+        }
+        pendingCreatedFolderIds = []
+        showCreateBuffPicker = false
+        if (folderId) expandFolderAndAncestors(folderId)
         selectedBuffSetId = newId
         focusRenameInput()
     }
 
-    /** @desc 删除当前 Buff 块 */
+    /** @desc 新建在折叠文件夹里时展开该文件夹与祖先，避免选中了却看不见 */
+    function expandFolderAndAncestors(folderId: string) {
+        const located = findNode(getBuffTree(), folderId)
+        const ids = [folderId, ...(located?.parentFolder ? [located.parentFolder.id] : [])]
+        collapsedFolders = new Set([...collapsedFolders].filter((key) => !ids.some((id) => key.includes(id))))
+    }
+
+    /** @desc 删除确认：将被级联删除的完整集合（含传入项自身） */
+    let pendingDeleteCascade = $state<string[]>([])
+    /** @desc 用户主动删除的根集合（级联项由 store 递归算） */
+    let pendingDeleteRoots = $state<string[]>([])
+
+    /** @desc 真正删除（store 内部会级联删除依赖方并剪掉存活方的引用） */
+    function confirmDeleteBuffSets() {
+        const roots = pendingDeleteRoots
+        const cascade = pendingDeleteCascade.length > 0 ? pendingDeleteCascade : buffDeleteCascadeOf(roots)
+        pendingDeleteRoots = []
+        pendingDeleteCascade = []
+        if (roots.length === 0) return
+        deleteBuffSets(roots)
+        if (selectedBuffSetId && cascade.includes(selectedBuffSetId)) selectedBuffSetId = null
+    }
+
+    /**
+     * @desc 请求删除：**先算出级联集合**（删除被引用的 Buff 会连带删除依赖它的 Buff）。
+     * 没有级联项时直接删（保持旧行为，不额外弹窗）；有级联项时弹确认并逐条列出。
+     */
+    function requestDeleteBuffSets(roots: string[]) {
+        if (roots.length === 0) return
+        const cascade = buffDeleteCascadeOf(roots)
+        if (cascade.length <= roots.length) {
+            pendingDeleteRoots = roots
+            confirmDeleteBuffSets()
+            return
+        }
+        pendingDeleteRoots = roots
+        pendingDeleteCascade = cascade
+    }
+
+    /** @desc 删除当前选中的 Buff 块（含级联确认） */
     function handleDeleteBuffSet() {
         if (!selectedBuffSetId) return
-        deleteBuffSet(selectedBuffSetId)
-        selectedBuffSetId = null
+        requestDeleteBuffSets([selectedBuffSetId])
     }
+
+    /** @desc 级联删除确认框里列出的条目（排除用户主动删的那些，只列「被连带」的） */
+    const cascadeOnlyNames = $derived(
+        pendingDeleteCascade.filter((id) => !pendingDeleteRoots.includes(id)).map((id) => buffLabelOf(id))
+    )
 
     /** @desc 并入/移出全局（并入成功提示作用域） */
     function handleToggleGlobal() {
@@ -322,45 +381,18 @@
     }
 
     /**
-     * @desc 复制 Buff：数字文件夹内→用文件夹名前缀 + 下一个数字 + 后缀命名；
-     * 其它情况→名字带数字时列出递增命名选项，否则「名字 复制」。新块插到原块之后。
+     * @desc 复制 Buff：短名末尾补 `#`，留在原文件夹；重名时由 store 继续补 `#`（`原#` → `原##`）。
+     * 复制品仍按原逻辑解除全局（全局树受保护，不复制回全局）。
      */
     function handleCopyBuffSet() {
         if (!selectedBuffSetId || !selectedBuffSet) return
         const placement = copyPlacementOf()
-        const folderNode = placement?.folderId ? findNode(storedTree, placement.folderId)?.node : null
-        const folder = folderNode?.kind === 'folder' ? folderNode : null
-        const folderBuffs = (folder?.children ?? [])
-            .filter((child) => child.kind === 'buff')
-            .map((child) => buffSets.find((buff) => buff.id === child.buffId))
-            .filter((buff): buff is BuffConf => !!buff)
-        const parsed = folderBuffs.map((buff) => buffLeafName(buff.name).match(/^(\d+)([^\d].*)?$/))
-        if (folder && folderBuffs.length > 0 && parsed.every((match) => match !== null)) {
-            const nums = parsed.map((match) => parseInt(match![1]))
-            const ownLeaf = buffLeafName(selectedBuffSet.name)
-            const ownSuffix = ownLeaf.match(/^\d+([^\d].*)?$/)?.[1] ?? ''
-            const suffix = ownSuffix || (parsed[0]?.[2] ?? '')
-            const copyName = folder.name + (Math.max(...nums) + 1) + suffix
-            const newId = duplicateBuffSet(selectedBuffSetId, copyName, placement ?? undefined)
-            if (newId) selectedBuffSetId = newId
-            return
-        }
-        const options = copyNameOptions(buffLeafName(selectedBuffSet.name))
-        if (options.length === 1) {
-            const newId = duplicateBuffSet(selectedBuffSetId, undefined, placement ?? undefined)
-            if (newId) selectedBuffSetId = newId
-            return
-        }
-        copyOptions = options
-        showCopyOptions = true
-    }
-
-    /** @desc 确认复制（选中新块） */
-    function confirmCopyBuff(name: string) {
-        if (!selectedBuffSetId) return
-        const newId = duplicateBuffSet(selectedBuffSetId, name, copyPlacementOf() ?? undefined)
+        const newId = duplicateBuffSet(
+            selectedBuffSetId,
+            `${buffLeafName(selectedBuffSet.name)}#`,
+            placement ?? undefined
+        )
         if (newId) selectedBuffSetId = newId
-        showCopyOptions = false
     }
 
     /** @desc 重命名选中块（空名兜底；编辑器组件内 Enter/失焦触发） */
@@ -369,26 +401,52 @@
         renameBuffSet(selectedBuffSetId, value)
     }
 
-    /** @desc 切换某角色的作用域；全部选中时归为 all */
-    function handleToggleChar(idx: number) {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        const current: number[] = selectedBuffSet.scope === 'all' ? [0, 1, 2] : (selectedBuffSet.scope as number[])
-        const next = current.includes(idx) ? current.filter((i) => i !== idx) : [...current, idx].sort()
-        setBuffSetScope(selectedBuffSetId, next.length === 3 ? 'all' : next)
+    /**
+     * @desc 生效成员（作用域）变更：四态状态机在 `buff-modal-members` 里算好后交回这里写 store。
+     * 全局 Buff 的受益者被锁定，store 侧也会拒绝。
+     */
+    function handleScopeChange(scope: 'all' | number[]) {
+        if (!selectedBuffSetId) return
+        setBuffSetScope(selectedBuffSetId, scope)
     }
 
-    /** @desc 切换「效应专属」作用域（空数组=仅效应） */
-    function handleToggleNonChar() {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        setBuffSetScope(selectedBuffSetId, isNonCharBuff ? 'all' : [])
-    }
+    /** @desc 右列当前 tab：默认「具体效果」（只有它展开右侧乘区栏） */
+    let editorTab = $state<BuffEditorTab>('effect')
 
-    /** @desc 是否为默认全局 buff（global- 前缀，锁定不可编辑条件） */
+    /** @desc 是否为默认全局 buff（global- 前缀，锁定不可改名 / 条件） */
     function isDefaultGlobalBuff(): boolean {
         return !!selectedBuffSet && selectedBuffSet.id.startsWith('global-')
     }
 
-    let condPanelOpen = $state(false)
+    /**
+     * @desc 保存 Buff 级规则（门槛条件 tab）。
+     * `buffActive` 的成环校验在这里做：直接自引用与间接循环都拒绝并 toast，成功返回 null。
+     * 默认全局块（内置）不允许配条件（与旧「链/阶不可改」一致）。
+     */
+    function handleSaveRules(rules: BuffRule[]): string | null {
+        if (!selectedBuffSetId || !selectedBuffSet) return '没有选中的 BUFF'
+        if (isDefaultGlobalBuff()) return '默认全局 BUFF 无法设置条件'
+        const cycle = cyclePathOf(buffSets, selectedBuffSetId, rules)
+        if (cycle) {
+            const names = cycle.map((id) => buffLabelOf(id)).join(' → ')
+            return `条件引用成环：${names}`
+        }
+        setBuffSetRules(selectedBuffSetId, rules)
+        return null
+    }
+
+    /** @desc Buff id → 显示名（规则文案与成环提示用） */
+    const buffLabelOf = (id: string): string => {
+        const buff = buffSets.find((b) => b.id === id)
+        return buff ? buffLeafName(buff.name) : id
+    }
+
+    /** @desc `buffActive` 条件可引用的候选：当前 tab 树里的其它 Buff（不含内置默认全局块） */
+    const ruleBuffOptions = $derived(
+        buffSets
+            .filter((b) => b.id !== selectedBuffSetId && !b.id.startsWith('global-'))
+            .map((b) => ({ id: b.id, label: buffLeafName(b.name) }))
+    )
 
     /** @desc 当前 Buff 的乘区条目列表（同一乘区可多条，各自配数值/引用/覆盖/条件） */
     const selectedZones = $derived(selectedBuffSet?.zones ?? [])
@@ -436,69 +494,6 @@
         selectedBuffSetId
         expandedZoneIndex = null
     })
-
-    /** @desc 展开/收起生效条件面板 */
-    function toggleCondPanel() {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        condPanelOpen = !condPanelOpen
-    }
-
-    /** @desc 生效条件摘要文案（仅链/阶：它们是整个 BUFF 的硬性条件；属性/类型挂在乘区上） */
-    const conditionSummary = $derived(conditionSummaryOf(selectedBuffSet, team))
-
-    /** @desc 参考角色必须恰好一个：设置了链/阶但未选参考角色时，默认参考第一位 */
-    function ensureConditionRef() {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        if (selectedBuffSet.conditionRefCharIdx === undefined) setBuffSetConditionRef(selectedBuffSetId, 0)
-    }
-
-    /** @desc 当前参考角色槽位 */
-    const condRefIdx = $derived(selectedBuffSet?.conditionRefCharIdx ?? 0)
-    /** @desc 当前链门槛（chains 数组形式；兼容旧 chain 字段） */
-    const currentChain = $derived(selectedBuffSet?.condition?.chains?.[0]?.min ?? selectedBuffSet?.condition?.chain)
-    /** @desc 当前阶门槛（refinements 数组形式；兼容旧 refinement 字段） */
-    const currentRefine = $derived(
-        selectedBuffSet?.condition?.refinements?.[0]?.min ?? selectedBuffSet?.condition?.refinement
-    )
-
-    /**
-     * @desc 设置链门槛（再次点击取消）。
-     * 链条件与阶条件**只能生效其中一个**：设置链会清空全部阶条件。
-     */
-    function setBuffChain(min: number) {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        if (isDefaultGlobalBuff()) return
-        const { next, clearing } = nextConditionForChain(selectedBuffSet.condition ?? {}, min, currentChain, condRefIdx)
-        setBuffSetCondition(selectedBuffSetId, next)
-        if (!clearing) ensureConditionRef()
-    }
-
-    /** @desc 设置阶门槛（再次点击取消）；设置阶会清空全部链条件 */
-    function setBuffRefinement(min: number) {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        if (isDefaultGlobalBuff()) return
-        const { next, clearing } = nextConditionForRefinement(
-            selectedBuffSet.condition ?? {},
-            min,
-            currentRefine,
-            condRefIdx
-        )
-        setBuffSetCondition(selectedBuffSetId, next)
-        if (!clearing) ensureConditionRef()
-    }
-
-    /** @desc 设置参考角色槽位（默认全局 buff 拒绝）；链/阶门槛同步迁移到新参考角色 */
-    function setConditionRef(i: number) {
-        if (!selectedBuffSetId || !selectedBuffSet) return
-        if (isDefaultGlobalBuff()) {
-            addToast('默认全局buff无法设置链/阶条件', 'info')
-            return
-        }
-        setBuffSetConditionRef(selectedBuffSetId, i)
-        const cond = selectedBuffSet.condition
-        if (!cond) return
-        setBuffSetCondition(selectedBuffSetId, conditionWithRefCharIdx(cond, i))
-    }
 
     /**
      * @desc 打开引用配置弹窗（按**下标**定位乘区，同一乘区可添加多次）：
@@ -849,7 +844,7 @@
         return items
     })
 
-    /** @desc 右键菜单复制：选中目标后走原复制逻辑（含叠层/数字递增命名） */
+    /** @desc 右键菜单复制：选中目标后走同一套「短名 + #」逻辑 */
     function handleCopyFor(id: string) {
         selectedBuffSetId = id
         handleCopyBuffSet()
@@ -933,6 +928,51 @@
         allGlobal: multiSelectionAllGlobal()
     })
 
+    /**
+     * @desc 底部**上下文全局按钮**的作用集合：多选 → 勾选集合；非多选 → 当前选中 Buff（无选中即空）。
+     * 内置默认块（`global-` 前缀）既不能删也不能移出全局，这里一并跳过。
+     */
+    const contextGlobalIds = $derived.by(() => {
+        const ids = multiSelect ? [...multi.selectedIds] : selectedBuffSetId ? [selectedBuffSetId] : []
+        return ids.filter((id) => !id.startsWith('global-'))
+    })
+
+    /** @desc 当前 tab 决定按钮语义：全局 → 移出全局；非全局 → 并入全局 */
+    const globalActionState = $derived.by(() => {
+        const toGlobal = activeTab === 'nonGlobal'
+        const count = contextGlobalIds.length
+        const scopeText = multiSelect ? '勾选的 BUFF' : '当前选中的 BUFF'
+        return {
+            label: toGlobal ? '并入全局' : '移出全局',
+            icon: toGlobal ? 'mdi:crown-outline' : 'mdi:minus-circle-outline',
+            disabled: count === 0,
+            title:
+                count === 0
+                    ? `没有选中可操作的 BUFF（${scopeText}）`
+                    : `把${scopeText}（${count} 条）${toGlobal ? '并入全局' : '移出全局'}`
+        }
+    })
+
+    /** @desc 批量删除确认里要提示的级联条数（选中项之外还会被删掉多少） */
+    const multiDeleteCascadeExtra = $derived(
+        Math.max(0, buffDeleteCascadeOf([...multi.selectedIds]).length - multi.selectedIds.size)
+    )
+
+    /** @desc 底部上下文全局操作：多选作用勾选集合、非多选作用当前选中 Buff */
+    function handleContextGlobal() {
+        const ids = contextGlobalIds
+        if (ids.length === 0) return
+        const toGlobal = activeTab === 'nonGlobal'
+        if (!setBuffSetsGlobal(ids, toGlobal)) return
+        addToast(toGlobal ? `已并入全局 ${ids.length} 条 BUFF` : `已移出全局 ${ids.length} 条 BUFF`, 'success')
+        if (multiSelect) {
+            multi.selectedIds = new Set()
+            return
+        }
+        // 单条操作为了「搬完还看得见」跟随到目标 tab（与右键菜单的并入/移出行为一致）
+        if (ids.length === 1) activeTab = toGlobal ? 'global' : 'nonGlobal'
+    }
+
     /** @desc 武器图标表（按需加载，失败静默；角色详情/队伍配置共用同一份数据） */
     let weaponIcons = $state<Record<string, string>>({})
     $effect(() => {
@@ -951,134 +991,192 @@
     {#snippet title()}
         <Icon icon="mdi:widgets" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
         <span>BUFF 配置</span>
-        <!-- @desc 标题栏右侧：导入Buff集/速查入口 -->
-        <div class="ml-auto mr-4 flex items-center gap-1">
-            <button
-                onclick={() => (showImport = true)}
-                class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+        <!-- @desc 标题栏「BUFF 配置」右侧：全局/非全局胶囊 tab；空工程时随内容一起隐藏 -->
+        {#if buffSets.length > 0}
+            <div
+                class="ml-3 flex shrink-0 overflow-hidden border"
+                style="border-color: var(--theme-divider-border);"
+                role="tablist"
+                aria-label="BUFF 作用域"
             >
-                <Icon icon="mdi:import" class="size-3.5" />
-                导入Buff集
-            </button>
-            <button
-                onclick={() => (showLookup = true)}
-                class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
-            >
-                <Icon icon="mdi:magnify" class="size-3.5" />
-                速查
-            </button>
-        </div>
+                {#each [{ value: 'nonGlobal' as const, label: '非全局' }, { value: 'global' as const, label: '全局' }] as tab (tab.value)}
+                    {@const on = activeTab === tab.value}
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={on}
+                        onclick={() => (activeTab = tab.value)}
+                        class="px-3 py-0.5 text-[11px] font-medium transition-colors"
+                        style={on
+                            ? 'background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);'
+                            : 'color: var(--theme-modal-text); opacity: 0.65;'}
+                    >
+                        {tab.label}
+                    </button>
+                {/each}
+            </div>
+            <!-- @desc 标题栏右侧：只剩「导入Buff集」入口（「速查」已移除） -->
+            <div class="ml-auto mr-4 flex items-center gap-1">
+                <button
+                    onclick={() => (showImport = true)}
+                    class="flex items-center gap-1 rounded-none px-2 py-1 text-xs text-(--theme-accent-text) transition-colors hover:bg-(--theme-modal-text)/5"
+                >
+                    <Icon icon="mdi:import" class="size-3.5" />
+                    导入Buff集
+                </button>
+            </div>
+        {/if}
     {/snippet}
 
-    <div class="flex flex-1 overflow-hidden">
-        <BuffModalList
-            bind:selectedBuffSetId
-            bind:collapsedFolders
-            bind:dragState
-            tree={listTree}
-            buffCount={buffSets.length}
-            {leftWidth}
-            {team}
-            {charIconMap}
-            derivedQueries={listDerived}
-            context={listContext}
-            {multiSelect}
-            {manualMode}
-            {activeTab}
-            onchangetab={(tab) => (activeTab = tab)}
-            multiSelectedIds={multi.selectedIds}
-            {resizingSidebar}
-            {sidebarDividerHover}
-            selection={selectionState}
-            onselect={(id) => (selectedBuffSetId = id)}
-            ontogglemultiid={toggleMultiSelectId}
-            ontogglemultifolder={toggleMultiSelectFolder}
-            ontogglefolder={toggleFolder}
-            onfoldermenu={openFolderMenu}
-            onitemmenu={openItemMenu}
-            onstartdrag={startDrag}
-            ondragmove={onDragMove}
-            ondragend={onDragEnd}
-            ondragcancel={cancelBuffDrag}
-            onstartresize={startSidebarResize}
-            onhoverdivider={(hover) => (resizer.dividerHover = hover)}
-            onToggleMultiSelect={toggleMultiSelect}
-            onselectall={toggleSelectAll}
-            onsortselected={sortMultiSelected}
-            onmultiglobal={multiSetGlobal}
-            onrequestmultidelete={requestMultiDelete}
-            oncreatebuff={handleCreateBuffSet}
-            oncreatefolder={openCreateManualFolder}
-        />
-
-        <!-- @desc 右列：上（块编辑器 + 乘区清单）下（保存并关闭），sidebar 占满整高 -->
-        <div class="flex-1 flex flex-col overflow-hidden">
-            <div class="flex flex-1 overflow-hidden">
-                {#if selectedBuffSet}
-                    <BuffModalEditor
-                        bind:condPanelOpen
-                        bind:expandedZoneIndex
-                        bind:renameInputEl
-                        buff={selectedBuffSet}
-                        {team}
-                        {teamNames}
-                        {charIconMap}
-                        isGlobal={globalBuffSetIds.includes(selectedBuffSet.id)}
-                        isDefaultGlobal={selectedBuffSet.id.startsWith('global-')}
-                        {scopeChars}
-                        {isNonCharBuff}
-                        {conditionSummary}
-                        {currentChain}
-                        {currentRefine}
-                        {condRefIdx}
-                        zones={selectedZones}
-                        {overrideZoneIds}
-                        {externalOverrides}
-                        ontogglestar={() => toggleBuffSetStarred(selectedBuffSet.id)}
-                        onrename={handleRename}
-                        oncopy={handleCopyBuffSet}
-                        ontoggleglobal={handleToggleGlobal}
-                        ondelete={handleDeleteBuffSet}
-                        ontogglechar={handleToggleChar}
-                        ontogglenonchar={handleToggleNonChar}
-                        ontogglecond={toggleCondPanel}
-                        onsetref={setConditionRef}
-                        onsetchain={setBuffChain}
-                        onsetrefine={setBuffRefinement}
-                        onsetzonevalue={(index, value) => setZoneValueAt(selectedBuffSet.id, index, value)}
-                        onoverride={(index, override) => setZoneOverrideAt(selectedBuffSet.id, index, override)}
-                        onopenref={openRefModal}
-                        onremovezone={(index) => removeZoneAt(selectedBuffSet.id, index)}
-                        ontogglezonecond={toggleZoneCondition}
-                        onzonecondchange={handleZoneConditionChange}
-                    />
-                    <!-- @desc 右栏乘区清单：点击即**添加**一个乘区条目（同一乘区可添加多次，各自独立配置）；宽度固定 -->
-                    <BuffModalZoneBar
-                        zones={selectedZones}
-                        onadd={(zoneId) => addZoneToBuffSet(selectedBuffSet.id, zoneId)}
-                    />
-                {:else}
-                    <div class="flex-1 flex items-center justify-center text-xs text-(--theme-modal-text)/40">
-                        选择一个 BUFF 块进行编辑
-                    </div>
-                {/if}
-            </div>
-            <!-- @desc 右列底部：保存并关闭按钮 -->
-            <div
-                class="flex items-center justify-end gap-2 border-t px-5 py-3 shrink-0"
-                style="border-top: 1px solid var(--theme-divider-border);"
-            >
+    {#if buffSets.length === 0}
+        <!-- @desc 空工程：清空列表/编辑器，只留两个入口大卡片 -->
+        <div class="flex flex-1 items-center justify-center px-6 py-10">
+            <div class="grid w-full max-w-[640px] grid-cols-1 gap-3 sm:grid-cols-2">
                 <button
-                    onclick={handleModalClose}
-                    class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
-                    style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    type="button"
+                    onclick={handleCreateBuffSet}
+                    class="group flex min-h-40 flex-col items-center justify-center gap-3 rounded-none border px-6 py-8 transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-accent-bg)/5"
+                    style="border-color: var(--theme-divider-border);"
                 >
-                    <Icon icon="mdi:check" class="size-4" />
-                    保存并关闭
+                    <span
+                        class="flex size-12 items-center justify-center rounded-full"
+                        style="background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);"
+                    >
+                        <Icon icon="mdi:plus" class="size-6" style="color: var(--theme-accent-text);" />
+                    </span>
+                    <span class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);"
+                        >新建 BUFF</span
+                    >
+                    <span class="text-[11px]" style="color: var(--theme-modal-text); opacity: 0.45;"
+                        >从空白 Buff 开始配置乘区</span
+                    >
+                </button>
+                <button
+                    type="button"
+                    onclick={() => (showImport = true)}
+                    class="group flex min-h-40 flex-col items-center justify-center gap-3 rounded-none border px-6 py-8 transition-colors hover:border-(--theme-accent-bg) hover:bg-(--theme-accent-bg)/5"
+                    style="border-color: var(--theme-divider-border);"
+                >
+                    <span
+                        class="flex size-12 items-center justify-center rounded-full"
+                        style="background: color-mix(in srgb, var(--theme-accent-bg) 12%, transparent);"
+                    >
+                        <Icon icon="mdi:import" class="size-6" style="color: var(--theme-accent-text);" />
+                    </span>
+                    <span class="text-base font-black tracking-tight" style="color: var(--theme-modal-text);"
+                        >导入 Buff 集</span
+                    >
+                    <span class="text-[11px]" style="color: var(--theme-modal-text); opacity: 0.45;"
+                        >从本地 Buff 集导入实体增益</span
+                    >
                 </button>
             </div>
         </div>
-    </div>
+    {:else}
+        <div class="flex flex-1 overflow-hidden">
+            <BuffModalList
+                bind:selectedBuffSetId
+                bind:collapsedFolders
+                bind:dragState
+                tree={listTree}
+                buffCount={buffSets.length}
+                {leftWidth}
+                {team}
+                {charIconMap}
+                derivedQueries={listDerived}
+                context={listContext}
+                {multiSelect}
+                {manualMode}
+                multiSelectedIds={multi.selectedIds}
+                {resizingSidebar}
+                {sidebarDividerHover}
+                globalAction={globalActionState}
+                selection={selectionState}
+                onselect={(id) => (selectedBuffSetId = id)}
+                ontogglemultiid={toggleMultiSelectId}
+                ontogglemultifolder={toggleMultiSelectFolder}
+                ontogglefolder={toggleFolder}
+                onfoldermenu={openFolderMenu}
+                onitemmenu={openItemMenu}
+                onstartdrag={startDrag}
+                ondragmove={onDragMove}
+                ondragend={onDragEnd}
+                ondragcancel={cancelBuffDrag}
+                onstartresize={startSidebarResize}
+                onhoverdivider={(hover) => (resizer.dividerHover = hover)}
+                onToggleMultiSelect={toggleMultiSelect}
+                onselectall={toggleSelectAll}
+                onsortselected={sortMultiSelected}
+                onContextGlobal={handleContextGlobal}
+                onrequestmultidelete={requestMultiDelete}
+                oncreatebuff={handleCreateBuffSet}
+            />
+
+            <!-- @desc 右列：上（块编辑器 + 乘区清单）下（保存并关闭），sidebar 占满整高 -->
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <div class="flex flex-1 overflow-hidden">
+                    {#if selectedBuffSet}
+                        <BuffModalEditor
+                            bind:tab={editorTab}
+                            bind:expandedZoneIndex
+                            bind:renameInputEl
+                            buff={selectedBuffSet}
+                            {team}
+                            {teamNames}
+                            {charIconMap}
+                            isGlobal={globalBuffSetIds.includes(selectedBuffSet.id)}
+                            isDefaultGlobal={selectedBuffSet.id.startsWith('global-')}
+                            zones={selectedZones}
+                            {overrideZoneIds}
+                            {externalOverrides}
+                            buffOptions={ruleBuffOptions}
+                            onrename={handleRename}
+                            oncopy={handleCopyBuffSet}
+                            ondelete={handleDeleteBuffSet}
+                            onscope={handleScopeChange}
+                            onsaverules={handleSaveRules}
+                            onsetzonevalue={(index, value) => setZoneValueAt(selectedBuffSet.id, index, value)}
+                            onoverride={(index, override) => setZoneOverrideAt(selectedBuffSet.id, index, override)}
+                            onopenref={openRefModal}
+                            onremovezone={(index) => removeZoneAt(selectedBuffSet.id, index)}
+                            ontogglezonecond={toggleZoneCondition}
+                            onzonecondchange={handleZoneConditionChange}
+                        />
+                        <!-- @desc 右栏乘区清单：只有「具体效果」tab 展开（展开/收起走 MOTION_MS.base） -->
+                        {#if editorTab === 'effect'}
+                            <div
+                                class="flex shrink-0"
+                                transition:slide|local={{ ...slideParams(MOTION_MS.base), axis: 'x' }}
+                            >
+                                <BuffModalZoneBar
+                                    zones={selectedZones}
+                                    onadd={(zoneId) => addZoneToBuffSet(selectedBuffSet.id, zoneId)}
+                                />
+                            </div>
+                        {/if}
+                    {:else}
+                        <div class="flex-1 flex items-center justify-center text-xs text-(--theme-modal-text)/40">
+                            选择一个 BUFF 块进行编辑
+                        </div>
+                    {/if}
+                </div>
+                <!-- @desc 右列底部：保存并关闭按钮 -->
+                <div
+                    class="flex items-center justify-end gap-2 border-t px-5 py-3 shrink-0"
+                    style="border-top: 1px solid var(--theme-divider-border);"
+                >
+                    <button
+                        onclick={handleModalClose}
+                        class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
+                        style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
+                    >
+                        <Icon icon="mdi:check" class="size-4" />
+                        保存并关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
 </Modal>
 
 <!-- @desc 引用配置弹窗：选择引用角色/属性、阈值与换算规则（线性/离散、除乘）、上下限 clamp -->
@@ -1122,7 +1220,9 @@
     onclose={() => (showDeleteFolderConfirm = false)}
     onconfirm={confirmDeleteFolder}
 >
-    将删除该文件夹内的所有 <strong>{deleteFolderCount}</strong> 条 BUFF，确定吗？
+    将删除该文件夹内的所有 <strong>{deleteFolderCount}</strong> 条 BUFF{deleteFolderCascadeExtra > 0
+        ? `，并级联删除依赖它们条件的 ${deleteFolderCascadeExtra} 条 BUFF`
+        : ''}，确定吗？
 </ConfirmDialog>
 
 <!-- @desc 文件夹批量重命名弹窗：按「新前缀 + 1..N + 新后缀」重新编号全部子 Buff -->
@@ -1158,7 +1258,19 @@
     />
 {/if}
 
-<!-- @desc 多选批量删除确认弹窗 -->
+<!-- @desc 新建 BUFF：先选文件夹（可就地新建最多两级子文件夹），确认后才真正创建 -->
+{#if showCreateBuffPicker}
+    <BuffFolderPickerModal
+        open={showCreateBuffPicker}
+        mode="create"
+        heading="新建 BUFF：选择文件夹"
+        folders={moveFolderOptions}
+        allowCreateFolder={activeTab === 'nonGlobal'}
+        oncreatefolder={createFolderForNewBuff}
+        onclose={cancelCreateBuffPicker}
+        onpick={confirmCreateBuff}
+    />
+{/if}
 <ConfirmDialog
     open={showMultiDeleteConfirm}
     title="确认批量删除"
@@ -1168,29 +1280,40 @@
     onclose={() => (showMultiDeleteConfirm = false)}
     onconfirm={confirmMultiDelete}
 >
-    将删除选中的 <strong>{multi.selectedIds.size}</strong> 条 BUFF（全局 buff 不受影响），确定吗？
+    将删除选中的 <strong>{multi.selectedIds.size}</strong> 条 BUFF（全局 buff 不受影响）{multiDeleteCascadeExtra > 0
+        ? `，并级联删除依赖它们条件的 ${multiDeleteCascadeExtra} 条 BUFF`
+        : ''}，确定吗？
 </ConfirmDialog>
 
-<!-- @desc 复制命名选项弹窗（buff 名带数字时的递增命名选择） -->
-{#if showCopyOptions}
-    <BuffModalCopyModal names={copyOptions} onclose={() => (showCopyOptions = false)} onpick={confirmCopyBuff} />
-{/if}
+<!-- @desc 级联删除确认：删除被「其它 BUFF 生效」条件引用的 BUFF 时，列出会被连带删除的依赖方 -->
+<ConfirmDialog
+    open={pendingDeleteCascade.length > pendingDeleteRoots.length}
+    title="确认删除（含级联删除）"
+    icon="mdi:delete-alert-outline"
+    danger
+    confirmLabel="确认删除"
+    onclose={() => {
+        pendingDeleteRoots = []
+        pendingDeleteCascade = []
+    }}
+    onconfirm={confirmDeleteBuffSets}
+>
+    这些 BUFF 被其它 BUFF 的「生效条件」引用；删除后依赖它们的 BUFF 也无法生效，将被一起删除：
+    <ul class="mt-1.5 max-h-40 overflow-y-auto text-[11px]">
+        {#each cascadeOnlyNames as name, i (i)}
+            <li class="truncate">· {name}</li>
+        {/each}
+    </ul>
+    <p class="mt-1.5">
+        共 <strong>{pendingDeleteCascade.length}</strong> 条（含你选中的 {pendingDeleteRoots.length} 条）。
+    </p>
+</ConfirmDialog>
 
-<!-- @desc 速查弹窗（新建 BUFF 场景：创建Buff入口）与引用速查（只读），以及 Buff 导入弹窗 -->
-<QuickLookup
-    locked={getLocked()}
-    open={showLookup}
-    {team}
-    showCustomHitOption={false}
-    onCreateBuff={(name) => createBuffSet(name)}
-    onclose={() => (showLookup = false)}
-/>
-
+<!-- @desc 引用速查（只读，引用配置弹窗里的入口）与 Buff 导入弹窗 -->
 <QuickLookup
     locked={getLocked()}
     open={showRefLookup}
     {team}
-    showBuffOption={false}
     showCustomHitOption={false}
     onclose={() => (showRefLookup = false)}
 />

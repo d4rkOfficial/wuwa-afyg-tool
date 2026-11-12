@@ -53,10 +53,9 @@ export interface EncounterState {
     config: PhaseStateV2<ConfigState>
 }
 
-// ── 新工程结构（version 6：在 v5 重击块升级之上，Buff 文件夹改为「角色名-本体 / 角色名-x链 / 角色名-武器名」，
-// 旧导入混在本体里的声骸 / 套装 / 武器按实体归档）──
+// ── 新工程结构（version 7：在 v6 文件夹归档之上，Buff 级条件改版为 `rules` 规则列表并移除星标）──
 
-export const PROJECT_VERSION = 6
+export const PROJECT_VERSION = 7
 
 export interface ProjectV2 {
     version: number

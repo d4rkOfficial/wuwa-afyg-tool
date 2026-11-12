@@ -11,6 +11,7 @@ import {
     usesCoefficientFormula,
     zoneConditionMet,
     type ConditionProfile,
+    type RuleEvalDeps,
     type ZoneCtx
 } from './compute'
 import { describeZoneConditionBadge } from './condition'
@@ -156,7 +157,18 @@ const zoneCtxOf = (entryLike: DamageEntry, ctx: DamageTraceCtx, echoDescByEntry:
     chains: ctx.conditionProfile.chains,
     refinements: ctx.conditionProfile.refinements,
     element: entryLike.damageElement,
-    damageTypes: resolveDamageTypes(entryLike, ctx.damageEntryDamageTypes, ctx.charInfoMap, echoDescByEntry)
+    damageTypes: resolveDamageTypes(entryLike, ctx.damageEntryDamageTypes, ctx.charInfoMap, echoDescByEntry),
+    isEffect: entryLike.isEffect,
+    damageName: entryLike.displayName
+})
+
+/** @desc Buff 级规则的求值装置（与 `computeAll` 同源：面板按条目现算，敌人类型取工程配置） */
+const ruleDepsOf = (ctx: DamageTraceCtx): RuleEvalDeps => ({
+    team: ctx.team,
+    configState: ctx.configState,
+    charInfoMap: ctx.charInfoMap,
+    weaponInfoMap: ctx.weaponInfoMap,
+    ...(ctx.configState.enemy?.type ? { enemyType: ctx.configState.enemy.type } : {})
 })
 
 /**
@@ -735,7 +747,9 @@ export function buildDamageSegments(
         ctx.damageEntryDamageTypes,
         ctx.conditionProfile,
         ctx.charInfoMap,
-        echoDescByEntry
+        echoDescByEntry,
+        true,
+        ruleDepsOf(ctx)
     )
     /** @desc 目标侧乘区的来源（集谐·干涉层数）：不做作用域过滤，来源可能挂在别的角色身上 */
     const targetSideBuffs = getTargetSideSourceBuffs(
@@ -745,7 +759,9 @@ export function buildDamageSegments(
         ctx.damageEntryDamageTypes,
         ctx.conditionProfile,
         ctx.charInfoMap,
-        echoDescByEntry
+        echoDescByEntry,
+        true,
+        ruleDepsOf(ctx)
     )
     /**
      * @desc 乘区来源的判定上下文：条件判据（与引擎同口径）+ 引用的解算结果（`resolveRefZoneValues`）
