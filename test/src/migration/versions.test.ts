@@ -9,7 +9,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { migrateProject, VERSIONLESS_ASSUME_CURRENT_AFTER } from '$lib/data/migration'
+import { migrateProject, VERSIONLESS_ASSUME_CURRENT_AFTER } from '$src/migration'
 import { PROJECT_VERSION } from '$lib/types/project'
 import type { OpBlock, TimelineData } from '$lib/calc/timeline.types'
 
@@ -163,7 +163,7 @@ describe('v4 → v5：旧「备注即重击」的普攻块升级为独立重击�
 
     it('版本号提升到当前版本（5）', () => {
         const project = migrateProject(v4Project([block('b1', 'MouseLeft', '重击')]))
-        assert.equal(PROJECT_VERSION, 5)
+        assert.equal(PROJECT_VERSION, 6)
         assert.equal(project.version, PROJECT_VERSION)
     })
 

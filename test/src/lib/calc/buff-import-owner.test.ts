@@ -150,20 +150,54 @@ describe('导入落点：条件文件夹在外，来源文件夹在内', () => {
             1,
             TEAM
         )
-        assert.equal(target.conditionFolder, '乙本体')
+        assert.equal(target.conditionFolder, '乙-本体')
         assert.equal(target.sourceFolder, '千古洑流 共技时 攻击1层')
-        assert.equal(target.fullName, '乙本体\\千古洑流 共技时 攻击1层\\1阶')
+        assert.equal(target.fullName, '乙-本体\\千古洑流 共技时 攻击1层\\1阶')
     })
 
     it('无条件 self Buff 补本体门后落角色本体文件夹', () => {
         const target = resolveImportTarget('普通效果', undefined, 0, TEAM)
-        assert.equal(target.conditionFolder, '甲本体')
-        assert.equal(target.fullName, '甲本体\\普通效果')
+        assert.equal(target.conditionFolder, '甲-本体')
+        assert.equal(target.fullName, '甲-本体\\普通效果')
     })
 
     it('工坊根 Buff 没有来源文件夹时只拼条件文件夹', () => {
         const target = resolveImportTarget('普通效果', { chains: [{ charIdx: 0, min: 2 }] }, 0, TEAM)
         assert.equal(target.sourceFolder, null)
-        assert.equal(target.fullName, '甲2链\\普通效果')
+        assert.equal(target.fullName, '甲-2链\\普通效果')
+    })
+})
+
+describe('导入落点：实体来源决定归属文件夹', () => {
+    it('首位声骸：进 角色-声骸名，条件仍是角色本体门', () => {
+        const items = buildEntityImportItems(entityWith('echo', '声骸X', '首位声骸效果', 'self'), TEAM)
+        const item = items[0]
+        assert.equal(item.targetName, '甲-声骸X\\首位声骸效果')
+        assert.deepEqual(item.condition?.chains, [{ charIdx: 0, min: 0 }], '条件仍是角色本体，不是声骸条件')
+    })
+
+    it('套装：进 角色-套装名-x件', () => {
+        const items = buildEntityImportItems(entityWith('2set', '套装S', '套装效果', 'self'), TEAM)
+        assert.equal(items[0].targetName, '甲-套装S-2件\\套装效果')
+    })
+
+    it('武器：进 角色-武器名', () => {
+        const items = buildEntityImportItems(entityWith('weapon', '武器A', '武器效果', 'self'), TEAM)
+        assert.equal(items[0].targetName, '甲-武器A\\武器效果')
+    })
+
+    it('来源文件夹与实体同名时不再重复套一层；不同名则保留为二级', () => {
+        const same = buildEntityImportItems(entityWith('echo', '声骸X', '声骸X\\子效果', 'self'), TEAM)
+        assert.equal(same[0].targetName, '甲-声骸X\\子效果')
+        const nested = buildEntityImportItems(entityWith('echo', '声骸X', '子文件夹\\效果', 'self'), TEAM)
+        assert.equal(nested[0].targetName, '甲-声骸X\\子文件夹\\效果')
+    })
+
+    it('角色本体 / 链：沿用条件文件夹的新命名', () => {
+        assert.equal(resolveImportTarget('普通', undefined, 0, TEAM).fullName, '甲-本体\\普通')
+        assert.equal(
+            resolveImportTarget('链效果', { chains: [{ charIdx: 0, min: 2 }] }, 0, TEAM).fullName,
+            '甲-2链\\链效果'
+        )
     })
 })

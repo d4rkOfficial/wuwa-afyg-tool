@@ -32,6 +32,22 @@ export interface CoarsePath {
     folder: string | null
 }
 
+/** @desc 角色本体文件夹：`角色名-本体` */
+export const characterBodyFolderName = (character: string): string => `${character}-本体`
+
+/** @desc 共鸣链文件夹：`角色名-链数链` */
+export const characterChainFolderName = (character: string, min: number): string => `${character}-${min}链`
+
+/** @desc 武器文件夹：`角色名-武器名` */
+export const characterWeaponFolderName = (character: string, weapon: string): string => `${character}-${weapon}`
+
+/** @desc 首位声骸文件夹：`角色名-声骸名` */
+export const characterEchoFolderName = (character: string, echo: string): string => `${character}-${echo}`
+
+/** @desc 套装文件夹：`角色名-套装名-x件` */
+export const characterSetFolderName = (character: string, setName: string, pieces: number): string =>
+    `${character}-${setName}-${pieces}件`
+
 /** @desc 某 Buff 的粗分类落点：本体 / 单链 / 单阶武器；其它一律根目录 */
 export const coarsePathOf = (buff: BuffInstance, team: readonly CharSlot[]): CoarsePath => {
     const tab = buff.global ? 'global' : 'nonGlobal'
@@ -53,14 +69,14 @@ export const coarsePathOf = (buff: BuffInstance, team: readonly CharSlot[]): Coa
         const { charIdx, min } = chains[0]
         if (charIdx < 0) return { tab, folder: null }
         const name = charNameOf(charIdx)
-        return { tab, folder: min <= 0 ? `${name}本体` : `${name}${min}链` }
+        return { tab, folder: min <= 0 ? characterBodyFolderName(name) : characterChainFolderName(name, min) }
     }
     if (refines.length === 1 && chains.length === 0) {
         const { charIdx } = refines[0]
         if (charIdx < 0) return { tab, folder: null }
         const name = charNameOf(charIdx)
         const weapon = team[charIdx]?.weapon
-        return { tab, folder: `${name}的${weapon ?? '武器'}` }
+        return { tab, folder: characterWeaponFolderName(name, weapon ?? '武器') }
     }
     return { tab, folder: null }
 }

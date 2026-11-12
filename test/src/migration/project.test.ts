@@ -13,7 +13,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { parseProjectFile, importProjects, getProjects, __seedProjectsForTest } from '$lib/data/project.svelte'
-import { readVersion, VERSIONLESS_ASSUME_CURRENT_AFTER, migrateProject } from '$lib/data/migration'
+import { readVersion, VERSIONLESS_ASSUME_CURRENT_AFTER, migrateProject } from '$src/migration'
 import { PROJECT_VERSION } from '$lib/types/project'
 import type { CharSlot } from '$lib/types/project'
 import type { CalcState } from '$lib/calc/calculation.types'

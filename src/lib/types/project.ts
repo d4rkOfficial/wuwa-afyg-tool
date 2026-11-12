@@ -53,9 +53,10 @@ export interface EncounterState {
     config: PhaseStateV2<ConfigState>
 }
 
-// ── 新工程结构（version 5：在 v4 乘区改名/变体拍平之上，旧「备注即重击」的普攻块升级为独立重击图标块）──
+// ── 新工程结构（version 6：在 v5 重击块升级之上，Buff 文件夹改为「角色名-本体 / 角色名-x链 / 角色名-武器名」，
+// 旧导入混在本体里的声骸 / 套装 / 武器按实体归档）──
 
-export const PROJECT_VERSION = 5
+export const PROJECT_VERSION = 6
 
 export interface ProjectV2 {
     version: number

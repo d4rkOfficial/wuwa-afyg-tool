@@ -45,7 +45,7 @@ export const normalizeConditionForScope = (cond: BuffCondition, scope: Condition
  *
  * 为什么是链条件而不是阶条件：「本体」这个概念属于**链行** —— 链 = 角色共鸣链，0 链即角色本体；
  * 阶 = 武器精炼阶数，武器总有一个精炼档位（默认 1 阶），不存在「本体」档。
- * 因此导入角色来源的 buff 时补 0 链，既保留「挂在哪个角色身上」的归属（左侧列表归档到「角色名本体」），
+ * 因此导入角色来源的 buff 时补 0 链，既保留「挂在哪个角色身上」的归属（左侧列表归档到「角色名-本体」），
  * 又不会因为档位把本体效果挡掉（`≥ 0 链` 恒成立）。
  */
 export const withOwnerBodyGate = (cond: BuffCondition, owner: number): BuffCondition => {

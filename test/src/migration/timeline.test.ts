@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { dedupeDamageBlockIds, migrateProject } from '$lib/data/migration'
+import { dedupeDamageBlockIds, migrateProject } from '$src/migration'
 import { buildDamageEntriesFromTimeline } from '$lib/calc/calculation.store.svelte'
 import type { DamageBlock, TimelineData } from '$lib/calc/timeline.types'
 import type { CharSlot } from '$lib/types/project'

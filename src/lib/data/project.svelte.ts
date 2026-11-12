@@ -8,7 +8,7 @@ import { PROJECT_VERSION } from '$lib/types/project'
 import type { TimelineData } from '$lib/calc/timeline.types'
 import type { CalcState } from '$lib/calc/calculation.types'
 import type { ConfigState } from '$lib/calc/config.types'
-import { conditionProfileFromTeam, migrateProject, toPlainProject, PHASE_ORDER } from '$lib/data/migration'
+import { conditionProfileFromTeam, migrateProject, toPlainProject, PHASE_ORDER } from '$src/migration'
 import { clearProjectSession } from '$lib/data/view-session'
 
 const PROJECTS_KEY = 'projects'

@@ -6,7 +6,7 @@ import { init as initConfig } from '$lib/calc/config.store.svelte'
 import type { ConfigState } from '$lib/calc/config.types'
 import { init as initTimeline } from '$lib/calc/timeline.store.svelte'
 import type { TimelineData } from '$lib/calc/timeline.types'
-import { conditionProfileFromTeam } from '$lib/data/migration'
+import { conditionProfileFromTeam } from '$src/migration'
 import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
 
 /** @desc 重载当前工程全部阶段数据（不改变视图状态）；切工程 / 链阶变动 / 刷新结果共用 */

@@ -6,7 +6,7 @@ import type { CharSlot } from '$lib/types/project'
 import type { ImportBuffInput } from './calculation.store.svelte'
 import type { BuffCondition } from './calculation.types'
 import { ownerIdxFor, ownerIdxOfItem } from './buff-owner'
-import { resolveImportTarget } from './buff-import-target'
+import { resolveImportTarget, type ImportOrigin } from './buff-import-target'
 
 export type { BuffLibraryEntity }
 export { ownerIdxFor, ownerIdxOfItem, primaryOwnerOf, rewriteOwnerInCondition, rewriteOwnerInZones } from './buff-owner'
@@ -14,9 +14,10 @@ export { ownerIdxFor, ownerIdxOfItem, primaryOwnerOf, rewriteOwnerInCondition, r
 export function toImportItem(
     b: { name: string; scope?: BuffLibraryScope; condition?: BuffCondition; zones: ImportBuffInput['zones'] },
     ownerIdx: number,
-    team?: [CharSlot, CharSlot, CharSlot]
+    team?: [CharSlot, CharSlot, CharSlot],
+    origin?: ImportOrigin
 ): ImportBuffInput {
-    const target = resolveImportTarget(b.name, b.condition, ownerIdx, team ?? [])
+    const target = resolveImportTarget(b.name, b.condition, ownerIdx, team ?? [], origin)
     return {
         name: b.name,
         targetName: target.fullName,
@@ -47,6 +48,8 @@ export function buildBuffImportItems(
 ): ImportBuffInput[] {
     const owners = ownerIdxFor(team, entity)
     const firstOwner = owners[0] ?? -1
+    /** @desc 实体来源决定归属文件夹（声骸 / 套装 / 武器）；条件仍按角色本体门走 */
+    const origin: ImportOrigin = { entityType: entity.entityType, entityName: entity.entityName }
     if (owners.length > 1) {
         const selfItems = owners.flatMap((owner) =>
             buffs
@@ -55,7 +58,8 @@ export function buildBuffImportItems(
                     toImportItem(
                         { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
                         owner,
-                        team
+                        team,
+                        origin
                     )
                 )
         )
@@ -65,13 +69,19 @@ export function buildBuffImportItems(
                 toImportItem(
                     { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
                     firstOwner,
-                    team
+                    team,
+                    origin
                 )
             )
         return [...selfItems, ...otherItems]
     }
     return buffs.map((b: BuffLibraryBuff) =>
-        toImportItem({ name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones }, firstOwner, team)
+        toImportItem(
+            { name: b.buffName, scope: b.scope, condition: b.condition, zones: b.zones },
+            firstOwner,
+            team,
+            origin
+        )
     )
 }
 

@@ -37,15 +37,15 @@ describe('粗分类落点', () => {
     it('本体 / 单链 / 单阶武器 / 其它', () => {
         assert.deepEqual(coarsePathOf(buff('a', { condition: chain(1, 0) }), TEAM), {
             tab: 'nonGlobal',
-            folder: '乙本体'
+            folder: '乙-本体'
         })
         assert.deepEqual(coarsePathOf(buff('b', { condition: chain(1, 2) }), TEAM), {
             tab: 'nonGlobal',
-            folder: '乙2链'
+            folder: '乙-2链'
         })
         assert.deepEqual(coarsePathOf(buff('c', { condition: refine(0, 1) }), TEAM), {
             tab: 'nonGlobal',
-            folder: '甲的武器甲'
+            folder: '甲-武器甲'
         })
         assert.deepEqual(
             coarsePathOf(
@@ -84,7 +84,7 @@ describe('迁移：数字前后缀建二级文件夹并改短名', () => {
         const bodyFolder = migrated.tree.nonGlobal[0]
         assert.equal(bodyFolder.kind, 'folder')
         if (bodyFolder.kind !== 'folder') return
-        assert.equal(bodyFolder.name, '甲本体')
+        assert.equal(bodyFolder.name, '甲-本体')
         const numericFolder = bodyFolder.children.find((node) => node.kind === 'folder')
         assert.ok(numericFolder && numericFolder.kind === 'folder')
         if (numericFolder.kind !== 'folder') return
@@ -95,7 +95,7 @@ describe('迁移：数字前后缀建二级文件夹并改短名', () => {
         )
         assert.deepEqual(
             migrated.buffs.map((item) => item.name),
-            ['甲本体\\火光\\1层', '甲本体\\普通Buff', '甲本体\\火光\\10层', '甲本体\\火光\\2层']
+            ['甲-本体\\火光\\1层', '甲-本体\\普通Buff', '甲-本体\\火光\\10层', '甲-本体\\火光\\2层']
         )
     })
 
@@ -122,11 +122,11 @@ describe('迁移：数字前后缀建二级文件夹并改短名', () => {
         const migrated = migrateLegacyBuffTree(buffs, TEAM)
         assert.deepEqual(
             migrated.buffs.map((b) => b.name),
-            ['甲本体\\锁3链 共鸣解放时 增伤', '甲本体\\锁3链 同奏增益', '甲本体\\火光\\1层', '甲本体\\火光\\2层']
+            ['甲-本体\\锁3链 共鸣解放时 增伤', '甲-本体\\锁3链 同奏增益', '甲-本体\\火光\\1层', '甲-本体\\火光\\2层']
         )
         const body = migrated.tree.nonGlobal[0]
         if (body.kind !== 'folder') return
-        assert.equal(body.name, '甲本体')
+        assert.equal(body.name, '甲-本体')
         const folder = body.children.find((node) => node.kind === 'folder')
         assert.ok(folder && folder.kind === 'folder')
         if (folder.kind !== 'folder') return
@@ -204,14 +204,14 @@ describe('导入追加与撞名 #', () => {
     it('本体/单链建一级文件夹，同路径追加，撞名 Buff 加 #', () => {
         const buffs = new Map<string, BuffInstance>()
         let tree = emptyBuffTree()
-        const b1 = buff('a', { name: '甲本体\\暴击', condition: chain(0, 0) })
+        const b1 = buff('a', { name: '甲-本体\\暴击', condition: chain(0, 0) })
         buffs.set(b1.id, b1)
         tree = appendBuffToTree(tree, b1, TEAM, buffs)
 
         const b2 = buff('b', { name: '暴击', condition: chain(0, 0) })
         buffs.set(b2.id, b2)
-        const name = importedBuffName('暴击', tree.nonGlobal, '甲本体', buffs)
-        assert.equal(name, '甲本体\\暴击#')
+        const name = importedBuffName('暴击', tree.nonGlobal, '甲-本体', buffs)
+        assert.equal(name, '甲-本体\\暴击#')
         b2.name = name
         tree = appendBuffToTree(tree, b2, TEAM, buffs)
 
@@ -219,7 +219,7 @@ describe('导入追加与撞名 #', () => {
         const folder = tree.nonGlobal[0]
         assert.equal(folder.kind, 'folder')
         if (folder.kind === 'folder') {
-            assert.equal(folder.name, '甲本体')
+            assert.equal(folder.name, '甲-本体')
             assert.equal(folder.children.length, 2)
         }
     })
