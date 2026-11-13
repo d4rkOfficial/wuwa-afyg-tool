@@ -15,8 +15,6 @@ import {
     getConditionProfile,
     setConditionProfileChains,
     setConditionProfileRefinements,
-    getHideConditionMismatch,
-    toggleHideConditionMismatch,
     importBuffSets as importBuffConfs,
     getGlobalBuffSetIds as getGlobalBuffConfIds,
     getPaneEffectSources,
@@ -233,7 +231,7 @@ defineTool('rename_damage_entry', {
 
 defineTool('get_buff_confs', {
     description:
-        '获取工程 Buff 配置清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_conf_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。可选 zoneId：只列出含该乘区的配置，并在每项附带命中乘区的数值/引用摘要；不传则保持原来的全量清单。',
+        '获取工程 Buff 配置清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（all=通用 / 全队 / 仅效应 / 角色号）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_conf_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。可选 zoneId：只列出含该乘区的配置，并在每项附带命中乘区的数值/引用摘要；不传则保持原来的全量清单。',
     parameters: {
         type: 'object',
         properties: {
@@ -518,7 +516,7 @@ defineTool('toggle_damage_type', {
 
 defineTool('get_condition_profile', {
     description:
-        '获取链/阶配置（每个角色的共鸣链 0-6 与武器精炼 0-5，0=未精炼）及“可用Buff”过滤开关状态。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程；省略则读活动工程。',
+        '获取链/阶配置（每个角色的共鸣链 0-6 与武器精炼 0-5，0=未精炼）。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程；省略则读活动工程。',
     parameters: {
         type: 'object',
         properties: {
@@ -532,14 +530,12 @@ defineTool('get_condition_profile', {
             return {
                 projectId,
                 projectName: project.name,
-                ...conditionProfileOf(project),
-                hideConditionMismatch: getHideConditionMismatch()
+                ...conditionProfileOf(project)
             }
         }
         return {
             chains: getConditionProfile().chains,
-            refinements: getConditionProfile().refinements,
-            hideConditionMismatch: getHideConditionMismatch()
+            refinements: getConditionProfile().refinements
         }
     }
 })
@@ -583,15 +579,6 @@ defineTool('set_refinement', {
         setConditionProfileRefinements(slot - 1, value)
         ctx.notifyCalc?.()
         return { slot, refinements: getConditionProfile().refinements }
-    }
-})
-
-defineTool('toggle_condition_mismatch_hide', {
-    description: '切换“可用Buff/全部Buff”过滤：开启时隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 Buff。',
-    parameters: { type: 'object', properties: {} },
-    handler: () => {
-        toggleHideConditionMismatch()
-        return { hideConditionMismatch: getHideConditionMismatch() }
     }
 })
 
@@ -1016,7 +1003,7 @@ defineTool('get_damage_entry_buff_sources', {
 
 defineTool('set_buff_conf_scope', {
     description:
-        '设置工程 Buff 配置的作用范围：all（全队）或槽位数组（如 [1,3] 表示仅 1、3 号位）。全局工程 Buff 配置不可修改范围。',
+        '设置工程 Buff 配置的作用范围：all（通用：三名角色 + 效应伤害）或槽位数组（如 [1,3] 表示仅 1、3 号位；[0,1,2] 是「全队」——只对三名角色生效、不含效应）。全局工程 Buff 配置不可修改范围。',
     parameters: {
         type: 'object',
         properties: {
@@ -1049,7 +1036,7 @@ defineTool('set_buff_conf_scope', {
 defineTool('set_buff_conf_rules', {
     description:
         '设置工程 Buff 配置的**规则列表**（全部 AND，同时满足才生效），传 null 清除。' +
-        'rules 结构：[{"kind":"chain","charIdx":0-2,"min":0-6} | {"kind":"refinement","charIdx":0-2,"min":1-5} | {"kind":"damageNameRegex","pattern":"…"}（对伤害条目 displayName 做正则包含匹配） | {"kind":"damageNameEquals","value":"…"} | {"kind":"zoneCompare","charIdx":-1或0-2,"zone":"atk/hp/def/recharge/offTuneBuildupRate/tuneBreakBoost/unisonBoonLayer/critRate/critDmg","op":"gt/ge/lt/le/eq","value":数字}（charIdx=-1 表示「伤害条目的角色」；只读「无条件部分」面板） | {"kind":"enemyType","type":"BOSS/精英怪/小怪"} | {"kind":"buffActive","mode":"all/any","buffIds":["…"]}]。' +
+        'rules 结构：[{"kind":"chain","charIdx":0-2,"min":0-6} | {"kind":"refinement","charIdx":0-2,"min":1-5} | {"kind":"damageNameRegex","pattern":"…"}（对伤害条目 displayName 做正则包含匹配） | {"kind":"damageNameEquals","value":"…"} | {"kind":"zoneCompare","charIdx":-1或0-2,"zone":"atk/hp/def/recharge/offTuneBuildupRate/tuneBreakBoost/unisonBoonLayer/critRate/critDmg","op":"gt/ge/lt/le/eq","value":数字}（charIdx=-1 表示「伤害条目的角色」；读「无条件部分」面板 —— 装备 + 其它 BUFF 的固定乘区，不含本 BUFF 自身） | {"kind":"enemyType","type":"BOSS/精英怪/小怪"} | {"kind":"buffActive","mode":"all/any","buffIds":["…"]}]。' +
         '默认全局 Buff 配置不可设置规则；buffActive 引用成环（含自引用）会被拒绝。属性/伤害类型条件不属于 Buff 级，请用 set_buff_conf_zone_condition 挂到乘区。',
     parameters: {
         type: 'object',

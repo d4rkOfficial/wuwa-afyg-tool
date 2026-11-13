@@ -16,7 +16,14 @@ import {
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
 
-export type BuffLibraryScope = 'self' | 'self_except' | 'team' | 'effect_only'
+/**
+ * @desc Buff 库的作用域（**导入源语义**，与工程侧 `BuffInstance.scope` 的映射见 `mapImportedScope`）：
+ * - `self` = 对自己 / `self_except` = 自己除外
+ * - `team` = **通用**（三名角色 + 效应伤害，导入后是 `'all'`）
+ * - `team_only` = **全队**（只有三名角色、不含效应，导入后是 `[0,1,2]`）
+ * - `effect_only` = 仅效应（导入后是 `[]`）
+ */
+export type BuffLibraryScope = 'self' | 'self_except' | 'team' | 'team_only' | 'effect_only'
 
 export { CHAIN_MAX, REFINE_MAX }
 
@@ -199,7 +206,8 @@ export function setPiecesOf(type: BuffEntityType): number {
 export const SCOPE_LABELS: Record<BuffLibraryScope, string> = {
     self: '对自己',
     self_except: '自己除外',
-    team: '对全队',
+    team: '通用',
+    team_only: '全队',
     effect_only: '效应'
 }
 

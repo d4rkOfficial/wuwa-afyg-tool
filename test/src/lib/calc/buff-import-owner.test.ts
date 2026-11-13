@@ -125,10 +125,17 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
     // 回归：工坊 / 本地 Buff 库里的「效应专属」导入工程后变成「全队共享」。
     // 根因是 mapImportedScope 把 effect_only 和 team 一起落到了 'all' —— 不只是显示错，
     // 而是这条 buff 真的会对全部角色的条目生效。
-    it('mapImportedScope：effect_only（效应专属）必须落成空数组，不能变全队', () => {
+    it('mapImportedScope：effect_only（效应专属）必须落成空数组，不能变通用', () => {
         assert.deepEqual(mapImportedScope('effect_only', -1, 3), [], '无归属时同样是效应专属')
         assert.deepEqual(mapImportedScope('effect_only', 0, 3), [], '归属槽位不影响效应专属')
-        assert.deepEqual(mapImportedScope('team', 0, 3), 'all', 'team 才是全队')
+        assert.equal(mapImportedScope('team', 0, 3), 'all', 'team = 通用（三名角色 + 效应）')
+    })
+
+    // 「全队」与「通用」不是一个东西：team_only 只对三名角色生效（[0,1,2]），效应条目不吃。
+    it('mapImportedScope：team_only 是「全队」（[0,1,2]），与 team 的「通用」区分', () => {
+        assert.deepEqual(mapImportedScope('team_only', 0, 3), [0, 1, 2])
+        assert.deepEqual(mapImportedScope('team_only', -1, 3), [0, 1, 2], '与归属槽位无关')
+        assert.notEqual(mapImportedScope('team_only', 0, 3), 'all')
     })
 
     it('端到端：效应专属条目落库后 scope 为空数组（不再变成全队）', () => {

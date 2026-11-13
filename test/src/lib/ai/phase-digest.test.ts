@@ -341,13 +341,13 @@ describe('工程 Buff 配置清单渲染', () => {
             { name: '攻击加成', scope: 'all', global: true, zoneCount: 2 },
             { name: '效应专属', scope: [], global: false, zoneCount: 1 },
             { name: '双人共享', scope: [0, 1], global: false, zoneCount: 3, rules: '角色1 共鸣链 ≥ 1' },
-            { name: '三角色专属', scope: [0, 1, 2], global: false, zoneCount: 1 }
+            { name: '全队专属', scope: [0, 1, 2], global: false, zoneCount: 1 }
         ])
         const lines = out.split('\n')
-        assert.ok(lines[1].includes('[01] 攻击加成[全局] · 全队 · 2 乘区'))
+        assert.ok(lines[1].includes('[01] 攻击加成[全局] · 通用 · 2 乘区'))
         assert.ok(lines[2].includes('[02] 效应专属 · 效应专属 · 1 乘区'))
         assert.ok(lines[3].includes('[03] 双人共享 · 角色1/2 · 3 乘区 · 条件: 角色1 共鸣链 ≥ 1'))
-        assert.ok(lines[4].includes('[04] 三角色专属 · 三角色 · 1 乘区'), '仅角色全选是四态里的独立状态')
+        assert.ok(lines[4].includes('[04] 全队专属 · 全队 · 1 乘区'), '全队（仅三名角色）是四态里的独立状态')
     })
 
     it('空清单给出明确提示', () => {

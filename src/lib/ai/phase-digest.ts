@@ -354,11 +354,11 @@ export interface BuffConfDigestItem {
     zoneSummary?: string
 }
 
-/** @desc 作用域文案（四态口径见 `classifyBuffScope`） */
+/** @desc 作用域文案（四态口径见 `classifyBuffScope`：通用 / 全队 / 仅效应 / 指定角色） */
 export const scopeLabel = (scope: 'all' | number[]): string => {
-    if (scope === 'all') return '全队'
+    if (scope === 'all') return '通用'
     if (scope.length === 0) return '效应专属'
-    if (scope.length >= 3) return '三角色'
+    if (scope.length >= 3) return '全队'
     return `角色${scope.map((i) => i + 1).join('/')}`
 }
 

@@ -66,12 +66,9 @@ let _damageEntryDamageTypes = $state<Record<string, string[]>>({})
 let _damageEntryDisplayNames = $state<Record<string, string>>({})
 let _showBuffModal = $state(false)
 let _showDamageTypeModal = $state(false)
-let _buffDiffMode = $state(false)
 let _locked = $state(false)
 /** @desc 全局生效配置：各角色共鸣链 / 武器精炼阶数（结果计算与条件过滤共用） */
 let _conditionProfile: ConditionProfile = $state({ chains: [0, 0, 0], refinements: [1, 1, 1] })
-/** @desc 默认隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff */
-let _hideConditionMismatch = $state(true)
 /** @desc 锁定态下拦截所有写操作（加锁环节，如对比分锁） */
 function assertUnlocked(): boolean {
     if (_locked) {
@@ -192,6 +189,14 @@ export function canUndoTable(): boolean {
     const version = _historyVersion
     void version
     return _undoStack.length > 0
+}
+
+/**
+ * @desc 表格数据版本号：内容真正变化（微任务里与基线比较过）才自增。
+ * 供「结果要不要重算」这类判定当廉价指纹用（比深拷贝快照比较便宜几个数量级），读取即建立响应式依赖。
+ */
+export function getTableVersion(): number {
+    return _historyVersion
 }
 
 export function canRedoTable(): boolean {
@@ -629,7 +634,7 @@ export function getAllBuffConfs(): BuffConf[] {
     return _buffSets
 }
 
-/** @desc 新建空 Buff 块（随机 id，默认全队作用域），返回新块 id */
+/** @desc 新建空 Buff 块（随机 id，默认「通用」作用域），返回新块 id */
 export function createBuffSet(
     name: string,
     placement?: { tab: 'global' | 'nonGlobal'; folderId?: string | null }
@@ -673,7 +678,7 @@ export function createBuffSet(
     return buffSet.id
 }
 
-/** @desc 导入接口类型：外部（工坊 share / AI）传入的 Buff 结构，scope 用 share 语义（self/self_except/team/effect_only） */
+/** @desc 导入接口类型：外部（工坊 share / AI）传入的 Buff 结构，scope 用导入源语义（self/self_except/team/team_only/effect_only） */
 export interface ImportBuffZone {
     zoneId: string
     value: number
@@ -698,7 +703,8 @@ export interface ImportBuffInput {
     name: string
     /** @desc 已解析好的工程全名；存在时 store 不再二次解析，避免条件文件夹重复叠加 */
     targetName?: string
-    scope?: 'self' | 'self_except' | 'team' | 'effect_only'
+    /** @desc 来源作用域（Buff 库语义）；`team`=通用（三名角色+效应）、`team_only`=全队（仅三名角色） */
+    scope?: 'self' | 'self_except' | 'team' | 'team_only' | 'effect_only'
     ownerIdx?: number
     /** @desc 旧链/阶条件（工坊 share / AI 生成仍按这个字段产出）：导入时升级为 `rules` */
     condition?: LegacyGateCondition
@@ -708,8 +714,12 @@ export interface ImportBuffInput {
 }
 
 /**
- * @desc share 的 scope 语义 → 工具 `BuffConf.scope`（`'all' | number[]`）：由导入方传入 ownerIdx
- * （该实体归属的角色槽位，无则 -1），`self_except` 需要队伍总槽位数。
+ * @desc share / Buff 库的 scope 语义 → 工程 `BuffConf.scope`（`'all' | number[]`）：由导入方传入 ownerIdx
+ * （该实体归属的角色槽位，无则 -1），`self_except` / `team_only` 需要队伍总槽位数。
+ *
+ * 四态对齐（全项目统一叫法）：`team` = **通用**（三名角色 + 效应，`'all'`）、
+ * `team_only` = **全队**（只有三名角色，`[0..n-1]`）、`effect_only` = 仅效应（`[]`）、
+ * 其余是角色子集。注意「全队」与「通用」**不是一个东西**：效应伤害只有通用才吃。
  *
  * **`effect_only` 必须映射成空数组**（工具侧「效应专属」就是 `scope: []`，见 `classifyBuffScope`）：
  * 曾经把它和 `team` 一起落到 `'all'`，症状是「工坊 / 本地 Buff 库里明明是效应专属，导入工程后变成全队共享」
@@ -728,6 +738,10 @@ export function mapImportedScope(
             if (ownerIdx < 0) return 'all'
             const idxs: number[] = []
             for (let i = 0; i < teamSize; i++) if (i !== ownerIdx) idxs.push(i)
+            return idxs.length ? idxs : []
+        }
+        case 'team_only': {
+            const idxs = Array.from({ length: teamSize }, (_, i) => i)
             return idxs.length ? idxs : []
         }
         case 'effect_only':
@@ -1479,16 +1493,7 @@ export function getDamageEntryConfig(entryId: string): DamageEntryConfig {
 
 const damageTypesOf = (entryId: string): string[] => _damageEntryDamageTypes[entryId] ?? []
 
-/** @desc ── Buff 差异模式（拉表页按段展示 新增/移除/不变/全局 的 buff 变化）── */
-
-export function getBuffDiffMode(): boolean {
-    return _buffDiffMode
-}
-export function toggleBuffDiffMode() {
-    _buffDiffMode = !_buffDiffMode
-}
-
-/** @desc ── 生效配置（链/阶）与条件不符隐藏 ── */
+/** @desc ── 生效配置（链/阶）── */
 
 export function getConditionProfile(): ConditionProfile {
     return _conditionProfile
@@ -1524,15 +1529,6 @@ export function setConditionProfileRefinements(idx: number, value: number) {
         refinements: _conditionProfile.refinements.map((r, j) => (j === idx ? value : r))
     }
     _profileChangeListener?.()
-}
-
-/** @desc 隐藏不匹配开关的读取/切换 */
-export function getHideConditionMismatch(): boolean {
-    return _hideConditionMismatch
-}
-
-export function toggleHideConditionMismatch() {
-    _hideConditionMismatch = !_hideConditionMismatch
 }
 
 /** @desc 按拖拽结果重排非全局 Buff 块（全局固定在最前） */
@@ -1846,6 +1842,18 @@ export function notifyCalcUpdate() {
         _updateInFlight = true
         _onupdate(getCalcState())
     }
+}
+
+/**
+ * @desc 用给定快照**回滚**整份表格（Buff 配置弹窗「不保存」丢弃本次会话改动用）。
+ *
+ * 复用 `applyTableSnapshot`（含宿主回写），因此工程文件也会回到快照状态；
+ * 回滚本身也压一次撤销栈，用户仍可 Ctrl+Z 把丢弃的改动拿回来。
+ */
+export function restoreCalcSnapshot(snapshot: CalcState): void {
+    if (!assertUnlocked()) return
+    applyTableSnapshot(snapshot)
+    markTableDirty()
 }
 
 /** @desc 伤害条目被复制/拆分后，按旧 id→新 id 映射重绑 buff 与伤害类型（key 前缀匹配） */

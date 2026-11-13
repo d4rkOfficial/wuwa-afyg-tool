@@ -15,7 +15,7 @@ import { ZONE_NO_REF_IDS } from '$lib/calc/calculation.consts'
 import { buffFolderPath, buffLeafName, joinBuffPath, sanitizeLeafName } from '$lib/calc/buff-name'
 
 const str = (v: unknown): string => String(v ?? '').trim()
-const SCOPES: BuffSetScope[] = ['self', 'self_except', 'team', 'effect_only']
+const SCOPES: BuffSetScope[] = ['self', 'self_except', 'team', 'team_only', 'effect_only']
 
 defineTool('sync_buff_set_from_share', {
     description:
@@ -87,7 +87,7 @@ defineTool('get_buff_set_entity_buffs', {
 
 defineTool('update_buff_set_entity_buffs', {
     description:
-        '整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffName 必须是全名（文件夹A\\buff名，根 Buff 直接写短名）；folders 可传空文件夹/排序。buffs 结构：[{"buffName":"文件夹A\\\\buff名","scope":"self|self_except|team|effect_only","exclusive":false,"condition":{...可选},"zones":[...]}]。',
+        '整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffName 必须是全名（文件夹A\\buff名，根 Buff 直接写短名）；folders 可传空文件夹/排序。buffs 结构：[{"buffName":"文件夹A\\\\buff名","scope":"self|self_except|team_only|team|effect_only","exclusive":false,"condition":{...可选},"zones":[...]}]。scope 语义：self=自己 / self_except=自己除外 / team_only=全队（仅三名角色，不含效应）/ team=通用（三名角色 + 效应）/ effect_only=效应专属。',
     dangerous: true,
     parameters: {
         type: 'object',

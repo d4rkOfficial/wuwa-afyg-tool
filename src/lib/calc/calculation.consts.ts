@@ -172,7 +172,7 @@ export interface GroupedBuffConfItem {
     children?: BuffConf[]
 }
 
-/** @desc Buff 作用域归类（四态）：全队 / 仅角色全选 / 仅效应 / 指定角色子集 */
+/** @desc Buff 作用域归类（四态）：通用 / 全队 / 仅效应 / 指定角色子集 */
 export interface BuffScopeClass {
     kind: 'all' | 'charsAll' | 'effect' | 'chars'
     /** @desc kind='chars' 时的角色槽位（去重升序） */
@@ -181,12 +181,12 @@ export interface BuffScopeClass {
 
 /**
  * @desc 归类一个 Buff 的作用域（列表作用域徽标 / 生效成员卡共用口径），四态一一对应：
- * - `'all'` → **全队**（三角色 + 效应通用）
- * - `[0,1,2]`（槽位覆盖全部角色）→ **仅角色全选**（三角色，但**不含**效应伤害）
+ * - `'all'` → **通用**（三名角色 + 效应伤害都吃）
+ * - `[0,1,2]`（槽位覆盖全部角色）→ **全队**（只有三名角色，**不含**效应伤害）
  * - `[]` → **仅效应**
  * - 其余槽位数组 → 指定角色子集
  *
- * 注意 `[0,1,2]` 与 `'all'` 是**不同**状态：引擎里 `'all'` 连效应条目一起生效，
+ * 注意 `[0,1,2]`（全队）与 `'all'`（通用）是**不同**状态：引擎里 `'all'` 连效应条目一起生效，
  * 而 `[0,1,2]` 只对三个角色槽位生效（效应条目没有角色槽位）。
  */
 export const classifyBuffScope = (scope: 'all' | number[] | undefined, teamSize = 3): BuffScopeClass => {

@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **173** 个工具。
+> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **172** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
@@ -205,7 +205,7 @@ _无参数_
 
 > ⚠️ **危险工具**：执行后不可轻易撤销
 
-整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffName 必须是全名（文件夹A\buff名，根 Buff 直接写短名）；folders 可传空文件夹/排序。buffs 结构：[{"buffName":"文件夹A\\buff名","scope":"self\|self_except\|team\|effect_only","exclusive":false,"condition":{...可选},"zones":[...]}]。
+整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffName 必须是全名（文件夹A\buff名，根 Buff 直接写短名）；folders 可传空文件夹/排序。buffs 结构：[{"buffName":"文件夹A\\buff名","scope":"self\|self_except\|team_only\|team\|effect_only","exclusive":false,"condition":{...可选},"zones":[...]}]。scope 语义：self=自己 / self_except=自己除外 / team_only=全队（仅三名角色，不含效应）/ team=通用（三名角色 + 效应）/ effect_only=效应专属。
 
 | 参数         | 必填   | 类型   | 说明                                                            |
 | ------------ | ------ | ------ | --------------------------------------------------------------- |
@@ -390,7 +390,7 @@ _无参数_
 
 ### `get_buff_confs`
 
-获取工程 Buff 配置清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（self/self_except/team/effect_only/all）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_conf_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。可选 zoneId：只列出含该乘区的配置，并在每项附带命中乘区的数值/引用摘要；不传则保持原来的全量清单。
+获取工程 Buff 配置清单（一行一条）：行首方括号里的数字就是**序号**（create/rename/delete/绑定/乘区工具都填它）、名称、作用范围（all=通用 / 全队 / 仅效应 / 角色号）、是否全局默认、生效条件、乘区条数。**不含各乘区的数值/引用**——那部分用 get_buff_conf_detail 按需查；某条目绑了哪些 Buff 见 get_damage_entries。可选 zoneId：只列出含该乘区的配置，并在每项附带命中乘区的数值/引用摘要；不传则保持原来的全量清单。
 
 | 参数        | 必填 | 类型                  | 说明                                                                            |
 | ----------- | ---- | --------------------- | ------------------------------------------------------------------------------- |
@@ -472,7 +472,7 @@ _无参数_
 
 ### `get_condition_profile`
 
-获取链/阶配置（每个角色的共鸣链 0-6 与武器精炼 0-5，0=未精炼）及“可用Buff”过滤开关状态。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程；省略则读活动工程。
+获取链/阶配置（每个角色的共鸣链 0-6 与武器精炼 0-5，0=未精炼）。**可跨工程只读**：传 projectId 读任意工程且不切换当前工程；省略则读活动工程。
 
 | 参数        | 必填 | 类型   | 说明                                            |
 | ----------- | ---- | ------ | ----------------------------------------------- |
@@ -495,12 +495,6 @@ _无参数_
 | ------- | ------ | ------ | --------------- |
 | `slot`  | **是** | number | 角色槽位（1-3） |
 | `value` | **是** | number | 阶数 0-5        |
-
-### `toggle_condition_mismatch_hide`
-
-切换“可用Buff/全部Buff”过滤：开启时隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 Buff。
-
-_无参数_
 
 ### `import_buff_set_entity_to_project`
 
@@ -583,7 +577,7 @@ _无参数_
 
 ### `set_buff_conf_scope`
 
-设置工程 Buff 配置的作用范围：all（全队）或槽位数组（如 [1,3] 表示仅 1、3 号位）。全局工程 Buff 配置不可修改范围。
+设置工程 Buff 配置的作用范围：all（通用：三名角色 + 效应伤害）或槽位数组（如 [1,3] 表示仅 1、3 号位；[0,1,2] 是「全队」——只对三名角色生效、不含效应）。全局工程 Buff 配置不可修改范围。
 
 | 参数       | 必填   | 类型           | 说明                 |
 | ---------- | ------ | -------------- | -------------------- |
@@ -923,7 +917,7 @@ _无参数_
 
 ### `set_setting`
 
-修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-200全黑~~0原图~~200极白, mode?:"light"\|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card\|modal\|sidebar\|content\|toolbar\|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"\|"dark"}，按昼夜分别保存；card=卡片（卡片类容器：声骸/套装/方案卡、结果页伤害行、下拉拉表与平铺拉表的行与单元格）；modal=弹窗（所有弹窗外壳（设置、工坊、各类 picker、确认框）的面板本体）；sidebar=侧边栏（工程列表侧边栏，含其顶部标题栏与列表项）；content=主内容区（欢迎页、队伍配置、排轴、拉表、词条/环境配置、结果页各自的主内容区底色）；toolbar=工具栏（顶部工具栏、底部工具栏、底部悬浮工具栏、阶段页签栏）；widget=小部件（小控件，可出现在任意容器内部（故与上面五项正交）：卡片式小块及其行/格、图标按钮、picker 卡、声骸槽卡、词条卡、操作块、属性/抗性输入框等。成片逐行/逐格元素请叠加 data-sf-flat，避免每个元素都重算一次背景模糊。注：开关与滑块用语义色、下拉与菜单项走 --theme-context-menu-* 组件命名空间，均不归本区域）)、calc_view(dropdown/spread)、simplify_toolbar、simplify_context_menu、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。
+修改允许 AI 控制的设置。key 白名单：theme_mode(dark/light)、theme_accent_hue(default=青色/orange=橘红/orangeyellow=橙黄/magenta=品红/cyan=青色别名/indigo=靛蓝/green=墨绿/mono=黑白 或 0-360 整数)、theme_background_image(http(s)/data:image 地址或空串清除；白天/黑夜各一张，写法为地址或 {mode:"light"\|"dark", url}，缺省写当前主题那张)、theme_bg_image_effect(对象 {blur?:0-32, mask?:-200全黑~~0原图~~200极白, mode?:"light"\|"dark"}，按昼夜分别保存)、appearance_reset(值可空，或 "light"/"dark"/"白天"/"黑夜" 指定昼夜；恢复该昼夜的区域质感与背景图效果默认值)、surface_style(对象 {surface:"card\|modal\|sidebar\|content\|toolbar\|widget", opacity?:0-100（不透明度）, blur?:0-32, depth?:0-100(昼更白/夜更黑), reset?:true, mode?:"light"\|"dark"}，按昼夜分别保存；card=卡片（卡片类容器：声骸/套装/方案卡、结果页伤害行、拉表（分类/分段平铺）的行与单元格）；modal=弹窗（所有弹窗外壳（设置、工坊、各类 picker、确认框）的面板本体）；sidebar=侧边栏（工程列表侧边栏，含其顶部标题栏与列表项）；content=主内容区（欢迎页、队伍配置、排轴、拉表、词条/环境配置、结果页各自的主内容区底色）；toolbar=工具栏（顶部工具栏、底部工具栏、底部悬浮工具栏、阶段页签栏）；widget=小部件（小控件，可出现在任意容器内部（故与上面五项正交）：卡片式小块及其行/格、图标按钮、picker 卡、声骸槽卡、词条卡、操作块、属性/抗性输入框等。成片逐行/逐格元素请叠加 data-sf-flat，避免每个元素都重算一次背景模糊。注：开关与滑块用语义色、下拉与菜单项走 --theme-context-menu-* 组件命名空间，均不归本区域）)、calc_view(categorized 分类平铺/segmented 分段平铺)、simplify_toolbar、simplify_context_menu、confirm_deletes(删除前二次确认)、sidebar_actions(侧边栏新建/导入按钮开关)、modal_close_position(top-left/top-right 弹窗关闭按钮位置)、toast_position(top-right/none/top-left/top-center/bottom-center/bottom-left/bottom-right)、multi_entry_expand(结果页是否允许同时展开多个伤害条目，默认 false=同时只展开一个)、lock_watermark(排轴锁定水印开关)、lock_watermark_text(水印文本，最长 24 字，空串=回落「已锁定」)、gpu_accel、reload_on_result_refresh、reload_on_profile_change、data_provider(数据源 id 或 default=重置)、clear_cache(list/info/image/all)、ai_enabled(布尔)、ai_danger_mode(ask/ask_once/trust)、ai_persona_prompt(文本或空串=恢复默认)。按键图标/快捷键位/AI 配置文件/工坊实例请用专用工具 set_keymap_entry/set_shortcut/manage_ai_profile/manage_workshop，归档管理用 archive_project/unarchive_project/delete_project；Buff 命名规则与黑话词典是内置技能卡，正文用技能工具（list_skills / use_skill）查看、由用户在设置里编辑。
 
 | 参数    | 必填   | 类型                      | 说明                           |
 | ------- | ------ | ------------------------- | ------------------------------ |

@@ -161,11 +161,12 @@ export const BUILTIN_SKILLS: AiSkill[] = [
 2. Buff 级条件是**规则列表**（BuffInstance.rules，用 set_buff_conf_rules 设置），规则之间**全部 AND**；种类：
    chain（某角色共鸣链 ≥ N） / refinement（武器精炼 ≥ N） / damageNameRegex（伤害条目 displayName 正则包含匹配） /
    damageNameEquals（displayName 全等） / zoneCompare（某角色面板数值比较，charIdx=-1 表示伤害条目的角色，
-   只读「无条件部分」面板） / enemyType（BOSS / 精英怪 / 小怪） / buffActive（all=全部生效 / any=至少一个生效，引用其它 BUFF）。
+   读「无条件部分」面板：装备 + 其它 BUFF 的固定乘区，不含本 BUFF 自身，因此可用作「每层 +1、至多 N 层」的自封顶） /
+   enemyType（BOSS / 精英怪 / 小怪） / buffActive（all=全部生效 / any=至少一个生效，引用其它 BUFF）。
 3. **链与阶可以并存**（不再互斥、也不会拆分 Buff）；旧字段 condition.chain / condition.refinement / chains / refinements 已废弃。
 4. 链/阶档位的真源是角色槽位 team[i].chain / team[i].refinement，由「角色详情配置」设置，不是可编辑变量。
 5. buffActive 引用**禁止成环**（含直接自引用），会被工具拒绝；删除被引用的 BUFF 会级联删除依赖它的 BUFF。
-6. 生效成员（scope）：'all'=全队（三角色+效应）/ [0,1,2]=仅角色全选 / []=仅效应 / 子集=指定角色。`
+6. 生效成员（scope）：'all'=通用（三名角色 + 效应伤害）/ [0,1,2]=全队（只对三名角色，不含效应）/ []=仅效应 / 子集=指定角色。「全队」与「通用」不是一个东西，别混。`
     }
 ]
 
