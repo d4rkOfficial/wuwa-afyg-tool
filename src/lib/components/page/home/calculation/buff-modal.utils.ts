@@ -2,7 +2,7 @@
  * `buff-modal.svelte` 的纯逻辑层（**不 import 任何 store**，需要 store 能力的部分由调用方注入）：
  * 数据变换、查表、格式化、默认值构造、拖拽状态装配。
  *
- * 放置约定与同目录 `spread-table.utils.ts` / `dropdown-table.utils.ts` 一致：
+ * 放置约定与同目录 `spread-table.utils.ts` 一致：
  * 纯函数住同目录 `*.utils.ts`，落进 ESLint 的「纯逻辑层」享受函数式约束。
  */
 import { ZONE_REF_DEFS, ZONE_REF_MAP, ZONE_MAP, classifyBuffScope, groupBuffSets } from '$lib/calc/calculation.consts'
@@ -137,9 +137,9 @@ export const checkedCharsIn = (scope: 'all' | number[], teamSize = 3): number[] 
 
 /**
  * @desc 点击某张角色卡后的作用域（四态状态机，已与产品逐条对齐）：
- * - 勾着效应时**再勾角色 = 全队**（`'all'`）；
- * - 全队状态下取消一个角色 = 取消效应、保留剩余角色；
- * - 只勾部分角色时勾满三个 = **仅角色全选**（`[0,1,2]`），不是全队（效应仍是关的）；
+ * - 勾着效应时**再勾角色 = 通用**（`'all'`，三名角色 + 效应都吃）；
+ * - 通用状态下取消一个角色 = 取消效应、保留剩余角色；
+ * - 只勾部分角色时勾满三个 = **全队**（`[0,1,2]`，效应仍是关的）；
  * - 取消最后一个角色 = **仅效应**（`[]`）；永远不会产生「一个成员都没有」。
  */
 export const nextScopeAfterCharToggle = (scope: 'all' | number[], idx: number, teamSize = 3): 'all' | number[] => {
@@ -157,8 +157,8 @@ export const nextScopeAfterCharToggle = (scope: 'all' | number[], idx: number, t
 
 /**
  * @desc 点击效应卡后的作用域；返回 null 表示**禁止**这次操作（仅效应取消效应 = 空成员）。
- * - 勾效应 = 全队（`'all'`）；
- * - 从全队取消效应 = **仅角色全选**（`[0,1,2]`）；
+ * - 勾效应 = 通用（`'all'`，三名角色 + 效应）；
+ * - 从通用取消效应 = **全队**（`[0,1,2]`，只有三名角色）；
  * - 仅效应（`[]`）取消效应 → 禁止。
  */
 export const nextScopeAfterEffectToggle = (scope: 'all' | number[], teamSize = 3): 'all' | number[] | null => {
@@ -171,8 +171,8 @@ export const nextScopeAfterEffectToggle = (scope: 'all' | number[], teamSize = 3
 
 /**
  * @desc 条目作用域徽标（**行首**，取代原星标图标）：
- * - 全队 → 主题色实心「全队」
- * - 仅角色全选（`[0,1,2]`）→ 主题色描边「三角色」
+ * - 通用（`'all'`，三名角色 + 效应都吃）→ 主题色实心「通用」
+ * - 全队（`[0,1,2]`，只有三名角色）→ 主题色描边「全队」
  * - 仅效应（空数组）→ 主题色描边「效应专属」
  * - 指定角色（1~2 个槽位）→ 逐个出角色名，用该角色属性色做空心 + 半透明底
  * `elementColor` 由调用方注入（它是 store 能力，不进本模块）。
@@ -187,7 +187,7 @@ export const scopeBadgesOf = (
         return [
             {
                 key: 'all',
-                label: '全队',
+                label: '通用',
                 style: 'border-color: transparent; background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #fff);'
             }
         ]
@@ -196,7 +196,7 @@ export const scopeBadgesOf = (
         return [
             {
                 key: 'chars-all',
-                label: '三角色',
+                label: '全队',
                 style: 'border-color: var(--theme-accent-bg); background: transparent; color: var(--theme-accent-text);'
             }
         ]

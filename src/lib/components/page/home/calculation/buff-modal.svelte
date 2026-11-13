@@ -1,7 +1,7 @@
 <script lang="ts">
     /**
      * @desc BUFF 配置弹窗：标题栏「BUFF 配置」+ 全局/非全局胶囊 tab + 导入入口；
-     * 左侧 Buff 块列表（文件夹/拖拽排序/拖出删除/多选/上下文全局操作）；
+     * 左侧 Buff 块列表（文件夹/拖拽排序/拖出删除/多选批量操作/新建）；
      * 右侧块编辑器三个 tab（具体效果 / 生效成员 / 门槛条件），仅「具体效果」展开右栏乘区清单。
      */
     import {
@@ -29,6 +29,8 @@
         moveBuffTreeNode,
         moveBuffFolderSibling,
         pruneEmptyBuffFolders,
+        getCalcState,
+        restoreCalcSnapshot,
         setShowBuffModal
     } from '$lib/calc/calculation.store.svelte'
     import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
@@ -37,7 +39,14 @@
     import { findBuffPlacement, findNode } from '$lib/calc/buff-tree-state'
     import { buffLeafName } from '$lib/calc/buff-name'
     import type { CharSlot } from '$lib/types/project'
-    import type { BuffRule, ZoneRef, BuffConf, BuffCondition, BuffTreeNode } from '$lib/calc/calculation.types'
+    import type {
+        BuffRule,
+        ZoneRef,
+        BuffConf,
+        BuffCondition,
+        BuffTreeNode,
+        CalcState
+    } from '$lib/calc/calculation.types'
     import { cyclePathOf } from '$lib/calc/rules'
     import { slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
@@ -55,10 +64,12 @@
     import BuffModalEditor from './buff-modal-editor.svelte'
     import BuffModalZoneBar from './buff-modal-zone-bar.svelte'
     import BuffModalRefModal from './buff-modal-ref-modal.svelte'
-    import BuffModalFolderRenameModal from './buff-modal-folder-rename-modal.svelte'
     import BuffFolderNameModal from './buff-folder-name-modal.svelte'
     import BuffFolderPickerModal from './buff-folder-picker-modal.svelte'
-    import { onMount } from 'svelte'
+    import UnsavedChangesDialog from '$lib/components/ui/unsaved-changes-dialog.svelte'
+    import { diffBuffConfig } from './unsaved-changes.utils'
+    import type { UnsavedChangeItem } from '$lib/types/unsaved-change'
+    import { onMount, untrack } from 'svelte'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
     import type { ComponentsProps } from '$lib/types'
@@ -87,13 +98,55 @@
     let { open, team, onclose, class: className, style: styleProp }: Props = $props()
 
     /**
-     * @desc 关闭弹窗：**先清理空文件夹**再落 store（清理只在关闭/保存时做，见 requirements.md A1）。
+     * @desc 打开时的数据快照（关闭确认 / 「不保存」回滚用）：`getCalcState()` 自带深拷贝。
+     * 只在 `open` 翻转时取一次 —— 快照本身不能跟着 store 变化重取，否则「改动」永远为空。
+     */
+    let openSnapshot = $state<CalcState | null>(null)
+    /** @desc 关闭前确认弹窗的改动清单；空数组 = 不需要确认 */
+    let closeChanges = $state<UnsavedChangeItem[]>([])
+    let showCloseConfirm = $state(false)
+
+    $effect(() => {
+        const isOpen = open
+        untrack(() => {
+            openSnapshot = isOpen ? getCalcState() : null
+            if (!isOpen) {
+                showCloseConfirm = false
+                closeChanges = []
+            }
+        })
+    })
+
+    /**
+     * @desc 真正关闭弹窗：**先清理空文件夹**再落 store（清理只在关闭/保存时做，见 requirements.md A1）。
      * 清理会走 `commitBuffTree` 一并持久化，所以不需要在这里额外落一次快照。
      */
-    const handleModalClose = () => {
+    const finishClose = () => {
         pruneEmptyBuffFolders()
         setShowBuffModal(false)
         onclose()
+    }
+
+    /**
+     * @desc 右上角 ❌ / Esc 的关闭入口：本次会话有改动时先弹「以下修改还未保存」，
+     * 无改动则直接关闭（省一次无意义确认）。
+     */
+    const requestClose = () => {
+        const changes = openSnapshot ? diffBuffConfig(openSnapshot, getCalcState()) : []
+        if (changes.length === 0) {
+            finishClose()
+            return
+        }
+        closeChanges = changes
+        showCloseConfirm = true
+    }
+
+    /** @desc 不保存：回滚到打开时的快照（含宿主回写）后退出 */
+    const discardAndClose = () => {
+        const snapshot = openSnapshot
+        showCloseConfirm = false
+        if (snapshot) restoreCalcSnapshot(snapshot)
+        finishClose()
     }
 
     let showRefLookup = $state(false)
@@ -149,9 +202,6 @@
     /** @desc 新建 BUFF 前的文件夹选择弹窗；取消时回滚本次新建的文件夹 */
     let showCreateBuffPicker = $state(false)
     let pendingCreatedFolderIds = $state<string[]>([])
-    /** @desc 文件夹批量重命名弹窗 */
-    let showFolderRename = $state(false)
-    let folderRenameTarget = $state<GroupedBuffConfItem | null>(null)
     /** @desc 手动文件夹的新建 / 重命名弹窗；null = 关闭 */
     let folderNameRequest = $state<
         | { mode: 'create'; parentId?: string | null; id?: string; name: string }
@@ -368,7 +418,7 @@
         if (!ok) return
         activeTab = isGlobal ? 'nonGlobal' : 'global'
         if (!isGlobal) {
-            addToast(selectedBuffSet.scope === 'all' ? '已并入全局，全队生效' : '已并入全局', 'success')
+            addToast(selectedBuffSet.scope === 'all' ? '已并入全局，通用生效' : '已并入全局', 'success')
         } else {
             addToast('已移出全局', 'info')
         }
@@ -667,7 +717,7 @@
         addToast(`已删除文件夹「${folder.name ?? ''}」及其中 ${count} 条 BUFF`, 'info')
     }
 
-    /** @desc 文件夹右键菜单项：多选态 → 整组批量操作；非多选 → 重命名 / 删除 / 全局 / 批量重命名 */
+    /** @desc 文件夹右键菜单项：多选态 → 整组批量操作；非多选 → 重命名 / 删除 / 全局 */
     let folderMenuItems = $derived.by(() => {
         const folder = folderMenuTarget
         if (!folder) return []
@@ -702,15 +752,6 @@
         const members = folderMembers(folder).filter((item) => !isMultiSelectDisabled(item.id))
         const allGlobal = members.length > 0 && members.every((item) => globalBuffSetIds.includes(item.id))
         const common = [
-            ...(members.length > 0
-                ? [
-                      {
-                          label: '批量重命名',
-                          icon: 'mdi:rename-box',
-                          action: () => openFolderRename(folder)
-                      }
-                  ]
-                : []),
             {
                 label: allGlobal ? '整组移出全局' : '整组并入全局',
                 icon: allGlobal ? 'mdi:minus-circle-outline' : 'mdi:crown-outline',
@@ -743,12 +784,6 @@
         }
         return common
     })
-
-    /** @desc 打开文件夹批量重命名弹窗：按「新前缀 + 序号 + 新后缀」重新编号全部子 Buff */
-    function openFolderRename(folder: GroupedBuffConfItem) {
-        folderRenameTarget = folder
-        showFolderRename = true
-    }
 
     /** @desc 打开单个 buff 右键菜单（普通/全局/多选状态统一入口） */
     function openItemMenu(e: MouseEvent, id: string) {
@@ -862,26 +897,6 @@
         handleDeleteBuffSet()
     }
 
-    /** @desc 确认文件夹批量重命名：子 Buff 依次命名为 新前缀+1..N+新后缀 */
-    function confirmFolderRename(prefix: string, suffix: string) {
-        const folder = folderRenameTarget
-        if (!folder) return
-        const members = folderMembers(folder)
-        if (members.length === 0) return
-        const trimmedPrefix = prefix.trim()
-        const trimmedSuffix = suffix.trim()
-        if (!trimmedPrefix && !trimmedSuffix) {
-            addToast('前缀与后缀不能同时为空', 'error')
-            return
-        }
-        members.forEach((child, i) => {
-            renameBuffSet(child.id, `${trimmedPrefix}${i + 1}${trimmedSuffix}`)
-        })
-        addToast(`已批量重命名 ${members.length} 条 BUFF`, 'success')
-        showFolderRename = false
-        folderRenameTarget = null
-    }
-
     // ── 多选模式的全部行为已抽到 `./buff-modal-multiselect.svelte`；此处只做模板可读的薄别名 ──
     const toggleMultiSelect = multi.toggle
     const isMultiSelectDisabled = multi.isDisabled
@@ -929,8 +944,9 @@
     })
 
     /**
-     * @desc 底部**上下文全局按钮**的作用集合：多选 → 勾选集合；非多选 → 当前选中 Buff（无选中即空）。
-     * 内置默认块（`global-` 前缀）既不能删也不能移出全局，这里一并跳过。
+     * @desc 「并入 / 移出全局」的作用集合：多选 → 勾选集合（底部工具栏批量按钮）；
+     * 非多选 → 当前选中 Buff（右列详情头部按钮，在复制/删除旁边）。内置默认块（`global-` 前缀）
+     * 既不能删也不能移出全局，这里一并跳过。
      */
     const contextGlobalIds = $derived.by(() => {
         const ids = multiSelect ? [...multi.selectedIds] : selectedBuffSetId ? [selectedBuffSetId] : []
@@ -947,9 +963,11 @@
             icon: toGlobal ? 'mdi:crown-outline' : 'mdi:minus-circle-outline',
             disabled: count === 0,
             title:
-                count === 0
-                    ? `没有选中可操作的 BUFF（${scopeText}）`
-                    : `把${scopeText}（${count} 条）${toGlobal ? '并入全局' : '移出全局'}`
+                count > 0
+                    ? `把${scopeText}（${count} 条）${toGlobal ? '并入全局' : '移出全局'}`
+                    : multiSelect
+                      ? '没有勾选可操作的 BUFF'
+                      : '内置默认全局块：不可移出全局'
         }
     })
 
@@ -958,7 +976,7 @@
         Math.max(0, buffDeleteCascadeOf([...multi.selectedIds]).length - multi.selectedIds.size)
     )
 
-    /** @desc 底部上下文全局操作：多选作用勾选集合、非多选作用当前选中 Buff */
+    /** @desc 并入/移出全局：多选作用勾选集合（底部工具栏）、非多选作用当前选中 Buff（详情头部） */
     function handleContextGlobal() {
         const ids = contextGlobalIds
         if (ids.length === 0) return
@@ -981,13 +999,7 @@
 </script>
 
 <!-- @desc BUFF 配置弹窗根容器：共享弹窗外壳 + 内容（标题栏入口/左侧列表/右侧编辑器/底部保存） -->
-<Modal
-    {open}
-    onclose={handleModalClose}
-    noScroll
-    class={mergeClass(['h-full w-[1180px]', className])}
-    style={styleProp}
->
+<Modal {open} onclose={requestClose} noScroll class={mergeClass(['h-full w-[1180px]', className])} style={styleProp}>
     {#snippet title()}
         <Icon icon="mdi:widgets" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
         <span>BUFF 配置</span>
@@ -1130,9 +1142,11 @@
                             {overrideZoneIds}
                             {externalOverrides}
                             buffOptions={ruleBuffOptions}
+                            globalAction={multiSelect ? null : globalActionState}
                             onrename={handleRename}
                             oncopy={handleCopyBuffSet}
                             ondelete={handleDeleteBuffSet}
+                            onContextGlobal={handleContextGlobal}
                             onscope={handleScopeChange}
                             onsaverules={handleSaveRules}
                             onsetzonevalue={(index, value) => setZoneValueAt(selectedBuffSet.id, index, value)}
@@ -1160,13 +1174,13 @@
                         </div>
                     {/if}
                 </div>
-                <!-- @desc 右列底部：保存并关闭按钮 -->
+                <!-- @desc 右列底部：保存并关闭按钮（显式保存 → 不弹未保存确认） -->
                 <div
                     class="flex items-center justify-end gap-2 border-t px-5 py-3 shrink-0"
                     style="border-top: 1px solid var(--theme-divider-border);"
                 >
                     <button
-                        onclick={handleModalClose}
+                        onclick={finishClose}
                         class="inline-flex items-center gap-1.5 rounded-none px-4 py-1.5 text-sm font-medium transition-all hover:brightness-125"
                         style="background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                     >
@@ -1178,6 +1192,18 @@
         </div>
     {/if}
 </Modal>
+
+<!-- @desc 关闭确认：右上角 ❌ / Esc 时有改动才出现（不保存 = 回滚到打开时的快照） -->
+<UnsavedChangesDialog
+    open={showCloseConfirm}
+    items={closeChanges}
+    onclose={() => (showCloseConfirm = false)}
+    ondiscard={discardAndClose}
+    onsave={() => {
+        showCloseConfirm = false
+        finishClose()
+    }}
+/>
 
 <!-- @desc 引用配置弹窗：选择引用角色/属性、阈值与换算规则（线性/离散、除乘）、上下限 clamp -->
 <BuffModalRefModal
@@ -1225,16 +1251,7 @@
         : ''}，确定吗？
 </ConfirmDialog>
 
-<!-- @desc 文件夹批量重命名弹窗：按「新前缀 + 1..N + 新后缀」重新编号全部子 Buff -->
-{#if showFolderRename && folderRenameTarget}
-    <BuffModalFolderRenameModal
-        folder={folderRenameTarget}
-        onclose={() => (showFolderRename = false)}
-        onconfirm={confirmFolderRename}
-    />
-{/if}
-
-<!-- @desc 手动文件夹的新建 / 重命名弹窗 -->
+<!-- @desc 手动文件夹的新建 / 重命名弹窗（纯改名：只收一个文件夹名） -->
 {#if folderNameRequest}
     <BuffFolderNameModal
         title={folderNameRequest.mode === 'create' ? '新建文件夹' : '重命名文件夹'}

@@ -71,10 +71,15 @@
         style: styleProp
     }: Props = $props()
 
+    /**
+     * @desc 受益目标（Buff 库作用域）：与工程的四种作用域一一对应 ——
+     * 自己 / 队友（自己除外）→ 角色子集，**全队**=只有三名角色，**通用**=三名角色 + 效应，效应=仅效应。
+     */
     const SCOPE_TABS: { value: BuffLibraryScope; label: string }[] = [
         { value: 'self', label: '自己' },
         { value: 'self_except', label: '队友' },
-        { value: 'team', label: '全队' },
+        { value: 'team_only', label: '全队' },
+        { value: 'team', label: '通用' },
         { value: 'effect_only', label: '效应' }
     ]
 
@@ -145,7 +150,7 @@
             <div
                 class="flex shrink-0 overflow-hidden rounded-none border"
                 style="border-color: var(--theme-divider-border);"
-                title="受益目标：自己=仅自身；队友=自己除外；全队=整个队伍；效应=效应专属（互斥）"
+                title="受益目标：自己=仅自身；队友=自己除外；全队=仅三名角色（不含效应）；通用=三名角色+效应；效应=效应专属（互斥）"
             >
                 {#each SCOPE_TABS as t (t.value)}
                     <button

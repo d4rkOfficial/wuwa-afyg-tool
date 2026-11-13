@@ -1,9 +1,9 @@
 // 生效成员四态 + 作用域徽标 + 空文件夹清理：纯逻辑口径的回归。
 //
-// 状态机来自 `.tmp/buff-modal-redesign/requirements.md` 的「已对齐的决定」：
-//   `'all'`（三角色 + 效应） / `[0,1,2]`（仅角色全选） / `[]`（仅效应） / 子集
-//   勾效应 = 全队；全队取消效应 = 仅角色全选；仅效应取消效应 = 禁止；
-//   全队取消一个角色 = 取消效应保留剩余；取消最后一个角色 = 仅效应；禁止空成员。
+// 命名口径（全项目统一）：`'all'` = **通用**（三名角色 + 效应） / `[0,1,2]` = **全队**（不含效应） /
+//   `[]` = 仅效应 / 子集 = 指定角色。两者不是同义词，徽标与说明必须能区分开。
+//   勾效应 = 通用；通用取消效应 = 全队；仅效应取消效应 = 禁止；
+//   通用取消一个角色 = 取消效应保留剩余；取消最后一个角色 = 仅效应；禁止空成员。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -26,9 +26,9 @@ const TEAM = [{ character: '甲' }, { character: '乙' }, { character: '丙' }] 
 ]
 
 describe('classifyBuffScope：四态', () => {
-    it("'all' = 全队；[0,1,2] = 仅角色全选（不是全队）", () => {
+    it("'all' = 通用；[0,1,2] = 全队（不是通用）", () => {
         assert.equal(classifyBuffScope('all').kind, 'all')
-        assert.equal(classifyBuffScope([0, 1, 2]).kind, 'charsAll', '三角色不含效应，必须与全队区分')
+        assert.equal(classifyBuffScope([0, 1, 2]).kind, 'charsAll', '全队不含效应，必须与通用区分')
         assert.equal(classifyBuffScope([]).kind, 'effect')
         assert.deepEqual(classifyBuffScope([2, 0]), { kind: 'chars', idxs: [0, 2] })
     })
@@ -39,7 +39,7 @@ describe('classifyBuffScope：四态', () => {
 })
 
 describe('生效成员状态机', () => {
-    it('勾效应 = 全队；从全队取消效应 = 仅角色全选', () => {
+    it('勾效应 = 通用；从通用取消效应 = 全队', () => {
         assert.equal(nextScopeAfterEffectToggle([0, 1]), 'all')
         assert.deepEqual(nextScopeAfterEffectToggle('all'), [0, 1, 2])
     })
@@ -48,17 +48,17 @@ describe('生效成员状态机', () => {
         assert.equal(nextScopeAfterEffectToggle([]), null)
     })
 
-    it('勾着效应时再勾角色 → 全队', () => {
+    it('勾着效应时再勾角色 → 通用', () => {
         assert.equal(nextScopeAfterCharToggle([], 0), 'all')
-        assert.deepEqual(nextScopeAfterCharToggle('all', 0), [1, 2], '全队里「点已勾选的角色」= 取消该角色 + 取消效应')
+        assert.deepEqual(nextScopeAfterCharToggle('all', 0), [1, 2], '通用里「点已勾选的角色」= 取消该角色 + 取消效应')
     })
 
-    it('全队取消一个角色 = 取消效应 + 保留剩余角色', () => {
+    it('通用取消一个角色 = 取消效应 + 保留剩余角色', () => {
         assert.deepEqual(nextScopeAfterCharToggle('all', 0), [1, 2])
         assert.deepEqual(nextScopeAfterCharToggle('all', 1), [0, 2])
     })
 
-    it('部分角色勾满三个 = 仅角色全选（[0,1,2]），不是全队', () => {
+    it('部分角色勾满三个 = 全队（[0,1,2]），不是通用', () => {
         assert.deepEqual(nextScopeAfterCharToggle([0, 1], 2), [0, 1, 2])
     })
 
@@ -83,14 +83,14 @@ describe('scopeBadgesOf：行首徽标', () => {
     const badges = (scope: 'all' | number[]) =>
         scopeBadgesOf({ id: 'b', name: 'b', zones: [], scope } as BuffConf, TEAM, elementColor)
 
-    it('四态各自的徽标', () => {
+    it('四态各自的徽标（all=通用、[0,1,2]=全队）', () => {
         assert.deepEqual(
             badges('all').map((b) => b.label),
-            ['全队']
+            ['通用']
         )
         assert.deepEqual(
             badges([0, 1, 2]).map((b) => b.label),
-            ['三角色']
+            ['全队']
         )
         assert.deepEqual(
             badges([]).map((b) => b.label),

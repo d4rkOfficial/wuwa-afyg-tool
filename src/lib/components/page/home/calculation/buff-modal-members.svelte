@@ -2,9 +2,12 @@
     /**
      * @desc 右列「生效成员」tab：三张角色卡 + 一张效应卡（四态作用域）。
      *
+     * 四态的界面叫法（全项目统一）：**通用**（三名角色 + 效应）/ **全队**（只有三名角色）/
+     * **仅效应** / 指定角色子集。
+     *
      * 状态机由 `buff-modal.utils` 的 `nextScopeAfterCharToggle` / `nextScopeAfterEffectToggle` 给出
      * （纯函数、可单测），本组件只负责把点击换算成新作用域并交回父组件：
-     * - 勾效应 = 全队；从全队取消效应 = 仅角色全选；仅效应取消效应 = 禁止（返回 null）
+     * - 勾效应 = 通用；从通用取消效应 = 全队；仅效应取消效应 = 禁止（返回 null）
      * - 取消最后一个角色 = 仅效应；永远不会产生「一个成员都没有」
      */
     import Icon from '@iconify/svelte'
@@ -12,7 +15,6 @@
     import type { CharSlot } from '$lib/types/project'
     import type { BuffConf } from '$lib/calc/calculation.types'
     import { classifyBuffScope } from '$lib/calc/calculation.consts'
-    import { describeRule } from '$lib/calc/rules'
     import { addToast } from '$lib/data/toast.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { mergeClass } from '$lib/utils/component-style'
@@ -40,26 +42,16 @@
     const chars = $derived(checkedCharsIn(buff.scope, team.length))
     const hasEffect = $derived(effectCheckedIn(buff.scope))
 
-    /** @desc 当前作用域的一句话说明（四态） */
+    /** @desc 当前作用域的一句话说明（四态：通用 / 全队 / 仅效应 / 指定角色） */
     const scopeSummary = $derived.by(() => {
-        if (scopeClass.kind === 'all') return '全队：三名角色 + 效应伤害'
-        if (scopeClass.kind === 'charsAll') return '三角色：只对三名角色的伤害生效，不含效应伤害'
+        if (scopeClass.kind === 'all') return '通用：三名角色 + 效应伤害'
+        if (scopeClass.kind === 'charsAll') return '全队：只对三名角色的伤害生效，不含效应伤害'
         if (scopeClass.kind === 'effect') return '效应专属：只对效应伤害生效'
         const names = scopeClass.idxs.map((i) => team[i]?.character ?? `角色${i + 1}`).join('、')
         return `指定角色：${names}`
     })
 
-    /** @desc 该 Buff 的条件里是否带「当前角色」口径的规则（提示用户作用域与条件的关系） */
-    const hasCurrentCharRule = $derived(
-        (buff.rules ?? []).some((rule) => rule.kind === 'zoneCompare' && rule.charIdx < 0)
-    )
-    const ruleHint = $derived(
-        (buff.rules ?? [])
-            .filter((rule) => rule.kind === 'zoneCompare' && rule.charIdx < 0)
-            .map((rule) => describeRule(rule, { slotName: (i) => team[i]?.character ?? `角色${i + 1}` }))
-            .join(' 且 ')
-    )
-
+    /** @desc 切换单个角色：状态机保证「永远不会一个成员都没有」 */
     const toggleChar = (idx: number) => {
         if (locked) return
         onscope(nextScopeAfterCharToggle(buff.scope, idx, team.length))
@@ -89,7 +81,7 @@
 <div class={mergeClass(['flex flex-1 flex-col gap-3 overflow-y-auto p-3', className])} style={styleProp}>
     <div class="flex flex-wrap items-center gap-2 text-[11px] text-(--theme-modal-text)/60">
         <Icon icon="mdi:account-group-outline" class="size-3.5 shrink-0" style="color: var(--theme-accent-text);" />
-        <span class="text-xs font-black tracking-tight text-(--theme-modal-text)">这些角色可以吃到</span>
+        <span class="text-xs font-black tracking-tight text-(--theme-modal-text)">这些伤害源可以吃到</span>
         <span class="min-w-0 truncate">· {scopeSummary}</span>
     </div>
 
@@ -146,22 +138,7 @@
         </button>
     </div>
 
-    <ul class="space-y-1 text-[10px] text-(--theme-modal-text)/45">
-        <li>· 勾选「效应伤害」= 全队（三名角色 + 效应）；从全队取消效应 = 只保留三角色。</li>
-        <li>· 只保留效应时光环不再取消效应（至少保留一个生效成员）。</li>
-        <li>· 取消最后一个角色 = 只剩效应；角色全勾但没勾效应 = 三角色专属（不含效应）。</li>
-    </ul>
-
     {#if locked}
         <p class="text-[10px] text-(--theme-modal-text)/40">全局 BUFF 的受益者被锁定，需先移出全局再改。</p>
-    {/if}
-    {#if hasCurrentCharRule}
-        <div
-            class="flex items-start gap-1.5 border px-2 py-1.5 text-[10px]"
-            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg); color: var(--theme-modal-text); opacity: 0.7;"
-        >
-            <Icon icon="mdi:information-outline" class="mt-px size-3.5 shrink-0" />
-            <span class="min-w-0">条件里用了「当前角色」口径：{ruleHint}（按伤害条目的归属角色判定）</span>
-        </div>
     {/if}
 </div>

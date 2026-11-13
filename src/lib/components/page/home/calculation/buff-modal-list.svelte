@@ -2,14 +2,15 @@
     /**
      * @desc BUFF 配置弹窗的**左栏列表**：
      * 叠层文件夹（可折叠 / 整体拖拽）+ 独立 buff 块（可拖拽 / 拖出删除），插入位置显示指示条；
-     * 底部是单排工具栏（多选开关 / 批量操作 / **新建 BUFF** / **上下文全局操作**）。
+     * 底部是单排工具栏（多选开关 / 多选批量操作 + 批量并入·移出全局 / **新建 BUFF**）。
+     * 非多选态的「并入 / 移出全局」不在本组件，而在右列 BUFF 详情头部（复制、删除旁边）。
      *
      * 职责边界（受控区，无自有数据状态）：
      * - 折叠集合 `collapsedFolders`、拖拽状态 `dragState`、选中项**全部归父组件所有**并双向绑定。
      * - 树 `tree`、条目数 `buffCount`、队伍与派生查询由父组件注入；本组件**不回读**父组件状态，
      *   所有数据写入与菜单打开都经回调交回父组件（父组件是 store 的唯一调用方）。
      * - 全局/非全局的切换胶囊 tab 在**弹窗标题栏**（父组件），本组件不再自绘 tab。
-     * - 星标已彻底移除：行首改为**作用域徽标**（全队 / 三角色 / 效应专属 / 角色名）。
+     * - 星标已彻底移除：行首改为**作用域徽标**（通用 / 全队 / 效应专属 / 角色名）。
      */
     import Icon from '@iconify/svelte'
     import Button from '$lib/components/ui/button.svelte'
@@ -64,7 +65,7 @@
         resizingSidebar: boolean
         /** @desc 左栏宽度调宽把手是否悬停 */
         sidebarDividerHover: boolean
-        /** @desc 底部**上下文全局按钮**的文案 / 图标 / 可用性（父组件按当前 tab 与选中集合算） */
+        /** @desc 多选态底部**批量全局按钮**的文案 / 图标 / 可用性（父组件按当前 tab 与勾选集合算） */
         globalAction: { label: string; icon: string; disabled: boolean; title: string }
         /** @desc 选中某个条目（非多选态） */
         onselect: (id: string) => void
@@ -96,7 +97,7 @@
         onselectall: () => void
         /** @desc 已选项按名称排序 */
         onsortselected: () => void
-        /** @desc 底部上下文全局按钮（多选作用勾选集合，非多选作用当前选中 Buff） */
+        /** @desc 多选态批量并入/移出全局（非多选时该按钮在右列 BUFF 详情头部，不在本组件） */
         onContextGlobal: () => void
         /** @desc 请求批量删除（按偏好决定是否二次确认） */
         onrequestmultidelete: () => void
@@ -418,8 +419,8 @@
             <div class="text-xs text-(--theme-modal-text)/30 text-center py-4">暂无 BUFF 块</div>
         {/if}
     </div>
-    <!-- @desc 底部操作栏（单排）：多选开关 ·（多选时）全选/排序/删除 · 右侧「上下文全局操作」+「新建 BUFF」。
-             「新建 BUFF」在多选开启时隐藏；全局按钮多选时作用于勾选集合、非多选时作用于当前选中 Buff，无选中禁用。 -->
+    <!-- @desc 底部操作栏（单排）：多选开关 ·（多选时）全选/排序/删除/上下文全局操作 ·（非多选）新建 BUFF。
+             全局操作只在多选时留在这里（作用于勾选集合）；非多选时它由右列 BUFF 详情的按钮承担（在「复制/删除」旁边）。 -->
     <div
         class="shrink-0 border-t p-2 flex items-center gap-1"
         style="border-top: 1px solid var(--theme-divider-border);"
@@ -479,29 +480,28 @@
                     {#if leftWidth >= 280}<span>删除</span>{/if}
                 </button>
             {/if}
-        {/if}
-        <!-- @desc 上下文全局操作：当前在「全局」= 移出全局；在「非全局」= 并入全局 -->
-        <button
-            type="button"
-            disabled={globalAction.disabled}
-            onclick={onContextGlobal}
-            class={[
-                'ml-auto flex items-center gap-1 rounded-none border px-2 py-1 text-[11px] transition-colors',
-                globalAction.disabled
-                    ? 'cursor-not-allowed border-transparent text-(--theme-modal-text)/25'
-                    : 'border-(--theme-divider-border) text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
-            ].join(' ')}
-            title={globalAction.title}
-        >
-            <Icon icon={globalAction.icon} class="size-3.5" />
-            {#if leftWidth >= 300}<span>{globalAction.label}</span>{/if}
-        </button>
-        {#if !multiSelect}
+            <!-- @desc 批量上下文全局操作：勾选集合全在非全局 → 并入；全在全局 → 移出 -->
+            <button
+                type="button"
+                disabled={globalAction.disabled}
+                onclick={onContextGlobal}
+                class={[
+                    'ml-auto flex items-center gap-1 rounded-none border px-2 py-1 text-[11px] transition-colors',
+                    globalAction.disabled
+                        ? 'cursor-not-allowed border-transparent text-(--theme-modal-text)/25'
+                        : 'border-(--theme-divider-border) text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
+                ].join(' ')}
+                title={globalAction.title}
+            >
+                <Icon icon={globalAction.icon} class="size-3.5" />
+                {#if leftWidth >= 300}<span>{globalAction.label}</span>{/if}
+            </button>
+        {:else}
             <button
                 type="button"
                 data-press="none"
                 onclick={oncreatebuff}
-                class="flex items-center justify-center gap-1 rounded-none border px-2 py-1 text-[11px] font-medium transition-all hover:brightness-125"
+                class="ml-auto flex items-center justify-center gap-1 rounded-none border px-2 py-1 text-[11px] font-medium transition-all hover:brightness-125"
                 style="border-color: var(--theme-divider-border); background: var(--theme-accent-bg); color: var(--theme-accent-text-on-bg, #ffffff);"
                 title="新建 BUFF 块"
             >
@@ -538,7 +538,7 @@
     {/if}
 {/snippet}
 
-<!-- @desc 条目作用域徽标（名称右侧）：全队=主题色实心 / 效应专属=主题色空心 / 指定角色=角色属性色空心+半透明底 -->
+<!-- @desc 条目作用域徽标（名称右侧）：通用=主题色实心 / 全队=主题色描边 / 效应专属=主题色描边 / 指定角色=角色属性色空心+半透明底 -->
 {#snippet scopeBadges(bs: BuffConf)}
     {#each scopeBadgesOf(bs, team, derivedQueries.elementColor) as badge (badge.key)}
         <span

@@ -50,9 +50,16 @@
         renameInputEl: HTMLInputElement | null
         /** @desc `buffActive` 条件可引用的 Buff 候选 */
         buffOptions: { id: string; label: string }[]
+        /**
+         * @desc 头部「并入全局 / 移出全局」按钮（**非多选时**的唯一入口，放在复制/删除旁边）。
+         * 多选态的批量入口在左栏底部工具栏，那时父组件传 null。
+         */
+        globalAction: { label: string; icon: string; disabled: boolean; title: string } | null
         onrename: (value: string) => void
         oncopy: () => void
         ondelete: () => void
+        /** @desc 头部「并入/移出全局」点击 */
+        onContextGlobal: () => void
         /** @desc 生效成员（作用域）变更 */
         onscope: (scope: 'all' | number[]) => void
         /** @desc 保存 Buff 级规则；返回错误文案（null = 成功） */
@@ -79,9 +86,11 @@
         expandedZoneIndex = $bindable(),
         renameInputEl = $bindable(),
         buffOptions,
+        globalAction,
         onrename,
         oncopy,
         ondelete,
+        onContextGlobal,
         onscope,
         onsaverules,
         onsetzonevalue,
@@ -121,7 +130,7 @@
 </script>
 
 <div class={mergeClass(['flex min-w-0 flex-1 flex-col', className])} style={styleProp}>
-    <!-- @desc 选中块头部：重命名（回车/失焦保存）/复制/删除（全局块锁定只读，改名与删除禁用） -->
+    <!-- @desc 选中块头部：重命名（回车/失焦保存）/复制/删除/并入或移出全局（全局块锁定只读，改名与删除禁用） -->
     <div
         class="shrink-0 border-b px-3 py-2.5 flex items-center gap-2"
         style="border-bottom: 1px solid var(--theme-divider-border);"
@@ -168,11 +177,29 @@
             <span
                 class="shrink-0 flex items-center gap-1 border px-2 py-1.5 text-[11px] text-amber-400/80"
                 style="border-color: var(--theme-divider-border);"
-                title="全局 BUFF 不能删除，需先在列表右键菜单里「移出全局」"
+                title="全局 BUFF 不能删除，需先移出全局"
             >
                 <Icon icon="mdi:crown" class="size-3.5" />
                 全局
             </span>
+        {/if}
+        <!-- @desc 并入 / 移出全局（非多选时的唯一入口：就在复制、删除旁边；多选态用左栏底部批量按钮） -->
+        {#if globalAction}
+            <button
+                type="button"
+                disabled={globalAction.disabled}
+                onclick={onContextGlobal}
+                class={[
+                    'shrink-0 flex items-center gap-1 rounded-none border px-2 py-1.5 text-xs transition-colors',
+                    globalAction.disabled
+                        ? 'cursor-not-allowed border-transparent text-(--theme-modal-text)/25'
+                        : 'border-(--theme-divider-border) text-(--theme-accent-text) hover:bg-(--theme-accent-bg)/10'
+                ].join(' ')}
+                title={globalAction.title}
+            >
+                <Icon icon={globalAction.icon} class="size-3.5" />
+                {globalAction.label}
+            </button>
         {/if}
     </div>
 
@@ -204,10 +231,12 @@
                 {:else if item.value === 'members'}
                     <span class="shrink-0 text-[10px] text-(--theme-modal-text)/35">
                         {selectedBuffSet.scope === 'all'
-                            ? '全队'
+                            ? '通用'
                             : selectedBuffSet.scope.length === 0
                               ? '效应'
-                              : `${selectedBuffSet.scope.length}人`}
+                              : selectedBuffSet.scope.length >= team.length
+                                ? '全队'
+                                : `${selectedBuffSet.scope.length}人`}
                     </span>
                 {/if}
             </button>

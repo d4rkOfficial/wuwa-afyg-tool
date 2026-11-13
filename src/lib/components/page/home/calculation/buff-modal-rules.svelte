@@ -320,7 +320,8 @@
                             >
                         </div>
                         <p class="text-[10px] text-(--theme-modal-text)/40">
-                            读「无条件部分」面板：不含带属性/类型条件的乘区、不含带条件的其它 BUFF、不含本 BUFF。
+                            读「无条件部分」面板：装备 + 其它 BUFF 的固定乘区（不含带属性/类型条件的乘区、不含本 BUFF
+                            自身、不含依赖「某 BUFF 生效」的 BUFF）。
                         </p>
                     {:else if rule.kind === 'enemyType'}
                         <div class="flex flex-wrap items-center gap-1">

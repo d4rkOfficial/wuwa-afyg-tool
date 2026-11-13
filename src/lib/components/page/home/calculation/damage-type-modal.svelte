@@ -25,6 +25,10 @@
     import { fallbackIcon } from '$lib/utils/icons'
     import type { DamageEntry } from '$lib/calc/calculation.types'
     import type { CharSlot } from '$lib/types/project'
+    import type { UnsavedChangeItem } from '$lib/types/unsaved-change'
+    import { diffDamageTypes, type DamageTypeEntrySnapshot } from './unsaved-changes.utils'
+    import UnsavedChangesDialog from '$lib/components/ui/unsaved-changes-dialog.svelte'
+    import { untrack } from 'svelte'
 
     interface Props extends ComponentsProps {
         open: boolean
@@ -35,6 +39,62 @@
     }
 
     let { open, locked = false, onclose, onpersist, class: className, style: styleProp }: Props = $props()
+
+    /**
+     * @desc 打开时的伤害类型快照（关闭确认 / 「不保存」回滚用）。
+     * 只在 `open` 翻转时取一次：跟着 store 重取会让「改动」永远为空。
+     */
+    let openSnapshot = $state<DamageTypeEntrySnapshot[]>([])
+    /** @desc 关闭前确认弹窗的改动清单；空数组 = 不需要确认 */
+    let closeChanges = $state<UnsavedChangeItem[]>([])
+    let showCloseConfirm = $state(false)
+
+    /** @desc 当前每一条倍率的手填伤害类型（空 = 自动推导） */
+    const currentSnapshots = (): DamageTypeEntrySnapshot[] =>
+        getAllDamageEntries()
+            .filter((entry): entry is ListedEntry => !!entry.character)
+            .map((entry) => ({
+                id: entry.id,
+                name: ratioNameOf(entry),
+                character: entry.character,
+                types: getDamageTypesForEntry(entry.id)
+            }))
+
+    $effect(() => {
+        const isOpen = open
+        untrack(() => {
+            openSnapshot = isOpen ? currentSnapshots() : []
+            if (!isOpen) {
+                showCloseConfirm = false
+                closeChanges = []
+            }
+        })
+    })
+
+    /** @desc 右上角 ❌ / Esc：有改动先确认，无改动直接关闭 */
+    const requestClose = () => {
+        const changes = diffDamageTypes(openSnapshot, currentSnapshots())
+        if (changes.length === 0) {
+            onclose()
+            return
+        }
+        closeChanges = changes
+        showCloseConfirm = true
+    }
+
+    /** @desc 不保存：把每条改过的倍率恢复成打开时的手填值（含清空回自动推导），回写工程后退出 */
+    const discardAndClose = () => {
+        showCloseConfirm = false
+        const before = new Map(openSnapshot.map((entry) => [entry.id, entry]))
+        for (const entry of currentSnapshots()) {
+            const prev = before.get(entry.id)
+            if (!prev) continue
+            const sameTypes = [...prev.types].sort().join('|') === [...entry.types].sort().join('|')
+            if (!sameTypes) setDamageTypesForEntry(entry.id, prev.types)
+        }
+        onpersist()
+        onclose()
+    }
 
     /** @desc 条目类型：本弹窗只列有角色归属的倍率，未指定角色的（效应结算等）由结算方式决定类型，不在此展示 */
     type ListedEntry = DamageEntry & { character: string }
@@ -169,7 +229,7 @@
     ]
 </script>
 
-<Modal {open} {onclose} backdropClose class="w-[68rem] max-w-[94vw] {className}" style={mergedStyle}>
+<Modal {open} onclose={requestClose} backdropClose class="w-[68rem] max-w-[94vw] {className}" style={mergedStyle}>
     {#snippet title()}
         <span class="flex items-center gap-2 pr-8">
             <Icon icon="mdi:playlist-edit" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
@@ -331,3 +391,16 @@
         </div>
     </div>
 </Modal>
+
+<!-- @desc 关闭确认：右上角 ❌ / Esc 时有改动才出现（不保存 = 恢复成打开时的手填伤害类型） -->
+<UnsavedChangesDialog
+    open={showCloseConfirm}
+    items={closeChanges}
+    onclose={() => (showCloseConfirm = false)}
+    ondiscard={discardAndClose}
+    onsave={() => {
+        showCloseConfirm = false
+        onpersist()
+        onclose()
+    }}
+/>
