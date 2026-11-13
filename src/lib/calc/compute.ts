@@ -14,7 +14,7 @@ import type { CharSlot } from '$lib/types/project'
 import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS, zoneAppliesToCoeffEntry } from './calculation.consts'
 import { applyZone, recomputeTotals, type CharacterComputed } from './zone-ops'
 import { evaluateCondition } from './condition'
-import { evaluateRules, resolveActiveBuffIds, type RuleContext, type RuleStats } from './rules'
+import { evaluateRules, resolveActiveBuffIds, ruleMet, type RuleContext, type RuleStats } from './rules'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
     NON_DIRECT_ELEMENT,
@@ -274,7 +274,18 @@ export interface RuleEvalDeps {
 /** @desc 单条目规则求值装置（面板懒算 + 缓存；`statsOf` 缺省表示调用方拿不到面板） */
 interface EntryRuleDeps {
     enemyType?: EnemyTypeKind
-    statsOf?: (charIdx: number) => RuleStats | undefined
+    /** @desc 本条目显示名（面板里判定伤害名规则用；undefined = 无条目上下文，规则不构成否定） */
+    damageName?: string
+    /** @desc 读某槽位「无条件部分」面板；`excludeBuffId` = 正在判定的 Buff（其自身贡献不计入） */
+    statsOf?: (charIdx: number, excludeBuffId?: string) => RuleStats | undefined
+}
+
+/** @desc 面板判定用的静态上下文：**不含** `statsOf`（面板不得自引用） */
+interface PanelContext {
+    chains: number[]
+    refinements: number[]
+    damageName?: string
+    enemyType?: EnemyTypeKind
 }
 
 /** @desc 把角色面板压成规则可读的「无条件部分」数值（单位与面板显示一致） */
@@ -291,26 +302,51 @@ const ruleStatsOf = (stats: CharacterComputed): RuleStats => ({
 })
 
 /**
- * @desc 某角色槽位的「**无条件部分**」面板：只累加
- * ① 装备（武器 + 声骸）、② **没有 rules 的 Buff** 里 **不带属性/类型条件、也不带引用** 的乘区条目。
+ * @desc 能计入「无条件部分」面板的 Buff（`zoneCompare` 读到的数值来源）。
  *
- * 口径来由（已对齐）：`zoneCompare` 规则不得自引用，也不得依赖「哪些 Buff 生效」这个结论
- * —— 否则「规则 → 面板 → 规则」形成循环。因此这里刻意只读与规则无关的那部分累计值。
- * 带引用的条目一并排除（引用要读别人的面板，可能再触发规则判定）；这是**保守**取舍，已在报告里登记。
+ * 判定拆成三层，关键是**哪一层不需要面板**：
+ * - 作用域覆盖该角色（与生效范围同口径）；
+ * - 规则里**不含 `buffActive`** —— 它要「哪些 Buff 生效」这个结论，而结论又要读面板，互相递归；
+ * - 除 `zoneCompare` 外的规则（链 / 阶 / 伤害名 / 敌人类型）在该条目上成立 —— 这些规则都不读面板。
+ *
+ * `zoneCompare` 规则本身在此**不参与判定**：正在求值的就是它，因此「带门槛的产层源」
+ * （如「每层 +1 层、至多 4 层」的 `lt 4` 自封顶）照样进面板，再由 `statsOf` 把该 Buff 自身摘掉。
+ * 带属性/类型条件的乘区条目与带引用的条目仍然排除（引用要读别人的面板，可能再触发规则判定）。
  */
-const computeUnconditionalStats = (
+const panelBuffsOf = (
     charIdx: number,
     entry: DamageEntry,
     candidates: readonly BuffInstance[],
+    ctx: PanelContext
+): BuffInstance[] => {
+    const ruleCtx: RuleContext = {
+        chains: ctx.chains,
+        refinements: ctx.refinements,
+        activeCharIdx: charIdx,
+        ...(ctx.damageName !== undefined ? { damageName: ctx.damageName } : {}),
+        ...(ctx.enemyType !== undefined ? { enemyType: ctx.enemyType } : {})
+    }
+    const eligible = (buff: BuffInstance): boolean => {
+        if (!scopeMatches(buff, charIdx, entry.isEffect)) return false
+        const rules = buff.rules ?? []
+        if (rules.some((rule) => rule.kind === 'buffActive')) return false
+        return rules.every((rule) => rule.kind === 'zoneCompare' || ruleMet(rule, ruleCtx))
+    }
+    return candidates
+        .filter(eligible)
+        .map((buff) => ({ ...buff, zones: buff.zones.filter((zone) => !zone.condition && !zone.ref) }))
+}
+
+/** @desc 由「面板可计入 Buff 列表」算出角色面板（装备 + 这些 Buff 的不带条件/引用的乘区条目） */
+const panelStatsOf = (
+    charIdx: number,
+    plain: BuffInstance[],
     deps: RuleEvalDeps,
     coeffEntry: boolean
-): RuleStats | undefined => {
+): CharacterComputed | undefined => {
     const slot = deps.team[charIdx]
     const charInfo = slot?.character ? deps.charInfoMap[slot.character] : undefined
     if (!slot || !charInfo) return undefined
-    const plain = candidates
-        .filter((buff) => (buff.rules?.length ?? 0) === 0 && scopeMatches(buff, charIdx, entry.isEffect))
-        .map((buff) => ({ ...buff, zones: buff.zones.filter((z) => !z.condition && !z.ref) }))
     const stats = computeCharacterStats(
         charInfo,
         slot.weapon,
@@ -320,27 +356,103 @@ const computeUnconditionalStats = (
         undefined,
         coeffEntry
     )
-    for (const z of overrideZonesOf(plain, undefined)) applyZone(stats, z.zoneId, z.value, 'override')
+    for (const zone of overrideZonesOf(plain, undefined)) applyZone(stats, zone.zoneId, zone.value, 'override')
+    recomputeTotals(stats)
+    return stats
+}
+
+/**
+ * @desc 面板里能否「减掉自己」：面板的普通乘区都是 additive 写入（`ZONE_OPS` 的 add 分支），
+ * 直接减掉即可；但**覆盖写入**会改 `totalAtk/…`、`specialFinal2` 是连乘 —— 这两类退回重算。
+ */
+const subtractSafeOf = (zone: BuffZoneValue): boolean => !zone.override && zone.zoneId !== 'specialFinal2'
+
+/** @desc 从面板里摘掉自己：拷贝后逐条减法写回，再重算三维面板 */
+const panelStatsWithoutZones = (base: CharacterComputed, zones: readonly BuffZoneValue[]): RuleStats => {
+    const stats: CharacterComputed = {
+        ...base,
+        elementBonus: { ...base.elementBonus },
+        typeBonus: { ...base.typeBonus }
+    }
+    for (const zone of zones) applyZone(stats, zone.zoneId, -zone.value)
     recomputeTotals(stats)
     return ruleStatsOf(stats)
 }
 
-/** @desc 为一条伤害条目装配规则求值装置（面板按槽位懒算并缓存） */
+/**
+ * @desc 为一条伤害条目装配规则求值装置（面板按槽位懒算并缓存）。
+ *
+ * 缓存分两层：**基准面板**（某槽位，含全部可计入 Buff）每槽位只算一次；带 `excludeBuffId` 的
+ * 结果按「槽位 + Buff id」再缓存一层 —— 逐 Buff 摘掉自己只是拷贝后做减法，不是重算面板。
+ */
 const entryRuleDepsOf = (
     entry: DamageEntry,
     candidates: readonly BuffInstance[],
     deps: RuleEvalDeps | undefined,
-    coeffEntry: boolean
+    profile: ConditionProfile,
+    coeffEntry: boolean,
+    matchEntry = true
 ): EntryRuleDeps => {
     if (!deps) return {}
-    const cache = new Map<number, RuleStats | undefined>()
+    const panelCtx: PanelContext = {
+        chains: profile.chains,
+        refinements: profile.refinements,
+        ...(matchEntry ? { damageName: entry.displayName } : {}),
+        ...(deps.enemyType !== undefined ? { enemyType: deps.enemyType } : {})
+    }
+    const plainCache = new Map<number, BuffInstance[]>()
+    const baseCache = new Map<number, CharacterComputed | undefined>()
+    const statsCache = new Map<string, RuleStats | undefined>()
+
+    /** @desc 某槽位的面板可计入 Buff 列表（按槽位缓存） */
+    const plainOf = (charIdx: number): BuffInstance[] => {
+        const cached = plainCache.get(charIdx)
+        if (cached) return cached
+        const plain = panelBuffsOf(charIdx, entry, candidates, panelCtx)
+        plainCache.set(charIdx, plain)
+        return plain
+    }
+
+    /** @desc 基准面板（含全部可计入 Buff） */
+    const baseOf = (charIdx: number): CharacterComputed | undefined => {
+        if (!baseCache.has(charIdx)) baseCache.set(charIdx, panelStatsOf(charIdx, plainOf(charIdx), deps, coeffEntry))
+        return baseCache.get(charIdx)
+    }
+
+    /**
+     * @desc 摘掉某 Buff 自身后的面板数值。
+     *
+     * 只有「面板真的把它算进去了」才需要摘：加算条目按 `activeZonesOf` 同口径过滤后直接减法，
+     * 覆盖写入（改 `totalAtk/…`）与 `specialFinal2` 连乘则退回「重算一份不含它的面板」。
+     */
+    const statsWithout = (charIdx: number, base: CharacterComputed, excludeBuffId: string): RuleStats => {
+        const own = plainOf(charIdx).find((buff) => buff.id === excludeBuffId)
+        const ownZones = own?.zones.filter((zone) => !zone.ref && zone.value !== 0) ?? []
+        const ownAdds = ownZones.filter((zone) => !zone.override && (!coeffEntry || zoneAppliesToCoeffEntry(zone)))
+        const ownOverrides = ownZones.filter((zone) => zone.override)
+        if (ownOverrides.length === 0 && ownAdds.length === 0) return ruleStatsOf(base)
+        if (ownOverrides.length === 0 && ownAdds.every(subtractSafeOf)) {
+            return panelStatsWithoutZones(base, ownAdds)
+        }
+        const rest = plainOf(charIdx).filter((buff) => buff.id !== excludeBuffId)
+        const rebuilt = panelStatsOf(charIdx, rest, deps, coeffEntry)
+        return ruleStatsOf(rebuilt ?? base)
+    }
+
     return {
         ...(deps.enemyType !== undefined ? { enemyType: deps.enemyType } : {}),
-        statsOf: (charIdx: number): RuleStats | undefined => {
-            if (!cache.has(charIdx)) {
-                cache.set(charIdx, computeUnconditionalStats(charIdx, entry, candidates, deps, coeffEntry))
-            }
-            return cache.get(charIdx)
+        ...(matchEntry ? { damageName: entry.displayName } : {}),
+        statsOf: (charIdx: number, excludeBuffId?: string): RuleStats | undefined => {
+            const key = `${charIdx}|${excludeBuffId ?? ''}`
+            if (statsCache.has(key)) return statsCache.get(key)
+            const base = baseOf(charIdx)
+            const value = !base
+                ? undefined
+                : excludeBuffId
+                  ? statsWithout(charIdx, base, excludeBuffId)
+                  : ruleStatsOf(base)
+            statsCache.set(key, value)
+            return value
         }
     }
 }
@@ -363,6 +475,9 @@ const ruleContextOf = (
 /**
  * @desc 判定某个 Buff 的规则是否全部满足（引擎与「隐藏条件不匹配」筛选共用同一口径）。
  * `deps` 缺省（拿不到面板/敌人类型）时相关规则「不构成否定」，只有 `buffActive` 仍需 `activeOf`。
+ *
+ * `buffId` = 被判定 Buff 自己的 id：`zoneCompare` 用它把本 Buff 的乘区从面板里摘掉
+ * （「每层 +1、至多 N 层」这类自封顶写法依赖这一点）。
  */
 export function buffRulesMet(
     rules: BuffRule[] | undefined,
@@ -370,10 +485,12 @@ export function buffRulesMet(
     charIndex: number,
     ctx: { damageName?: string } = {},
     deps: EntryRuleDeps = {},
-    activeOf?: (buffId: string) => boolean
+    activeOf?: (buffId: string) => boolean,
+    buffId?: string
 ): boolean {
     return evaluateRules(rules, {
         ...ruleContextOf(profile, charIndex, ctx, deps),
+        ...(buffId !== undefined ? { currentBuffId: buffId } : {}),
         ...(activeOf ? { activeOf } : {})
     })
 }
@@ -469,7 +586,7 @@ function boundBuffs(
     rulesDeps?: RuleEvalDeps
 ): BuffInstance[] {
     const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
-    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, usesCoefficientFormula(entry))
+    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, profile, usesCoefficientFormula(entry), matchEntry)
     return activeBoundForChar(
         candidates,
         charIndex,
@@ -662,7 +779,7 @@ export function getTargetSideSourceBuffs(
     rulesDeps?: RuleEvalDeps
 ): BuffInstance[] {
     const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
-    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, usesCoefficientFormula(entry))
+    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, profile, usesCoefficientFormula(entry), matchEntry)
     return activeBoundForChar(
         candidates,
         -1,
@@ -675,7 +792,7 @@ export function getTargetSideSourceBuffs(
 }
 
 /**
- * @desc 该 Buff 对某个伤害条目**是否还有任何贡献**（表格「隐藏条件不匹配」筛选用）。
+ * @desc 该 Buff 对某个伤害条目**是否还有任何贡献**（拉表用：属性/类型条件不满足的格子应判为不可勾）。
  *
  * 条件分层之后，**属性/类型条件挂在乘区条目上**（`BuffZoneValue.condition`），Buff 级规则在 `rules`。
  * 表格若只看其中一层，就会出现「条件不满足、格子却仍可勾选」的 bug。
@@ -684,8 +801,8 @@ export function getTargetSideSourceBuffs(
  * 只要**存在至少一条**乘区条目「自身条件满足 且 值/引用/覆盖能生效」，就算有贡献。
  * 因此「一条不匹配 + 一条无条件」仍然算有贡献（引擎确实会把无条件那条计入），不会误判为不可用。
  *
- * 本函数只用于**界面过滤**（拿不到队伍/配置面板）：`buffActive` 规则按「引用项视为存活」判定，
- * 面板 / 敌人类型 / 伤害名规则缺上下文时「不构成否定」—— 宁可多显示，也不误判成不可用。
+ * 本函数只用于**界面判定**（拿不到队伍/配置面板）：`buffActive` 规则按「引用项视为存活」判定，
+ * 面板 / 敌人类型 / 伤害名规则缺上下文时「不构成否定」。
  */
 export const buffContributesToEntry = (
     buff: BuffInstance,
@@ -700,7 +817,8 @@ export const buffContributesToEntry = (
         charIndex,
         ctx.damageName !== undefined ? { damageName: ctx.damageName } : {},
         deps,
-        () => true
+        () => true,
+        buff.id
     )
     if (!rulesOk) return false
     const zoneCtx: ZoneCtx = {
@@ -715,6 +833,32 @@ export const buffContributesToEntry = (
         if (z.ref) return true
         return z.value !== 0 || !!z.override
     })
+}
+
+/**
+ * @desc 拉表格子「未达门槛」判定装置：为**一条伤害条目**装配一次规则求值器，之后逐 Buff 判定其 Buff 级规则。
+ *
+ * 与引擎同口径：候选集 = 该条目**当前已绑定**的 Buff —— 面板（`zoneCompare` 读的「无条件部分」）
+ * 与生效集合（`buffActive` 依赖）都只由它们组成，等于「这一段伤害当下」的门槛状态。
+ *
+ * 必须「一次装配、多次判定」：一条行有几十上百列，逐格重建面板 + 生效集合会把整表拖到不可用。
+ */
+export function createEntryRuleMatcher(args: {
+    entry: DamageEntry
+    /** @desc 该条目已绑定的 Buff（引擎同口径的候选集） */
+    boundBuffs: readonly BuffInstance[]
+    profile: ConditionProfile
+    deps: RuleEvalDeps
+}): (buff: BuffInstance) => boolean {
+    const { entry, profile, deps } = args
+    const charIdx = deps.team.findIndex((slot) => slot.character === entry.character)
+    /** @desc 条目上下文（伤害名规则用；引擎 `zoneCtx` 同口径） */
+    const entryCtx = { damageName: entry.displayName }
+    const ruleDeps = entryRuleDepsOf(entry, args.boundBuffs, deps, profile, usesCoefficientFormula(entry))
+    const ctx = ruleContextOf(profile, charIdx, entryCtx, ruleDeps)
+    const active = resolveActiveBuffIds(args.boundBuffs, () => true, ctx)
+    const activeOf = (buffId: string): boolean => active.has(buffId)
+    return (buff) => buffRulesMet(buff.rules, profile, charIdx, entryCtx, ruleDeps, activeOf, buff.id)
 }
 
 /**
@@ -1546,7 +1690,7 @@ export function computeAll(
         }
         const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
         const coeffEntry = usesCoefficientFormula(entry)
-        const entryRuleDeps = entryRuleDepsOf(entry, candidates, ruleDeps, coeffEntry)
+        const entryRuleDeps = entryRuleDepsOf(entry, candidates, ruleDeps, conditionProfile, coeffEntry)
         const entryBound = activeBoundForChar(
             candidates,
             charIndex,
@@ -1680,6 +1824,7 @@ export function computeOneEntry(
             weaponInfoMap,
             ...(enemy?.type ? { enemyType: enemy.type } : {})
         },
+        conditionProfile,
         coeffEntry
     )
     const bound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx, entryRuleDeps)
@@ -1775,7 +1920,7 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
     }
     const candidates = entryCandidateBuffs(entry, ctx.buffSets, ctx.damageEntryBuffSetIds)
     const coeffEntry = usesCoefficientFormula(entry)
-    const ruleDeps = entryRuleDepsOf(entry, candidates, ctx, coeffEntry)
+    const ruleDeps = entryRuleDepsOf(entry, candidates, ctx, ctx.conditionProfile, coeffEntry)
     const entryBound = activeBoundForChar(
         candidates,
         charIndex,

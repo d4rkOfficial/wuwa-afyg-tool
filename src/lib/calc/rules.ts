@@ -92,8 +92,17 @@ export interface RuleContext {
     damageName?: string
     /** @desc 工程敌人类型 */
     enemyType?: EnemyTypeKind
-    /** @desc 读某槽位「无条件部分」面板；undefined = 无该槽位面板（规则不构成否定） */
-    statsOf?: (charIdx: number) => RuleStats | undefined
+    /**
+     * @desc 读某槽位「无条件部分」面板；undefined = 无该槽位面板（规则不构成否定）。
+     * `excludeBuffId` = **正在判定的那个 Buff**：它自己的乘区贡献不计入面板，
+     * 这样「每层 +1 层、至多 4 层」这类自封顶写法才有稳定解（见 `ruleMet` 的 zoneCompare）。
+     */
+    statsOf?: (charIdx: number, excludeBuffId?: string) => RuleStats | undefined
+    /**
+     * @desc 正在判定的 Buff id（`resolveActiveBuffIds` / `buffRulesMet` 逐 Buff 注入）。
+     * `zoneCompare` 用它把「本 Buff 自身」从面板里摘掉。
+     */
+    currentBuffId?: string
     /** @desc 某 Buff 在本次伤害是否生效（`buffActive` 用；缺省 = 不生效） */
     activeOf?: (buffId: string) => boolean
 }
@@ -283,7 +292,8 @@ export const ruleMet = (rule: BuffRule, ctx: RuleContext): boolean => {
         case 'zoneCompare': {
             const idx = rule.charIdx < 0 ? ctx.activeCharIdx : rule.charIdx
             if (idx < 0) return true
-            const stats = ctx.statsOf?.(idx)
+            // 面板里**不含本 Buff 自身**：否则「每层 +1、至多 4 层」会自己看见自己而永远不满足/永远满足
+            const stats = ctx.statsOf?.(idx, ctx.currentBuffId)
             if (!stats) return true
             return compareWith(rule.op, stats[rule.zone], rule.value)
         }
@@ -329,7 +339,9 @@ export const resolveActiveBuffIds = (
     scopeOk: (buff: BuffInstance) => boolean,
     ctx: RuleContext
 ): Set<string> => {
-    const staticOk = buffs.filter((buff) => scopeOk(buff) && rulesMetExceptActive(buff.rules, ctx))
+    /** @desc 逐 Buff 求值：`currentBuffId` 让 `zoneCompare` 从面板里摘掉该 Buff 自身 */
+    const ctxOf = (buff: BuffInstance): RuleContext => ({ ...ctx, currentBuffId: buff.id })
+    const staticOk = buffs.filter((buff) => scopeOk(buff) && rulesMetExceptActive(buff.rules, ctxOf(buff)))
     const active = new Set<string>()
     let changed = staticOk.length > 0
     while (changed) {

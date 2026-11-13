@@ -167,7 +167,7 @@ export function computeCharStats(
          * 这里拿不到面板 / 敌人类型 / 伤害名，因此这些规则「不构成否定」；
          * `buffActive` 视为引用项存活（面板预览不展示依赖关系）。
          */
-        const rulesOk = buffRulesMet(bs.rules, conditionProfile, idx, {}, {}, () => true)
+        const rulesOk = buffRulesMet(bs.rules, conditionProfile, idx, {}, {}, () => true, bs.id)
         if (!rulesOk) continue
         for (const z of bs.zones) {
             const zoneId = z.zoneId
