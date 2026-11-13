@@ -134,8 +134,15 @@
         onkeydown={handleKeydown}
         out:fade={{ duration: motionDuration(130) }}
     >
+        <!-- @desc 面板底：**只取 modal 表面底色，不做自己的毛玻璃**（`data-sf-flat`）。
+             为什么：面板自带 `backdrop-filter` 时，`animate-pop-in`（transform: scale + translateY）会让
+             浏览器**每一帧都要重新采样并模糊整个面板背后的画面**；而默认「弹窗毛玻璃」强度是 32px，
+             这次重算是十几帧 × 大面积模糊 —— 打开弹窗时那一下卡顿就是它（与数据量无关，所以
+             「数据已经算好了」照样卡）。毛玻璃观感仍由外层遮罩的 `backdrop-blur-sm` 提供：
+             面板是半透明底色叠在「已经模糊过的整屏」之上，观感一致而动画期间零重算。 -->
         <div
             data-sf="modal"
+            data-sf-flat
             use:focusTrap
             tabindex="-1"
             class={mergeClass([

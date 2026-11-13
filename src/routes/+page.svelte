@@ -107,14 +107,25 @@
     /** @desc 工坊 iframe 弹窗的目标路径（空 = 工坊首页；如 /share/xxx = 详情页） */
     let workshopFramePath = $state('')
 
-    // 阶段切换加载反馈：activePhase/showResult 变化时显示遮罩 spinner，同步初始化完成后最短 200ms 隐藏
+    // 阶段切换加载反馈：activePhase/showResult 变化时先只渲染遮罩 spinner（让它在合成层上转起来），
+    // **下一帧**才挂载阶段内容 —— 否则新页面的同步初始化会和进场动画挤在同一帧，动画看起来就「卡住」。
     let phaseLoading = $state(false)
+    /** @desc 阶段内容是否可挂载：切换瞬间置 false，等遮罩真的画出来后再置 true（2 帧） */
+    let phaseContentReady = $state(true)
     let phaseLoadingTimer: ReturnType<typeof setTimeout> | null = null
+    /** @desc 切换代次：连续切换时让上一次的 rAF / 定时器作废 */
+    let phaseLoadingGen = 0
+    /** @desc 首次挂载没有「旧页面 → 新页面」的切换，内容直接挂着（别为启动多插两帧空白） */
+    let phaseFirstRun = true
 
     $effect(() => {
         activePhase
         showResult
+        const gen = ++phaseLoadingGen
+        const gated = !phaseFirstRun
+        phaseFirstRun = false
         phaseLoading = true
+        if (gated) phaseContentReady = false
         if (phaseLoadingTimer !== null) {
             clearTimeout(phaseLoadingTimer)
             phaseLoadingTimer = null
@@ -122,8 +133,12 @@
         void tick().then(() => {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
+                    if (gen !== phaseLoadingGen) return
+                    // 此刻遮罩 + spinner 已经画过至少一帧（动画已在合成器上跑），再做同步初始化
+                    phaseContentReady = true
                     phaseLoadingTimer = setTimeout(() => {
                         phaseLoadingTimer = null
+                        if (gen !== phaseLoadingGen) return
                         phaseLoading = false
                     }, 200)
                 })
@@ -706,58 +721,63 @@
                         class="absolute inset-0 z-30 flex items-center justify-center pointer-events-none select-none"
                         style="background: color-mix(in srgb, var(--theme-timeline-bg) 45%, transparent);"
                     >
-                        <Icon icon="mdi:loading" class="size-7 animate-spin" style="color: var(--theme-accent-text);" />
+                        <!-- spinner 外面套一层将会进合成层的包裹层：主线程被页面初始化占住时，转圈仍由合成器驱动 -->
+                        <span class="inline-flex animate-spin" style="will-change: transform;">
+                            <Icon icon="mdi:loading" class="size-7" style="color: var(--theme-accent-text);" />
+                        </span>
                     </div>
                 {/if}
-                {#key activeProject?.id}
-                    {#if showResult}
-                        <div class="h-full animate-shrink-in">
-                            <Result
-                                team={activeProject.team}
-                                calcState={activeProject.phases.calculation.data as CalcState | null}
-                                configState={activeProject.phases.config.data as ConfigState | null}
-                                refreshKey={resultRefreshKey}
-                            />
-                        </div>
-                    {:else if activePhase === 'team'}
-                        <div class="h-full animate-shrink-in">
-                            <TeamConfig
-                                team={activeProject.team}
-                                onupdate={handleUpdateTeam}
-                                onreset={handleResetTeam}
-                                locked={teamPhaseLocked}
-                            />
-                        </div>
-                    {:else if activePhase === 'timeline'}
-                        <div class="h-full animate-shrink-in">
-                            <Timeline
-                                team={activeProject.team}
-                                locked={phaseLocked}
-                                data={activeProject.phases.timeline.data as TimelineData | null}
-                                onupdate={updateTimeline}
-                            />
-                        </div>
-                    {:else if activePhase === 'calculation'}
-                        <div class="h-full animate-shrink-in">
-                            <Calculation
-                                team={activeProject.team}
-                                timelineData={activeProject.phases.timeline.data as TimelineData | null}
-                                calcState={activeProject.phases.calculation.data as CalcState | null}
-                                locked={phaseLocked}
-                                onupdate={(state) => updateCalculation(state)}
-                            />
-                        </div>
-                    {:else}
-                        <div class="h-full animate-shrink-in">
-                            <Config
-                                team={activeProject.team}
-                                data={activeProject.phases.config.data as ConfigState | null}
-                                locked={phaseLocked}
-                                onupdate={(state) => updateConfig(state)}
-                            />
-                        </div>
-                    {/if}
-                {/key}
+                {#if phaseContentReady}
+                    {#key activeProject?.id}
+                        {#if showResult}
+                            <div class="h-full animate-shrink-in">
+                                <Result
+                                    team={activeProject.team}
+                                    calcState={activeProject.phases.calculation.data as CalcState | null}
+                                    configState={activeProject.phases.config.data as ConfigState | null}
+                                    refreshKey={resultRefreshKey}
+                                />
+                            </div>
+                        {:else if activePhase === 'team'}
+                            <div class="h-full animate-shrink-in">
+                                <TeamConfig
+                                    team={activeProject.team}
+                                    onupdate={handleUpdateTeam}
+                                    onreset={handleResetTeam}
+                                    locked={teamPhaseLocked}
+                                />
+                            </div>
+                        {:else if activePhase === 'timeline'}
+                            <div class="h-full animate-shrink-in">
+                                <Timeline
+                                    team={activeProject.team}
+                                    locked={phaseLocked}
+                                    data={activeProject.phases.timeline.data as TimelineData | null}
+                                    onupdate={updateTimeline}
+                                />
+                            </div>
+                        {:else if activePhase === 'calculation'}
+                            <div class="h-full animate-shrink-in">
+                                <Calculation
+                                    team={activeProject.team}
+                                    timelineData={activeProject.phases.timeline.data as TimelineData | null}
+                                    calcState={activeProject.phases.calculation.data as CalcState | null}
+                                    locked={phaseLocked}
+                                    onupdate={(state) => updateCalculation(state)}
+                                />
+                            </div>
+                        {:else}
+                            <div class="h-full animate-shrink-in">
+                                <Config
+                                    team={activeProject.team}
+                                    data={activeProject.phases.config.data as ConfigState | null}
+                                    locked={phaseLocked}
+                                    onupdate={(state) => updateConfig(state)}
+                                />
+                            </div>
+                        {/if}
+                    {/key}
+                {/if}
                 {#if !showResult && phaseLocked && getLockWatermark()}
                     <!-- 已锁定遮罩：纯透明背景 + SVG pattern 平铺小字（文案可在 设置-交互相关-锁定水印 自定义）。
                          整层 opacity-10 封顶，文字取 currentColor（主题文本色），保证任何主题/任何变量解析下都只弱显示、不遮挡内容 -->
