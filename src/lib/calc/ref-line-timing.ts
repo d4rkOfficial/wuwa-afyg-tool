@@ -87,7 +87,11 @@ export const parseRefLineSeconds = (raw: string): { relative: boolean; seconds: 
  * @param refLines 全部参考线（含 id/pos/name）
  * @param timings 现有时间记点（用于推算「上一有效记点」）
  */
-export const resolveRefLineSeconds = (id: string, refLines: RefLineLike[], timings: TimingEntry[]): number | null => {
+export const resolveRefLineSeconds = (
+    id: string,
+    refLines: readonly RefLineLike[],
+    timings: readonly TimingEntry[]
+): number | null => {
     const rl = refLines.find((r) => r.id === id)
     const raw = rl?.name ?? ''
     // 候选集合 = 现有记点 + 新记点（秒数置 null），按参考线位置排序
@@ -121,6 +125,34 @@ export const resolveRefLineSeconds = (id: string, refLines: RefLineLike[], timin
     // 绝对时间早于上一记点 → 改走相对追加
     if (!parsed.relative && seconds < prevSeconds) seconds = prevSeconds + parsed.seconds
     return seconds
+}
+
+/** @desc 已配置记点的参考线 id 集合（`timings` 里出现即算「配了记点」，秒数未填写也算） */
+export const timingRefLineIds = (timings: readonly TimingEntry[]): Set<string> =>
+    new Set(timings.map((t) => t.refLineId))
+
+/**
+ * @desc 参考线改名后同步时间记点（纯函数）：
+ * - 新名字能解析出时间 → 已有记点**按新名字重算**秒数，没有则新增一条；
+ * - 新名字解析不出 → 删掉该参考线的记点；
+ * - 其它参考线的记点原样保留；**没有任何改动时返回入参数组本身**（调用方据此跳过工程写入）。
+ * 秒数口径与「自动配置」同源（`resolveRefLineSeconds`），只对中间参考线有意义：
+ * `left`/`right` 是边界线、名字不可编辑，改名路径不会传进来。
+ */
+export const syncRefLineTiming = (
+    id: string,
+    refLines: readonly RefLineLike[],
+    timings: readonly TimingEntry[]
+): readonly TimingEntry[] => {
+    if (!refLines.some((r) => r.id === id)) return timings
+    // 重算基准取「不含本条」的记点，避免拿旧秒数当上一记点
+    const others = timings.filter((t) => t.refLineId !== id)
+    const exists = others.length !== timings.length
+    const seconds = resolveRefLineSeconds(id, refLines, others)
+    if (seconds === null) return exists ? others : timings
+    if (!exists) return [...timings, { refLineId: id, seconds }]
+    const prev = timings.find((t) => t.refLineId === id)
+    return prev?.seconds === seconds ? timings : timings.map((t) => (t.refLineId === id ? { ...t, seconds } : t))
 }
 
 // ── 自动配置时间记点 ──

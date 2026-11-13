@@ -14,6 +14,7 @@
         getEditValue,
         setEditingId,
         setEditValue,
+        getTimingRefLineIds,
         getDraggingId,
         getDragBlockId,
         getDragBlockVisualPositions,
@@ -124,6 +125,8 @@
     let enterFromInput = false
 
     let uiBtnIconMap = $derived(new Map(getUiBtnIcons()))
+    /** @desc 已配置时间记点的参考线 id：标签放大加粗，一眼区分「会切段」的线 */
+    let timingRefLineIds = $derived(getTimingRefLineIds())
     // 手柄图标（游戏原生，blockKey 为手柄 id 时使用）
     const gamepadIconMap = new Map(GAMEPAD_BUTTONS.filter((b) => b.icon).map((b) => [b.id, b.icon as string]))
     // 查找索引：伤害层每帧渲染用 O(1) 替代 find（拖拽帧成本优化）
@@ -780,7 +783,9 @@
                             />
                         {:else}
                             <span
-                                class="text-[9px] tabular-nums cursor-pointer"
+                                class="tabular-nums cursor-pointer {timingRefLineIds.has(rl.id)
+                                    ? 'text-[11.25px] font-bold'
+                                    : 'text-[9px]'}"
                                 style="color: {getDraggingId() === rl.id || getSelectedRefLineIds()[rl.id]
                                     ? 'var(--theme-accent-bg)'
                                     : 'var(--theme-timeline-text)'}; transform: scale({getDraggingId() === rl.id

@@ -6,7 +6,10 @@ import {
     autoConfigureTimings,
     parseRefLineSeconds,
     resolveRefLineSeconds,
-    type RefLineLike
+    syncRefLineTiming,
+    timingRefLineIds,
+    type RefLineLike,
+    type TimingEntry
 } from '$lib/calc/ref-line-timing'
 
 const END = 'right'
@@ -76,4 +79,57 @@ test('resolveRefLineSeconds：结束线不足上一条记点时 +30s 直到大�
     const lines = [mk('a', '200s', 100), end()]
     assert.equal(resolveRefLineSeconds(END, lines, [{ refLineId: 'a', seconds: 200 }]), 210)
     assert.equal(resolveRefLineSeconds(END, lines, [{ refLineId: 'a', seconds: 30 }]), 120)
+})
+
+// ────────────────────────── 改名同步时间记点 ──────────────────────────
+
+test('改名同步记点：新名字能解析出时间 → 自动新增一条记点', () => {
+    const before = [mk('a', '起手', 100), mk('b', '爆发', 200), end()]
+    const timings: TimingEntry[] = []
+    // 没改名 → 无变化，返回入参本身（调用方据此跳过工程写入）
+    assert.equal(syncRefLineTiming('a', before, timings), timings)
+
+    const after = [mk('a', '25s', 100), mk('b', '爆发', 200), end()]
+    const next = syncRefLineTiming('a', after, timings)
+    assert.deepEqual(next, [{ refLineId: 'a', seconds: 25 }])
+    assert.notEqual(next, timings)
+})
+
+test('改名同步记点：已有记点按新名字重算（重算基准不含自己的旧秒数）', () => {
+    const lines = [mk('a', '25s', 100), mk('b', '+30s', 200), end()]
+    const timings: TimingEntry[] = [
+        { refLineId: 'a', seconds: 25 },
+        { refLineId: 'b', seconds: 55 }
+    ]
+    // b 从「起手」改成「+30s」→ 25 + 30 = 55
+    assert.equal(syncRefLineTiming('b', lines, timings), timings, '算出来没变 → 同一引用')
+    // 再改成「1m」→ 绝对 60s
+    const renamed = [mk('a', '25s', 100), mk('b', '1m', 200), end()]
+    assert.deepEqual(syncRefLineTiming('b', renamed, timings), [
+        { refLineId: 'a', seconds: 25 },
+        { refLineId: 'b', seconds: 60 }
+    ])
+})
+
+test('改名同步记点：新名字解析不出时间 → 删掉该参考线的记点，其余保留', () => {
+    const lines = [mk('a', '25s', 100), mk('b', '起手', 200), end()]
+    const timings: TimingEntry[] = [
+        { refLineId: 'a', seconds: 25 },
+        { refLineId: 'b', seconds: 55 }
+    ]
+    assert.deepEqual(syncRefLineTiming('b', lines, timings), [{ refLineId: 'a', seconds: 25 }])
+    // 本来就没有记点 → 同一引用
+    const only = [{ refLineId: 'a', seconds: 25 }]
+    assert.equal(syncRefLineTiming('b', lines, only), only)
+    // 参考线不存在（已删除）→ 不动
+    assert.equal(syncRefLineTiming('zz', lines, only), only)
+})
+
+test('timingRefLineIds：秒数为 null 的「未填写」记点也算已配置', () => {
+    const ids = timingRefLineIds([
+        { refLineId: 'a', seconds: 25 },
+        { refLineId: 'b', seconds: null }
+    ])
+    assert.deepEqual([...ids], ['a', 'b'])
+    assert.equal(timingRefLineIds([]).size, 0)
 })

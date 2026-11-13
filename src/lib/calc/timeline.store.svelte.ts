@@ -1,5 +1,5 @@
 import type { CharSlot } from '$lib/types/project'
-import { updateCustomSkillHits } from '$lib/data/project.svelte'
+import { getActiveProject, updateCustomSkillHits, updateResultAnalysis } from '$lib/data/project.svelte'
 import type { SkillEntry } from '$lib/api/types'
 import {
     getCharacterInfo,
@@ -41,6 +41,7 @@ import { getCharElementMap as getSharedCharElementMap, setCharElements } from '$
 import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 import { getInputShortcutId } from '$lib/data/shortcuts.svelte'
 import { registerDragCancel } from '$lib/utils/drag-guard'
+import { syncRefLineTiming, timingRefLineIds, type TimingEntry } from './ref-line-timing'
 
 // ── Core Data ──
 let _refLines = $state<RefLine[]>([
@@ -287,6 +288,10 @@ export function canRedo(): boolean {
 // ── Getters ──
 export function getRefLines() {
     return _refLines
+}
+/** @desc 已配置时间记点的参考线 id 集合（来自「数据分析」的 timings；标签要加重显示） */
+export function getTimingRefLineIds(): Set<string> {
+    return timingRefLineIds(getActiveProject()?.analysis?.timings ?? [])
 }
 export function getOpBlocks() {
     return _opBlocks
@@ -1307,13 +1312,30 @@ export function startEdit(id: string, label: string) {
     _editValue = label
 }
 
+/**
+ * @desc 改名后同步「数据分析」的时间记点（新增 / 按新名字重算 / 解析不出则删除）；
+ * 口径见 `syncRefLineTiming`，无变化时不写工程。
+ */
+function syncTimingAfterRename(id: string) {
+    const analysis = getActiveProject()?.analysis
+    const timings: readonly TimingEntry[] = analysis?.timings ?? []
+    const next = syncRefLineTiming(id, _refLines, timings)
+    if (next === timings) return
+    updateResultAnalysis({ ...analysis, timings: [...next] })
+}
+
 export function confirmEdit() {
     if (!_editingId || isBoundary(_editingId)) return
     const idx = _refLines.findIndex((r) => r.id === _editingId)
     if (idx < 0) return
-    const currentX = vx(_editingId, _refLines[idx].pos)
-    _dragVisualPositions = { ..._dragVisualPositions, [_editingId]: currentX }
-    _refLines = _refLines.map((r) => (r.id === _editingId ? { ...r, name: _editValue } : r))
+    const id = _editingId
+    const currentX = vx(id, _refLines[idx].pos)
+    _dragVisualPositions = { ..._dragVisualPositions, [id]: currentX }
+    // 只在名字真的变了时同步记点：原样保存不该覆盖「数据分析」里手填的秒数
+    if (_refLines[idx].name !== _editValue) {
+        _refLines = _refLines.map((r) => (r.id === id ? { ...r, name: _editValue } : r))
+        syncTimingAfterRename(id)
+    }
     save()
     _editingId = null
 }
