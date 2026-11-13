@@ -2,7 +2,7 @@ import { browser } from '$app/environment'
 import { dbGet, dbSet } from './db'
 import { normalizeKeyEvent, physicalLabel } from './keymap.svelte'
 
-export type ShortcutGroup = 'timeline' | 'timeline-quick' | 'calc-spread' | 'calc-dropdown'
+export type ShortcutGroup = 'timeline' | 'timeline-quick' | 'calc-spread'
 
 export interface ShortcutDef {
     id: string
@@ -17,8 +17,7 @@ export interface ShortcutDef {
 export const SHORTCUT_GROUPS: { key: ShortcutGroup; label: string }[] = [
     { key: 'timeline', label: '排轴·通用' },
     { key: 'timeline-quick', label: '排轴·快速排轴' },
-    { key: 'calc-spread', label: '拉表·平铺' },
-    { key: 'calc-dropdown', label: '拉表·下拉' }
+    { key: 'calc-spread', label: '拉表·平铺' }
 ]
 
 const KEY = 'shortcuts'
@@ -166,46 +165,6 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
         label: '切换默认滚动方向',
         desc: '平铺表主轴在纵向/横向之间切换',
         defaultKey: 'shift'
-    },
-    // ── 拉表·下拉 ──
-    {
-        id: 'calc-dropdown.expand-next',
-        group: 'calc-dropdown',
-        label: '展开下一条',
-        desc: '展开下一条伤害的增益选择',
-        defaultKey: ' '
-    },
-    {
-        id: 'calc-dropdown.copy-dt-next',
-        group: 'calc-dropdown',
-        label: '复制伤害类型到下一段',
-        desc: '把当前伤害类型复制到下一段效应',
-        defaultKey: 'shift+enter',
-        lockedMods: ['shift']
-    },
-    {
-        id: 'calc-dropdown.copy-from-prev',
-        group: 'calc-dropdown',
-        label: '从上一段复制增益',
-        desc: '从上一段直伤复制增益',
-        defaultKey: 'shift+z',
-        lockedMods: ['shift']
-    },
-    {
-        id: 'calc-dropdown.copy-to-next',
-        group: 'calc-dropdown',
-        label: '复制增益到下一段',
-        desc: '把当前增益复制到下一段直伤',
-        defaultKey: 'shift+x',
-        lockedMods: ['shift']
-    },
-    {
-        id: 'calc-dropdown.clear-all',
-        group: 'calc-dropdown',
-        label: '清空条目增益',
-        desc: '清空当前条目的全部增益',
-        defaultKey: 'shift+c',
-        lockedMods: ['shift']
     }
 ]
 

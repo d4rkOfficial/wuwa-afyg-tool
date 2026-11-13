@@ -18,17 +18,18 @@
     import {
         setShowBuffModal,
         setShowDamageTypeModal,
-        getBuffDiffMode,
-        toggleBuffDiffMode,
-        getHideConditionMismatch,
-        toggleHideConditionMismatch,
         getConditionProfile,
         undoTable,
         redoTable,
         canUndoTable,
         canRedoTable
     } from '$lib/calc/calculation.store.svelte'
-    import { getCalcViewMode, getScrollAxisDefault, setScrollAxisDefault } from '$lib/data/calc-view.svelte'
+    import {
+        getHeaderCompact,
+        getScrollAxisDefault,
+        setScrollAxisDefault,
+        toggleHeaderCompact
+    } from '$lib/data/calc-view.svelte'
     import { openSubstatLibrary } from '$lib/data/substat-library-ui.svelte'
     import { addToast } from '$lib/data/toast.svelte'
 
@@ -299,97 +300,76 @@
                 <Icon icon="mdi:tune-variant" class="size-4 shrink-0" />
                 {#if !simplifyToolbar}<span class="hidden truncate @[700px]:inline">BUFF配置</span>{/if}
             </button>
-            {#if getCalcViewMode() !== 'spread'}
-                <button
-                    onclick={toggleBuffDiffMode}
-                    class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
-                        ? 'rounded-none px-3 py-2'
-                        : 'rounded-none px-3 py-1.5'} {getBuffDiffMode()
-                        ? 'border-(--theme-accent-bg)'
-                        : 'border-(--theme-sidebar-text)/20'}"
-                    style="color: {getBuffDiffMode() ? 'var(--theme-accent-text)' : 'var(--theme-sidebar-text)'}"
-                    title={getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}
-                >
-                    <Icon
-                        icon={getBuffDiffMode() ? 'mdi:swap-vertical-bold' : 'mdi:swap-vertical'}
-                        class="size-4 shrink-0"
-                    />
-                    {#if !simplifyToolbar}
-                        <span class="hidden truncate @[700px]:inline"
-                            >{getBuffDiffMode() ? 'Buff差异模式' : 'Buff全览模式'}</span
-                        >
-                    {/if}
-                </button>
-            {/if}
-            {#if getCalcViewMode() === 'spread'}
-                <button
-                    onclick={() => setShowDamageTypeModal(true)}
-                    class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
-                        ? 'rounded-none px-3 py-2'
-                        : 'rounded-none px-3 py-1.5'}"
-                    title="逐个倍率确认伤害类型（拉表第一步）"
-                >
-                    <Icon icon="mdi:playlist-edit" class="size-4 shrink-0" />
-                    {#if !simplifyToolbar}
-                        <span class="hidden truncate @[700px]:inline">编辑伤害类型</span>
-                    {/if}
-                </button>
-                <button
-                    onclick={() => {
-                        const next = getScrollAxisDefault() === 'vertical' ? 'horizontal' : 'vertical'
-                        setScrollAxisDefault(next)
-                        addToast(
-                            next === 'horizontal'
-                                ? '已切换为默认横向滚动（Shift+方向键改变默认方向，Ctrl+滚轮临时换向）'
-                                : '已切换为默认纵向滚动（Shift+方向键改变默认方向，Ctrl+滚轮临时换向）',
-                            'success'
-                        )
-                    }}
-                    class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
-                        ? 'rounded-none px-3 py-2'
-                        : 'rounded-none px-3 py-1.5'} {getScrollAxisDefault() === 'horizontal'
-                        ? 'border-(--theme-accent-bg)'
-                        : 'border-(--theme-sidebar-text)/20'}"
-                    style="color: {getScrollAxisDefault() === 'horizontal'
-                        ? 'var(--theme-accent-text)'
-                        : 'var(--theme-sidebar-text)'}"
-                    title="修改默认滚动方向：Shift+方向键 改变默认方向（持久）；Ctrl+滚轮 临时换向"
-                >
-                    <Icon
-                        icon={getScrollAxisDefault() === 'horizontal' ? 'mdi:arrow-right-bold' : 'mdi:arrow-down'}
-                        class="size-4 shrink-0"
-                    />
-                    {#if !simplifyToolbar}
-                        <span class="hidden truncate @[700px]:inline"
-                            >{getScrollAxisDefault() === 'horizontal' ? '默认横向滚动' : '默认纵向滚动'}</span
-                        >
-                    {/if}
-                </button>
-            {/if}
-            {#if getCalcViewMode() !== 'spread'}
-                <button
-                    onclick={toggleHideConditionMismatch}
-                    class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
-                        ? 'rounded-none px-3 py-2'
-                        : 'rounded-none px-3 py-1.5'} {getHideConditionMismatch()
-                        ? 'border-(--theme-accent-bg)'
-                        : 'border-(--theme-sidebar-text)/20'}"
-                    style="color: {getHideConditionMismatch()
-                        ? 'var(--theme-accent-text)'
-                        : 'var(--theme-sidebar-text)'}"
-                    title="隐藏条件不匹配（链/阶低于配置、属性/类型对不上条目）的 buff"
-                >
-                    <Icon
-                        icon={getHideConditionMismatch() ? 'mdi:filter-off' : 'mdi:filter-outline'}
-                        class="size-4 shrink-0"
-                    />
-                    {#if !simplifyToolbar}
-                        <span class="hidden truncate @[700px]:inline"
-                            >{getHideConditionMismatch() ? '可用Buff' : '全部Buff'}</span
-                        >
-                    {/if}
-                </button>
-            {/if}
+            <button
+                onclick={() => setShowDamageTypeModal(true)}
+                class="inline-flex items-center gap-1.5 border border-(--theme-sidebar-text)/20 text-xs text-(--theme-sidebar-text) transition-colors hover:border-(--theme-sidebar-text)/40 {simplifyToolbar
+                    ? 'rounded-none px-3 py-2'
+                    : 'rounded-none px-3 py-1.5'}"
+                title="逐个倍率确认伤害类型（拉表第一步）"
+            >
+                <Icon icon="mdi:playlist-edit" class="size-4 shrink-0" />
+                {#if !simplifyToolbar}
+                    <span class="hidden truncate @[700px]:inline">编辑伤害类型</span>
+                {/if}
+            </button>
+            <button
+                onclick={() => {
+                    const next = getScrollAxisDefault() === 'vertical' ? 'horizontal' : 'vertical'
+                    setScrollAxisDefault(next)
+                    addToast(
+                        next === 'horizontal'
+                            ? '已切换为默认横向滚动（Shift+方向键改变默认方向，Ctrl+滚轮临时换向）'
+                            : '已切换为默认纵向滚动（Shift+方向键改变默认方向，Ctrl+滚轮临时换向）',
+                        'success'
+                    )
+                }}
+                class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
+                    ? 'rounded-none px-3 py-2'
+                    : 'rounded-none px-3 py-1.5'} {getScrollAxisDefault() === 'horizontal'
+                    ? 'border-(--theme-accent-bg)'
+                    : 'border-(--theme-sidebar-text)/20'}"
+                style="color: {getScrollAxisDefault() === 'horizontal'
+                    ? 'var(--theme-accent-text)'
+                    : 'var(--theme-sidebar-text)'}"
+                title="修改默认滚动方向：Shift+方向键 改变默认方向（持久）；Ctrl+滚轮 临时换向"
+            >
+                <Icon
+                    icon={getScrollAxisDefault() === 'horizontal' ? 'mdi:arrow-right-bold' : 'mdi:arrow-down'}
+                    class="size-4 shrink-0"
+                />
+                {#if !simplifyToolbar}
+                    <span class="hidden truncate @[700px]:inline"
+                        >{getScrollAxisDefault() === 'horizontal' ? '默认横向滚动' : '默认纵向滚动'}</span
+                    >
+                {/if}
+            </button>
+            <!-- @desc 表头详细/简略：简略 = 隐藏首行/次行（文件夹横条），只保留列名行（两种平铺共用，偏好持久化） -->
+            <button
+                onclick={() => {
+                    const compact = toggleHeaderCompact()
+                    addToast(
+                        compact ? '表头已切换为简略（只保留列名行）' : '表头已切换为详细（含文件夹横条）',
+                        'success'
+                    )
+                }}
+                class="inline-flex items-center gap-1.5 border text-xs transition-colors {simplifyToolbar
+                    ? 'rounded-none px-3 py-2'
+                    : 'rounded-none px-3 py-1.5'} {getHeaderCompact()
+                    ? 'border-(--theme-accent-bg)'
+                    : 'border-(--theme-sidebar-text)/20'}"
+                style="color: {getHeaderCompact() ? 'var(--theme-accent-text)' : 'var(--theme-sidebar-text)'}"
+                title="表头详细/简略：简略只保留列名行（隐藏文件夹首行/次行）"
+            >
+                <Icon
+                    icon={getHeaderCompact() ? 'mdi:collapse-all-outline' : 'mdi:view-dashboard-outline'}
+                    class="size-4 shrink-0"
+                />
+                {#if !simplifyToolbar}
+                    <span class="hidden truncate @[700px]:inline"
+                        >{getHeaderCompact() ? '表头(简略)' : '表头(详细)'}</span
+                    >
+                {/if}
+            </button>
         {/if}
     {/if}
     {#if simplifyToolbar}

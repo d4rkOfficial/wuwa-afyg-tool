@@ -1,17 +1,15 @@
 /**
- * @desc 拉表两视图（铺开 `spread-table` / 下拉 `dropdown-table`）共用的**纯逻辑**。
+ * @desc 拉表（分类平铺 / 分段平铺，共用 `spread-table`）的**纯逻辑**。
  *
- * 抽因（实测）：两张表渲染的是同一领域（伤害条目 × Buff 绑定），但 DOM 结构毫不相同
- * （矩阵 vs 列表，跨文件共享的元素壳只有 4 种微结构），真正重复的是**判定口径与文案拼装**：
+ * 抽因（实测）：同一领域（伤害条目 × Buff 绑定）里的判定口径与文案拼装必须只有一份：
  * `damageTypesByEntry`、`inferredDamageTypeMap`、`charToIdx`、条件贡献判定、伤害类型短名、
- * 影响源文案、选中集合增删在这两个文件里各写了一份、且逐字相同 —— 一旦其中一处改口径，
- * 就会出现「同一格在两个视图里可用性不同」的隐性不一致。
+ * 影响源文案、选中集合增删。一旦口径漂移，就会出现「同一格在两处可用性不同」的隐性不一致。
  *
  * 注：本文件位于 `components/` 下，**不在** `eslint.config.js` 的 functional-preference
  * 文件列表内（该层只覆盖 `calc/ api/ utils/ consts/ types/ ai/generate/ ai/tools/`），
  * 故此处按该层的写法自律（纯函数、入参不可重赋值、只用 `const` 与箭头函数），但规则本身不强制。
  */
-import { buffContributesToEntry, resolveDamageTypes, type ConditionProfile } from '$lib/calc/compute'
+import { resolveDamageTypes, zoneConditionMet, type ConditionProfile } from '$lib/calc/compute'
 import { inferDamageTypes } from '$lib/calc/utils'
 import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP, zoneAppliesToCoeffEntry } from '$lib/calc/calculation.consts'
 import type { BuffConf, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
@@ -104,7 +102,7 @@ export const paneSourceText = (charName: string, zoneLabels: readonly string[], 
     `影响源：${charName} 的${zoneLabels.join('、')}会被它改写，而${subject}引用了该面板 —— 勾上后参与该角色在这一段的面板计算`
 
 /**
- * @desc Buff 作用域是否覆盖本条：效应伤害只吃「全队」或「效应专属（空数组）」；
+ * @desc Buff 作用域是否覆盖本条：效应伤害只吃「通用（`'all'`）」或「仅效应（空数组）」；
  * 其余条目要求作用域指向本条目所属角色（charIdx < 0 → 不覆盖）。
  */
 export const buffScopeOk = (bs: BuffConf, isEffect: boolean | undefined, charIdx: number): boolean => {
@@ -176,35 +174,47 @@ export const buffUsableByEntry = (bs: BuffConf, entry: DamageEntry): boolean =>
     isDirectDamage(entry) || buffRelevantForNonDirect(bs, entry)
 
 /**
- * @desc 条件匹配判定（隐藏开关开启时过滤链/阶低于配置、属性/类型对不上条目的 buff）。
+ * @desc 乘区级「伤害属性 / 伤害类型」条件是否至少有一条乘区能满足（引擎口径：任一条目满足即可吃到）。
  *
- * 用 `buffContributesToEntry` 而非实例级条件：属性/类型条件挂在**乘区条目**上，
- * 只看实例级会让「乘区条件不满足」的 buff 仍可勾选。
- *
- * **上下文与引擎同口径**（属性 + 解析后的伤害类型，`computeAll` 的 `zoneCtx` 也是这两项，非直伤条目一样传）：
- * 曾经对非直伤条目传空上下文（`{}`），于是一律触发 `evaluateCondition` 的「需要条目上下文的子句视为不满足」，
- * 把「带属性/类型条件的乘区」全部判成不匹配 —— 实测症状：效应条目上带「导电/效应」条件的加深 buff
- * 被默认开启的「可用Buff」过滤挡掉、挂不上（引擎其实是吃的）。非直伤的伤害类型由
- * `buildDamageTypesByEntry` 提供（效应 → `效应伤害`；处决/响应 → 推断类型）。
+ * 这是**软条件**：不满足时格子仍属于「这个 Buff 和这个条目有关」，只是当下勾不上 →
+ * 拉表用它决定「显示灰色禁止图标且不可勾选」；列是否保留不看它（看 `cellBlockReasonOf` 的硬门槛）。
  */
-export const buffMatchesEntry = (
-    bs: BuffConf | undefined,
+export const buffZonesConditionOk = (
+    bs: BuffConf,
     entry: DamageEntry,
-    ctx: {
-        hideConditionMismatch: boolean
-        conditionProfile: ConditionProfile
-        damageTypes: string[] | undefined
-        charIdx: number
-    }
-): boolean => {
-    if (!bs) return false
-    if (!ctx.hideConditionMismatch) return true
-    return buffContributesToEntry(
-        bs,
-        { element: entry.damageElement, damageTypes: ctx.damageTypes ?? [] },
-        ctx.conditionProfile,
-        ctx.charIdx
+    damageTypes: readonly string[] | undefined,
+    profile: ConditionProfile
+): boolean =>
+    bs.zones.some((zone) =>
+        zoneConditionMet(zone, {
+            chains: profile.chains,
+            refinements: profile.refinements,
+            element: entry.damageElement,
+            damageTypes: damageTypes ? [...damageTypes] : []
+        })
     )
+
+/**
+ * @desc 拉表格子「不可勾」的原因（null = 可勾）：
+ * - `scope`：作用域不覆盖本条目；
+ * - `zone`：非直伤条目吃不到该乘区（追加型双暴等）；
+ * - `condition`：乘区级伤害属性/类型条件不满足。
+ *
+ * 三者都渲染成灰色禁止图标；区分原因是为了「列是否保留」只看前两者（软条件不隐藏整列）。
+ */
+export type CellBlockReason = 'scope' | 'zone' | 'condition'
+
+export const cellBlockReasonOf = (
+    bs: BuffConf,
+    entry: DamageEntry,
+    charIdx: number,
+    damageTypes: readonly string[] | undefined,
+    profile: ConditionProfile
+): CellBlockReason | null => {
+    if (!buffScopeOk(bs, entry.isEffect, charIdx)) return 'scope'
+    if (!buffUsableByEntry(bs, entry)) return 'zone'
+    if (!buffZonesConditionOk(bs, entry, damageTypes, profile)) return 'condition'
+    return null
 }
 
 /**

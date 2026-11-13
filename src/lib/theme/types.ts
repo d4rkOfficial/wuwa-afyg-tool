@@ -39,7 +39,7 @@ export const SURFACE_GROUPS: { label: string; items: { key: SurfaceKey; label: s
             {
                 key: 'card',
                 label: '卡片',
-                hint: '卡片类容器：声骸/套装/方案卡、结果页伤害行、下拉拉表与平铺拉表的行与单元格'
+                hint: '卡片类容器：声骸/套装/方案卡、结果页伤害行、拉表（分类/分段平铺）的行与单元格'
             },
             { key: 'modal', label: '弹窗', hint: '所有弹窗外壳（设置、工坊、各类 picker、确认框）的面板本体' },
             { key: 'sidebar', label: '侧边栏', hint: '工程列表侧边栏，含其顶部标题栏与列表项' },

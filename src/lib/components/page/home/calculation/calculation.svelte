@@ -1,5 +1,5 @@
 <script lang="ts">
-    /** @desc 计算页入口组件：连接 store（calculation.store.svelte.ts）与页面状态，根据 calcViewMode 切换 铺开表/下拉表 两种拉表视图 */
+    /** @desc 计算页入口组件：连接 store 与页面状态，按 calcViewMode 切换「分类平铺 / 分段平铺」两种拉表视图 */
     import { untrack } from 'svelte'
     import {
         getAllDamageEntries,
@@ -13,17 +13,13 @@
         getCalcState,
         getDamageTypesForEntry,
         init,
-        getGlobalBuffSetIds,
-        getBuffDiffMode,
-        getConditionProfile,
-        getHideConditionMismatch
+        getConditionProfile
     } from '$lib/calc/calculation.store.svelte'
     import type { CharSlot } from '$lib/types/project'
     import type { TimelineData } from '$lib/calc/timeline.types'
     import type { CalcState } from '$lib/calc/calculation.types'
     import BuffModal from './buff-modal.svelte'
     import SpreadTable from './spread-table.svelte'
-    import DropdownTable from './dropdown-table.svelte'
     import { getCalcViewMode } from '$lib/data/calc-view.svelte'
     import type { ComponentsProps } from '$lib/types'
 
@@ -54,11 +50,10 @@
         untrack(() => init(team, timelineData, calcState, locked, onupdate))
     })
 
-    /** @desc 从 store 派生：全部伤害条目 / Buff 块列表 / Buff 弹窗开关 / 全局 Buff 列表 */
+    /** @desc 从 store 派生：全部伤害条目 / Buff 块列表 / Buff 弹窗开关 */
     let damageEntries = $derived(getAllDamageEntries())
     let buffSets = $derived(getAllBuffConfs())
     let showBuffModal = $derived(getShowBuffModal())
-    let globalBuffSetIds = $derived(getGlobalBuffSetIds())
     /** @desc 条目→已选伤害类型 / 条目→已绑定 Buff 的映射（供表格展示） */
     let entryDamageTypeMap = $derived<Record<string, string[]>>(
         Object.fromEntries(damageEntries.map((e) => [e.id, getDamageTypesForEntry(e.id)]))
@@ -94,19 +89,19 @@
         })
     }
 
-    /** @desc 铺开表：切换某条目↔某 Buff 的绑定后持久化 */
+    /** @desc 平铺表：切换某条目↔某 Buff 的绑定后持久化 */
     function handleSpreadToggle(entryId: string, buffId: string) {
         toggleBuffSetForEntry(entryId, buffId)
         onupdate(getCalcState())
     }
 
-    /** @desc 铺开表：批量覆写某条目绑定的 Buff 集合（框选/行列头三态用）后持久化 */
+    /** @desc 平铺表：批量覆写某条目绑定的 Buff 集合（框选/行列头三态用）后持久化 */
     function handleSpreadSetEntryBuffSetIds(entryId: string, ids: string[]) {
         setBuffSetIdsForEntry(entryId, ids)
         onupdate(getCalcState())
     }
 
-    /** @desc 铺开表：批量覆写多条目的 Buff 绑定（框选批量用，单次持久化） */
+    /** @desc 平铺表：批量覆写多条目的 Buff 绑定（框选批量用，单次持久化） */
     function handleSpreadSetEntriesBuffSetIds(entries: Record<string, string[]>) {
         if (!setBuffSetIdsForEntries(entries)) return
         onupdate(getCalcState())
@@ -117,36 +112,22 @@
     <!-- @desc Buff 配置弹窗（挂载于页面顶层，open 由 store 控制） -->
     <BuffModal open={showBuffModal} {team} onclose={handleCloseBuffModal} />
 
-    <!-- @desc 视图切换：spread → 铺开表（传绑定映射/条件配置/回调用）；否则 → 下拉表（多传 buffDiffMode 差异模式） -->
+    <!-- @desc 视图切换：两张平铺表共用同一个组件，只靠 mode 切换结构（分类平铺 / 分段平铺） -->
     {#if !viewReady}
         <!-- 让出的一帧：页面已可见，重表还在路上（首屏渲染被推迟到下一帧，避免点击后整帧卡住） -->
         <div class="flex flex-1 items-center justify-center text-xs text-(--theme-modal-text)/40">加载中…</div>
-    {:else if calcViewMode === 'spread'}
+    {:else}
         <SpreadTable
             {team}
             {damageEntries}
             {buffSets}
             {entryBuffSetIdMap}
             {entryDamageTypeMap}
-            {globalBuffSetIds}
             conditionProfile={getConditionProfile()}
-            hideConditionMismatch={getHideConditionMismatch()}
+            mode={calcViewMode}
             ontoggle={handleSpreadToggle}
             onSetEntryBuffSetIds={handleSpreadSetEntryBuffSetIds}
             onSetEntriesBuffSetIds={handleSpreadSetEntriesBuffSetIds}
-        />
-    {:else}
-        <DropdownTable
-            {team}
-            {damageEntries}
-            {buffSets}
-            {entryBuffSetIdMap}
-            {entryDamageTypeMap}
-            {globalBuffSetIds}
-            conditionProfile={getConditionProfile()}
-            hideConditionMismatch={getHideConditionMismatch()}
-            buffDiffMode={getBuffDiffMode()}
-            {onupdate}
         />
     {/if}
 </div>

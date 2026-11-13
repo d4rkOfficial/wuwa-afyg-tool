@@ -17,7 +17,14 @@
     import Tabs from '$lib/components/ui/tabs.svelte'
     import Button from '$lib/components/ui/button.svelte'
     import { addToast } from '$lib/data/toast.svelte'
-    import { getCalcViewMode, setCalcViewMode } from '$lib/data/calc-view.svelte'
+    import {
+        getCalcViewMode,
+        getShowUnmetColumns,
+        normalizeCalcViewMode,
+        setCalcViewMode,
+        setShowUnmetColumns,
+        type CalcViewMode
+    } from '$lib/data/calc-view.svelte'
     import { getSimplifyToolbar, setSimplifyToolbar } from '$lib/data/toolbar-prefs.svelte'
     import { getSimplifyContextMenu, setSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
     import {
@@ -75,9 +82,9 @@
         'bottom-right': '屏幕右下角向上堆叠'
     }
 
-    function switchCalcViewMode(mode: 'dropdown' | 'spread') {
+    function switchCalcViewMode(mode: CalcViewMode) {
         setCalcViewMode(mode)
-        addToast(mode === 'spread' ? '已切换为 buff 平铺模式' : '已切换为 buff 下拉模式', 'success')
+        addToast(mode === 'segmented' ? '已切换为分段平铺' : '已切换为分类平铺', 'success')
     }
 
     // ── 分段文字 tab（`ui/tabs`，T15）──
@@ -91,6 +98,8 @@
     const CONFIRM_DELETES_TABS = pair('二次确认', '直接删除')
     const SIMPLIFY_CONTEXT_MENU_TABS = pair('精简', '完整')
     const LOCK_WATERMARK_TABS = pair('显示', '隐藏')
+    /** @desc 不达门槛的 Buff 列：显示 / 隐藏（隐藏后只保留至少一行真正达标的列） */
+    const UNMET_COLUMNS_TABS = pair('显示', '隐藏')
 
     /** @desc 弹窗关闭按钮位置（互斥取值，值域与 `ModalClosePosition` 一致，持久化键不变） */
     const CLOSE_POSITION_TABS = [
@@ -100,8 +109,8 @@
 
     /** @desc 拉表视图（互斥取值，值域与 `calc-view` 的 `CalcViewMode` 一致） */
     const CALC_VIEW_TABS = [
-        { value: 'dropdown', label: '下拉' },
-        { value: 'spread', label: '平铺' }
+        { value: 'categorized', label: '分类平铺' },
+        { value: 'segmented', label: '分段平铺' }
     ]
 
     /** @desc 消息提示位置：7 段，逐段 `title` 沿用原来的 `TOAST_POSITION_HINTS` 悬浮说明 */
@@ -112,7 +121,8 @@
     }))
 
     const pickCalcViewMode = (value: string) => {
-        if (value === 'dropdown' || value === 'spread') switchCalcViewMode(value)
+        const mode = normalizeCalcViewMode(value)
+        if (mode) switchCalcViewMode(mode)
     }
 
     const pickClosePosition = (value: string) => {
@@ -134,12 +144,31 @@
              按用户要求并入「界面显示」—— 它本来就是同一类「界面怎么显示」的开关，不是另一类设置。 -->
         <SettingRow>
             <div class="min-w-0">
-                <FieldLabel label="拉表视图" hint="选择拉表页面编辑 Buff 的方式" />
+                <FieldLabel
+                    label="拉表视图"
+                    hint="分类平铺：按角色×直伤/非直伤分子表；分段平铺：按时间记点分段、所有伤害按顺序列出"
+                />
             </div>
             <Tabs
                 items={CALC_VIEW_TABS}
                 value={getCalcViewMode()}
                 onchange={pickCalcViewMode}
+                compact
+                class={ROW_TABS}
+                {...TAB_ACCENT}
+            />
+        </SettingRow>
+        <SettingRow class="mt-2">
+            <div class="min-w-0">
+                <FieldLabel
+                    label="不达门槛的 Buff 列"
+                    hint="拉表时是否显示「未达门槛」的 Buff 列：隐藏后只保留至少一行真正达标的列（分类/分段平铺共用）"
+                />
+            </div>
+            <Tabs
+                items={UNMET_COLUMNS_TABS}
+                value={segValue(getShowUnmetColumns())}
+                onchange={(v) => setShowUnmetColumns(segBool(v))}
                 compact
                 class={ROW_TABS}
                 {...TAB_ACCENT}

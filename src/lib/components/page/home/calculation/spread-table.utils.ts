@@ -1,6 +1,7 @@
 /**
- * @desc 铺开表（`spread-table.svelte`）的**纯计算层**：列序/叠层分组、列分隔线、
- * 「条目 × Buff」整表结构（可用性、表头标签、行统计）、勾选统计、伤害源页签与渐进渲染切片。
+ * @desc 平铺拉表（`spread-table.svelte`：分类平铺 / 分段平铺）的**纯计算层**：列序/叠层分组、列分隔线、
+ * 「条目 × Buff」整表结构（单元格状态、表头标签、行统计）、勾选统计、伤害源页签、
+ * 分段平铺的记点切段与整表构建、渐进渲染切片。
  *
  * 原先这些派生块全部内联在组件的 `<script>` 里（该文件曾 1400+ 行）。抽出的原则：
  * **只搬「输入 → 输出」的纯计算**，不搬交互状态机（框选、鼠标/键盘事件、滚动同步仍留在组件里），
@@ -13,7 +14,7 @@ import { LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$lib/calc/calculation.co
 import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
 import type { PaneEffectSource } from '$lib/calc/pane-effects'
 import type { CharSlot } from '$lib/types/project'
-import { buffRelevantForNonDirect, entryCharIdx, isNonDirectDamage, zoneLabelsOf } from './damage-table.utils'
+import { entryCharIdx, isNonDirectDamage, zoneLabelsOf } from './damage-table.utils'
 
 /** @desc 叠层分组：同「前缀+后缀」≥2 条成组；仅用于表头分组展示与分隔线，列本身仍每层一列 */
 export interface FolderGroup {
@@ -81,10 +82,18 @@ export const headColumnWidthPx = (text: string, lines: number, span = 1, trackin
     return Math.ceil(clamped / Math.max(1, span))
 }
 
-/** @desc 单元格结构数据：只含「该格是否可用」——勾选态在模板里直接读 entryBuffSetIdMap，避免勾选触发整表结构重建 */
+/**
+ * @desc 单元格**结构**数据：只含与勾选无关的判定 —— 勾选态在模板里直接读 `entryBuffSetIds`，
+ * 「未达门槛」在渲染时现算（`spread-table.svelte` 的 `rulesMetOf`）。
+ *
+ * 分层为了性能：结构不依赖勾选 → 点一格不重建整张表（只有那一格的图标变）。
+ */
 export interface CellData {
     buffId: string
+    /** @desc 可勾选（硬门槛 + 乘区属性/类型条件都满足）；false = 显示灰色禁止图标且点不动 */
     enabled: boolean
+    /** @desc 硬门槛（作用域 + 该条目吃不吃这个乘区）是否通过：决定这一列在本表里要不要保留 */
+    hardOk: boolean
     /** @desc 该格是「影响源」：作用域指向本条目引用的角色面板，勾上后参与该角色在这一段的面板计算 */
     pane: boolean
 }
@@ -93,10 +102,15 @@ export interface RowData {
     entry: DamageEntry
     cells: CellData[]
     enabledBuffIds: string[]
-    splitBefore: boolean
+    /** @desc 选中口径「连续行段」的段首：行上方画主题色分割线（两种平铺都用；口径见各建表函数） */
+    runStart: boolean
+    /** @desc 选中口径「连续行段」的段尾：行下方画主题色分割线 */
+    runEnd: boolean
+    /** @desc 该行是否可编辑（分段平铺：非选中来源的行只显示首列伤害信息，右侧绝对留白） */
+    editable: boolean
 }
 
-/** @desc 表头单元格（第二行=列名行）：标签、分隔线、可用数都在结构派生里一次算好 */
+/** @desc 表头单元格（列名行）：标签、分隔线、可用数都在结构派生里一次算好 */
 export interface HeadCell {
     ci: number
     label: string
@@ -117,21 +131,34 @@ export interface HeadGroupCell {
     sepClass: string
 }
 
-export interface GroupData {
+/** @desc 渲染层统一的一张平铺表（分类平铺 = 每个「角色×直伤/非直伤」一张；分段平铺 = 每个时间段一张） */
+export interface CalcTable {
+    /** @desc 稳定 key（`{#each}` 用） */
     key: string
-    charName: string
-    kind: 'direct' | 'nondirect'
+    /** @desc 表标题（分类平铺=角色名；分段平铺=参考线名） */
+    title: string
+    /** @desc 副标题（分类平铺=直伤/非直伤；分段平铺=时间范围） */
+    subtitle: string
+    /** @desc 标题配色用的元素名（分段/其它为空串 → 走默认文字色） */
+    element: string
     rows: RowData[]
-    /** @desc 与 columns 同索引：该组内每个 buff 列的可用条目数 */
+    /** @desc 与 columns 同索引：该表内「真正可用」的条目数（>0 的列才显示） */
     enabledCounts: number[]
-    /** @desc 该组角色吃不到的 buff 列索引（组内无任何启用行）——表头直接筛掉 */
+    /** @desc 该表保留的 buff 列索引 */
     visibleColIdx: number[]
     /** @desc 是否存在叠层列（决定表头是否两级） */
     hasFolder: boolean
     headerGroups: HeadGroupCell[]
     headerCols: HeadCell[]
-    /** @desc 该组实际能用的全局 buff（scope/条件/乘区判定）——吃不到的全局 buff 不显示 */
-    visibleGlobalBuffs: BuffConf[]
+}
+
+/** @desc 一个「伤害来源」的条目分组（分类平铺按它建表；页签也按它计数） */
+export interface SourceEntryGroup {
+    key: string
+    /** @desc 角色名（「其它」为空串） */
+    charName: string
+    kind: 'direct' | 'nondirect' | 'other'
+    entries: DamageEntry[]
 }
 
 /**
@@ -205,161 +232,218 @@ export const columnSepClass = (
     return solid ? 'spread-sep-solid' : 'spread-sep'
 }
 
-/** @desc 伤害源标识：直伤/处决/响应取引起它的角色；效应类非直伤条目不带 character（视为非角色引起） */
-export const entrySourceOf = (e: DamageEntry): string => e.character ?? ''
-
 /**
  * @desc 效应/处决/响应伤害实际读取的乘区、以及「该 buff 能不能勾到这个条目上」的判定，
  * 都搬到两表共用的 `damage-table.utils`（同一领域判定不重复维护）。
  */
 
+/** @desc 单元格「与勾选无关」的状态判定结果（由组件注入的判定器给出） */
+export interface CellState {
+    /** @desc 不可勾（作用域/乘区不匹配，或乘区级伤害属性/类型条件不满足）→ 灰色禁止图标 */
+    blocked: boolean
+    /** @desc 硬门槛（作用域 + 乘区）通过：列是否保留看它，**不看**软条件 */
+    hardOk: boolean
+}
+
 /** @desc 整表结构构建的依赖（store 侧能力一律注入，见文件头注释） */
 export interface SpreadTableDeps {
     columns: readonly BuffConf[]
-    damageEntries: readonly DamageEntry[]
     charToIdx: Record<string, number>
-    globalBuffs: readonly BuffConf[]
     team: readonly CharSlot[]
     folderGroupOf: ReadonlyMap<string, FolderGroup>
-    /** @desc 单元格可用性判定（组件侧带模块级缓存的那一个） */
-    enabledFor: (bs: BuffConf, entry: DamageEntry, charIdx: number) => boolean
+    /** @desc 单元格结构判定（与勾选无关，组件侧带缓存） */
+    stateFor: (bs: BuffConf, entry: DamageEntry, charIdx: number) => CellState
+    /** @desc Buff 级门槛判定（**依赖勾选**：面板/生效集合随绑定变化）；只有隐藏不达门槛列时才会被调用 */
+    rulesMetFor?: (bs: BuffConf, entry: DamageEntry) => boolean
+    /** @desc 是否把「不达门槛」的列筛掉（全局偏好）；开启时结构会随勾选重建，关闭时结构稳定 */
+    hideUnmetColumns?: boolean
     /** @desc 条目的「影响源」查询（scope 指向被引用角色、且改写其面板乘区的 Buff） */
     paneSourcesOf: (entryId: string) => Record<string, PaneEffectSource>
+    /**
+     * @desc 条目在**全量伤害序列**里的下标（分类平铺判定「不连续」用）：
+     * 两个同源倍率在全量序列里不相邻 ⇒ 它们之间夹着别的来源的倍率 ⇒ 该行上方画分割线。
+     */
+    orderIndexOf?: (entryId: string) => number
 }
 
-/** @desc 预计算整表「结构」数据：单元格可用性、表头标签/分隔线、行统计一次算好；勾选态不参与，故点单元格不重建整表 */
-export const buildSpreadTable = (deps: SpreadTableDeps): GroupData[] => {
-    const { columns: cols, charToIdx, globalBuffs, team, folderGroupOf, enabledFor, paneSourcesOf } = deps
-    const groupMap = new Map<
-        string,
-        { charName: string; kind: 'direct' | 'nondirect'; items: { entry: DamageEntry; idx: number }[] }
-    >()
-    for (let i = 0; i < deps.damageEntries.length; i++) {
-        const entry = deps.damageEntries[i]
+/** @desc 某列是否算「真正可用」（决定列保留）：硬门槛必须过；开启「隐藏不达门槛列」时还要至少一行门槛达标 */
+const columnCounted = (
+    deps: Pick<SpreadTableDeps, 'rulesMetFor' | 'hideUnmetColumns'>,
+    bs: BuffConf,
+    entry: DamageEntry,
+    state: CellState
+): boolean => {
+    if (!state.hardOk) return false
+    if (!deps.hideUnmetColumns) return true
+    return deps.rulesMetFor ? deps.rulesMetFor(bs, entry) : true
+}
+
+/**
+ * @desc 把伤害条目按「伤害源」分组（分类平铺按它建表；页签计数也用它）。
+ * 分组键与页签 key 同口径（`entrySourceKeyOf`）：角色在队伍里 → `slot-N:direct|nondirect`；否则「其它」。
+ */
+export const groupEntriesBySource = (
+    entries: readonly DamageEntry[],
+    charToIdx: Record<string, number>
+): SourceEntryGroup[] => {
+    const map = new Map<string, SourceEntryGroup>()
+    for (const entry of entries) {
         const isDirect = !isNonDirectDamage(entry)
-        const key = `${entry.character ?? ''}|${isDirect ? 'direct' : 'nondirect'}`
-        const g = groupMap.get(key) ?? {
-            charName: entry.character ?? '',
-            kind: isDirect ? ('direct' as const) : ('nondirect' as const),
-            items: []
+        const key = entrySourceKeyOf(charToIdx, entry)
+        const charName = key === NONE_SOURCE_KEY ? '' : (entry.character ?? '')
+        const group = map.get(key) ?? {
+            key,
+            charName,
+            kind:
+                key === NONE_SOURCE_KEY ? ('other' as const) : isDirect ? ('direct' as const) : ('nondirect' as const),
+            entries: []
         }
-        groupMap.set(key, g)
-        g.items.push({ entry, idx: i })
+        map.set(key, group)
+        group.entries.push(entry)
     }
+    return [...map.values()]
+}
 
-    const result: GroupData[] = []
-    for (const [groupKey, g] of groupMap) {
-        const enabledCounts: number[] = cols.map(() => 0)
-        const rows: RowData[] = []
-        for (const { entry, idx } of g.items) {
-            const charIdx = entryCharIdx(entry, charToIdx)
-            const cells: CellData[] = []
-            const enabledBuffIds: string[] = []
-            // 影响源：本条目引用的他角色面板会被哪些（作用域指向该角色的）Buff 改写
-            const paneSources = paneSourcesOf(entry.id)
-            for (let ci = 0; ci < cols.length; ci++) {
-                const bs = cols[ci]
-                const pane = paneSources[bs.id] !== undefined
-                const enabled = enabledFor(bs, entry, charIdx) || pane
-                cells.push({ buffId: bs.id, enabled, pane })
-                if (enabled) {
-                    enabledCounts[ci]++
-                    enabledBuffIds.push(bs.id)
-                }
-            }
-            rows.push({
-                entry,
-                cells,
-                enabledBuffIds,
-                // 不连续判定：排轴上紧邻的上一个伤害倍率不是由「当前伤害源」引起 → 视为一次不连续（同角色跨界直伤/非直伤不算断开）
-                splitBefore: idx > 0 && entrySourceOf(deps.damageEntries[idx - 1]) !== entrySourceOf(entry)
-            })
-        }
-        const visibleGlobalBuffs = globalBuffs.filter((gb) =>
-            g.items.some(({ entry }) => {
-                const charIdx = entryCharIdx(entry, charToIdx)
-                return (
-                    enabledFor(gb, entry, charIdx) && (!isNonDirectDamage(entry) || buffRelevantForNonDirect(gb, entry))
-                )
-            })
-        )
-        const visibleColIdx = cols.map((_, ci) => ci).filter((ci) => enabledCounts[ci] > 0)
-
-        // 表头两行一次算好：第一行仅叠层组（组起点列输出 colspan 组名，普通列输出占位），第二行列名（叠层子列显示层号/层号+后缀）
-        /** @desc 本组「影响源」列：被本组任一条目引用的角色面板，其改写者在该组内的并集 */
-        const groupPaneSources = new Map<string, { charIdx: number; zoneIds: string[] }>()
-        for (const { entry } of g.items) {
-            for (const [id, src] of Object.entries(paneSourcesOf(entry.id))) {
-                const existing = groupPaneSources.get(id)
-                if (!existing) {
-                    groupPaneSources.set(id, { charIdx: src.charIdx, zoneIds: [...src.zoneIds] })
-                    continue
-                }
-                for (const z of src.zoneIds) if (!existing.zoneIds.includes(z)) existing.zoneIds.push(z)
-            }
-        }
-        const headerGroups: HeadGroupCell[] = []
-        const headerCols: HeadCell[] = []
-        for (let p = 0; p < visibleColIdx.length; p++) {
-            const ci = visibleColIdx[p]
+/**
+ * @desc 分类平铺的一整张表（**只为选中来源构建**：分类平铺一次只显示一张子表，
+ * 全量构建其它来源纯属浪费 —— 这是之前整表卡顿的主因之一）。
+ *
+ * 行间分割线：同源的两条倍率在全量伤害序列里**不相邻**，说明中间夹着别的来源的倍率（排轴上的一次
+ * 不连续）→ 给后一条标 `runStart`，模板据此在它上方画一条主题色分割线（与分段平铺同一套类）。
+ * 只标一侧：两行在表里相邻，若首尾都标会叠成 4px 的双线。
+ */
+export const buildCategorizedTable = (deps: SpreadTableDeps, group: SourceEntryGroup): CalcTable => {
+    const { columns: cols, charToIdx, team, folderGroupOf, stateFor, paneSourcesOf, orderIndexOf } = deps
+    const enabledCounts: number[] = cols.map(() => 0)
+    const rows: RowData[] = []
+    /** @desc 同源相邻两行是否「不连续」（全量序列里夹了别的来源）；未注入下标时一律按连续处理 */
+    const discontinuous = (a: DamageEntry, b: DamageEntry): boolean =>
+        orderIndexOf !== undefined && orderIndexOf(b.id) !== orderIndexOf(a.id) + 1
+    for (let idx = 0; idx < group.entries.length; idx++) {
+        const entry = group.entries[idx]
+        const charIdx = entryCharIdx(entry, charToIdx)
+        const cells: CellData[] = []
+        const enabledBuffIds: string[] = []
+        const paneSources = paneSourcesOf(entry.id)
+        for (let ci = 0; ci < cols.length; ci++) {
             const bs = cols[ci]
-            const nextId = p + 1 < visibleColIdx.length ? cols[visibleColIdx[p + 1]]?.id : undefined
-            const sep = columnSepClass(folderGroupOf, bs.id, nextId)
-            const grp = folderGroupOf.get(bs.id)
-            const layerNum = grp ? (bs.name.match(LAYERED_BUFF_PATTERN)?.[2] ?? '') : ''
-            // 影响源列：该 Buff 作用于被本组引用的角色，会改写那个角色的面板乘区
-            const paneSrc = groupPaneSources.get(bs.id)
-            const paneSource = paneSrc
-                ? {
-                      charName: team[paneSrc.charIdx]?.character ?? `角色${paneSrc.charIdx + 1}`,
-                      zoneLabels: zoneLabelsOf(paneSrc.zoneIds)
-                  }
-                : undefined
-            headerCols.push({
-                ci,
-                label: grp ? (grp.label ?? (grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum)) : bs.name,
-                title: bs.name,
-                isLayer: grp !== undefined,
-                enabled: enabledCounts[ci],
-                sepClass: sep,
-                titleOn: `取消勾选：${bs.name}`,
-                titleOff: `勾选：${bs.name}`,
-                ...(paneSource ? { paneSource } : {})
-            })
-            if (!grp) {
-                headerGroups.push({ span: 1, sepClass: sep })
-                continue
-            }
-            const prevId = p > 0 ? cols[visibleColIdx[p - 1]]?.id : undefined
-            if (p > 0 && folderGroupOf.get(prevId ?? '')?.key === grp.key) continue
-            let run = 1
-            for (let k = p + 1; k < visibleColIdx.length; k++) {
-                if (folderGroupOf.get(cols[visibleColIdx[k]].id)?.key === grp.key) run++
-                else break
-            }
-            const tailId = cols[visibleColIdx[p + run - 1]].id
-            const afterTailId = p + run < visibleColIdx.length ? cols[visibleColIdx[p + run]]?.id : undefined
-            headerGroups.push({
-                span: run,
-                label: grp.suffix.length <= 3 ? grp.prefix : grp.prefix + LAYERED_BUFF_VAR + grp.suffix,
-                sepClass: columnSepClass(folderGroupOf, tailId, afterTailId)
-            })
+            const pane = paneSources[bs.id] !== undefined
+            const state = stateFor(bs, entry, charIdx)
+            const enabled = !state.blocked || pane
+            const hardOk = state.hardOk || pane
+            cells.push({ buffId: bs.id, enabled, hardOk, pane })
+            if (columnCounted(deps, bs, entry, state) || pane) enabledCounts[ci]++
+            if (enabled) enabledBuffIds.push(bs.id)
         }
-
-        result.push({
-            key: groupKey,
-            charName: g.charName,
-            kind: g.kind,
-            rows,
-            enabledCounts,
-            visibleColIdx,
-            hasFolder: headerCols.some((hc) => hc.isLayer),
-            headerGroups,
-            headerCols,
-            visibleGlobalBuffs
+        const prev = idx > 0 ? group.entries[idx - 1] : undefined
+        rows.push({
+            entry,
+            cells,
+            enabledBuffIds,
+            editable: true,
+            // 只在**段首上方**画一条（两行在表里是相邻的，若首尾都标会叠成 4px 双线）；
+            // 表首不加线（那里已有表头边框），表尾同理
+            runStart: prev !== undefined && discontinuous(prev, entry),
+            runEnd: false
         })
     }
-    return result
+    const visibleColIdx = cols.map((_, ci) => ci).filter((ci) => enabledCounts[ci] > 0)
+
+    // 影响源：被本组任一条目引用的角色面板，其改写者在该组内的并集
+    const groupPaneSources = new Map<string, { charIdx: number; zoneIds: string[] }>()
+    for (const entry of group.entries) {
+        for (const [id, src] of Object.entries(paneSourcesOf(entry.id))) {
+            const existing = groupPaneSources.get(id)
+            if (!existing) {
+                groupPaneSources.set(id, { charIdx: src.charIdx, zoneIds: [...src.zoneIds] })
+                continue
+            }
+            for (const z of src.zoneIds) if (!existing.zoneIds.includes(z)) existing.zoneIds.push(z)
+        }
+    }
+    const { headerGroups, headerCols, hasFolder } = buildHeaderOf({
+        columns: cols,
+        visibleColIdx,
+        enabledCounts,
+        folderGroupOf,
+        paneSourceOf: (buffId) => {
+            const src = groupPaneSources.get(buffId)
+            if (!src) return undefined
+            return {
+                charName: team[src.charIdx]?.character ?? `角色${src.charIdx + 1}`,
+                zoneLabels: zoneLabelsOf(src.zoneIds)
+            }
+        }
+    })
+
+    return {
+        key: group.key,
+        title: group.charName || '无角色',
+        subtitle: group.kind === 'direct' ? '直伤' : group.kind === 'nondirect' ? '非直伤' : '其它',
+        element: group.charName,
+        rows,
+        enabledCounts,
+        visibleColIdx,
+        hasFolder,
+        headerGroups,
+        headerCols
+    }
+}
+
+/**
+ * @desc 表头（文件夹横条 + 列名行）一次性算好：分类平铺按「本组可见列」，分段平铺按「选中来源的可见列」。
+ * 两处共用同一份实现，避免分隔线/叠层标签口径漂移。
+ */
+export const buildHeaderOf = (args: {
+    columns: readonly BuffConf[]
+    visibleColIdx: readonly number[]
+    enabledCounts: readonly number[]
+    folderGroupOf: ReadonlyMap<string, FolderGroup>
+    /** @desc buffId → 影响源说明（分类平铺用；分段平铺不传） */
+    paneSourceOf?: (buffId: string) => { charName: string; zoneLabels: string[] } | undefined
+}): { headerGroups: HeadGroupCell[]; headerCols: HeadCell[]; hasFolder: boolean } => {
+    const { columns: cols, visibleColIdx, enabledCounts, folderGroupOf } = args
+    const headerGroups: HeadGroupCell[] = []
+    const headerCols: HeadCell[] = []
+    for (let p = 0; p < visibleColIdx.length; p++) {
+        const ci = visibleColIdx[p]
+        const bs = cols[ci]
+        const nextId = p + 1 < visibleColIdx.length ? cols[visibleColIdx[p + 1]]?.id : undefined
+        const sep = columnSepClass(folderGroupOf, bs.id, nextId)
+        const grp = folderGroupOf.get(bs.id)
+        const layerNum = grp ? (bs.name.match(LAYERED_BUFF_PATTERN)?.[2] ?? '') : ''
+        const paneSource = args.paneSourceOf?.(bs.id)
+        headerCols.push({
+            ci,
+            label: grp ? (grp.label ?? (grp.suffix.length <= 3 ? layerNum + grp.suffix : layerNum)) : bs.name,
+            title: bs.name,
+            isLayer: grp !== undefined,
+            enabled: enabledCounts[ci] ?? 0,
+            sepClass: sep,
+            titleOn: `取消勾选：${bs.name}`,
+            titleOff: `勾选：${bs.name}`,
+            ...(paneSource ? { paneSource } : {})
+        })
+        if (!grp) {
+            headerGroups.push({ span: 1, sepClass: sep })
+            continue
+        }
+        const prevId = p > 0 ? cols[visibleColIdx[p - 1]]?.id : undefined
+        if (p > 0 && folderGroupOf.get(prevId ?? '')?.key === grp.key) continue
+        let run = 1
+        for (let k = p + 1; k < visibleColIdx.length; k++) {
+            if (folderGroupOf.get(cols[visibleColIdx[k]].id)?.key === grp.key) run++
+            else break
+        }
+        const tailId = cols[visibleColIdx[p + run - 1]].id
+        const afterTailId = p + run < visibleColIdx.length ? cols[visibleColIdx[p + run]]?.id : undefined
+        headerGroups.push({
+            span: run,
+            label: grp.suffix.length <= 3 ? grp.prefix : grp.prefix + LAYERED_BUFF_VAR + grp.suffix,
+            sepClass: columnSepClass(folderGroupOf, tailId, afterTailId)
+        })
+    }
+    return { headerGroups, headerCols, hasFolder: headerCols.some((hc) => hc.isLayer) }
 }
 
 /**
@@ -367,7 +451,7 @@ export const buildSpreadTable = (deps: SpreadTableDeps): GroupData[] => {
  * 仅供行头/列头 tooltip 展示，勾选变化不触发结构重建，只失效这两个标题表达式。
  */
 export const buildSelectionStats = (
-    tableData: readonly GroupData[],
+    tableData: readonly CalcTable[],
     entryBuffSetIdMap: Record<string, string[]>,
     colIndexById: ReadonlyMap<string, number>
 ): { colCounts: Map<number, number>[]; rowCounts: Map<string, number> } => {
@@ -399,96 +483,92 @@ export const buildSelectionStats = (
     return { colCounts, rowCounts }
 }
 
-/** @desc ── 伤害源切换（主内容区顶部）：按角色过滤要渲染的子表，减少一次要挂载的行/格 ── */
+/** @desc ── 伤害源切换（主内容区顶部）：页签 = 角色×(直伤/非直伤) + 其它；空页签不出现 ── */
 export const NONE_SOURCE_KEY = '\u0000none'
+
+/** @desc 来源维度：直伤 / 非直伤 / 其它（无角色或不属队伍的伤害） */
+export type SourceKind = 'direct' | 'nondirect' | 'other'
 
 export interface SourceTab {
     key: string
     label: string
-    /** @desc 角色名（无则 null，用于取头像与元素色；「其它」页签为 null） */
+    /** @desc 角色名（「其它」页签为 null，用于取头像与元素色） */
     char: string | null
+    kind: SourceKind
     element: string
+    /** @desc 该来源的伤害条目数（0 的页签不显示） */
     count: number
 }
 
-/** @desc 子表归属的页签键：命中队伍槽位 → slot-N；无角色/未命中 → 「其它」 */
-export const sourceKeyOf = (charToIdx: Record<string, number>, charName: string): string => {
+/** @desc 子表归属的页签键：命中队伍槽位 → `slot-N:direct|nondirect`；无角色/未命中 → 「其它」 */
+export const sourceKeyOf = (
+    charToIdx: Record<string, number>,
+    charName: string,
+    kind: 'direct' | 'nondirect' = 'direct'
+): string => {
     if (!charName) return NONE_SOURCE_KEY
     const ci = charToIdx[charName]
-    return ci === undefined ? NONE_SOURCE_KEY : `slot-${ci}`
+    return ci === undefined ? NONE_SOURCE_KEY : `slot-${ci}:${kind}`
 }
 
 /**
- * @desc 页签固定为「角色1 / 角色2 / 角色3 / 其它」四个队伍维度（不做「全部」——全部子表同时渲染最卡）：
- * 有角色的槽位显示角色名+头像，空槽位显示「角色N」，两者都没有子表时该页签不出现；「其它」承载无角色的伤害源。
+ * @desc 页签 = 每个角色的「直伤」「非直伤」各一个 + 「其它」，**空表页签不显示**。
+ * 计数直接来自条目分组（`groupEntriesBySource`），不需要先建整表 —— 切换页签才不会重算全量结构。
  */
 export const buildSourceTabs = (args: {
     team: readonly CharSlot[]
-    tableData: readonly GroupData[]
-    charToIdx: Record<string, number>
+    groups: readonly SourceEntryGroup[]
     elementColorOf: (charName: string) => string
 }): SourceTab[] => {
     const counts = new Map<string, number>()
-    for (const g of args.tableData) {
-        const key = sourceKeyOf(args.charToIdx, g.charName)
-        counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
+    for (const group of args.groups) counts.set(group.key, (counts.get(group.key) ?? 0) + group.entries.length)
     const tabs: SourceTab[] = []
     args.team.forEach((slot, i) => {
-        const key = `slot-${i}`
-        const count = counts.get(key) ?? 0
-        if (!slot.character && count === 0) return
+        if (!slot.character) return
+        for (const [kind, suffix] of [
+            ['direct', '直伤'],
+            ['nondirect', '非直伤']
+        ] as const) {
+            const key = `slot-${i}:${kind}`
+            const count = counts.get(key) ?? 0
+            if (count === 0) continue
+            tabs.push({
+                key,
+                label: `${slot.character}·${suffix}`,
+                char: slot.character,
+                kind,
+                element: args.elementColorOf(slot.character),
+                count
+            })
+        }
+    })
+    const otherCount = counts.get(NONE_SOURCE_KEY) ?? 0
+    if (otherCount > 0) {
         tabs.push({
-            key,
-            label: slot.character ?? `角色${i + 1}`,
-            char: slot.character ?? null,
-            element: args.elementColorOf(slot.character ?? ''),
-            count
+            key: NONE_SOURCE_KEY,
+            label: '其它',
+            char: null,
+            kind: 'other',
+            element: args.elementColorOf(''),
+            count: otherCount
         })
-    })
-    tabs.push({
-        key: NONE_SOURCE_KEY,
-        label: '其它',
-        char: null,
-        element: args.elementColorOf(''),
-        count: counts.get(NONE_SOURCE_KEY) ?? 0
-    })
+    }
     return tabs
 }
 
-/** @desc 生效的页签：未手动选择（或所选页签已不存在）时取第一个有子表的页签 */
+/** @desc 生效的页签：未手动选择（或所选页签已不存在/变空）时取第一个页签 */
 export const resolveActiveSource = (sourceKey: string | null, sourceTabs: readonly SourceTab[]): string | null =>
-    sourceKey !== null && sourceTabs.some((t) => t.key === sourceKey)
-        ? sourceKey
-        : (sourceTabs.find((t) => t.count > 0)?.key ?? sourceTabs[0]?.key ?? null)
+    sourceKey !== null && sourceTabs.some((t) => t.key === sourceKey) ? sourceKey : (sourceTabs[0]?.key ?? null)
 
-/** @desc 要渲染的子表下标：始终是 tableData 的原始下标——data-group / 框选 / 高亮 / 右键全选语义不变 */
-export const shownGroupIdxOf = (
-    tableData: readonly GroupData[],
-    activeSource: string | null,
-    charToIdx: Record<string, number>
-): number[] => {
-    if (activeSource === null) return tableData.map((_, gi) => gi)
-    return tableData
-        .map((g, gi) => (sourceKeyOf(charToIdx, g.charName) === activeSource ? gi : -1))
-        .filter((gi) => gi >= 0)
-}
-
-/** @desc 顶部「全局 BUFF」条：当前页签涉及的子表里能吃到该全局 buff 的并集（去重，保持出现顺序） */
-export const collectShownGlobalBuffs = (
-    tableData: readonly GroupData[],
-    shownGroupIdx: readonly number[]
-): BuffConf[] => {
-    const map = new Map<string, BuffConf>()
-    for (const gi of shownGroupIdx) {
-        for (const gb of tableData[gi].visibleGlobalBuffs) map.set(gb.id, gb)
-    }
-    return [...map.values()]
+/** @desc 条目是否属于某页签（分段平铺：只有这些行可勾 Buff） */
+export const entrySourceKeyOf = (charToIdx: Record<string, number>, entry: DamageEntry): string => {
+    const isDirect = !isNonDirectDamage(entry)
+    return sourceKeyOf(charToIdx, entry.character ?? '', isDirect ? 'direct' : 'nondirect')
 }
 
 /** @desc 结构指纹（条目集合 + 列集合）：切换工程/队伍后重置分帧进度，避免沿用上一个大表的值而失去分帧保护 */
-export const rowFingerprintOf = (damageEntries: readonly DamageEntry[], tableData: readonly GroupData[]): string =>
-    `${damageEntries.map((e) => e.id).join('|')}\u0000${tableData.map((g) => g.visibleColIdx.join(',')).join('|')}`
+export const rowFingerprintOf = (tables: readonly CalcTable[]): string =>
+    tables.map((t) => `${t.key}:${t.rows.map((r) => r.entry.id).join(',')}|${t.visibleColIdx.join(',')}`).join(';')
 
 /** @desc 已揭示的行（切片而非逐行 {#if} 判断：每帧只处理新增 chunk，且未揭示时复用原数组引用） */
 export const visibleRowsOf = (rows: readonly RowData[], visibleRows: number): RowData[] =>
@@ -501,3 +581,195 @@ export const columnHeadTitle = (hc: HeadCell, selCount: number, paneText: string
 /** @desc 行头 tooltip（已选/可用 + 操作提示） */
 export const rowHeadTitle = (displayName: string, selCount: number, enabledCount: number): string =>
     `${displayName}：单击高亮行，右键全选/全不选（已选 ${selCount}/${enabledCount}）`
+
+/* ────────────────────────── 分段平铺 ────────────────────────── */
+
+/**
+ * @desc 分段平铺的分割标记：**有记点的参考线**（`resultAnalysis.timings` 里 `seconds` 非空的那些）。
+ * `pos` 用于把伤害条目切进不同的表；`seconds` 用于表名里的时间范围。
+ */
+export interface SegmentMarker {
+    refLineId: string
+    /** @desc 参考线名（表名用；空名回退「未命名参考线」） */
+    name: string
+    /** @desc 时间轴位置（px） */
+    pos: number
+    /** @desc 记点秒数 */
+    seconds: number
+}
+
+/** @desc 记点 + 参考线 → 分割标记（按时间轴位置升序；无记点返回空数组） */
+export const buildSegmentMarkers = (
+    timings: readonly { refLineId: string; seconds: number | null }[],
+    refLines: readonly { id: string; name: string; pos: number }[]
+): SegmentMarker[] => {
+    const byId = new Map(refLines.map((rl) => [rl.id, rl]))
+    return timings
+        .flatMap((timing) => {
+            if (timing.seconds === null) return []
+            const rl = byId.get(timing.refLineId)
+            if (!rl) return []
+            return [
+                {
+                    refLineId: rl.id,
+                    name: rl.name.trim() || '未命名参考线',
+                    pos: rl.pos,
+                    seconds: timing.seconds
+                }
+            ]
+        })
+        .sort((a, b) => a.pos - b.pos)
+}
+
+/** @desc 一段时间段的切分规格（表名 + 时间范围 + 位置区间） */
+export interface SegmentSpec {
+    key: string
+    /** @desc 表名（参考线名；第一条记点之前叫「开场」） */
+    title: string
+    /** @desc 时间范围文案（表副标题） */
+    rangeText: string
+    /** @desc 起始位置（含） */
+    from: number
+    /** @desc 结束位置（不含；null = 到最后） */
+    to: number | null
+}
+
+/** @desc 秒数文案（一位小数，去尾 0） */
+const secondsText = (seconds: number): string => `${Math.round(seconds * 10) / 10}s`
+
+/**
+ * @desc 分割标记 → 段规格：**每个标记开启一段**，直到下一个标记；第一个标记之前的一段叫「开场」。
+ * 没有记点时退化成单张表（全部伤害），表名「全部伤害」。
+ */
+export const buildSegmentSpecs = (markers: readonly SegmentMarker[]): SegmentSpec[] => {
+    if (markers.length === 0) {
+        return [{ key: 'seg:all', title: '全部伤害', rangeText: '未配置时间记点', from: -Infinity, to: null }]
+    }
+    const specs: SegmentSpec[] = []
+    const first = markers[0]
+    if (first.pos > 0) {
+        specs.push({
+            key: 'seg:pre',
+            title: '开场',
+            rangeText: `0s ~ ${secondsText(first.seconds)}`,
+            from: -Infinity,
+            to: first.pos
+        })
+    }
+    for (let i = 0; i < markers.length; i++) {
+        const marker = markers[i]
+        const next = markers[i + 1]
+        specs.push({
+            key: `seg:${marker.refLineId}`,
+            title: marker.name,
+            rangeText: `${secondsText(marker.seconds)} ~ ${next ? secondsText(next.seconds) : '结束'}`,
+            from: marker.pos,
+            to: next ? next.pos : null
+        })
+    }
+    return specs
+}
+
+/**
+ * @desc 标出「选中口径的连续行段」的段首 / 段尾：相邻行都属于选中来源才算连续，
+ * 中间夹了别来源的行就断开 → 新段。模板据此在段首上方、段尾下方各画一条主题色分割线。
+ * （就地写回 `rows`，因为行对象是同一次构建里刚 push 的临时对象。）
+ */
+const markSelectedRuns = (rows: RowData[]): void => {
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        row.runStart = row.editable && rows[i - 1]?.editable !== true
+        row.runEnd = row.editable && rows[i + 1]?.editable !== true
+    }
+}
+
+/**
+ * @desc 分段平铺的整表构建：
+ * - **行** = 全部伤害条目（按时间轴位置升序，位置相同保持原顺序），按段规格切进不同的表；
+ * - **列** = 选中来源「能吃到的 Buff」的并集（`hardOk` 并集；列序与分类平铺同一份 columns 一致）；
+ * - **可编辑** = 条目属于选中来源；其余行只显示首列伤害信息（模板里 `row.editable` 为 false → 首列灰化、右侧绝对留白）；
+ * - **连续行段** = 相邻行都属于选中来源；段首 `runStart` / 段尾 `runEnd` 由模板画主题色分割线；
+ * - **空段不建表** = 一条伤害都没有落进去的时段整张表丢掉（只剩表头的表是纯噪音）。
+ */
+export const buildSegmentedTables = (args: {
+    specs: readonly SegmentSpec[]
+    damageEntries: readonly DamageEntry[]
+    /** @desc 条目 → 时间轴位置（px） */
+    posOf: (entry: DamageEntry) => number
+    charToIdx: Record<string, number>
+    /** @desc 选中来源的页签 key（null = 还没得选 → 全部行不可编辑） */
+    activeSource: string | null
+    columns: readonly BuffConf[]
+    folderGroupOf: ReadonlyMap<string, FolderGroup>
+    stateFor: (bs: BuffConf, entry: DamageEntry, charIdx: number) => CellState
+    /** @desc Buff 级门槛判定（隐藏不达门槛列时才需要，依赖勾选） */
+    rulesMetFor?: (bs: BuffConf, entry: DamageEntry) => boolean
+    /** @desc 是否隐藏「不达门槛」的列（全局偏好） */
+    hideUnmetColumns?: boolean
+}): CalcTable[] => {
+    const { specs, damageEntries, posOf, charToIdx, activeSource, columns: cols } = args
+    const ordered = damageEntries
+        .map((entry, idx) => ({ entry, idx, pos: posOf(entry) }))
+        .sort((a, b) => (a.pos === b.pos ? a.idx - b.idx : a.pos - b.pos))
+    const editableOf = (entry: DamageEntry): boolean =>
+        activeSource !== null && entrySourceKeyOf(charToIdx, entry) === activeSource
+
+    /** @desc 选中来源「真正可用」的 Buff 列 = 该来源各行 `hardOk`（+ 门槛，若开启隐藏）的并集 */
+    const enabledCounts: number[] = cols.map(() => 0)
+    for (const { entry } of ordered) {
+        if (!editableOf(entry)) continue
+        const charIdx = entryCharIdx(entry, charToIdx)
+        for (let ci = 0; ci < cols.length; ci++) {
+            const state = args.stateFor(cols[ci], entry, charIdx)
+            if (columnCounted(args, cols[ci], entry, state)) enabledCounts[ci]++
+        }
+    }
+    const visibleColIdx = cols.map((_, ci) => ci).filter((ci) => enabledCounts[ci] > 0)
+    const { headerGroups, headerCols, hasFolder } = buildHeaderOf({
+        columns: cols,
+        visibleColIdx,
+        enabledCounts,
+        folderGroupOf: args.folderGroupOf
+    })
+
+    const tables: CalcTable[] = specs.map((spec) => ({
+        key: spec.key,
+        title: spec.title,
+        subtitle: spec.rangeText,
+        element: '',
+        rows: [],
+        enabledCounts,
+        visibleColIdx,
+        hasFolder,
+        headerGroups,
+        headerCols
+    }))
+    const tableBySpec = new Map(tables.map((table, i) => [specs[i].key, table]))
+
+    for (const { entry, pos } of ordered) {
+        const spec = specs.find((s) => pos >= s.from && (s.to === null || pos < s.to)) ?? specs[specs.length - 1]
+        const table = tableBySpec.get(spec.key)
+        if (!table) continue
+        const editable = editableOf(entry)
+        const charIdx = entryCharIdx(entry, charToIdx)
+        const cells: CellData[] = editable
+            ? cols.map((bs) => {
+                  const state = args.stateFor(bs, entry, charIdx)
+                  return { buffId: bs.id, enabled: !state.blocked, hardOk: state.hardOk, pane: false }
+              })
+            : []
+        table.rows.push({
+            entry,
+            cells,
+            enabledBuffIds: cells.filter((cell) => cell.enabled).map((cell) => cell.buffId),
+            runStart: false,
+            runEnd: false,
+            editable
+        })
+    }
+
+    for (const table of tables) markSelectedRuns(table.rows)
+
+    // 该时段一条伤害都没有 → 整张表不渲染（空表只剩表头，纯噪音）
+    return tables.filter((table) => table.rows.length > 0)
+}

@@ -109,10 +109,10 @@ export const relockAllPhases = async (): Promise<void> => {
  */
 export const bootstrapRouteStores = async (): Promise<void> => {
     hideSplash()
-    // 首次进入：拉表默认平铺模式；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
+    // 首次进入：拉表默认分类平铺；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
     // 静默从工坊同步「标准词条集」（不再弹「同步工坊数据」弹窗；Buff 集不自动同步，由用户自行同步）
     if (isFirstVisit()) {
-        setCalcViewMode('spread')
+        setCalcViewMode('categorized')
         // AI 助手默认隐藏（**持久化**保存：用户可在设置里重新开启）
         void loadGenPrefs().then(() => updateGenPrefs({ enabled: false }))
         void applyFirstRunAppearance()

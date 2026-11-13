@@ -13,9 +13,10 @@ import assert from 'node:assert/strict'
 
 import {
     buildDamageTypesByEntry,
-    buffMatchesEntry,
+    buffZonesConditionOk,
     buffRelevantForNonDirect,
     buffUsableByEntry,
+    cellBlockReasonOf,
     zoneUsableByNonDirect
 } from '$lib/components/page/home/calculation/damage-table.utils'
 import { buffContributesToEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
@@ -70,16 +71,11 @@ const condZone = (zoneId: BuffZoneValue['zoneId'], value: number, condition: Buf
 
 const buff = (zones: BuffZoneValue[]): BuffInstance => ({ id: 'b1', name: '测试buff', zones, scope: 'all' })
 
-/** @desc 引擎的乘区条件上下文（`computeAll` 的 `zoneCtx` 就是这两项）+ 拉表的条件过滤，两侧一起比 */
+/** @desc 引擎的乘区条件上下文（`computeAll` 的 `zoneCtx` 就是这两项）+ 拉表的条件判定，两侧一起比 */
 const conditionAgrees = (bs: BuffInstance, entry: DamageEntry): { ui: boolean; engine: boolean } => {
     const damageTypes = buildDamageTypesByEntry([entry], {}, {}, {}).get(entry.id)
     return {
-        ui: buffMatchesEntry(bs, entry, {
-            hideConditionMismatch: true,
-            conditionProfile: DEFAULT_CONDITION_PROFILE,
-            damageTypes,
-            charIdx: -1
-        }),
+        ui: buffZonesConditionOk(bs, entry, damageTypes, DEFAULT_CONDITION_PROFILE),
         engine: buffContributesToEntry(
             bs,
             { element: entry.damageElement, damageTypes: damageTypes ?? [] },
@@ -184,5 +180,34 @@ describe('非直伤条目也要带条目上下文判乘区条件（含属性/类
         assert.deepEqual(map.get('eff'), ['效应伤害'], '效应结算 → 效应伤害')
         assert.deepEqual(map.get('tune'), ['其它类型伤害'], '处决 → 推断类型')
         assert.deepEqual(map.get('direct'), ['普攻伤害'], '直伤按技能类型兜底')
+    })
+})
+
+// ────────────────────────── 单元格状态：不可勾的原因（灰色禁止图标） ──────────────────────────
+
+describe('cellBlockReasonOf：不可勾的原因分层', () => {
+    const profile = DEFAULT_CONDITION_PROFILE
+    const conductiveZone = (): BuffZoneValue => ({
+        zoneId: 'bonusDmg',
+        value: 10,
+        condition: { elements: ['导电'] }
+    })
+
+    it('作用域不覆盖 → scope（硬门槛，整列也不保留）', () => {
+        const bs: BuffInstance = { ...buff([zone('bonusDmg', 10)]), scope: [1] }
+        assert.equal(cellBlockReasonOf(bs, directEntry, 0, ['普攻伤害'], profile), 'scope')
+    })
+
+    it('非直伤吃不到该乘区 → zone（硬门槛）', () => {
+        assert.equal(cellBlockReasonOf(buff([zone('bonusDmg', 10)]), effectEntry, -1, ['效应伤害'], profile), 'zone')
+    })
+
+    it('伤害属性/类型条件对不上 → condition（软条件：列保留、单格灰禁）', () => {
+        assert.equal(cellBlockReasonOf(buff([conductiveZone()]), directEntry, 0, ['普攻伤害'], profile), 'condition')
+    })
+
+    it('属性对得上 → 可勾（null）', () => {
+        const electroEntry: DamageEntry = { ...directEntry, damageElement: '导电' }
+        assert.equal(cellBlockReasonOf(buff([conductiveZone()]), electroEntry, 0, ['普攻伤害'], profile), null)
     })
 })

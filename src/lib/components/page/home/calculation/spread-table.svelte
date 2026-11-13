@@ -1,36 +1,41 @@
 <script lang="ts">
-    /** @desc 铺开表（拉表铺开模式）：按角色×直伤/非直伤分组，Buff 作列、条目作行，支持单元格/行列头三态勾选、框选批量、叠层文件夹列线区分
+    /** @desc 拉表平铺视图（同一组件两种模式）：分类平铺 = 按角色×直伤/非直伤分组、Buff 作列、条目作行（同源两条倍率之间夹了别的来源 → 行间画主题色分割线）；分段平铺 = 按时间记点切段、所有伤害按顺序列出（非选中来源的行首列灰化、右侧留白，选中来源的连续行段首尾画主题色分割线）。支持单元格三态勾选 / 灰色禁止 / 空心圆门槛提示、框选批量、叠层文件夹列线区分
      *  性能约定：
      *  1) 结构化数据（可用性/表头/列分隔）与勾选状态分离——点单元格不再重建整表结构；
-     *  2) 列表底色走区域系统 card（data-sf-flat，无毛玻璃）；吸顶表头为 toolbar 叠 card 底并取卡片毛玻璃（数量只与列数相关）；
-     *  3) 高亮只给目标行/列上主题色，不压暗其它行列（无遮罩测量、无逐行 opacity 合成层）；
+     *  2) 列表底色走区域系统 card（data-sf-flat，无毛玻璃）；吸顶表头（toolbar 叠 card 底）与首列行头（card 毛玻璃）保留模糊，
+     *     这样铺开表的首列不会把壁纸直接漏出来（模糊元素数量只与列数/行数同阶）；
+     *  3) 高亮只给目标行/列上主题色，不压暗其它行列（无遮罩测量、无逐行 opacity 合成层），也不再替换单元格图标；
      *  4) 渐进渲染按结构指纹重置，并以切片方式分帧揭示；
      *  5) 表格宽度由表头内容决定（不再测宽等宽、不再补填充列）；
      *  6) 顶部「伤害源」切换按角色过滤要渲染的子表，从根上减少一次挂载的行/格数量。 */
     import { onMount, onDestroy } from 'svelte'
-    import { fade, slide } from 'svelte/transition'
     import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+    import type { WeaponInfo } from '$lib/api/types'
+    import { getWeaponInfo } from '$lib/api/data-cache'
     import { buffLeafName } from '$lib/calc/buff-name'
     import type { CharSlot } from '$lib/types/project'
-    import type { ConditionProfile } from '$lib/calc/compute'
+    import type { ConditionProfile, RuleEvalDeps } from '$lib/calc/compute'
+    import type { PaneEffectSource } from '$lib/calc/pane-effects'
+    import { createEntryRuleMatcher } from '$lib/calc/compute'
     import {
         applyIdsSelection,
         buildCharToIdx,
         buildDamageTypesByEntry,
         buildInferredDamageTypeMap,
-        buffMatchesEntry,
-        buffScopeOk,
-        buffUsableByEntry,
+        cellBlockReasonOf,
         damageTypeShort,
         inferredDamageTypeText,
         paneSourceText
     } from './damage-table.utils'
     import {
+        buildCategorizedTable,
+        buildSegmentedTables,
+        buildSegmentMarkers,
+        buildSegmentSpecs,
         buildSelectionStats,
         buildSourceTabs,
-        buildSpreadTable,
-        collectShownGlobalBuffs,
         columnHeadTitle,
+        groupEntriesBySource,
         headColumnWidthPx,
         HEAD_BAND_LINES,
         HEAD_BAND_TRACKING_PX,
@@ -39,35 +44,35 @@
         resolveActiveSource,
         rowFingerprintOf,
         rowHeadTitle,
-        shownGroupIdxOf,
         visibleRowsOf,
-        NONE_SOURCE_KEY,
-        type CellData,
-        type GroupData,
-        type RowData
+        type CalcTable,
+        type CellState,
+        type RowData,
+        type SourceEntryGroup
     } from './spread-table.utils'
     import { getCalcElementMap, getPaneEffectSources, getBuffTree } from '$lib/calc/calculation.store.svelte'
+    import { getConfig } from '$lib/calc/config.store.svelte'
+    import { getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
     import { storedColumnLayout } from '$lib/calc/buff-tree-state'
     import { elementColor, getCharIconMap } from '$lib/calc/timeline.store.svelte'
     import {
-        getGlobalBuffCollapsed,
+        getHeaderCompact,
         getScrollAxisDefault,
-        setGlobalBuffCollapsed,
-        setScrollAxisDefault
+        getShowUnmetColumns,
+        setScrollAxisDefault,
+        type CalcViewMode
     } from '$lib/data/calc-view.svelte'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
     import { fallbackIcon } from '$lib/utils/icons'
-    import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
-    import { getActiveId } from '$lib/data/project.svelte'
+    import { getActiveId, getActiveProject } from '$lib/data/project.svelte'
     import { attachSessionScroll, readSessionScroll, readSessionTab, writeSessionTab } from '$lib/data/view-session'
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import ContextMenu from '$lib/components/layout/context-menu.svelte'
-    import Chip from '$lib/components/ui/chip.svelte'
     import Tag from '$lib/components/ui/tag.svelte'
     import EmptyState from '$lib/components/ui/empty-state.svelte'
 
@@ -77,9 +82,9 @@
         buffSets: BuffConf[]
         entryBuffSetIdMap: Record<string, string[]>
         entryDamageTypeMap: Record<string, string[]>
-        globalBuffSetIds: string[]
         conditionProfile: ConditionProfile
-        hideConditionMismatch: boolean
+        /** @desc 视图模式：分类平铺 / 分段平铺（同一张组件，靠它切换结构） */
+        mode: CalcViewMode
         ontoggle: (entryId: string, buffId: string) => void
         onSetEntryBuffSetIds: (entryId: string, ids: string[]) => void
         onSetEntriesBuffSetIds?: (map: Record<string, string[]>) => void
@@ -91,9 +96,8 @@
         buffSets,
         entryBuffSetIdMap,
         entryDamageTypeMap,
-        globalBuffSetIds,
         conditionProfile,
-        hideConditionMismatch,
+        mode,
         ontoggle,
         onSetEntryBuffSetIds,
         onSetEntriesBuffSetIds,
@@ -105,7 +109,6 @@
     const columnLayout = $derived(storedColumnLayout(getBuffTree(), buffSets))
     const columns = $derived(columnLayout.columns)
     const columnPaths = $derived(columnLayout.paths)
-    const globalBuffs = $derived(buffSets.filter((b) => globalBuffSetIds.includes(b.id)))
 
     /** @desc 列 id → 全局列序索引（勾选统计用，避免每格线性查找） */
     const colIndexById = $derived.by(() => new Map(columns.map((c, i) => [c.id, i] as const)))
@@ -116,7 +119,7 @@
     const pathAt = (ci: number): string[] => columnPaths.get(columns[ci]?.id ?? '') ?? [columns[ci]?.name ?? '']
 
     /** @desc 顶级文件夹边界=实线；次级文件夹边界=虚线；同文件夹内/根 Buff 间=常规线 */
-    const sepClassAt = (group: GroupData, colPos: number): string => {
+    const sepClassAt = (group: CalcTable, colPos: number): string => {
         const ci = group.visibleColIdx[colPos]
         const nextCi = group.visibleColIdx[colPos + 1]
         if (ci === undefined || nextCi === undefined) return ''
@@ -134,6 +137,10 @@
 
     /** @desc 表头层数 = 最深路径长度（根 Buff=1、一级文件夹=2、二级文件夹=3） */
     const headerDepth = $derived(Math.max(1, ...columns.map((column) => columnPaths.get(column.id)?.length ?? 1)))
+    /** @desc 表头是否简略（全局偏好）：简略 = 隐藏首行/次行（文件夹横条），只保留列名行 */
+    const headerCompact = $derived(getHeaderCompact())
+    /** @desc 当前有效表头层数：简略时恒为 1（角格 rowspan / 吸顶偏移都按它算） */
+    const effectiveDepth = $derived(headerCompact ? 1 : headerDepth)
 
     interface HeaderBandCell {
         key: string
@@ -146,7 +153,8 @@
     }
 
     /** @desc 顶级/中层表头按路径前缀合并为 colspan；根 Buff 的上级留空 */
-    const headerBandsOf = (group: GroupData): HeaderBandCell[][] => {
+    const headerBandsOf = (group: CalcTable): HeaderBandCell[][] => {
+        if (headerCompact) return []
         const bands = headerDepth - 1
         if (bands <= 0) return []
         const paths = group.visibleColIdx.map((ci) => pathAt(ci))
@@ -193,7 +201,7 @@
      * 于是长文案靠**列变宽**而不是靠无限折行消化（口径与常量见 `spread-table.utils` 的 `headColumnWidthPx`）。
      * 横条带 `tracking-[0.1em]`：字距必须一起算进去，否则宽度算少一截，长文案会正好多折一行。
      */
-    const columnWidthsOf = (group: GroupData, bands: readonly HeaderBandCell[][]): number[] => {
+    const columnWidthsOf = (group: CalcTable, bands: readonly HeaderBandCell[][]): number[] => {
         const widths = group.visibleColIdx.map((ci, colPos) => {
             const hc = group.headerCols[colPos]
             const label = hc ? buffLeafName(columns[ci]?.name ?? hc.label) : ''
@@ -217,6 +225,16 @@
         let total = 0
         for (let k = 0; k < span; k++) total += widths[start + k] ?? HEAD_COL_MIN_PX
         return total
+    }
+
+    /** @desc 一列的分隔线类（列位索引）：一次算好，单元格渲染只查数组 */
+    const columnSepsOf = (table: CalcTable): string[] =>
+        table.visibleColIdx.map((_, colPos) => sepClassAt(table, colPos))
+
+    interface TableLayout {
+        bands: HeaderBandCell[][]
+        widths: number[]
+        seps: string[]
     }
 
     /**
@@ -254,96 +272,127 @@
         }
     })
 
-    /**
-     * @desc 非直伤条目对 buff 的可用性判定：scope 匹配 + 乘区可吃（`buffUsableByEntry`）+
-     * （隐藏条件不匹配时）**该 buff 对本条目仍有贡献**。
-     *
-     * 注意不能用实例级条件代替：属性/类型条件挂在**乘区条目**上（条件分层之后实例级只剩链/阶硬门槛），
-     * 只看实例级会出现「乘区条件不满足、格子却仍可勾选」的 bug。
-     * 判定口径与下拉表共用 `damage-table.utils`（属性 + 解析后伤害类型，非直伤条目同样带上下文）。
-     *
-     * `buffUsableByEntry` 是**乘区级硬门槛**：处决/响应/效应的双暴只有「覆盖」写入生效，
-     * 因此「追加型暴击率/暴击伤害」buff 在这些行上不可勾（勾了也不参与计算）。
-     */
-    const buffEnabledForEntry = (bs: BuffConf, entry: DamageEntry, charIdx: number): boolean =>
-        buffScopeOk(bs, entry.isEffect, charIdx) &&
-        buffUsableByEntry(bs, entry) &&
-        buffMatchesEntry(bs, entry, {
-            hideConditionMismatch,
-            conditionProfile,
-            damageTypes: damageTypesByEntry.get(entry.id),
-            charIdx
+    /** @desc 武器信息（面板类门槛 `zoneCompare` 要用；与技术详情同源，取不到就按无武器算） */
+    let weaponInfoMap = $state<Record<string, WeaponInfo>>({})
+    $effect(() => {
+        const names = team.map((slot) => slot.weapon).filter((name): name is string => !!name)
+        if (names.length === 0) return
+        void Promise.all(names.map((name) => getWeaponInfo(name).catch(() => null))).then((list) => {
+            const map: Record<string, WeaponInfo> = {}
+            names.forEach((name, i) => {
+                const info = list[i]
+                if (info) map[name] = info
+            })
+            weaponInfoMap = map
         })
+    })
+
+    /** @desc 引擎入参（Buff 级门槛求值用：面板 / 敌人类型 / 队伍） */
+    const engineDeps = $derived<RuleEvalDeps>({
+        team,
+        configState: getConfig(),
+        charInfoMap,
+        weaponInfoMap,
+        ...(getConfig().enemy?.type ? { enemyType: getConfig().enemy.type } : {})
+    })
 
     /**
-     * @desc 可用性结果缓存：(entryId, buffId) → enabled，避免每次重建都全量重跑贡献判定。
+     * @desc **与勾选无关**的单元格结构判定（`cellBlockReasonOf`）：
+     * 硬门槛（作用域 / 乘区）决定列是否保留；软条件（伤害属性/类型）只让该格变灰禁。
      *
-     * 缓存与上下文都挂在**组件实例**上（Svelte 的普通 `<script>` 是实例作用域，不是模块作用域）：
-     * 模块级会让缓存跨实例/跨工程存活，而这里的作废判据是「引用是否变化」，
-     * 一旦条目被就地改写（引用不变）就会拿到过期结果，故刻意保持实例级。
-     *
-     * 上下文（含**条目清单本身**的引用）未变时复用；任一项变了即整体作废。
-     * 把条目清单也纳入上下文，是为了让缓存不会跨工程串味——不同工程可能撞出
-     * 相同的 entry.id/buffId，仅比条件档位/角色信息是不足以判定结果仍然有效的。
+     * 缓存只有「与勾选无关」的上下文 → **点单元格不会重建整表结构**（这是交互流畅的关键）。
+     * 缓存挂在组件实例上（普通 `<script>` 是实例作用域），上下文引用变化即整体作废。
      */
-    let _enabledCache = new Map<string, boolean>()
-    let _enabledCacheCtx: {
-        hide: boolean
-        profile: ConditionProfile | null
-        types: Record<string, string[]> | null
-        chars: Record<string, number> | null
-        infos: Record<string, unknown> | null
-        echoes: Record<string, string> | null
-        entries: DamageEntry[] | null
-    } = { hide: false, profile: null, types: null, chars: null, infos: null, echoes: null, entries: null }
+    /** @desc 结构判定上下文（与勾选无关）：`$derived` 引用比较，逐格 O(1) 且不分配对象 */
+    const stateCtx = $derived({
+        profile: conditionProfile,
+        types: entryDamageTypeMap,
+        chars: charToIdx,
+        infos: charInfoMap,
+        echoes: echoDescByEntry,
+        entries: damageEntries
+    })
+    let _stateCache = new Map<string, CellState>()
+    let _stateCtxRef: typeof stateCtx | null = null
 
-    function buffEnabledForEntryCached(bs: BuffConf, entry: DamageEntry, charIdx: number): boolean {
-        const ctx = {
-            hide: hideConditionMismatch,
-            profile: conditionProfile,
-            types: entryDamageTypeMap,
-            chars: charToIdx,
-            infos: charInfoMap,
-            echoes: echoDescByEntry,
-            entries: damageEntries
-        }
-        if (
-            ctx.hide !== _enabledCacheCtx.hide ||
-            ctx.profile !== _enabledCacheCtx.profile ||
-            ctx.types !== _enabledCacheCtx.types ||
-            ctx.chars !== _enabledCacheCtx.chars ||
-            ctx.infos !== _enabledCacheCtx.infos ||
-            ctx.echoes !== _enabledCacheCtx.echoes ||
-            ctx.entries !== _enabledCacheCtx.entries
-        ) {
-            _enabledCacheCtx = ctx
-            _enabledCache.clear()
+    function cellStateOf(bs: BuffConf, entry: DamageEntry, charIdx: number): CellState {
+        if (_stateCtxRef !== stateCtx) {
+            _stateCtxRef = stateCtx
+            _stateCache.clear()
         }
         const key = entry.id + '\u0000' + bs.id
-        let v = _enabledCache.get(key)
-        if (v === undefined) {
-            v = buffEnabledForEntry(bs, entry, charIdx)
-            _enabledCache.set(key, v)
+        const cached = _stateCache.get(key)
+        if (cached) return cached
+        const reason = cellBlockReasonOf(bs, entry, charIdx, damageTypesByEntry.get(entry.id), conditionProfile)
+        // 硬门槛不过（scope/zone）→ 列不保留；软条件不过（condition）→ 列保留、只是这格灰禁
+        const state: CellState = { blocked: reason !== null, hardOk: reason === null || reason === 'condition' }
+        _stateCache.set(key, state)
+        return state
+    }
+
+    /**
+     * @desc Buff 级门槛（链/阶/面板/伤害名/敌人类型/Buff 依赖）是否满足 —— **依赖勾选**（面板与生效集合随绑定变化），
+     * 所以只在**渲染时**按可见格现算，不写进表结构；开启「隐藏不达门槛列」时才在构建期参与选列。
+     *
+     * 判定器按条目装配一次（`createEntryRuleMatcher`）再逐 Buff 调用：一条行有上百列，逐格重建面板会把整表拖垮。
+     */
+    /** @desc 门槛判定上下文（依赖勾选）：`$derived` 引用比较，渲染热路径 O(1) */
+    const rulesCtx = $derived({
+        profile: conditionProfile,
+        deps: engineDeps,
+        bindings: entryBuffSetIdMap,
+        buffs: buffSets,
+        entries: damageEntries
+    })
+    let _rulesCache = new Map<string, boolean>()
+    let _rulesCtxRef: typeof rulesCtx | null = null
+    let _matchers = new Map<string, (buff: BuffConf) => boolean>()
+
+    function rulesMetOf(bs: BuffConf, entry: DamageEntry): boolean {
+        if ((bs.rules?.length ?? 0) === 0) return true
+        if (_rulesCtxRef !== rulesCtx) {
+            _rulesCtxRef = rulesCtx
+            _rulesCache.clear()
+            _matchers = new Map()
         }
-        return v
+        const key = entry.id + '\u0000' + bs.id
+        const cached = _rulesCache.get(key)
+        if (cached !== undefined) return cached
+        let matcher = _matchers.get(entry.id)
+        if (!matcher) {
+            const boundIds = new Set(entryBuffSetIdMap[entry.id] ?? [])
+            const bound = buffSets.filter((buff) => boundIds.has(buff.id))
+            matcher = createEntryRuleMatcher({
+                entry,
+                boundBuffs: bound,
+                profile: conditionProfile,
+                deps: engineDeps
+            })
+            _matchers.set(entry.id, matcher)
+        }
+        const met = matcher(bs)
+        _rulesCache.set(key, met)
+        return met
     }
 
     const EMPTY_IDS: string[] = []
+    /** @desc 是否隐藏「不达门槛」的 Buff 列（全局偏好；关闭时结构完全不依赖勾选，交互最顺） */
+    const hideUnmetColumns = $derived(!getShowUnmetColumns())
 
-    /** @desc 预计算整表「结构」数据：单元格可用性、表头标签/分隔线、行统计一次算好；勾选态不参与，故点单元格不重建整表 */
-    const tableData = $derived.by(() =>
-        buildSpreadTable({
-            columns,
-            damageEntries,
-            charToIdx,
-            globalBuffs,
-            team,
-            folderGroupOf,
-            // 可用性判定走组件实例上的缓存（见 buffEnabledForEntryCached），影响源查询仍是 store 的按需查询
-            enabledFor: buffEnabledForEntryCached,
-            paneSourcesOf: getPaneEffectSources
-        })
-    )
+    /**
+     * @desc 影响源查询的**按条目缓存**：`paneEffectSourcesOf` 要对「本段已绑定的引用」×「全量 Buff」做嵌套扫描
+     * （实测 190 条 × 139 Buff ≈ 10ms），而勾选一次只有一条条目的绑定真的变了。
+     * 用「该条目的绑定数组引用」作缓存键 → 只有被改的那一条重算，其余直接命中。
+     */
+    let _paneCache = new Map<string, { bound: readonly string[]; value: Record<string, PaneEffectSource> }>()
+    const paneSourcesOf = (entryId: string): Record<string, PaneEffectSource> => {
+        const bound = entryBuffSetIdMap[entryId] ?? EMPTY_IDS
+        const hit = _paneCache.get(entryId)
+        if (hit && hit.bound === bound) return hit.value
+        const value = getPaneEffectSources(entryId)
+        _paneCache.set(entryId, { bound, value })
+        return value
+    }
 
     /**
      * @desc 影响源提示文案：该列 Buff 作用于「被本组某段伤害引用的角色」，会改写那个角色的面板乘区。
@@ -352,27 +401,97 @@
     const paneSourceTooltip = (src: { charName: string; zoneLabels: string[] }): string =>
         paneSourceText(src.charName, src.zoneLabels, '本组的伤害')
 
-    /** @desc 勾选统计（已选数）：按「已绑定的 (条目, buff) 对」增量累加——成本 O(已绑定数)，而非 O(行×列) */
-    const selStats = $derived(buildSelectionStats(tableData, entryBuffSetIdMap, colIndexById))
-
     /** @desc 视角记忆所属工程：本组件随工程切换重挂载（+page 的 `{#key activeProject.id}`），取挂载时的活动工程即可 */
     const sessionProjectId = getActiveId()
 
-    /** @desc ── 伤害源切换（主内容区顶部）：按角色过滤要渲染的子表，减少一次要挂载的行/格（大表卡顿从根上缓解）；
-     *  UI 对齐「词条/环境配置」的角色页签；只影响显示哪些子表，不改任何勾选数据。
+    /** @desc ── 伤害源切换（主内容区顶部）：一次只选一个来源；只影响显示/可编辑范围，不改任何勾选数据。
      *  初值取本工程上次看的页签（会话记忆，见 `$lib/data/view-session`）── */
     let sourceKey = $state<string | null>(readSessionTab(sessionProjectId, 'calculation'))
     const charIconMap = $derived(getCharIconMap())
 
-    /** @desc 页签固定为「角色1 / 角色2 / 角色3 / 其它」四个队伍维度（不做「全部」——全部子表同时渲染最卡） */
-    const sourceTabs = $derived(buildSourceTabs({ team, tableData, charToIdx, elementColorOf: elementColor }))
-    /** @desc 生效的页签：未手动选择（或所选页签已不存在）时取第一个有子表的页签 */
+    /** @desc 页签 = 角色×(直伤/非直伤) + 其它；空表页签不出现（计数直接来自条目分组，不必先建表） */
+    const sourceGroups = $derived<SourceEntryGroup[]>(groupEntriesBySource(damageEntries, charToIdx))
+    /** @desc 条目 → 全量伤害序列下标（分类平铺判定「不连续」：两个同源倍率之间夹了别的来源） */
+    const entryOrderMap = $derived.by(() => {
+        const map = new Map<string, number>()
+        damageEntries.forEach((entry, i) => map.set(entry.id, i))
+        return map
+    })
+    const sourceTabs = $derived(buildSourceTabs({ team, groups: sourceGroups, elementColorOf: elementColor }))
+    /** @desc 生效的页签：未手动选择（或所选页签已消失）时取第一个页签 */
     const activeSource = $derived(resolveActiveSource(sourceKey, sourceTabs))
-    /** @desc 要渲染的子表下标：始终是 tableData 的原始下标——data-group / 框选 / 高亮 / 右键全选语义不变 */
-    const shownGroupIdx = $derived(shownGroupIdxOf(tableData, activeSource, charToIdx))
+    /** @desc 分类平铺：**只为选中来源建这一张表**（全量建其它来源纯属浪费） */
+    const categorizedTables = $derived<CalcTable[]>(
+        mode !== 'categorized'
+            ? []
+            : (() => {
+                  const group = sourceGroups.find((g) => g.key === activeSource)
+                  if (!group) return []
+                  return [
+                      buildCategorizedTable(
+                          {
+                              columns,
+                              charToIdx,
+                              team,
+                              folderGroupOf,
+                              stateFor: cellStateOf,
+                              ...(hideUnmetColumns ? { rulesMetFor: rulesMetOf, hideUnmetColumns } : {}),
+                              paneSourcesOf,
+                              orderIndexOf: (id) => entryOrderMap.get(id) ?? -1
+                          },
+                          group
+                      )
+                  ]
+              })()
+    )
 
-    /** @desc 顶部「全局 BUFF」条：当前页签涉及的子表里能吃到该全局 buff 的并集（去重，保持出现顺序） */
-    const shownGlobalBuffs = $derived(collectShownGlobalBuffs(tableData, shownGroupIdx))
+    /** @desc 条目 → 时间轴位置（分段平铺切段用；来源块可能是操作块也可能是参考线） */
+    const blockPosMap = $derived.by(() => {
+        const map = new Map<string, number>()
+        for (const block of getOpBlocks()) map.set(block.id, block.pos)
+        for (const line of getRefLines()) map.set(line.id, line.pos)
+        return map
+    })
+    /** @desc 分割标记 = 有记点的参考线（`analysis.timings` 里 seconds 非空的那些） */
+    const segmentMarkers = $derived(buildSegmentMarkers(getActiveProject()?.analysis?.timings ?? [], getRefLines()))
+    const segmentSpecs = $derived(buildSegmentSpecs(segmentMarkers))
+
+    /** @desc 分段平铺：每段一张表，行 = 全部伤害（非选中来源的行只显示首列，右侧留白） */
+    const segmentedTables = $derived(
+        mode === 'segmented'
+            ? buildSegmentedTables({
+                  specs: segmentSpecs,
+                  damageEntries,
+                  posOf: (entry) => blockPosMap.get(entry.sourceTimelineBlockId) ?? 0,
+                  charToIdx,
+                  activeSource,
+                  columns,
+                  folderGroupOf,
+                  stateFor: cellStateOf,
+                  ...(hideUnmetColumns ? { rulesMetFor: rulesMetOf, hideUnmetColumns } : {})
+              })
+            : []
+    )
+
+    /** @desc 要渲染的表：分类平铺 = 选中来源那张；分段平铺 = 每段一张 */
+    const tables = $derived<CalcTable[]>(mode === 'segmented' ? segmentedTables : categorizedTables)
+
+    /**
+     * @desc 每张表的**渲染布局**（表头横条 / 列宽 / 分隔线）一次性算好并缓存。
+     *
+     * 为什么不在模板里现算：模板里的 `{#each}` 会在「渐进渲染揭示新行」「高亮切换」等状态变化时重新求值，
+     * 现算会把 `headerBandsOf` / `columnWidthsOf`（按文字量估算宽度）重复跑上百次。
+     * 这里只依赖表结构 → 行揭示/高亮不再触发这些计算。
+     */
+    const tableLayouts = $derived<TableLayout[]>(
+        tables.map((table) => {
+            const bands = headerBandsOf(table)
+            return { bands, widths: columnWidthsOf(table, bands), seps: columnSepsOf(table) }
+        })
+    )
+
+    /** @desc 勾选统计（已选数）：按「已绑定的 (条目, buff) 对」增量累加——成本 O(已绑定数)，而非 O(行×列) */
+    const selStats = $derived(buildSelectionStats(tables, entryBuffSetIdMap, colIndexById))
 
     const selectSource = (key: string) => {
         sourceKey = key
@@ -381,24 +500,25 @@
         highlight = null
     }
 
-    /** @desc 单击单元格：切换绑定 */
-    function toggleCell(row: RowData, cell: CellData) {
-        ontoggle(row.entry.id, cell.buffId)
+    /** @desc 单击单元格：切换绑定（分段平铺里非选中来源的行不可编辑） */
+    function toggleCell(row: RowData, buffId: string) {
+        if (!row.editable) return
+        ontoggle(row.entry.id, buffId)
     }
 
     /** @desc 行/列全选或全不选（右键菜单触发，取代原行/列头点击三态） */
     function selectRow(row: RowData, all: boolean) {
-        if (row.enabledBuffIds.length === 0) return
+        if (!row.editable || row.enabledBuffIds.length === 0) return
         onSetEntryBuffSetIds(
             row.entry.id,
             applyIdsSelection(entryBuffSetIdMap[row.entry.id] ?? [], row.enabledBuffIds, all)
         )
     }
 
-    function selectColumn(group: GroupData, ci: number, all: boolean) {
+    function selectColumn(group: CalcTable, ci: number, all: boolean) {
         const col = columns[ci]
         for (const r of group.rows) {
-            if (!r.cells[ci].enabled) continue
+            if (!r.editable || !r.cells[ci]?.enabled) continue
             onSetEntryBuffSetIds(r.entry.id, applyIdsSelection(entryBuffSetIdMap[r.entry.id] ?? [], [col.id], all))
         }
     }
@@ -424,9 +544,9 @@
     /** @desc 首列/表头右键菜单（仿 layout/context-menu；items 在触发处构造闭包） */
     let ctxMenu = $state<{ x: number; y: number; items: Array<{ label: string; action: () => void }> } | null>(null)
 
-    function onRowHeaderContextMenu(e: MouseEvent, gi: number, ri: number) {
+    function onRowHeaderContextMenu(e: MouseEvent, ti: number, ri: number) {
         e.preventDefault()
-        const row = tableData[gi]?.rows[ri]
+        const row = tables[ti]?.rows[ri]
         if (!row) return
         ctxMenu = {
             x: e.clientX,
@@ -438,9 +558,9 @@
         }
     }
 
-    function onColHeaderContextMenu(e: MouseEvent, gi: number, ci: number) {
+    function onColHeaderContextMenu(e: MouseEvent, ti: number, ci: number) {
         e.preventDefault()
-        const group = tableData[gi]
+        const group = tables[ti]
         if (!group) return
         ctxMenu = {
             x: e.clientX,
@@ -488,11 +608,11 @@
 
     /** @desc 渐进渲染：首帧不立刻铺满所有行，逐帧新增 chunk 行，避免打开大表/切换工程时单帧阻塞卡顿。
      *  box-select/行列高亮均依赖 data-row/data-col，行分批挂载不影响交互；切片保留原索引，data-row 语义不变。 */
-    const maxGroupRows = $derived(tableData.reduce((m, g) => Math.max(m, g.rows.length), 0))
+    const maxGroupRows = $derived(tables.reduce((m, table) => Math.max(m, table.rows.length), 0))
     const ROW_CHUNK = 24
     let visibleRows = $state(ROW_CHUNK)
     /** @desc 结构指纹（条目集合 + 列集合）：切换工程/队伍后重置分帧进度，避免沿用上一个大表的值而失去分帧保护 */
-    const rowFingerprint = $derived(rowFingerprintOf(damageEntries, tableData))
+    const rowFingerprint = $derived(rowFingerprintOf(tables))
     let lastFingerprint = ''
     $effect(() => {
         const fp = rowFingerprint
@@ -509,22 +629,22 @@
         return () => cancelAnimationFrame(raf)
     })
     /** @desc 已揭示的行（切片而非逐行 {#if} 判断：每帧只处理新增 chunk，且未揭示时复用原数组引用） */
-    const shownRows = (g: GroupData): RowData[] => visibleRowsOf(g.rows, visibleRows)
+    const shownRows = (g: CalcTable): RowData[] => visibleRowsOf(g.rows, visibleRows)
 
     /**
      * @desc 表格滚动位置的会话记忆（切页签/切工程再回来时回到原来的视野，见 `$lib/data/view-session`）。
      *
-     * 位置**按页签分别记**：页签之间行数差别很大，共用一份会被较短页签夹掉。
+     * 位置**按「视图+页签」分别记**：页签之间行数差别很大，共用一份会被较短页签夹掉。
      * 记录与恢复都要让着「渐进渲染」与浏览器的夹取：
      *  - 必须等本页签的行**铺满**（`visibleRows >= activeGroupRows`）再恢复：行是逐帧揭示的，过早写
      *    scrollTop 会被夹到「当前已揭示的高度」，对着还没长高的表设位置只会把记忆里的位置丢掉；
      *  - 恢复落定前**不记录**：切页签时浏览器会把 scrollTop 夹到新内容的高度并补发一次 scroll 事件，
      *    记下来就会把新页签的位置覆盖成「夹后的值」（恰是马上要恢复的那个值）。
      */
-    const spreadSlotOf = (source: string): string => `spread:${source}`
+    const spreadSlotOf = (source: string): string => `spread:${mode}:${source}`
     const spreadScrollKey = (source: string): string => `${source}|${rowFingerprint}`
     /** @desc 当前页签要渲染的行数上限：渐进渲染进度拿它比，不必等别的页签的大表铺完才恢复本页签的位置 */
-    const activeGroupRows = $derived(shownGroupIdx.reduce((m, gi) => Math.max(m, tableData[gi]?.rows.length ?? 0), 0))
+    const activeGroupRows = $derived(tables.reduce((m, table) => Math.max(m, table.rows.length), 0))
     /** @desc 已恢复落定的「页签|结构指纹」（$state：记录下来要让上面的记录 effect 重新挂上监听） */
     let scrollRestoredKey = $state('')
     $effect(() => {
@@ -679,13 +799,6 @@
         }
     }
 
-    /** @desc 全局 BUFF 条展开/收起（偏好持久化在 calc-view 里） */
-    let globalBuffCollapsed = $state(getGlobalBuffCollapsed())
-    const toggleGlobalBuffCollapsed = () => {
-        globalBuffCollapsed = !globalBuffCollapsed
-        setGlobalBuffCollapsed(globalBuffCollapsed)
-    }
-
     /** @desc 方向键滚动：↑↓ 沿「主轴」（默认滚动方向），←→ 沿次轴；Shift 键本身直接切换默认方向 */
     const ARROW_STEP = 60
     function handleArrowKey(e: KeyboardEvent) {
@@ -720,13 +833,13 @@
     /** @desc 应用框选：范围内单元格有已勾选 → 全部取消，否则全部勾选（仅可启用单元格）；
      *  范围由调用方（mouseup）快照传入，不再读交互状态，便于「先隐藏框、延后应用」 */
     function applySelection(gi: number, r0: number, r1: number, c0: number, c1: number) {
-        const group = tableData[gi]
+        const group = tables[gi]
         if (!group) return
         const byRow = new Map<RowData, string[]>()
         let anySelected = false
         for (let ri = r0; ri <= r1; ri++) {
             const row = group.rows[ri]
-            if (!row) continue
+            if (!row?.editable) continue
             const selIds = new Set(entryBuffSetIdMap[row.entry.id] ?? [])
             for (let ci = c0; ci <= c1; ci++) {
                 const cell = row.cells[ci]
@@ -785,10 +898,10 @@
     }}
 />
 
-<!-- @desc 铺开表根容器：顶部伤害源页签（不滚动）+ 下方表格滚动区 -->
+<!-- @desc 平铺表根容器：顶部伤害源页签（不滚动）+ 下方表格滚动区 -->
 <div class="flex h-full flex-col {className}" style={styleProp}>
-    <!-- @desc 伤害源切换：固定「角色1/角色2/角色3/其它」四个队伍维度页签（UI 对齐「词条/环境配置」的角色页签）；
-         不做「全部」——所有子表同时渲染最卡，故一次只看一个伤害源 -->
+    <!-- @desc 伤害源切换：页签 = 每个角色的「直伤」「非直伤」各一个 + 「其它」，空表页签不显示；
+         一次只选一个来源（分类平铺只渲染那张子表，分段平铺只有该来源的行可勾 Buff） -->
     {#if sourceTabs.length > 1}
         <div
             class="flex shrink-0 flex-wrap items-center gap-2 border-b border-(--theme-divider-border) px-3 py-2"
@@ -807,7 +920,7 @@
                         ? `background: color-mix(in srgb, ${tab.element} 18%, transparent); color: ${tab.element};`
                         : ''}
                     onclick={() => selectSource(tab.key)}
-                    title={tab.count > 0 ? `${tab.label}：${tab.count} 张子表` : `${tab.label}：暂无伤害条目`}
+                    title={`${tab.label}：${tab.count} 条伤害`}
                 >
                     {#if tab.char && charIconMap[tab.char]}
                         <img
@@ -816,7 +929,7 @@
                             use:fallbackIcon={'/icons/placeholder-character.svg'}
                             class="size-5 shrink-0 rounded-full"
                         />
-                    {:else if tab.key === NONE_SOURCE_KEY}
+                    {:else if tab.kind === 'other'}
                         <span
                             class="flex size-5 shrink-0 items-center justify-center rounded-full bg-(--theme-modal-text)/10"
                             ><Icon icon="mdi:dots-horizontal" class="size-3.5" /></span
@@ -824,52 +937,12 @@
                     {:else}
                         <span
                             class="flex size-5 shrink-0 items-center justify-center rounded-full bg-(--theme-modal-text)/10 text-[10px]"
-                            >{tab.label.charAt(0)}</span
+                            >{tab.char?.charAt(0) ?? '?'}</span
                         >
                     {/if}
                     <span>{tab.label}</span>
                 </button>
             {/each}
-        </div>
-    {/if}
-    <!-- @desc 全局 BUFF 条：当前伤害源涉及的所有全局 buff 列在表上方，chips 自动换行；可展开/收起（偏好持久化） -->
-    {#if shownGlobalBuffs.length > 0}
-        <div class="flex shrink-0 flex-col border-b border-(--theme-divider-border)" data-sf="toolbar" data-sf-flat>
-            <div class="flex items-center gap-1.5 px-3 py-1.5">
-                <button
-                    onclick={toggleGlobalBuffCollapsed}
-                    class="inline-flex items-center gap-1 rounded-none px-1 py-0.5 text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50 transition-colors hover:text-(--theme-modal-text)"
-                    title={globalBuffCollapsed ? '展开全局 BUFF' : '收起全局 BUFF'}
-                    aria-expanded={!globalBuffCollapsed}
-                >
-                    <Icon
-                        icon={globalBuffCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'}
-                        class="size-3.5 shrink-0"
-                    />
-                    全局 BUFF
-                    <span class="text-(--theme-modal-text)/30">{shownGlobalBuffs.length}</span>
-                </button>
-                {#if globalBuffCollapsed}
-                    <!-- 收起时给一行摘要，知道当前吃到了哪些（超出宽度截断） -->
-                    <span
-                        class="min-w-0 flex-1 truncate text-[10px] text-(--theme-modal-text)/35"
-                        transition:fade={slideParams(MOTION_MS.fast)}
-                        >{shownGlobalBuffs.map((gb) => gb.name).join('、')}</span
-                    >
-                {/if}
-            </div>
-            {#if !globalBuffCollapsed}
-                <div
-                    class="theme-scrollbar flex max-h-28 flex-wrap items-center gap-1 overflow-y-auto px-3 pb-2"
-                    transition:slide|local={slideParams(MOTION_MS.base)}
-                >
-                    {#each shownGlobalBuffs as gb (gb.id)}
-                        <Chip style="background: var(--theme-buff-yellow-bg); color: var(--theme-buff-yellow-text);">
-                            <Icon icon="mdi:crown" class="size-3" />{gb.name}
-                        </Chip>
-                    {/each}
-                </div>
-            {/if}
         </div>
     {/if}
     <!-- @desc 表格滚动容器：横向/纵向滚动 + 框选鼠标事件 + Ctrl 滚轮次轴滚动 + 默认横向时普通滚轮也横滚 -->
@@ -911,22 +984,20 @@
         {/if}
         {#if damageEntries.length === 0}
             <EmptyState size="lg" class="flex items-center justify-center">暂无伤害数据</EmptyState>
-        {:else if shownGroupIdx.length === 0}
+        {:else if tables.length === 0}
             <EmptyState size="lg" class="flex items-center justify-center">该伤害源暂无伤害条目</EmptyState>
         {/if}
-        <!-- @desc 逐组渲染：每个角色×直伤/非直伤一个子表（表宽由表头内容决定）；只渲染当前伤害源页签命中的子表 -->
-        {#each shownGroupIdx as gi (tableData[gi].key)}
-            {@const group = tableData[gi]}
-            {@const charElement = getCalcElementMap()[group.charName] ?? ''}
-            {@const headerBands = headerBandsOf(group)}
-            {@const colWidths = columnWidthsOf(group, headerBands)}
-            <div class="mx-3 my-3.5" data-group-wrap={gi}>
+        <!-- @desc 逐表渲染：分类平铺 = 选中来源那一张；分段平铺 = 每个时间段一张（表宽由表头内容决定） -->
+        {#each tables as table, ti (table.key)}
+            {@const charElement = table.element ? (getCalcElementMap()[table.element] ?? '') : ''}
+            {@const layout = tableLayouts[ti]}
+            <div class="mx-3 my-3.5" data-group-wrap={ti}>
                 <!-- 列表（表体）底色跟随「卡片」透明度/深度；data-sf-flat 只取底色不用毛玻璃（逐格元素避免逐元素重算模糊） -->
                 <table
                     class="w-auto text-xs shadow-(--theme-card-shadow)"
                     data-sf="card"
                     data-sf-flat
-                    data-group-table={gi}
+                    data-group-table={ti}
                     style="--sf-base: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border);"
                 >
                     <!-- 标题块与全局 buff 折叠行放入 caption：宽度自动跟随表头（表格宽度） -->
@@ -940,21 +1011,20 @@
                         >
                             <span
                                 class="text-sm font-black tracking-tight"
-                                style="color: var(--theme-element-{charElement}, #888);"
-                                >{group.charName || '无角色'}</span
+                                style={charElement
+                                    ? `color: var(--theme-element-${charElement}, #888);`
+                                    : 'color: var(--theme-modal-text);'}>{table.title}</span
                             >
-                            <span class="text-xs text-(--theme-modal-text)/60"
-                                >· {group.kind === 'direct' ? '直伤' : '非直伤'}</span
-                            >
-                            <span class="ml-auto text-[10px] text-(--theme-modal-text)/40">{group.rows.length} 条</span>
+                            <span class="text-xs text-(--theme-modal-text)/60">· {table.subtitle}</span>
+                            <span class="ml-auto text-[10px] text-(--theme-modal-text)/40">{table.rows.length} 条</span>
                         </div>
                     </caption>
-                    <!-- 表头：顶级/中层文件夹按路径前缀 colspan 合并，最后一行为每列 Buff 短名 -->
+                    <!-- 表头：顶级/中层文件夹按路径前缀 colspan 合并，最后一行为每列 Buff 短名；简略态跳过文件夹横条 -->
                     <thead>
-                        {#each headerBands as band, rowIdx (rowIdx)}
+                        {#each layout.bands as band, rowIdx (rowIdx)}
                             <tr>
                                 {#if rowIdx === 0}
-                                    {@render entryCorner(headerDepth)}
+                                    {@render entryCorner(effectiveDepth)}
                                 {/if}
                                 {#each band as cell (cell.key)}
                                     <!-- 文件夹横条：固定 3 行高度（`h-12` = 3 × leading-3 12px + py-1 8px = 44px，另留 4px 余量），
@@ -964,7 +1034,7 @@
                                         data-sf-under="card"
                                         class="sticky {headerTopClass(
                                             rowIdx,
-                                            headerDepth
+                                            effectiveDepth
                                         )} z-30 h-12 overflow-hidden border-b border-(--theme-divider-border) p-0 text-center {cell.sepClass}"
                                         style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
                                         colspan={cell.span}
@@ -975,7 +1045,7 @@
                                             <span
                                                 class="line-clamp-3 max-w-full break-words px-1.5 py-1 text-center text-[10px] font-black leading-3 tracking-[0.1em] text-(--theme-modal-text)/70"
                                                 style="max-width: {bandLabelMaxWidth(
-                                                    colWidths,
+                                                    layout.widths,
                                                     cell.start,
                                                     cell.span
                                                 )}px;"
@@ -987,13 +1057,13 @@
                             </tr>
                         {/each}
                         <tr>
-                            {#if headerBands.length === 0}
-                                {@render entryCorner(headerDepth)}
+                            {#if layout.bands.length === 0}
+                                {@render entryCorner(effectiveDepth)}
                             {/if}
-                            {#each group.headerCols as hc, colPos (hc.ci)}
+                            {#each table.headerCols as hc, colPos (hc.ci)}
                                 {@const colHighlighted =
-                                    highlight?.gi === gi && highlight.kind === 'col' && highlight.index === hc.ci}
-                                {@const selCount = selStats.colCounts[gi]?.get(hc.ci) ?? 0}
+                                    highlight?.gi === ti && highlight.kind === 'col' && highlight.index === hc.ci}
+                                {@const selCount = selStats.colCounts[ti]?.get(hc.ci) ?? 0}
                                 {@const headTitle = columnHeadTitle(
                                     hc,
                                     selCount,
@@ -1005,21 +1075,18 @@
                                     data-colhead={hc.ci}
                                     data-sf="toolbar"
                                     data-sf-under="card"
-                                    data-col-w={colWidths[colPos] ?? HEAD_COL_MIN_PX}
+                                    data-col-w={layout.widths[colPos] ?? HEAD_COL_MIN_PX}
                                     class="sticky {headerTopClass(
-                                        headerBands.length,
-                                        headerDepth
-                                    )} z-30 h-8 min-w-[108px] cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-middle {sepClassAt(
-                                        group,
-                                        colPos
-                                    )}"
-                                    style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg); width: {colWidths[
-                                        colPos
-                                    ] ?? HEAD_COL_MIN_PX}px;"
+                                        layout.bands.length,
+                                        effectiveDepth
+                                    )} z-30 h-8 min-w-[108px] cursor-pointer select-none border-b border-(--theme-divider-border) p-0 align-middle {layout
+                                        .seps[colPos] ?? ''}"
+                                    style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg); width: {layout
+                                        .widths[colPos] ?? HEAD_COL_MIN_PX}px;"
                                     class:spread-head-hl={colHighlighted}
                                     title={headTitle}
-                                    onclick={() => clickColHeader(gi, hc.ci)}
-                                    oncontextmenu={(e) => onColHeaderContextMenu(e, gi, hc.ci)}
+                                    onclick={() => clickColHeader(ti, hc.ci)}
+                                    oncontextmenu={(e) => onColHeaderContextMenu(e, ti, hc.ci)}
                                 >
                                     <span
                                         class="relative flex h-full w-full flex-col items-center justify-center px-1.5 py-1 transition-colors hover:bg-(--theme-modal-text)/5 {hc.enabled ===
@@ -1032,7 +1099,7 @@
                                              免得 `max-content` 再把列撑宽；超长仍由 `line-clamp` 收尾（完整名字在 `title` 里）。 -->
                                         <span
                                             class="line-clamp-2 w-full break-words text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
-                                            style="max-width: {(colWidths[colPos] ?? HEAD_COL_MIN_PX) - 12}px;"
+                                            style="max-width: {(layout.widths[colPos] ?? HEAD_COL_MIN_PX) - 12}px;"
                                             title={hc.title}>{buffLeafName(columns[hc.ci]?.name ?? hc.label)}</span
                                         >
                                         {#if hc.paneSource}
@@ -1051,18 +1118,29 @@
                     </thead>
                     <!-- 表体：每行一个伤害条目（行头单击高亮行/右键全选全不选 + 伤害类型编辑），单元格可勾选 -->
                     <tbody>
-                        {#each shownRows(group) as row, ri (row.entry.id)}
+                        {#each shownRows(table) as row, ri (row.entry.id)}
                             {@const rowHighlighted =
-                                highlight?.gi === gi && highlight.kind === 'row' && highlight.index === ri}
-                            {@const colHighlightActive = highlight?.gi === gi && highlight.kind === 'col'}
+                                row.editable &&
+                                highlight?.gi === ti &&
+                                highlight.kind === 'row' &&
+                                highlight.index === ri}
+                            {@const colHighlightActive =
+                                row.editable && highlight?.gi === ti && highlight.kind === 'col'}
                             {@const selIds = entryBuffSetIdMap[row.entry.id] ?? EMPTY_IDS}
-                            <tr class:spread-rowhl-on={rowHighlighted} class:split-row={row.splitBefore}>
+                            {@const selIdSet = new Set(selIds)}
+                            <tr
+                                class:spread-rowhl-on={rowHighlighted}
+                                class:spread-run-start={row.runStart}
+                                class:spread-run-end={row.runEnd}
+                            >
                                 <td
                                     data-press=""
                                     data-rowhead={ri}
                                     data-sf="card"
-                                    data-sf-flat
-                                    class="sticky left-0 z-20 cursor-pointer select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5"
+                                    class="sticky left-0 z-20 select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5 {row.editable
+                                        ? 'cursor-pointer'
+                                        : 'cursor-default'}"
+                                    class:spread-rowhead-muted={!row.editable}
                                     style="--sf-base: var(--theme-modal-bg);"
                                     class:spread-frozen-hl={rowHighlighted}
                                     title={rowHeadTitle(
@@ -1070,14 +1148,15 @@
                                         selStats.rowCounts.get(row.entry.id) ?? 0,
                                         row.enabledBuffIds.length
                                     )}
-                                    onclick={() => clickRowHeader(gi, ri)}
-                                    oncontextmenu={(e) => onRowHeaderContextMenu(e, gi, ri)}
+                                    onclick={() => row.editable && clickRowHeader(ti, ri)}
+                                    oncontextmenu={(e) => row.editable && onRowHeaderContextMenu(e, ti, ri)}
                                 >
                                     <div class="flex w-full items-center gap-1.5 py-0.5 text-left">
                                         <span
                                             class="truncate text-(--theme-modal-text)"
-                                            style="color: var(--theme-element-{row.entry.damageElement}, #888);"
-                                            >{row.entry.displayName}</span
+                                            style="color: {row.editable
+                                                ? `var(--theme-element-${row.entry.damageElement}, #888)`
+                                                : 'var(--theme-modal-text)'};">{row.entry.displayName}</span
                                         >
                                     </div>
                                     <!-- 视为：伤害类型（只读展示，编辑统一在底部工具栏的「编辑伤害类型」弹窗）；stopPropagation 避免触发行高亮 -->
@@ -1103,67 +1182,75 @@
                                         {/if}
                                     </div>
                                 </td>
-                                {#each group.visibleColIdx as ci, colPos (ci)}
+                                {#each table.visibleColIdx as ci, colPos (ci)}
                                     {@const cell = row.cells[ci]}
-                                    {@const head = group.headerCols[colPos]}
+                                    {@const head = table.headerCols[colPos]}
                                     {@const colHighlighted = colHighlightActive && highlight?.index === ci}
-                                    {@const on = selIds.includes(cell.buffId)}
-                                    {@const named = on && (colHighlighted || rowHighlighted)}
-                                    {@const cellTitle =
-                                        cell.pane && head?.paneSource
+                                    {@const on = !!cell && selIdSet.has(cell.buffId)}
+                                    {@const cellTitle = !row.editable
+                                        ? ''
+                                        : !cell?.enabled
+                                          ? `本条目吃不到「${head?.title ?? ''}」（受作用域 / 伤害类型 / 属性条件限制，不可勾选）`
+                                          : cell.pane && head?.paneSource
                                             ? `${paneSourceTooltip(head.paneSource)}\n${on ? '点击取消勾选' : '点击勾选'}`
                                             : on
                                               ? head?.titleOn
                                               : head?.titleOff}
+                                    {@const unmet = !!cell && cell.enabled && !rulesMetOf(columns[ci], row.entry)}
                                     <td
-                                        class="w-[108px] min-w-[108px] border-b border-(--theme-divider-border) p-0 text-center {sepClassAt(
-                                            group,
-                                            colPos
-                                        )}"
+                                        class="w-[108px] min-w-[108px] border-b border-(--theme-divider-border) p-0 text-center {layout
+                                            .seps[colPos] ?? ''}"
                                         class:spread-cell-hl={colHighlighted}
-                                        data-group={gi}
+                                        data-group={ti}
                                         data-row={ri}
                                         data-col={ci}
                                     >
-                                        {#if cell.enabled}
+                                        {#if !row.editable}
+                                            <!-- 分段平铺：非选中来源的行，右侧**绝对留白**（不显示图标/勾选，连禁止图标都不给） -->
+                                            <span class="block h-7 w-full"></span>
+                                        {:else if !cell.enabled}
+                                            <!-- 受作用域 / 伤害类型 / 属性条件限制：灰色禁止图标，且点不动 -->
+                                            <span
+                                                class="flex min-h-7 w-full items-center justify-center px-1 py-1"
+                                                title={cellTitle}
+                                            >
+                                                <Icon
+                                                    icon="mdi:close"
+                                                    class="size-4 shrink-0"
+                                                    style="color: var(--theme-modal-text); opacity: 0.28;"
+                                                />
+                                            </span>
+                                        {:else}
                                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                                             <button
-                                                onclick={() => toggleCell(row, cell)}
+                                                onclick={() => toggleCell(row, cell.buffId)}
                                                 title={cellTitle}
-                                                class="flex min-h-6 w-full cursor-pointer items-center justify-center px-1.5 py-1.5 transition-colors hover:bg-(--theme-modal-text)/10"
+                                                class="flex min-h-7 w-full cursor-pointer items-center justify-center px-1 py-1 transition-colors hover:bg-(--theme-modal-text)/10"
                                             >
-                                                {#if on}
-                                                    <!-- 高亮行/列时改显 buff 名：图标保留挂载仅隐藏，避免切换高亮时反复销毁/创建图标组件；
-                                                     名称宽度上限与表头列宽上限一致，保证出现/消失不改变列 max-content（不触发整表重排） -->
+                                                {#if on && !unmet}
+                                                    <!-- 已勾选 + 达门槛：加粗打勾（图标不再因为行列高亮换成 buff 名，名字看表头即可） -->
                                                     <Icon
-                                                        icon="mdi:check"
-                                                        class="size-3.5 shrink-0"
-                                                        style="color: var(--theme-accent-text);{named
-                                                            ? ' display:none;'
-                                                            : ''}"
+                                                        icon="mdi:check-bold"
+                                                        class="size-5 shrink-0"
+                                                        style="color: var(--theme-accent-text);"
                                                     />
-                                                    {#if named}
-                                                        <!-- 名称宽度上限与表头列宽上限一致（同一份 `colWidths`），
-                                                             叠层子列沿用更窄的 43px：保证名称出现/消失不改变列 max-content（不触发整表重排） -->
-                                                        <span
-                                                            class="w-full line-clamp-2 text-[10px] leading-tight text-(--theme-accent-text)"
-                                                            style="max-width: {head?.isLayer
-                                                                ? 43
-                                                                : (colWidths[colPos] ?? HEAD_COL_MIN_PX) - 12}px;"
-                                                            >{buffLeafName(columns[ci].name)}</span
-                                                        >
-                                                    {/if}
+                                                {:else if unmet}
+                                                    <!-- 未达门槛（Buff 级规则不满足）：已勾选 = 主题色空心圆（放大 1.25 倍），未勾 = 灰色空心圆（保持原尺寸） -->
+                                                    <Icon
+                                                        icon="mdi:circle-outline"
+                                                        class={on ? 'size-5 shrink-0' : 'size-4 shrink-0'}
+                                                        style="color: {on
+                                                            ? 'var(--theme-accent-text)'
+                                                            : 'var(--theme-modal-text)'}; opacity: {on ? 1 : 0.3};"
+                                                    />
                                                 {:else if cell.pane}
                                                     <!-- 影响源（未勾选）：用连接图标提示这是别的角色面板的改写者 -->
                                                     <Icon
                                                         icon="mdi:transit-connection-variant"
-                                                        class="size-3.5 shrink-0 opacity-30"
+                                                        class="size-4 shrink-0 opacity-30"
                                                     />
                                                 {/if}
                                             </button>
-                                        {:else}
-                                            <!-- 不可用（作用域/条件不匹配）不显示文字 -->
-                                            <span class="block h-6 w-full"></span>
                                         {/if}
                                     </td>
                                 {/each}
@@ -1200,7 +1287,8 @@
     .spread-root {
         --spread-hl: color-mix(in srgb, var(--theme-accent-bg) 20%, transparent);
     }
-    /* 底色交给区域系统（data-sf）：列表=card；表头=toolbar 叠 card 底（含卡片毛玻璃）；此处只放高亮/分隔线等叠加效果 */
+    /* 底色交给区域系统（data-sf）：列表=card（表体逐格用 flat）；表头=toolbar 叠 card 底、首列行头=card 毛玻璃；
+       此处只放高亮/分隔线等叠加效果 */
     /* 列间分割线：叠层组与邻接列之间用主题色实线，其余用常规分隔线 */
     .spread-sep {
         border-right: 1px solid var(--theme-divider-border);
@@ -1229,11 +1317,15 @@
     .spread-cell-hl {
         background-color: var(--spread-hl);
     }
-    /* 排轴上「上一个伤害倍率不是当前伤害源引起的」→ 该行上方画加粗提亮的主题色点横线，行头处实线收口，突出这次不连续 */
-    .split-row td {
-        border-top: 2px dashed color-mix(in srgb, var(--theme-accent-bg) 70%, transparent);
+    /* 行间分割线（两种平铺共用）：段首行上方 / 段尾行下方各画一条主题色分割线（整行含吸顶首列） */
+    .spread-run-start td {
+        border-top: 2px solid color-mix(in srgb, var(--theme-accent-bg) 70%, transparent);
     }
-    .split-row td[data-rowhead] {
-        border-top-style: solid;
+    .spread-run-end td {
+        border-bottom: 2px solid color-mix(in srgb, var(--theme-accent-bg) 70%, transparent);
+    }
+    /* 非选中口径的行：首列灰化（文字/伤害类型一起压暗，元素色由模板改成常规文字色） */
+    .spread-rowhead-muted {
+        opacity: 0.4;
     }
 </style>
