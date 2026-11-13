@@ -454,6 +454,16 @@
             class="flex items-center gap-2 text-[11px] {getModalClosePosition() === 'top-left' ? '' : 'ml-auto'}"
             style="color: var(--theme-modal-text); opacity: 0.55;"
         >
+            {#if substatComputing || buffComputing}
+                <!-- 贡献分析在空闲帧/分片里算（不抢开窗动画），这里给出全局提示：任何页签都看得到进度 -->
+                <span class="flex items-center gap-1" title="副词条 / Buff 贡献正在重算">
+                    <span class="inline-flex animate-spin" style="will-change: transform;">
+                        <Icon icon="mdi:loading" class="size-3.5" />
+                    </span>
+                    计算中…
+                </span>
+                <span class="size-1 rounded-full" style="background: var(--theme-divider-border);"></span>
+            {/if}
             {#if totalDur > 0}
                 <span class="tabular-nums tracking-[0.22em]">总时长 {totalDur.toFixed(1)}s</span>
                 <span class="size-1 rounded-full" style="background: var(--theme-divider-border);"></span>

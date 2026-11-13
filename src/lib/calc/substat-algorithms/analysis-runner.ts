@@ -41,14 +41,24 @@ export const runContributionAnalysisAsync = async (
     const parts = options.parts ?? ['substat', 'buff']
     const wantsSubstat = parts.includes('substat')
     const wantsBuff = parts.includes('buff')
-    const session: ContributionAnalysisSession = prepareContributionAnalysis(req)
     const result: ContributionAnalysisResult = { substat: [], buff: [] }
+
+    // 基线（`prepare`）本身也是几十毫秒的同步活，先让一帧再算，调用方刚渲染的「计算中…」才画得出来
+    await yieldFrame()
+    const session: ContributionAnalysisSession = prepareContributionAnalysis(req)
 
     for (let i = 0; i < session.characters.length; i++) {
         await yieldFrame()
-        if (wantsSubstat) result.substat.push(session.analyzeSubstat(i, options.algorithm))
-        if (wantsBuff) result.buff.push(session.analyzeBuff(i))
-        onProgress?.({ substat: [...result.substat], buff: [...result.buff] })
+        if (wantsSubstat) {
+            result.substat.push(session.analyzeSubstat(i, options.algorithm))
+            onProgress?.({ substat: [...result.substat], buff: [...result.buff] })
+        }
+        // 副词条与 Buff 之间再让一帧：两半各算一次同步块减半，界面在中间就能刷出一批结果
+        if (wantsSubstat && wantsBuff) await yieldFrame()
+        if (wantsBuff) {
+            result.buff.push(session.analyzeBuff(i))
+            onProgress?.({ substat: [...result.substat], buff: [...result.buff] })
+        }
     }
     return result
 }

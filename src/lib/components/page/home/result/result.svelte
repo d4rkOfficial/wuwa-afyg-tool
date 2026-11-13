@@ -14,7 +14,8 @@
         getAllDamageEntries,
         getCalcState,
         getConditionProfile,
-        getGlobalBuffSetIds
+        getGlobalBuffSetIds,
+        getTableVersion
     } from '$lib/calc/calculation.store.svelte'
     import { getConfig } from '$lib/calc/config.store.svelte'
     import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$lib/calc/result.types'
@@ -23,6 +24,13 @@
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
     import { runContributionAnalysisAsync } from '$lib/calc/substat-algorithms/analysis-runner'
     import type { ContributionAnalysisRequest } from '$lib/calc/substat-algorithms/analysis'
+    import {
+        analysisNeeded,
+        nextAnalysisCache,
+        type AnalysisCache,
+        type AnalysisInputs,
+        type AnalysisPart
+    } from './analysis/analysis-cache.utils'
     import { tick, untrack, onMount } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
@@ -98,7 +106,7 @@
     })
 
     $effect(() => {
-        if (refreshKey > 0) untrack(() => computeAll())
+        if (refreshKey > 0) untrack(() => refreshAll())
     })
 
     /**
@@ -115,11 +123,11 @@
         if (fp === _entriesFp) return
         _entriesFp = fp
         if (loading) return
-        untrack(() => computeAll())
+        untrack(() => refreshAll())
     })
 
-    // 链/阶档位变化（含从数据分析弹窗打开角色详情配置修改）→ 轻量重算 entries；
-    // 数据分析弹窗打开时同步刷新词条贡献分析；指纹避免挂载期与 loadData 重复计算
+    // 链/阶档位变化（含从数据分析弹窗打开角色详情配置修改）→ 重算表格 + 数据分析（图表 / 贡献）；
+    // 指纹避免挂载期与 loadData 重复计算。`loading` 期间的改动由 `loadData()` 收尾处补算（见 refreshAll）。
     let _profileFp = ''
     $effect(() => {
         const p = getConditionProfile()
@@ -127,10 +135,7 @@
         if (fp === _profileFp) return
         _profileFp = fp
         if (loading) return
-        untrack(() => {
-            computeAll()
-            if (showDataAnalysis) void runAnalysis(['substat', 'buff'])
-        })
+        untrack(() => refreshAll())
     })
 
     async function loadData() {
@@ -167,8 +172,21 @@
         rigCritEntryIds = getActiveProject()?.analysis?.rigCritEntryIds ?? []
         noCritEntryIds = getActiveProject()?.analysis?.noCritEntryIds ?? []
         missEntryIds = getActiveProject()?.analysis?.missEntryIds ?? []
-        computeAll()
         loading = false
+        refreshAll()
+    }
+
+    /**
+     * @desc 重算表格，并在数据分析弹窗打开时一并重跑「图表 + 贡献」的分析结果。
+     *
+     * 所有刷新入口都走这里，是为了堵住一条真实漏刷：链/阶改动会先落回队伍（工程 team），
+     * 结果页 props 随之变化 → `loadData()` 置 `loading`，而指纹类 effect 在 `loading` 期间
+     * 主动跳过；若收尾处不补一次分析，图表与词条 / Buff 贡献就会停在旧数据（实测复现：
+     * 从数据分析弹窗打开「角色详情配置」改链阶）。
+     */
+    function refreshAll() {
+        computeAll()
+        if (showDataAnalysis) void runAnalysis(['substat', 'buff'])
     }
 
     function computeAll() {
@@ -322,7 +340,87 @@
     /** @desc 请求序号：只接受最新一次的结果，避免快速切换算法时旧结果覆盖新结果 */
     let analysisSeq = 0
 
-    type AnalysisPart = 'substat' | 'buff'
+    /**
+     * @desc 分析输入指纹（**全部廉价可比**：版本号 / 字符串 / 对象引用，不做深拷贝）。
+     * 判定与缓存登记的口径在 `./analysis/analysis-cache.utils`（纯函数 + 单测）。
+     */
+    const analysisInputsOf = (): AnalysisInputs => {
+        const p = getConditionProfile()
+        return {
+            table: getTableVersion(),
+            entries: _entriesFp,
+            profile: `${p.chains.join(',')}|${p.refinements.join(',')}`,
+            teamRef: team,
+            configRef: configState,
+            charInfoRef: charInfoMap,
+            weaponInfoRef: weaponInfoMap,
+            echoTextRef: getEchoSkillText(),
+            crit: `${rigCritEntryIds.join(',')}|${noCritEntryIds.join(',')}|${missEntryIds.join(',')}`,
+            refresh: refreshKey
+        }
+    }
+
+    /** @desc 已算结果的缓存登记：哪几部分是「按当前输入」算的（输入变了就只剩本次算出来的部分） */
+    let analysisDone: AnalysisCache | null = null
+
+    /**
+     * @desc 跑直伤贡献分析（主线程分片，无 Worker）。
+     *
+     * `parts` 决定算哪一半：切换副词条算法时只重算副词条（Buff 与算法无关，重算纯属浪费）。
+     * 输入与算法都没变时**直接返回**（弹窗重开 = 秒开）；每次结果都按 `analysisSeq` 校验，晚到的旧结果丢弃。
+     */
+    async function runAnalysis(parts: readonly AnalysisPart[]) {
+        if (getAllDamageEntries().length === 0) return
+        const inputs = analysisInputsOf()
+        const need = analysisNeeded(analysisDone, parts, inputs, selectedAlgorithm)
+        if (need.length === 0) return
+        const seq = ++analysisSeq
+        if (need.includes('substat')) substatComputing = true
+        if (need.includes('buff')) buffComputing = true
+        // 先让「计算中…」渲染出来，再开始同步重算
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        if (seq !== analysisSeq) return
+        try {
+            const res = await runContributionAnalysisAsync(
+                analysisRequest(),
+                { algorithm: selectedAlgorithm, parts: need },
+                (partial) => {
+                    if (seq !== analysisSeq) return
+                    if (need.includes('substat')) substatAnalysis = partial.substat
+                    if (need.includes('buff')) buffAnalysis = partial.buff
+                }
+            )
+            if (seq !== analysisSeq) return
+            if (need.includes('substat')) substatAnalysis = res.substat
+            if (need.includes('buff')) buffAnalysis = res.buff
+            // 只有「这次要的部分都算完、且没被更新的请求顶掉」才登记为有效结果
+            analysisDone = nextAnalysisCache(analysisDone, inputs, need, selectedAlgorithm)
+        } catch (err) {
+            console.warn('[contribution-analysis] 直伤贡献分析失败', err)
+        } finally {
+            if (seq === analysisSeq) {
+                substatComputing = false
+                buffComputing = false
+            }
+        }
+    }
+
+    /**
+     * @desc 打开弹窗后的分析调度：**先让开窗动画跑完再算**。
+     *
+     * 冷启动那一次重算 ≈130ms（真实工程可能更久），如果和弹窗进场动画挤在同一帧，
+     * 动画就会掉帧；这里让步给空闲帧（`requestIdleCallback`，超时兜底），
+     * 动画期间只用缓存结果 + 标题栏的「计算中…」提示。
+     */
+    function scheduleAnalysis() {
+        const start = () => void runAnalysis(['substat', 'buff'])
+        if (typeof window === 'undefined') return start()
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(() => start(), { timeout: 240 })
+            return
+        }
+        window.setTimeout(start, 120)
+    }
 
     /** @desc 组装直伤贡献分析入参（与 computeAll 同源：同一份 store 状态，不另建缓存） */
     function analysisRequest(): ContributionAnalysisRequest {
@@ -344,46 +442,9 @@
         }
     }
 
-    /**
-     * @desc 跑直伤贡献分析（主线程分片，无 Worker）。
-     *
-     * `parts` 决定算哪一半：切换副词条算法时只重算副词条（Buff 与算法无关，重算纯属浪费）。
-     * 每次结果都按 `analysisSeq` 校验，晚到的旧结果直接丢弃。
-     */
-    async function runAnalysis(parts: AnalysisPart[]) {
-        if (getAllDamageEntries().length === 0) return
-        const seq = ++analysisSeq
-        if (parts.includes('substat')) substatComputing = true
-        if (parts.includes('buff')) buffComputing = true
-        // 先让「计算中…」渲染出来，再开始同步重算
-        await new Promise((resolve) => setTimeout(resolve, 0))
-        if (seq !== analysisSeq) return
-        try {
-            const res = await runContributionAnalysisAsync(
-                analysisRequest(),
-                { algorithm: selectedAlgorithm, parts },
-                (partial) => {
-                    if (seq !== analysisSeq) return
-                    if (parts.includes('substat')) substatAnalysis = partial.substat
-                    if (parts.includes('buff')) buffAnalysis = partial.buff
-                }
-            )
-            if (seq !== analysisSeq) return
-            if (parts.includes('substat')) substatAnalysis = res.substat
-            if (parts.includes('buff')) buffAnalysis = res.buff
-        } catch (err) {
-            console.warn('[contribution-analysis] 直伤贡献分析失败', err)
-        } finally {
-            if (seq === analysisSeq) {
-                substatComputing = false
-                buffComputing = false
-            }
-        }
-    }
-
     function handleOpenAnalysis() {
         showDataAnalysis = true
-        void runAnalysis(['substat', 'buff'])
+        scheduleAnalysis()
     }
 
     /** @desc 切换算法：只重算副词条那一半（Buff 贡献与算法无关） */
@@ -406,8 +467,8 @@
             () => showDataAnalysis,
             (v) => {
                 showDataAnalysis = v
-                // 由 AI / 快捷键打开与点按钮打开必须同口径：打开即跑一次分析
-                if (v) void runAnalysis(['substat', 'buff'])
+                // 由 AI / 快捷键打开与点按钮打开必须同口径：打开即跑一次分析（输入没变时秒开，见 scheduleAnalysis）
+                if (v) scheduleAnalysis()
             }
         )
         return () => unregisterPanel('data-analysis')
