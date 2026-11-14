@@ -13,6 +13,7 @@ import { providerQuery } from '$lib/api/provider'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
 import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$lib/calc/rules'
 import { EFFECTS_TEXT, SCOPE_RULES_TEXT, EXAMPLES_TEXT, REF_RULES_TEXT } from './prompts.config'
 import { renderConditionRules } from './prompts'
 import { analyzeCharacterTerms } from './terms'
@@ -43,9 +44,9 @@ export interface ExistingBuffRow {
     buffName: string
     scope?: string
     exclusive?: boolean
-    /** @desc 旧格式实例级链/阶门槛（库内数据） */
+    /** @desc 链/阶载荷（与 `rules` 折算后比较） */
     condition?: unknown
-    /** @desc 新格式 Buff 级规则（工程内数据） */
+    /** @desc Buff 级规则（库内与工程内同一套形状） */
     rules?: unknown
     zones?: Array<{ zoneId?: string; value?: number; override?: boolean; condition?: unknown }>
 }
@@ -134,7 +135,6 @@ export const createBuffSetDataSource = (): GenerateDataSource => ({
                     buffName: b.buffName,
                     scope: b.scope,
                     exclusive: b.exclusive,
-                    condition: b.condition,
                     ...(b.rules ? { rules: b.rules } : {}),
                     zones: b.zones.map((z) => ({
                         zoneId: z.zoneId,
@@ -320,7 +320,7 @@ export const GENERATE_TOOLS: ToolDefinition[] = [
         function: {
             name: 'get_condition_rules',
             description:
-                '获取 Buff 生效条件（condition）的取值与判定细则（角色共鸣链 chain / 武器精炼 refinement / 伤害属性 elements / 伤害类型 damageTypes，多字段可并存）。当某增益确实存在共鸣链/精炼门槛或属性/类型限定时调用。',
+                '获取 Buff 生效条件（condition）的取值与判定细则：实例级的链/阶门槛（chains / refinements，可并存）、规则列表 rules（伤害名正则 / 面板数值 / 敌人类型，同类只能有一条）、以及乘区级的伤害属性 elements / 伤害类型 damageTypes。当某增益确实存在共鸣链、精炼、面板、敌人类型或属性/类型限定时调用。',
             parameters: { type: 'object', properties: {} }
         }
     },
@@ -438,11 +438,11 @@ export async function executeGenerateTool(
         case 'get_scope_rules':
             return SCOPE_RULES_TEXT
         case 'get_condition_rules':
-            return renderConditionRules(curType)
+            return renderConditionRules(curType, ctx.data.target)
         case 'get_ref_rules':
             return REF_RULES_TEXT
         case 'get_slang_dict':
-            // 词典正文来自内置技能卡「黑话词典」；被禁用 / 清空时如实告知，不再回落硬编码词典
+            // 词典正文来自内置技能卡「黑话词典」；被禁用 / 清空时如实告知，不回落硬编码词典
             return ctx.slangDict?.trim() || '（黑话词典技能已被用户清空或禁用，本次不做黑话对照）'
         case 'get_examples':
             return filterExamples(curType)
@@ -531,26 +531,24 @@ export function buildDiff(
     }
 }
 
+/**
+ * @desc 条件的**语义口径**：`condition`（链/阶载荷）与 `rules` 折算成同一组规则，再按内容排序。
+ * 只改条件也要被 diff 认出来，且「condition 写链 3」与「rules 写 chain 3」视为同一件事。
+ */
+const canonicalConditions = (cond: unknown, rules: unknown): string => {
+    const merged = normalizeRules(rules) ?? rulesFromLegacyCondition(cond as LegacyGateCondition | undefined, 0) ?? []
+    return merged
+        .map((rule) => JSON.stringify(rule))
+        .sort()
+        .join('|')
+}
+
 function sameBuff(existing: ExistingBuffRow, p: ProposedBuff): boolean {
     if (existing.scope !== p.scope) return false
     if (!!existing.exclusive !== !!p.exclusive) return false
-    const normCond = (c: unknown): string => {
-        if (!c || typeof c !== 'object') return ''
-        const o = c as Record<string, unknown>
-        if (o.type === 'chain' || o.type === 'refinement') {
-            const min = typeof o.min === 'number' ? Math.floor(o.min) : 0
-            return `${o.type}:${min}`
-        }
-        const parts: string[] = []
-        if (typeof o.chain === 'number') parts.push(`chain:${Math.floor(o.chain)}`)
-        if (typeof o.refinement === 'number') parts.push(`refinement:${Math.floor(o.refinement)}`)
-        if (Array.isArray(o.elements)) parts.push(`elements:${[...(o.elements as string[])].sort().join(',')}`)
-        if (Array.isArray(o.damageTypes)) parts.push(`damageTypes:${[...(o.damageTypes as string[])].sort().join(',')}`)
-        return parts.join('|')
+    if (canonicalConditions(existing.condition, existing.rules) !== canonicalConditions(p.condition, p.rules)) {
+        return false
     }
-    if (normCond(existing.condition) !== normCond(p.condition)) return false
-    const normRules = (rules: unknown): string => (Array.isArray(rules) ? JSON.stringify(rules) : '')
-    if (normRules(existing.rules) !== normRules(p.rules)) return false
     const eZones = existing.zones ?? []
     const pZones = p.zones ?? []
     if (eZones.length !== pZones.length) return false

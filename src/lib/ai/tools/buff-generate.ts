@@ -258,6 +258,7 @@ defineTool('generate_project_buff_confs', {
                     scope: b.scope as ImportBuffInput['scope'],
                     ownerIdx: firstOwner,
                     ...(b.condition ? { condition: b.condition as never } : {}),
+                    ...(b.rules ? { rules: b.rules as never } : {}),
                     zones: (b.zones ?? []).map((z) => ({
                         zoneId: z.zoneId ?? '',
                         value: z.value ?? 0,

@@ -12,13 +12,13 @@ import { sanitizeLeafName } from '$lib/calc/buff-name'
 import type { BuffCondition } from '$lib/calc/calculation.types'
 import { normalizeRules, type LegacyGateCondition } from '$lib/calc/rules'
 
-/** @desc 生成结果里的旧格式实例级条件（链/阶 + 可能残留的旧属性/类型字段） */
+/** @desc 生成结果里的实例级链/阶条件（链/阶 + 可能附带的属性/类型字段） */
 export type SanitizedGateCondition = LegacyGateCondition & {
     elements?: string[]
     damageTypes?: string[]
 }
 
-export const BUFF_SCOPES = ['self', 'self_except', 'team', 'effect_only'] as const
+export const BUFF_SCOPES = ['self', 'self_except', 'team', 'team_only', 'effect_only'] as const
 export type BuffScope = (typeof BUFF_SCOPES)[number]
 
 export interface GeneratedZone {
@@ -36,7 +36,8 @@ export interface GeneratedZone {
         discrete?: boolean
         divisor?: number
         multiplier?: number
-        refOwner?: 'self' | 'owner'
+        /** @desc 引用归属：本角色（`self`/`owner`）/ 出伤者（`active`） */
+        refOwner?: 'self' | 'owner' | 'active'
     } | null
 }
 
@@ -44,7 +45,7 @@ export interface GeneratedBuff {
     buffName?: string
     scope?: string
     exclusive?: boolean
-    /** @desc 旧格式：实例级链/阶硬门槛（导入时升级为 `rules`；链与阶可以并存） */
+    /** @desc 实例级链/阶硬门槛（导入时升级为 `rules`；链与阶可以并存） */
     condition?: unknown
     /** @desc 新格式：Buff 级规则列表（discriminated union，全部 AND） */
     rules?: unknown
@@ -137,7 +138,9 @@ function sanitizeRef(ref: GeneratedZone['ref']): GeneratedZone['ref'] {
     if (ref.discrete) clean.discrete = true
     if (Number.isFinite(ref.divisor)) clean.divisor = ref.divisor
     if (Number.isFinite(ref.multiplier)) clean.multiplier = ref.multiplier
-    if (ref.refOwner === 'self' || ref.refOwner === 'owner') clean.refOwner = ref.refOwner
+    if (ref.refOwner === 'self' || ref.refOwner === 'owner' || ref.refOwner === 'active') {
+        clean.refOwner = ref.refOwner
+    }
     return clean
 }
 
@@ -158,10 +161,10 @@ const normClauses = (value: unknown, max: number, minFloor: number) => {
 }
 
 /**
- * @desc 清洗**旧格式**的实例级生效条件：白名单校验 + 数值归一化。
- * - 兼容 `{ type:'chain'|'refinement', min }` 与单值 `{ chain } / { refinement }`，统一升级为数组形式
- * - 链与阶**不再互斥**（v7 起两者可以同时作为规则存在）
- * - 旧的 `elements` / `damageTypes` 仍按原样回传（导入时它们本就属于乘区级，由乘区条目承载）
+ * @desc 清洗实例级生效条件（`{ type, min }` / 单值 / 数组三种形状）：白名单校验 + 数值归一化。
+ * - `{ type:'chain'|'refinement', min }` 与单值 `{ chain } / { refinement }` 一律归为数组形式
+ * - 链与阶**可以并存**（v7 起两者都作为规则存在）
+ * - `elements` / `damageTypes` 原样回传（它们属于乘区级，由乘区条目承载）
  */
 export function sanitizeCondition(cond: unknown): SanitizedGateCondition | undefined {
     if (!cond || typeof cond !== 'object') return undefined
@@ -173,7 +176,7 @@ export function sanitizeCondition(cond: unknown): SanitizedGateCondition | undef
     if (chains) out.chains = chains
     if (refinements) out.refinements = refinements
 
-    // 旧格式兼容：{ type:'chain'|'refinement', min } → 数组形式
+    // 单条形态：{ type:'chain'|'refinement', min } → 数组形式
     if (c.type === 'chain' || c.type === 'refinement') {
         const min = typeof c.min === 'number' && Number.isFinite(c.min) ? Math.floor(c.min) : NaN
         if (c.type === 'chain' && !out.chains && Number.isFinite(min) && min >= 0 && min <= CHAIN_MAX) {
@@ -183,7 +186,7 @@ export function sanitizeCondition(cond: unknown): SanitizedGateCondition | undef
             out.refinements = [{ charIdx: 0, min }]
         }
     }
-    // 旧单值字段：升级为数组形式
+    // 单值字段：归为数组形式
     if (!out.chains && typeof c.chain === 'number' && Number.isFinite(c.chain)) {
         const min = Math.floor(c.chain)
         if (min >= 0 && min <= CHAIN_MAX) out.chains = [{ charIdx: 0, min }]

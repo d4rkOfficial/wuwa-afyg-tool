@@ -7,7 +7,7 @@
  *
  * 主动 / 被动语义：
  * - `active`：回合装配只注入「名称 + 一句话描述」清单，AI 判断匹配后调用 `use_skill` 激活正文
- * - `passive`：每回合**直接注入正文**（常驻生效），且不再出现在主动技能清单里（避免重复）
+ * - `passive`：每回合**直接注入正文**（常驻生效），且不出现在主动技能清单里（避免重复）
  * - 两者都在 `enabled=false` 时完全不注入
  */
 
@@ -26,7 +26,7 @@ export interface AiSkill {
     body: string
     /** @desc 是否启用（禁用后既不入清单也不注入正文） */
     enabled: boolean
-    /** @desc 主动 / 被动（旧数据缺失时按 active 处理） */
+    /** @desc 主动 / 被动（缺失时按 active 处理） */
     mode: SkillMode
     /** @desc 内置技能（不可删除，可改正文 / 描述 / 类型 / 启停） */
     builtin?: boolean
@@ -43,11 +43,11 @@ export const SKILL_MODE_HINTS: Record<SkillMode, string> = {
     passive: '每一轮都直接注入正文，常驻生效，无需助手调用 use_skill'
 }
 
-/** @desc 任意来源（旧数据 / 导入 JSON）的 mode → 合法 SkillMode，缺失或非法一律视为主动 */
+/** @desc 任意来源（持久化数据 / 导入 JSON）的 mode → 合法 SkillMode，缺失或非法一律视为主动 */
 export const coerceSkillMode = (value: unknown): SkillMode =>
     value === 'passive' || value === 'active' ? value : DEFAULT_SKILL_MODE
 
-/** @desc 把任意来源的对象补全为合法 AiSkill（旧数据缺 mode 时按 active 兼容） */
+/** @desc 把任意来源的对象补全为合法 AiSkill（缺 mode 时按 active 兼容） */
 export const normalizeSkill = (raw: Partial<AiSkill> & { id?: string }, fallback?: AiSkill): AiSkill => ({
     id: String(raw.id ?? fallback?.id ?? ''),
     name: String(raw.name ?? fallback?.name ?? '').trim(),
@@ -70,7 +70,7 @@ export const SKILL_IDS = {
  * @desc 内置技能：把「查询异常恢复流程」等既有约定固化为可禁用 / 可改的技能卡。
  *  - 「数据自愈」= 主动：只在查询异常时才需要，按需激活最省 token
  *  - 「条件与链阶」= 被动：只要在碰 Buff 条件就适用，属于常驻口径，直接每轮注入
- *  - 「Buff 命名规则」/「黑话词典」= 主动：原「提示词设置」里的两项配置，改为技能卡；
+ *  - 「Buff 命名规则」/「黑话词典」= 主动：命名规则与黑话词典两项配置，以技能卡形式提供；
  *    生成流程按 id 直接读取正文（用户改正文即改生成口径），禁用 / 清空则回落到内置宽松默认
  *    用户可在设置里改类型。
  */
@@ -159,14 +159,18 @@ export const BUILTIN_SKILLS: AiSkill[] = [
         body: `本工具的条件系统口径（回答用户或写配置时严格遵守）：
 1. 伤害类型条件、伤害属性条件挂在**具体乘区**上（BuffZoneValue.condition）：不满足时只有该乘区不计入，同一条目其它乘区照常生效。
 2. Buff 级条件是**规则列表**（BuffInstance.rules，用 set_buff_conf_rules 设置），规则之间**全部 AND**；种类：
-   chain（某角色共鸣链 ≥ N） / refinement（武器精炼 ≥ N） / damageNameRegex（伤害条目 displayName 正则包含匹配） /
-   damageNameEquals（displayName 全等） / zoneCompare（某角色面板数值比较，charIdx=-1 表示伤害条目的角色，
+   chain（某角色共鸣链 ≥ N） / refinement（武器精炼 ≥ N） / damageNameRegex（伤害条目 displayName 正则包含匹配；
+   需要全等时用 ^…$） / zoneCompare（某角色面板数值比较，charIdx=-1 表示伤害条目的角色（出伤者），
    读「无条件部分」面板：装备 + 其它 BUFF 的固定乘区，不含本 BUFF 自身，因此可用作「每层 +1、至多 N 层」的自封顶） /
-   enemyType（BOSS / 精英怪 / 小怪） / buffActive（all=全部生效 / any=至少一个生效，引用其它 BUFF）。
-3. **链与阶可以并存**（不再互斥、也不会拆分 Buff）；旧字段 condition.chain / condition.refinement / chains / refinements 已废弃。
+   enemyType（多选：BOSS / 精英怪 / 小怪，命中任意一项即满足） / buffActive（all=全部生效 / any=至少一个生效，引用其它 BUFF）。
+   **同类条件只允许一条**：需要多处取值时写进同一条的多值字段，不要再建第二条同类条件。
+   Buff 集（主页「Buff 集」）里只允许前 5 种：buffActive 引用工程内 buff id，库里没有该 id 空间；
+   且库内 zoneCompare 的 charIdx 只有两档（0=本角色 / -1=出伤者）。
+3. **链与阶可以并存**（互不排斥，也不会拆分 Buff）；实例级 condition.chain / condition.refinement / chains / refinements 会被换算成 rules 规则，写入一律用 rules。
 4. 链/阶档位的真源是角色槽位 team[i].chain / team[i].refinement，由「角色详情配置」设置，不是可编辑变量。
 5. buffActive 引用**禁止成环**（含直接自引用），会被工具拒绝；删除被引用的 BUFF 会级联删除依赖它的 BUFF。
-6. 生效成员（scope）：'all'=通用（三名角色 + 效应伤害）/ [0,1,2]=全队（只对三名角色，不含效应）/ []=仅效应 / 子集=指定角色。「全队」与「通用」不是一个东西，别混。`
+6. 生效成员（scope）：'all'=通用（三名角色 + 效应伤害）/ [0,1,2]=全队（只对三名角色，不含效应）/ []=仅效应 / 子集=指定角色。「全队」与「通用」不是一个东西，别混。
+7. 引用（转模）归属 refOwner：self / owner = 本角色（角色自身 / 装备者），active = 出伤者（本次伤害所属角色，导入后 characterIdx=-1）。`
     }
 ]
 
@@ -239,14 +243,14 @@ export const enabledSkillBodyOf = (skills: AiSkill[], id: string): string => {
     return skill?.enabled ? skill.body.trim() : ''
 }
 
-/** @desc 旧版「提示词设置」里的命名规则 / 黑话词典（已迁为内置技能卡） */
+/** @desc ai-prefs 里的命名规则 / 黑话词典字段（由内置技能卡承载） */
 export interface LegacyPromptPrefs {
     namingRule?: string
     slangDict?: string
 }
 
 /**
- * @desc 把旧版提示词偏好换算成内置技能的正文覆盖（一次性迁移用）。
+ * @desc 把 ai-prefs 里的提示词偏好换算成内置技能的正文覆盖（一次性迁移用）。
  *  只返回确实有自定义内容的项；对应技能 id 已有存档时由调用方跳过，避免覆盖现有技能。
  */
 export const legacyPrefsToSkillOverrides = (legacy: LegacyPromptPrefs | null | undefined): AiSkill[] => {

@@ -125,7 +125,7 @@ export const generateBuffs = async (options: GenerateBuffOptions): Promise<Gener
         data.target === 'project'
             ? '工程导入时会按条件/来源自动建立文件夹；buffName 只写单段短名，不要带任何文件夹前缀或反斜杠。'
             : 'buffName 只写单段短名，不要带任何文件夹前缀或反斜杠；文件夹由用户在编辑器中手动维护。'
-    const systemContent = `${renderSystemPrompt(systemTemplate, { entityType, namingRule })}\n当前生成目标：${targetLabel}。${targetHint}`
+    const systemContent = `${renderSystemPrompt(systemTemplate, { entityType, namingRule, target: data.target })}\n当前生成目标：${targetLabel}。${targetHint}`
     const messages: ChatMessage[] = [{ role: 'system', content: systemContent }]
     const initialUser = renderInitialTaskPrompt(initialTaskTemplate, { entityType, entityName })
     messages.push({ role: 'user', content: initialUser })
@@ -147,7 +147,7 @@ export const generateBuffs = async (options: GenerateBuffOptions): Promise<Gener
 
     emitStatus(`开始生成：${entityName}`)
 
-    // 无工具调用上限：只有「模型不再调工具」或「用户停止」才会离开循环
+    // 无工具调用上限：只有「模型停止调用工具」或「用户停止」才会离开循环
     for (let round = 1; ; round++) {
         if (signal?.aborted) throw abortedError()
         roundText = ''

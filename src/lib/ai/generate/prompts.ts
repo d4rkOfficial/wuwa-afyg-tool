@@ -7,7 +7,10 @@ import {
     BUFF_NAME_LEAF_RULE_TEXT,
     CONDITION_CHAIN_RULES_TEXT,
     CONDITION_REFINE_RULES_TEXT,
-    CONDITION_COMMON_RULES_TEXT
+    CONDITION_COMMON_RULES_TEXT,
+    CONDITION_BUFF_RULES_TEXT,
+    CONDITION_LIBRARY_SLOT_TEXT,
+    CONDITION_PROJECT_ONLY_TEXT
 } from './prompts.config'
 
 // 乘区白名单表（保留在 system，作为 zoneId 校验边界）
@@ -20,12 +23,21 @@ export const REF_ZONE_LIST_TEXT = ZONE_REF_DEFS.map(
     (z) => `- ${z.id}（${z.label}，单位：${z.unit === '%' ? '百分数' : '固定值'}）`
 ).join('\n')
 
-// 生效条件规则按实体类型裁剪：角色才讲 chain，武器才讲 refinement，其他只讲属性/类型
-export function renderConditionRules(entityType?: string): string {
+/** @desc 生成目标：工程 Buff 配置 / 主页 Buff 集（决定槽位口径） */
+export type ConditionTarget = 'project' | 'buff-set'
+
+/**
+ * @desc 生效条件规则：按实体类型裁剪（角色讲 chain、武器讲 refinement），
+ * 再按生成目标补一段「本次目标特有的槽位 / 能力口径」（Buff 集：charIdx 一律 0；工程：buffActive / 槽位不输出）。
+ */
+export function renderConditionRules(entityType?: string, target?: ConditionTarget): string {
     const parts: string[] = []
+    if (target === 'buff-set') parts.push(CONDITION_LIBRARY_SLOT_TEXT)
+    if (target === 'project') parts.push(CONDITION_PROJECT_ONLY_TEXT)
     if (entityType === 'character') parts.push(CONDITION_CHAIN_RULES_TEXT)
     if (entityType === 'weapon') parts.push(CONDITION_REFINE_RULES_TEXT)
     parts.push(CONDITION_COMMON_RULES_TEXT)
+    parts.push(CONDITION_BUFF_RULES_TEXT)
     return parts.join('\n')
 }
 
@@ -48,13 +60,15 @@ export function renderNamingRules(userRule: string): string {
 export interface RenderSystemContext {
     entityType?: string
     namingRule?: string
+    /** @desc 生成目标（决定条件里的槽位口径） */
+    target?: ConditionTarget
 }
 
 export function renderSystemPrompt(template: string, ctx: RenderSystemContext = {}): string {
     const rendered = template
         .replaceAll('{ZONE_LIST}', ZONE_LIST_TEXT)
         .replaceAll('{REF_ZONE_LIST}', REF_ZONE_LIST_TEXT)
-        .replaceAll('{CONDITION_RULES}', renderConditionRules(ctx.entityType))
+        .replaceAll('{CONDITION_RULES}', renderConditionRules(ctx.entityType, ctx.target))
         .replaceAll('{NAMING_RULES}', renderNamingRules(ctx.namingRule?.trim() ?? ''))
     // 自定义模板可能删掉 {NAMING_RULES} 占位符：硬性格式仍然强制附加，保证生成名永不带反斜杠
     return template.includes('{NAMING_RULES}') ? rendered : `${rendered}\n\n${BUFF_NAME_LEAF_RULE_TEXT}`

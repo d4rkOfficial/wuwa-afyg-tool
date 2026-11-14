@@ -78,7 +78,7 @@ defineTool('get_buff_set_entity_buffs', {
                 shortName: buffLeafName(b.buffName),
                 scope: b.scope,
                 exclusive: !!b.exclusive,
-                condition: b.condition ?? null,
+                rules: b.rules ?? [],
                 zones: b.zones
             }))
         }
@@ -87,7 +87,7 @@ defineTool('get_buff_set_entity_buffs', {
 
 defineTool('update_buff_set_entity_buffs', {
     description:
-        '整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffName 必须是全名（文件夹A\\buff名，根 Buff 直接写短名）；folders 可传空文件夹/排序。buffs 结构：[{"buffName":"文件夹A\\\\buff名","scope":"self|self_except|team_only|team|effect_only","exclusive":false,"condition":{...可选},"zones":[...]}]。scope 语义：self=自己 / self_except=自己除外 / team_only=全队（仅三名角色，不含效应）/ team=通用（三名角色 + 效应）/ effect_only=效应专属。',
+        '整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffName 必须是全名（文件夹A\\buff名，根 Buff 直接写短名）；folders 可传空文件夹/排序。buffs 结构：[{"buffName":"文件夹A\\\\buff名","scope":"self|self_except|team_only|team|effect_only","exclusive":false,"rules":[...可选],"zones":[...]}]。scope 语义：self=自己 / self_except=自己除外 / team_only=全队（仅三名角色，不含效应）/ team=通用（三名角色 + 效应）/ effect_only=效应专属。rules 是 Buff 级门槛（全部 AND，**同一种 kind 只能有一条**），库内允许 kind：chain（min 0-6）、refinement（min 1-5）、damageNameRegex（pattern）、zoneCompare（charIdx 只有 0=本角色 / -1=出伤者，zone 取 atk/hp/def/recharge/offTuneBuildupRate/critRate/critDmg，op 取 ge/gt/eq/le/lt）、enemyType（types 数组，多选：BOSS/精英怪/小怪）。',
     dangerous: true,
     parameters: {
         type: 'object',
