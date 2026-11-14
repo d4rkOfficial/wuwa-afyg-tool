@@ -12,6 +12,7 @@ import type {
 } from './types'
 import { SURFACE_KEYS } from './types'
 import { bgMaskCss } from './bg-mask'
+import { supportsBackdropFilter, surfaceBackdrop, surfaceOpacity } from './blur-support'
 import { TAG_INK_LIGHT_L } from './tag-ink'
 import darkPreset from './preset/dark.json'
 import lightPreset from './preset/light.json'
@@ -380,19 +381,10 @@ function applyAccentOverride(root: HTMLElement) {
 const clamp = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, v))
 
 /**
- * @desc 计算某类区域的毛玻璃/背景明暗：blur=0 且 depth=0 时返回 none（不产生合成开销）。
- * 深度同时作用在背面（昼提亮/夜压暗），让「更白/更黑」在毛玻璃上成立。
+ * @desc 当前环境是否支持毛玻璃（只探测一次：结果在页面生命周期内不会变）。
+ * 不支持时（旧 WebView / 无 `backdrop-filter` 的内嵌浏览器）走 `blur-support.ts` 的兜底口径。
  */
-function computeSurfaceBackdrop(style: SurfaceStyle, isLight: boolean): string {
-    const parts: string[] = []
-    if (style.blur > 0) parts.push(`blur(${clamp(style.blur, 0, 32)}px)`, 'saturate(1.08)')
-    const depth = clamp(style.depth, 0, 100)
-    if (depth > 0) {
-        const brightness = isLight ? 1 + (depth / 100) * 0.35 : 1 - (depth / 100) * 0.6
-        parts.push(`brightness(${brightness.toFixed(3)})`)
-    }
-    return parts.length ? parts.join(' ') : 'none'
-}
+const blurSupported = supportsBackdropFilter()
 
 function applyBgBlend(root: HTMLElement) {
     const isLight = activeId === 'light'
@@ -404,13 +396,16 @@ function applyBgBlend(root: HTMLElement) {
     root.style.setProperty('--theme-bg-mask', bgMaskCss(appearance.bgImageMask))
 
     // ── 六类区域：透明度 / 毛玻璃强度 / 背景深度（由 layout.css 的 [data-sf] 规则消费）──
+    // `data-blur` 让 CSS 也能按「有没有毛玻璃」分支（表格单元的兜底层等），无需重复探测。
+    root.dataset.blur = blurSupported ? 'on' : 'off'
     for (const key of SURFACE_KEYS) {
         const style = appearance.surfaces[key] ?? DEFAULT_APPEARANCE[activeMode()].surfaces[key]
         const depth = clamp(style.depth, 0, 100)
         root.style.setProperty(`--sf-${key}-depth`, `${(depth * 0.9).toFixed(1)}%`)
         root.style.setProperty(`--sf-${key}-target`, isLight ? '#ffffff' : '#000000')
-        root.style.setProperty(`--sf-${key}-opacity`, `${clamp(style.opacity, 0, 100)}%`)
-        root.style.setProperty(`--sf-${key}-backdrop`, computeSurfaceBackdrop(style, isLight))
+        // 无毛玻璃环境：要求毛玻璃的表面抬到可读不透明度（否则 sticky 表头 / 首列压不住滚动内容）
+        root.style.setProperty(`--sf-${key}-opacity`, `${surfaceOpacity(style, blurSupported)}%`)
+        root.style.setProperty(`--sf-${key}-backdrop`, surfaceBackdrop(style, isLight, blurSupported))
     }
 
     // 旧类名 .theme-glass-surface 兼容：跟随弹窗表面的毛玻璃强度

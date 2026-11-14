@@ -588,6 +588,37 @@
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
+    /* ── 表格单元里的毛玻璃层（data-sf-layer）──
+       部分 WebView / WebKit **不会给 th / td 渲染 backdrop-filter**（表格单元的盒子走表格绘制路径，
+       不是独立合成层），症状就是「吸顶表头 / 冻结首列没有模糊」。这里把毛玻璃挪到 ::before 伪元素上：
+       伪元素是普通 box，各引擎都能正常取样身后的滚动内容。
+       只搬毛玻璃、不搬底色：底色留在单元自己身上，高亮用的 inset box-shadow 绘制顺序不受影响
+       （伪元素是透明的，模糊一层纯色不改变观感）。
+       用法：表格单元保留 data-sf（拿到底色 / 毛玻璃变量），再加 data-sf-layer 让模糊由伪元素承载。 */
+    [data-sf][data-sf-layer] {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+    [data-sf][data-sf-layer]::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        backdrop-filter: var(--sf-backdrop, none);
+        -webkit-backdrop-filter: var(--sf-backdrop, none);
+    }
+    /* 叠层单元（如「表头 = toolbar 叠 card 底」）的毛玻璃取垫层强度 */
+    [data-sf][data-sf-under][data-sf-layer]::before {
+        backdrop-filter: var(--sfu-backdrop, none);
+        -webkit-backdrop-filter: var(--sfu-backdrop, none);
+    }
+    /* 无毛玻璃环境（theme.svelte.ts 在 html 上打 data-blur="off"）：伪元素不承载模糊，
+       不透明度已由该处抬到可读档，表头 / 首列不会漏出下面的滚动内容 */
+    [data-blur='off'] [data-sf][data-sf-layer]::before {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
     [data-sf='card'] {
         --sf-base: var(--theme-card-bg);
         --sf-depth: var(--sf-card-depth);

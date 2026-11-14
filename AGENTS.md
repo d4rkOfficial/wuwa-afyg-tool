@@ -44,8 +44,12 @@
     - `key` ∈ `card` / `modal` / `sidebar` / `content` / `toolbar` / `widget`（`SurfaceKey`，见 `$lib/theme/types`）
     - 叠加 `data-sf-flat` = 只取该区域底色、不做毛玻璃（用于大量逐行/逐格元素，避免每个元素重算一次背景模糊）
     - 叠加 `data-sf-under="<key>"` = 在本区域底色之下再垫一层其它区域底色
+    - 表格单元（`th` / `td`）要毛玻璃时**必须**再加 `data-sf-layer`：部分 WebView / WebKit 不给表格单元渲染
+      `backdrop-filter`（症状：吸顶表头 / 冻结首列没有模糊），该属性把模糊挪到 `::before` 承载
     - 需要指定基色时用内联 `style="--sf-base: var(--theme-xxx-bg)"` 覆盖
     - 规则与变量发射见 `src/routes/layout.css` 的 `[data-sf]` 段与 `theme.svelte.ts`；`pnpm run check:surfaces` 会校验取值合法性
+    - 运行时不支持 `backdrop-filter` 时（旧 WebView），`theme.svelte.ts` 会给 `<html>` 打 `data-blur="off"` 并把
+      「要求毛玻璃」的表面不透明度抬到可读档（`$lib/theme/blur-support.ts`），别在组件里另写探测
 - 优先复用 `src/lib/components/ui/` 的既有元件，不要手搓。新增重复控件前先检查该目录；`ui/` 缺失的元件应补在 `ui/` 而不是就地内联
 - `class` / `style` 的合并统一走 `$lib/utils/component-style.ts`，不要各组件重写派生块：
     - 主题配色三件套 → `mergeComponentsStyle({ backgroundImage, textColor, style: styleProp })`
