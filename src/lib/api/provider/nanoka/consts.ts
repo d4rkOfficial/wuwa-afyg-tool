@@ -2,6 +2,7 @@
 // 仅由 nanoka 适配器使用；base URL 与版本解析都封装在此，不被应用其他层感知。
 
 import { browser } from '$app/environment'
+import { readStorage, writeStorage } from '$lib/utils/safe-storage'
 import type { NanokaManifest } from './types'
 
 export const NANOKA_BASE = 'https://static.nanoka.cc'
@@ -9,8 +10,9 @@ export const ZH_DATA_BASE = `${NANOKA_BASE}/ww`
 export const ASSET_BASE = `${NANOKA_BASE}/assets/ww`
 
 const VERSION_KEY = 'wuwa-afyg:ww-version'
+const FALLBACK_WW_VERSION = '3.5'
 
-let _wwVersion = browser ? (localStorage.getItem(VERSION_KEY) ?? '3.5') : '3.5'
+let _wwVersion = browser ? (readStorage(VERSION_KEY) ?? FALLBACK_WW_VERSION) : FALLBACK_WW_VERSION
 
 export function getWWVersion() {
     return _wwVersion
@@ -39,7 +41,7 @@ export async function ensureVersion() {
                 if (text) {
                     const parsed: NanokaManifest | string = JSON.parse(text)
                     _wwVersion = typeof parsed === 'string' ? parsed : (parsed.ww?.latest ?? _wwVersion)
-                    if (browser) localStorage.setItem(VERSION_KEY, _wwVersion)
+                    if (browser) writeStorage(VERSION_KEY, _wwVersion)
                 }
             } catch {
                 // keep fallback

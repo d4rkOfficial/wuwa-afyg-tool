@@ -22,7 +22,7 @@
     import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
-    import { runContributionAnalysisAsync } from '$lib/calc/substat-algorithms/analysis-runner'
+    import { createContributionAnalysisRunner } from '$lib/calc/substat-algorithms/analysis-runner.svelte'
     import type { ContributionAnalysisRequest } from '$lib/calc/substat-algorithms/analysis'
     import {
         analysisNeeded,
@@ -363,8 +363,11 @@
     /** @desc 已算结果的缓存登记：哪几部分是「按当前输入」算的（输入变了就只剩本次算出来的部分） */
     let analysisDone: AnalysisCache | null = null
 
+    /** @desc 贡献分析执行器：优先 Worker 线程，Worker 不可用时自动回退主线程分片 */
+    const analysisRunner = createContributionAnalysisRunner()
+
     /**
-     * @desc 跑直伤贡献分析（主线程分片，无 Worker）。
+     * @desc 跑直伤贡献分析（默认 Worker 线程，不占界面帧）。
      *
      * `parts` 决定算哪一半：切换副词条算法时只重算副词条（Buff 与算法无关，重算纯属浪费）。
      * 输入与算法都没变时**直接返回**（弹窗重开 = 秒开）；每次结果都按 `analysisSeq` 校验，晚到的旧结果丢弃。
@@ -377,11 +380,11 @@
         const seq = ++analysisSeq
         if (need.includes('substat')) substatComputing = true
         if (need.includes('buff')) buffComputing = true
-        // 先让「计算中…」渲染出来，再开始同步重算
+        // 先让「计算中…」渲染出来，再派发计算
         await new Promise((resolve) => setTimeout(resolve, 0))
         if (seq !== analysisSeq) return
         try {
-            const res = await runContributionAnalysisAsync(
+            const res = await analysisRunner.run(
                 analysisRequest(),
                 { algorithm: selectedAlgorithm, parts: need },
                 (partial) => {
@@ -406,11 +409,11 @@
     }
 
     /**
-     * @desc 打开弹窗后的分析调度：**先让开窗动画跑完再算**。
+     * @desc 打开弹窗后的分析调度：**先让开窗动画跑完再派发**。
      *
-     * 冷启动那一次重算 ≈130ms（真实工程可能更久），如果和弹窗进场动画挤在同一帧，
-     * 动画就会掉帧；这里让步给空闲帧（`requestIdleCallback`，超时兜底），
-     * 动画期间只用缓存结果 + 标题栏的「计算中…」提示。
+     * 计算本身在 Worker 线程（不占界面帧），但派发前的请求组装与 `$state.snapshot` 仍在主线程，
+     * 因此仍让步给空闲帧（`requestIdleCallback`，超时兜底）：动画期间只用缓存结果 + 标题栏的
+     * 「计算中…」提示。
      */
     function scheduleAnalysis() {
         const start = () => void runAnalysis(['substat', 'buff'])
@@ -422,7 +425,12 @@
         window.setTimeout(start, 120)
     }
 
-    /** @desc 组装直伤贡献分析入参（与 computeAll 同源：同一份 store 状态，不另建缓存） */
+    /**
+     * @desc 组装直伤贡献分析入参（与 computeAll 同源：同一份 store 状态，不另建缓存）。
+     *
+     * `baselineEntries` 直接把结果页刚算好的 `cleanEntries` 交出去：分析需要的基线就是它，
+     * 让分析内部再跑一次 `computeAll` 等于把整条引擎重算一遍（同参数同配置）。
+     */
     function analysisRequest(): ContributionAnalysisRequest {
         const calc = getCalcState()
         return {
@@ -438,7 +446,9 @@
             noCritEntryIds,
             missEntryIds,
             conditionProfile: getConditionProfile(),
-            echoSkillText: getEchoSkillText()
+            echoSkillText: getEchoSkillText(),
+            // 空数组（还没算过表格）不算「已提供基线」，否则分析会把基线当成 0
+            ...(cleanEntries.length > 0 ? { baselineEntries: cleanEntries } : {})
         }
     }
 
@@ -471,7 +481,10 @@
                 if (v) scheduleAnalysis()
             }
         )
-        return () => unregisterPanel('data-analysis')
+        return () => {
+            unregisterPanel('data-analysis')
+            analysisRunner.dispose()
+        }
     })
     let tableContainer = $state<HTMLDivElement | undefined>()
 

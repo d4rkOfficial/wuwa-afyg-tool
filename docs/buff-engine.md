@@ -30,6 +30,18 @@ BuffInstance ─┘
 - `ResultEntry` 是结果页 / 乘区溯源 / 贡献分析唯一消费的数据形状：它们只读 `ResultEntry`，不感知引擎内部结构。
   贡献分析（副词条 / Buff）另走「改动入参 → `computeOneEntry` 重算 → 差值」这一条路径，与结果页同一实现。
 
+### 贡献分析的执行方式
+
+- **基线不重算**：结果页把自己的 `computeAll` 输出（`cleanEntries`）经 `baselineEntries` 传给分析，
+  分析只在没拿到时才内部跑一次 `computeAll`（AI / WS 工具走这条）。
+- **计算在 Worker 线程**（`substat-algorithms/analysis.worker.ts`）：副词条 Shapley 与 Buff 逐条移除是
+  上千次 `computeOneEntry`，放主线程必然卡界面；Worker 不可用时才回退主线程分片（`analysis-runner.ts`）。
+- 两条路径共用 `analysis.ts` 的 `prepareContributionAnalysis` + `runContributionSteps`，结果逐字段一致
+  （`test/src/lib/calc/substat-algorithms/analysis-runner.test.ts` 钉住等价）。
+- 请求必须可结构化克隆：`$state` 代理在派发前用 `$state.snapshot` 转纯数据。**Worker 里没有
+  `localStorage`**，而客户端构建的 `browser` 恒为 `true` —— 模块顶层读存储一律走
+  `$lib/utils/safe-storage`，否则 Worker 加载即崩。
+
 ### 乘区算子（`ZONE_OPS`）
 
 每个乘区只声明一次它的语义，三条写入路径共用：

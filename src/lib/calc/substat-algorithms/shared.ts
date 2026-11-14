@@ -29,6 +29,8 @@ export interface AnalysisInputs {
     noCritEntryIds: Set<string>
     missEntryIds: Set<string>
     conditionProfile: ConditionProfile
+    /** @desc 调用方已算好的全量引擎结果：给了就不在内部再跑一次 `computeAll`（见 `ContributionAnalysisRequest`） */
+    baselineEntries?: ResultEntry[]
 }
 
 /** @desc 三口径伤害（期望 / 凹暴 / 不暴）+ 当前配置实际伤害：分析里所有贡献都用这一组数表达 */
@@ -114,22 +116,28 @@ const totalsOf = (entries: ResultEntry[], inputs: AnalysisInputs): DamageTotals 
 export const pctOf = (value: number, base: number): number => (base > 0 ? (value / base) * 100 : 0)
 
 /**
- * @desc 建立全队各角色的分析上下文：基线只算一次 `computeAll`，之后每个角色各自持有重算闭包。
+ * @desc 建立全队各角色的分析上下文：基线取 `inputs.baselineEntries`（结果页已经算过的那一份），
+ * 没有才内部跑 `computeAll`；之后每个角色各自持有重算闭包。
+ *
+ * 复用外部结果不改变口径：同一份 `computeAll` 同参数同配置的输出，`totalsOf` 也只读它，
+ * 与内部重算逐字段相等（`test/…/analysis-runner.test.ts` 钉住这条等价）。
  *
  * 没有伤害条目的角色**仍然保留**（基线为 0）：界面按队伍槽位渲染角色页签，缺项会让页签数量跳动。
  */
 export const prepareAnalysis = (inputs: AnalysisInputs): CharacterDamageContext[] => {
-    const allEntries = computeAll(
-        inputs.damageEntries,
-        inputs.buffSets,
-        inputs.damageEntryBuffSetIds,
-        inputs.damageEntryDamageTypes,
-        inputs.configState,
-        inputs.team,
-        inputs.charInfoMap,
-        inputs.weaponInfoMap,
-        inputs.conditionProfile
-    )
+    const allEntries =
+        inputs.baselineEntries ??
+        computeAll(
+            inputs.damageEntries,
+            inputs.buffSets,
+            inputs.damageEntryBuffSetIds,
+            inputs.damageEntryDamageTypes,
+            inputs.configState,
+            inputs.team,
+            inputs.charInfoMap,
+            inputs.weaponInfoMap,
+            inputs.conditionProfile
+        )
 
     return inputs.team.flatMap((slot, index) => {
         const character = slot.character

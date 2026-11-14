@@ -8,10 +8,12 @@
 import { browser } from '$app/environment'
 import { fetchApiJson } from '$lib/api/local-api'
 import { providerQuery } from '$lib/api/provider'
+import { readStorage, writeStorage } from '$lib/utils/safe-storage'
 
 const VERSION_KEY = 'wuwa-afyg:ww-version'
+const FALLBACK_WW_VERSION = '3.5'
 
-let _wwVersion = browser ? (localStorage.getItem(VERSION_KEY) ?? '3.5') : '3.5'
+let _wwVersion = browser ? (readStorage(VERSION_KEY) ?? FALLBACK_WW_VERSION) : FALLBACK_WW_VERSION
 let _versionPromise: Promise<void> | null = null
 
 export function getWWVersion(): string {
@@ -29,7 +31,7 @@ export async function ensureVersion(): Promise<void> {
                 const v = await fetchApiJson<unknown>(`/api/v1/version/latest${providerQuery()}`)
                 if (typeof v === 'string' && v) {
                     _wwVersion = v
-                    if (browser) localStorage.setItem(VERSION_KEY, v)
+                    if (browser) writeStorage(VERSION_KEY, v)
                 }
             } catch {
                 // keep fallback
