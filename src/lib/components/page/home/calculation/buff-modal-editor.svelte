@@ -8,7 +8,7 @@
      * - 当前 tab（`tab`）与行内乘区条件展开项（`expandedZoneIndex`）用 `$bindable` 双向绑定：
      *   父组件要靠 tab 决定右侧「添加乘区」栏是否展开（只有具体效果 tab 展开）。
      * - 名称编辑输入框（`bind:this` 自动聚焦）是**本组件的 DOM 细节**，故重命名草稿与失焦/回车保存
-     *   也一并在本组件内完成。父组件不再需要「重命名后聚焦输入框」。
+     *   也一并在本组件内完成。父组件无需关心「重命名后聚焦输入框」。
      * - 所有数据写入一律经回调交回父组件（父组件是 store 的唯一调用方）。
      */
     import Icon from '@iconify/svelte'
@@ -267,7 +267,7 @@
                         title={overridden ? `同乘区已有覆盖条目：覆盖优先于一切，本条目不参与计算` : ''}
                     >
                         <span class="shrink-0 text-xs text-(--theme-modal-text) truncate">{zoneLabel}</span>
-                        <!-- @desc 乘区条件徽标：紧跟在乘区名后，样式与同行「覆盖」按钮同款，仅背景改为半透明 -->
+                        <!-- @desc 乘区条件徽标：紧跟在乘区名后，样式与同行「覆盖」按钮同款，只有背景取半透明 -->
                         {#if condBadge}
                             <span
                                 class="shrink-0 max-w-32 truncate rounded-none border px-1.5 py-0.5 text-[10px]"
@@ -299,7 +299,8 @@
                         {/if}
                         {#if zone.ref && !ZONE_NO_REF_IDS.has(zone.zoneId)}
                             {@const refDef = ZONE_REF_MAP.get(zone.ref.zoneId) ?? ZONE_MAP.get(zone.ref.zoneId)}
-                            {@const refName = teamNames[zone.ref.characterIdx] ?? '?'}
+                            {@const refName =
+                                zone.ref.characterIdx < 0 ? '出伤者' : (teamNames[zone.ref.characterIdx] ?? '?')}
                             {@const refOp = zone.ref.threshold < 0 ? '+' : '-'}
                             {@const refTh = zone.ref.threshold < 0 ? -zone.ref.threshold : zone.ref.threshold}
                             {@const refS = simplifyPct(zone.ref.pct)}

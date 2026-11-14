@@ -102,7 +102,12 @@ function resolveRefValue(ref: ZoneRef, panel: CharacterComputed | undefined): nu
         if (excess <= 0) return 0
         const divisor = ref.divisor ?? 1
         const multiplier = ref.multiplier ?? 0
-        const steps = Math.floor(excess / divisor)
+        /**
+         * @desc 档位数取整前加一个极小的容差：小数档长会被浮点除算少一档
+         * （实测 divisor 0.1、excess 0.3 → 2.9999999999999716 → floor 2，少给一档）。
+         * 容差只用于吸收除法误差，不会把「真的差一点」的输入凑成一档。
+         */
+        const steps = Math.floor(excess / divisor + 1e-9)
         value = steps * multiplier
     } else {
         // 离散转模不写 pct（缺省 0）；这里兜一下，避免历史数据里 pct 缺失算出 NaN
@@ -599,7 +604,7 @@ function boundBuffs(
 }
 
 /** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 条目）。
- *  门槛判定（作用域 + 实例级硬性条件）均已在此前完成，此处只做乘区写入（含每条目自身的乘区条件）。
+ *  门槛判定（作用域 + 实例级硬性条件）由调用方先完成，此处只做乘区写入（含每条目自身的乘区条件）。
  *
  *  `coeffEntry=true` 用于**系数基类条目**（处决/响应/效应/偏谐系数直伤）：
  *  基础双暴与装备双暴都不计入（基准改 0% / 100%），且**双暴只有「覆盖」写入生效**
@@ -924,7 +929,7 @@ const withExtraRatioFactor = (factors: RatioFactor[], extraRatio: number, hits: 
  * @desc 直伤条目结算。
  *
  * `targetTuneStrainLayer` 是**目标侧**的集谐·干涉层数（挂在怪物身上、全队一份），由调用方用
- * `targetSideValueOf()` 算好后传入 —— 不再读 `stats.tuneStrainLayer`（那是按角色累加的，
+ * `targetSideValueOf()` 算好后传入 —— 不读 `stats.tuneStrainLayer`（那是按角色累加的，
  * 会出现「某角色的集谐层数」，与游戏定义不符）。
  */
 function computeResultEntry(
@@ -1725,11 +1730,13 @@ export function computeAll(
         // 被引用角色面板：按需现算（同一槽位只算一次）
         const panelCache = new Map<number, CharacterComputed>()
         const panelOf = (refIdx: number): CharacterComputed => {
-            if (refIdx === charIndex) return partialStats
-            const cached = panelCache.get(refIdx)
+            // 出伤者（`characterIdx = -1`）= 本条目所属角色；其余按槽位
+            const idx = refIdx < 0 ? charIndex : refIdx
+            if (idx === charIndex) return partialStats
+            const cached = panelCache.get(idx)
             if (cached) return cached
             const built = buildEntryPanel(
-                refIdx,
+                idx,
                 partialStats,
                 charIndex,
                 entry,
@@ -1743,7 +1750,7 @@ export function computeAll(
                 coeffEntry,
                 entryRuleDeps
             )
-            panelCache.set(refIdx, built)
+            panelCache.set(idx, built)
             return built
         }
 
@@ -1837,11 +1844,13 @@ export function computeOneEntry(
     // 被引用角色面板：按需现算（同一槽位只算一次）
     const panelCache = new Map<number, CharacterComputed>()
     const panelOf = (refIdx: number): CharacterComputed => {
-        if (refIdx === charIndex) return partialStats
-        const cached = panelCache.get(refIdx)
+        // 出伤者（`characterIdx = -1`）= 本条目所属角色；其余按槽位
+        const idx = refIdx < 0 ? charIndex : refIdx
+        if (idx === charIndex) return partialStats
+        const cached = panelCache.get(idx)
         if (cached) return cached
         const built = buildEntryPanel(
-            refIdx,
+            idx,
             partialStats,
             charIndex,
             entry,
@@ -1855,7 +1864,7 @@ export function computeOneEntry(
             coeffEntry,
             entryRuleDeps
         )
-        panelCache.set(refIdx, built)
+        panelCache.set(idx, built)
         return built
     }
 
@@ -1897,7 +1906,7 @@ export interface RefResolveContext {
 /**
  * @desc 某条目上「引用（转模）乘区」的**实际数值**：键为 `${buffId}#${zoneIndex}`（`BuffInstance.zones` 下标）。
  *
- * 溯源只展示**结果**，不展示转模过程（「攻击白值 超出2000 每100→5 ≤30」这类规则文案已移除），
+ * 溯源只展示**结果**，不展示转模过程（不做「攻击白值 超出2000 每100→5 ≤30」这类规则文案），
  * 但结果必须与引擎逐条目结算写进乘区的数值完全相同 —— 因此这里刻意复用引擎同一条链路
  * （`entryBound` → 本条目可见面板 → `resolveRefValue`），而不是在溯源里另算一遍公式。
  */
@@ -1945,11 +1954,13 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
     // 被引用角色面板：与 computeAll 同一套「按需现算 + 缓存」；引用一律读**回写前**的面板
     const panelCache = new Map<number, CharacterComputed>()
     const panelOf = (refIdx: number): CharacterComputed => {
-        if (refIdx === charIndex) return partialStats
-        const cached = panelCache.get(refIdx)
+        // 出伤者（`characterIdx = -1`）= 本条目所属角色；其余按槽位
+        const idx = refIdx < 0 ? charIndex : refIdx
+        if (idx === charIndex) return partialStats
+        const cached = panelCache.get(idx)
         if (cached) return cached
         const built = buildEntryPanel(
-            refIdx,
+            idx,
             partialStats,
             charIndex,
             entry,
@@ -1962,7 +1973,7 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
             ctx.weaponInfoMap,
             coeffEntry
         )
-        panelCache.set(refIdx, built)
+        panelCache.set(idx, built)
         return built
     }
 

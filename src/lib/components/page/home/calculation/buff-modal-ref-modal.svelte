@@ -1,15 +1,13 @@
 <script lang="ts">
     /**
-     * @desc 引用配置弹窗（自 `buff-modal.svelte` **原样抽出**，标记与行为未改）：
-     * 选择引用角色/属性，再把换算规则与 clamp（「超过 N 的部分」/ 线性·离散 / 每 N 换 M / 上下限）
+     * @desc 引用配置弹窗：选择引用角色/属性，再把换算规则与 clamp（「超过 N 的部分」/ 线性·离散 / 每 N 换 M / 上下限）
      * 交给 `buff-modal-ref-config.svelte`（纯受控视图，同 `ui` 对象双向绑定）。
      *
      * 职责边界：
      * - 「是否打开」由父组件通过 `open` 决定（父组件用 `ui.zoneIndex >= 0` 这一个值同时控制打开与「配置哪个乘区」，
      *   本组件**不回读**父组件状态，避免两个真相源）。
      * - 草稿态（12 个字段）由父组件的 `ui` 状态对象持有并 `$bindable` 双向绑定：父组件的 `openRefModal()`
-     *   写草稿 → 置 `zoneIndex`，顺序与原实现逐句相同（原实现就是在父组件里先写 12 个 `$state`、最后置
-     *   `showRefModal = true`）。
+     *   写好草稿后置 `zoneIndex`，本组件随该跳变生效。
      * - 确认/清除由父组件落库（`onconfirm` / `onclear`），本组件不 import store。
      */
     import Icon from '@iconify/svelte'
@@ -77,10 +75,10 @@
     {/snippet}
 
     <div class="space-y-4">
-        <!-- Character selector (top) -->
+        <!-- Character selector (top)：三名角色 + 出伤者（本条伤害所属角色） -->
         <div role="group" aria-label="引用角色">
             <span class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用角色</span>
-            <div class="flex gap-2">
+            <div class="flex items-center gap-2">
                 {#each team as slot, i (i)}
                     <button
                         onclick={() => (ui.characterIdx = i)}
@@ -107,6 +105,16 @@
                         {/if}
                     </button>
                 {/each}
+                <button
+                    onclick={() => (ui.characterIdx = -1)}
+                    class={[
+                        'h-9 rounded-none border px-2.5 text-xs transition-colors',
+                        ui.characterIdx < 0
+                            ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                            : 'border-(--theme-divider-border) text-(--theme-modal-text)/50 hover:text-(--theme-modal-text)'
+                    ].join(' ')}
+                    title="引用本次伤害所属角色的面板">出伤者</button
+                >
             </div>
         </div>
 

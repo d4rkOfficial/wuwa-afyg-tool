@@ -1,7 +1,6 @@
 <script lang="ts">
     /**
-     * @desc 「乘区引用」配置弹窗（Phase 5.6：自 `buff-entity-edit-modal.svelte` **原样抽出**，标记与行为未改）：
-     * 引用属性下拉 + 换算口径卡（超过 N 的部分 / 线性地·离散地 / 每 N 换 M）+ 下限上限。
+     * @desc 「乘区引用」配置弹窗：引用属性下拉 + 换算口径卡（超过 N 的部分 / 线性地·离散地 / 每 N 换 M）+ 下限上限。
      *
      * 职责边界：
      * - 本组件持有**引用草稿**（11 个 `$state`），只在「确认」时把结果交回父组件（`onconfirm`）、
@@ -9,7 +8,7 @@
      * - `open` 由父组件传入（父组件用同一个值决定是否打开本弹窗），本组件**不回读**父组件状态，
      *   避免出现两个真相源（参见 `settings/sections/ai.svelte` 的同类教训）。
      * - 打开时用 `untrack` 从 `zoneRef` / `zoneId` 重新初始化草稿：只跟随 `open` 的假→真跳变，
-     *   与改前 `openRefModal()` 里「先写 11 个 `$state`、最后置 `showRefModal = true`」逐句等价。
+     *   不是每个响应式依赖变化都重置。
      *
      * 「超过 / 下限 / 上限」三个开关按钮的类串与条件**逐字相同**，收敛为 snippet `refToggleBtn`。
      */
@@ -22,6 +21,14 @@
     import Tabs from '$lib/components/ui/tabs.svelte'
     import { ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
     import type { BuffEntityType, BuffLibraryZoneRef } from '$lib/data/buff-library.svelte'
+    import {
+        LIBRARY_REF_OWNER_TABS,
+        applyRefOwnerChoice,
+        defaultRefOwnerOf,
+        isActiveRefOwner,
+        sanitizeRefOwner,
+        type LibraryRefOwner
+    } from '$lib/calc/buff-library-condition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { mergeClass } from '$lib/utils/component-style'
     import { simplifyPct } from './buff-entity-utils'
@@ -66,6 +73,17 @@
     let refHasLower = $state(false)
     let refHasUpper = $state(false)
     let refIsDiscrete = $state(false)
+    /** @desc 引用归属：本角色（self/owner 合并）/ 出伤者（active） */
+    let refOwner = $state<LibraryRefOwner>(defaultRefOwnerOf(entityType))
+
+    /** @desc 归属页签当前值（self/owner 都落在「本角色」这一档） */
+    const ownerChoice = $derived(isActiveRefOwner(refOwner) ? 'active' : 'owner')
+    const ownerHint = $derived(LIBRARY_REF_OWNER_TABS.find((tab) => tab.value === ownerChoice)?.hint ?? '')
+
+    /** @desc 页签回调入参是 value（string），落库值由实体类型决定（本角色 → self / owner） */
+    const pickRefOwner = (next: string) => {
+        refOwner = applyRefOwnerChoice(next === 'active' ? 'active' : 'owner', entityType)
+    }
 
     // ── 引用值转换口径（线性地 / 离散地）：2 选 1 分段页签，交给 ui/tabs（与 buff-modal 同一实现）──
     /** @desc 转换口径页签；顺序即分段顺序（false=线性地、true=离散地） */
@@ -84,6 +102,7 @@
         if (!open) return
         untrack(() => {
             showRefZoneMenu = false
+            refOwner = sanitizeRefOwner(zoneRef?.refOwner) ?? defaultRefOwnerOf(entityType)
             if (zoneRef) {
                 refTargetZoneId = zoneRef.targetZoneId
                 refThreshold = zoneRef.threshold ?? 0
@@ -132,7 +151,7 @@
             discrete: refIsDiscrete,
             divisor: refDivisor,
             multiplier: refMultiplier,
-            refOwner: entityType === 'character' ? 'self' : 'owner'
+            refOwner
         }
         onconfirm?.(ref)
         onclose?.()
@@ -169,10 +188,24 @@
         >
             {entityName}
         </span>
-        {entityType === 'character' ? '自身的' : '装备者的'}
+        {ownerChoice === 'active' ? '出伤者的' : entityType === 'character' ? '自身的' : '装备者的'}
     {/snippet}
 
     <div class="space-y-4">
+        <!-- 引用归属：本角色 / 出伤者（导入后分别落到实体归属槽位 / -1） -->
+        <div role="group" aria-label="引用归属" class="flex flex-col gap-1.5">
+            <span class="block text-[10px] text-(--theme-modal-text)/50">引用谁的属性</span>
+            <Tabs
+                items={LIBRARY_REF_OWNER_TABS.map((tab) => ({ value: tab.value, label: tab.label }))}
+                value={ownerChoice}
+                onchange={pickRefOwner}
+                backgroundImage="color-mix(in srgb, var(--theme-accent-bg) 12%, transparent)"
+                textColor="var(--theme-accent-text)"
+                class="[&>button]:py-1.5 [&>button]:text-xs"
+            />
+            <p class="text-[10px] text-(--theme-modal-text)/40">{ownerHint}</p>
+        </div>
+
         <!-- Zone selector -->
         <div role="group" aria-label="引用属性">
             <span class="text-[10px] text-(--theme-modal-text)/50 block mb-1.5">引用属性</span>

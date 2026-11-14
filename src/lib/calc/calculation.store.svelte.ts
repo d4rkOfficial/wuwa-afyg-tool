@@ -55,6 +55,7 @@ import {
 } from './buff-name'
 import { ownerIdxOfItem, rewriteOwnerInRules } from './buff-owner'
 import { resolveImportTarget } from './buff-import-target'
+import { libraryRefCharacterIdx } from './buff-library-condition'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffConf[]>([])
@@ -285,7 +286,7 @@ export function init(
      * 震谐/骇破响应的倍率来自**技能表**（`getSkillCache()`），而技能表由排轴页的
      * `loadCharElements()` 异步预热 —— 进工程的首帧建设条目时缓存往往还是空的，
      * 于是倍率恒为 0。这里把这类角色挑出来，缓存补齐后重建一次条目；
-     * 否则整场会话都停在 0（历史上条目只在 init 时建一次，不会再刷新）。
+     * 否则整场会话都停在 0（条目只在 init 时建一次，不会自动刷新）。
      */
     const coldResponders = [
         ...new Set(_entries.filter((e) => e.isTuneResponse && !e.ratioValue).map((e) => e.character))
@@ -694,19 +695,20 @@ export interface ImportBuffZone {
         discrete?: boolean
         divisor?: number
         multiplier?: number
-        refOwner?: 'self' | 'owner'
+        /** @desc 引用归属：本角色（`self`/`owner`）/ 出伤者（`active` → `characterIdx = -1`） */
+        refOwner?: 'self' | 'owner' | 'active'
     }
 }
 
 export interface ImportBuffInput {
     /** @desc 来源全名（保留工坊文件夹，供人工导入项直接使用） */
     name: string
-    /** @desc 已解析好的工程全名；存在时 store 不再二次解析，避免条件文件夹重复叠加 */
+    /** @desc 已解析好的工程全名；存在时 store 不二次解析，避免条件文件夹重复叠加 */
     targetName?: string
     /** @desc 来源作用域（Buff 库语义）；`team`=通用（三名角色+效应）、`team_only`=全队（仅三名角色） */
     scope?: 'self' | 'self_except' | 'team' | 'team_only' | 'effect_only'
     ownerIdx?: number
-    /** @desc 旧链/阶条件（工坊 share / AI 生成仍按这个字段产出）：导入时升级为 `rules` */
+    /** @desc 实例级链/阶条件（工坊 share / AI 生成按这个字段产出）：导入时换算为 `rules` */
     condition?: LegacyGateCondition
     /** @desc 新版 Buff 级规则；存在时优先于 `condition` */
     rules?: BuffRule[]
@@ -722,7 +724,7 @@ export interface ImportBuffInput {
  * 其余是角色子集。注意「全队」与「通用」**不是一个东西**：效应伤害只有通用才吃。
  *
  * **`effect_only` 必须映射成空数组**（工具侧「效应专属」就是 `scope: []`，见 `classifyBuffScope`）：
- * 曾经把它和 `team` 一起落到 `'all'`，症状是「工坊 / 本地 Buff 库里明明是效应专属，导入工程后变成全队共享」
+ * 若与 `team` 一起落到 `'all'`，症状是「工坊 / 本地 Buff 库里明明是效应专属，导入工程后变成全队共享」
  * —— 而且不只是显示：`scope: 'all'` 会让这条 buff 对**所有**角色的条目都生效。AI 生成的
  * `effect_only` buff（`ai/generate/sanitize.ts` 会把效应专属标成它）走的也是本函数，同样受此影响。
  */
@@ -809,8 +811,8 @@ export function importBuffSetsWithDecisions(
             const zone: BuffZoneValue = { zoneId, value: z.value }
             if (z.ref && ZONE_REF_MAP.has(z.ref.targetZoneId as never) && !ZONE_NO_REF_IDS.has(zoneId)) {
                 zone.ref = {
-                    // 引用归属跟随实体主人，而不是工坊/生成结果里写死的 0
-                    characterIdx: owner,
+                    // 引用归属：出伤者 → -1（引擎按本条目所属角色解算）；本角色 → 实体归属槽位
+                    characterIdx: libraryRefCharacterIdx(z.ref.refOwner, owner),
                     zoneId: z.ref.targetZoneId as never,
                     threshold: z.ref.threshold ?? 0,
                     pct: z.ref.pct,
@@ -1883,7 +1885,7 @@ export function remapDuplicatedDamageBuffs(damageMap: Record<string, string>) {
 }
 
 /** @desc 重建全局 buff 绑定：把每个标记为 global 的 buff 按作用域挂到适用条目上。
- *  工程不再自动创建「默认全局 buff」（原 global-{角色名} / global-all 空块已由 migration 清除），
+ *  工程不自动创建「默认全局 buff」（既有数据里的 global-{角色名} / global-all 空块由 migration 清除），
  *  全局 buff 完全由用户按需并入。
  *
  *  「适用条目」不止作用域命中的条目：跨角色引用（转模）会读「本条目可见的被引用角色面板」，

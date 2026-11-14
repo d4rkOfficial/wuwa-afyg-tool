@@ -1,9 +1,9 @@
 /**
  * @desc Buff 归属重指纯函数：把一份 buff 的链/阶规则与引用归属，落到「该实体在当前配队里真正的主人槽位」。
  *
- * 背景（曾经的 bug）：工坊落库与 AI 生成结果里的链/阶条件 `charIdx` 一律是 0
- * （share 迁移与 `sanitizeCondition` 的默认值），而导入时不做重指，于是
- * **任何人的链 buff 都进 1 号位的链、任何人的阶 buff 都进 1 号位的武器**。
+ * 为什么需要重指：工坊落库与 AI 生成结果里的链/阶条件 `charIdx` 一律是 0
+ * （share 迁移与 `sanitizeCondition` 的默认值），导入时若不做重指，
+ * **任何人的链 buff 都会进 1 号位的链、任何人的阶 buff 都会进 1 号位的武器**。
  *
  * 之所以单独成文件：`calculation.store`（写）与 `buff-import-utils`（检测）都要用它，
  * 放在任一侧都会造成 store ↔ utils 的循环依赖。
@@ -44,9 +44,9 @@ export const ownerIdxOfItem = (item: { ownerIdx?: number }, fallback = -1): numb
 
 /**
  * @desc 把规则里的角色归属重指到目标槽位。
- * - `target < 0`（该实体不在配队里）→ **丢弃**链/阶规则与面板规则，避免显示成某个角色的门槛；
- * - 否则 `chain` / `refinement` 规则的 charIdx 全部改成 target；
- * - `zoneCompare` 规则的 `-1`（= 伤害条目的角色）保持不变，其余槽位同样重指。
+ * - `target < 0`（该实体不在配队里）→ **丢弃**链/阶规则与「本角色」档的面板规则，避免显示成某个角色的门槛；
+ * - 否则 `chain` / `refinement` 规则的 charIdx 全部重指为 target；
+ * - `zoneCompare` 的 `-1`（= 伤害条目的角色 / 出伤者）**与归属无关**，任何 target 下都保留；其余槽位重指。
  */
 export const rewriteOwnerInRules = (rules: BuffRule[] | undefined, target: number): BuffRule[] | undefined => {
     if (!rules?.length) return rules
@@ -58,8 +58,12 @@ export const rewriteOwnerInRules = (rules: BuffRule[] | undefined, target: numbe
             continue
         }
         if (rule.kind === 'zoneCompare') {
+            if (rule.charIdx < 0) {
+                out.push(rule)
+                continue
+            }
             if (target < 0) continue
-            out.push(rule.charIdx < 0 ? rule : { ...rule, charIdx: target })
+            out.push({ ...rule, charIdx: target })
             continue
         }
         out.push(rule)
@@ -67,6 +71,12 @@ export const rewriteOwnerInRules = (rules: BuffRule[] | undefined, target: numbe
     return out.length > 0 ? out : undefined
 }
 
-/** @desc 把乘区条目里的引用归属重指到目标槽位；target < 0 时保持原样（由引擎按无归属处理） */
+/**
+ * @desc 把乘区条目里的引用归属重指到目标槽位。
+ * `characterIdx < 0`（出伤者）与归属无关，原样保留；`target < 0`（实体不在配队）时其余引用保持原样
+ * （由引擎按无归属处理）。
+ */
 export const rewriteOwnerInZones = (zones: readonly BuffZoneValue[], target: number): BuffZoneValue[] =>
-    zones.map((z) => (z.ref && target >= 0 ? { ...z, ref: { ...z.ref, characterIdx: target } } : { ...z }))
+    zones.map((z) =>
+        z.ref && target >= 0 && z.ref.characterIdx >= 0 ? { ...z, ref: { ...z.ref, characterIdx: target } } : { ...z }
+    )

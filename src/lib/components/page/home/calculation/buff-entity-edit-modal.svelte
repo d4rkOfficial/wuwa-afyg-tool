@@ -8,7 +8,7 @@
      * 覆盖同一乘区唯一；链条件与阶条件互斥（只能挂在整条 Buff 上）。
      * 数据在本地草稿上编辑，保存时整体写回本地 Buff 集（`updateEntityBuffs`）。
      *
-     * 结构（Phase 5.6 拆分，标记与行为未改）：
+     * 结构：
      * - 本文件 = 弹窗外壳（标题 / 底栏 / 左栏条目列表 / 右栏乘区清单）+ **Buff 草稿的唯一真相源**。
      * - 中部就地编辑区 → `buff-entity-editor.svelte`（受控区域，两条视图状态用 `$bindable` 回写）。
      * - 引用配置弹窗 → `buff-entity-ref-modal.svelte`（自带 11 个草稿 `$state`，确认时交回本外壳）。
@@ -21,13 +21,10 @@
     import BuffEntityEditor from './buff-entity-editor.svelte'
     import BuffEntityRefModal from './buff-entity-ref-modal.svelte'
     import { ZONE_NO_OVERRIDE_IDS, ZONE_SECTION_VIEWS } from '$lib/calc/calculation.consts'
-    import type {
-        BuffEntityType,
-        BuffLibraryBuff,
-        BuffLibraryGateCondition,
-        BuffLibraryScope
-    } from '$lib/data/buff-library.svelte'
+    import type { BuffEntityType, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
     import { ENTITY_TYPE_LABELS, updateEntityBuffs } from '$lib/data/buff-library.svelte'
+    import type { BuffRule } from '$lib/calc/calculation.types'
+    import { describeLibraryRules } from '$lib/calc/buff-library-condition'
     import { buffFolderPath, buffLeafName } from '$lib/calc/buff-name'
     import { describeZoneConditionBadge } from '$lib/calc/condition'
     import { addToast } from '$lib/data/toast.svelte'
@@ -71,16 +68,7 @@
                 buffName: b.buffName,
                 scope: b.scope,
                 exclusive: b.exclusive,
-                ...(b.condition
-                    ? {
-                          condition: {
-                              ...(b.condition.chains ? { chains: b.condition.chains.map((c) => ({ ...c })) } : {}),
-                              ...(b.condition.refinements
-                                  ? { refinements: b.condition.refinements.map((c) => ({ ...c })) }
-                                  : {})
-                          }
-                      }
-                    : {}),
+                ...(b.rules ? { rules: b.rules.map((rule) => ({ ...rule })) } : {}),
                 zones: b.zones.map((z) => ({
                     ...z,
                     ...(z.ref ? { ref: { ...z.ref } } : {}),
@@ -131,37 +119,11 @@
     })
 
     /**
-     * @desc 设置实例级链门槛（再次点击取消）。
-     * 链条件与阶条件**只能生效其中一个**：设置链会清空全部阶条件。
+     * @desc 写回当前 Buff 的 Buff 级规则（条件卡整组提交）。
+     * 规则之间的组合由规则面板负责（全部 AND），外壳只做持久化。
      */
-    function setBuffChain(min: number) {
-        const cond = activeBuff?.condition ?? {}
-        const clearing = (cond.chains?.[0]?.min ?? cond.chain) === min
-        const next: BuffLibraryGateCondition = { ...cond }
-        delete next.chain
-        delete next.refinement
-        delete next.refinements
-        if (clearing) delete next.chains
-        else next.chains = [{ charIdx: 0, min }]
-        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: next } : b))
-    }
-
-    /** @desc 设置实例级阶门槛（再次点击取消）；设置阶会清空全部链条件 */
-    function setBuffRefinement(min: number) {
-        const cond = activeBuff?.condition ?? {}
-        const clearing = (cond.refinements?.[0]?.min ?? cond.refinement) === min
-        const next: BuffLibraryGateCondition = { ...cond }
-        delete next.chain
-        delete next.chains
-        delete next.refinement
-        if (clearing) delete next.refinements
-        else next.refinements = [{ charIdx: 0, min }]
-        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: next } : b))
-    }
-
-    function clearCondition() {
-        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, condition: undefined } : b))
-        condPanelOpen = false
+    function setActiveRules(rules: BuffRule[]) {
+        buffs = buffs.map((b, i) => (i === activeBuffIdx ? { ...b, rules: rules.length > 0 ? rules : undefined } : b))
     }
 
     function selectBuff(idx: number) {
@@ -388,15 +350,12 @@
             <BuffEntityEditor
                 buff={activeBuff}
                 buffIndex={activeBuffIdx}
-                {entityType}
                 bind:expandedZoneIdx
                 bind:condPanelOpen
                 onrename={renameBuff}
                 onremove={removeBuff}
                 onscope={setBuffScope}
-                onchain={setBuffChain}
-                onrefine={setBuffRefinement}
-                onClearCondition={clearCondition}
+                onrules={setActiveRules}
                 onPatchZone={patchZoneAt}
                 onoverride={setZoneOverride}
                 onRemoveZone={removeZoneAt}
@@ -490,6 +449,11 @@
                     )
                     .join(' · ') || '无乘区'}
             </span>
+            {#if buff.rules?.length}
+                <span class="block truncate text-[10px] text-(--theme-accent-text)/70"
+                    >条件：{describeLibraryRules(buff.rules)}</span
+                >
+            {/if}
         </button>
     </div>
 {/snippet}

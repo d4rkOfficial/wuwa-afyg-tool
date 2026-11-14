@@ -1,28 +1,32 @@
 <script lang="ts">
     /**
-     * @desc Buff 预设编辑器 → 中部「就地编辑器」栏目（Phase 5.6：自 `buff-entity-edit-modal.svelte`
-     * **原样抽出**，标记与行为未改）：作用域 / 链阶硬门槛 / 乘区贡献条目列表。
+     * @desc Buff 预设编辑器 → 中部「就地编辑器」栏目：作用域 / 链阶硬门槛 / 乘区贡献条目列表。
      *
      * 职责边界：
      * - 本组件是**受控区域**：Buff 草稿与两条视图状态（`expandedZoneIdx` / `condPanelOpen`）都归外壳所有，
      *   两条视图状态用 `$bindable` 双向绑定 —— 外壳的 `selectBuff` / `addBuff` / `removeBuff` / 打开重置
-     *   共 4 条路径都要把 `expandedZoneIdx` / `condPanelOpen` 归零，状态留在外壳才能保持这些重置逐句不变
-     *   （与 `result/analysis/segment-dps.svelte` 用 `$bindable` 保标记逐字不变同一做法）。
+     *   共 4 条路径都要把 `expandedZoneIdx` / `condPanelOpen` 归零，状态留在外壳才能在一处完成这些重置
+     *   （与 `result/analysis/segment-dps.svelte` 用 `$bindable` 同一做法）。
      * - `buff` 由外壳传入（外壳用同一个值决定渲染本区域还是空态），本组件**不回读**外壳状态。
      * - 三个乘区行内开关按钮（覆盖 / 引用 / 条件）的类串与条件**逐字相同**，收敛为 snippet `zoneToggleBtn`。
-     * - **唯一的一处有意差异**：链/阶折叠动画原为内联 `{{ duration: 200 }}`，现改走
-     *   `slideParams(MOTION_MS.base)`（180ms，且跟随「减弱动态效果」）。原因是 `scripts/check-motion.mjs` ③
-     *   的棘轮按「文件 + 指令 + 实参」白名单定位站点，搬迁后旧站点失效、新站点即判为新增违规；
-     *   该脚本不在本任务可改范围内，故按闸门提示改走 token（与同一弹窗里引用配置卡的写法一致）。
+     * - 链/阶折叠动画走 `slideParams(MOTION_MS.base)`（180ms，且跟随「减弱动态效果」），
+     *   与同一弹窗里引用配置卡的写法一致 —— `scripts/check-motion.mjs` ③ 禁止指令内联手写时长。
      */
     import Icon from '@iconify/svelte'
     import Button from '$lib/components/ui/button.svelte'
     import { slide } from 'svelte/transition'
     import type { ComponentsProps } from '$lib/types'
     import ZoneConditionPanel from './zone-condition-panel.svelte'
+    import BuffModalRules from './buff-modal-rules.svelte'
     import { ZONE_MAP, ZONE_NO_OVERRIDE_IDS, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
-    import type { BuffEntityType, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
-    import { CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
+    import type { BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
+    import type { BuffRule } from '$lib/calc/calculation.types'
+    import {
+        LIBRARY_RULE_KINDS,
+        LIBRARY_ZONE_COMPARE_OPTIONS,
+        describeLibraryRules,
+        isActiveRefOwner
+    } from '$lib/calc/buff-library-condition'
     import BuffPathInput from './buff-path-input.svelte'
     import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
@@ -34,17 +38,15 @@
         buff: BuffLibraryBuff | null
         /** @desc 当前 Buff 的下标（回传给外壳的改名 / 删除 / 作用域回调用） */
         buffIndex: number
-        entityType: BuffEntityType
         /** @desc 展开行内「乘区条件」面板的乘区下标（绑定自外壳，外壳切条目时要归零） */
         expandedZoneIdx: number | null
-        /** @desc 链/阶硬门槛折叠面板是否展开（绑定自外壳，打开弹窗时要归零） */
+        /** @desc 门槛条件折叠面板是否展开（绑定自外壳，打开弹窗时要归零） */
         condPanelOpen: boolean
         onrename?: (idx: number, value: string) => void
         onremove?: (idx: number) => void
         onscope?: (idx: number, scope: BuffLibraryScope) => void
-        onchain?: (min: number) => void
-        onrefine?: (min: number) => void
-        onClearCondition?: () => void
+        /** @desc 写回当前 Buff 的 Buff 级规则（链阶 / 伤害名 / 面板数值 / 敌人类型） */
+        onrules?: (rules: BuffRule[]) => void
         onPatchZone?: (zoneIndex: number, patch: Partial<BuffLibraryBuff['zones'][number]>) => void
         onoverride?: (zoneIndex: number, override: boolean) => void
         onRemoveZone?: (zoneIndex: number) => void
@@ -54,15 +56,12 @@
     let {
         buff,
         buffIndex,
-        entityType,
         expandedZoneIdx = $bindable(),
         condPanelOpen = $bindable(),
         onrename,
         onremove,
         onscope,
-        onchain,
-        onrefine,
-        onClearCondition,
+        onrules,
         onPatchZone,
         onoverride,
         onRemoveZone,
@@ -83,23 +82,11 @@
         { value: 'effect_only', label: '效应' }
     ]
 
-    /** @desc 各实体类型可配置的硬门槛：角色 = 共鸣链、武器 = 精炼（与工坊业务口径一致） */
-    const canChain = $derived(entityType === 'character')
-    const canRefinement = $derived(entityType === 'weapon')
-
+    /** @desc 各实体类型可配置的条件：Buff 级规则对任何实体都成立（导入时按实体归属重指） */
     const zones = $derived(buff?.zones ?? [])
 
-    /** @desc 门槛条件摘要（只描述链/阶硬门槛；属性/类型条件挂在乘区上） */
-    const conditionSummary = $derived.by(() => {
-        const cond = buff?.condition
-        if (!cond) return ''
-        const parts: string[] = []
-        const chain = cond.chains?.[0]?.min ?? cond.chain
-        if (chain !== undefined && canChain) parts.push(chain > 0 ? `≥${chain}链` : '角色本体')
-        const refine = cond.refinements?.[0]?.min ?? cond.refinement
-        if (refine !== undefined && canRefinement) parts.push(`武器 ≥${refine}阶`)
-        return parts.join('，')
-    })
+    /** @desc 门槛条件摘要（Buff 级规则的紧凑文案；空条件返回空串） */
+    const rulesSummary = $derived(describeLibraryRules(buff?.rules))
 </script>
 
 <div
@@ -168,98 +155,39 @@
             </div>
         </div>
 
-        <!-- 链/阶硬门槛（折叠面板，链阶互斥；属性/类型条件挂在乘区上） -->
+        <!-- 门槛条件（Buff 级规则：链/阶、伤害名正则、角色面板数值、敌人类型；全部 AND） -->
         <div class="shrink-0 border-b" style="border-color: var(--theme-divider-border);">
             <button
                 onclick={() => (condPanelOpen = !condPanelOpen)}
                 class={[
                     'flex w-full items-center gap-1.5 px-3 py-2 text-left text-[10px] transition-colors hover:bg-(--theme-modal-text)/5',
-                    conditionSummary ? 'text-(--theme-accent-text)' : 'text-(--theme-modal-text)/60'
+                    rulesSummary ? 'text-(--theme-accent-text)' : 'text-(--theme-modal-text)/60'
                 ].join(' ')}
-                title="链/阶条件（硬性门槛，链阶互斥）"
+                title="Buff 级门槛条件：列出的条件全部满足才生效"
             >
                 <Icon
                     icon={condPanelOpen ? 'mdi:chevron-down' : 'mdi:chevron-right'}
                     class="size-3.5 shrink-0 text-(--theme-modal-text)/40"
                 />
-                <span class="shrink-0">链/阶条件</span>
-                {#if conditionSummary}
-                    <span class="min-w-0 truncate">：{conditionSummary}</span>
+                <span class="shrink-0">条件</span>
+                {#if rulesSummary}
+                    <span class="min-w-0 truncate">：{rulesSummary}</span>
+                {:else}
+                    <span class="min-w-0 truncate text-(--theme-modal-text)/30">（无条件，导入后恒生效）</span>
                 {/if}
             </button>
             {#if condPanelOpen}
-                {@const cond = buff.condition ?? {}}
-                <div
-                    transition:slide|local={slideParams(MOTION_MS.base)}
-                    class="flex flex-wrap items-center gap-2 px-3 pb-2.5"
-                >
-                    {#if canChain}
-                        <div
-                            class="flex items-center gap-2 rounded-none border px-2 py-1"
-                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                        >
-                            <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70">共鸣链</span>
-                            <div
-                                class="flex overflow-hidden rounded-none border"
-                                style="border-color: var(--theme-divider-border);"
-                            >
-                                {#each Array.from({ length: CHAIN_MAX + 1 }, (_, k) => k) as n (n)}
-                                    <button
-                                        onclick={() => onchain?.(n)}
-                                        title={n === 0 ? '本体（0链）' : `≥${n}链`}
-                                        class={[
-                                            'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                            (cond.chains?.[0]?.min ?? cond.chain) === n
-                                                ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                        ].join(' ')}
-                                    >
-                                        {n === 0 ? '本体' : n}
-                                    </button>
-                                {/each}
-                            </div>
-                        </div>
-                    {/if}
-                    {#if canRefinement}
-                        <div
-                            class="flex items-center gap-2 rounded-none border px-2 py-1"
-                            style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
-                        >
-                            <span class="flex h-6 items-center text-[10px] text-(--theme-modal-text)/70">精炼</span>
-                            <div
-                                class="flex overflow-hidden rounded-none border"
-                                style="border-color: var(--theme-divider-border);"
-                            >
-                                {#each Array.from({ length: REFINE_MAX }, (_, k) => k + 1) as n (n)}
-                                    <button
-                                        onclick={() => onrefine?.(n)}
-                                        title={`≥${n}阶`}
-                                        class={[
-                                            'flex h-6 min-w-6 items-center justify-center px-1 text-[11px] transition-colors',
-                                            (cond.refinements?.[0]?.min ?? cond.refinement) === n
-                                                ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
-                                                : 'text-(--theme-modal-text)/40 hover:text-(--theme-modal-text)/70'
-                                        ].join(' ')}
-                                    >
-                                        {n}
-                                    </button>
-                                {/each}
-                            </div>
-                        </div>
-                    {/if}
-                    {#if !canChain && !canRefinement}
-                        <span class="text-[10px] text-(--theme-modal-text)/35"
-                            >链/阶条件只用于角色（共鸣链）与武器（精炼）实体</span
-                        >
-                    {/if}
-                    <button
-                        onclick={onClearCondition}
-                        class="flex h-6 items-center gap-1 rounded-none border px-2 text-[10px] text-(--theme-modal-text)/40 transition-colors hover:border-red-500/40 hover:text-red-500"
-                        style="border-color: var(--theme-divider-border);"
-                    >
-                        <Icon icon="mdi:close-circle-outline" class="size-3" />
-                        清除
-                    </button>
+                <div transition:slide|local={slideParams(MOTION_MS.base)} class="flex h-72 px-0 pb-1">
+                    <BuffModalRules
+                        rules={buff.rules ?? []}
+                        charMode="owner"
+                        kinds={LIBRARY_RULE_KINDS}
+                        zoneCompareOptions={LIBRARY_ZONE_COMPARE_OPTIONS}
+                        onsave={(next) => {
+                            onrules?.(next)
+                            return null
+                        }}
+                    />
                 </div>
             {/if}
         </div>
@@ -356,8 +284,8 @@
                                     !!z.ref,
                                     () => onOpenRef?.(zoneIndex),
                                     z.ref
-                                        ? `引${entityType === 'character' ? '自己' : '主人'} ${ZONE_REF_MAP.get(z.ref.targetZoneId)?.label ?? z.ref.targetZoneId} × ${z.ref.pct}%`
-                                        : '引用某属性（如 当前攻击×N%）',
+                                        ? `引${isActiveRefOwner(z.ref.refOwner) ? '出伤者' : '本角色'} ${ZONE_REF_MAP.get(z.ref.targetZoneId)?.label ?? z.ref.targetZoneId} × ${z.ref.pct}%`
+                                        : '引用某属性（如 本角色攻击×N%）',
                                     'mdi:link-variant',
                                     z.ref ? '已引用' : '引用'
                                 )}

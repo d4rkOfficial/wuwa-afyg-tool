@@ -6,7 +6,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildEntityImportItems, dedupeImportItems } from '$lib/calc/buff-import-utils'
+import { buildEntityImportItems, dedupeImportItems, toImportItem } from '$lib/calc/buff-import-utils'
 import { resolveImportTarget } from '$lib/calc/buff-import-target'
 import { getAllBuffConfs, importBuffSetsWithDecisions, mapImportedScope } from '$lib/calc/calculation.store.svelte'
 import { classifyBuffScope } from '$lib/calc/calculation.consts'
@@ -71,7 +71,7 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
     it('dedupeImportItems 不能把「同名不同主人」当成批次内重复丢掉', () => {
         const items = buildEntityImportItems(entityWith('echo', '声骸X', '首位声骸效果A', 'self'), TEAM)
         const deduped = dedupeImportItems(items)
-        assert.equal(deduped.length, 2, '同名但归属不同 → 两条都要留下（这就是曾经的 bug）')
+        assert.equal(deduped.length, 2, '同名但归属不同 → 两条都要留下（去重键含归属）')
         assert.deepEqual(
             deduped.map((i) => i.ownerIdx),
             [0, 1]
@@ -138,7 +138,7 @@ describe('共享实体的导入批次：每个主人都要拿到条目', () => {
         assert.notEqual(mapImportedScope('team_only', 0, 3), 'all')
     })
 
-    it('端到端：效应专属条目落库后 scope 为空数组（不再变成全队）', () => {
+    it('端到端：效应专属条目落库后 scope 为空数组（保持仅效应）', () => {
         const entity = entityWith('echo', '声骸X', '效应专属加深E2E', 'effect_only')
         const items = buildEntityImportItems(entity, TEAM)
         const deduped = dedupeImportItems(items)
@@ -195,7 +195,7 @@ describe('导入落点：实体来源决定归属文件夹', () => {
         assert.equal(items[0].targetName, '甲-武器A\\武器效果')
     })
 
-    it('来源文件夹与实体同名时不再重复套一层；不同名则保留为二级', () => {
+    it('来源文件夹与实体同名时只保留一层；不同名则保留为二级', () => {
         const same = buildEntityImportItems(entityWith('echo', '声骸X', '声骸X\\子效果', 'self'), TEAM)
         assert.equal(same[0].targetName, '甲-声骸X\\子效果')
         const nested = buildEntityImportItems(entityWith('echo', '声骸X', '子文件夹\\效果', 'self'), TEAM)
@@ -208,5 +208,75 @@ describe('导入落点：实体来源决定归属文件夹', () => {
             resolveImportTarget('链效果', { chains: [{ charIdx: 0, min: 2 }] }, 0, TEAM).fullName,
             '甲-2链\\链效果'
         )
+    })
+})
+
+// ── 归属轴：本角色（实体归属槽位）/ 出伤者（-1）──
+describe('归属轴：出伤者档与归属槽位无关', () => {
+    const cmp = (charIdx: number) => ({ kind: 'zoneCompare', charIdx, zone: 'critRate', op: 'ge', value: 60 }) as const
+    const importRules = (charIdx: number, owner: number) =>
+        (toImportItem({ name: '单档', rules: [cmp(charIdx)], zones: [] }, owner, TEAM).rules ?? []).filter(
+            (rule) => rule.kind === 'zoneCompare'
+        )
+
+    it('本角色档重指到主人在配队里的槽位', () => {
+        assert.deepEqual(importRules(0, 1), [cmp(1)], '「本角色」跟着主人走')
+    })
+
+    it('出伤者档保持 -1（与主人槽位无关）', () => {
+        assert.deepEqual(importRules(-1, 1), [cmp(-1)])
+    })
+
+    it('实体不在配队里：本角色档丢弃，出伤者档照常保留', () => {
+        assert.deepEqual(importRules(0, -1), [], '没有归属就不留「本角色」档')
+        assert.deepEqual(importRules(-1, -1), [cmp(-1)], '出伤者与实体归属无关，不能跟着一起丢')
+    })
+
+    it('引用归属：refOwner=active 导入成 characterIdx=-1，本角色落实体归属槽位', () => {
+        const entity = {
+            entityType: '2set',
+            entityName: '套装S',
+            source: 'share',
+            buffs: [
+                {
+                    buffName: '转模出伤者',
+                    scope: 'team',
+                    zones: [
+                        {
+                            zoneId: 'extraRatio',
+                            value: 0,
+                            ref: { targetZoneId: 'baseAtk', pct: 10, refOwner: 'active' }
+                        }
+                    ]
+                }
+            ]
+        } as unknown as BuffLibraryEntity
+        importBuffSetsWithDecisions(buildEntityImportItems(entity, TEAM), {}, -1, TEAM.length)
+        const written = getAllBuffConfs().find((s) => s.name.endsWith('转模出伤者'))
+        assert.equal(written?.zones[0]?.ref?.characterIdx, -1, '出伤者 = 本条目所属角色')
+    })
+
+    it('引用归属：refOwner=owner（本角色）导入成实体归属槽位', () => {
+        const entity = {
+            entityType: '2set',
+            entityName: '套装S',
+            source: 'share',
+            buffs: [
+                {
+                    buffName: '转模本角色',
+                    scope: 'team',
+                    zones: [
+                        {
+                            zoneId: 'extraRatio',
+                            value: 0,
+                            ref: { targetZoneId: 'baseAtk', pct: 10, refOwner: 'owner' }
+                        }
+                    ]
+                }
+            ]
+        } as unknown as BuffLibraryEntity
+        importBuffSetsWithDecisions(buildEntityImportItems(entity, TEAM), {}, -1, TEAM.length)
+        const written = getAllBuffConfs().find((s) => s.name.endsWith('转模本角色'))
+        assert.equal(written?.zones[0]?.ref?.characterIdx, 0, '本角色 = 该套装在配队里的首个主人')
     })
 })

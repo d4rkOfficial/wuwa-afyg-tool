@@ -3,6 +3,8 @@ import { dbGet, dbSet } from '$lib/data/db'
 import { getShareBase } from './workshop.svelte'
 import { ZONE_MAP, ZONE_NO_REF_IDS, resolveZoneId } from '$lib/calc/calculation.consts'
 import { normalizeZoneCondition } from '$lib/calc/condition'
+import { normalizeRules, rulesFromLegacyCondition } from '$lib/calc/rules'
+import { sanitizeLibraryRules, sanitizeRefOwner, type LibraryRefOwner } from '$lib/calc/buff-library-condition'
 import type { BuffCondition, BuffRule } from '$lib/calc/calculation.types'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/consts/game-terms'
 import {
@@ -31,15 +33,15 @@ export { CHAIN_MAX, REFINE_MAX }
  * @desc Buff 库（本地库 / 工坊 share）的**实例级条件**：只有链/阶硬门槛。
  *
  * 这是**导入源格式**，与工程的 `BuffInstance.rules` 不是同一层：导入工程时由
- * `rulesFromLegacyCondition` 升级为 `chain` / `refinement` 规则（见 `buff-import-target`）。
- * 之所以不直接把库里也改成 `rules`：share 接口与既有 localStorage 数据都还按这个形状存。
+ * `rulesFromLegacyCondition` 换算为 `chain` / `refinement` 规则（见 `buff-import-target`）。
+ * 库里保持这个形状：share 接口与既有 localStorage 数据都按它存。
  */
 export interface BuffLibraryGateCondition {
     chains?: { charIdx: number; min: number }[]
     refinements?: { charIdx: number; min: number }[]
-    /** @desc 兼容旧结构：单值链（参考角色按 0 号位） */
+    /** @desc 单值链（参考角色按 0 号位） */
     chain?: number
-    /** @desc 兼容旧结构：单值阶 */
+    /** @desc 单值阶 */
     refinement?: number
 }
 
@@ -87,26 +89,27 @@ function cloneZoneCondition(cond: BuffCondition): BuffCondition {
     }
 }
 
-function cloneCondition(cond: BuffLibraryGateCondition): BuffLibraryGateCondition {
-    return {
-        ...(cond.chains ? { chains: cond.chains.map((c) => ({ ...c })) } : {}),
-        ...(cond.refinements ? { refinements: cond.refinements.map((c) => ({ ...c })) } : {})
-    }
-}
-
 /**
- * @desc 按实体类型裁剪条件（工坊预设库口径）：
- * 链条件只属于角色实体、阶条件只属于武器实体；声骸 / 套装一律清空实例级条件
- * （它们的生效条件由乘区级 / 导入时的角色本体门承担）。
+ * @desc 库内 Buff 级条件的**唯一折算入口**：把两份表示合并成一组规则 ——
+ * `condition.chains/refinements`（工坊的链阶门槛）折算成 `chain` / `refinement` 规则，
+ * 与规则列表（`rules`，工坊放在 `condition.rules` 里）**并存时两者都要**，最后统一过库口径裁剪。
+ *
+ * 库里只保留一种表示（`rules`），避免同一条 Buff 出现两套条件语义。
  */
-function sanitizeConditionForEntity(
-    entityType: BuffEntityType,
-    cond: BuffLibraryGateCondition
-): BuffLibraryGateCondition | undefined {
-    const out = cloneCondition(cond)
-    if (entityType !== 'character') delete out.chains
-    if (entityType !== 'weapon') delete out.refinements
-    return Object.keys(out).length > 0 ? out : undefined
+export const libraryRulesOf = (buff: { rules?: unknown; condition?: unknown }): BuffRule[] | undefined => {
+    const cond = (buff.condition && typeof buff.condition === 'object' ? buff.condition : {}) as Record<string, unknown>
+    const listed = normalizeRules(buff.rules) ?? normalizeRules(cond.rules)
+    const explicit = sanitizeLibraryRules(listed) ?? []
+    const legacy = sanitizeLibraryRules(rulesFromLegacyCondition(normalizeGateCondition(buff.condition), 0)) ?? []
+    const merged: BuffRule[] = []
+    const seen = new Set<string>()
+    for (const rule of [...explicit, ...legacy]) {
+        const key = JSON.stringify(rule)
+        if (seen.has(key)) continue
+        seen.add(key)
+        merged.push(rule)
+    }
+    return merged.length > 0 ? merged : undefined
 }
 
 export interface BuffLibraryZoneRef {
@@ -118,7 +121,11 @@ export interface BuffLibraryZoneRef {
     discrete?: boolean
     divisor?: number
     multiplier?: number
-    refOwner?: 'self' | 'owner'
+    /**
+     * @desc 引用归属（本角色 / 出伤者），导入工程时折算成 `ZoneRef.characterIdx`：
+     * `active` → `-1`（出伤者 = 本条目所属角色），`self` / `owner` → 实体归属槽位。
+     */
+    refOwner?: LibraryRefOwner
 }
 
 /** @desc 乘区贡献条目：同一乘区可出现多次，每条各带数值 / 引用 / 覆盖 / 自己的乘区级条件 */
@@ -137,8 +144,7 @@ export interface BuffLibraryItem {
     buffName: string
     scope?: BuffLibraryScope
     exclusive?: boolean
-    condition?: BuffLibraryGateCondition
-    /** @desc 新版 Buff 级规则（导入工程时直接带入；库里其它条目仍可能是旧的 `condition`） */
+    /** @desc Buff 级规则（库口径，见 `calc/buff-library-condition`） */
     rules?: BuffRule[]
     zones: BuffLibraryZone[]
 }
@@ -147,8 +153,12 @@ export interface BuffLibraryBuff {
     buffName: string
     scope?: BuffLibraryScope
     exclusive?: boolean
+    /**
+     * @desc 链/阶门槛的**输入载荷通道**（工坊 `condition` jsonb、AI 生成结果用它）。
+     * 读入时由 `libraryRulesOf` 折算成 `rules`，实体上不保留该字段。
+     */
     condition?: BuffLibraryGateCondition
-    /** @desc 新版 Buff 级规则（与 `condition` 二选一，优先 `rules`） */
+    /** @desc Buff 级规则（库口径：5 种 kind，`charIdx` 只有「本角色 0 / 出伤者 -1」两档） */
     rules?: BuffRule[]
     zones: BuffLibraryZone[]
 }
@@ -282,7 +292,7 @@ export function getBuffLibrary(): BuffLibraryItem[] {
                 buffName: buff.buffName,
                 scope: buff.scope,
                 exclusive: buff.exclusive,
-                ...(buff.condition ? { condition: buff.condition } : {}),
+                ...(buff.rules ? { rules: buff.rules } : {}),
                 zones: buff.zones
             })
         }
@@ -325,13 +335,12 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
                 const name = clampBuffPathName(String(bb.buffName ?? '').trim(), 1)
                 const zones = normalizeZones(bb.zones)
                 if (!name) continue
+                const rules = libraryRulesOf(bb)
                 buffs.push({
                     buffName: name,
                     scope: (bb.scope as BuffLibraryScope) ?? undefined,
                     exclusive: !!bb.exclusive,
-                    ...(normalizeGateCondition(bb.condition)
-                        ? { condition: normalizeGateCondition(bb.condition) }
-                        : {}),
+                    ...(rules ? { rules } : {}),
                     zones
                 })
             }
@@ -361,7 +370,8 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
             const name = clampBuffPathName(String(obj.buffName ?? '').trim(), 1)
             const zones = normalizeZones(obj.zones)
             if (!name) continue
-            const buff = { buffName: name, zones }
+            const rules = libraryRulesOf(obj)
+            const buff = { buffName: name, ...(rules ? { rules } : {}), zones }
             const existing = map.get(key)
             if (existing) {
                 const k = buffKey(buff)
@@ -381,6 +391,19 @@ function normalizeStored(data: unknown): BuffLibraryEntity[] {
     return [...map.values()]
 }
 
+/** @desc 归一化引用条目：目标乘区必填，归属档位走白名单（白名单外丢弃，避免脏值流到工程侧） */
+const normalizeLibraryRef = (ref: unknown): BuffLibraryZoneRef | undefined => {
+    if (!ref || typeof ref !== 'object') return undefined
+    const raw = ref as Record<string, unknown>
+    const targetZoneId = typeof raw.targetZoneId === 'string' ? raw.targetZoneId.trim() : ''
+    if (!targetZoneId) return undefined
+    const next = { ...(raw as unknown as BuffLibraryZoneRef), targetZoneId }
+    const refOwner = sanitizeRefOwner(raw.refOwner)
+    if (refOwner) next.refOwner = refOwner
+    else delete next.refOwner
+    return next
+}
+
 /**
  * @desc 归一化乘区贡献条目列表（历史乘区 id 重映射 + 白名单校验 + 引用 / 覆盖 /
  * **乘区级生效条件**保留 + 允许同乘区多条）：与工程侧 `migration.normalizeZoneList` 同口径，
@@ -395,7 +418,7 @@ function normalizeZones(value: unknown): BuffLibraryZone[] {
         const zoneId = resolveZoneId(String(zo.zoneId ?? ''))
         if (!ZONE_MAP.has(zoneId)) continue
         const num = Number(zo.value)
-        const ref = ZONE_NO_REF_IDS.has(zoneId) ? undefined : (zo.ref as BuffLibraryZoneRef | undefined)
+        const ref = ZONE_NO_REF_IDS.has(zoneId) ? undefined : normalizeLibraryRef(zo.ref)
         const condition = normalizeZoneCondition(zo.condition as BuffCondition | undefined)
         zones.push({
             zoneId,
@@ -420,15 +443,15 @@ function cloneBuffsValid(buffs: BuffLibraryBuff[]): BuffLibraryBuff[] {
         const name = b.buffName.trim()
         if (!name || seen.has(name)) continue
         seen.add(name)
+        const rules = libraryRulesOf(b)
         out.push({
             buffName: name,
             scope: b.scope,
             exclusive: b.exclusive,
-            ...(b.condition ? { condition: cloneCondition(b.condition) } : {}),
-            ...(b.rules ? { rules: b.rules.map((rule) => ({ ...rule })) } : {}),
+            ...(rules ? { rules } : {}),
             zones: b.zones.map((z) => {
                 const copy: BuffLibraryZone = { ...z }
-                // 层数类乘区（集谐干涉/同奏增益等）只填固定层数，持久化前清除历史遗留引用
+                // 层数类乘区（集谐干涉/同奏增益等）只填固定层数，持久化前丢弃该类乘区上可能存在的引用
                 if (ZONE_NO_REF_IDS.has(z.zoneId)) delete copy.ref
                 if (copy.condition) copy.condition = cloneZoneCondition(copy.condition)
                 if (copy.ref) copy.ref = { ...copy.ref }
@@ -446,10 +469,7 @@ export async function updateEntityBuffs(
     folders?: BuffLibraryFolder[]
 ) {
     const key = entityKey(entityType, entityName)
-    const valid = cloneBuffsValid(buffs).map((b) => ({
-        ...b,
-        ...(b.condition ? { condition: sanitizeConditionForEntity(entityType, b.condition) } : {})
-    }))
+    const valid = cloneBuffsValid(buffs)
     const exists = _entities.some((e) => entityKey(e.entityType, e.entityName) === key)
     const nextFolders = mergeFolders(folders ?? [], valid)
     if (exists) {
@@ -520,7 +540,10 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
                 buff_name?: string
                 scope?: BuffLibraryScope
                 exclusive?: boolean
+                /** @desc 工坊侧的实例级条件（链/阶），读入后折算为 `rules` */
                 condition?: BuffLibraryGateCondition
+                /** @desc 工坊侧的 Buff 级规则（与工具箱同一套判据） */
+                rules?: unknown
                 buff_set?: BuffLibraryZone[]
             }>
             folders?: Array<{
@@ -542,15 +565,18 @@ export async function fetchBuffSetsFromShare(): Promise<FetchBuffSetsResult> {
             foldersByKey.set(key, list)
         }
         const rows: BuffLibraryItem[] = (json.buffSets ?? [])
-            .map((r) => ({
-                entityType: (r.entity_type ?? '') as BuffEntityType,
-                entityName: (r.entity_name ?? '').trim(),
-                buffName: clampBuffPathName((r.buff_name ?? '').trim(), 1),
-                scope: r.scope,
-                exclusive: !!r.exclusive,
-                ...(normalizeGateCondition(r.condition) ? { condition: normalizeGateCondition(r.condition) } : {}),
-                zones: normalizeZones(r.buff_set)
-            }))
+            .map((r) => {
+                const rules = libraryRulesOf({ rules: r.rules, condition: r.condition })
+                return {
+                    entityType: (r.entity_type ?? '') as BuffEntityType,
+                    entityName: (r.entity_name ?? '').trim(),
+                    buffName: clampBuffPathName((r.buff_name ?? '').trim(), 1),
+                    scope: r.scope,
+                    exclusive: !!r.exclusive,
+                    ...(rules ? { rules } : {}),
+                    zones: normalizeZones(r.buff_set)
+                }
+            })
             .filter((row) => ENTITY_TYPES.includes(row.entityType) && !!row.entityName && !!row.buffName)
         mergeShareRows(rows, foldersByKey)
         await persist()
@@ -579,7 +605,7 @@ function mergeShareRows(rows: BuffLibraryItem[], foldersByKey: ReadonlyMap<strin
             buffName: row.buffName.trim(),
             scope: row.scope,
             exclusive: row.exclusive,
-            ...(row.condition ? { condition: row.condition } : {}),
+            ...(row.rules ? { rules: row.rules } : {}),
             zones
         })
     }
