@@ -140,7 +140,7 @@ const MOTION_DIRECTIVE = /^(transition|in|out|animate):/
  *
  * 为什么不能对整行做 `<[A-Z]` 之类的文本匹配：那样对「指令属于哪个标签」毫无判断力——
  * 实测会把 `<div transition:slide …>` 与同一行后面的 `<Icon …>` 算成同一条命中，
- * 于是所有「元素挂指令 + 同行还有组件」的合法写法全部误报。这里改为：
+ * 于是所有「元素挂指令 + 同行还有组件」的合法写法全部误报。这里按标签归属判定：
  * 扫描模板 → 逐个解析起始标签 → 只在**属性位置**识别指令 → 组件判定只看该标签自己的 name。
  */
 const collectDirectives = (src) => {
@@ -292,7 +292,7 @@ const allDirectives = [...facts].flatMap(([file, f]) => f.directives.map((d) => 
 // ─────────── ③ 手写字面量时长棘轮（基线 + 单调递减） ───────────
 
 /**
- * @desc ③ 基线：**已清零**（T17 把最后 14 处迁到 `slideParams(MOTION_MS.*)` 后实测 0 处）。
+ * @desc ③ 基线：**0 处**（实测无内联手写字面量时长；所有动效时长走 `MOTION_MS` / `motionDuration` / `slideParams`）。
  * key = `<文件> :: <指令>=<实参>`，value = 该 key 的出现次数（同文件同型站点会合并计数）。
  * key 刻意不含行号与标签名：行号会随无关编辑漂移，按「文件 + 指令 + 实参」定位才稳定。
  * 还清债后请**同时**下调 LITERAL_DURATION_BASELINE 与对应条目（脚本会自检两者一致）。
@@ -303,18 +303,14 @@ const LITERAL_DURATION_BASELINE = 0
 const LITERAL_SITES = new Map([])
 
 /**
- * @desc ③ 永久豁免：**当前为空**（T26 已清空最后一条）。
+ * @desc ③ 永久豁免：**当前为空**。
  *
- * 曾经的唯一一条是 `layout/modal.svelte` 的遮罩 `out:fade={{ duration: 130 }}`，
- * 理由是「刻意比 --motion-fast(120) 多 10ms，与面板 out:popOut 的默认 130ms 配对」。
- * T26 把它改成 `out:fade={{ duration: motionDuration(130) }}`：
- *   - 正常模式仍返回 130ms（`motionDuration` 只在 reduce 下压到 1ms）→ 配对观感**不变**；
- *   - reduce 下遮罩与面板（`out:popOut` 默认值已是 `motionDuration(130)`）一起归零，
- *     修掉 T18 留下的「面板瞬收、遮罩 130ms 才淡完」的不对称。
- * 于是它不再需要豁免：实参里没有字面量 `duration: <数字>`，③ 自然不命中。
- *
- * 这里保留空 Map 而不是删掉整个机制：下一个「确实只能用字面量」的站点仍应有登记处，
+ * 登记处保留为空 Map 而不是删掉整个机制：下一个「确实只能用字面量」的站点仍应有登记处，
  * 脚本也照旧无条件打印本清单（空 = 无豁免，不留误导）。
+ *
+ * 判定口径：实参里没有字面量 `duration: <数字>` 就不命中 —— `motionDuration(130)` 这类包装
+ * 在正常模式返回 130ms、reduce 下压到 1ms，遮罩与面板（`out:popOut` 默认 `motionDuration(130)`）
+ * 一起归零，正常模式下配对观感不变，也不需要登记豁免。
  */
 const EXEMPT = new Map([])
 
@@ -363,7 +359,7 @@ const EXEMPT = new Map([])
     }
     if (reclaimed.length) {
         for (const x of reclaimed)
-            console.log(`   ↺ 可下调基线（已不再手写）: ${x} → 现为 ${LITERAL_DURATION_BASELINE}`)
+            console.log(`   ↺ 可下调基线（该站点已无手写字面量）: ${x} → 现为 ${LITERAL_DURATION_BASELINE}`)
     }
     if (!fresh.length && !reclaimed.length) console.log('   ✓ 无新增违规，基线无冗余')
     for (const [key, reason] of EXEMPT) {

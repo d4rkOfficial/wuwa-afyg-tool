@@ -89,7 +89,7 @@ describe('非直伤弹窗：触发者即开关', () => {
         ])
     })
 
-    it('效应层数归 0 时段数一并复位，且不再写入', () => {
+    it('效应层数归 0 时段数一并复位，且该条目不写入', () => {
         openPicker('d')
         updateNonDirectPickerEffect('风蚀效应', { layers: 4, hits: 3 })
         updateNonDirectPickerEffect('风蚀效应', { layers: 0 })

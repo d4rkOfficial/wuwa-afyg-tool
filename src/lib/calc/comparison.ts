@@ -42,7 +42,7 @@ export function getComparisonEligibility(
     const refinements = new Set<number>()
     for (const bs of buffSets) {
         if (!bs.rules?.length || !mounted.has(bs.id)) continue
-        // 链/阶门槛现在是 Buff 级规则（可并存，不再二选一）
+        // 链/阶门槛都是 Buff 级规则（可并存）
         for (const rule of bs.rules) {
             if (rule.kind === 'chain' && rule.min >= 0) chains.add(rule.min)
             if (rule.kind === 'refinement' && rule.min >= 0) refinements.add(rule.min)

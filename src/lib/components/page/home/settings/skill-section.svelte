@@ -33,9 +33,8 @@
     const enabledCount = $derived(skills.filter((s) => s.enabled).length)
 
     /**
-     * @desc 逐行启停（T15）：原来是 `mdi:toggle-switch` 图标按钮，与编辑弹窗里那个手搓 toggle 按钮
-     * 是**同一个概念的两套实现**，现统一为 `ui/tabs` 的两段文字 tab（启用｜禁用）。
-     * 轨道宽度取设置内统一的 `ROW_TABS`（`./utils`），原先这里是 `w-28`。
+     * @desc 逐行启停：`ui/tabs` 的两段文字 tab（启用｜禁用），与编辑弹窗里的同类控件是**同一个概念、同一套实现**。
+     * 轨道宽度取设置内统一的 `ROW_TABS`（`./utils`），与列表行同宽。
      */
     const ENABLED_TABS = [
         { value: 'on', label: '启用' },

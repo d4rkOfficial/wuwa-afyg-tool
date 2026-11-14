@@ -5,7 +5,7 @@
 // 设计：
 //   - 每个检查项都带「基线白名单」= 整改开始时的既有债务（见 .tmp/component-consistency-plan.md）。
 //   - 白名单外的**新**违规 → 失败（exit 1），防退化。
-//   - 白名单内已不再违规的条目 → 提示「可回收」，不失败（推动债务单调下降）。
+//   - 白名单内当前无违规的条目 → 提示「可回收」，不失败（推动债务单调下降）。
 //   - 永远豁免项放在 EXEMPT，不计入债务。
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, extname } from 'node:path'
@@ -74,9 +74,7 @@ const BASELINE = {
     //  `comparison-modal` / `skill-picker` 各 2 处；另有一处 `ui/confirm-dialog.svelte` 因
     //  `class={…}` 写法被漏检而从未进基线）。故现为**硬闸门**：新增手搓 backdrop 立即失败。
     backdrop: new Set([]),
-    // ④ 内联 <style> —— 9 个中 5 个已迁移（toast/welcome-screen 动画 → layout.css @theme；
-    //    config/team-config 的 .hide-scrollbar → layout.css；toolbar → Tailwind arbitrary variant），
-    //    余 4 个见 EXEMPT.style。基线归零。
+    // ④ 内联 <style> —— 只保留 EXEMPT.style 里列出的少数几个（各有无法用 Tailwind 表达的理由）。基线归零。
     style: new Set([]),
     // ⑤ 禁止裸 z-40..z-100（弹窗层级一律走 layout.css 的 --z-* token）
     //    Phase 3.5 已完成：原 30 个文件的裸值全部迁移为 z-(--z-*)，基线归零。
@@ -101,28 +99,23 @@ const BASELINE = {
      * ── 剩余 4 项的处置结论（T34 逐项实测后落定，**不要再把它们当「待接线」**）──
      * • `button`：✅ **已回收**（T5，原基线最大一笔债）。它**不是**「找不到接线点」，而是元件 API
      *   不足以承接现状 —— 已扩充合同（`children` / `type` / `$restProps` / `compact` / `bare`），
-     *   并接线**弹窗 footer 族 10 处**（实测该族原本只有 `transition-colors hover:*`，
+     *   并接线**弹窗 footer 族 10 处**（实测该族只有 `transition-colors hover:*`，
      *   `bare` 关掉元件自带的状态层后与原生按钮无可见差异）。剩余 371 处按目录分批推进。
      * • `avatar`：✅ **已回收**（非直伤弹窗重做）：接线点是该弹窗「处决/响应」行的触发者头像
-     *   （点头像 = 启用 + 指定触发者），并为此给元件补了 `xs`（24px）档 —— 原先最小 `sm` 是 32px，
+     *   （点头像 = 启用 + 指定触发者），并为此给元件补了 `xs`（24px）档 —— `sm` 档 32px
      *   在 36px 行高的密集行里偏大。T34 记的另一个障碍（「不可关掉自身表面」）实测不构成问题：
      *   行本身已有底色/描边，头像自带的 `theme-glass-surface` 叠上去正是想要的观感。
      * • `search-box`：三个 picker 的搜索框都在 `{#snippet title()}` 里，形态是
      *   「放大镜 + 无边框透明 input + 清除钮」；`search-box` 是**有边框+底色**的独立输入控件，
      *   与本项目 title 行设计不同；且它 `value`/`oninput` 非 `$bindable`，换用要把
-     *   `bind:value={query}` 改成 `value` + `oninput` 两处手写（3 个 picker × 2 = 6 处）。
+     *   `bind:value={query}` 写成 `value` + `oninput` 两处手写（3 个 picker × 2 = 6 处）。
      *   属**待扩充**（需无边框档 + `bindable`），不是「没有场景」。
-     * • `select`：见 2.7 决策 —— 全项目手搓下拉（`layout/context-menu`、`timeline/context-menu`、
-     *   `config.svelte` 主词条菜单）**语义是命令菜单/就地菜单**，与「取值选择器」不同，
-     *   不应硬接。判定为「保留的通用控件」，故永久留在基线而非待办。
+     * • `select`：✅ **已回收**（Buff 门槛条件编辑器的「属性 / 比较符」下拉改用 `ui/select`）。
+     *   它再次证明「取值选择器」与命令菜单/就地菜单是两类语义：后者仍不硬接。
      * → 结论：`search-box` 是**元件扩充**任务（AGENTS §3「ui/ 缺失的元件应补在 ui/」），
-     *   接线点已定位；`select` + `switch` 是**明确保留**的通用控件。
+     *   接线点已定位；`switch` 是**明确保留**的通用控件。
      */
-    uiNoRef: new Set([
-        'src/lib/components/ui/search-box.svelte',
-        'src/lib/components/ui/select.svelte',
-        'src/lib/components/ui/switch.svelte'
-    ])
+    uiNoRef: new Set(['src/lib/components/ui/search-box.svelte', 'src/lib/components/ui/switch.svelte'])
 }
 
 /** @desc 判定「手搓 backdrop」：fixed inset-0 + 视觉遮罩特征（排除透明的 click-catcher） */
@@ -132,7 +125,7 @@ const isBackdrop = (cls) => /fixed inset-0/.test(cls) && /backdrop-blur|--theme-
  * @desc 抽出所有 class 属性值。**必须同时支持两种写法**：
  *   - `class="…"`（字面量）
  *   - `class={…}`（表达式，内部做花括号配对，跳过字符串字面量里的括号）
- * 早期版本只扫字面量，导致 `ui/confirm-dialog.svelte` 用
+ * 只扫字面量会让 `ui/confirm-dialog.svelte` 用
  * `class={mergeClass(['… fixed inset-0 … backdrop-blur-sm', className])}` 手搓的 backdrop
  * 完全逃过检查（实测漏检）。多行写法也靠花括号配对覆盖。
  */

@@ -1,6 +1,6 @@
 // 回归：IndexedDB 落盘必须先把 Svelte `$state`（= Proxy）转成结构化克隆安全的纯值。
 //
-// 历史 bug：`$state` 读出来的一切对象/数组都是 Proxy，结构化克隆（`indexedDB.put` 与
+// 根因：`$state` 读出来的一切对象/数组都是 Proxy，结构化克隆（`indexedDB.put` 与
 // `structuredClone` 同一套算法）明确拒绝 Proxy → `DataCloneError` 被 `dbSet` 的 try/catch 吞掉，
 // 表现就是「设置改了、退出重进就丢」（实测受影响：工坊/分享源、按键图标、快捷键位、AI 助手偏好）。
 import { describe, it } from 'node:test'

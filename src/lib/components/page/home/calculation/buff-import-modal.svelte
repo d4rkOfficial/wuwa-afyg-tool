@@ -171,7 +171,7 @@
             .join(' / ')
     }
 
-    /** @desc 统一的导入执行 + 结果提示（重名由 store 自动补 #，不再弹冲突窗） */
+    /** @desc 统一的导入执行 + 结果提示（重名由 store 自动补 #，不弹冲突窗） */
     function runImport(items: ImportBuffInput[]) {
         const report = importBuffSetsWithDecisions(items, { autoRename: true }, -1, team.length)
         const parts = [`已导入 ${report.added} 条`]

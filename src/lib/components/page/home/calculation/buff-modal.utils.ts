@@ -11,7 +11,7 @@ import type { BuffTreeNode } from '$lib/calc/buff-tree'
 import type { BuffConf, ZoneRef } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
-/** @desc 右栏「添加乘区」清单的固定宽度（不再支持拖拽调宽） */
+/** @desc 右栏「添加乘区」清单的固定宽度（不做拖拽调宽） */
 export const ZONE_BAR_WIDTH = 208
 
 // ── 数字/百分比换算 ──
@@ -170,7 +170,7 @@ export const nextScopeAfterEffectToggle = (scope: 'all' | number[], teamSize = 3
 // ── 列表展示派生（徽标 / 分组）──
 
 /**
- * @desc 条目作用域徽标（**行首**，取代原星标图标）：
+ * @desc 条目作用域徽标（**行首**）：
  * - 通用（`'all'`，三名角色 + 效应都吃）→ 主题色实心「通用」
  * - 全队（`[0,1,2]`，只有三名角色）→ 主题色描边「全队」
  * - 仅效应（空数组）→ 主题色描边「效应专属」
@@ -231,7 +231,7 @@ export const folderMembersOf = (folder: GroupedBuffConfItem): BuffConf[] => [
     ...((folder as BuffTreeNode).gateChildren ?? []).flatMap((gate) => folderMembersOf(gate))
 ]
 
-/** @desc 目录图标配色：一律半透明灰（星标已移除，不再有「内部有收藏条目」的标黄口径） */
+/** @desc 目录图标配色：一律半透明灰（不按「内部有收藏条目」标黄） */
 export const folderIconClass = (base: string): string => `${base} opacity-60`
 
 /** @desc 非全局容器（角色链 / 武器目录）下未被数字归并的散条目（数字目录由 foldersOf 分支渲染） */

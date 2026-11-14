@@ -64,9 +64,9 @@ export const TURN_SEGMENT_HINTS: Record<TurnSegmentId, string> = {
     activeSkills: '启用中的主动技能「名称 + 一句话描述」清单，正文由 use_skill 按需激活',
     context: '当前工程 / 视图 / 环节锁定 / 打开的弹窗（以本条为准）',
     workSummary:
-        '要求 AI 每轮先用 set_work_summary 更新的一句话工作摘要（同时显示在助手悬浮窗大标题上）；该段**始终注入**，禁用后 AI 不再维护摘要',
+        '要求 AI 每轮先用 set_work_summary 更新的一句话工作摘要（同时显示在助手悬浮窗大标题上）；该段**始终注入**，禁用后 AI 不维护摘要',
     changes: '自上次对话以来的工程改动，回合开始时取出并清空队列',
-    history: '上一轮回传的完整消息序列（含此前的工具调用与结果）',
+    history: '上一轮回传的完整消息序列（含其中的工具调用与结果）',
     user: '本轮用户输入'
 }
 

@@ -2,17 +2,17 @@
     /**
      * @desc 时间轴「伤害绑定」轨道的伤害块叠层（第 4 轨 overlay）。
      *
-     * 抽自 `timeline.svelte` 的单块渲染块（约 96 行）：它是该文件里**唯一**自成一段、
-     * 与操作块/参考线互不干扰的大结构（AGENTS §3「大的布局结构 → 独立组件」）。
+     * 它是 `timeline.svelte` 里**唯一**自成一段、与操作块/参考线互不干扰的大结构，
+     * 按 AGENTS §3「大的布局结构 → 独立组件」独立成组件。
      *
      * 职责边界：
      * - **不拥有**状态：叠层数据 `damageStack`、查找索引 `teamByChar` / `opBlockById`、
      *   以及 `gpuAccel` 全由宿主传入（宿主已经为伤害层渲染建好了这几个索引，重复建会白花开销）。
      * - **自带**两个动作：`nonpassiveWheel`（Ctrl+滚轮纵向滚动，必须 `passive:false` 才能
      *   `preventDefault`）与 `measureDamageWidth`（把块宽批量提交给 store）。
-     *   `measureDamageWidth` 原本与宿主的 `measureWidth` 共享「一个微任务只 flush 一次」的
-     *   批处理标记；两者**读写的是不同 store 字段**（伤害块宽 vs 操作块宽），拆开后各自批处理，
-     *   语义不变（同一帧内至多多一次微任务写入）。
+     *   `measureDamageWidth` 与宿主的 `measureWidth` 各自批处理（每个微任务 flush 一次）：
+     *   两者**读写的是不同 store 字段**（伤害块宽 vs 操作块宽），故互不干扰
+     *   （同一帧内至多多一次微任务写入）。
      * - 仍直接调用 store 读取拖拽/选中状态（`getIsGroupDrag` / `getDragBlockId` 等）：
      *   与 `damage-list` / `skill-picker` 等同目录组件一致 —— 这些是全局单例状态，不是宿主私有状态。
      */

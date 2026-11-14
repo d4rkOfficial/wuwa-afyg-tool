@@ -102,7 +102,7 @@ describe('dedupeDamageBlockIds', () => {
         assert.deepEqual(ids, ['dX', 'dX-2'])
     })
 
-    it('迁移幂等：再跑一次不再变化', () => {
+    it('迁移幂等：再跑一次结果保持不变', () => {
         const once = migrateProject(projectOf([damageBlock('dX'), damageBlock('dX')]))
         const twice = migrateProject(once)
         assert.deepEqual(twice, once)
@@ -110,7 +110,7 @@ describe('dedupeDamageBlockIds', () => {
 })
 
 describe('buildDamageEntriesFromTimeline 生成的条目 id 恒唯一', () => {
-    it('两个伤害块共用同一 id（历史数据）时，条目 id 不撞车', () => {
+    it('两个伤害块共用同一 id（用户既有数据）时，条目 id 不撞车', () => {
         const entries = buildDamageEntriesFromTimeline(timelineOf([damageBlock('dX'), damageBlock('dX')]), team)
         const ids = entries.map((e) => e.id)
         assert.equal(ids.length, 2)

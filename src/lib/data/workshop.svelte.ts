@@ -7,7 +7,7 @@ export interface WorkshopInstance {
     url: string
     /**
      * @desc 工坊站点 `<title>`（如「椰果工坊 · 鸣算屋转接器」）。
-     * `undefined` = 尚未抓取；`''` = 已尝试抓取但失败（持久化后不再重试）。
+     * `undefined` = 尚未抓取；`''` = 已尝试抓取但失败（持久化后不重试）。
      */
     title?: string
 }
@@ -34,7 +34,7 @@ const titleJobs = new Map<string, Promise<string>>()
 const persist = (): Promise<void> => dbSet(KEY, { instances, activeId })
 
 const fetchWorkshopTitle = (url: string): Promise<string> => {
-    // 无服务端的独立静态包没有跨域代理可用：标题抓不到就按「已尝试过」处理（''），不再重试
+    // 无服务端的独立静态包没有跨域代理可用：标题抓不到就按「已尝试过」处理（''），不重试
     if (!browser || __OFFLINE_BUILD__) return Promise.resolve('')
     const existing = titleJobs.get(url)
     if (existing) return existing

@@ -3,10 +3,10 @@ import { describe, it } from 'node:test'
 import { BLOCK_W, parsePositionArgs, type PositionResolveDeps } from '$lib/ai/timeline-position'
 
 /**
- * @desc 排轴位置参数解析：排轴统一用 pos（像素坐标），秒数定位已废除。
+ * @desc 排轴位置参数解析：排轴统一用 pos（像素坐标），不接受秒数定位。
  * 这些用例钉住三件事：① pos 绝对定位的合法区间与报错文案；
  * ② anchor 相对定位的贴靠基准（半个块宽 + offset，offset 是坐标不是秒）；
- * ③ 传旧 {time: 秒} 必须**报错**而不是被静默当成其它定位方式。
+ * ③ 传 {time: 秒} 必须**报错**而不是被静默当成其它定位方式。
  */
 
 const deps = (over: Partial<PositionResolveDeps> = {}): PositionResolveDeps => ({
@@ -39,10 +39,10 @@ describe('parsePositionArgs', () => {
         assert.throws(() => parsePositionArgs({ pos: 20000 }, deps({ maxPos: 19000 })), /pos 须为 0-19000/)
     })
 
-    it('旧 time（秒）直接废除：报错而不是兼容', () => {
-        assert.throws(() => parsePositionArgs({ time: 5 }, deps()), /position\.time 已废除/)
+    it('time（秒）不兼容：报错而不是静默接受', () => {
+        assert.throws(() => parsePositionArgs({ time: 5 }, deps()), /position\.time 不是有效参数/)
         // 即使同时给了 pos，也不静默兼容（避免两种坐标语义并存）
-        assert.throws(() => parsePositionArgs({ time: 5, pos: 798 }, deps()), /position\.time 已废除/)
+        assert.throws(() => parsePositionArgs({ time: 5, pos: 798 }, deps()), /position\.time 不是有效参数/)
     })
 
     it('anchor 相对定位：默认 after，贴靠半个块宽', () => {
@@ -53,7 +53,7 @@ describe('parsePositionArgs', () => {
         assert.equal(parsePositionArgs({ anchor: 1, side: 'before' }, deps()), 1000 - BLOCK_W / 2)
     })
 
-    it('offset 是坐标偏移，不再乘 PPS', () => {
+    it('offset 是坐标偏移，不乘 PPS', () => {
         assert.equal(parsePositionArgs({ anchor: 1, offset: 100 }, deps()), 1000 + BLOCK_W / 2 + 100)
         assert.equal(parsePositionArgs({ anchor: 1, side: 'before', offset: 100 }, deps()), 1000 - BLOCK_W / 2 - 100)
         assert.throws(() => parsePositionArgs({ anchor: 1, offset: -1 }, deps()), /offset 须为非负数字/)

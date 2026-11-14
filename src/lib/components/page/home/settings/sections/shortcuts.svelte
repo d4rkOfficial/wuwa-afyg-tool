@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @desc 设置 → 快捷键位（Phase 5.1 第二增量：自 `settings-modal.svelte` 原样抽出，标记与行为未改）。
+     * @desc 设置 → 快捷键位。
      * 快捷键数据来自全局 store `$lib/data/shortcuts.svelte`；待录制 id `shortcutCapture` 托管在
      * `settings-ui.svelte.ts`，因为按下新键的捕获监听（含 Esc 取消）留在外壳的 window keydown 中。
      */

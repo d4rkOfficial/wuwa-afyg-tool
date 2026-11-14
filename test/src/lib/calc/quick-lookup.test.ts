@@ -1,6 +1,6 @@
-// ── T12 抽出的速查纯函数：与「抽取前内联实现」逐例等价 ───────────────────────
-// 这三个函数原本内联在 `quick-lookup-content.svelte`（该组件依赖 {@html} 与 DOM 滚动容器，
-// 起不了 SSR 断言），故抽出后必须用**行为等价测试**补上原来的空缺。
+// ── T12 抽出的速查纯函数：与组件内联版本逐例等价 ───────────────────────
+// 这三个函数内联在 `quick-lookup-content.svelte`（该组件依赖 {@html} 与 DOM 滚动容器，
+// 起不了 SSR 断言），故抽出后必须用**行为等价测试**覆盖其全部边界。
 import { describe, it } from 'node:test'
 import { strict as assert } from 'node:assert'
 import {
@@ -11,7 +11,7 @@ import {
     statNodeKey
 } from '$lib/components/page/home/quick-lookup/quick-lookup.utils'
 
-// ── 参照实现：逐字复刻抽取前的内联版本 ──
+// ── 参照实现：逐字复刻组件内联版本 ──
 const oldMerge = (
     sets: readonly { name: string; pieces: number }[],
     bonusOf: (i: number) => Record<string, string>
@@ -105,7 +105,7 @@ describe('T12 quick-lookup 纯函数（抽取等价性）', () => {
         assert.equal(Number.isNaN(compareStatAttrs(a, b)), false)
     })
 
-    it('formatSubstatValue：与旧实现逐例一致（边界 1 / NaN / 负数 / 空串）', () => {
+    it('formatSubstatValue：与内联实现逐例一致（边界 1 / NaN / 负数 / 空串）', () => {
         for (const v of ['0.12', '0', '0.999', '1', '1.0', '12', 'abc', '', '-0.5', '2.5%']) {
             assert.equal(formatSubstatValue(v), oldFmt(v), `输入 ${JSON.stringify(v)}`)
         }

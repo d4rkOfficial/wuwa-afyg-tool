@@ -3,9 +3,8 @@ import { LEFT_WIDTH_DEFAULT, LEFT_WIDTH_MAX, LEFT_WIDTH_MIN } from './buff-modal
 /**
  * @desc Buff 弹窗左栏宽度的**拖拽调节**（三态高亮 + rAF 节流）。
  *
- * 抽因（T2-followup）：这段状态 + `$effect` + 起手 handler 原本内联在
- * `buff-modal.svelte` 里约 35 行，是一套与弹窗其余部分无关的纯交互微件
- * （与主页 sidebar 的拖动条同构），抽出后宿主只需接线。
+ * 本模块是一套与弹窗其余部分无关的纯交互微件（与主页 sidebar 的拖动条同构），
+ * 宿主只需接线：状态 + `$effect` + 起手 handler 都在这里。
  *
  * rAF 节流的原因：`mousemove` 在高刷屏上可每帧触发多次，直接写 `$state` 会让
  * 依赖宽度的布局每事件重算一次。这里只记录目标值、每帧合并写一次；

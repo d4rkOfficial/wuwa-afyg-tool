@@ -10,6 +10,7 @@
   prettier 只按自己的格式重排（不报错），`check-scrollbar`/`check-components` 等静态检查器也全都看不见（实测踩过：
   `layout.css` 从 700 行被"格式化"到 773 行）。改完 CSS 后建议用浏览器把整文件解析回来核对规则条数。
 - 后端注释使用/** @desc [markdown] */形式，前端则不用遵守
+- 文档、注释、测试标题一律描述当前状态，不要写“不再”“原先”“旧版”“已废弃”等变化描述
 
 ## 2. 页面逻辑分离
 
@@ -90,7 +91,7 @@
 > **环境说明（本机既有，无法修复）**：`.vercel\output\functions\![-]\catchall.func\...` 在 OS 层被 ACL 拒绝（EPERM），
 > 本机用户亦无权限删除它。应对方式已固化，**不要**为绕开它去改部署配置：
 >
-> - `pnpm run format` / `pnpm run lint` 已改成**显式路径**（`"src" "test" "docs" "scripts" "*.{js,mjs,cjs,ts,json,md}"`）。
+> - `pnpm run format` / `pnpm run lint` 使用**显式路径**（`"src" "test" "docs" "scripts" "*.{js,mjs,cjs,ts,json,md}"`）。
 >   根因：`prettier .` 会**先递归展开目录再套 ignore**，展开阶段就 `Unable to expand directory "."` 失败 ——
 >   `.prettierignore` 里加 `.vercel/` **实测无效**。故**不要**把脚本改回 `prettier .`。
 > - `pnpm run build` 在仓库根**必然失败**（adapter-vercel 的 `rimraf` 打不进被拒目录）。
@@ -98,8 +99,8 @@
 >   构建后核对依赖文件数并对**产物 CSS** 做探针复核（专职抓「写了个不生成 CSS 的类名」这类静态检查器盲区）。
 >   它已实测通过（`adapter-vercel ✔ done`、PWA precache 119、`node_modules` 17779 → 17779）。
 > - **测试加载失败必须是响的**：聚合入口 `test/run-tests.ts` 对每个测试文件单独 `try/catch`，
->   加载期抛错会打印 `[test] ✖ 加载失败：<文件>` 并让退出码变 1（见 §5.2）。历史上两种「静默消失」：
->   ① 手写 import 清单漏登记（实测漏 3 个文件、41 条用例，`pnpm test` 毫无提示，现已改为自动发现）；
+>   加载期抛错会打印 `[test] ✖ 加载失败：<文件>` 并让退出码变 1（见 §5.2）。已知两种「静默消失」场景：
+>   ① 手写 import 清单漏登记（实测漏 3 个文件、41 条用例，`pnpm test` 毫无提示；当前入口自动发现测试文件）；
 >   ② 文件在**模块加载阶段**抛错 ⇒ `describe/it` 一个都不注册，`node:test` 汇总里**看不到任何 fail**，
 >   唯一症状是 `tests` 计数变少（实测踩过：266 → 262；根因是测试把编译产物写到 `.tmp/xxx/` 又在 `after()` 里
 >   `rmSync`，sandbox 在目录被删后把它列入**永久拒绝**名单，下次 `mkdirSync` 同路径直接 EPERM）。
@@ -126,9 +127,9 @@
 - **UI / store 层**（`*.svelte`、`*.svelte.ts`）仅基础解析 + 少量最佳实践规则，不做函数式约束（Runes 响应式状态保留可变性）
 - 新增纯逻辑函数时遵守：入参不可重赋值（`no-param-reassign`）、优先 `const`、优先箭头函数
 - Svelte 最佳实践采用**渐进棘轮**：不全量启用 `svelte/recommended`（会淹没函数式信号），只逐条引入能量化收敛的规则
-    - `svelte/require-each-key` 已**清零并升为 `error`**（T9）：基线 **0 处**，无白名单。历史轨迹：Phase 0 实测 141 处 → 6.4 四批清到 50 → T9 清掉最后 47 处。此后新增无 key 的 `{#each}` 直接报 error
+    - `svelte/require-each-key` 为 **error**：基线 **0 处**，无白名单；无 key 的 `{#each}` 直接报 error
     - 补 key 时**必须**保证 key 唯一——重复 key 是 Svelte 运行时错误。值列表用值作 key（先确认无重复）；对象列表用稳定 id 字段；位置即身份（定长元组）用索引变量
-        - **「看起来唯一」不等于唯一**：T9 实测踩到三处反例 —— ① `getSkillPickerGroups()` 的 `group.type` 来自逐 `skill_trees` 节点 push 的 `buildSkillGroups`，**同一 type 可出现多次**；② `slot.triggerSets` 的 `name` 会**刻意重复**（`set-picker` 选 5 件套时写入 `{name,5}` + `{name,2}` 两条，见 `togglePiece`）；③ 持久化的 `comparison` 配置可能来自旧版本/导入，无法证明组合不重复。这三处最终都改用索引（位置即身份），而不是硬塞值作 key
+        - **「看起来唯一」不等于唯一**：T9 实测踩到三处反例 —— ① `getSkillPickerGroups()` 的 `group.type` 来自逐 `skill_trees` 节点 push 的 `buildSkillGroups`，**同一 type 可出现多次**；② `slot.triggerSets` 的 `name` 会**刻意重复**（`set-picker` 选 5 件套时写入 `{name,5}` + `{name,2}` 两条，见 `togglePiece`）；③ 持久化的 `comparison` 配置可能由导入产生，无法证明组合不重复。这三处最终都改用索引（位置即身份），而不是硬塞值作 key
         - 判定顺序：先用一次性 Node 脚本对**真实数据源**采样去重（不是读代码猜），证不出唯一就用索引并在报告里写明理由
     - 组件一致性另由 `scripts/check-components.mjs` + `scripts/check-surfaces.mjs` 把关（已接入 `pnpm run check`）
         - `scripts/check-components.mjs` ⑧ 校验「`ui/` 元件必须被至少一个消费方引用」（防「假组件化」：文件存在 ≠ 已接线；判定覆盖 `$lib`/相对路径 import、`<X>` 渲染与 barrel re-export，**注释里的路径提及不算引用**）。设计系统里**暂时零引用**的元件作为债务登记在该脚本 `BASELINE.uiNoRef`，**只减不增、且不删除**（保留为通用控件，接线时直接复用）；新增零引用 `ui/` 元件立即失败，基线内已恢复引用则提示「可回收」但不失败
@@ -144,7 +145,7 @@
 - **入口**：`test/run-tests.ts` **自动发现** `test/**/*.test.ts` 并**逐个隔离 `import`**
   （本环境禁止子进程，故不能用 `node --test`）。新增测试只要按镜像规则放对位置就会被跑到
 - **加载失败必须响**：入口对每个文件单独 `try/catch`，抛错会打 `[test] ✖ 加载失败：<文件>` 并让退出码为 1
-  （历史坑：手写清单漏登记 ⇒ 用例永远不跑；加载期抛错 ⇒ 用例静默消失，只有 `tests` 计数变小）
+  （失败模式：手写清单漏登记 ⇒ 用例永远不跑；加载期抛错 ⇒ 用例静默消失，只有 `tests` 计数变小）
 - **命令**：`pnpm test`（全部）· `pnpm test:one calc`（只跑路径含 `calc` 的文件）· `pnpm test:list`（只列文件）·
   `pnpm test:watch` · 单文件 `node --import ./test/preload-runes.mjs --import ./test/preload.mjs <test 文件>`
 - **别名**：`$lib` → `src/lib`（SvelteKit 自带）· `$src` → `src`（测试 import 路由模块用，避免 7 层相对路径）。

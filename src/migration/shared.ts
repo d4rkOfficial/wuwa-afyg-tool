@@ -9,20 +9,20 @@ export const PHASE_ORDER: PhaseKey[] = ['team', 'timeline', 'calculation', 'conf
 /**
  * @desc 缺 `project.version` 时的兜底判定门槛（毫秒）：**2026-10-01 00:00 伦敦时间**。
  *
- * 背景：工坊（分享中转站）历史上用逐字段白名单重建工程对象，把 `project.version` 一并抹掉了。
- * 于是「上传工坊再下载」拿回的文件没有版本号，`readVersion` 按老规矩当成 0，整条迁移链重跑
+ * 背景：工坊（分享中转站）用逐字段白名单重建工程对象，会把 `project.version` 一并抹掉。
+ * 于是「上传工坊再下载」拿回的文件没有版本号，`readVersion` 若按 0 处理，整条迁移链就会重跑
  * —— 其中 `migrateV2toV3` 的 `bindPaneEffectSources` 会把「影响源」Buff 补勾到伤害段上（只加不减），
  * 症状就是「本来没勾的同奏层数被挂到守岸人全部倍率 + 处决倍率」。
  *
- * 工具自身导出的文件**一直带 `project.version`**，所以「没有版本号」在现代分享件里不是
- * 「老工程」而是「中转站吃掉了版本号」。这个日期远晚于 v4（2026-09-27 引入 v2→v3/v3→v4）
- * 与 v3，因此晚于它的无版本文件可以直接断言为当前最新版。
+ * 工具自身导出的文件**一直带 `project.version`**，所以现代分享件「没有版本号」意味着
+ * 「中转站吃掉了版本号」，而不是「v0 工程」。这个日期远晚于 v4（2026-09-27 起有 v2→v3 / v3→v4）与 v3，
+ * 因此晚于它的无版本文件可以直接断言为当前最新版。
  *
- * 注意：工具早年确实存在过无版本号的导出文件，所以门槛之前仍按 0 处理（迁移链照跑），
+ * 注意：无版本号的导出文件确实存在过，所以门槛之前仍按 0 处理（迁移链照跑），
  * 不能用「无版本号 = 最新版」一刀切。
  *
  * 另注：门槛之后新增的版本若也要作用于这些无版本号文件，必须做成**幂等且无条件执行**的结构性归一化
- * （如 v5 的「旧备注重击块 → 独立重击块」，见 `migrateHeavyPressOpBlocks` 在 `migrateProject` 里的兜底调用），
+ * （如 v5 的「备注重击块 → 独立重击块」，见 `migrateHeavyPressOpBlocks` 在 `migrateProject` 里的兜底调用），
  * 否则会被本兜底判定直接跳过。
  */
 export const VERSIONLESS_ASSUME_CURRENT_AFTER = Date.UTC(2026, 9, 1, 0, 0, 0, 0)
@@ -63,7 +63,7 @@ export const emptyCharSlot = (): CharSlot => ({
     refinement: 1
 })
 
-/** @desc 内置链/精炼档位：链阶真源是角色槽位（team[].chain / team[].refinement），不再走变量 */
+/** @desc 内置链/精炼档位：链阶真源是角色槽位（team[].chain / team[].refinement），不用变量 */
 export const DEFAULT_SLOTS = [0, 1, 2] as const
 
 export const emptyEncounter = (): EncounterState => ({
@@ -73,18 +73,18 @@ export const emptyEncounter = (): EncounterState => ({
     config: { locked: false, data: null }
 })
 
-/** @desc 读取旧结构里某阶段的锁定标记（phases[phase].locked 的兼容读取） */
+/** @desc 读取 v0 结构里某阶段的锁定标记（phases[phase].locked） */
 export const lockedOf = (container: Record<string, unknown>, key: PhaseKey): boolean =>
     asRecord(container[key]).locked === true
 
-/** @desc 读取旧结构里的队伍锁定标记（teamLocked 可能是布尔或 phases.team 对象） */
+/** @desc 读取队伍锁定标记（teamLocked 可能是布尔或 phases.team 对象） */
 export const teamLockedOf = (container: Record<string, unknown>): boolean =>
     container.teamLocked === true || asRecord(container.teamLocked).locked === true
 
-/** @desc 链/阶对比弹窗的对比点（兼容旧字段名） */
+/** @desc 链/阶对比弹窗的对比点（chains / refinements 两个数组） */
 export type ComparisonPoint = { chains: number[]; refinements: number[] }
 
-/** @desc 旧版自动生成的默认全局 buff（global-{角色名} / global-all）标识 */
+/** @desc 自动生成的默认全局 buff（global-{角色名} / global-all）标识 */
 export const isLegacyAutoGlobal = (id: string): boolean => id.startsWith('global-')
 
 export const normalizeTeam = (raw: unknown): [CharSlot, CharSlot, CharSlot] =>

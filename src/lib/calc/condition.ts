@@ -81,8 +81,8 @@ export const describeZoneConditionBadge = (cond: BuffCondition | undefined): str
 
 /**
  * @desc 归一化乘区级生效条件：只保留 `elements` / `damageTypes`。
- * 历史字段（`chains` / `refinements` / `chain` / `refinement` / `logic`）一律丢弃 ——
- * 链阶已迁到 Buff 级 `rules`，乘区级不再承载。
+ * `chains` / `refinements` / `chain` / `refinement` / `logic` 等字段一律丢弃 ——
+ * 链阶由 Buff 级 `rules` 承载。
  */
 export const normalizeCondition = (cond: BuffCondition | undefined): BuffCondition => {
     if (!cond) return {}

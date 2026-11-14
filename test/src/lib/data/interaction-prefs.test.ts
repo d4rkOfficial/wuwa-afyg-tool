@@ -1,7 +1,7 @@
 // 「弹窗关闭按钮位置」重进丢失配置的回归：
-// 该设置此前只有写入口（setModalClosePosition → localStorage），模块初始化时**没有读回**，
-// 于是刷新 / 重进后一律回到默认右上角。
-// 这里锁住「读回时的取值口径」：只认两个合法值，其余（含 null / 空串 / 历史脏值）回落默认。
+// 该设置必须由模块初始化时读回（setModalClosePosition → localStorage 只是写入口），
+// 否则刷新 / 重进后一律回到默认右上角。
+// 这里锁住「读回时的取值口径」：只认两个合法值，其余（含 null / 空串 / 脏值）回落默认。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -18,7 +18,7 @@ describe('parseModalClosePosition', () => {
         assert.equal(DEFAULT_MODAL_CLOSE_POSITION, 'top-right')
     })
 
-    it('非法 / 历史脏值回落默认，不抛错', () => {
+    it('非法 / 脏值回落默认，不抛错', () => {
         for (const raw of ['', 'left', 'TOP-LEFT', '{"position":"top-left"}', 'undefined']) {
             assert.equal(parseModalClosePosition(raw), DEFAULT_MODAL_CLOSE_POSITION, `raw=${raw}`)
         }

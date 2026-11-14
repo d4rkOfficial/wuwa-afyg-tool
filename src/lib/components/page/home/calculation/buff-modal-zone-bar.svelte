@@ -1,11 +1,11 @@
 <script lang="ts">
     /**
-     * @desc 右栏乘区清单（自 `buff-modal.svelte` 原样抽出）：点击即**添加**一个乘区条目
+     * @desc 右栏乘区清单：点击即**添加**一个乘区条目
      * （同一乘区可添加多次，各自独立配置）；宽度固定。
      *
      * 职责边界：本组件是**纯展示 + 单一回传**——`zones` 只用于显示每个乘区已有几条，
      * 点击只把被点的乘区 id 交回父组件（`onadd`），不直接改数据。
-     * 尺寸（`ZONE_BAR_WIDTH` / 左边框色）是**内容驱动的定尺**，与原实现同为字面量，未开 `class` 口子。
+     * 尺寸（`ZONE_BAR_WIDTH` / 左边框色）是**内容驱动的定尺**，一律字面量，未开 `class` 口子。
      */
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'

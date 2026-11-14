@@ -1,10 +1,10 @@
 <script lang="ts">
     /**
-     * @desc 数据分析 → 队伍出伤曲线（Phase 5.3：自 `data-analysis-modal.svelte` 原样抽出，标记与行为未改）。
+     * @desc 数据分析 → 队伍出伤曲线。
      *
-     * 曲线的画布、Chart 实例与「累计 / 窗口」页签都是本区块私有的，随区块一起抽出；
+     * 曲线的画布、Chart 实例与「累计 / 窗口」页签都是本区块私有的；
      * 绘制体在 `./chart-utils`（纯函数），本组件只负责早退判断、销毁旧实例与重绘时机。
-     * 重绘依赖沿用抽出前的一组：画布、事件、页签、时间记点（原为 `sortedTimings`，此处用等价的 `validTimings`）。
+     * 重绘依赖是：画布、事件、页签、时间记点（此处用 `validTimings`）。
      */
     import { onMount, untrack } from 'svelte'
     import Icon from '@iconify/svelte'

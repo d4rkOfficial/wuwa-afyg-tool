@@ -1,6 +1,6 @@
 // AI 助手偏好（持久化到 IndexedDB）：是否启用 AI 助手 + AI 助手人设提示词 + 危险操作策略，独立于模型配置保存
-// 注：Buff 命名规则与黑话词典已迁为内置技能卡（见 $lib/ai/skills 的 BUILTIN_SKILLS），
-//     这里只保留旧字段的读取（LegacyPromptPrefs），供技能卡做一次性迁移。
+// 注：Buff 命名规则与黑话词典由内置技能卡承载（见 $lib/ai/skills 的 BUILTIN_SKILLS），
+//     这里保留其字段的读取（LegacyPromptPrefs），供技能卡做一次性迁移。
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from '$lib/data/db'
 import { DEFAULT_SYSTEM_PROMPT } from '$lib/ai/persona'
@@ -18,7 +18,7 @@ export interface AiGenPrefs extends LegacyPromptPrefs {
 }
 
 const PREFS_KEY = 'ai-gen-prefs'
-// 旧版本存储 key（仅 namingRule 字段），首次加载时迁移
+// 更早的存储 key（仅 namingRule 字段），首次加载时迁移
 const LEGACY_PREFS_KEY = 'ai-naming-prefs'
 
 const DEFAULT_PREFS: AiGenPrefs = {
@@ -53,7 +53,7 @@ export async function loadGenPrefs(): Promise<void> {
     let stored = await dbGet<Partial<AiGenPrefs>>(PREFS_KEY)
     let migrated = false
     if (!stored?.data) {
-        // 旧结构迁移：仅 namingRule
+        // 该 key 只存 namingRule
         const legacy = await dbGet<{ namingRule?: string }>(LEGACY_PREFS_KEY)
         if (legacy?.data && typeof legacy.data === 'object') {
             stored = { data: legacy.data as Partial<AiGenPrefs>, ts: legacy.ts }
@@ -62,7 +62,7 @@ export async function loadGenPrefs(): Promise<void> {
     }
     if (stored?.data && typeof stored.data === 'object') {
         const d = stored.data as Record<string, unknown>
-        // 兼容旧结构（仅 namingRule / initialTaskPrompt）：字段缺失 → 填充默认值
+        // 该 key 的结构只有 namingRule / initialTaskPrompt：其余字段缺失 → 填充默认值
         const hasLegacyShape = typeof d.initialTaskPrompt === 'string' && typeof d.systemPrompt !== 'string'
         _prefs = {
             enabled: typeof d.enabled === 'boolean' ? d.enabled : DEFAULT_PREFS.enabled,
@@ -72,7 +72,7 @@ export async function loadGenPrefs(): Promise<void> {
                     : DEFAULT_PREFS.systemPrompt,
             dangerMode:
                 d.dangerMode === 'ask_once' || d.dangerMode === 'trust' ? d.dangerMode : DEFAULT_PREFS.dangerMode,
-            // 旧字段只读保留：技能卡加载时据此补一次正文覆盖（随后不再使用）
+            // namingRule 只读保留：技能卡加载时据此补一次正文覆盖
             ...(!hasLegacyShape && typeof d.namingRule === 'string' && d.namingRule.trim()
                 ? { namingRule: d.namingRule }
                 : {}),

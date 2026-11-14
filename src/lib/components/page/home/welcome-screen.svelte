@@ -109,7 +109,7 @@
                         style={strokeStyle}>让排轴与伤害计算更简单</span
                     >
                 </h1>
-                <!-- 主要动作：新建 / 本地导入 / 工坊下载（取代原刊头右侧说明文字） -->
+                <!-- 主要动作：新建 / 本地导入 / 工坊下载 -->
                 <div class="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
                     <button
                         onclick={oncreate}

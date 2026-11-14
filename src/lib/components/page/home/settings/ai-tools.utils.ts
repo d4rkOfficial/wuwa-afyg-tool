@@ -1,13 +1,13 @@
 /**
  * @desc 助手工具时间线的并入逻辑（纯函数，便于单测）。
  *
- * ## 为什么必须单独抽出来
- * 原实现是「拿**最后一张卡**，名称相同就当作它的结果」：
- * 只要有一张卡没配对到结果事件，**后续每一次配对都会顺延错位**，症状就是卡片永远停在「执行中…」。
+ * ## 为什么要按 `seq` 配对
+ * 若按「拿**最后一张卡**，名称相同就当作它的结果」配对：只要有一张卡没配对到结果事件，
+ * **后续每一次配对都会顺延错位**，症状就是卡片永远停在「执行中…」。
  * 实测触发点：服务端 `web_search` 完成时只更新了实时状态、**没有发结果事件**，
  * 于是它后面所有工具的结果都被记到了别人身上（或各自新增一张卡），原卡永远不收尾。
  *
- * 改成按 `seq`（回合内递增的调用序号）配对后，一次错配**只影响自己**，不会传染。
+ * 按 `seq`（回合内递增的调用序号）配对后，一次错配**只影响自己**，不会传染。
  */
 export interface ToolCard {
     name: string
@@ -173,7 +173,7 @@ export const describeToolCard = (card: Pick<ToolCard, 'name' | 'args' | 'result'
     return { requestLabel, request, responseLabel, response }
 }
 
-// ── AI 输出「活动流」：思考 / 工具 / 回复 / 提示按发生顺序排列（取代聊天气泡里的三个 tab）──
+// ── AI 输出「活动流」：思考 / 工具 / 回复 / 提示按发生顺序排列 ──
 
 /** @desc 一条活动（渲染顺序即发生顺序） */
 export interface AssistantActivity {
@@ -192,7 +192,7 @@ export interface AssistantActivity {
  * @desc 连续同类文本合并到同一行；切换类型（如工具调用之后）则新起一行。
  *
  * 流式 delta 可能一秒几十次；这里对「追加到最后一个同类活动」走**原地更新**，
- * 不再每次复制整个活动数组。长会话里这能把每次 token 的 O(活动数) 拷贝降成 O(1)；
+ * 不复制整个活动数组。长会话里这能把每次 token 的 O(活动数) 拷贝降成 O(1)；
  * 仅在新起一行时才创建新数组。
  */
 export const appendActivityText = (
@@ -353,7 +353,7 @@ export const formatCount = (value: number): string =>
 /**
  * @desc `run_js` 的执行结果 → **顶层活动行**（与「代码」工具行分开）。
  *
- * 用户要求「代码 / 运行结果 / 运行报错」是三行独立输出：返回值与错误不再只藏在
+ * 用户要求「代码 / 运行结果 / 运行报错」是三行独立输出：返回值与错误不只藏在
  * 代码卡片的展开结果里。返回值与日志由 worker 侧按上限截断过，这里只负责解析与排版。
  */
 export const appendRunJsOutput = (activities: readonly AssistantActivity[], raw?: string): AssistantActivity[] => {

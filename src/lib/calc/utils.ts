@@ -188,7 +188,7 @@ function combinedColor(cats: DamageTypeCategory[]): string {
 
 /**
  * @desc 直伤按类型占比（仅含角色来源、非纯效应的直伤）。
- * 单一类型计入自身类别；同时属于多个类型（a&b…）的伤害独立成「a&b」组合类别，不再分摊进各单一类型。
+ * 单一类型计入自身类别；同时属于多个类型（a&b…）的伤害独立成「a&b」组合类别，不分摊进各单一类型。
  */
 export function aggregateDirectDamageByType(entries: ResultEntry[]): DirectDamageByType[] {
     const result: DirectDamageByType[] = []

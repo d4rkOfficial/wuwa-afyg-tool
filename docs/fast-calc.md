@@ -39,7 +39,7 @@ https://<工具箱地址>/fast-calc?import_project=<工程 JSON 的 URL>
 frame.contentWindow.postMessage({ type: 'fast-calc:load', project }, '*')
 ```
 
-`project` 可以是工程对象，也可以是 JSON 字符串。旧格式 `{ version, project }` 也兼容。
+`project` 可以是工程对象，也可以是 JSON 字符串。也接受信封格式 `{ version, project }`。
 
 ---
 

@@ -148,7 +148,7 @@ const fetchProjectsPage = async (params: {
     return { projects: json.projects ?? [], total: json.total ?? 0 }
 }
 
-/** @desc 逐页扫描工程列表（用于本地检索）；complete=false 表示还有没扫到的老工程 */
+/** @desc 逐页扫描工程列表（用于本地检索）；complete=false 表示还有没扫到的工程 */
 const scanProjects = async (
     sort: ShareSort,
     limit: number

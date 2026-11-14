@@ -17,6 +17,8 @@
         onchange?: (value: string) => void
         placeholder?: string
         disabled?: boolean
+        /** @desc 紧凑尺寸（行内条件编辑器等窄空间用；默认 md） */
+        size?: 'sm' | 'md'
         renderOption?: Snippet<[SelectOption]>
     }
 
@@ -26,6 +28,7 @@
         onchange,
         placeholder = '请选择',
         disabled = false,
+        size = 'md',
         renderOption,
         backgroundImage,
         textColor,
@@ -59,6 +62,15 @@
 
     let current = $derived(options.find((o) => o.value === value))
 
+    /**
+     * @desc 菜单挂到 `document.body`：祖先只要有 `transform` / `backdrop-filter`（弹窗面板就是），
+     * `position: fixed` 就会变成「相对该祖先定位」并被裁切 —— 视口坐标会整体错位。
+     */
+    const portal = (node: HTMLElement) => {
+        document.body.appendChild(node)
+        return { destroy: () => node.remove() }
+    }
+
     function toggle() {
         if (disabled) return
         if (open) {
@@ -85,7 +97,11 @@
     $effect(() => {
         if (!open) return
         overlayEl?.focus()
-        const onScroll = () => close()
+        // 菜单自身滚动（选项多时）不应关闭菜单；只有外层滚动才重新定位
+        const onScroll = (e: Event) => {
+            if (e.target instanceof Node && menuEl?.contains(e.target)) return
+            close()
+        }
         window.addEventListener('scroll', onScroll, true)
         return () => window.removeEventListener('scroll', onScroll, true)
     })
@@ -111,7 +127,8 @@
     {disabled}
     type="button"
     class={mergeClass([
-        'flex w-full items-center justify-between gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-input-bg) px-2 py-1.5 text-sm outline-none transition-colors focus:border-(--theme-accent-bg)',
+        'flex w-full items-center justify-between gap-2 rounded-none border border-(--theme-card-border) bg-(--theme-input-bg) outline-none transition-colors focus:border-(--theme-accent-bg)',
+        size === 'sm' ? 'px-2 py-1 text-xs' : 'px-2 py-1.5 text-sm',
         'hover:brightness-110 active:brightness-95 disabled:active:brightness-100',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         className || ''
@@ -133,8 +150,9 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
+        use:portal
         bind:this={overlayEl}
-        class="fixed inset-0 z-(--z-modal) outline-none"
+        class="fixed inset-0 z-(--z-popover) outline-none"
         role="presentation"
         tabindex="-1"
         onclick={close}
@@ -153,7 +171,8 @@
                     onclick={() => select(opt.value)}
                     type="button"
                     class={[
-                        'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors',
+                        'flex w-full items-center gap-2 text-left transition-colors',
+                        size === 'sm' ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs',
                         opt.value === value
                             ? 'bg-(--theme-accent-bg)/10 text-(--theme-accent-text)'
                             : 'text-(--theme-modal-text) hover:bg-(--theme-modal-text)/5'

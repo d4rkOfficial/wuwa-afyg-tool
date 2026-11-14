@@ -2,9 +2,9 @@
 //
 // 用法：node scripts/check-scrollbar.mjs
 //
-// 背景：Phase 10 之前，全局默认滚动条是硬编码灰、主题化靠给容器补 .theme-scrollbar，
-// 于是 35 个文件里的滚动容器有 11 个漏了 class、一直渲染成硬编码灰；同时组件里还散落着
-// 手写的 `[&::-webkit-scrollbar]:hidden` / `:global(.hide-scrollbar::-webkit-scrollbar)` 片段。
+// 背景：全局默认滚动条只在 layout.css 定义 —— 拇指色引用昼夜主题变量，容器无需逐个补
+// .theme-scrollbar class；隐藏滚动条统一用 .hide-scrollbar，组件里不写
+// `[&::-webkit-scrollbar]:hidden` / `:global(.hide-scrollbar::-webkit-scrollbar)` 这类片段。
 // 「统一」的唯一可持续做法是把样式收敛到一处：本脚本据此把关。
 //
 // 设计（报告风格对齐 scripts/check-motion.mjs / check-components.mjs）：
@@ -37,7 +37,7 @@ const files = walk('src')
 
 /**
  * @desc 滚动条样式的「唯一权威」必须体现的三件事：
- *   1) 默认拇指色引用昼夜主题变量 --theme-scrollbar-thumb（不再是硬编码灰）；
+ *   1) 默认拇指色引用昼夜主题变量 --theme-scrollbar-thumb（不写死灰色）；
  *   2) 与「配色」主色 --theme-accent-bg 混色（用户明确要求滚动条跟随配色）；
  *   3) [data-scrolling] + :hover 两条显形路径（自动隐藏 + 鼠标可见性提示），
  *      且 webkit 与 Firefox(scrollbar-color) 两条渲染路径都覆盖。
@@ -137,7 +137,7 @@ const sections = []
         for (const x of fresh) console.log(`   ✗ 新增违规 ${x}（基线 ${BASELINE} → 实测 ${measured}）`)
     }
     if (reclaimed.length) {
-        for (const x of reclaimed) console.log(`   ↺ 可下调基线（已迁移/删除）: ${x} → 现为 ${BASELINE}`)
+        for (const x of reclaimed) console.log(`   ↺ 可下调基线（该站点已无手写样式）: ${x} → 现为 ${BASELINE}`)
     }
     if (!fresh.length && !reclaimed.length) console.log('   ✓ 无新增违规，基线无冗余')
     sections.push(`② 手写滚动条站点 ${measured} 处（基线 ${BASELINE}），新增 ${fresh.length}`)

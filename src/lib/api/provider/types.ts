@@ -1,7 +1,7 @@
 // ── Data provider contract ────────────────────────────────────────────────
 // 应用对上游的唯一抽象：任何上游只需实现 DataProvider 接口，把各自原始数据
 // 抓取并转换成语义一致的规范化契约类型（见 $lib/api/types）。其余代码只依赖
-// 该接口，不再感知具体上游。接入新上游的工作流程见 docs/upstream-integration.md。
+// 该接口，不感知具体上游。接入新上游的工作流程见 docs/upstream-integration.md。
 
 import type {
     Character,

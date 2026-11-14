@@ -276,12 +276,12 @@ export const normalizeBuffTree = (
     }
 }
 
-/** @desc 显式树迁移版本：旧工程/旧扁平树重跑一次数字前后缀迁移 */
+/** @desc 显式树迁移版本：v1 工程与扁平树跑一次数字前后缀迁移 */
 export const BUFF_TREE_VERSION = 2
 
 export interface LegacyMigrationResult {
     tree: BuffTreeState
-    /** @desc 迁移后的 Buff 列表（数字组成员已改成全名） */
+    /** @desc 迁移后的 Buff 列表（数字组成员的名字已展开为全名） */
     buffs: BuffInstance[]
 }
 
@@ -320,8 +320,8 @@ const numericFolderName = (prefix: string, suffix: string, used: Set<string>): s
 }
 
 /**
- * @desc 迁移旧工程：按条件粗分，再把「同前缀 + 同后缀」的数字命名成员收进数字文件夹。
- * - 以旧行为为准：`锁3链…` 与 `锁3链 同奏…` 后缀不同，不合并；
+ * @desc 迁移 v1 工程：按条件粗分，再把「同前缀 + 同后缀」的数字命名成员收进数字文件夹。
+ * - 后缀不同不合并（`锁3链…` 与 `锁3链 同奏…` 属不同后缀）；
  * - 只拆最后一组「数字 + 非数字后缀」；空前缀不建文件夹；
  * - 同组 ≥2 条才建文件夹；文件夹名用前缀（撞名补后缀）；
  * - 子短名为 `${数字}${后缀}`；Buff 全名为 `条件文件夹\数字文件夹\短名`；
@@ -331,7 +331,7 @@ export const migrateLegacyBuffTree = (
     buffs: readonly BuffInstance[],
     team: readonly CharSlot[]
 ): LegacyMigrationResult => {
-    // 已经是全名（含分隔符）的工程不再二次拆数字，避免把 v1 短名越改越乱
+    // 已经是全名（含分隔符）的工程不二次拆数字，避免把 v1 短名越改越乱
     if (buffs.some((buff) => buff.name.includes('\\'))) {
         const named = normalizeBuffFullNames(buffs)
         return {

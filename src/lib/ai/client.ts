@@ -15,7 +15,7 @@ const DIRECT_BASE_HOSTS = ['api.deepseek.com']
  *
  * 只有带图片附件的消息需要转换：`content` 由字符串变成 content parts，并把 `images`
  * 这个**内部字段摘掉**（它不是协议字段，发出去只会让服务商困惑）。
- * 其余消息原样传递，保持与改动前完全一致的请求体。
+ * 其余消息原样传递，请求体保持原形状。
  */
 export const toChatWireMessages = (messages: readonly ChatMessage[]): unknown[] =>
     messages.map((message) => {
@@ -106,7 +106,7 @@ interface StreamChunk {
     error?: { message?: string }
 }
 
-/** @desc AI 客户端错误（原名 DeepSeekError；现已支持任意 OpenAI 兼容服务商，不再绑定服务商） */
+/** @desc AI 客户端错误（支持任意 OpenAI 兼容服务商，不绑定具体服务商） */
 export class AiClientError extends Error {
     debug: string
 

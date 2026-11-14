@@ -1,7 +1,7 @@
 /**
  * @desc 拉表（分类平铺 / 分段平铺，共用 `spread-table`）的**纯逻辑**。
  *
- * 抽因（实测）：同一领域（伤害条目 × Buff 绑定）里的判定口径与文案拼装必须只有一份：
+ * 职责（实测）：把同一领域（伤害条目 × Buff 绑定）里的判定口径与文案拼装收在一处：
  * `damageTypesByEntry`、`inferredDamageTypeMap`、`charToIdx`、条件贡献判定、伤害类型短名、
  * 影响源文案、选中集合增删。一旦口径漂移，就会出现「同一格在两处可用性不同」的隐性不一致。
  *
@@ -219,7 +219,7 @@ export const cellBlockReasonOf = (
 
 /**
  * @desc 在 `current` 之上批量勾选/取消 `ids`（两个表的行/列/文件夹批量操作共用）。
- * 保留 `current` 的原有顺序（Set 的插入序），新增项追加在后 —— 与原先就地 new Set 的写法一致。
+ * 保留 `current` 的既有顺序（Set 的插入序），新增项追加在后。
  */
 export const applyIdsSelection = (current: readonly string[], ids: readonly string[], select: boolean): string[] => {
     const next = new Set(current)

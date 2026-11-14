@@ -95,15 +95,15 @@ test('改名同步记点：新名字能解析出时间 → 自动新增一条记
     assert.notEqual(next, timings)
 })
 
-test('改名同步记点：已有记点按新名字重算（重算基准不含自己的旧秒数）', () => {
+test('改名同步记点：已有记点按新名字重算（重算基准不含自己上一次的秒数）', () => {
     const lines = [mk('a', '25s', 100), mk('b', '+30s', 200), end()]
     const timings: TimingEntry[] = [
         { refLineId: 'a', seconds: 25 },
         { refLineId: 'b', seconds: 55 }
     ]
-    // b 从「起手」改成「+30s」→ 25 + 30 = 55
+    // b 重命名为「+30s」→ 25 + 30 = 55
     assert.equal(syncRefLineTiming('b', lines, timings), timings, '算出来没变 → 同一引用')
-    // 再改成「1m」→ 绝对 60s
+    // 再重命名为「1m」→ 绝对 60s
     const renamed = [mk('a', '25s', 100), mk('b', '1m', 200), end()]
     assert.deepEqual(syncRefLineTiming('b', renamed, timings), [
         { refLineId: 'a', seconds: 25 },

@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @desc 设置 → 缓存清理（Phase 5.1 第二增量：自 `settings-modal.svelte` 原样抽出，标记与行为未改）。
+     * @desc 设置 → 缓存清理。
      * 自有状态（`cacheEntries` / `cacheBusy` / `expandedCache`）落在 `settings-ui.svelte.ts`
      * （`cacheEntries` 的刷新被外壳「打开设置」的 $effect 共用）；分类文案与清理提示留在本组件。
      */
@@ -55,8 +55,8 @@
         echo: '声骸',
         'echo-set': '声骸套装',
         'character-v3': '角色详情',
-        // 旧版角色详情缓存（v2 接口已下线）：保留标签便于单独清理残留条目
-        'character-v2': '角色详情（旧）'
+        // v2 角色详情缓存（v2 接口已下线）：保留该标签便于单独清理残留条目
+        'character-v2': '角色详情（v2）'
     }
 
     const entityLabel = (entity: string): string => CACHE_ENTITY_LABELS[entity] ?? entity
@@ -175,7 +175,7 @@
                     </Button>
                 </div>
 
-                <!-- 条目明细：逐条清理（T15/T16：展开动效；`|local` 必加，避免所在分类块新建时重复播放） -->
+                <!-- 条目明细：逐条清理（展开动效；`|local` 必加，避免所在分类块新建时重复播放） -->
                 {#if expanded}
                     <div
                         transition:slide|local={slideParams(MOTION_MS.base)}

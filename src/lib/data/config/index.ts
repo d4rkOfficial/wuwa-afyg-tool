@@ -215,7 +215,7 @@ const readLocal = (key: string): unknown => {
     try {
         return JSON.parse(raw)
     } catch {
-        // 非 JSON 的旧格式（如 '1'/'0'/纯字符串）按原文返回
+        // 非 JSON 的存法（如 '1'/'0'/纯字符串）按原文返回
         return raw
     }
 }
@@ -305,9 +305,9 @@ export class ConfigParseError extends Error {
     }
 }
 
-/** @desc 解析结果：旧格式文件被升级后会带上 `legacyVersion`，供界面提示 */
+/** @desc 解析结果：v1 文件被升级后会带上 `legacyVersion`，供界面提示 */
 export interface ParsedConfig extends ExportedConfig {
-    /** @desc 来源是旧格式（扁平 entries、无分类字段）时记录其版本号 */
+    /** @desc 来源是 v1 格式（扁平 entries、无分类字段）时记录其版本号 */
     legacyVersion?: number
 }
 
@@ -327,8 +327,8 @@ const coerceBuckets = (value: unknown, field: string): Record<string, Record<str
 }
 
 /**
- * @desc 把旧格式（扁平 `entries: { 分组: { 键: 值 } }`）按登记表归类到两类。
- * 已知键以其登记的分组/分类为准（旧文件里放错分组也能纠正），未知键沿用原分组、
+ * @desc 把 v1 格式（扁平 `entries: { 分组: { 键: 值 } }`）按登记表归类到两类。
+ * 已知键以其登记的分组/分类为准（v1 文件里放错分组也能纠正），未知键沿用原分组、
  * 分组也未知时归入「设置」，以便导入时报为未知项而不是静默丢弃。
  */
 const classifyLegacyBuckets = (
@@ -349,8 +349,8 @@ const classifyLegacyBuckets = (
 
 /**
  * @desc 解析配置文件文本（校验 kind / version），失败抛 {@link ConfigParseError}。
- * 新格式（v2：`settings` / `libraries`）原样读取；旧格式（v1：扁平 `entries`）按登记表归类升级，
- * 返回的始终是新格式结构，因此「导入旧文件 → 重新导出」自然产出新格式。
+ * 新格式（v2：`settings` / `libraries`）原样读取；v1 格式（扁平 `entries`）按登记表归类升级，
+ * 返回的始终是 v2 结构，因此「导入 v1 文件 → 重新导出」自然产出 v2 格式。
  */
 export const parseConfigFile = (text: string): ParsedConfig => {
     let raw: unknown
@@ -383,9 +383,9 @@ export const parseConfigFile = (text: string): ParsedConfig => {
         return { kind: 'wuwa-afyg-config', version, exportedAt, settings, libraries }
     }
 
-    // 旧格式：扁平的 entries（可能同时带 groups 别名），按登记表归类到两类
+    // v1 格式：扁平的 entries（可能同时带 groups 别名），按登记表归类到两类
     const legacy = isPlainObject(record.entries) ? record.entries : isPlainObject(record.groups) ? record.groups : null
-    if (!legacy) throw new ConfigParseError('配置文件缺少 settings / libraries（或旧版 entries）')
+    if (!legacy) throw new ConfigParseError('配置文件缺少 settings / libraries（或 v1 的 entries）')
     return {
         kind: 'wuwa-afyg-config',
         version: CONFIG_VERSION,
@@ -448,7 +448,7 @@ export interface ConfigImportResult {
 }
 
 /**
- * @desc 导入配置（新旧格式皆可：旧格式已在 {@link parseConfigFile} 里升级为新结构）。
+ * @desc 导入配置（v2 与 v1 格式皆可：v1 已在 {@link parseConfigFile} 里升级为 v2 结构）。
  * - `merge`（默认）：只覆盖文件中出现的项，未出现的保持现状
  * - `replace`：**被选中的**条目里，文件中未出现的会被清除（回到默认）
  * @param options.keys 只应用这些配置项（缺省 = 全部）；粒度到单条，见 {@link selectConfigEntries}

@@ -60,7 +60,7 @@ const CHARACTER_INFO: CharacterInfo = {
 const responseEntryOf = () => getAllDamageEntries().find((e) => e.isTuneResponse)
 
 describe('偏谐响应倍率：技能缓存补齐后要重建条目', () => {
-    it('进工程首帧建设条目（缓存冷）后，缓存补齐时倍率不再是 0', async () => {
+    it('进工程首帧建设条目（缓存冷）后，缓存补齐时倍率恢复为正确值', async () => {
         assert.ok(getCharElementMap()[RESPONDER], `静态元素表应含 ${RESPONDER}（否则本用例走的是元素补齐路径）`)
         const originalFetch = globalThis.fetch
         globalThis.fetch = (async (input: RequestInfo | URL) => {

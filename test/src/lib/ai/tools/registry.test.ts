@@ -132,7 +132,7 @@ test('ask_user handler：补全 id、忽略 boolean 的 options、原样透传�
         seen[0].questions.map((q) => ({ id: q.id, type: q.type, question: q.question, options: q.options })),
         [
             { id: 'q1', type: 'boolean', question: '要不要继续？', options: undefined },
-            // 第 3 题 id 与第 1 题冲突 → 改为「冲突 id + 该题序号」= q1-3
+            // 第 3 题 id 与第 1 题冲突 → 归一为「冲突 id + 该题序号」= q1-3
             { id: 'q1-3', type: 'single', question: '用哪套？', options: seen[0].questions[1].options }
         ]
     )

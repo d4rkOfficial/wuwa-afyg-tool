@@ -1,13 +1,13 @@
 <script lang="ts">
     /**
-     * @desc 设置 → 交互相关（Phase 5.1 第三增量：自 `settings-modal.svelte` 原样抽出，标记与行为未改）。
+     * @desc 设置 → 交互相关。
      * 本 tab 无自有状态：所有开关直连各自的全局 store（`calc-view` / `toolbar-prefs` / `render-prefs` /
-     * `context-menu-prefs` / `interaction-prefs`），外壳也不再读它们，故 `settings-ui.svelte.ts` 无需迁入任何状态
-     * （与第一增量的 `performance` / `config` 同情形，不发明重复状态）。
+     * `context-menu-prefs` / `interaction-prefs`），外壳也不读它们，故 `settings-ui.svelte.ts` 不持有本 tab 的状态
+     * （与 `performance` / `config` 同情形，不发明重复状态）。
      * `TOAST_POSITION_LABELS` / `TOAST_POSITION_HINTS` 只服务本 tab，随文案一并留下。
      *
-     * T15：本 tab 的 7 个 `ui/switch` + 3 处手搓分段按钮组（拉表视图 / 关闭按钮位置 / 消息提示位置）
-     * 全部换成 `ui/tabs` 的文字 tab（两段短语写「该状态下的实际行为」，多段保留原值域与文案）。
+     * 控件形态：7 个开关项 + 3 组互斥选项（拉表视图 / 关闭按钮位置 / 消息提示位置）都是 `ui/tabs`
+     * 的文字 tab（两段短语写「该状态下的实际行为」，多段保留各自值域与文案）。
      * 分段控件的宽度 / 配色 / 布尔换算统一走 `../utils`。
      */
     import Icon from '@iconify/svelte'
@@ -87,9 +87,8 @@
         addToast(mode === 'segmented' ? '已切换为分段平铺' : '已切换为分类平铺', 'success')
     }
 
-    // ── 分段文字 tab（`ui/tabs`，T15）──
-    // 改造前本 tab 混用两种实现：`ui/switch`（布尔项）与手搓分段按钮组（互斥取值）。
-    // 现在统一为「文字 tab + 单一滑动指示块」；布尔项的两个分段写**该状态下的实际行为**，
+    // ── 分段文字 tab（`ui/tabs`）──
+    // 本 tab 的分段控件统一为「文字 tab + 单一滑动指示块」；布尔项的两个分段写**该状态下的实际行为**，
     // 而不是偷懒的「开｜关」（用户明确要求）。
 
     const SIMPLIFY_TOOLBAR_TABS = pair('简化', '完整')
@@ -113,7 +112,7 @@
         { value: 'segmented', label: '分段平铺' }
     ]
 
-    /** @desc 消息提示位置：7 段，逐段 `title` 沿用原来的 `TOAST_POSITION_HINTS` 悬浮说明 */
+    /** @desc 消息提示位置：7 段，逐段 `title` 取 `TOAST_POSITION_HINTS` 的悬浮说明 */
     const TOAST_POSITION_TABS = TOAST_POSITIONS.map((p) => ({
         value: p,
         label: TOAST_POSITION_LABELS[p],
@@ -140,8 +139,7 @@
             <Icon icon="mdi:widgets-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             界面显示
         </SectionTitle>
-        <!-- 拉表视图：原先是独立分区（自己一个 SectionTitle + 一行卡片），
-             按用户要求并入「界面显示」—— 它本来就是同一类「界面怎么显示」的开关，不是另一类设置。 -->
+        <!-- 拉表视图放在「界面显示」分区里：它本来就是同一类「界面怎么显示」的开关，不是另一类设置。 -->
         <SettingRow>
             <div class="min-w-0">
                 <FieldLabel
@@ -303,7 +301,7 @@
         </SectionTitle>
         <!-- 说明进卡片：标签 + 分段 + 说明同处一块表面 -->
         <div class={mergeClass([CARD_SURFACE, 'px-3 py-2.5'])} style={CARD_STYLE}>
-            <FieldLabel label="消息提示位置" hint="操作反馈的弹出位置；选「不弹出」后不再显示任何反馈" />
+            <FieldLabel label="消息提示位置" hint="操作反馈的弹出位置；选「不弹出」后不显示任何反馈" />
             <div class="mt-2">
                 <Tabs
                     items={TOAST_POSITION_TABS}

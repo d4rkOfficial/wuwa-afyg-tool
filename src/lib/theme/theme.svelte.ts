@@ -54,7 +54,7 @@ function systemDefaultThemeId(): string | null {
 
 const PRESETS: Theme[] = [darkPreset as Theme, lightPreset as Theme]
 
-/** @desc 六类区域兜底外观（= 黑夜默认；仅用于缺项回落与旧数据归一化） */
+/** @desc 六类区域兜底外观（= 黑夜默认；仅用于缺项回落与存量数据归一化） */
 export const DEFAULT_SURFACES: Record<SurfaceKey, SurfaceStyle> = {
     card: { opacity: 20, blur: 0, depth: 5 },
     modal: { opacity: 40, blur: 32, depth: 100 },
@@ -122,7 +122,7 @@ export const DEFAULT_NEON_GLOW = 0
  * `default-backgrounds` 拉进模块图，被**根 layout（nodes/0）**静态引用而在首屏关键路径上整体下载
  * —— 每个用户、每次进入都付这 280KB，而它只在「首次进入」才用得上。
  * 动态 import 后它成为独立 chunk，只有走到这里才请求。改动后请用构建产物复核：
- * `nodes/0` 不再静态 import 该 chunk（.tmp 下有现成的可达性分析脚本思路）。
+ * `nodes/0` 不静态 import 该 chunk（.tmp 下有现成的可达性分析脚本思路）。
  */
 export async function applyFirstRunAppearance() {
     const { DEFAULT_BACKGROUND_DARK, DEFAULT_BACKGROUND_LIGHT } = await import('./default-backgrounds')
@@ -266,7 +266,7 @@ function applyThemeCSS() {
         /*
          * `app.html` 为了「开屏跟随系统」放了**两条** `meta[name=theme-color]`，各自带
          * `media="(prefers-color-scheme: dark|light)"`。JS 启动后颜色真相源变成用户选择的主题，
-         * 而用户的选择未必等于系统档 —— 若只改第一条（原实现），浅色系统 + 手动选深色主题时
+         * 而用户的选择未必等于系统档 —— 若只改第一条，浅色系统 + 手动选深色主题时
          * 浏览器会用另一条 media 命中的值，标题栏颜色就错了。
          * 故这里把整组收敛成一条无 media 的 meta：改第一条、摘掉它的 media、删掉其余。
          */
@@ -506,7 +506,7 @@ export async function loadThemes() {
 
     const ov = await dbGet<Partial<ThemeOverrides>>(OVERRIDES_KEY)
     if (ov) {
-        // 外观设置按昼夜分别归一化（旧版扁平字段不再读取，缺项一律用默认值）
+        // 外观设置按昼夜分别归一化（扁平字段不读取，缺项一律用默认值）
         overrides = {
             ...DEFAULT_OVERRIDES,
             ...ov.data,
@@ -524,15 +524,15 @@ export async function loadThemes() {
                 trimmed = true
             }
         }
-        // 圆角：旧数据没有这一项（回落默认），有但越界/非数的也一并夹回来
+        // 圆角：存量数据没有这一项（回落默认），有但越界/非数的也一并夹回来
         const radius = clamp(Number(overrides.surfaceRadius), 0, SURFACE_RADIUS_MAX)
         if (!Number.isFinite(radius) || radius !== overrides.surfaceRadius) {
             overrides.surfaceRadius = Number.isFinite(radius) ? radius : DEFAULT_SURFACE_RADIUS
             trimmed = true
         }
-        // 霓虹灯：旧字段是**百分比**强度 `neonText`（默认 1，即肉眼不可见的 0.1px），
-        // 现已拆成「字体 / 边框」两档 px 值。转换口径：`neonText <= 1`（含历史默认值）
-        // 视为「没开过」，直接落到新的 0px 默认；其余按原换算 强度/100*10 折成 px。
+        // 霓虹灯：存量字段 `neonText` 是**百分比**强度（默认 1，即肉眼不可见的 0.1px），
+        // 当前按「字体 / 边框」两档 px 值存储。转换口径：`neonText <= 1`（含默认值）
+        // 视为「没开过」，直接落到 0px 默认；其余按 强度/100*10 折成 px。
         const legacyNeon = Number((ov.data as { neonText?: unknown }).neonText)
         if (Number.isFinite(legacyNeon)) {
             overrides.neonTextGlow =
@@ -560,7 +560,7 @@ export function getActiveId(): string {
 
 export async function setActiveTheme(id: string) {
     if (themes.find((t) => t.id === id) && id !== activeId) {
-        // 背景图效果与背景质感按昼夜分别保存，切主题即切到另一套设置，不再做正负反转
+        // 背景图效果与背景质感按昼夜分别保存，切主题即切到另一套设置（不做正负反转）
         activeId = id
         await dbSet(ACTIVE_KEY, id)
         writeThemeModeMirror()

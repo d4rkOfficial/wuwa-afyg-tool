@@ -9,13 +9,13 @@
  * 单个文件直接跑：
  *   node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/test/src/lib/calc/coeff-crit.test.ts
  *
- * 为什么不用 `node --test`：本环境禁止子进程，`--test` 会按文件 spawn 子进程直接失败；
- * 所以改成「同进程内逐个 import」，`describe` / `it` 在 import 时注册、由 `node:test` 汇总。
+ * 不用 `node --test` 的原因：本环境禁止子进程，`--test` 会按文件 spawn 子进程直接失败；
+ * 因此走「同进程内逐个 import」，`describe` / `it` 在 import 时注册、由 `node:test` 汇总。
  *
- * 为什么不再手写 import 清单（历史教训，两条都踩过）：
+ * 不手写 import 清单的原因（实测教训，两条都踩过）：
  *   ① 新测试忘了登记 ⇒ 用例永远不跑（实测漏了 3 个文件、41 条用例，`pnpm test` 毫无提示）；
  *   ② 某文件在 import 期抛错 ⇒ 整批静默消失（汇总里看不到 fail，只是总数变少）。
- * 现在按路径约定自动发现（见 `paths.ts`），且**每个文件单独 try/catch**：加载失败会显式报错并让退出码变 1。
+ * 所以按路径约定自动发现（见 `paths.ts`），且**每个文件单独 try/catch**：加载失败会显式报错并让退出码变 1。
  */
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'

@@ -2,8 +2,8 @@
 //
 // 四条约定（见 refs.ts）：
 // 1. 排轴的短索引是内部 id 的纯函数投影 —— 移动 / 删除 / 重排都**不会**让它指向别的条目；
-// 2. 入参仍兼容内部 id（WS / 脚本要精确寻址，旧消息里的 id 也不会失效）；
-// 3. 位置序号在排轴域**已废弃**：传数字不再被当作「第几个」，避免静默指错块；
+// 2. 入参仍兼容内部 id（WS / 脚本要精确寻址，既有消息里的 id 也不会失效）；
+// 3. 位置序号在排轴域不被接受：传数字一律报错，避免静默指错块；
 // 4. 定位失败报错要精准：给出可用短索引清单，模型能自我纠正；短索引碰撞必须报错而非取第一个。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
@@ -111,16 +111,16 @@ describe('短索引解析：排轴按 id 派生，不随位置漂移', () => {
         setup()
         const key = shortKeyOf('op-3')
         assert.equal(resolveOpBlock(key).id, 'op-3')
-        // op-3 原本排最后，移到最前（pos=0）
+        // op-3 初始排最后，移到最前（pos=0）
         setOpBlockPos('op-3', 0)
         assert.equal(opBlocksInOrder()[0].id, 'op-3', '展示顺序已改变')
         assert.equal(resolveOpBlock(key).id, 'op-3', '短索引不受影响')
         assert.notEqual(opBlocksInOrder()[0].id, 'op-1')
         // 若此刻用「第 1 个」去寻址，会落到 op-3 上 —— 与操作前的第 1 个不同
-        assert.throws(() => resolveOpBlock(1), /未找到操作块「1」/, '位置序号已废弃，直接报错而不是静默指错')
+        assert.throws(() => resolveOpBlock(1), /未找到操作块「1」/, '位置序号不被接受，直接报错而不是静默指错')
     })
 
-    it('仍兼容内部 id（WS / 脚本精确寻址，旧消息不失效）', () => {
+    it('仍兼容内部 id（WS / 脚本精确寻址，既有消息不失效）', () => {
         setup()
         assert.equal(resolveOpBlock('op-2').id, 'op-2')
         assert.equal(resolveRefLine('rl-late').id, 'rl-late')
@@ -159,7 +159,7 @@ describe('短索引解析：报错要精准', () => {
         )
     })
 
-    it('数字参数不再被当作位置序号', () => {
+    it('数字参数不被当作位置序号', () => {
         setup()
         assert.throws(() => resolveOpBlock(9), /未找到操作块「9」/)
         assert.throws(() => resolveRefLine(1), /未找到参考线「1」/)

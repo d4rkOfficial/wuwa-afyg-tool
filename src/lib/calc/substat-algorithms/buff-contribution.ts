@@ -181,7 +181,7 @@ const folderGroupsOf = (effective: readonly EffectiveBuff[], displayedIds: Reado
  * @desc 文件夹的整组移除损失：把该文件夹内全部生效 Buff 一起移除后的伤害差值。
  *
  * 只有一条 Buff 的文件夹直接复用该条贡献（同一次重算），避免无意义的重算。
- * 与逐条求和刻意不同：乘算叠加下「整组」< Σ，界面只展示整组，Σ 不再混进同一行。
+ * 与逐条求和刻意不同：乘算叠加下「整组」< Σ，界面只展示整组，Σ 不混进同一行。
  */
 const folderContributionsOf = (
     ctx: CharacterDamageContext,

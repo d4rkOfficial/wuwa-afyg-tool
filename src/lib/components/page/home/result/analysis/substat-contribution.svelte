@@ -2,8 +2,8 @@
     /**
      * @desc 数据分析 → 副词条贡献（单角色视图）。
      *
-     * 旧版是「三角色并排」的窄栏（每栏约 1/3 宽），塞不下 Buff 明细；现在改成
-     * 「角色页签 + 左右两栏（副词条 / Buff）」，本组件只负责其中一个角色的副词条那一栏。
+     * 版式为「角色页签 + 左右两栏（副词条 / Buff）」：并排两栏才塞得下 Buff 明细；本组件只负责
+     * 其中一个角色的副词条那一栏。
      * 柱状图（按词条类型汇总）的画布与 Chart 实例仍在此持有，绘制体在 ./chart-utils。
      */
     import { onMount, untrack } from 'svelte'
@@ -148,7 +148,7 @@
                 </div>
                 <div class="rounded-none border px-3 py-2" style="border-color: var(--theme-divider-border);">
                     <div class="{SECTION_LABEL} text-(--theme-modal-text)/45">副词条总贡献</div>
-                    <!-- 占比直接跟在数值后面（同一行括号），不再单独占一行灰字 -->
+                    <!-- 占比直接跟在数值后面（同一行括号），不单独占一行灰字 -->
                     <div class="mt-1 flex items-baseline gap-1 text-(--theme-accent-text)">
                         <span class={STAT_VALUE_SM}>
                             +{Math.round(analysis.substatTotalNorm).toLocaleString()}
@@ -213,7 +213,7 @@
                 {#each analysis.echoes as echo, ei (ei)}
                     <div class="rounded-none border" style="border-color: var(--theme-divider-border);">
                         <div class="px-3 py-2">
-                            <!-- 只保留这块声骸的分数（右侧、放大）；不再有底部「小计」行 -->
+                            <!-- 只保留这块声骸的分数（右侧、放大）；没有底部「小计」行 -->
                             <div class="mb-1.5 flex items-start justify-between gap-2">
                                 <span
                                     class="pt-0.5 text-[10px] font-medium"

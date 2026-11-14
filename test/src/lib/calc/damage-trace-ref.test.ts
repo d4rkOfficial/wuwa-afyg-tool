@@ -1,7 +1,7 @@
 // 溯源「引用（转模）」口径回归。
 //
 // 口径：溯源**只给结果** —— 引用乘区解算出多少就显示多少（与引擎写进乘区的数值逐值相同），
-// 不再显示规则过程（「攻击白值 超出2000 每100→5 ≤30」这类文案已整体移除，`TracePart` 也不再带 `note`）。
+// 不含规则过程（`TracePart` 没有 `note` 字段，「攻击白值 超出2000 每100→5 ≤30」这类文案不在溯源里）。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -131,7 +131,7 @@ describe('引用（转模）溯源：面板 chip 也按结果逐条列出', () =
     // 攻击% += 当前攻击 超出 900 的部分 ×10% → (1000-900)×10% = 10% ⇒ 面板攻击 1000 → 1100
     const atkRef = refZone('atkPct', { characterIdx: 0, zoneId: 'totalAtk', threshold: 900, pct: 10 })
 
-    it('面板来源里出现的是解算后的攻击%，残差占位不再兜住引用', () => {
+    it('面板来源里出现的是解算后的攻击%，残差占位不参与引用', () => {
         const { result, segs } = run([{ id: 'b1', name: '攻击转模', zones: [atkRef], scope: 'all' }])
         assert.equal(result.totalAtk, 1100, '引用命中后面板攻击 = 1000 + 10%×1000')
         const labels = segs.baseParts.map((p) => `${p.source}·${p.label}`)

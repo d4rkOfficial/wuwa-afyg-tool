@@ -43,11 +43,11 @@
     let mergedStyle = $derived(mergeComponentsStyle({ backgroundImage, textColor, style: styleProp }))
 
     /**
-     * @desc 思考强度（T15：原来是 3 个手搓分段按钮，与「类型 / 状态」两个控件同一形态）
-     * → `ui/tabs` 的文字 tab（轨道取设置内统一的 `ROW_TABS`，分段必然等分，指示块无需测量即可对齐）。
+     * @desc 思考强度：`ui/tabs` 的文字 tab（轨道取设置内统一的 `ROW_TABS`，分段必然等分，指示块无需测量即可对齐），
+     * 与「类型 / 状态」两个控件同一形态。
      *
      * 档位与助手弹窗的会话级覆盖**共用** `$lib/ai/thinking` 的 `THINKING_LEVELS`：
-     * 新增 `off`（关）后这里由三段变四段，`.tmp/components.md` 无需改动（`ui/tabs` 按段数算指示块宽）。
+     * 档位表里含 `off`（关），共四段，`.tmp/components.md` 无需改动（`ui/tabs` 按段数算指示块宽）。
      */
     const REASONING_TABS = THINKING_LEVELS.map((level) => ({ value: level, label: THINKING_LABELS[level] }))
     const pickReasoning = (value: string) => {
@@ -142,7 +142,7 @@
             await addProfile(patch.label, patch)
         } else if (!(await updateProfile(draft.id, patch))) {
             // 配置已不存在（被设置页 / AI 的 manage_ai_profile 工具删掉）——必须报错，
-            // 不能像原先那样无条件弹「已保存」，那会让「保存不生效」看起来像静默失败
+            // 不能在这里无条件弹「已保存」，那会让「保存不生效」看起来像静默失败
             addToast('保存失败：该配置已不存在，请关掉弹窗重新打开设置', 'error')
             return
         }

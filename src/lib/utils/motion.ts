@@ -36,11 +36,11 @@ export const slideParams = (ms: number) => ({ duration: motionDuration(ms) })
  * Mac 式关闭动效：快速缩小 + 淡出（与 animate-pop-in 打开动画配对）。
  * 用法：<div out:popOut>...</div>
  *
- * T18：默认时长改走 `motionDuration(130)` —— 裸写 `out:popOut` 的调用点（layout/modal.svelte:151）
- * 之前拿的是硬编码 130ms，reduce 下照样播；包一层后 reduce → 1ms（与 slideParams 的调用点行为一致）。
+ * 默认时长走 `motionDuration(130)`：裸写 `out:popOut` 的调用点（layout/modal.svelte:151）
+ * 因此也跟随减弱动态效果（reduce → 1ms，与 slideParams 的调用点行为一致）。
  * 显式传参的调用点（`out:popOut={slideParams(MOTION_MS.fast)}`）不受影响：实参覆盖默认值。
  * 130 这个数刻意比 --motion-fast(120) 多 10ms，与遮罩的 `out:fade={{ duration: motionDuration(130) }}`
- * （modal.svelte 的遮罩，T26 起也走 motionDuration）成对，保证「面板先收、遮罩后淡」；勿改成 token。
+ * （modal.svelte 的遮罩也走 motionDuration）成对，保证「面板先收、遮罩后淡」；勿改成 token。
  */
 export function popOut(node: Element, { duration = motionDuration(130) } = {}) {
     const f = fade(node, { duration })

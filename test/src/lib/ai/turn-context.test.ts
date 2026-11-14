@@ -40,7 +40,7 @@ test('buildTurnSegments：分段顺序固定为 人设 → 当前状态 → 工�
     ])
 })
 
-test('segmentsToMessages：工作摘要段可像其它段一样被临时禁用（禁用后不再要求 AI 维护摘要）', () => {
+test('segmentsToMessages：工作摘要段可像其它段一样被临时禁用（禁用后不要求 AI 维护摘要）', () => {
     const segments = buildTurnSegments({ systemPrompt: '人设' })
     const messages = segmentsToMessages(segments, ['workSummary'])
     assert.equal(

@@ -1,7 +1,7 @@
 <script lang="ts">
     /**
      * @desc 开关（Switch）：主题化的胶囊开关。
-     * 原先在设置弹窗里手写了 11 份同样的 `<button>` + 滑块 `<span>`，此组件是其唯一实现。
+     * 开关的唯一实现：全项目都用本组件，调用点无需各自拼 `<button>` + 滑块 `<span>`。
      */
     import type { ComponentsProps } from '$lib/types'
     import { mergeClass } from '$lib/utils/component-style'
@@ -25,17 +25,17 @@
     }: Props = $props()
 </script>
 
-<!-- 动效（Phase 8.x）：
+<!-- 动效：
      ① 底色切换（关=灰 / 开=强调色）走 `--motion-fast`——按压/切换属即时反馈档；
      ② 滑块位移**用 transform 而非 left**：`left` 是布局属性，过渡会每帧触发重排，
         `translate-x` 走合成层、且 `--motion-fast` 只驱动 transform，不影响其它属性；
      ③ 按压反馈（位移/缩放）由 layout.css 的全局 `:where(button:not(:disabled))` 提供，
         这里只叠加全局没覆盖的非 transform 部分（按下轻微提亮）。该全局规则在
         `prefers-reduced-motion: reduce` 下已把按钮的 transform/transition 归零，故本组件的
-        底色过渡不再重复写 `motion-reduce:transition-none`；滑块的 transform 由下方 `motion-reduce` 关掉
+        底色过渡无需重复写 `motion-reduce:transition-none`；滑块的 transform 由下方 `motion-reduce` 关掉
         （非 button 元素不受全局规则覆盖；本仓库其余非按钮过渡同样尚未逐个覆盖，见报告）。
-     水平几何与原 `left: {checked ? '18px' : '2px'}` 完全等价（2px + 16px = 18px，滑块 size-4 = 16px），
-     因此这是纯动效层，不改视觉。 -->
+     水平几何为 `translate-x` 2px ↔ 18px（2px + 16px = 18px，滑块 size-4 = 16px），与 `left` 定位等价，
+     故属纯动效层，不影响视觉。 -->
 <button
     type="button"
     role="switch"

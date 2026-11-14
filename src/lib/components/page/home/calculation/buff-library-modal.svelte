@@ -74,8 +74,8 @@
     let tab = $state<BuffCategory>('character')
     /**
      * @desc 分类 tab 的分段清单（`ui/tabs` 的 `items`）：顺序即 `BUFF_CATEGORY_ORDER`，
-     * 文案即 `BUFF_CATEGORY_LABELS`，图标等价于改造前的三元链（character→account、weapon→sword、
-     * echo→ghost、其余→layers）。**段数/文案/顺序/点击语义逐项未变**。
+     * 文案即 `BUFF_CATEGORY_LABELS`，图标按分类取（character→account、weapon→sword、
+     * echo→ghost、其余→layers）。
      */
     const categoryTabs = BUFF_CATEGORY_ORDER.map((cat) => ({
         value: cat,
@@ -94,11 +94,11 @@
      *
      * 满宽档（面板吃满 820px、轨道 772px）这两个类**都不需要**：每段外框盒 192px、内容盒 168px，
      * 最宽内容（图标 16 + gap 6 + `首位声骸` 56 = 78px）绰绰有余 —— 所以本调用点**不需要 `min-w-[…]`**
-     * （那是 T19 给 `w-fit` 收缩轨道用的机制，本轨道是 `flex` 满宽块，宽度不由内容决定）。
+     * （那是 `w-fit` 收缩轨道才需要的机制，本轨道是 `flex` 满宽块，宽度不由内容决定）。
      *
      * 它们在**窄档**才见分晓（实测视口 400px → 面板 360、轨道 312、每段内容盒 ≈ 53px）：
      * - `[&>button]:min-w-0`：分段是 `flex: 1 1 0%` 且默认 `min-width: auto`。CJK 可逐字断行，
-     *   于是 min-content 只有**一个字** —— 面板压窄时标签会**折成两行**（实测改造前在 400px / 360px
+     *   于是 min-content 只有**一个字** —— 面板压窄时标签会**折成两行**（实测 400px / 360px
      *   两档段高 29 → 45px、`首位声骸` 的文本 rect 变成多个），而不是把轨道撑宽。`min-w-0` 后四段
      *   **任何视口下严格等分**，与指示块（宽恒为「轨道内宽 ÷ N」）永远同宽。
      * - `[&>button]:whitespace-nowrap`：`min-w-0` 之后每段只有固定额度，内容盒装不下时仍拒绝断行。
@@ -107,7 +107,7 @@
      * - 用 `[&>button]:` 后代变体而不是裸类：裸 `min-w-0` 落在**轨道**上、对分段无效（实测
      *   `minWidthComputed` 仍是 `auto`、折行照旧），而 `ui/tabs` 基底没有 `min-w-0`，只能从调用点覆盖。
      * - 判据实测（十档 1400→360px）：段宽极差 0、段高一律 28px、无折行、不溢出行、指示块 |左差| 0。
-     *   先照此改 `ui/tabs` 的调用点而不是元件基底：既有调用点标签都短、没有触发场景。
+     *   这两条只加在本调用点、不进 `ui/tabs` 基底：其它调用点标签都短、没有触发场景。
      */
     const TABS_FIT_CLASS = '[&>button]:min-w-0 [&>button]:whitespace-nowrap'
     let query = $state('')
@@ -382,7 +382,7 @@
             </div>
         {/if}
 
-        <!-- Tab bar：等宽分段 + 单一滑动指示块（ui/tabs；改造前是 4 个各自硬切底色的手搓 button） -->
+        <!-- Tab bar：等宽分段 + 单一滑动指示块（ui/tabs） -->
         <Tabs
             items={categoryTabs}
             value={tab}

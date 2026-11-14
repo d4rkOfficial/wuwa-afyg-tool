@@ -1,46 +1,46 @@
 /**
- * @desc 设置弹窗（`settings-modal.svelte`）的 UI 状态模块 —— Phase 5.1「外壳 + 每 tab 一组件」拆分时，
- * 存放**被抽出的 tab 独占**的状态与函数（仍被其余 tab 使用的状态留在外壳里，两边都要用的搬到这里、外壳 import）。
+ * @desc 设置弹窗（`settings-modal.svelte`）的 UI 状态模块：存放各 tab 与外壳**共用**的状态与函数
+ * （仍被其余 tab 使用的状态留在外壳里，两边都要用的搬到这里、外壳 import）。
  * 风格对齐 `src/lib/data/*.svelte.ts`：模块级 `$state` + `get*` / `set*` 访问器。
  *
- * ⚠️ 5.1 第一增量（抽出 `performance` / `config` 两个 tab；`config` 现已升级为独立的「配置同步」弹窗，
- * 由设置标题栏入口打开，不再属于设置栏目）实测**没有任何状态可搬**：
+ * ⚠️ `performance` / `config` 两个栏目**没有任何状态可搬**（`config` 是独立的「配置同步」弹窗，
+ * 由设置标题栏入口打开，不属于设置栏目）：
  *   - `performance`：三个开关直连全局 store `$lib/data/render-prefs.svelte`（`getGpuAccel` 等），
  *     不读不写外壳的 `$state` / `$derived` / 函数 —— 若在这里再包一层只会造出重复状态。
- *   - `config`：当时只是一层标题 + 独立的配置区块组件（现已升级为独立「配置同步」弹窗，见 `config-sync-modal.svelte`）。
+ *   - `config`：只是一层标题 + 独立的配置区块组件（现为独立「配置同步」弹窗，见 `config-sync-modal.svelte`）。
  *   - 外壳的 `tab`、`SETTING_TABS`、主题 / 背景图 / keymap / cache / archive / connection / ai 等状态
- *     仍被其余 tab 的 `{#if tab === …}` 分支使用，按迁移契约必须留在外壳。
- * 故第一增量只把「设置栏目」的公共类型 `SettingsTab`（原先内联在外壳的 `$state<…>` 上）落在这里。
+ *     仍被其余 tab 的 `{#if tab === …}` 分支使用，必须留在外壳。
+ * 此外这里放「设置栏目」的公共类型 `SettingsTab`（外壳的 `$state` 用它做类型校验）。
  *
- * 5.1 第二增量（抽出 `shortcuts` / `keymap` / `cache` 三个 tab）迁入的**两边共用**状态：
+ * **两边共用**的状态（`shortcuts` / `cache` 用）：
  *   - `tab`：侧栏导航与仍留外壳的 tab 分支要读 → 共用。
  *   - `shortcutCapture`：shortcuts tab 的「记录」按钮写、外壳的 window keydown 捕获（含 Esc 取消）读 → 共用。
  *   - `cacheEntries` + `refreshCacheEntries`：cache tab 用；外壳「打开设置」的 `$effect` 也要刷新一次 → 共用。
- * 同一增量迁入的**tab 独占**状态：`cacheBusy`、`expandedCache`。
- * （`keymap` 后来迁成独立弹窗 `keymap-editor-modal.svelte`，其 `keyPickerFor` / `uiBtnIconList` /
- *  `entryById` / `updateEntry` 都已随弹窗下沉到组件内部，本模块不再持有。）
+ * 同一处 tab 独占的状态：`cacheBusy`、`expandedCache`。
+ * （`keymap` 是独立弹窗 `keymap-editor-modal.svelte`，其 `keyPickerFor` / `uiBtnIconList` /
+ *  `entryById` / `updateEntry` 都在组件内部，本模块不持有。）
  *
- * 5.1 第三增量（抽出 `ai` / `ai-conn`、`archive`、`interaction` 三个 tab）迁入的：
+ * **`ai` / `archive` / `interaction` 三个栏目**的状态：
  *   - `ai` 与 `ai-conn` 在外壳里**共用同一个分支与同一个根节点**（内部再按 `tab` 细分），
- *     故按「一个 tab 一个组件」合成一个 `sections/ai.svelte`；迁入的**两边共用**状态：`aiEditTarget`、
+ *     故按「一个 tab 一个组件」合成一个 `sections/ai.svelte`；**两边共用**的状态：`aiEditTarget`、
  *     `promptEditOpen`、`aiDeleteTarget`，以及共用的删除实现 `doDeleteAiProfile` ——
  *     外壳的 AI 配置编辑 / 提示词编辑 / 删除确认三个次级弹窗是 `fixed` 覆盖层，必须留在外壳
  *     （设置面板内容区的毛玻璃与入场动画会为 `fixed` 建立包含块），而 tab 侧要写这三个状态、
  *     并要「关闭二次确认时直接删除」，两边必须共用同一份（复制状态或复制删除实现都会有两个真相源）。
- *   - `archive`：同理迁入 `archiveDeleteTarget`（外壳原名 `confirmDelete`）、`closeArchiveDelete`、
- *     `doArchiveDelete`（永久删除确认弹窗留外壳）；另迁入归档卡片的三张图标表 `archiveWeaponIcons` /
- *     `archiveEchoIcons` / `archiveEchoSetIcons` —— 原外壳在**挂载时**（与是否打开设置无关）就预取它们，
- *     预取 `$effect` 与 `archiveIconsLoaded` 守卫仍留外壳以保持原时序，`archive.svelte` 只读这三份状态
+ *   - `archive`：`archiveDeleteTarget`、`closeArchiveDelete`、`doArchiveDelete`
+ *     （永久删除确认弹窗留外壳）；归档卡片的三张图标表 `archiveWeaponIcons` / `archiveEchoIcons` /
+ *     `archiveEchoSetIcons` 也在这里 —— 外壳在**挂载时**（与是否打开设置无关）就预取它们，
+ *     预取 `$effect` 与 `archiveIconsLoaded` 守卫留外壳，`archive.svelte` 只读这三份状态
  *     （若把状态留在 section：TabPanel 的 `{#key active}` 会让每次切回归档 tab 都重新预取，属行为变化）。
- *   - `interaction`：**没有任何状态迁入** —— 所有开关直连 `calc-view` / `toolbar-prefs` / `render-prefs` /
- *     `context-menu-prefs` / `interaction-prefs`，外壳也不再读它们，与第一增量的 `performance` / `config`
+ *   - `interaction`：**没有状态在本模块** —— 所有开关直连 `calc-view` / `toolbar-prefs` / `render-prefs` /
+ *     `context-menu-prefs` / `interaction-prefs`，外壳也不读它们，与 `performance` / `config`
  *     同情形，不发明重复状态。
  *
- * 反向（刻意不搬，避免造出重复状态或把展示逻辑塞进 store）：
+ * 刻意不放在本模块的（避免造出重复状态或把展示逻辑塞进 store）：
  *   - `keymapEntries` 只是 `$lib/data/keymap.svelte` 的 `$derived` 视图（非自有状态），留在 keymap.svelte；
  *     `iconOf` / `gamepadIconOf` 亦只被该 tab 使用。
  *   - `CACHE_LABELS` / `CACHE_ENTITY_LABELS` / `entityLabel` / `entriesOf` / `runCacheClear` 等带图标、
- *     文案与 `addToast` 的展示逻辑留在 cache.svelte；第三增量的 `TOAST_POSITION_LABELS` / `TOAST_POSITION_HINTS` /
+ *     文案与 `addToast` 的展示逻辑留在 cache.svelte；`TOAST_POSITION_LABELS` / `TOAST_POSITION_HINTS` /
  *     `DANGER_MODE_OPTIONS` 同理留在各自 section。store 只放状态与「跨文件唯一的写入口」。
  *   - `charIconMap`（`archive`）与 `aiProfiles` / `aiActiveId`（`ai`）只是全局 store 的 `$derived` 视图，
  *     随各自 section 留下。
@@ -48,16 +48,16 @@
  * ⚠️ 唯一违反「store 不 import addToast」的例外（仅 `doDeleteAiProfile` / `doArchiveDelete` 两处）：
  * 它们同时是外壳确认弹窗的 onconfirm 与本 tab「跳过二次确认」路径的实现，搬进 store 是避免复制的唯一办法。
  *
- * 5.1 第四增量（抽出 `theme` / `connection` 两个 tab）迁入的：
- *   - `theme`：`bgEditingLight` / `bgUrl` / `surfaceKey` —— 抽取前都是外壳的 `$state`，
- *     而 `TabPanel` 的 `{#key active}` 会在切栏目时重挂载 section，留在 section 里会被重置（行为变化）。
+ * **`theme` / `connection` 两个栏目**的状态：
+ *   - `theme`：`bgEditingLight` / `bgUrl` / `surfaceKey` —— `TabPanel` 的 `{#key active}` 会在切栏目时
+ *     重挂载 section，留在 section 里会被重置（行为变化）。
  *     其中 `bgEditingLight` / `bgUrl` 还被外壳「打开设置」的 `$effect` 写，故由 store 提供唯一的写入口
- *     `syncThemeEditing()`（= 原外壳那两行赋值）；`editingBgKey` / `editingBg` 两个派生也留在 store，
+ *     `syncThemeEditing()`（外壳那两行赋值的唯一入口）；`editingBgKey` / `editingBg` 两个派生也留在 store，
  *     因为那个 `$effect` 的**依赖语义**建在 `editingBg` 的派生值上（理由见 `syncThemeEditing` 注释）。
  *   - `connection`：`kuroPhone` / `kuroCode` / `kuroLoginBusy` / `kuroLoginInfo` / `kuroLoginError` /
- *     `kuroCountdown`（+ 非响应式的 `kuroTimer`）与 `newWorkshopUrl` 同样因重挂载而必须上移；
+ *     `kuroCountdown`（+ 非响应式的 `kuroTimer`）与 `newWorkshopUrl` 同样因重挂载必须上移；
  *     倒计时定时器的起停（`startKuroCountdown`）也随之进 store，否则卸载后没人能清理/复用它。
- *     后补的 WS 服务地址草稿 `wsServerInput` 同理上移：输入框允许停在半成品（未点「应用」不落盘），
+ *     WS 服务地址草稿 `wsServerInput` 同理上移：输入框允许停在半成品（未点「应用」不落盘），
  *     留在 section 会被切换栏目重挂载清空。**落盘的**开关与地址不在这里，在
  *     `$lib/data/ws-prefs.svelte`（跨会话持久，且 `+layout` 启动时要读）。
  *   - 留在各自 section 的：`COLOR_PRESETS` / `getPresetStyle` / `compressImage`（theme）与

@@ -35,8 +35,8 @@ export const isThinkingLevel = (value: unknown): value is ThinkingLevel =>
 
 /**
  * @desc 把任意来源的值归一为合法档位。
- * 非法 / 缺失一律回落 `medium` —— 与 `config.svelte.ts` 原先读盘容错（「非 low/high 即 medium」）一致，
- * 故老数据不会因为新增 `off` 档而被改写。
+ * 非法 / 缺失一律回落 `medium` —— 沿用 `config.svelte.ts` 的读盘容错口径（「非 low/high 即 medium」），
+ * 故已持久化的档位值不会被改写。
  */
 export const coerceThinkingLevel = (value: unknown): ThinkingLevel => (isThinkingLevel(value) ? value : 'medium')
 

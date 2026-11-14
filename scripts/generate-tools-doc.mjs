@@ -14,7 +14,7 @@ const ROOT = path.resolve(__dirname, '..')
 const TOOLS_DIR = path.join(ROOT, 'src/lib/ai/tools')
 const GENERATE_FILE = path.join(ROOT, 'src/lib/ai/generate/tools.ts')
 const OUT = path.join(ROOT, 'docs/tools.md')
-/** @desc `--out <path>`：只为「改前/改后 diff」留出口；不带参数时行为与以前完全一致 */
+/** @desc `--out <path>`：只为「改前/改后 diff」留出口；不带参数时写入 docs/tools.md */
 const outArgIdx = process.argv.indexOf('--out')
 const OUT_PATH = outArgIdx === -1 ? OUT : path.resolve(ROOT, process.argv[outArgIdx + 1])
 
@@ -119,10 +119,10 @@ function stringValueAt(src, j) {
  * @desc 拼接的多段字符串字面量（`'a' + 'b' + \`c\` + CONST`）逐段取值后连起来。
  *
  * ⚠️ 必须在 `+` **左侧**停下，不能「一路扫到源码末尾」（T28 踩过）：
- * 早先的循环把标识符也当可跳过字符（为了跳过 `+ CONST` 这类引用），于是 `'描述…'` 之后的
+ * 循环若把标识符也当可跳过字符（为了跳过 `+ CONST` 这类引用），`'描述…'` 之后的
  * `;` / `)` / `,` / `}` 全部跳不过去才停——但如果整个 defineTool 块后面没有这些字符，
  * 扫描会越过值的边界，把后续源码里的字符串（连 `defineTool('ask_user'` 的名字）也拼进描述里。
- * 现在的规则：遇到 `+` 先**向前看**，只有「右操作数以引号/反引号开头」才继续拼；
+ * 规则：遇到 `+` 先**向前看**，只有「右操作数以引号/反引号开头」才继续拼；
  * 否则（标识符 / 标识符成员访问等运行时表达式）就地停下，已收集的字面量片段即为结果。
  */
 function concatValueAt(src, j) {
@@ -165,13 +165,11 @@ function concatValueAt(src, j) {
 /**
  * @desc 找「按顶层 key 取出某个字符串字段」的值；取值支持：字符串字面量、拼接字面量、**引用本文件里的常量**。
  *
- * 旧实现是 `objText.match(/key:\s*'…'/)` —— 取「块内第一个」该 key，与嵌套层级无关。于是：
- *   · `ask_user` / `web_fetch` 把 `parameters` 写在 `description` 之前时，拿到的是**第一个参数的 description**
- *     （实测 docs/tools.md 里 ask_user 的摘要是 title 那句、web_fetch 的是 url 那句）；
- *   · 顶层 `description: DESCRIPTION`（引用常量）时完全取不到。
- * 现在改成：① 只在**顶层**找 key（topLevelEntries 的括号栈）→ 找到后**只把该键的值文本**交给取值器
- *   （所以调用方不必关心自己传进来的文本是整文件、块还是切片，也不需要做下标偏移）；
- *   ② 值先试字面量，再试「本文件内同名常量的值」。
+ * 只在**顶层**找 key（topLevelEntries 的括号栈）→ 找到后**只把该键的值文本**交给取值器：
+ *   · 不会误取嵌套对象里的同名 key —— `ask_user` / `web_fetch` 把 `parameters` 写在 `description`
+ *     之前时，拿到的仍是工具自己的 description，而不是第一个参数的 description（title / url 那句）；
+ *   · 调用方不必关心自己传进来的文本是整文件、块还是切片，也不需要做下标偏移。
+ *   值先试字面量，再试「本文件内同名常量的值」，因此顶层 `description: DESCRIPTION`（引用常量）也能取到。
  *
  * @param {string} objText 对象文本（可以带或不带最外层花括号）
  * @param {string} key 字段名
@@ -204,8 +202,8 @@ function resolveLocalConstant(src, valueText) {
     if (!nameM) return ''
     const name = nameM[1]
     // ⚠️ 声明正则必须挂 `const`，不能出现「裸标识符也能命中」的形态：
-    // 早先写成 `(?:^|\n)\s*(?:const\s+)?NAME\s*=`，于是拼接串里的 `+ NAME` 这个引用点也被当成一处声明
-    // → hits.length=2 → 判定「同名多份声明」直接放弃 → 全项目长描述变空（踩过，务必保留 const 前缀）。
+    // 写成 `(?:^|\n)\s*(?:const\s+)?NAME\s*=` 时，拼接串里的 `+ NAME` 这个引用点也会被当成一处声明
+    // → hits.length=2 → 判定「同名多份声明」直接放弃 → 全项目长描述变空（务必保留 const 前缀）。
     const re = new RegExp(`(?:^|\\n)[ \\t]*(?:export\\s+)?const\\s+${name}\\s*(?::[^=\\n]+)?=\\s*`, 'g')
     const hits = []
     let m
@@ -248,11 +246,10 @@ function skipComment(src, i) {
 /**
  * @desc 从 `src[i]`（`` ` ``）跳到模板字符串结束之后，**并把 `${…}` 里的表达式整段跳过**。
  *
- * 为什么要把 `${…}` 排除（T26）：属性级模板字符串里常出现
+ * `${…}` 必须整段跳过：属性级模板字符串里常出现
  * `` `上下文分段 id（${SEGMENT_IDS.map((id) => `${id}（…）`).join(' / ')}）` `` 这种嵌套表达式，
- * 里面还有嵌套模板串。旧实现只跟踪「一个反引号到下一个反引号」，
- * 于是 `` ${id} `` 的 `` ` `` 被当成收尾 → 后面的属性被整段吞掉（实测 `ai-session.ts:83` 的
- * `segmentId` 在 docs/tools.md 里少了一行，`calculation.ts` 另有 2 处同类写法）。
+ * 里面还有嵌套模板串。只跟踪「一个反引号到下一个反引号」时，`` ${id} `` 的 `` ` `` 会被当成收尾
+ * → 后面的属性被整段吞掉（`ai-session.ts:83` 的 `segmentId` 会少一行，`calculation.ts` 另有 2 处同类写法）。
  */
 function skipTemplate(src, i) {
     i++ // 跳过开头的反引号
@@ -277,7 +274,7 @@ function skipTemplate(src, i) {
  * @returns {{ end: number, bodyStart: number, bodyEnd: number, body: string }} `end = -1` 表示没配上。
  *
  * 同时跟踪 `{}` / `[]` / `()`：只跟踪 `{}` 时，对象内部的数组（`required: ['a']`、`enum: [...]`）
- * 会让配对数提前归零、解析被截断（历史上 Buff 生成辅助 15 个工具只抽出 1 个就是这个原因）。
+ * 会让配对数提前归零、解析被截断（Buff 生成辅助的 15 个工具会只抽出 1 个）。
  * 括号不匹配的杂散闭括号直接忽略（TS 类型里的 `>`、泛型等不参与本扫描器）。
  */
 function skipBalanced(src, openIdx) {
@@ -323,15 +320,13 @@ function skipStringLiteral(src, i) {
 /**
  * @desc 把一段对象字面量文本按**顶层键**切成 `[{ key, start, end }]`（`end` = 该值结束的下标）。
  *
- * 旧实现在整段文本上反复 `match(/^\s*(\w+):\s*\{/)`，这会把**属性内部的**键
- * （`type:` / `enum:` / `description:` / `items:`）也当成属性抽出来 —— 于是：
- *   · 属性表多出 `type` / `description` 之类的假条目；
+ * 只认**顶层键**：属性内部的键（`type:` / `enum:` / `description:` / `items:`）不算 —— 否则：
+ *   · 属性表会多出 `type` / `description` 之类的假条目；
  *   · 真正的属性只抽出「第一个」，后续属性被吞（`ai-session.ts` 的 `segmentId` 就是这样丢的）。
  *
- * 这里改成**括号栈**驱动：只有「没有未闭合容器」（`stack.length === 1`，即只剩对象自身那层）时才认键。
+ * 实现是**括号栈**驱动：只有「没有未闭合容器」（`stack.length === 1`，即只剩对象自身那层）时才认键。
  * ⚠️ 不能靠「记住上一个键」这种状态位：`handler: () => { … }` 这种箭头函数体
- * 内部的 `key: value` 会被误认成顶层键（T26 第一版就踩了这个坑：`parameters` 被真·嵌套键
- * 挤到列表后面、`find` 取不到 → 全项目参数表变空）。
+ * 内部的 `key: value` 会被误认成顶层键（`parameters` 会被真·嵌套键挤到列表后面、`find` 取不到 → 全项目参数表变空）。
  */
 function topLevelEntries(text) {
     const entries = []
@@ -382,11 +377,11 @@ function topLevelEntries(text) {
                 while (j < text.length && /\s/.test(text[j])) j++
                 const end = valueEnd(text, j)
                 entries.push({ key: m[1], start: j, end })
-                // ⚠️ 必须从**值的结束处**继续扫（T28 修）。早先是 `i = j`（值的**起点**），于是循环会把
-                // 值文本本身当成新的键位继续认键：`description: DESCRIPTION,` 之后紧跟的
-                // `requires: 'askUser'`、注释里的 `关键信息（目标、偏好…）` 都被当成顶层键 push 进 entries
-                // → 下一个 entry 的 `start` 落到值之后很远的地方 → 「用 next.start 截取本键值」的做法拿到
-                // 一大段混着注释与后续键的脏文本。ask_user / web_fetch 的长描述因此取不到值（T28 踩过）。
+                // ⚠️ 必须从**值的结束处**继续扫，不能从值的**起点**继续 —— 否则循环会把值文本本身
+                // 当成新的键位继续认键：`description: DESCRIPTION,` 之后紧跟的
+                // `requires: 'askUser'`、注释里的 `关键信息（目标、偏好…）` 都会被当成顶层键 push 进 entries
+                // → 下一个 entry 的 `start` 落到值之后很远的地方 → 「用 next.start 截取本键值」会拿到
+                // 一大段混着注释与后续键的脏文本，ask_user / web_fetch 的长描述因此取不到值。
                 if (end < j) break // 防御：值结束点异常时不要死循环
                 i = end + 1
                 continue
@@ -411,10 +406,9 @@ function valueEnd(text, j) {
 /**
  * @desc 抽 `parameters` 的 `required` 与 `properties`。
  *
- * T26 修的两个 bug：
- *  1. **`required` 只认顶层**。旧实现用 `/required:\s*\[([^\]]*)\]/` 在整段参数文本里找第一个
- *     `required`，而属性内部的 `items: { …, required: ['value','label'] }` 会先被命中 ——
- *     `ask_user` 就是这样把 `required: ['questions']` 整条读丢的（文档里 `questions` 标「否」）。
+ *  1. **`required` 只认顶层**。在整段参数文本里找第一个 `required` 会命中属性内部的
+ *     `items: { …, required: ['value','label'] }` —— `ask_user` 就会把 `required: ['questions']`
+ *     整条读丢（文档里 `questions` 标「否」）。
  *  2. **属性表只取顶层键**，并用 `type:` 过滤掉无类型字段（`additionalProperties: false` 之类不是参数）。
  */
 function extractParams(objText, fileSrc) {
@@ -443,13 +437,12 @@ function extractParams(objText, fileSrc) {
         .map((e) => {
             const valText = propsText.slice(e.start, e.end + 1)
             const desc = pickString(valText, 'description', fileSrc)
-            // `type` 与 `enum` 都走**结构化**取值（T34 修的两个错值/错位）：
-            //  ① type 旧实现是 `/(^|[\s{[(,])type\s*:\s*([^,}\n]+)/` —— 它用「到逗号为止」截取值，
-            //     于是**联合类型数组** `type: ['number', 'string']`（config.ts 的 `value`）
-            //     在文档里变成 `['number` 这种半截字符串；`enum` 里带引号的值同理。
-            //  ② enum 旧实现在整段值文本里找第一个 `enum:`，命中**嵌套** enum →
-            //     `timeline.ts` 的 `position` 被渲染成 `object（before / after）`。
-            // 现在两者统一走 `readTypeSpec` / `readOwnEnum`（都基于 `topLevelEntries` 的括号栈，
+            // `type` 与 `enum` 都走**结构化**取值：
+            //  ① type 不能按「到逗号为止」截取 —— 那样**联合类型数组** `type: ['number', 'string']`
+            //     （config.ts 的 `value`）在文档里会变成 `['number` 这种半截字符串；`enum` 里带引号的值同理。
+            //  ② enum 只认**自身那一层**的键 —— 在整段值文本里找第一个 `enum:` 会命中**嵌套** enum，
+            //     `timeline.ts` 的 `position` 会被渲染成 `object（before / after）`。
+            // 因此两者统一走 `readTypeSpec` / `readOwnEnum`（都基于 `topLevelEntries` 的括号栈，
             // 与 `required` 只认顶层同源）：值一律取「值本身的语法边界」，数组逐项取值，引号交给 `skipStringLiteral`。
             const spec = readTypeSpec(valText, fileSrc)
             return {
@@ -474,9 +467,9 @@ function ownValueText(valText, key) {
  *
  * `type` 的两种形态都要处理：
  *  · 裸字面量 —— `type: 'object'` / `type: 'string'`；多段拼接（`type: 'a' + 'b'`）走 `concatValueAt`；
- *  · **数组字面量** —— `type: ['number', 'string']`（联合类型）。旧实现按「到逗号为止」截取，
- *    会把数组截成 `['number` 这种半截内容（docs/tools.md 里 config.ts 的 `value` 曾如此）。
- * 数组逐项取值后以 ` / ` 连接，与 `enum` 的渲染口径一致。
+ *  · **数组字面量** —— `type: ['number', 'string']`（联合类型）。按「到逗号为止」截取会把数组
+ *    截成 `['number` 这种半截内容（docs/tools.md 里 config.ts 的 `value`），所以数组逐项取值后
+ *    以 ` / ` 连接，与 `enum` 的渲染口径一致。
  *
  * `enum` 只认顶层（见 `readOwnEnum`），非数组字面量（常量引用等）返回 `null`，
  * 由调用方回退——这样「没有 enum」与「enum 解析不出」在文档里表现一致（都不加括号后缀）。
@@ -553,8 +546,8 @@ function readOwnEnum(valText) {
     if (!valueText.startsWith('[')) return [] // 非数组字面量（引用常量等）不解析
     const inner = valueText.slice(1, -1)
     // 这里**不需要**再剥引号：`valueTextAt` 走 `skipStringLiteral`，而 `skipBalanced` 内部会经
-    // `skipString` 处理，`'none'` 已是裸 `none`。旧实现里那句 `.replace(/^'|'$/g, '')` 缺少 `g`
-    // 之外的锚定问题，本身就是死代码（实测：加与不加产物一致），故删除以免误导后人。
+    // `skipString` 处理，`'none'` 已是裸 `none`。多加一句 `.replace(/^'|'$/g, '')` 属于死代码
+    // （实测：加与不加产物一致），故不写以免误导后人。
     return inner
         .split(',')
         .map((s) => s.trim())
@@ -757,8 +750,8 @@ const firstDiffByte = (a, b) => {
  *
  * 为什么是**逐字节**比较（而不是 check-components-doc 那种空白/表格归一后比较）：
  * 本脚本的产物自己就过一遍 Prettier（上面那段），生成侧与磁盘侧口径完全一致，
- * 没有「列宽填充差异」需要容忍 —— 于是任何字节差异都是真漂移（历史上发生过
- * 145 个工具的参数表被打成 `_无参数_`、整文件少 367 行却无人发现）。
+ * 没有「列宽填充差异」需要容忍 —— 于是任何字节差异都是真漂移（145 个工具的参数表被打成
+ * `_无参数_`、整文件少 367 行都能被立刻抓到）。
  * 归一化比较会放过的「空白/换行悄悄变了」这类漂移，在这里也应当算错。
  */
 if (process.argv.includes('--check')) {

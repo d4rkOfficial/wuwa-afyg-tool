@@ -7,8 +7,8 @@ import type { AlgorithmId } from '$lib/calc/substat-algorithms/types'
  * @desc 「数据分析 → 贡献」结果的**有效性判定与缓存登记**（纯函数）。
  *
  * 为什么需要：整套贡献分析（`prepare` + 逐角色副词条 + Buff）实测约 130ms，且分 4 片占主线程；
- * 而打开弹窗以前每次都无条件重算一遍 —— 结果明明已经在 `substatAnalysis` / `buffAnalysis` 里，
- * 仍要再卡一下。这里用一份**全廉价**的输入指纹决定「要不要重算」：
+ * 而结果本来就在 `substatAnalysis` / `buffAnalysis` 里，无条件重算只会白卡一下。
+ * 这里用一份**全廉价**的输入指纹决定「要不要重算」：
  * 版本号 / 字符串 / 对象引用，不做任何深拷贝（请求体里有角色技能树，深拷贝贵得离谱）。
  *
  * 口径约定：

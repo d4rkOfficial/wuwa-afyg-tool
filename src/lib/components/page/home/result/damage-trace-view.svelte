@@ -77,7 +77,7 @@
                 detail: `白值 ${fmt(seg.baseWhite)} + 绿值 ${fmt(seg.baseGreen)} = ${fmt(seg.totalStat)}`
             })
         }
-        // 倍率：系数类 ratioNum 已含额外倍率，不再重复加
+        // 倍率：系数类 ratioNum 已含额外倍率，不重复加
         const ratioPct = seg.ratioIncludesExtra ? seg.ratioPct : seg.ratioPct + seg.extraRatioPct
         const ratioParts: TracePart[] = [
             {
@@ -289,7 +289,7 @@
         viewport = { w: window.innerWidth, h: window.innerHeight }
     }}
     onmousedown={(e) => {
-        // 浮窗已 portal 到 body，不再属于 rootEl，点它内部（滚动条、✕）不应视为「点外部」
+        // 浮窗已 portal 到 body，不属于 rootEl，点它内部（滚动条、✕）不应视为「点外部」
         const t = e.target as Node
         if (tip && rootEl && !rootEl.contains(t) && !(tipEl && tipEl.contains(t))) closeTip()
     }}

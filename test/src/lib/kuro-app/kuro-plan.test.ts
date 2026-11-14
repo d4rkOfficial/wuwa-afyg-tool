@@ -125,7 +125,7 @@ describe('buildKuroPlans', () => {
         assert.equal(plan.options, undefined)
     })
 
-    it('治疗声骸能整只角色导入（不再因为治疗效果加成被跳过）', () => {
+    it('治疗声骸能整只角色导入（治疗效果加成不导致跳过）', () => {
         const ch = character('维里奈', [
             echo(4, '治疗效果加成'),
             echo(3, '共鸣效率'),

@@ -110,7 +110,7 @@ describe('app.html 手机端重定向契约', () => {
         }
     })
 
-    it('已经在 /shell-page 不再跳（防自跳自循环）', () => {
+    it('已在 /shell-page 时不跳（防自跳自循环）', () => {
         assert.equal(
             run({
                 pathname: '/shell-page',

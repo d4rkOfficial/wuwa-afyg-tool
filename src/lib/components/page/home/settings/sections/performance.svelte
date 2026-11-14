@@ -1,11 +1,11 @@
 <script lang="ts">
     /**
-     * @desc 设置 → 性能相关（Phase 5.1 第一增量：自 `settings-modal.svelte` 原样抽出，标记与行为未改）。
+     * @desc 设置 → 性能相关。
      * 三个开关直连全局 store `$lib/data/render-prefs.svelte`（与外壳无共享状态，故无需 settings-ui store 中转）。
      *
-     * T15：三个 `ui/switch` 换成 `ui/tabs` 的两段文字 tab。两个分段各自写**该状态下的实际行为**
+     * 三个开关都是 `ui/tabs` 的两段文字 tab。两个分段各自写**该状态下的实际行为**
      * （「重载｜重算」而不是「开｜关」），因为这三项关闭后并非「功能失效」，而是走另一条更轻的路径。
-     * 分段控件的宽度 / 配色 / 布尔换算统一走 `../utils`（原先每个 section 各定义一份，规格不一致）。
+     * 分段控件的宽度 / 配色 / 布尔换算统一走 `../utils`（各 section 共用同一份规格）。
      */
     import Icon from '@iconify/svelte'
     import SectionTitle from '$lib/components/ui/section-title.svelte'

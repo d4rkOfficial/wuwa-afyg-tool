@@ -9,7 +9,7 @@
  *  （`draft = pickRadio(draft, question, value)`），不自己写规则。
  *
  * 「其它」的**唯一化**（也归本文件）：AI 在 options 里自带「其它」时，那一项本身就是自定义输入槽
- *  （归一成 `customOption`），界面不再补第二行；只有没自带时才由界面补一行 `CUSTOM_LABEL`。
+ *  （归一成 `customOption`），界面不补第二行；只有没自带时才由界面补一行 `CUSTOM_LABEL`。
  *  两条路径共用同一套草稿字段（`customOn` / `customText`），故互斥规则与提交结果完全一致。
  *
  * 契约来源：`$lib/ai/tools/ask-user.types.ts`（本文件不改它，只按它归一）。
@@ -83,7 +83,7 @@ export interface AskCardQuestion {
     allowCustom: boolean
     /**
      * @desc **AI 自带的**「其它」选项 value（没有则 null）：它就是本题的自定义输入槽 ——
-     *  界面**不再补第二行「其它」**，而是让这一项自己展开输入框（见 `isOtherOption` / `setCustomPick`）。
+     *  界面**不补第二行「其它」**，而是让这一项自己展开输入框（见 `isOtherOption` / `setCustomPick`）。
      */
     customOption: string | null
     customPlaceholder: string
@@ -105,7 +105,7 @@ export interface AskDraftItem {
 /** @desc 整组草稿：key = 归一后的题目 id */
 export type AskDraft = Record<string, AskDraftItem>
 
-/** @desc 归一后的整组提问（组件渲染取它，不再看原始 request） */
+/** @desc 归一后的整组提问（组件渲染取它，不看原始 request） */
 export interface AskCardGroup {
     title: string
     description: string
@@ -127,7 +127,7 @@ const readType = (v: unknown): AskUserQuestionType =>
 /** @desc 空草稿（每次返回新对象，避免多处共享同一份可变状态） */
 export const emptyDraftItem = (): AskDraftItem => ({ picked: [], customOn: false, customText: '', skipped: false })
 
-// ── 「其它」选项识别（AI 自己给了「其它」时不再补一行）────────────────────────
+// ── 「其它」选项识别（AI 自己给了「其它」时不补一行）────────────────────────
 
 /**
  * @desc 「其它」的写法词表。为什么不是「label === '其它'」一条：
@@ -200,7 +200,7 @@ export const normalizeQuestion = (raw: AskUserQuestion, index: number, used: Set
         ...(description ? { description } : {}),
         options,
         allowCustom,
-        // AI 已经给了「其它」→ 让**那一项自己**展开输入框（界面不再补第二行，否则会看到两个「其它」）；
+        // AI 已经给了「其它」→ 让**那一项自己**展开输入框（界面不补第二行，否则会看到两个「其它」）；
         // 没给才由界面补一行（模板据 `customOption === null && allowCustom` 渲染）。
         customOption: allowCustom ? (options.find(isOtherOption)?.value ?? null) : null,
         customPlaceholder: customPlaceholder || DEFAULT_CUSTOM_PLACEHOLDER,
@@ -373,7 +373,7 @@ export const cancelResult = (): AskUserResult => ({ submitted: false, answers: [
  * @desc 把 `resolve` 包成**最多生效一次**的收尾函数。
  *  为什么需要它：提问卡有两条收尾路径（用户提交 / 卡片卸载按放弃收尾），二者可能同时发生
  *  （提交 → 父组件清状态 → 卡片卸载 → 卸载回调再收尾一次）。原生 `Promise` 对重复 `resolve`
- *  本身是幂等的，但这里要把「只 resolve 一次」变成**代码级事实**，顺带让重复调用不再触发任何副作用。
+ *  本身是幂等的，但这里要把「只 resolve 一次」变成**代码级事实**，顺带让重复调用不触发任何副作用。
  */
 export const settleOnce = <T>(settle: (value: T) => void): ((value: T) => void) => {
     let done = false

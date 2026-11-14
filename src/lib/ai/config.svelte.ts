@@ -33,8 +33,8 @@ export interface AiProfile {
     /**
      * @desc 单个回合内允许的工具轮次上限（模型调用 → 执行工具 → 再调模型的循环次数）。
      *
-     * 原先硬编码 8 轮：查数据 + 改配置 + 校验这类任务很容易超过，超过后回合被静默掐断。
-     * 现在按配置声明，默认值也放宽；到顶时会向界面明确报告，而不是假装正常结束。
+     * 为什么开放：查数据 + 改配置 + 校验这类任务很容易超过固定轮次，到顶后回合会被静默掐断。
+     * 故改由配置声明，默认值也放宽；到顶时会向界面明确报告，而不是假装正常结束。
      */
     maxToolRounds: number
     /**
@@ -44,7 +44,7 @@ export interface AiProfile {
      * - Cloudflare / Vercel 的转发有请求体与执行时长限制，附图的回合容易被平台掐断；
      * - 部分端点本身支持 CORS，直连还能少一跳、少暴露一次 API Key。
      * 代价：端点必须自己配置 CORS（预检要放行 `Authorization` 头），否则浏览器会拦下。
-     * 默认 `false` = 沿用原来的自动策略（本地 / 已知支持 CORS 的 host 直连，其余走代理）。
+     * 默认 `false` = 自动策略（本地 / 已知支持 CORS 的 host 直连，其余走代理）。
      */
     directRequest: boolean
 }
@@ -72,7 +72,7 @@ const MAX_MAX_TOOL_ROUNDS = 200
 
 /**
  * @desc 归一化「上下文窗口」：只接受区间内的有限数值并取整，其余（缺失 / 非数 / 越界）一律回落默认。
- * 与 `coerceThinkingLevel` 同一口径：老数据缺字段时静默补默认，而不是报错或留 `undefined`。
+ * 与 `coerceThinkingLevel` 同一口径：字段缺失时静默补默认，而不是报错或留 `undefined`。
  */
 export const coerceContextWindow = (value: unknown): number => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_CONTEXT_WINDOW
@@ -97,7 +97,7 @@ export const coerceMaxToolRounds = (value: unknown): number => {
     return rounded
 }
 
-/** @desc 归一化「浏览器直连」开关：只认真正的 `true`，其余（缺失 / 旧数据）一律 `false`（自动策略） */
+/** @desc 归一化「浏览器直连」开关：只认真正的 `true`，其余（缺失 / 非布尔值）一律 `false`（自动策略） */
 export const coerceDirectRequest = (value: unknown): boolean => value === true
 
 export interface AiConfig {
@@ -126,8 +126,7 @@ const DEFAULT_PROFILES: AiProfile[] = [
  * @desc 一份**空白**的新配置草稿（`id` 为空 = 尚未创建）。
  *
  * 三个刻意的选择：
- * 1. **不预先落库** —— 它只是弹窗的初始值；用户点保存时才 `addProfile`，取消则什么都不发生
- *    （原先「新建」会先落库再开弹窗，取消也会留下一条空配置）。
+ * 1. **不预先落库** —— 它只是弹窗的初始值；用户点保存时才 `addProfile`，取消则什么都不发生。
  * 2. **不拿当前生效配置预填** —— 否则用户会以为已经建好，且容易存出一份和现有配置重复的东西。
  * 3. 名称给一个随便取的占位（配置总得有个名字），其余输入框留白。
  */

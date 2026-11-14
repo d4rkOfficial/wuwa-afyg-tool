@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @desc tab 面板的共享动效外壳（Phase 8.4）：把面板内容包在 `{#key active}` 里，
+     * @desc tab 面板的共享动效外壳：把面板内容包在 `{#key active}` 里，
      * 切换 tab 时整块重挂载并播放 `animate-rise-in` 入场动画，让全项目的 tab 系统
      * （设置弹窗 15 分支 / Buff 集 / AI 助手气泡 / 其它）动效一致，而不是各自发明一套。
      *

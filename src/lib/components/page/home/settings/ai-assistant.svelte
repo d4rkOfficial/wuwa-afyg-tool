@@ -81,10 +81,10 @@
         images?: string[]
         /**
          * @desc AI 输出的**活动流**（按发生顺序）：思考 / 工具 / 回复 / 提示。
-         * 这是新的列表式 UI 的数据源 —— 不再有聊天气泡与「聊天 / 思考 / 工具」tab。
+         * 这是列表式 UI 的数据源 —— 没有聊天气泡与「聊天 / 思考 / 工具」tab。
          */
         activities?: AssistantActivity[]
-        // 发言是否已结束（结束后保留活动流，不再自动收起）
+        // 发言是否已结束（结束后保留活动流，不自动收起）
         done?: boolean
         /** @desc 单条消息当前渲染的活动行上限（长任务可点「显示更早的活动」回看；只影响显示） */
         activityLimit?: number
@@ -325,8 +325,8 @@
      *    而 `layout.css` 给 `--motion-slow`(260ms) 的用途注释是「页面 / 弹窗级过渡」，不是窗口形变。
      *  - 观感：380 → 260 是 **−120ms（快 32%）** 的可见加速；本组件还刻意配了 Mac 式
      *    cubic-bezier(.32,.72,.24,1)（快出慢收）与之一致，换 token 会拆散这组配对。
-     *  - 收敛：原先同一组时长在模板里手抄 8 遍、复位定时器又写死 420ms（与动画不同步）；
-     *    现在模板与定时器共用这一个常量，杜绝两处数值漂移。reduce 下由 FORM_MORPH 压到 1ms。
+     *  - 收敛：模板与复位定时器共用这一个常量（同一组时长只写一次），杜绝两处数值漂移；
+     *    reduce 下由 FORM_MORPH 压到 1ms。
      */
     const FORM_MORPH_MS = 380
     /*
@@ -619,7 +619,7 @@
                     } else if (evt.type === 'reasoning') {
                         last().activities = appendActivityText(last().activities ?? [], 'reasoning', evt.text ?? '')
                     } else if (evt.type === 'tool') {
-                        // 按 seq 配对（不再用「最后一行 + 名称相同」）：一次漏配对只影响自己
+                        // 按 seq 配对（不用「最后一行 + 名称相同」）：一次漏配对只影响自己
                         last().activities = applyToolEventToActivities(last().activities ?? [], evt)
                         // run_js 的返回值 / 报错独立成顶层行，不塞进「代码」卡片的展开结果里
                         if (evt.toolName === 'run_js' && evt.resultText !== undefined) {
@@ -662,7 +662,7 @@
         // 回合结束（正常 / 中止 / 报错）：提问卡一律收尾 —— 否则 `ask_user` 的 Promise 会永久悬挂
         // （提交过的卡在收尾时已把 askCard 置空，这里是无副作用的空操作）
         cancelAskCard()
-        // 发言结束：活动流保持原样（不再有 tab 切换与自动收起）
+        // 发言结束：活动流保持原样（没有 tab 切换与自动收起）
         const lastMsg = display[display.length - 1]
         if (lastMsg?.role === 'assistant') lastMsg.done = true
         busy = false
@@ -675,7 +675,7 @@
      * @desc 是否「吸附在底部」。
      *
      * 只有用户本来就在底部时才自动跟随新内容；一旦用户往上翻（读旧消息 / 展开某张工具卡），
-     * 后续流式输出不再把他拽回去 —— 这正是「AI 输出时不再总是强制向下滚动」。
+     * 后续流式输出不会把他拽回去 —— 即「AI 输出时不总是强制向下滚动」。
      * 用户手动滚回底部、或点「回到底部」按钮 / 发送新消息时恢复吸附。
      */
     let stickToBottom = $state(true)
@@ -868,7 +868,7 @@
             >
                 <Icon icon="mdi:robot-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
                 <!-- 大标题 = 当前工作摘要（AI 每轮经 `set_work_summary` 更新）。
-                     提供商 / 模型刻意不再占位：输入区右侧的「模型 · 等级」已承担该信息，
+                     提供商 / 模型刻意不占位：输入区右侧的「模型 · 等级」已承担该信息，
                      标题留给「正在做什么」这件对用户更有用的事。 -->
                 <div class="min-w-0 flex-1 leading-tight">
                     <div
@@ -920,7 +920,7 @@
                 </Button>
             </div>
 
-            <!-- 实时状态条原先挂在头部下方；现按 DSH 的形态**下移**到 composer 之后（见文件底部） -->
+            <!-- 实时状态条：按 DSH 的形态放在 composer 之后（见文件底部） -->
 
             <!-- 上下文 / 用量 / 运行情况面板（默认收起；入口为头部 layers 按钮） -->
             <AiContextPanel
@@ -1260,12 +1260,12 @@
                     </div>
                 {/if}
 
-                <!-- 危险确认卡与 ask_user 提问卡已移入 composer 卡片内部（见本文件末尾的 `pendingCard` snippet） -->
+                <!-- 危险确认卡与 ask_user 提问卡渲染在 composer 卡片内部（见本文件末尾的 `pendingCard` snippet） -->
             </div>
 
             <!-- composer（输入框 + 权限 / 模型·等级 / 用量圈 / 发送）与状态行都在子组件里，宿主只给 busy 与回调。
                  危险确认卡 / `ask_user` 卡经 `pending` 槽位渲染在 composer **卡片内部**（替掉输入行）：
-                 此刻回合正阻塞在工具里等作答，发送任何文本都不会被处理，故不再并排留一个用不了的输入框。 -->
+                 此刻回合正阻塞在工具里等作答，发送任何文本都不会被处理，故不并排留一个用不了的输入框。 -->
             <AiComposer
                 {busy}
                 longTask={longTaskActive}
@@ -1304,7 +1304,7 @@
 
 {#snippet pendingCard()}
     {#if confirmCard}
-        <!-- 危险操作确认：内容驱动，样式交给 composer 卡片（不再自带外框与底色） -->
+        <!-- 危险操作确认：内容驱动，样式交给 composer 卡片（不自带外框与底色） -->
         <div class="flex items-start gap-2">
             <Icon icon="mdi:alert-outline" class="mt-px size-4 shrink-0 text-red-500" />
             <div class="min-w-0 flex-1 leading-tight">
@@ -1345,7 +1345,7 @@
     {:else if askCard}
         <!-- 「向用户提问」卡片（ask_user）：`{#key}` 保证换一组问题一定重挂新实例，
              组件卸载时按「放弃」收尾，不会把上一组问题与作答残留到下一轮。
-             `embedded` 让卡片不再自带外框/底色 —— composer 卡片已经提供了表面。 -->
+             `embedded` 让卡片不自带外框/底色 —— composer 卡片已经提供了表面。 -->
         {#key askCard}
             <AskUserCard request={askCard.request} onresolve={askCard.resolve} embedded />
         {/key}

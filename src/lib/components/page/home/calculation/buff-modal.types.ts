@@ -3,7 +3,7 @@
  * 与 `buff-modal.utils.ts` 同一放置约定：不 import store，只描述形状。
  *
  * 外壳自身的 props 直接写在其内部的 `interface Props extends ComponentsProps`（闸门 ① 要求），
- * 故此处不再重复一份 `BuffModalProps`。
+ * 故此处不重复一份 `BuffModalProps`。
  */
 import type { BuffTreeNode } from '$lib/calc/buff-tree'
 

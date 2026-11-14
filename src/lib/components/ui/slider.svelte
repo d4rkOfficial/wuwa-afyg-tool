@@ -1,10 +1,10 @@
 <script lang="ts">
     /**
      * @desc 滑块：默认档 = 标签行（左侧文案或富标签 + 右侧等宽数值）+ range 输入 + 上下限说明行。
-     * 原先 `settings-modal.svelte` 里手写了 6 份同样的 7 行结构，且各自重复输入框样式与
-     * `Number((e.target as HTMLInputElement).value)` 这段取值代码。
+     * 标签行 / 轨道 / 说明行的结构与取值都由组件内生完成（调用点不必再写
+     * `Number((e.target as HTMLInputElement).value)` 这段取值代码）。
      *
-     * 两个可选档位（都为「行头已有名称」的密集列表服务，默认档零漂移）：
+     * 两个可选档位（都为「行头已有名称」的密集列表服务）：
      *  - `inline`：只发一条轨道 + 右侧数值，**不渲染可见标签**（`label` 仅作 aria-label）；
      *  - `thumbBadge`：数值不进右侧，而是做成**骑在拇指上的小标签**（与 `config/echo-slot-card`
      *    的副词条滑杆同一视觉：轨道 + 已选段填充 + 跟随位置的数值胶囊），胶囊位置用 `clamp()`

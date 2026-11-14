@@ -7,7 +7,7 @@ import { browser } from '$app/environment'
  * - `segmented` 分段平铺：按时间记点（参考线）切段，每段一张表，所有伤害按时间顺序列出，
  *   只有「选中来源」的行可勾 Buff，其它行只显示左侧伤害信息（其余绝对留白）。
  *
- * 旧的 `dropdown` / `spread` 已废除（下拉表整块删除），载入时会迁移到 `categorized`。
+ * 视图只有这两种；存量偏好里的 `dropdown` / `spread` 由 {@link migrateViewMode} 归到 `categorized`。
  */
 export type CalcViewMode = 'categorized' | 'segmented'
 export type CalcScrollAxis = 'vertical' | 'horizontal'
@@ -24,7 +24,7 @@ let _headerCompact: boolean = $state(false)
 /** @desc 拉表是否显示「不达门槛」的 Buff 列（默认显示；关掉后只保留至少一行真正达标的列） */
 let _showUnmetColumns: boolean = $state(true)
 
-/** @desc 旧视图值 → 新视图值（下拉表已删除，一律归到分类平铺） */
+/** @desc 存量视图值 → 当前视图值（只有 `categorized` / `segmented` 两种，其余一律按分类平铺） */
 const migrateViewMode = (saved: string | null): CalcViewMode => (saved === 'segmented' ? 'segmented' : 'categorized')
 
 // 模块加载时从 localStorage 恢复

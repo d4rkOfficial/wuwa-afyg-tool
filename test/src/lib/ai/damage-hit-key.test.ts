@@ -1,7 +1,6 @@
 // 直伤命中「稳定标识」回归：hitKey 由命中身份派生，其它命中增删或自身改倍率/属性/段数都不变。
 //
-// 被替代的做法是 hitIndex（数组下标），它的失效场景正是这次修复的目标：
-// 读完之后另一条命中被解绑 → 下标整体前移 → update_damage_hit 改错条目。
+// 用 hitIndex（数组下标）会失效：读完之后另一条命中被解绑 → 下标整体前移 → update_damage_hit 改错条目。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 

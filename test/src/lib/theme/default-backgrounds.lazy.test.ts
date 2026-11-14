@@ -6,7 +6,7 @@
 // 一旦 theme store 用**顶层静态** import 引它，这个模块就进入模块图，被根 layout（nodes/0）
 // 静态引用而落进**首屏关键路径**：每个用户、每次进入都下载 282KB（含 service worker 预缓存清单），
 // 而它只在首次进入才用得上。实测过这个回归：静态 import 时产物里该 chunk 被 nodes/0 静态 import
-// 且出现在 index.html 的 modulepreload 列表；改成函数内动态 import 后二者都消失。
+// 且出现在 index.html 的 modulepreload 列表；用动态 import 时二者都不出现。
 //
 // 因为无法在单测里跑完整构建，这里把「不能出现顶层静态 import」这条钉死为源码断言。
 // 通过 test/preload.mjs 解析 TS 与相对导入。
@@ -31,7 +31,7 @@ describe('内置默认背景图必须按需加载（防 282KB 落回首屏）', 
             null,
             `theme.svelte.ts 里出现了对 ./default-backgrounds 的顶层静态 import：\n  ${hit?.[0] ?? ''}\n` +
                 '这会把 280KB base64 拉进首屏关键路径（nodes/0 静态 import → index.html modulepreload）。' +
-                '请改成在 applyFirstRunAppearance() 内 `await import(...)`（该函数已是 async）。'
+                '请在 applyFirstRunAppearance() 内用 `await import(...)`（该函数已是 async）。'
         )
     })
 
@@ -57,7 +57,7 @@ describe('内置默认背景图必须按需加载（防 282KB 落回首屏）', 
         assert.doesNotMatch(
             withoutComments,
             /^\s*import\s/m,
-            'default-backgrounds.ts 一旦引入其它模块就不再是叶子常量模块，懒加载分块会连带拉进别的代码'
+            'default-backgrounds.ts 必须保持为叶子常量模块：引入其它模块后懒加载分块会连带拉进别的代码'
         )
         assert.match(withoutComments, /export const DEFAULT_BACKGROUND_LIGHT\s*=\s*'data:image\//)
         assert.match(withoutComments, /export const DEFAULT_BACKGROUND_DARK\s*=\s*'data:image\//)

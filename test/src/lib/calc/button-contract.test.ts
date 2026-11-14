@@ -1,6 +1,6 @@
 // ── `ui/button` 的 `bare` 档契约 ──────────────────────────────────────────────
 // 动机（T5 实测）：`ui/button` 自带一整套**状态层**样式（focus-visible / disabled /
-// active:brightness），而项目里有 10 处弹窗 footer 按钮**原本没有任何自定义状态样式**。
+// active:brightness），而项目里有 10 处弹窗 footer 按钮没有任何自定义状态样式。
 // 直接换过去会凭空多出键盘焦点轮廓、禁用态变暗与按下提亮 —— 属可见行为变化。
 // `bare` 就是为这类接线准备的「关掉状态层」开关。
 //
@@ -28,10 +28,10 @@ import { pathToFileURL } from 'node:url'
  * @desc 把组件编译成 SSR 模块再 import。
  *
  * ⚠️ **不要把临时文件写到专用子目录并在结束后删掉它**（本项目实测踩过，代价是整组用例静默消失）：
- * 早期版本写到 `.tmp/button-contract-test/` 并在 `after()` 里 `rmSync` 清理；但 sandbox 删掉该目录后
+ * 把临时文件写到 `.tmp/button-contract-test/` 再在 `after()` 里 `rmSync` 清理时，sandbox 删掉该目录后
  * 会把它列入**永久拒绝**名单 —— 下一次运行 `mkdirSync` 同一路径直接 EPERM，整个测试文件在 import
  * 阶段抛错、**用例一个都不注册**（症状是 `pnpm test` 总数莫名变少而没有任何失败输出，极易漏过）。
- * 现在改为：写到 `.tmp/` 下的**单文件**（不建子目录、不删），每次覆盖 —— 无目录生命周期问题。
+ * 因此只写 `.tmp/` 下的**单文件**（不建子目录、不删），每次覆盖 —— 无目录生命周期问题。
  *
  * 注：不能用 `mem:` 这类自定义 scheme 走 module hook —— Node 会以 `Invalid URL` 拒绝。
  */

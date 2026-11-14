@@ -598,22 +598,18 @@
                                         style="background: color-mix(in srgb, var(--theme-modal-text) 10%, transparent);"
                                     ></span>
                                 </div>
-                                <!-- @desc 条目行的 in:/out:fade 挂在**普通 div 包裹层**上（T28 修）。
-                                     历史：T16 起这行用 data-press="none" 退出全局按压，因为 layout.css 的
-                                     `:where(button:not(:disabled))` 并集把 opacity 列进 transition-property !important，
-                                     与 fade 逐帧写 inline opacity 抢同一属性。
-                                     T18 把退出规则的 `transition: none` 收窄掉后，`data-press="none"` 只剩「不要按压 transform」，
-                                     按钮于是重新拿到并集里的 opacity 过渡 → 淡入被多拖一条 ~100ms 平滑尾巴。
-                                     T26 试过把 fade 挪到 `<div class="contents">` 上，但两处都没成：
-                                       · fade 其实还留在 button 上（跟随 fade 的那个元素仍命中并集 → 尾巴照旧）；
-                                       · `display: contents` 不产生盒子 → ① opacity 没有视觉对象（写了也看不见）
-                                         ② 它自身不产生盒，space-y-1 加在它身上的 4px 行距被**丢弃** → 行距 54px 变 50px。
-                                     T28 改成三条同时成立（实测见 .tmp/reports/T28.md §A）：
-                                       ① 包裹层是**普通** `<div data-press="none">`：非 button 且带 data-press="none"
-                                          → 加入规则两分支都不命中 → transition-property 仍是默认 all / 0s；
-                                          容器级退出规则 `:where([data-press='none']) :where(button…)` 照旧管住按钮的按压 transform；
-                                       ② 它产生盒子 → opacity 真的可见，且 space-y-1 的边距落在**它**身上（行距与无包裹层时逐项相等）；
-                                       ③ fade 跟着它走 → 逐帧写的 inline opacity 不再被 CSS 再平滑一次。 -->
+                                <!-- @desc 条目行的 in:/out:fade 挂在**普通 div 包裹层**上：
+                                      layout.css 的 `:where(button:not(:disabled))` 并集把 opacity 列进 transition-property
+                                      !important，与 fade 逐帧写的 inline opacity 抢同一属性，故 fade 挂不到 button 上
+                                      （会多拖一条 ~100ms 平滑尾巴）。
+                                      也不能挂在 `<div class="contents">` 上：`display: contents` 不产生盒子 →
+                                      ① opacity 没有视觉对象（写了也看不见）② space-y-1 的 4px 行距被**丢弃**（行距 54px 变 50px）。
+                                      当前写法三条同时成立（实测见 .tmp/reports/T28.md §A）：
+                                        ① 包裹层是**普通** `<div data-press="none">`：非 button 且带 data-press="none"
+                                           → 加入规则两分支都不命中 → transition-property 仍是默认 all / 0s；
+                                           容器级退出规则 `:where([data-press='none']) :where(button…)` 照旧管住按钮的按压 transform；
+                                        ② 它产生盒子 → opacity 真的可见，且 space-y-1 的边距落在**它**身上（行距与无包裹层时逐项相等）；
+                                        ③ fade 跟着它走 → 逐帧写的 inline opacity 不会被 CSS 再平滑一次。 -->
                                 {#each group.items as item (item.name)}
                                     <div
                                         data-press="none"

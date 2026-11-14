@@ -1,7 +1,7 @@
 <script lang="ts">
     /**
      * @desc 空态 / 加载态占位文案：居中、次要色、无数据或加载中的统一样式。
-     * 原先在 6 个组件里手写了 9 份同样的 `<div class="py-N text-center …">`。
+     * 调用点只需传入文案，无需各自拼 `<div class="py-N text-center …">`。
      */
     import type { Snippet } from 'svelte'
     import type { ComponentsProps } from '$lib/types'

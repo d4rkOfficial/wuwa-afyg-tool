@@ -101,7 +101,7 @@
     const pickShareMode = (next: string) => {
         if (next === 'total' || next === 'pct') shareMode = next
     }
-    /** @desc 页签尺寸：沿用改造前这两个小分段控件的 11px / px-2 py-0.5（`[&>button]:` 方能压过组件内建 text-sm px-3 py-1） */
+    /** @desc 页签尺寸：这两个小分段控件取 11px / px-2 py-0.5（`[&>button]:` 方能压过组件内建 text-sm px-3 py-1） */
     const TABS_COMPACT_CLASS = '[&>button]:px-2 [&>button]:py-0.5 [&>button]:text-[11px]'
 
     const CHAIN_RANGE = [0, 1, 2, 3, 4, 5, 6]

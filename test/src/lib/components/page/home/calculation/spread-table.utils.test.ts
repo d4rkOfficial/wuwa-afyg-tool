@@ -173,7 +173,7 @@ describe('buildSegmentSpecs：每个标记开启一段，首段叫「开场」',
         )
     })
 
-    it('第一条记点就在 0 位置时不再出「开场」段', () => {
+    it('第一条记点就在 0 位置时不产生「开场」段', () => {
         const specs = buildSegmentSpecs([{ refLineId: 'x', name: '开局', pos: 0, seconds: 0 }])
         assert.deepEqual(
             specs.map((s) => s.title),

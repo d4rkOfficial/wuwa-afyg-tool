@@ -181,7 +181,7 @@
      *
      * 所有刷新入口都走这里，是为了堵住一条真实漏刷：链/阶改动会先落回队伍（工程 team），
      * 结果页 props 随之变化 → `loadData()` 置 `loading`，而指纹类 effect 在 `loading` 期间
-     * 主动跳过；若收尾处不补一次分析，图表与词条 / Buff 贡献就会停在旧数据（实测复现：
+     * 主动跳过；若收尾处不补一次分析，图表与词条 / Buff 贡献就会停在未重算的结果（实测复现：
      * 从数据分析弹窗打开「角色详情配置」改链阶）。
      */
     function refreshAll() {
@@ -552,7 +552,7 @@
             </div>
         </div>
 
-        <!-- Detail table（表头放在滚动容器外，不再吸附） -->
+        <!-- Detail table（表头放在滚动容器外，不吸附） -->
         <div
             class="shrink-0 border-b"
             data-sf="toolbar"

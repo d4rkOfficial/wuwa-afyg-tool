@@ -61,7 +61,7 @@ describe('溯源来源文件夹树', () => {
         )
     })
 
-    it('收起文件夹只隐藏其子行，顺序保持来源原本的先后', () => {
+    it('收起文件夹只隐藏其子行，顺序保持来源声明的先后', () => {
         const rows = buildTracePartRows(ROWS, new Set(['folder:套装']))
         assert.deepEqual(
             rows.map((row) => `${row.kind}:${row.name}`),

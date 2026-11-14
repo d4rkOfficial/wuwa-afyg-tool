@@ -2,7 +2,7 @@
     /**
      * @desc 内联小徽标（chip）：可包图标 + 文本，底色/前景色由调用方决定。
      *
-     * 抽因（实测，非「看起来像」）：拉表（`spread-table`）里逐字重复的壳只有两档 ——
+     * 拉表（`spread-table`）里用到的壳只有两档（实测）：
      * - `badge`：黄底小徽标（`inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[10px] font-medium`）；
      * - `plain`：已绑定 Buff 名等 chip（同上但 `gap-1`）。
      *

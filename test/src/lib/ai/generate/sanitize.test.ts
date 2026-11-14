@@ -40,7 +40,7 @@ describe('AI 生成 Buff 名称', () => {
 })
 
 // 转模回归：离散转模按「每 divisor 转 multiplier」折算，本就不写 pct；
-// 曾经要求 pct 必须是数字，导致这类 ref 被整条丢掉（转模永远写不进去）。
+// 因此 pct 不能强制要求数字，否则这类 ref 会被整条丢掉（转模永远写不进去）。
 describe('AI 生成引用 / 转模（ref）', () => {
     it('离散转模不写 pct 也能保留', () => {
         const out = sanitizeBuffs([

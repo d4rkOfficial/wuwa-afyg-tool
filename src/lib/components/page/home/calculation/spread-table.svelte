@@ -1,12 +1,12 @@
 <script lang="ts">
     /** @desc 拉表平铺视图（同一组件两种模式）：分类平铺 = 按角色×直伤/非直伤分组、Buff 作列、条目作行（同源两条倍率之间夹了别的来源 → 行间画主题色分割线）；分段平铺 = 按时间记点切段、所有伤害按顺序列出（非选中来源的行首列灰化、右侧留白，选中来源的连续行段首尾画主题色分割线）。支持单元格三态勾选 / 灰色禁止 / 空心圆门槛提示、框选批量、叠层文件夹列线区分
      *  性能约定：
-     *  1) 结构化数据（可用性/表头/列分隔）与勾选状态分离——点单元格不再重建整表结构；
+     *  1) 结构化数据（可用性/表头/列分隔）与勾选状态分离——点单元格不重建整表结构；
      *  2) 列表底色走区域系统 card（data-sf-flat，无毛玻璃）；吸顶表头（toolbar 叠 card 底）与首列行头（card 毛玻璃）保留模糊，
      *     这样铺开表的首列不会把壁纸直接漏出来（模糊元素数量只与列数/行数同阶）；
-     *  3) 高亮只给目标行/列上主题色，不压暗其它行列（无遮罩测量、无逐行 opacity 合成层），也不再替换单元格图标；
+     *  3) 高亮只给目标行/列上主题色，不压暗其它行列（无遮罩测量、无逐行 opacity 合成层），也不替换单元格图标；
      *  4) 渐进渲染按结构指纹重置，并以切片方式分帧揭示；
-     *  5) 表格宽度由表头内容决定（不再测宽等宽、不再补填充列）；
+     *  5) 表格宽度由表头内容决定（不测宽等宽、不补填充列）；
      *  6) 顶部「伤害源」切换按角色过滤要渲染的子表，从根上减少一次挂载的行/格数量。 */
     import { onMount, onDestroy } from 'svelte'
     import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
@@ -113,7 +113,7 @@
     /** @desc 列 id → 全局列序索引（勾选统计用，避免每格线性查找） */
     const colIndexById = $derived.by(() => new Map(columns.map((c, i) => [c.id, i] as const)))
 
-    /** @desc 不再按名字叠层分组；表头路径由 columnPaths 提供 */
+    /** @desc 不按名字叠层分组；表头路径由 columnPaths 提供 */
     const folderGroupOf = $derived(new Map())
 
     const pathAt = (ci: number): string[] => columnPaths.get(columns[ci]?.id ?? '') ?? [columns[ci]?.name ?? '']
@@ -481,7 +481,7 @@
      *
      * 为什么不在模板里现算：模板里的 `{#each}` 会在「渐进渲染揭示新行」「高亮切换」等状态变化时重新求值，
      * 现算会把 `headerBandsOf` / `columnWidthsOf`（按文字量估算宽度）重复跑上百次。
-     * 这里只依赖表结构 → 行揭示/高亮不再触发这些计算。
+     * 这里只依赖表结构 → 行揭示/高亮不触发这些计算。
      */
     const tableLayouts = $derived<TableLayout[]>(
         tables.map((table) => {
@@ -506,7 +506,7 @@
         ontoggle(row.entry.id, buffId)
     }
 
-    /** @desc 行/列全选或全不选（右键菜单触发，取代原行/列头点击三态） */
+    /** @desc 行/列全选或全不选（右键菜单触发；行/列头点击只做高亮） */
     function selectRow(row: RowData, all: boolean) {
         if (!row.editable || row.enabledBuffIds.length === 0) return
         onSetEntryBuffSetIds(
@@ -524,7 +524,7 @@
     }
 
     /** @desc ── 行/列高亮（左键单击首列/表头触发，行列互斥；再点同目标取消，表格外点击清除）──
-     *  行高亮=行级 opacity 压暗其他行；列高亮=单层遮罩压暗非高亮列（仅 1~2 个矩形，替代逐单元格 opacity） */
+     *  行高亮=行级 opacity 压暗其他行；列高亮=单层遮罩压暗非高亮列（仅 1~2 个矩形，不用逐单元格 opacity） */
     let highlight = $state<{ gi: number; kind: 'row' | 'col'; index: number } | null>(null)
 
     function clickRowHeader(gi: number, ri: number) {
@@ -632,7 +632,7 @@
     const shownRows = (g: CalcTable): RowData[] => visibleRowsOf(g.rows, visibleRows)
 
     /**
-     * @desc 表格滚动位置的会话记忆（切页签/切工程再回来时回到原来的视野，见 `$lib/data/view-session`）。
+     * @desc 表格滚动位置的会话记忆（切页签/切工程再回来时回到上次的视野，见 `$lib/data/view-session`）。
      *
      * 位置**按「视图+页签」分别记**：页签之间行数差别很大，共用一份会被较短页签夹掉。
      * 记录与恢复都要让着「渐进渲染」与浏览器的夹取：
@@ -831,7 +831,7 @@
     }
 
     /** @desc 应用框选：范围内单元格有已勾选 → 全部取消，否则全部勾选（仅可启用单元格）；
-     *  范围由调用方（mouseup）快照传入，不再读交互状态，便于「先隐藏框、延后应用」 */
+     *  范围由调用方（mouseup）快照传入，不读交互状态，便于「先隐藏框、延后应用」 */
     function applySelection(gi: number, r0: number, r1: number, c0: number, c1: number) {
         const group = tables[gi]
         if (!group) return
@@ -1028,7 +1028,7 @@
                                 {/if}
                                 {#each band as cell (cell.key)}
                                     <!-- 文件夹横条：固定 3 行高度（`h-12` = 3 × leading-3 12px + py-1 8px = 44px，另留 4px 余量），
-                                         文字放不下时靠**列变宽**消化（列宽由 `columnWidthsOf` 按文字量算），不再无限折行。 -->
+                                         文字放不下时靠**列变宽**消化（列宽由 `columnWidthsOf` 按文字量算），不无限折行。 -->
                                     <th
                                         data-sf="toolbar"
                                         data-sf-under="card"
@@ -1168,7 +1168,7 @@
                                         <span class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
                                             >伤害类型：</span
                                         >
-                                        <!-- 去重后渲染：历史工程/外部导入的伤害类型数组可能带重复项，重复 key 会抛 each_key_duplicate -->
+                                        <!-- 去重后渲染：既有工程数据 / 外部导入的伤害类型数组可能带重复项，重复 key 会抛 each_key_duplicate -->
                                         {#each [...new Set(entryDamageTypeMap[row.entry.id] ?? [])] as dt (dt)}
                                             <Tag style="background: var(--theme-input-bg);">{damageTypeShort(dt)}</Tag>
                                         {/each}
@@ -1228,7 +1228,7 @@
                                                 class="flex min-h-7 w-full cursor-pointer items-center justify-center px-1 py-1 transition-colors hover:bg-(--theme-modal-text)/10"
                                             >
                                                 {#if on && !unmet}
-                                                    <!-- 已勾选 + 达门槛：加粗打勾（图标不再因为行列高亮换成 buff 名，名字看表头即可） -->
+                                                    <!-- 已勾选 + 达门槛：加粗打勾（图标不随行列高亮换成 buff 名，名字看表头即可） -->
                                                     <Icon
                                                         icon="mdi:check-bold"
                                                         class="size-5 shrink-0"
@@ -1324,7 +1324,7 @@
     .spread-run-end td {
         border-bottom: 2px solid color-mix(in srgb, var(--theme-accent-bg) 70%, transparent);
     }
-    /* 非选中口径的行：首列灰化（文字/伤害类型一起压暗，元素色由模板改成常规文字色） */
+    /* 非选中口径的行：首列灰化（文字/伤害类型一起压暗，元素色也取常规文字色） */
     .spread-rowhead-muted {
         opacity: 0.4;
     }

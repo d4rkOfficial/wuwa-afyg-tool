@@ -62,7 +62,7 @@
         /** @desc 收尾回调：提交 / 放弃都走它（单词型事件 prop 全小写，AGENTS §3） */
         onresolve: (result: AskUserResult) => void
         /**
-         * @desc 嵌在助手 composer 卡片**内部**时置 true：不再自带边框 / 底色 / 内边距。
+         * @desc 嵌在助手 composer 卡片**内部**时置 true：不自带边框 / 底色 / 内边距。
          *  外壳（composer）已经提供了表面，再叠一层会变成「卡片里的卡片」。
          *  刻意用 prop 而不是让调用方传 `class`/`style` 去压：根节点的边框色与底色是**内联 style**
          *  （见下），内联样式压不过 class，用 `!important` 又会与主题变量打架。

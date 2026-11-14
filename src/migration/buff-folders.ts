@@ -148,10 +148,10 @@ const migrateBuffTreeFolderNames = (
 }
 
 /**
- * @desc v5 → v6 的 Buff 文件夹命名迁移：旧文件夹 → `角色名-本体 / 角色名-x链 / 角色名-武器名`，
- * 并把旧导入混在角色本体里的声骸 / 套装 / 武器 Buff 归到 `角色名-实体名[-x件]`。
+ * @desc v5 → v6 的 Buff 文件夹命名迁移：v5 文件夹 → `角色名-本体 / 角色名-x链 / 角色名-武器名`，
+ * 并把混在角色本体里的声骸 / 套装 / 武器 Buff 归到 `角色名-实体名[-x件]`。
  *
- * 只由 `migrateV5toV6` 调用（与版本绑定）；函数本身幂等，重复调用同一份已迁移数据不会变化。
+ * 只由 `migrateV5toV6` 调用（与版本绑定）；函数本身幂等，重复调用同一份数据不会变化。
  */
 export const migrateBuffFolderNaming = (calc: CalcState, team: readonly CharSlot[]): CalcState => {
     const buffs = calc.buffSets.map((buff) => {

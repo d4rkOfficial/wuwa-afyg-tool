@@ -65,13 +65,13 @@ test('update_skill：未知技能 / 非法 mode 报可读错误', async () => {
     await call('delete_skill', { name: '__skill_mode__' })
 })
 
-test('旧的命名规则专用工具已从源码删除（不是仅未 import）', () => {
+test('命名规则专用工具已从源码删除（不是仅未 import）', () => {
     const source = readFileSync('src/lib/ai/tools/buff-generate.ts', 'utf8')
     assert.equal(source.includes("defineTool('set_naming_rule'"), false)
     assert.equal(source.includes("defineTool('get_naming_rule'"), false)
 })
 
-test('旧的命名规则专用工具不再注册', async () => {
+test('命名规则专用工具不注册：调用报「未知工具」', async () => {
     const legacySet = await call('set_naming_rule', { rule: 'x' })
     const legacyGet = await call('get_naming_rule', {})
     assert.equal(legacySet.ok, false)

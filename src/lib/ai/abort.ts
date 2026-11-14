@@ -8,7 +8,7 @@
  * 打不断已经在跑的工具。用户看到的就是「任务早完成了，却还在执行中，而且暂停不掉」。
  *
  * 这里用 race 把控制权交回回合循环：`signal` 一触发就**立刻**以中止结果收尾，
- * 不再等工具自己返回（工具若之后才返回，其结果会被丢弃）。
+ * 不等工具自己返回（工具若之后才返回，其结果会被丢弃）。
  * 于是 `endToolCall` 必定执行、状态条必定恢复、循环下一轮也会看到 signal 已 abort 而收尾。
  */
 export const ABORTED_TOOL_OUTPUT = JSON.stringify({ ok: false, cancelled: true, error: '已停止生成' })

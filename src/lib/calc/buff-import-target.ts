@@ -95,7 +95,7 @@ export const resolveImportTarget = (
     )
     const character = owner >= 0 ? (team[owner]?.character ?? null) : null
     const originFolder = originFolderOf(character, origin)
-    /** @desc 来源文件夹与实体同名时不再多套一层（如 `声骸X\声骸X\短名`） */
+    /** @desc 来源文件夹与实体同名时不多套一层（如 `声骸X\声骸X\短名`） */
     const sourceFolder = origin?.entityName && rawSourceFolder === origin.entityName ? null : rawSourceFolder
     const folder = originFolder ?? coarse.folder
     return {

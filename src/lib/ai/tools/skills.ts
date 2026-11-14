@@ -1,7 +1,7 @@
 // AI 工具：AI Skill（技能卡）的通用增删改查 + 激活
 // 主动技能用 use_skill 按需激活；被动技能正文已随每轮 system 常驻注入。
-// 通用 CRUD 取代旧的 get_naming_rule / set_naming_rule：命名规则只是内置技能卡之一，
-// AI 通过 update_skill 修改「Buff 命名规则」即可，不再有专用工具。
+// 命名规则由通用 CRUD 承担（不设专用工具）：命名规则只是内置技能卡之一，
+// AI 通过 update_skill 修改「Buff 命名规则」即可。
 import { defineTool } from './registry'
 import {
     addSkill,

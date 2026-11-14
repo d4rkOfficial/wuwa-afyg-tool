@@ -81,10 +81,10 @@ export const syncPhaseLockSideEffects = (phase: PhaseKey): void => {
 }
 
 /**
- * @desc 重新锁定全部环节：先全部解锁，再按原锁定状态逐个重锁
- * （重锁 timeline/config 会重新同步全局 buff 并把当前内存态写回工程，修复换工程后残留旧数据的问题）。
- * 活动工程在开头取一次快照：原实现在循环里反复读组件里的 `$derived(activeProject)`，
- * 而循环内只用到 `.id`（解锁/加锁的目标 id）与开头已拍平的 `wasLocked`，取快照后语义不变。
+ * @desc 重新锁定全部环节：先全部解锁，再按开头记录的锁定状态逐个重锁
+ * （重锁 timeline/config 会重新同步全局 buff 并把当前内存态写回工程，清掉换工程后残留的数据）。
+ * 活动工程在开头取一次快照：循环内只用到 `.id`（解锁/加锁的目标 id）与开头已拍平的 `wasLocked`，
+ * 故不必每轮都读组件里的 `$derived(activeProject)`，取快照后语义不变。
  */
 export const relockAllPhases = async (): Promise<void> => {
     const project = getActiveProject()
@@ -110,7 +110,7 @@ export const relockAllPhases = async (): Promise<void> => {
 export const bootstrapRouteStores = async (): Promise<void> => {
     hideSplash()
     // 首次进入：拉表默认分类平铺；禁用 AI 助手；应用默认外观（昼夜质感 + 内置背景图）；
-    // 静默从工坊同步「标准词条集」（不再弹「同步工坊数据」弹窗；Buff 集不自动同步，由用户自行同步）
+    // 静默从工坊同步「标准词条集」（不弹「同步工坊数据」弹窗；Buff 集不自动同步，由用户自行同步）
     if (isFirstVisit()) {
         setCalcViewMode('categorized')
         // AI 助手默认隐藏（**持久化**保存：用户可在设置里重新开启）

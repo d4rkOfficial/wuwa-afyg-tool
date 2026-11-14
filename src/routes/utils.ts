@@ -43,8 +43,8 @@ export const collectTeamCharacterNames = (projects: readonly Project[]): string[
 /**
  * @desc 工程数据指纹：队伍 + 时间线骨架（引用线/操作块/伤害块数量与首尾 id）+ 拉表数据 + 配置数据。
  * 用途：判断「刷新结果」时数据是否真的变过（未变则跳过逐阶段重挂载）。
- * 入参而非内部读 store：原实现读 `getActiveProject()`，调用点改为 `projectDataFingerprint(getActiveProject())`
- * ——实参在同一时刻求值，语义不变，换来一个可单测的纯函数。
+ * 入参而非内部读 store：调用点传 `projectDataFingerprint(getActiveProject())`，实参在同一时刻求值，
+ * 因此语义不变，同时换来一个可单测的纯函数。
  */
 export const projectDataFingerprint = (project: Project | null): string => {
     if (!project) return 'null'

@@ -107,7 +107,7 @@ describe('shell-page 视口适配契约', () => {
         ]) {
             assert.ok(SHELL_HTML.includes(`id="${id}"`), `缺少挂点 ${id}`)
         }
-        // 曾按用户要求移除：右上角常驻全屏/切换按钮
+        // 不设右上角常驻全屏/切换按钮（挂点也不存在）
         assert.ok(!SHELL_HTML.includes('shell-fs-toggle'), '不应有右上角全屏切换按钮')
         // 脚本引用的 DOM 必须都存在
         const ids = [...SCRIPT.matchAll(/getElementById\('([^']+)'\)/g)].map((m) => m[1])
@@ -128,14 +128,14 @@ describe('shell-page 衬线遮罩层契约', () => {
         assert.ok(SHELL_HTML.includes('>切换至横屏开始使用</button>'), '缺少主行动按钮文案')
     })
 
-    it('文案：品牌名 + 「鸣潮社区公益工具」副标题，无旧提示语与页脚', () => {
+    it('文案：品牌名 + 「鸣潮社区公益工具」副标题，无多余提示语与页脚', () => {
         assert.ok(SHELL_HTML.includes('椰果工具箱'), '缺少品牌名')
         assert.ok(SHELL_HTML.includes('鸣潮社区公益工具'), '副标题应为「鸣潮社区公益工具」')
-        assert.ok(!SHELL_HTML.includes('鸣潮拉表工具'), '不应再有旧副标题')
-        assert.ok(!SHELL_HTML.includes('建议横屏使用'), '不应出现旧提示语「建议横屏使用」')
+        assert.ok(!SHELL_HTML.includes('鸣潮拉表工具'), '不应出现副标题「鸣潮拉表工具」')
+        assert.ok(!SHELL_HTML.includes('建议横屏使用'), '不应出现提示语「建议横屏使用」')
         assert.ok(!SHELL_HTML.includes('当前环境不支持自动横屏'), '不应动态覆写按钮文案')
-        // 页脚已按要求移除：整页只出现一次（即副标题那处）
-        assert.equal(SHELL_HTML.match(/鸣潮社区公益工具/g)?.length, 1, '页脚应已移除')
+        // 页脚只出现零次：整页仅副标题那一处带品牌名
+        assert.equal(SHELL_HTML.match(/鸣潮社区公益工具/g)?.length, 1, '页脚不应出现')
         assert.ok(!SHELL_HTML.includes('shell-brand-foot'), '不应残留页脚样式或节点')
     })
 
@@ -174,7 +174,7 @@ describe('shell-page 衬线遮罩层契约', () => {
 
         const fills = [...markTag.matchAll(/fill="([^"]+)"/g)].map((m) => m[1])
         assert.equal(fills.length, markPaths.length, '每条路径都应保留自己的 fill')
-        assert.ok(!markTag.includes('currentColor'), '品牌图标不应改为 currentColor')
+        assert.ok(!markTag.includes('currentColor'), '品牌图标不应使用 currentColor')
     })
 
     it('允许手机捏合缩放（viewport 未设禁令、未拦 touch-action）', () => {
@@ -207,7 +207,7 @@ describe('shell-page 横竖屏行为契约', () => {
         // 用宽高比判方向会让遮罩显隐整个反过来。这里直接断言竖屏时遮罩确实显示。
         const { els } = runShell(390, 844, { landscape: false })
         assert.equal(els['shell-hint'].hidden, false, '竖屏（宽<高）必须显示遮罩')
-        // 且方向判定集中在一个函数里，别处不再各判一套
+        // 且方向判定集中在一个函数里，别处各判一套
         const fn = SCRIPT.match(/function isLandscapeScreen\(\) \{[\s\S]*?\n\}/)?.[0] ?? ''
         assert.ok(fn.length > 0, '缺少统一的横屏判定函数')
         assert.ok(/orientationApi\.type/.test(fn), '应优先取 Screen Orientation API 的实际方向')

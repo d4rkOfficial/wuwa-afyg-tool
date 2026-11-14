@@ -51,12 +51,12 @@ export async function dbGet<T>(key: string): Promise<{ data: T; ts: number } | n
  * 实证（本仓库探针）：`let x = $state([])` 经 `svelte/compiler` 编成 `$.state($.proxy([]))`，
  * 重新赋值走 `$.set(source, v, true)`（同样代理），故 `dbSet(KEY, 任意 $state)` 必然命中；
  * 而 `structuredClone(new Proxy({}, {}))` 在 Node/浏览器都直接抛 `DataCloneError`。
- * 受影响的存量调用点：`workshop`（工坊/分享源）、`keymap`（按键图标）、`shortcuts`（快捷键位）、
- * `ai-prefs`（AI 助手偏好）——它们原先都直接传 `$state`，长期静默写入失败。
+ * 受影响的调用点：`workshop`（工坊/分享源）、`keymap`（按键图标）、`shortcuts`（快捷键位）、
+ * `ai-prefs`（AI 助手偏好）—— 直接把 `$state` 传进来，写入会长期静默失败。
  *
  * 两条路：先试 `structuredClone`（原生、保真，Date/Map/Blob 等原样保留），失败（= Proxy / 含函数）
  * 再退回 JSON 深拷贝（各 store 存的本就是 JSON 安全结构）。收敛到落盘口而不是逐个调用点改，
- * 是为了不再有下一个 store 忘掉 `$state.snapshot`（结构化克隆不认 Proxy 这类坑在 Worker/序列化场景里反复出现过）。
+ * 是为了让调用点无须各自记得 `$state.snapshot`（结构化克隆不认 Proxy 这类坑在 Worker/序列化场景里反复出现过）。
  */
 export const toStorable = <T>(data: T): unknown => {
     try {

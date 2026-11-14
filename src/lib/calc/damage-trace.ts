@@ -202,10 +202,10 @@ interface ZoneTraceCtx {
 const zoneApplies = (zone: BuffZoneValue, coeffEntry: boolean): boolean => !coeffEntry || zoneAppliesToCoeffEntry(zone)
 
 /**
- * @desc 拉表Buff 指定乘区的来源（普通加值 / 覆盖 / 引用）；存在生效覆盖时只列覆盖来源，加算值不再显示（与引擎一致）。
+ * @desc 拉表Buff 指定乘区的来源（普通加值 / 覆盖 / 引用）；存在生效覆盖时只列覆盖来源，加算值不显示（与引擎一致）。
  *
  * **引用只给结果**：转模（`ZoneRef`）的解算值由 `resolveRefZoneValues` 按「本条目可见面板」算出，
- * 溯源直接展示该数值，不再展示规则过程（如「攻击白值 超出2000 每100→5 ≤30」）。
+ * 溯源直接展示该数值，不展示规则过程（如「攻击白值 超出2000 每100→5 ≤30」）。
  */
 function buffZoneParts(
     buffs: BuffConf[],
@@ -257,7 +257,7 @@ function buffZoneParts(
  * - 类型加成 `for (const dt of damageTypes) stats.typeBonus[dt.replace('伤害','')]` —— 只有词条类型在
  *   该条目的伤害类型集合里才计入
  *
- * 旧实现只按 label 正则判断「像不像加成」，于是「共鸣技能伤害加成」也被列进普攻条目的增伤区来源 ——
+ * 不能只按 label 正则判断「像不像加成」：那样「共鸣技能伤害加成」会被列进普攻条目的增伤区来源 ——
  * 引擎根本没算它，属于溯源弹窗「列了不参与结算的来源」的错误来源。
  * 这里顺带覆盖「引擎完全不认的词条」（两表都没有 → 引擎 applyEntryStatToAccum 落空 → 不计入）。
  */
@@ -359,7 +359,7 @@ function collectBaseParts(
         for (const sub of echo.substats) pushStat(sub.type, sub.value)
     })
 
-    // 拉表Buff 攻击/生命/防御（引用按解算结果直接给数值，不再显示转模规则）
+    // 拉表Buff 攻击/生命/防御（引用按解算结果直接给数值，不显示转模规则）
     const zoneFlat = kind === 'atk' ? 'atkFlat' : kind === 'hp' ? 'hpFlat' : 'defFlat'
     const zonePct = kind === 'atk' ? 'atkPct' : kind === 'hp' ? 'hpPct' : 'defPct'
     for (const bs of buffs) {

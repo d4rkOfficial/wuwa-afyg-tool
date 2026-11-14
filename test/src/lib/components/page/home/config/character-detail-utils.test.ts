@@ -1,10 +1,10 @@
 // 角色详情面板的链/阶门槛：必须与引擎一样识别 Buff 级规则（`BuffInstance.rules`）。
 //
-// 回归背景：面板里曾只认旧字段 condition.chain / condition.refinement，
+// 回归背景：只看实例级 condition.chain / condition.refinement 时，
 // 仇远 1 链的「暴击率 +20%」放入全局后，即使链档位是 0 也会被算进面板，
 // 面板因此恒为 81.6%，与伤害结算（引擎按 0 链不生效）对不上。
 //
-// v7 起链/阶不再是「字段」而是规则（可并存、全部 AND），因此这里的用例也改成规则形态。
+// v7 起链/阶是规则而不是「字段」（可并存、全部 AND），因此这里的用例也按规则形态构造。
 import { beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 

@@ -10,7 +10,7 @@ describe('bg-mask', () => {
         assert.equal(bgMaskOf(0).alpha, 0)
     })
 
-    it('压暗段：-100 与旧口径一致（60% 黑），再往下一路加浓到 -200 全黑', () => {
+    it('压暗段：-100 是 60% 黑，再往下一路加浓到 -200 全黑', () => {
         assert.equal(bgMaskCss(-50), 'rgba(0, 0, 0, 0.300)')
         assert.equal(bgMaskCss(-100), 'rgba(0, 0, 0, 0.600)')
         assert.equal(bgMaskCss(-150), 'rgba(0, 0, 0, 0.800)')
@@ -18,7 +18,7 @@ describe('bg-mask', () => {
         assert.deepEqual(bgMaskOf(-200), { rgb: '0, 0, 0', alpha: 1 })
     })
 
-    it('提白段沿用旧口径：100 → 35% 白、200 → 70% 白', () => {
+    it('提白段：100 → 35% 白、200 → 70% 白', () => {
         assert.equal(bgMaskCss(100), 'rgba(255, 255, 255, 0.350)')
         assert.equal(bgMaskCss(200), 'rgba(255, 255, 255, 0.700)')
         assert.deepEqual(bgMaskOf(200), { rgb: '255, 255, 255', alpha: 0.7 })

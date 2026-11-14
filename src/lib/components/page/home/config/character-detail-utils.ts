@@ -157,7 +157,7 @@ export function computeCharStats(
         if (bs.scope === 'all') return true
         return Array.isArray(bs.scope) && bs.scope.includes(idx)
     })
-    // 兼容旧工程：无任何全局 buff 时回退到原 global-角色名 匹配
+    // 兼容既有工程数据：没有任何全局 buff 时，回退到按 `global-角色名` 匹配
     const fallbackGlobalBuffs = (calcState?.buffSets ?? []).filter((bs) => bs.id === charGlobalId)
     const effectiveGlobalBuffs = globalBuffs.length > 0 ? globalBuffs : fallbackGlobalBuffs
     const conditionProfile = getConditionProfile()

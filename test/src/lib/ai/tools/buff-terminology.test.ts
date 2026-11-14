@@ -109,7 +109,7 @@ test('工程 Buff 配置增删使用新参数和摘要，不写入主页 Buff �
     assert.equal((await run('get_buff_sets')).ok, false)
 })
 
-test('打开主页 Buff 集先返回主页；关闭面板保留当前工程；无效旧面板不改变工程', async () => {
+test('打开主页 Buff 集先返回主页；关闭面板保留当前工程；无效面板名不改变工程', async () => {
     let open = false
     registerPanel(
         'buff-set',
@@ -208,7 +208,7 @@ test('从主页 Buff 集导入工程的描述与实际落点一致，保留实�
     assert.equal(JSON.stringify(getBuffEntities()), before)
 })
 
-test('旧工程 Buff 参数不会被误当作新参数执行', async () => {
+test('传 buffSet 参数会被拒绝，不误当作 buffConf 执行', async () => {
     setup()
     await run('create_buff_conf', { name: '保留名称' })
     const out = await run('rename_buff_conf', { buffSet: 1, name: '不应修改' })

@@ -101,7 +101,7 @@
     {/snippet}
 
     <!-- @desc 单列滚动 + 右侧固定锚点列：**只由弹窗外壳滚动**（外壳的 body 已是 `overflow-y-auto`），
-         所以这里不再自己开滚动容器、也不锁高度 —— 原先的 `flex h-full min-h-0 overflow-hidden`
+         所以这里不自开滚动容器、也不锁高度 —— `flex h-full min-h-0 overflow-hidden`
          + 左列 `overflow-y-auto` 依赖 `h-full` 能解析到 body 高度，实测解析不出来时整块内容
          由外壳滚动，右侧那列六属性按钮就跟着列表一起滚走了。 -->
     <div class="flex">

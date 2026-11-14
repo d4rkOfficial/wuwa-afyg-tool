@@ -162,7 +162,7 @@ describe('归一：问题组 / 题号 / 选项 / allowCustom / required', () => 
     })
 })
 
-// ── 「其它」唯一化：AI 自带「其它」时，那一项自己就是输入槽（界面不再补第二行）──────────
+// ── 「其它」唯一化：AI 自带「其它」时，那一项自己就是输入槽（界面不补第二行）──────────
 describe('「其它」唯一化', () => {
     it('识别「其它」型选项：中英文变体、括号补充、大小写与空白都认', () => {
         const yes = [
@@ -454,8 +454,8 @@ describe('导航边界', () => {
         assert.equal(canGoNext(2, 3), false)
         assert.equal(canGoNext(0, 0), false)
         assert.equal(stepIndex(1, 3, -1), 0)
-        assert.equal(stepIndex(2, 3, 1), 2) // 末题不再前进
-        assert.equal(stepIndex(0, 3, -1), 0) // 首题不再后退
+        assert.equal(stepIndex(2, 3, 1), 2) // 末题停住，不前移
+        assert.equal(stepIndex(0, 3, -1), 0) // 首题停住，不后退
         assert.equal(clampIndex(99, 3), 2)
         assert.equal(clampIndex(-5, 3), 0)
         assert.equal(progressText(0, 3), '第 1 / 3 题')

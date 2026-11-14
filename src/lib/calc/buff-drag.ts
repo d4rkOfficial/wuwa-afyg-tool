@@ -37,7 +37,7 @@ export const dragBlockIndex = (parentRowIds: readonly string[], unitIds: readonl
  * - dropIdx 非法（负数 = 没产生有效落点，例如拖出列表或原地松开）
  * - 拖拽单元不在当前数据里（找不到可搬运的 id）
  * - 目标父容器没有任何可作锚点的行
- * - 算出来的顺序与原来完全一致
+ * - 算出来的顺序与现有顺序完全一致
  */
 export const computeDraggedOrder = (input: BuffDragOrderInput): string[] | null => {
     const { orderedIds, parentRowIds, unitIds, dropIdx } = input

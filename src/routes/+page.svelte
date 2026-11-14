@@ -387,7 +387,7 @@
         activePhase = 'team'
     }
 
-    /** @desc 导出工程：全阶段一次性导出（含结果页），不再弹勾选框 */
+    /** @desc 导出工程：全阶段一次性导出（含结果页），不弹勾选框 */
     function openExport(id: string) {
         const p = projects.find((pr) => pr.id === id)
         if (!p) return
@@ -955,7 +955,7 @@
     </Modal>
 {/if}
 
-<!-- @desc 导出不再弹勾选框：全阶段一次性导出（含结果页） -->
+<!-- @desc 导出：全阶段一次性导出（含结果页），不弹勾选框 -->
 
 <!-- Clone Modal -->
 {#if cloneModal}

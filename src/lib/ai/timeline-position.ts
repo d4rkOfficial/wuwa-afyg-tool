@@ -2,7 +2,7 @@
  * @desc 排轴位置参数解析（AI 工具共用，纯函数）。
  *
  * 排轴统一用 **pos 定位**：pos 是时间轴上的像素坐标，与摘要 `get_timeline_summary`
- * 输出的 `items[].pos` 同一坐标系、**与秒数无关**。秒数定位（`{time: 秒}`）已整体废除，
+ * 输出的 `items[].pos` 同一坐标系、**与秒数无关**。`{time: 秒}` 这种秒数定位不受支持：
  * 传入会直接报错并给出改写方式（不做静默兼容，避免两种坐标语义在参数里并存）。
  *
  * 两种写法：
@@ -26,7 +26,7 @@ export interface PositionResolveDeps {
 export const parsePositionArgs = (position: Record<string, unknown>, deps: PositionResolveDeps): number => {
     if (position.time !== undefined) {
         throw new Error(
-            'position.time 已废除：排轴统一用 pos 定位，请改传 {pos: 排轴坐标}（与 get_timeline_summary 的 pos 同坐标系），或用 {anchor, side, offset} 相对定位'
+            'position.time 不是有效参数：排轴统一用 pos 定位，请改传 {pos: 排轴坐标}（与 get_timeline_summary 的 pos 同坐标系），或用 {anchor, side, offset} 相对定位'
         )
     }
     if (position.pos !== undefined) {

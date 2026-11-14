@@ -1,16 +1,16 @@
 <script lang="ts">
     /**
-     * @desc 设置 → 连接配置（Phase 5.1 第四增量：自 `settings-modal.svelte` 原样抽出，标记与行为未改）。
-     * 迁移说明：
+     * @desc 设置 → 连接配置。
+     * 状态归属：
      *   - 登录表单与工坊实例输入（`kuroPhone` / `kuroCode` / `kuroLoginBusy` / `kuroLoginInfo` /
-     *     `kuroLoginError` / `kuroCountdown` / `newWorkshopUrl`）落在 `settings-ui.svelte.ts`：抽取前它们是
-     *     外壳的 `$state`，而 `TabPanel` 的 `{#key active}` 会在切换栏目时重挂载本组件 —— 留在组件里会被重置
+     *     `kuroLoginError` / `kuroCountdown` / `newWorkshopUrl`）落在 `settings-ui.svelte.ts`：
+     *     `TabPanel` 的 `{#key active}` 会在切换栏目时重挂载本组件 —— 留在组件里会被重置
      *     （行为变化）。60s 重发倒计时的定时器句柄与起停（`startKuroCountdown`）也随之进 store：
-     *     否则卸载后既没人清理、也没法在重挂载时续上原倒计时。
+     *     否则卸载后既没人清理、也没法在重挂载时续上倒计时。
      *   - `kuroSession` / `kuroValid` / `kuroReason` / `kuroBusy` / `kuroActiveRole`、`providerOptions` /
      *     `activeProviderId` / `providerVersions`、`workshopInstances` / `workshopActiveId` 只是各全局 store 的
      *     `$derived` 视图（非自有状态），随本组件留下；`clearKuroMessages` 与各 `handle*` 是本 tab 的展示逻辑。
-     *   - 「进入连接配置时加载各上游版本」的 `$effect` + `loadedVersionTab` 仍留外壳：它的触发条件是外壳自己的
+     *   - 「进入连接配置时加载各上游版本」的 `$effect` + `loadedVersionTab` 留外壳：它的触发条件是外壳自己的
      *     `tab`（外壳正是用这个值决定渲染哪个分支），搬进来就变成「本组件已挂载」这第二个判定来源。
      */
     import Icon from '@iconify/svelte'
@@ -744,7 +744,7 @@
 
         <SettingRow>
             <div class="min-w-0">
-                <FieldLabel label="启用 WS 连接" hint="关闭后立即断开，不再自动重连" />
+                <FieldLabel label="启用 WS 连接" hint="关闭后立即断开，不自动重连" />
             </div>
             <Tabs
                 items={WS_ENABLED_TABS}

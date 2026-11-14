@@ -264,7 +264,7 @@
                 {:else if tab === 'cache'}
                     <CacheSection />
                 {:else if tab === 'ai' || tab === 'ai-conn'}
-                    <!-- @desc 把外壳自己的 `tab` 传给 section：它用同一个值选标题 / 内容分支，不再回读 store
+                    <!-- @desc 把外壳自己的 `tab` 传给 section：它用同一个值选标题 / 内容分支，不回读 store
                          （回读会让「当前是哪个栏目」有两个真相源，见 `sections/ai.svelte` 的 `Props.tab`） -->
                     <AiSection {tab} />
                 {/if}

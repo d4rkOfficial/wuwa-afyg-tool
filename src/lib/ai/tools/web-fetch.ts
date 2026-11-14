@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // 【本文件的注释约定 — 改文案/加注释前必读】（与 ask-user.ts 同一套约束）
-// scripts/generate-tools-doc.mjs 是「纯正则 + 括号/引号/注释感知」的解析器（不执行 TS）。
-// T26 起它会跳过注释与模板串，T28 起取值只在**顶层键**上做、并支持引用本文件的常量，于是：
-//   A) 注释里出现反引号 / 裸引号**已不再是问题**（T28 实测：成对/单个反引号、单个/成对单引号、双引号、
-//      块注释、乃至参数表内部的这类注释，参数表都照常解析；见 .tmp/reports/T28.md §C.4）。
-//   B) `parameters` **仍必须是内联的对象字面量**：写成 `parameters: PARAMETERS`（引用常量）时
+// scripts/generate-tools-doc.mjs 是「纯正则 + 括号/引号/注释感知」的解析器（不执行 TS）：
+//   A) 它跳过注释与模板串，取值只在**顶层键**上做、并支持引用本文件的常量，因此注释里出现
+//      反引号 / 裸引号不影响解析（成对/单个反引号、单个/成对单引号、双引号、块注释、
+//      乃至参数表内部的这类注释，参数表都照常解析；见 .tmp/reports/T28.md §C.4）。
+//   B) `parameters` **必须是内联的对象字面量**：写成 `parameters: PARAMETERS`（引用常量）时
 //      extractParams 取不到花括号，参数表会变成「_无参数_」。这是解析器不执行 TS 的硬限制。
-//   C) 属性级 description 用模板字符串**已支持**（嵌套模板串也对，`${…}` 会被折叠成 `…`）。
+//   C) 属性级 description 支持模板字符串（嵌套模板串也对，`${…}` 会被折叠成 `…`）。
 // 代价与对策：参数表里的「默认 8000 / 硬顶 40000」等数字是**展示用字面量**，必须与
 // web-fetch.utils.ts 的 DEFAULT_MAX_CHARS / HARD_MAX_CHARS 保持一致（改常量时同步改这里）。
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,10 +91,9 @@ defineTool('web_fetch', {
         required: ['url'],
         additionalProperties: false
     },
-    // T28 起 generate-tools-doc.mjs 只取**顶层** description。这里的 DESCRIPTION 是同文件常量，
+    // generate-tools-doc.mjs 只取**顶层** description。这里的 DESCRIPTION 是同文件常量，
     // 解析器会顺着常量找到完整的模板串文案（实测 docs/tools.md 里 web_fetch 的摘要就是下面这段）。
-    // 历史上（T26 及以前）它取「块内第一个 description」，所以当时把 parameters 排在最前面来规避；
-    // 那段取舍已经不需要了 —— 本字段的位置现在与文档摘要无关。
+    // 本字段的位置与文档摘要无关。
     description: DESCRIPTION,
     // 能力门控：只有注入了 ToolContext.webFetch 的上下文（内置 AI 助手）能用；WS 远程接管不注入
     requires: 'webFetch',

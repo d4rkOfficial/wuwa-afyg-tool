@@ -1,10 +1,10 @@
 // 数据分析「贡献」结果的缓存判定（纯函数）：打开弹窗时该不该重算、重算后哪些部分仍有效。
 //
-// 背景：整套贡献分析约 130ms 且分片占主线程，以前每次打开弹窗都无条件重算一遍。
+// 背景：整套贡献分析约 130ms 且分片占主线程，因此打开弹窗不能无条件重算一遍。
 // 这里钉住三条口径：
 // 1. 输入指纹逐项比较（引用项按 `===`，其余按值）；
 // 2. Buff 与副词条算法无关 —— 换算法只让副词条失效；
-// 3. 输入一变，旧的「已算过」记录整体作废，不能拿旧结果冒充新结果。
+// 3. 输入一变，缓存的「已算过」记录整体作废，不能拿旧结果冒充新结果。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -116,10 +116,10 @@ describe('nextAnalysisCache：一次重算后的登记', () => {
         assert.equal(next.algorithm, 'shapley')
     })
 
-    it('输入变了 → 只留本次算出来的部分，旧结果作废', () => {
+    it('输入变了 → 只留本次算出来的部分，先前结果作废', () => {
         const changed = inputs({ entries: '130:9900' })
         const next = nextAnalysisCache(cache(), changed, ['substat'], 'single-loss')
-        assert.deepEqual(next.parts, ['substat'], '旧 Buff 结果是上一份输入的，不能留下')
+        assert.deepEqual(next.parts, ['substat'], '上一份输入算出的 Buff 结果不能留下')
         assert.equal(next.algorithm, 'single-loss')
         assert.equal(sameAnalysisInputs(next.inputs, changed), true)
     })

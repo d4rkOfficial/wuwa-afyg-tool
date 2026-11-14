@@ -93,7 +93,7 @@ if (browser) {
     } catch {
         /* ignore */
     }
-    // 修复：该键此前只有写入口（setModalClosePosition）没有读入口，刷新后「弹窗关闭按钮位置」被重置为默认
+    // 该键必须有读入口（`setModalClosePosition` 负责写入），否则刷新后「弹窗关闭按钮位置」会被重置为默认
     try {
         _modalClosePosition = parseModalClosePosition(localStorage.getItem(MODAL_CLOSE_KEY))
     } catch {

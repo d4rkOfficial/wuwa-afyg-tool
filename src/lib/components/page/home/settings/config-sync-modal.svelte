@@ -1,13 +1,13 @@
 <script lang="ts">
     /**
-     * @desc 配置同步（独立弹窗）：由原「设置 → 配置导入导出」栏目升级而来，入口在设置弹窗标题栏。
+     * @desc 配置同步（独立弹窗）：入口在设置弹窗标题栏。
      *
-     * 与旧版面（纵向堆叠：范围 → 导出 → 导入）的区别，也是「更高效」的落点：
+     * 版面是左右两栏，一件事一栏，互不挤占滚动空间：
      *   - 左栏只放**勾选范围**：大类 / 分组 / 逐条全部展开为统一列表行，整行可点，选中态用半透明底色 + 右侧对勾表达；
-     *   - 右栏一次只做一件事：`导出配置` / `导入配置` 分段切换，两者不再同时占滚动空间；
+     *   - 右栏一次只做一件事：`导出配置` / `导入配置` 分段切换；
      *   - 导出侧把「文件名 / 版本 / 已选条数 / 两类占比」压成一张摘要行，主按钮紧邻其下；
-     *   - 导入侧改为**拖放区 → 方式卡片 → 分组级预览 chip** 三步，仍保留「确认前不写任何配置」。
-     * 选择粒度与写入语义完全沿用 `$lib/data/config`（key 集合是唯一真源），此处只重排交互。
+     *   - 导入侧是**拖放区 → 方式卡片 → 分组级预览 chip** 三步，仍保留「确认前不写任何配置」。
+     * 选择粒度与写入语义完全沿用 `$lib/data/config`（key 集合是唯一真源），本弹窗只提供交互。
      */
     import Icon from '@iconify/svelte'
     import Modal from '$lib/components/layout/modal.svelte'
@@ -76,7 +76,7 @@
         library: 'mdi:layers-outline'
     }
 
-    /** @desc 全部登记项与「分组 → 条目」静态索引（模板里不再反复 filter） */
+    /** @desc 全部登记项与「分组 → 条目」静态索引（模板里不反复 filter） */
     const ALL_ENTRIES = listConfigEntries()
     const ENTRIES_BY_GROUP = new Map(
         CONFIG_GROUPS.map((g) => [g.id, ALL_ENTRIES.filter((e) => e.group === g.id)] as const)
@@ -120,7 +120,7 @@
     const legacyLine = $derived(
         pending
             ? pending.legacyVersion !== undefined
-                ? `旧格式 v${pending.legacyVersion} 已自动升级`
+                ? `v${pending.legacyVersion} 格式已自动升级`
                 : `v${pending.version}`
             : ''
     )

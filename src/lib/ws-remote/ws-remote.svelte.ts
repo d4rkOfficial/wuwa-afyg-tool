@@ -82,7 +82,7 @@ export function connectWs(raw: string): void {
     openSocket(url)
 }
 
-/** @desc 主动断开（hash 移除/组件卸载/下拉按钮），不再自动重连 */
+/** @desc 主动断开（hash 移除/组件卸载/下拉按钮），不自动重连 */
 export function disconnectWs(): void {
     _manualDisconnect = true
     clearReconnectTimer()

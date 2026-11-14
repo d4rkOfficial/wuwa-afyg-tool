@@ -1,12 +1,12 @@
 <script lang="ts">
     /**
-     * @desc 设置 → 工坊同步（新增栏目，归在「数据」分组，紧跟「连接配置」）。
+     * @desc 设置 → 工坊同步（归在「数据」分组，紧跟「连接配置」）。
      *
      * 为什么单开一栏而不是塞进「连接配置」的工坊实例块：那里已经有实例列表 + 添加框 + 恢复默认，
      * 再加两开关 + 时机 + 上次同步时间会挤成一片；而自动同步是「数据获取策略」，与「实例地址」不是同一件事。
      *
      * 状态直连 `$lib/data/workshop-sync.svelte`（与 `performance` / `interaction` 同形：不读不写外壳的
-     * `$state`，故 `settings-ui.svelte.ts` 无需迁入任何状态）。
+     * `$state`，故 `settings-ui.svelte.ts` 不持有任何状态）。
      * 文案常量（时机标签 / 分段标题）只服务本栏，随组件留下。
      */
     import Icon from '@iconify/svelte'

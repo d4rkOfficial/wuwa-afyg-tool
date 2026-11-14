@@ -46,7 +46,7 @@ describe('全局 Buff 绑定：作用域条目 + 引用条目', () => {
         assert.deepEqual(next.eC, [teamAll.id], '效应条目只拿全队作用域的全局 Buff')
     })
 
-    it('旧的全局绑定先剥离，不会残留', () => {
+    it('重建时先剥离既有全局绑定，不会残留', () => {
         const bindings = { eA: [refB.id, selfB.id], eB: [selfB.id], eC: [] }
         const next = rebuildGlobalBindings({ entries, team: TEAM, buffs, globalIds: ['selfB'], bindings })
         assert.deepEqual(next.eA, [refB.id, selfB.id], '引用条目保留自己 + 重新挂上的全局自 Buff')

@@ -356,7 +356,7 @@ export const contentKindOf = (contentType: string): 'html' | 'text' | 'json' | '
     return 'other'
 }
 
-/** @desc 组装抓取结果（纯函数：服务端取到字节后一次成型，宿主与工具都不再加工） */
+/** @desc 组装抓取结果（纯函数：服务端取到字节后一次成型，宿主与工具都不加工） */
 export const buildFetchResult = (input: {
     url: string
     status: number

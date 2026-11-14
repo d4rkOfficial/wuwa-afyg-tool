@@ -1,7 +1,7 @@
 // 无版本号工程的版本判定回归：**「上传工坊再下载被补勾影响源 Buff」**的守卫。
 //
 // 事故链（实测复现）：
-//   1. 工坊（分享中转站）历史上用逐字段白名单重建工程对象，把 `project.version` 抹掉了；
+//   1. 工坊（分享中转站）的下载件走逐字段白名单重建工程对象，`project.version` 因此丢失；
 //   2. 工具 `readVersion` 对无版本号一律返回 0，于是对下载件重跑整条迁移链；
 //   3. `migrateV2toV3` 的 `bindPaneEffectSources` 会把「影响源」Buff 补勾到引用该面板的伤害段上，
 //      而这个补勾**只加不减**、无法区分「用户主动取消勾选」与「从未勾选」；
@@ -167,7 +167,7 @@ describe('门槛之前的无版本号工程：迁移链照跑（哨兵）', () =
         assert.deepEqual(
             bindings[TARGET_ENTRY],
             [REF_BUFF.id, SOURCE_BUFF.id],
-            '老工程必须继续享受 v2→v3 的跨角色影响源补偿，否则旧工程的加成会静默变少'
+            '门槛之前的工程必须继续走 v2→v3 的跨角色影响源补偿，否则加成会静默变少'
         )
         assert.deepEqual(bindings[OWNER_ENTRY], [SOURCE_BUFF.id], '只加不减：被引用角色自己的条目不动')
     })

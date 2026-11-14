@@ -128,7 +128,7 @@ export async function previewSubstatPlansFromKuro(opts: { refresh?: boolean } = 
     }
 }
 
-/** @desc 一条写入选择：upstreamName 定位预览里的角色（角色名可能被用户改成某个形态，如漂泊者的属性） */
+/** @desc 一条写入选择：upstreamName 定位预览里的角色（工程内的角色名可能带形态，如漂泊者的属性） */
 export interface KuroPlanPick {
     upstreamName: string
     character: string

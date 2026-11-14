@@ -14,8 +14,8 @@ const HOVER =
 /**
  * @desc 配队 picker 卡片的 class（纯函数）。
  *
- * 原先 `weapon-picker` / `echo-picker` / `character-picker` 各写了一份 `itemClass`，
- * 三份**除宽度 token 外逐字相同**（`.tmp` 迁移脚本用穷举比对确保新实现输出与原文完全一致）。
+ * 三种 picker 卡片（`weapon-picker` / `echo-picker` / `character-picker`）共用这一份基类：
+ * 差异只有宽度（由 `widthClass` 传入），选择态与 hover 态逐字相同。
  */
 export const pickerCardClass = (selected: boolean, widthClass: string): string =>
     mergeClass([BASE, widthClass, selected ? SELECTED : HOVER])

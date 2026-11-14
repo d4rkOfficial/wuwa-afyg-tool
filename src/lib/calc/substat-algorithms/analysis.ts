@@ -14,9 +14,9 @@ import { getEchoSkillText, setEchoSkillText } from '$lib/data/char-info.svelte'
 /**
  * @desc 直伤贡献分析的入口（**纯函数 + 同步**，主线程直接算）。
  *
- * 曾经这套计算放在 Worker 里（`analysis.worker.ts` + runner 回退）；现在取消 Worker：
+ * 这套计算在主线程同步执行（不启 Worker）：
  * - 界面按角色分批让出主线程（见 `analysis-runner.ts`），不会一次性卡死；
- * - AI / WS 工具直接调用同一份同步实现，不再需要「开 worker / 序列化 / 回退」三条路径。
+ * - AI / WS 工具直接调用同一份同步实现，不需要「开 worker / 序列化 / 回退」三条路径。
  */
 export interface ContributionAnalysisRequest {
     damageEntries: DamageEntry[]

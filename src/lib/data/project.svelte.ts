@@ -30,16 +30,16 @@ function cloneEncounterPhase(target: Project, source: Project, phase: PhaseKey):
     else target.encounter.config = copyOne(source.encounter.config)
 }
 
-/** @desc 兼容期同步：把旧字段视图（phases/conditionProfile/buffSets）写入新结构真源 */
+/** @desc 兼容期同步：把视图字段（phases/conditionProfile/buffSets）写入新结构真源 */
 function syncLegacyIntoNew(p: Project): Project {
     const { phases, conditionProfile, buffSets } = p
     if (phases) {
         /**
          * @desc 逐阶段回填真源：**只在该阶段确实出现在 views 里时才覆盖**。
          *
-         * 旧实现无条件用 `phases` 重建整个 `encounter`，于是「视图里没有这个阶段」会被当成
+         * 不能无条件用 `phases` 重建整个 `encounter`：那样「视图里没有这个阶段」会被当成
          * 「这个阶段是空的」——导出文件按需导出、或迁移器已从 encounter 读到数据而视图尚未派生时，
-         * 真源数据就被清成 null（导入后只剩队伍配置的另一个成因）。
+         * 真源数据就会被清成 null（导入后只剩队伍配置的另一个成因）。
          */
         const enc = p.encounter
         if (phases.team) enc.teamLocked = phases.team.locked ?? enc.teamLocked
@@ -76,7 +76,7 @@ function syncLegacyIntoNew(p: Project): Project {
  * **三个视图都必须一起刷新**：
  * - `buffSets ← buffs`
  * - `conditionProfile ← team[].chain/refinement`
- * - `phases[].data/locked ← encounter.*` —— 这一条曾经漏掉，症状就是「复制工程后除了队伍配置全是空白」：
+ * - `phases[].data/locked ← encounter.*` —— 这一条漏掉时症状就是「复制工程后除了队伍配置全是空白」：
  *   `cloneProject` 把四阶段数据写进了 `encounter`（真源），但页面读的是 `p.phases.<phase>.data`
  *   （见 reloadActiveProjectStores），视图没同步 → 读到的还是 null。队伍配置读 `project.team`，所以只有它正常。
  */
@@ -364,7 +364,7 @@ export async function unlockPhase(id: string, phase: PhaseKey) {
     await persist()
 }
 
-/** @desc 同步写阶段的锁定状态到新结构（team 走 teamLocked）与过渡期视图 */
+/** @desc 同步写阶段的锁定状态到新结构（team 走 teamLocked）与视图字段 */
 function setPhaseLocked(project: Project, phase: PhaseKey, locked: boolean): void {
     if (phase === 'team') project.encounter.teamLocked = locked
     else if (phase === 'timeline') project.encounter.timeline.locked = locked
@@ -491,7 +491,7 @@ export function parseProjectFile(text: string): Project[] {
     const rawProjects: Record<string, unknown>[] = []
     /**
      * @desc 外层信封的产出时间（工具导出写 `Date.now()`，工坊落库写**上传时刻**）。
-     * 工坊历史上会把 `project.version` 抹掉，此时只能靠它判定「这不是老工程、而是被吃掉了版本号」，
+     * 工坊落库可能把 `project.version` 抹掉，此时只能靠它判定「这属于当前版本、只是版本号被吃掉」，
      * 见 migration 的 `readVersion` / `VERSIONLESS_ASSUME_CURRENT_AFTER`。故这里显式下传。
      */
     let envelopeExportedAt: number | undefined
@@ -551,7 +551,7 @@ export function getPhaseOrder(): PhaseKey[] {
 let _persistPending = false
 let _persistTimer: ReturnType<typeof setTimeout> | null = null
 
-/** @desc 落盘快照：只写新结构真源（不含 phases/conditionProfile 等过渡期视图字段） */
+/** @desc 落盘快照：只写新结构真源（不含 phases/conditionProfile 等视图字段） */
 function snapshotForStorage(): unknown {
     return JSON.parse(JSON.stringify(projects.map((p) => toPlainProject(p))))
 }

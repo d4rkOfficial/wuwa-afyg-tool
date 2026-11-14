@@ -1,11 +1,11 @@
 /**
  * @desc 数据分析弹窗（`data-analysis-modal.svelte`）的图表绘制与配色纯函数。
  *
- * Phase 5.3 第一增量：图表绘制体自弹窗原样抽出，只把「读哪个 `$state`、往哪个数组 push」
- * 改成显式入参 / 返回值。画布与 Chart 实例的持有、销毁时机仍留在各分区组件里：
- *   - `renderCurveChart` = 原 `drawCurveChart` 的绘制体（「空画布 / 空事件」早退与 `destroy` 留在组件侧）；
- *   - `renderBarCharts` / `renderTypeCharts` = 原 `drawBarCharts` / `drawTypeCharts` 的循环体，
- *     批量接收画布表、返回新建实例数组（主题变量仍是每批读一次，读取顺序不变）。
+ * 图表绘制体在这里，且参数化：不读 `$state`、不往外部数组 push，
+ * 数据经显式入参传入、绘制结果经返回值交出。画布与 Chart 实例的持有、销毁时机仍留在各分区组件里：
+ *   - `renderCurveChart` 只负责绘制体（「空画布 / 空事件」早退与 `destroy` 留在组件侧）；
+ *   - `renderBarCharts` / `renderTypeCharts` 批量接收画布表、返回新建实例数组
+ *     （主题变量仍是每批读一次，读取顺序不变）。
  * 本文件不 import 任何组件、不读写 store，只依赖 chart.js 与项目内的纯数据。
  */
 import Chart from 'chart.js/auto'

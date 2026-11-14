@@ -1,9 +1,9 @@
 <script lang="ts">
     /**
-     * @desc 设置 → 外观主题（Phase 5.1 第四增量：自 `settings-modal.svelte` 原样抽出，标记与行为未改）。
-     * 迁移说明：
-     *   - `bgEditingLight` / `bgUrl` / `surfaceKey` 落在 `settings-ui.svelte.ts`：抽取前它们都是外壳的 `$state`，
-     *     而 `TabPanel` 的 `{#key active}` 会在切换栏目时重挂载本组件 —— 留在组件里会被重置（行为变化）。
+     * @desc 设置 → 外观主题。
+     * 状态归属：
+     *   - `bgEditingLight` / `bgUrl` / `surfaceKey` 落在 `settings-ui.svelte.ts`：
+     *     `TabPanel` 的 `{#key active}` 会在切换栏目时重挂载本组件 —— 留在组件里会被重置（行为变化）。
      *     其中 `bgEditingLight` / `bgUrl` 还被外壳「打开设置」的 `$effect` 写，故写入口只有
      *     `syncThemeEditing()` 一份，外壳调用它，本组件只读写 store 的访问器。
      *   - `editingBgKey` / `editingBg` 两个派生同样留在 store：外壳那个 `$effect` 的依赖语义建在
@@ -13,18 +13,17 @@
      *   - `COLOR_PRESETS` / `getPresetStyle` / `compressImage` / `maskPreview` 与各 `handle*` 是本 tab 的
      *     展示逻辑，留下；`fileInput` 是 `bind:this` 的 DOM 引用，只能留在本组件（重挂载时元素本身也是新的）。
      *
-     * T15：本 tab 的 4 处手搓分段控件（主色调 7 段 / 昼夜切换小号 switch / 背景图 黑夜·白天 / 区域质感-区域 6 段）
-     * 全部换成 `ui/tabs` 的文字 tab（等宽分段 + 单块滑动指示块）。取值语义与持久化键不变：
-     * 主色调仍写 `accentHue`（含 `null` = 靛蓝这一历史取值）、昼夜仍走 `setActiveTheme('dark' | 'light')`、
+     * 控件形态：4 组分段控件（主色调 7 段 / 昼夜切换 / 背景图 黑夜·白天 / 区域质感-区域 6 段）都是
+     * `ui/tabs` 的文字 tab（等宽分段 + 单块滑动指示块）。取值语义与持久化键不变：
+     * 主色调仍写 `accentHue`（`null` 表示靛蓝）、昼夜仍走 `setActiveTheme('dark' | 'light')`、
      * 背景图编辑目标仍走 `setBgEditingLight`、区域仍走 `setSurfaceKey`。
      *
-     * UI 整改（本次）：
-     *   ① 标题一律走 `ui/section-title`（原先两处手写、且下边距比其他 tab 大一档）；
-     *   ② **背景图不再渲染两遍**：原先「缩略图（h-28，带换图/清除）」与下方「预览框（h-40，带 LIVE 标）」
-     *      是同一张图的两个副本，职能重复 —— 现在合并成一个预览框，换图 / 清除作为它的操作条，
-     *      没有图时该框本身就是上传入口（虚线提示 + 点击选图，行为与原先的虚线框一致）；
-     *   ③ 背景质感 / 背景图效果的滑块从预览框内部移出为独立分区（它们作用的是全工作区，不只是预览）；
-     *   ④ 分段控件的宽度 / 配色 / 外边距统一走 `../utils`，不再往控件 `class` 里塞 `mb-*`。
+     * 版面约定：
+     *   ① 标题一律走 `ui/section-title`；
+     *   ② 背景图只有**一处**预览 / 上传块：换图 / 清除是它的操作条，没有图时该框本身就是上传入口
+     *      （虚线提示 + 点击选图）；
+     *   ③ 背景质感 / 背景图效果的滑块独立分区（它们作用的是全工作区，不只是预览）；
+     *   ④ 分段控件的宽度 / 配色 / 外边距统一走 `../utils`，控件 `class` 里不塞 `mb-*`。
      */
     import Icon from '@iconify/svelte'
     import Slider from '$lib/components/ui/slider.svelte'
@@ -78,7 +77,7 @@
     /** @desc 卡片 / 弹窗 / 小部件的统一圆角（px；由「圆角」分区的滑块写回 override） */
     let surfaceRadius = $derived(overrides.surfaceRadius ?? DEFAULT_SURFACE_RADIUS)
 
-    /** @desc 卡片表面（本页多处卡片共用；原先每处各写一遍内联 border/background） */
+    /** @desc 卡片表面（本页多处卡片共用同一份内联 border/background） */
     const CARD_SURFACE = 'sf-radius rounded-none border'
     const CARD_STYLE = 'border-color: var(--theme-divider-border); background: var(--theme-input-bg);'
 
@@ -92,8 +91,8 @@
     let activeThemeBg = $derived(currentTheme === 'light' ? overrides.backgroundImageLight : overrides.backgroundImage)
 
     /**
-     * @desc 昼夜切换（T15：原来是手搓的小号 switch —— 只能表达「翻转」，两个分段说不出各自是什么）。
-     * 改成两段文字 tab 后按**目标值**直取，值域就是主题 id（`dark` / `light`）。
+     * @desc 昼夜切换：两段文字 tab 按**目标值**直取，值域就是主题 id（`dark` / `light`）
+     * —— 两个分段各自说清是哪个模式，而不是只能表达「翻转」。
      */
     const pickThemeMode = (value: string) => {
         const next = value === 'light' ? 'light' : 'dark'
@@ -111,9 +110,9 @@
     ]
 
     /**
-     * @desc 主色调预设（T15：原来是 7 个手搓分段按钮 + 黑白前的分隔线）。
+     * @desc 主色调预设（7 段）。
      * `key` 是 `ui/tabs` 的分段值（须唯一，同时用作 `{#each}` 的 key），`hue` 才是写进 `accentHue` 的取值
-     * ——持久化键与取值域完全不变（`null` = 靛蓝是历史取值，不是「未设置」）。
+     * ——持久化键与取值域完全不变（`null` = 靛蓝，不是「未设置」）。
      */
     const COLOR_PRESETS = [
         { key: 'default', name: '默认', hue: 190 as number | 'mono' | null },
@@ -124,11 +123,11 @@
         { key: 'forest', name: '墨绿', hue: 150 as number | 'mono' | null },
         { key: 'mono', name: '黑白', hue: 'mono' as const }
     ]
-    /** @desc 主色调分段清单（7 段；原来夹在「黑白」前的分隔线随等宽分段一并取消） */
+    /** @desc 主色调分段清单（7 段，等宽分段，无需分隔线） */
     const ACCENT_TABS = COLOR_PRESETS.map((p) => ({ value: p.key, label: p.name }))
     /** @desc 当前 `accentHue` 反查到的预设 key（7 个 hue 取值互不重复，故可反查） */
     const accentKey = $derived(COLOR_PRESETS.find((p) => p.hue === overrides.accentHue)?.key ?? COLOR_PRESETS[0].key)
-    /** @desc 当前预设的选中态配色：改造前直接写在选中按钮上，现在落到滑动指示块 + 选中项文字 */
+    /** @desc 当前预设的选中态配色（落在滑动指示块 + 选中项文字上） */
     const accentStyle = $derived(getPresetStyle(COLOR_PRESETS.find((p) => p.key === accentKey)!.hue))
     const pickAccent = (value: string) => {
         const preset = COLOR_PRESETS.find((p) => p.key === value)
@@ -136,10 +135,8 @@
     }
 
     /**
-     * @desc 编辑目标始终跟随当前主题（原先这里是「黑夜｜白天（当前）」两段分段控件，
-     * 可以手动切换"正在编辑哪一张"，但它本质只是在复述当前昼夜，用户明确要求删掉）。
-     * 现在的口径：**当前是黑夜就编辑黑夜那张，切成白天就编辑白天那张** —— 与下面
-     * `modeKey`（背景质感/背景图效果的坐标系）完全同一套，不再有「编辑目标」这个独立状态。
+     * @desc 编辑目标始终跟随当前主题：**当前是黑夜就编辑黑夜那张，切成白天就编辑白天那张** —— 与下面
+     * `modeKey`（背景质感/背景图效果的坐标系）完全同一套，没有「编辑目标」这个独立状态。
      * 清理草稿（file input / URL 输入框）放在 `$effect` 里随主题变化做一次。
      */
     let fileInput: HTMLInputElement | undefined = $state()
@@ -155,7 +152,7 @@
         setBgUrl(next.startsWith('http') ? next : '')
     })
 
-    /** @desc 背景质感「区域」六段（互斥取值；逐段 `title` 保留原来的区域说明，下方另有一行选中项说明） */
+    /** @desc 背景质感「区域」六段（互斥取值；逐段 `title` 取该区域的说明，下方另有一行选中项说明） */
     const SURFACE_TABS = SURFACE_GROUPS[0].items.map((item) => ({
         value: item.key,
         label: item.label,
@@ -274,7 +271,7 @@
             <Icon icon="mdi:palette-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             主色调
         </SectionTitle>
-        <!-- T15：7 段等宽文字 tab；指示块底色 / 选中项文字取当前预设自身的颜色（与改造前选中按钮同色） -->
+        <!-- 7 段等宽文字 tab；指示块底色 / 选中项文字取当前预设自身的颜色（与选中按钮同色） -->
         <Tabs items={ACCENT_TABS} value={accentKey} onchange={pickAccent} compact {...TAB_ACCENT} />
     </div>
 
@@ -305,10 +302,9 @@
             <Icon icon="mdi:image-outline" class="size-4 shrink-0" style="color: var(--theme-accent-text);" />
             背景图
         </SectionTitle>
-        <!-- 唯一的背景图预览/上传块（原先「缩略图 + 预览框」两个副本，职能重复） -->
+        <!-- 唯一的背景图预览/上传块：换图 / 清除是它的操作条 -->
         <div class={CARD_SURFACE} style={CARD_STYLE}>
-            <!-- 卡片头：说明进卡片。原先这里还有一组「黑夜｜白天（当前）」分段控件（手动选编辑目标），
-                 已按用户要求整块删除 —— 编辑目标现在跟随当前主题，见脚本里的 `syncEditingTarget`。 -->
+            <!-- 卡片头：说明进卡片。编辑目标跟随当前主题，见脚本里的 `syncEditingTarget`。 -->
             <div class="border-b px-3 py-2" style="border-color: var(--theme-divider-border);">
                 <FieldLabel
                     label="预览"
@@ -498,7 +494,7 @@
             背景质感
         </SectionTitle>
         <div class={mergeClass([CARD_SURFACE, 'px-3 py-3'])} style={CARD_STYLE}>
-            <!-- 说明与区域选择都放进卡片（说明原先是浮在卡片外的段落） -->
+            <!-- 说明与区域选择都放进卡片 -->
             <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
                     <FieldLabel

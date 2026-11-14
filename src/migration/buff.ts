@@ -2,7 +2,7 @@
  * @desc Buff 乘区 / 条件归一化与拉表计算态（CalcState）迁移。
  *
  * 口径（v7 起）：Buff 级条件统一为 `BuffInstance.rules`（discriminated union，全部 AND），
- * 旧的实例级 `condition`（链/阶）与 `conditionRefCharIdx` 已移除 —— 迁移期一律升级为规则；
+ * 实例级 `condition`（链/阶）与 `conditionRefCharIdx` 由迁移换算为规则，输出里只出现 `rules`；
  * 乘区级条件（伤害属性 / 伤害类型）保持原样，挂在各乘区条目上。
  */
 
@@ -15,7 +15,7 @@ import { asRecord, genId, isLegacyAutoGlobal, isRecord, pickNum } from './shared
 
 // ── Buff 归一化：乘区条目列表（含旧 variants 拍平）与乘区级条件 ──
 
-/** @desc 归一化乘区条目列表：历史 id 重映射、保留已知乘区键、引用、覆盖标记与乘区级生效条件 */
+/** @desc 归一化乘区条目列表：乘区 id 别名重映射、保留已知乘区键、引用、覆盖标记与乘区级生效条件 */
 export const normalizeZoneList = (zones: unknown): BuffZoneValue[] => {
     if (!Array.isArray(zones)) return []
     const out: BuffZoneValue[] = []
@@ -33,13 +33,13 @@ export const normalizeZoneList = (zones: unknown): BuffZoneValue[] => {
     return out
 }
 
-/** @desc 旧结构里可能存在的「同名变体」（已废弃，仅在迁移时读取） */
+/** @desc v3 及更早数据里的「同名变体」（仅在迁移时读取） */
 interface LegacyVariant {
     condition?: Record<string, unknown>
     zones?: unknown
 }
 
-/** @desc 读取旧结构里的 variants（类型上已移除，这里按宽松结构取，便于拍平迁移） */
+/** @desc 读取 `variants` 字段（类型里没有这一项，按宽松结构取，便于拍平迁移） */
 const legacyVariantsOf = (buff: Record<string, unknown>): LegacyVariant[] => {
     const raw = buff.variants
     return Array.isArray(raw) ? (raw.filter(isRecord) as LegacyVariant[]) : []
@@ -48,9 +48,9 @@ const legacyVariantsOf = (buff: Record<string, unknown>): LegacyVariant[] => {
 /**
  * @desc 归一化某个 Buff 的乘区条目列表。
  *
- * 旧结构 `variants[]`（同名变体）在这里**拍平成同一个 zones 列表**：变体级子条件下放到该变体的每个条目上
- * （与旧引擎「变体条件满足后其乘区才计入」等价）；旧 Buff 级的属性/类型条件同样下放。
- * 链/阶条件（旧实例级）不再是乘区条件 —— 它们在 `normalizeBuff` 里升级为 Buff 级规则。
+ * `variants[]`（同名变体）在这里**拍平成同一个 zones 列表**：变体级子条件下放到该变体的每个条目上
+ * （与引擎「变体条件满足后其乘区才计入」等价）；Buff 级的属性/类型条件同样下放。
+ * 链/阶条件（实例级）不作为乘区条件 —— 它们在 `normalizeBuff` 里换算为 Buff 级规则。
  */
 export const normalizeZones = (buff: Partial<BuffInstance> & Record<string, unknown>): BuffZoneValue[] => {
     const buffLevel = normalizeZoneCondition(asRecord(buff.condition) as BuffCondition) ?? {}
@@ -117,8 +117,8 @@ const intersect = (a: string[] | undefined, b: string[] | undefined): string[] |
 /**
  * @desc 归一化单个 Buff 实例。
  * Buff 实例级只保留 **规则**（`rules`）；伤害属性 / 伤害类型条件下放到每个乘区条目。
- * 旧字段（`condition.chains/refinements/chain/refinement` + `conditionRefCharIdx`）升级为链/阶规则，
- * `starred` 等已移除字段一律抹掉（不返回）。
+ * `condition.chains/refinements/chain/refinement` + `conditionRefCharIdx` 换算为链/阶规则，
+ * `starred` 等不在白名单里的字段一律抹掉（不返回）。
  */
 export const normalizeBuff = (raw: Partial<BuffInstance> & Record<string, unknown>): BuffInstance => {
     const id = typeof raw.id === 'string' && raw.id ? raw.id : genId('buff')
@@ -210,7 +210,7 @@ export const migrateCalcState = (raw: unknown): CalcState => {
 /**
  * @desc 拉表态的结构性归一化（与版本无关，幂等）。
  *
- * v7 起「链/阶互斥」已取消：链与阶可以同时作为规则存在，因此不再拆分 Buff、不再改写绑定表。
+ * v7 起链与阶可以同时作为规则存在，因此不拆分 Buff、不改写绑定表。
  * 这里保留入口只为兼容既有调用路径（工程载入 / 导入统一走它）。
  */
 export const normalizeCalcState = (state: CalcState): CalcState => state

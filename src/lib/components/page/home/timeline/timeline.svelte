@@ -129,7 +129,7 @@
     let timingRefLineIds = $derived(getTimingRefLineIds())
     // 手柄图标（游戏原生，blockKey 为手柄 id 时使用）
     const gamepadIconMap = new Map(GAMEPAD_BUTTONS.filter((b) => b.icon).map((b) => [b.id, b.icon as string]))
-    // 查找索引：伤害层每帧渲染用 O(1) 替代 find（拖拽帧成本优化）
+    // 查找索引：伤害层每帧渲染走 O(1) 查表（避免逐块 find）
     let teamByChar = $derived(new Map(team.map((s) => [s.character ?? '', s])))
     let opBlockById = $derived(new Map(getOpBlocks().map((b) => [b.id, b])))
     let damageStack = $derived(getDamageBlocksStacked())
@@ -163,7 +163,7 @@
 
     /** @desc 视角记忆所属工程：本组件随工程切换重挂载（+page 的 `{#key activeProject.id}`），取挂载时的活动工程即可 */
     const sessionProjectId = getActiveId()
-    /** @desc 时间轴横向滚动位置（切页签/切工程再回来时回到原来的视野） */
+    /** @desc 时间轴横向滚动位置（切页签/切工程再回来时回到上次的视野） */
     $effect(() => {
         const el = timelineEl
         if (!el) return
@@ -388,7 +388,7 @@
             const fromInput =
                 e.target instanceof HTMLElement && !!e.target.closest('input, textarea, [contenteditable]')
             const fromModal = getSkillPickerBlockId() !== null || getNonDirectPickerBlockId() !== null
-            // 一旦来自输入框/弹窗，保持抑制直到 keyup 重置（元素销毁后 repeat 的 target 不再是原元素）
+            // 一旦来自输入框/弹窗，保持抑制直到 keyup 重置（元素销毁后 repeat 的 target 会落到别的节点上）
             enterFromInput = enterFromInput || fromInput || fromModal
         }
         // 直伤/非直伤弹窗：ESC=保存并退出（全局兜底，弹窗内部事件也冒泡至此）；Enter 留给弹窗内点击

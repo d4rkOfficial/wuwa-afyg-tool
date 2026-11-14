@@ -1,4 +1,4 @@
-// 渲染偏好（持久化到 localStorage）：GPU 合成加速开关（transform 定位替代 left/top，拖拽/动画走合成层）
+// 渲染偏好（持久化到 localStorage）：GPU 合成加速开关（transform 定位而非 left/top，拖拽/动画走合成层）
 import { browser } from '$app/environment'
 
 const STORAGE_KEY = 'wuwa-afyg:render-prefs'
@@ -11,7 +11,7 @@ let _reloadOnProfileChange = $state(false)
 
 // 模块加载时从 localStorage 恢复
 if (browser) {
-    // 旧版本遗留的磁力光标开关（该功能已删除）：顺手清掉，避免留下设置里已无法访问的孤儿键
+    // 磁力光标开关在设置里已无对应项：顺手清掉存量键，避免留下孤儿键
     try {
         localStorage.removeItem('wuwa-afyg:render-prefs:magnetic')
     } catch {

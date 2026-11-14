@@ -110,7 +110,7 @@ export function listPlansFor(character: string): SubstatPlan[] {
 }
 
 /**
- * @desc 保存方案：standard=true 时校验副词条恰为 14 条并整份覆盖该角色的标准方案（来源变为 custom，工坊同步不再覆盖它）；
+ * @desc 保存方案：standard=true 时校验副词条恰为 14 条并整份覆盖该角色的标准方案（来源变为 custom，工坊同步不会覆盖它）；
  * 非标准方案为自由方案（5 个槽位、总 cost ≤12、每槽副词条 ≤5），同名方案视为覆盖更新。
  */
 export async function saveSubstatPlan(input: SubstatPlanInput): Promise<string | null> {

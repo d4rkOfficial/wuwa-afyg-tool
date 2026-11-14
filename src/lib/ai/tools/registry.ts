@@ -19,7 +19,7 @@ export interface ToolContext {
     /**
      * @desc 本回合的取消信号（用户按停止）。
      *  需要长时间跑工具的处理器（如 Buff 生成的多轮循环）必须把它透传出去 ——
-     *  `runToolCall` 的 race 只是「不再等结果」，真正的 HTTP 流要靠这个 signal 才会断开。
+     *  `runToolCall` 的 race 只是「不等结果」，真正的 HTTP 流要靠这个 signal 才会断开。
      */
     signal?: AbortSignal
     onConfirm?: (toolName: string, message: string) => Promise<boolean>

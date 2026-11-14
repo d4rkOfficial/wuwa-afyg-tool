@@ -1,7 +1,6 @@
 <script lang="ts">
     /**
      * @desc 数据分析 → 伤害占比（队伍横向比例条 + 三角色直伤类型环形图）。
-     * Phase 5.3：自 `data-analysis-modal.svelte` 原样抽出，标记与行为未改。
      *
      * 环形图的画布、Chart 实例随区块抽出（绘制体在 `./chart-utils`）；
      * 队伍占比色板 `shareItems` 由外壳计算（依赖 KPI 同源口径），此处只渲染。

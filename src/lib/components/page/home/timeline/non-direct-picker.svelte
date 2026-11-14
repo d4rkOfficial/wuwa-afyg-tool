@@ -2,10 +2,10 @@
     /**
      * @desc 非直伤配置弹窗（处决 / 响应 / 效应）：挂在时间轴上，为当前操作块（或参考线）标记「这一刻还发生了什么非直伤」。
      *
-     * 交互约定（T-非直伤重做）：
+     * 交互约定：
      *  - **点头像即启用**：处决/响应没有额外的开关按钮 —— 点哪个角色的头像，就是「谁触发」，
-     *    同时这一项也就启用了；再点同一头像取消。历史实现是「先点名称选中、再点头像指定触发者」两次点击，
-     *    而且允许「选了响应却没指定触发者」这种写进去也建不出条目的空配置（见 `applyNonDirectEntries`）。
+     *    同时这一项也就启用了；再点同一头像取消。一次点击即同时确定「谁触发」与「该项已启用」，
+     *    不存在「选了响应却没指定触发者」这种建不出条目的空配置（见 `applyNonDirectEntries`）。
      *  - **不可响应的行不显示**：队里没人会该响应技能时整行不渲染；技能表还没就绪时先不隐藏（判断不出来），
      *    并顺手把技能表补齐，就绪后自动收敛。
      *  - 已配置但触发者**已不在队伍/已无该技能**时，行仍显示（否则确认时会静默删掉配置），
@@ -70,7 +70,7 @@
         return getNonDirectPickerResponders()[name] ?? []
     }
 
-    /** @desc 点触发者：选中即启用、再点取消；对「已离队/已无技能」的旧触发者而言，点一下就是把它移除 */
+    /** @desc 点触发者：选中即启用、再点取消；对「已离队/已无技能」的失效触发者而言，点一下就是把它移除 */
     const toggleTrigger = (name: string, category: string, char: string) => {
         if (category === '处决') {
             setNonDirectPickerTuneTrigger(getNonDirectPickerTuneTrigger() === char ? null : char)
@@ -111,7 +111,7 @@
         <span>配置非直伤</span>
     {/snippet}
     <div class="space-y-4">
-        <!-- @desc 处决 / 响应：一行一项，行内直接点触发者的头像（不再有「先选名称再选角色」的两步） -->
+        <!-- @desc 处决 / 响应：一行一项，行内直接点触发者的头像即同时完成「选哪一项 + 指定谁触发」 -->
         <section>
             <SectionTitle>处决 / 响应</SectionTitle>
             <div class="space-y-1">
@@ -122,7 +122,7 @@
                     {@const stale = chosen.filter((n) => !candidates.includes(n))}
                     {@const enabled = chosen.length > 0}
                     {@const accent = rowColorOf(chosen)}
-                    <!-- @desc 队里没人能响应、且没有历史配置 → 整行不显示（选了也打不出伤害） -->
+                    <!-- @desc 队里没人能响应、且数据里没有已存配置 → 整行不显示（选了也打不出伤害） -->
                     {#if candidates.length > 0 || stale.length > 0}
                         <div
                             class="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1"
@@ -162,7 +162,7 @@
                                         <span class="whitespace-nowrap">{name}</span>
                                     </button>
                                 {/each}
-                                <!-- @desc 旧配置里已不在队伍（或无该技能）的触发者：降灰划掉，点一下移除 -->
+                                <!-- @desc 已存配置里不在队伍（或无该技能）的触发者：降灰划掉，点一下移除 -->
                                 {#each stale as name (name)}
                                     <button
                                         type="button"

@@ -26,7 +26,7 @@ describe('fast-calc 溯源弹窗：基础面板来源（baseParts）', () => {
         assert.match(flat, /panel: trace\.totalStat/)
     })
 
-    it('各乘区来源复用同一个 partsTable snippet（不再各自内联一张表）', () => {
+    it('各乘区来源复用同一个 partsTable snippet（不各自内联一张表）', () => {
         assert.match(flat, /\{#snippet partsTable\(parts: TracePart\[\], total\?: \{[^}]*\}\)/)
         assert.match(flat, /\{@render partsTable\(seg\.parts\)\}/)
         // 乘区行里不应再出现内联的 part 循环（说明已收敛到 snippet）
@@ -65,7 +65,7 @@ describe('fast-calc 三个 h2 级标题', () => {
 })
 
 describe('fast-calc 纯白独立页', () => {
-    it('html 也要改成白底（全站给 html 设了深色主题底，露出时会看到黑边）', () => {
+    it('html 也要用白底（全站给 html 设了深色主题底，露出时会看到黑边）', () => {
         const styleBlock = SOURCE.match(/<style>([\s\S]*)<\/style>/)?.[1] ?? ''
         assert.match(styleBlock, /:global\(html:root\) \{[\s\S]*?background: #fff/)
         assert.match(styleBlock, /:global\(html:root\) \{[\s\S]*?color-scheme: light/)

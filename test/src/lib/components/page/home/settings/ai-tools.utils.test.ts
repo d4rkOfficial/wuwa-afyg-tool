@@ -145,7 +145,7 @@ test('describeToolCard：web_fetch 展示请求参数与响应 JSON；失败结�
 })
 
 test('结果事件：按 seq 配对，**即使它不是最后一张卡**', () => {
-    // 关键回归：旧实现只看「最后一张卡」，中间插进任何东西就会把结果记错人
+    // 关键回归：结果必须按 seq 配对；只看「最后一张卡」时，中间插进任何东西就会把结果记错人
     let cards: ToolCard[] = []
     cards = applyToolEvent(cards, { toolName: 'a', seq: 1 })
     cards = applyToolEvent(cards, { toolName: 'b', seq: 2 })
@@ -161,13 +161,13 @@ test('结果事件的 seq 找不到对应卡时：只追加一张已结束的卡
     cards = applyToolEvent(cards, { toolName: 'a', resultLen: 7, seq: 999 })
 
     assert.equal(cards.length, 2)
-    assert.equal(cards[0].resultLen, undefined, '原有卡不能被顶掉（旧实现就是在这里全体错位）')
+    assert.equal(cards[0].resultLen, undefined, '原有卡不能被顶掉（否则整批卡错位）')
     assert.equal(cards[1].resultLen, 7)
 })
 
 test('done 事件：把卡标成「已完成」而不需要结果长度', () => {
-    // 服务端 web_search 只有「检索完成」，没有结果体 —— 原来它只更新实时状态、不发事件，
-    // 于是这张卡永远停在「执行中…」
+    // 服务端 web_search 只有「检索完成」，没有结果体 —— 只靠结果事件的话，
+    // 这张卡永远停在「执行中…」，所以 done 事件单独把状态标成已完成
     let cards = applyToolEvent([], { toolName: 'web_search', seq: 1 })
     assert.equal(cards[0].done, undefined)
     cards = applyToolEvent(cards, { toolName: 'web_search', seq: 1, done: true })
@@ -200,7 +200,7 @@ test('进度：没有可挂的卡时追加**无 seq 的伪卡**，因此永远�
     assert.equal(after[1].resultLen, undefined)
 })
 
-test('进度：已结束的 generate_ 卡不再接收新进度（避免续写上一轮的卡）', () => {
+test('进度：已结束的 generate_ 卡不接收新进度（避免续写上一轮的卡）', () => {
     const cards = applyToolProgress([{ name: 'generate_entity_buffs', args: {}, seq: 1, resultLen: 10 }], '新的生成')
     assert.equal(cards.length, 2)
     assert.equal(cards[1].name, 'buff生成')
@@ -237,7 +237,7 @@ test('实时生成：流式尾巴按上限截尾（长输出不会把 DOM 撑爆
 })
 
 test('实时生成：生成行已结束或不存在时退化成一条无 seq 的进度伪行', () => {
-    // 已结束的生成行不再被写
+    // 已结束的生成行不接收写入
     const finished = [
         {
             kind: 'tool' as const,

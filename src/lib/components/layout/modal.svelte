@@ -44,9 +44,9 @@
         /** @desc 是否响应 Esc 关闭。设为 false 表示由宿主自行处理 Esc（如"Esc=保存并关闭"） */
         escapable?: boolean
         /**
-         * @desc 拦截页面级快捷键：开启后非 Esc/Enter 的按键不再冒泡到 `window`。
-         * 用于「弹窗打开期间不应触发宿主页面快捷键」的场景（实测时间轴的两个 picker 原本
-         * 各自在面板上拦截，否则 Delete 会删掉时间轴选中项、Ctrl+Z 会撤销时间轴）。
+         * @desc 拦截页面级快捷键：开启后非 Esc/Enter 的按键不冒泡到 `window`。
+         * 用于「弹窗打开期间不应触发宿主页面快捷键」的场景（时间轴的两个 picker 必须拦截这些
+         * 按键，否则 Delete 会删掉时间轴选中项、Ctrl+Z 会撤销时间轴）。
          * Enter 仍放行：时间轴靠 `window` 监听把 Enter 当「保存并关闭」。
          */
         blockPageShortcuts?: boolean
@@ -102,8 +102,7 @@
      * @desc 背板上的键盘处理。
      * - Esc 且由外壳处理时：**必须截断冒泡**。否则同一次 Esc 会继续冒到页面级 `window`
      *   监听上，把「关闭本层」变成「顺带确认/保存背后的那一层」——实测 `quick-lookup`
-     *   叠在 `skill-picker` 之上时就会这样（原实现各自在自己的背板上 `stopPropagation`，
-     *   迁移到外壳后该行为丢失）。
+     *   叠在 `skill-picker` 之上时就会这样（外壳统一在各层的背板上 `stopPropagation`）。
      * - Esc 但 `escapable === false`：**放行冒泡**，因为此时宿主自己要处理 Esc
      *   （如时间轴上的「Esc = 保存并关闭」，它靠 `window` 监听拿到这个事件）。
      * - 非 Esc：默认放行；`blockPageShortcuts` 开启时拦住页面级快捷键（Enter 例外）。
@@ -180,9 +179,8 @@
             {/if}
             {#if !hideClose && !(title && closeAtTopLeft)}
                 <!-- @desc 角上的关闭按钮：`top-6` 对齐面板内边距（`p-6`），使按钮与标题行首行齐平。
-                     原先用 `top-3`，比标题行高约 11px，看起来「标题栏和关闭按钮没对齐」。
-                     注意 `hideClose` 必须在**这条路径**上也生效：原实现只在「有标题」那支里判断它，
-                     于是无标题的弹窗（如工坊 iframe）永远会渲染出这个按钮。 -->
+                     注意 `hideClose` 必须在**这条路径**上也生效，否则无标题的弹窗（如工坊 iframe）
+                     也会渲染出这个按钮。 -->
                 <button
                     onclick={onclose}
                     class="absolute top-6 rounded-none p-1 text-(--theme-modal-text)/40 transition-colors hover:text-(--theme-modal-text)/70 {closeAtTopLeft

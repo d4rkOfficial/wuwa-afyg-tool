@@ -3,7 +3,7 @@
 // 失败模式 —— **重复 key 是 Svelte 运行时报错**。T9 实测踩到三处「看起来唯一、其实不唯一」：
 //   ① `getSkillPickerGroups()` 的 `group.type`（同一 type 可来自多个 skill 节点）
 //   ② `slot.triggerSets` 的 `name`（选 5 件套时刻意写入 `{name,5}` + `{name,2}` 两条）
-//   ③ 持久化的 `comparison` 配置（旧版本 / 导入的工程无法证明组合不重复）
+//   ③ 持久化的 `comparison` 配置（持久化 / 导入的工程无法证明组合不重复）
 // 这三处最终都改用索引。本文件把「可证明唯一」的那几处固化下来，防止后人改回值作 key 时无声退化。
 //
 // ④ 另有一处**运行期数据**的反例（不在本文件断言，因为真源是上游接口而非本地常量）：
@@ -52,7 +52,7 @@ describe('each-key 唯一性证据', () => {
     it('buildSkillGroups 的 group.type 可以重复 —— 故组件用索引而非 type 作 key', () => {
         // 等价投影：`buildSkillGroups` 逐 `skill_trees` 节点 push，不按 type 去重。
         // 这里构造「两个同 type 节点」，断言「type 作 key 会重复」，把它固化成**已知反例**：
-        // 若哪天 buildSkillGroups 改成按 type 合并，本用例会失败并提醒可以回收成 type 作 key。
+        // 若哪天 buildSkillGroups 按 type 合并，本用例会失败并提醒可以回收成 type 作 key。
         const build = (skills: { type: string; values: [string, string, string][] }[]) =>
             skills
                 .map((s) => ({ type: s.type, hits: s.values.filter(([, v, e]) => v && e) }))

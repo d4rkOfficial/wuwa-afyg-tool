@@ -227,7 +227,7 @@
     /**
      * @desc 多选模式状态机（勾选 / 全选 / 批量删除·并入全局·排序）。
      * 放在 `selectedBuffSetId` 之后：构造时传入的 getter 闭包会读它，虽由闭包延迟求值（无 TDZ 风险），
-     * 但按依赖顺序书写更易读。`onExit` 的互斥清理原先内联在 `toggleMultiSelect()` 里。
+     * 但按依赖顺序书写更易读。`onExit` 负责退出多选时的互斥清理（关右键菜单 / 清拖拽状态 / 还原折叠态）。
      */
     const multi = createMultiSelect({
         isActive: () => multiSelect,
@@ -260,7 +260,7 @@
 
     /**
      * @desc ── 引用配置弹窗状态 ──
-     * 草稿 12 个字段 + 「配置哪个乘区 / 下拉开关 / 引用角色」收进一个对象（原先是 13 个平行 `$state`），
+     * 草稿 12 个字段 + 「配置哪个乘区 / 下拉开关 / 引用角色」收进一个对象，
      * 组件只读写字段；打开时由 `openRefModal()` 一次性写入，避免「先改字段、再置 open」的顺序被拆散。
      */
     interface RefModalUi extends RefModalState {}
@@ -385,7 +385,7 @@
 
     /**
      * @desc 请求删除：**先算出级联集合**（删除被引用的 Buff 会连带删除依赖它的 Buff）。
-     * 没有级联项时直接删（保持旧行为，不额外弹窗）；有级联项时弹确认并逐条列出。
+     * 没有级联项时直接删（不额外弹窗）；有级联项时弹确认并逐条列出。
      */
     function requestDeleteBuffSets(roots: string[]) {
         if (roots.length === 0) return
@@ -431,8 +431,8 @@
     }
 
     /**
-     * @desc 复制 Buff：短名末尾补 `#`，留在原文件夹；重名时由 store 继续补 `#`（`原#` → `原##`）。
-     * 复制品仍按原逻辑解除全局（全局树受保护，不复制回全局）。
+     * @desc 复制 Buff：短名末尾补 `#`，留在原文件夹；重名时由 store 继续补 `#`（`名称#` → `名称##`）。
+     * 复制品一律解除全局（全局树受保护，不复制回全局）。
      */
     function handleCopyBuffSet() {
         if (!selectedBuffSetId || !selectedBuffSet) return
@@ -471,7 +471,7 @@
     /**
      * @desc 保存 Buff 级规则（门槛条件 tab）。
      * `buffActive` 的成环校验在这里做：直接自引用与间接循环都拒绝并 toast，成功返回 null。
-     * 默认全局块（内置）不允许配条件（与旧「链/阶不可改」一致）。
+     * 默认全局块（内置）不允许配条件。
      */
     function handleSaveRules(rules: BuffRule[]): string | null {
         if (!selectedBuffSetId || !selectedBuffSet) return '没有选中的 BUFF'
@@ -885,13 +885,13 @@
         handleCopyBuffSet()
     }
 
-    /** @desc 右键菜单并入/移出全局：选中目标后走原逻辑 */
+    /** @desc 右键菜单并入/移出全局：先设选中项，再复用 `handleToggleGlobal` */
     function handleToggleGlobalFor(id: string) {
         selectedBuffSetId = id
         handleToggleGlobal()
     }
 
-    /** @desc 右键菜单删除：选中目标后走原删除逻辑 */
+    /** @desc 右键菜单删除：先设选中项，再复用 `handleDeleteBuffSet` */
     function handleDeleteFor(id: string) {
         selectedBuffSetId = id
         handleDeleteBuffSet()
@@ -1027,7 +1027,7 @@
                     </button>
                 {/each}
             </div>
-            <!-- @desc 标题栏右侧：只剩「导入Buff集」入口（「速查」已移除） -->
+            <!-- @desc 标题栏右侧：只剩「导入Buff集」入口 -->
             <div class="ml-auto mr-4 flex items-center gap-1">
                 <button
                     onclick={() => (showImport = true)}
@@ -1261,7 +1261,7 @@
     />
 {/if}
 
-<!-- @desc 「移入文件夹」二级弹窗：替代右键菜单里一长串移入项 -->
+<!-- @desc 「移入文件夹」二级弹窗：把一长串移入项收进可搜索的文件夹选择器 -->
 {#if showMovePicker}
     <BuffFolderPickerModal
         open={showMovePicker}

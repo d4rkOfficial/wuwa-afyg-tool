@@ -1,9 +1,9 @@
 // compute.ts 的 Buff 级规则门槛（`zoneCompare`）回归测试：**由 Buff 产出的面板值**（同奏增益层数）必须能被门槛读到。
 //
-// 历史 bug：门槛读的「无条件部分」面板曾无条件排除「所有带 rules 的 Buff」，而同奏层数的每个产层源
-// 都带自封顶规则（`unisonBoonLayer lt 4`）→ 门槛读到的层数恒为 0：
+// 口径：门槛读的「无条件部分」面板不能排除所有带 rules 的 Buff —— 同奏层数的每个产层源
+// 都带自封顶规则（`unisonBoonLayer lt 4`），一律排除的话门槛读到的层数恒为 0：
 // `ge` 永远不满足（一整套「每层同奏」增益全部不生效）、`lt` 永远满足（上限从不生效）。
-// 现在的口径：面板按「除 zoneCompare 外的规则」筛 Buff，并把**正在判定的那个 Buff 自身**从面板里摘掉。
+// 因此面板按「除 zoneCompare 外的规则」筛 Buff，并把**正在判定的那个 Buff 自身**从面板里摘掉。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 

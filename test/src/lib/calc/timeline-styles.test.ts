@@ -1,6 +1,6 @@
 // ── T12 抽出的时间轴纯样式函数：等价性 + 行为锁 ─────────────────────────────
-// 这些函数原本内联在 `timeline.svelte` 里（无法单测）。抽出时必须证明**输出逐字不变**，
-// 否则时间轴的拖拽/高亮定位会发生静默漂移。故此处把「旧内联实现」原样复刻为参照实现，
+// 这些函数内联在 `timeline.svelte` 里（无法单测）。抽出时必须证明**输出逐字不变**，
+// 否则时间轴的拖拽/高亮定位会发生静默漂移。故此处把组件内联版本原样复刻为参照实现，
 // 对全部标志组合做穷举比对 —— 这是「抽纯函数」这类重构唯一有意义的等价证据。
 import { describe, it } from 'node:test'
 import { strict as assert } from 'node:assert'
@@ -53,7 +53,7 @@ const oldDamageStackStyle = (
 const BOOLS = [false, true]
 
 describe('T12 timeline 纯样式函数（抽取等价性）', () => {
-    it('blockStyle 穷举 4 个布尔标志 × gpuAccel，输出与旧内联实现逐字相同', () => {
+    it('blockStyle 穷举 4 个布尔标志 × gpuAccel，输出与组件内联版本逐字相同', () => {
         let n = 0
         for (const pos of [0, 1, 80, 1234.5]) {
             for (const visual of [0, 80, 1400.25]) {

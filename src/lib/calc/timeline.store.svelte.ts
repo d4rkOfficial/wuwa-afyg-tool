@@ -59,7 +59,7 @@ let _entryIdSeq = 0
 /**
  * @desc 生成排轴条目的唯一 id（操作块用 `b`、参考线用 `c`）。
  *
- * 原先 `addOpBlock` 是裸 `b${Date.now()}`、参考线是裸 `c${Date.now()}` —— **同一毫秒内创建两个就撞 id**。
+ * 为什么不用裸 `b${Date.now()}` / `c${Date.now()}`：**同一毫秒内创建两个就撞 id**。
  * 而 id 有两个下游：① `damageBlocks.sourceId` 的外键（撞了就绑错块）；② AI 工具短索引的派生源
  * （撞了短索引一起撞）。所以这里用「毫秒 + 自增」并再避开已存在 id，保证既不重也不改既有数据。
  */
@@ -120,7 +120,7 @@ export function init(
     if (data && key === _lastInitKey) return
     _lastInitKey = key
     if (data) {
-        // 读盘垫片：旧版工程把参考线名字存在 `time`、参考线/操作块位置存成数字 `time`（秒）。
+        // 读盘垫片：更早的工程数据把参考线名字存在 `time`、参考线/操作块位置存成数字 `time`（秒）。
         // 加载时一次性归一成 `name` / `pos`（像素），此后全链路只有 pos 语义。
         _refLines = data.refLines.map((rl) => {
             const legacy = rl as { name?: string; time?: string | number; pos?: number }
@@ -1114,7 +1114,7 @@ const _estHeightCache = new Map<string, number>()
 
 export function getDamageBlocksStacked(): { block: DamageBlock; top: number; left: number }[] {
     const lastTrackIdx = getTRACKS().length - 1
-    // 一次性索引：sourceId → pos，替代每个伤害块的线性 find（拖拽帧成本 O(D×N) → O(D)）
+    // 一次性索引：sourceId → pos（免去每个伤害块的线性 find，拖拽帧成本 O(D×N) → O(D)）
     const opPos = new Map<string, number>()
     for (const b of _opBlocks) opPos.set(b.id, b.pos)
     const refPos = new Map<string, number>()
@@ -1965,7 +1965,7 @@ export function setBlockSpecial(blockId: string, kind: 'none' | 'intro' | 'switc
 function enforceIntro() {
     const lastTrackIdx = getTRACKS().length - 1
     const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
-    // id → 有序索引 Map，替代每块 findIndex（快速模式每键调用，O(N²) → O(N log N)）
+    // id → 有序索引 Map（免去每块 findIndex：快速模式每键调用，O(N²) → O(N log N)）
     const idxOf = new Map(sorted.map((s, i) => [s.id, i]))
     let changed = false
     const updated = _opBlocks.map((b) => {
@@ -2024,7 +2024,7 @@ function enforceSwitchback() {
     const lastTrackIdx = getTRACKS().length - 1
     const sorted = _opBlocks.filter((b) => b.trackIndex < lastTrackIdx).sort((a, b) => a.pos - b.pos)
     const globalIdxOf = new Map(sorted.map((s, i) => [s.id, i]))
-    // 按轨道的有序索引（替代同轨 findIndex）
+    // 按轨道的有序索引（免去同轨 findIndex）
     const trackSorted = new Map<number, OpBlock[]>()
     const trackIdxOf = new Map<number, Map<string, number>>()
     for (const b of sorted) {
@@ -2243,7 +2243,7 @@ export function formatTimeline() {
 
 /**
  * @desc 生成不重复的伤害块 id。
- * 原来直接写 `d${Date.now()}`：同一毫秒内连建多块（AI 批量排轴、连续粘贴/录入）就会拿到同一个 id。
+ * 不能用裸 `d${Date.now()}`：同一毫秒内连建多块（AI 批量排轴、连续粘贴/录入）就会拿到同一个 id。
  * 条目 id 由块 id 派生，块 id 撞车 ⇒ 条目 id 撞车 ⇒ 拉表 `{#each … (entry.id)}` 抛 each_key_duplicate，
  * 并且两块的 Buff 绑定会互相覆盖。这里撞到已有 id 就追加 `-2`/`-3`。
  */
@@ -2676,7 +2676,7 @@ export function buildDamageListFrom(source: DamageListSource) {
                     ? (refLines.find((r) => r.id === d.sourceId)?.pos ?? 0)
                     : (opBlocks.find((b) => b.id === d.sourceId)?.pos ?? 0)
             const op = opBlocks.find((b) => b.id === d.sourceId)
-            // x 只参与同 pos 时的 tie-breaker（与活动工程原来的口径一致）；跨工程没有 DOM 实测宽度时用默认 56
+            // x 只参与同 pos 时的 tie-breaker（与活动工程的口径一致）；跨工程没有 DOM 实测宽度时用默认 56
             const x = d.sourceType === 'ref' ? pos : op ? op.pos - (blockWidths[op.id] ?? 56) / 2 : pos
             const sourceChar =
                 d.sourceType === 'ref'

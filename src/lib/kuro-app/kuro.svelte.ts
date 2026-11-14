@@ -46,7 +46,7 @@ let _busy = $state(false)
 let _loaded = false
 /** @desc 选用的绑定角色 roleId（持久化） */
 let _roleId = $state('')
-/** @desc 请求「打开设置并跳到连接配置」的标记：登录已内联在设置里，不再有独立登录窗口 */
+/** @desc 请求「打开设置并跳到连接配置」的标记：登录内联在设置里，没有独立登录窗口 */
 let _settingsRequest = $state(false)
 
 export const getKuroSettingsRequest = () => _settingsRequest

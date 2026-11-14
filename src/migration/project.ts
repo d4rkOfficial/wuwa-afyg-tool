@@ -22,9 +22,9 @@ import {
 import { dedupeDamageBlockIds, migrateHeavyPressOpBlocks } from './timeline'
 import { PROJECT_MIGRATIONS } from './versions'
 
-// ── 兼容视图同步：新结构 ↔ 旧字段 ──
+// ── 兼容视图同步：新结构 ↔ 视图字段 ──
 
-/** @desc 由新结构派生旧字段视图（过渡期兼容，新代码请直接用 encounter / buffs） */
+/** @desc 由新结构派生视图字段（新代码请直接用 encounter / buffs） */
 const syncLegacyViews = (p: ProjectV2): Project => {
     const phases = {
         team: { locked: p.encounter.teamLocked, data: null as unknown },
@@ -135,7 +135,7 @@ export const migrateProject = (raw: unknown): Project => {
     return syncLegacyViews(project)
 }
 
-/** @desc 由工程派生用于保存的精简快照（不落过渡期视图字段） */
+/** @desc 由工程派生用于保存的精简快照（不落视图字段） */
 export const toPlainProject = (p: Project): ProjectV2 => {
     const { phases: _phases, conditionProfile: _profile, buffSets: _buffs, ...rest } = p
     return deepClone(rest)

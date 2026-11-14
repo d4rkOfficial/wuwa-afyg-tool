@@ -94,7 +94,7 @@ const akiDevCode = () => ipDevCode(AKI_USER_AGENT)
 /**
  * @desc akiBox「取数据」系列接口请求头：source/UA/devCode + `did`（设备号）+ `b-at`（数据令牌）。
  *  **不能带 `token`**：参考实现明确注明 token 会导致上游返回「参数错误」（未解析出参数时的误报），
- *  这也是本项目此前报「取角色列表失败，参数错误」的原因。
+ *  界面上的表现就是「取角色列表失败，参数错误」。
  */
 const akiDataHeaders = async (did: string, bat: string): Promise<Record<string, string>> => ({
     source: 'ios',

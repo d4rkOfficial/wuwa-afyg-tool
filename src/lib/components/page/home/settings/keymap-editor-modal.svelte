@@ -1,9 +1,8 @@
 <script lang="ts">
     /**
-     * @desc 排轴页按键图标编辑（独立弹窗）：原「设置 → 按键图标」栏目升级而来，
-     * 入口在「设置 → 交互相关 → 界面显示 → 排轴页按键图标」的「编辑」按钮。
+     * @desc 排轴页按键图标编辑（独立弹窗）：入口在「设置 → 交互相关 → 界面显示 → 排轴页按键图标」的「编辑」按钮。
      * 列表与「选择按键与手柄键位」弹窗放在同一个组件里：后者是前者的次级弹窗，
-     * 共享 `keyPickerFor` 与图标表，不再占用设置外壳的状态。
+     * 共享 `keyPickerFor` 与图标表，不占用设置外壳的状态。
      */
     import Icon from '@iconify/svelte'
     import Modal from '$lib/components/layout/modal.svelte'

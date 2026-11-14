@@ -1,5 +1,5 @@
-// Buff 文件夹命名迁移：旧「角色名本体 / 角色名2链 / 角色名的武器」→ 新「角色名-本体 / 角色名-2链 / 角色名-武器名」，
-// 并把旧导入混在角色本体里的声骸 / 套装 / 武器 Buff 归到 `角色名-实体名[-x件]`。
+// Buff 文件夹命名迁移（v5 → v6）：「角色名本体 / 角色名2链 / 角色名的武器」→「角色名-本体 / 角色名-2链 / 角色名-武器名」，
+// 并把混在角色本体里的声骸 / 套装 / 武器 Buff 归到 `角色名-实体名[-x件]`。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -95,7 +95,7 @@ const projectOf = (buffs: BuffInstance[], buffTree: BuffTreeState = tree): Recor
 
 /**
  * @desc v6 及更早的工程数据：**实例级 condition**（chains / refinements）。
- * 迁移到 v7 时必须升级为 `rules`，因此这里刻意保留旧形状（不能直接用新 helper 构造）。
+ * 迁移到 v7 时必须升级为 `rules`，因此这里刻意手写该形状（不能直接用新 helper 构造）。
  */
 const legacyBuff = (id: string, name: string, condition: Record<string, unknown>): BuffInstance =>
     ({ id, name, zones: [{ zoneId: 'atkPct', value: 10 }], scope: 'all', condition }) as unknown as BuffInstance
@@ -127,19 +127,19 @@ const folderNames = (nodes: readonly BuffTreeNode[], depth = 0): string[] => {
 }
 
 describe('Buff 文件夹命名迁移', () => {
-    it('本体 / 链 / 武器文件夹改成短横线命名', () => {
+    it('本体 / 链 / 武器文件夹统一为短横线命名', () => {
         const names = migrate().buffSets.map((b) => b.name)
         assert.ok(names.includes('甲-本体\\本体效果'))
         assert.ok(names.includes('甲-2链\\链效果'))
         assert.ok(names.includes('甲-武器A\\武器效果'))
     })
 
-    it('旧导入的声骸 / 套装从角色本体移出，武器也按实体归类', () => {
+    it('混在本体下的声骸 / 套装移出角色本体，武器也按实体归类', () => {
         const names = migrate().buffSets.map((b) => b.name)
         assert.ok(names.includes('甲-声骸X\\声骸效果'), '首位声骸进 角色-声骸名')
         assert.ok(names.includes('甲-套装S-2件\\套装效果'), '套装进 角色-套装名-x件')
-        assert.ok(!names.some((name) => name.startsWith('甲-本体\\声骸X')), '声骸来源文件夹不再留在本体下')
-        assert.ok(!names.some((name) => name.startsWith('甲-本体\\套装S')), '套来源文件夹不再留在本体下')
+        assert.ok(!names.some((name) => name.startsWith('甲-本体\\声骸X')), '声骸来源文件夹不应留在本体下')
+        assert.ok(!names.some((name) => name.startsWith('甲-本体\\套装S')), '套来源文件夹不应留在本体下')
         assert.ok(names.includes('甲-本体\\未知来源\\普通效果'), '认不出来源的 Buff 留在本体')
     })
 
@@ -173,7 +173,7 @@ describe('Buff 文件夹命名迁移', () => {
         assert.deepEqual(twice?.buffTree, once.buffTree)
     })
 
-    it('已是 v6 的工程不再重跑命名迁移（与版本绑定）', () => {
+    it('已是 v6 的工程保留原文件夹命名（迁移与版本绑定）', () => {
         const raw = projectOf(BUFFS)
         raw.version = 6
         const calc = migrateProject(raw).encounter.calculation.data

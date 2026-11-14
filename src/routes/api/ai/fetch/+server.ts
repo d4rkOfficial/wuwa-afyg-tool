@@ -149,7 +149,7 @@ export async function POST({ request }: { request: Request }) {
             continue
         }
 
-        // 4xx / 5xx **不再是工具错误**：完整 fetch 的语义是「把服务端真实响应交回来」，
+        // 4xx / 5xx **不算工具错误**：完整 fetch 的语义是「把服务端真实响应交回来」，
         // 由 status + 响应体让模型自己判断；否则调错一个 API 参数都拿不到错误详情。
         const contentType = upstream.headers.get('content-type') ?? ''
         const declared = Number.parseInt(upstream.headers.get('content-length') ?? '', 10)

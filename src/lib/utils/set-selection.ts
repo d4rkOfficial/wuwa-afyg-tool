@@ -1,9 +1,10 @@
 /**
  * @desc 触发套装选择的**纯逻辑**（唯一口径）：部位预算、件数切换、有效件数、展示文案。
  *
- * 为什么抽出来：同一套「同名取最大件数再求和」的口径原先在 `set-picker.svelte`、
- * `team-config.svelte`、`ai/tools/team.ts` 里各写了一遍；而件数切换的预算判断只写在 picker 里，
- * 于是**选完 3 件套再点 5 件套**会绕过预算（`{A,3}` + `{B,5}` + `{B,2}` = 8/5，见 `togglePieceSelection` 注释）。
+ * 为什么抽出来：同一套「同名取最大件数再求和」的口径若在 `set-picker.svelte`、
+ * `team-config.svelte`、`ai/tools/team.ts` 各写一遍就会漂移；而件数切换的预算判断必须与
+ * 选择结果同源，否则**选完 3 件套再点 5 件套**会绕过预算（`{A,3}` + `{B,5}` + `{B,2}` = 8/5，
+ * 见 `togglePieceSelection` 注释）。
  * 这里把口径收成一处，UI 与 AI 工具共用，测试也直接打在这层。
  */
 import type { SelectedSet } from '$lib/types/project'
@@ -29,7 +30,7 @@ export const remainingPiecesOf = (sets: readonly SelectedSet[]): number =>
  * @desc 5 件套的选择结果：**只留这一套**，并附上被它包含的 2 件套条目。
  *
  * 5 件套占满全部 5 个部位，因此它与任何其它套装都不可共存 —— 选中它必须**替换掉**先前选择。
- * 曾经的 bug：新选 5 件套时只做 `[...selected, {5}, {2}]`，于是「先 3 件套、再 5 件套」
+ * 不能在新选 5 件套时只做 `[...selected, {5}, {2}]`：那样「先 3 件套、再 5 件套」
  * 会得到 3 + 5 = 8 件（超出预算），且 picker 底部仍显示 `8/5`。
  */
 export const fivePieceSelection = (name: string): SelectedSet[] => [

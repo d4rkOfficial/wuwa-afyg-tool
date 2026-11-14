@@ -3,7 +3,7 @@
      * @desc 数据分析 → Buff 贡献（单角色视图）。
      *
      * 算法：把该 Buff 从「这个角色伤害条目」的绑定里拿掉，重算该角色总伤，损失量即贡献。
-     * 口径统一为**当前配置**（凹暴 / 不暴 / 未命中已在结果页生效），不再分别展示期望/凹暴/不暴三列。
+     * 口径统一为**当前配置**（凹暴 / 不暴 / 未命中已在结果页生效），不分别展示期望/凹暴/不暴三列。
      * 逐条损失**不可相加**（多条 Buff 乘算叠加，1+1 ≠ 2），因此表头另给「移除全部 Buff」的总贡献，
      * 这一点在帮助弹窗与副标题里都写清楚，避免用户拿两种数互相校验。
      *
@@ -76,7 +76,7 @@
     const folderTitle = (row: BuffTreeRow): string =>
         `${row.path.join(BUFF_PATH_SEP)}（整组移除 +${fmt(row.contribution)}）`
 
-    /** @desc Buff 行 hover：完整全名 + 乘区明细（乘区名不再以 badge 形式占位） */
+    /** @desc Buff 行 hover：完整全名 + 乘区明细（乘区名不以 badge 形式占位） */
     const buffTitle = (row: BuffTreeRow): string => {
         const zones = row.buff?.zones ?? []
         const fullName = [...row.path, row.name].join(BUFF_PATH_SEP)

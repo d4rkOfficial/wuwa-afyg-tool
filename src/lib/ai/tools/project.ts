@@ -111,7 +111,7 @@ defineTool('create_project', {
         const name = str(args.name)
         if (!name) throw new Error('工程名称不能为空')
         const project = await createProject(name)
-        // 新建即切换活动工程：同步重载阶段 store，避免紧跟的查询读到旧工程数据
+        // 新建即切换活动工程：同步重载阶段 store，避免紧跟的查询读到上一个工程的数据
         reloadActiveProjectStores()
         return { id: project.id, name: project.name }
     }
@@ -199,7 +199,7 @@ defineTool('delete_project', {
         const id = str(args.id)
         if (!id) throw new Error('缺少工程 id')
         await deleteProject(id)
-        // 删除活动工程会改变活动工程；重载一次让后续查询不再读到已删除工程的数据
+        // 删除活动工程会改变活动工程；重载一次让后续查询读不到已删除工程的数据
         reloadActiveProjectStores()
         return { deleted: id }
     }

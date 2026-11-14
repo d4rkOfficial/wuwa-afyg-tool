@@ -9,8 +9,8 @@
      * - 折叠集合 `collapsedFolders`、拖拽状态 `dragState`、选中项**全部归父组件所有**并双向绑定。
      * - 树 `tree`、条目数 `buffCount`、队伍与派生查询由父组件注入；本组件**不回读**父组件状态，
      *   所有数据写入与菜单打开都经回调交回父组件（父组件是 store 的唯一调用方）。
-     * - 全局/非全局的切换胶囊 tab 在**弹窗标题栏**（父组件），本组件不再自绘 tab。
-     * - 星标已彻底移除：行首改为**作用域徽标**（通用 / 全队 / 效应专属 / 角色名）。
+     * - 全局/非全局的切换胶囊 tab 在**弹窗标题栏**（父组件），本组件不自绘 tab。
+     * - 行首是**作用域徽标**（通用 / 全队 / 效应专属 / 角色名）。
      */
     import Icon from '@iconify/svelte'
     import Button from '$lib/components/ui/button.svelte'
@@ -407,7 +407,7 @@
                             class="size-4 shrink-0 text-(--theme-accent-text)"
                         />
                     {:else}
-                        <!-- @desc 行首改为作用域徽标（星标已移除） -->
+                        <!-- @desc 行首是作用域徽标（通用 / 全队 / 效应专属 / 角色名） -->
                         {@render scopeBadges(item.buffSet!)}
                     {/if}
                     <span class="truncate flex-1">{buffLeafName(item.buffSet!.name)}</span>
@@ -585,7 +585,7 @@
                 class="size-4 shrink-0 text-(--theme-accent-text)"
             />
         {:else}
-            <!-- @desc 行首改为作用域徽标（星标已移除） -->
+            <!-- @desc 行首是作用域徽标（通用 / 全队 / 效应专属 / 角色名） -->
             {@render scopeBadges(child)}
         {/if}
         <span class="truncate flex-1">{buffLeafName(child.name)}</span>

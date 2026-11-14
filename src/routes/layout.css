@@ -8,7 +8,7 @@
        下面的 --animate-* 大多数由这些 token 组合而成（改一档即可全局调律）。
        T18 逐一核对了这两者的关系：**有 4 条刻意保留字面量**（rise-in / shrink-in / icon-pop 的 0.32s、
        card-pop-in 的 0.42s）。它们与最近的一档 token（--motion-slow 260ms）差 60~160ms，
-       改成 token 是**肉眼可见的加速**，故按「差值 ≤ 30ms 才对齐 token，否则只把注释改对」处理；
+       取 token 会让它们肉眼可见地加速，故按「差值 ≤ 30ms 才对齐 token，否则只把注释写对」处理；
        每条的行尾注释写明了原值、处置与理由。
 
        `static` 是必需的，不是可选项：Tailwind v4 默认只把「被引用过」的 @theme 变量发射到 :root，
@@ -22,7 +22,7 @@
        - `--duration-*` / `--ease-*` 是 Tailwind 的命名空间：凡是在 @theme 里写成 `--ease-xxx` 的键，
          Tailwind 都会额外生成同名 `.ease-xxx` 工具类。本项目内置的 `ease-out` 关键字工具类正是
          由 `--ease-out` 生成的，这里刻意把它**覆盖成同一个值**（cubic-bezier(0.2,0,0,1) 比关键字
-         `ease-out` 更「快出慢收」），因此 `.ease-out` 仍然可用、只是曲线与原来不同——这是本次有意的调律。
+         `ease-out` 更「快出慢收」），因此 `.ease-out` 仍然可用、只是曲线取上面这个值——这是有意的调律。
        - 时长 token 一律用 `--motion-*` 而**不**用 `--duration-*`：后者会生成 `.duration-fast` 之类
          的工具类，与 Tailwind 既有的数字型 `duration-150` 混在一起易生歧义；`--motion-*` 不占命名空间，
          只当普通自定义属性用（组件里用 `var(--motion-fast)` 引用）。 */
@@ -260,7 +260,7 @@
          ring → box-shadow、brightness → filter、opacity → opacity）；
          唯一在并集外的是 outline-color（focus-visible:outline-* 6 + 2 处），而它本来也不在 Tailwind
          transition-colors 的动画属性表里，即 0 处实际受影响。
-         ⚠️ T18 起 data-press="none" **不再**是这条并集的逃生通道（语义已收窄为只管按压 transform，
+         ⚠️ `data-press="none"` **不是**这条并集的逃生通道（它的语义专一：只管按压 transform，
          见下面的退出规则）。真出现「按钮必须过渡并集外属性」时，最小且局部的做法是在退出规则附近补一条
          显式还原：:where(<该按钮>) { transition-property: <它要保留的属性> !important; }
          （必须 !important 且同层靠后，才能压过上面这条并集）。
@@ -271,7 +271,7 @@
          （或写 data-press="none" —— 非按钮写了它就直接被加入规则排除，自身 transition 原样保留）。
          data-press="none" 对 <button> **没有**这个作用（按钮分支刻意不看 data-press），见上面的还原配方。
          按钮上没有任何一处自定义 duration（duration-* 在按钮上实测 0 处），故统一为 --motion-fast 120ms
-         （原先带 transition-colors 的按钮是 Tailwind 默认 150ms → 120ms，差 30ms，是刻意的统一）。
+         （带 transition-colors 的按钮由 Tailwind 默认的 150ms 统一到 120ms，差 30ms，是刻意的统一）。
          */
     :where(button:not(:disabled), [data-press]:not([data-press='none'])) {
         transition:
@@ -304,7 +304,7 @@
        本项目整行类的 hover 反馈是 `hover:bg-(--theme-modal-text)/3`，在真实行底 rgb(17,17,17)
        （= --theme-modal-bg #111111 + 「卡片」区域 20% 叠色）上实测得到 rgb(23,23,23)，即 **Δ=6/255**。
        按下反馈的可见强度应当与之一致（同一条「一级反馈」标尺），于是逐档实测：
-         brightness(1.12) → rgb(19,19,19) Δ=2   ← 太弱，深色行底上肉眼几乎不可辨（T31 初值即此，已废弃）
+         brightness(1.12) → rgb(19,19,19) Δ=2   ← 太弱，深色行底上肉眼几乎不可辨（弃用）
          brightness(1.25) → rgb(21,21,21) Δ=4   ← 仍弱于 hover
          brightness(1.35) → rgb(23,23,23) Δ=6   ← **与 hover 底色同强度**（采用）
          brightness(1.45) → rgb(25,25,25) Δ=8   ← 明显强于 hover，按下会「闪」
@@ -313,17 +313,15 @@
         transform: none;
         filter: brightness(1.35);
     }
-    /* 退出开关：**只退出按压的位移/缩放，不退出过渡**（T18 收窄语义）。
+    /* 退出开关：**只退出按压的位移/缩放，不退出过渡**。
        适用场景：整行可点区域、拖拽把手、卡片级按钮、自带 animate-* 的元素 —— 它们要的是「按下去不缩」，
        而不是「连 hover 的颜色渐变一起瞬变」。
-       ⚠️ 旧规则体里还带 `transition: none !important`（Phase 8.2 起），它把这个元素的**一切过渡**都杀掉。
-       T21（commit 15ef1e6）刚给 35 处整行/整卡按钮贴上 `data-press="none"`，它们几乎全带
-       `transition-colors` / `transition-all` + `hover:bg-*`：旧规则下这些 hover 过渡直接消失
-       （T18 用 headless Edge + CDP 实测：改前 computed transition = `none / 0s`，hover 底色瞬变；
-       改后 = 与其它按钮一致的 7 项并集 / 0.12s）。故这里把它删掉。
-       删掉后这些**按钮**由加入规则的第一分支 `button:not(:disabled)`（刻意不看 data-press）接管，
-       拿到与全项目其它 415 个按钮完全相同的并集 + --motion-fast —— 是「更一致」，不是新特例。
-       于是 `data-press="none"` 的语义被收窄成专一的「不要按压 transform」，不再兼职一个隐形的
+       规则体里**不写** `transition: none !important`：那会把这个元素的**一切过渡**都杀掉，
+       而贴 `data-press="none"` 的 35 处整行/整卡按钮几乎全带 `transition-colors` / `transition-all`
+       + `hover:bg-*`，它们的 hover 过渡会直接消失（届时 computed transition = `none / 0s`，hover 底色瞬变）。
+       现在这些**按钮**由加入规则的第一分支 `button:not(:disabled)`（刻意不看 data-press）接管，
+       拿到与全项目其它 415 个按钮完全相同的 7 项并集 + --motion-fast —— 一致而非特例。
+       故 `data-press="none"` 的语义专一地是「不要按压 transform」，不兼职一个隐形的
        「关掉本元素所有过渡」开关（那种副作用没人能预见，且所有闸门都看不见）。 */
     :where(button[data-press='none']),
     :where(button[data-press='none']):active,
@@ -360,7 +358,7 @@
          （真值表：三种写法 × 按钮/非按钮已逐项实测，原始输出见 .tmp/reports/T18.md §1。） */
 
     /* ── 关于「按压用 transform」的包含块风险（8.2 评估，T18 扩到非按钮目标）──
-       transform（非 none）会让该元素成为**包含块**，其 position: fixed 后代将改为相对该元素定位
+       transform（非 none）会让该元素成为**包含块**，其 position: fixed 后代将相对该元素定位
        —— 本项目已被同类坑咬过一次：damage-trace-view.svelte 的浮窗注释明确写着祖先的
        backdrop-filter 会让 fixed 后代错位，故它才把浮窗 `use:portal` 挂到 document.body。
        T18 用 headless Edge 实测复现（.tmp/t18-tr-transform-probe.html）：给一个 200×80 的容器加本规则的
@@ -397,11 +395,11 @@
          spread-table.svelte:755、comparison-modal.svelte:1103（分离模型下 <tr> 自身边框按 CSS 2.1 §17.6.1
          本就不绘制，不存在这个错位）。
          结论：整行可点**可以**用 data-press（不引发布局重排、不挪动兄弟行），但若该行自带 border-b 且较宽，
-         错位肉眼可见 —— 这类行 T31 起**改用 `data-press="row"`**（非几何变体，见上面的规则与注释），
-         不再需要「不加」或改结构。**只有显式 `border-separate` 的表**（行边框本就不绘制）才适合直接上默认几何按压。
+         错位肉眼可见 —— 这类行**用 `data-press="row"`**（非几何变体，见上面的规则与注释），
+         不需要「不加」或改结构。**只有显式 `border-separate` 的表**（行边框本就不绘制）才适合直接上默认几何按压。
          T31 像素级复核（探针 .tmp/t31-probe/pixel.html，3× 截图自解码，见 .tmp/reports/T31.md §3.2）把机理钉死为：
          collapse 下给 <tr> 加 scale 时，**行的底色与行内文字都跟着缩**（在表左缘内 5px 的列上，
-         行底色的垂直区段被压缩、且该列不再有任何行底色），**但由表格绘制的行边框一动不动**
+         行底色的垂直区段被压缩、且该列没有任何行底色），**但由表格绘制的行边框一动不动**
          （亮红 border-bottom 在按下前后都是 y[56.67..60.33]、厚 3.66px，完全一致）——
          所以「错位」的准确描述是「底色与文字一起缩了约 18px、分隔线钉在原处」，而不是「底色内缩」。
        · <th> / <td>（display: table-cell）✅ 生效（dTop +0.747，dW −0.535）。
@@ -450,11 +448,9 @@
         font-family: 'JetBrains Mono', ui-monospace, monospace;
     }
     /* ── 滚动条：全局默认即主题化（Phase 10.1）──
-       原先 `*::-webkit-scrollbar*` 用的是硬编码灰（oklch(0.3 0 0) / oklch(0.5 0 0)），只有 .theme-scrollbar
-       才引用 --theme-scrollbar-*；于是「统一」被迫变成给每个容器补 class，漏掉的容器就一直显示硬编码灰。
-       现在默认值直接取 theme.svelte.ts 按昼夜发射的 --theme-scrollbar-thumb，并与 --theme-accent-bg
-       混色（跟随「配色」色相）：任何 scroll 容器都自动跟随昼夜 + 配色，无需再补 class。
-       `.theme-scrollbar`（52 处调用点）因此退化为与全局默认完全等价的显式声明；
+       `*::-webkit-scrollbar*` 的默认值直接取 theme.svelte.ts 按昼夜发射的 --theme-scrollbar-thumb，并与
+       --theme-accent-bg 混色（跟随「配色」色相）：任何 scroll 容器都自动跟随昼夜 + 配色，无需逐个补 class。
+       `.theme-scrollbar`（52 处调用点）因此是与全局默认完全等价的显式声明；
        本轮**刻意保留**调用点与那一段规则，不做大规模删 class 的改动（视觉风险大、收益为零）。
 
        默认透明 + 滚动/悬停才显形（Phase 10.2，配合 $lib/utils/scrollbar-autohide.ts 打的
@@ -513,7 +509,7 @@
             var(--theme-accent-bg, rgba(0, 0, 0, 0.5))
         );
     }
-    /* 兼容既有调用点：与全局默认等价（不再需要，保留以维持 52 处调用点不变） */
+    /* 兼容既有调用点：与全局默认等价（保留以维持 52 处调用点不变） */
     .theme-scrollbar {
         scrollbar-color: transparent transparent;
     }
@@ -528,8 +524,8 @@
     }
     .w-icon {
         filter: var(--theme-w-icon-filter, none);
-        /* T18：原为字面量 0.2s（T16 §6c 点名的「③ 抓不到的写死时长」）→ --motion-base 180ms（−20ms，≤30ms 故对齐）。
-           缓动维持 CSS 默认的 ease，不改成 --ease-out：本项只对齐时长，避免顺手改手感的额外观感变化。
+        /* 时长走 --motion-base 180ms（与展开/收起同一档），缓动维持 CSS 默认的 ease、不用 --ease-out：
+           本项只对齐时长，避免顺手改动手感。
            reduce 兜底见文件末尾的归零块。 */
         transition: filter var(--motion-base);
     }
@@ -757,8 +753,8 @@
 
 /* ── 统一圆角：`.sf-radius`（自绘表面）──
    设置面板等处的卡片 / 分区块是**手写表面**（内联 `border-color` + `background: var(--theme-input-bg)`），
-   没有 `data-sf`，落不进上面那条规则；给它们一个显式类，比逐个改成 `data-sf` 稳妥
-   （改成 data-sf 会让这些小块吃 widget 表面的 20% 不透明度，观感变化远大于「加个圆角」）。
+   没有 `data-sf`，落不进上面那条规则；给它们一个显式类，比逐个挂 `data-sf` 稳妥
+   （挂 data-sf 会让这些小块吃 widget 表面的 20% 不透明度，观感变化远大于「加个圆角」）。
    同样必须未分层，才能压过组件 class 里的 `rounded-none`。 */
 .sf-radius {
     border-radius: var(--theme-surface-radius, 2px);
@@ -770,7 +766,7 @@
    **把角裁掉** —— 看起来是「缺了一角」而不是圆角（用户实测点出，已用无头渲染复现对照）。
 
    刻意用**与轨道同值**的圆角，而不是几何上更「同心理」的 `calc(r - 2px)`：
-   后者在用户把半径调到默认的 2px 时算出 0，选段又变回直角 —— 正好是这次要修的症状。
+   后者在用户把半径调到默认的 2px 时算出 0，选段又变回直角 —— 正是要避免的症状。
    同值不会溢出：给角加圆角只会**削掉**面积，内缩 2px 的块用与外层相同半径仍然完整落在轨道内。
    经实测（半径 14px 对照渲染）：同值圆角在选段左右两端都成立了真正的圆角。 */
 .sf-radius-inner {

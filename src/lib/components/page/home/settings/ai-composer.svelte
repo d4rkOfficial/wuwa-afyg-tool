@@ -9,7 +9,7 @@
      * 1. **右上角「暂时收起」**：只把输入区折成**一行**（左侧显示当前阶段 / 上一轮汇总），
      *    窗口与消息区都留着；点这一行即展开。刻意不做成「收起整个悬浮窗」—— 头部已有那个按钮。
      * 2. **`pending` 槽位替掉输入行**：危险操作确认卡与 `ask_user` 提问卡都渲染在**本卡片内部**
-     *    （原先它们在消息列表末尾，与输入框分成两块）。此刻回合正阻塞在工具里等作答，
+     *    （消息列表末尾不放这两张卡）。此刻回合正阻塞在工具里等作答，
      *    发送任何文本都不会被处理，故直接让卡片顶替输入行，而不是并排留一个用不了的输入框。
      *    此状态下不提供收起 —— 收起会把待作答的问题藏起来。
      * 3. **用量圈**紧贴发送按钮，表示最近一次请求的 prompt token 占上下文窗口的比例。
@@ -25,8 +25,8 @@
      * ## 为什么菜单向上展开、且不用 `ui/select`
      * - composer 贴在窗口底部，向下展开会被悬浮窗的 `overflow-hidden` 直接裁掉 → 一律 `bottom-full`。
      * - `ui/select` 的菜单把 `fixed inset-0` 当透明捕捉层；而悬浮窗在**拖动时带 `transform`**，
-     *   那会让 `fixed` 改为相对窗口定位（外层还有 `overflow-hidden`），菜单会错位甚至被裁掉。
-     *   故这里改为「监听 window 的 pointerdown 捕获阶段」关闭菜单，不铺任何覆盖层。
+     *   那会让 `fixed` 相对窗口定位（外层还有 `overflow-hidden`），菜单会错位甚至被裁掉。
+     *   故这里的关闭方式是「监听 window 的 pointerdown 捕获阶段」，不铺任何覆盖层。
      */
     import type { Snippet } from 'svelte'
     import Icon from '@iconify/svelte'
@@ -55,7 +55,7 @@
     interface Props extends ComponentsProps {
         /** @desc 生成中：发送按钮变为停止，且不允许再发送 */
         busy: boolean
-        /** @desc 长任务模式是否开启（仅用于把停止按钮的提示改成「结束长任务」） */
+        /** @desc 长任务模式是否开启（停止按钮的提示随之显示「结束长任务」） */
         longTask?: boolean
         /** @desc 发送：正文（可能为空串）+ 图片附件 data URL 列表（可能为空数组） */
         onsend: (text: string, images: string[]) => void

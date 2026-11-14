@@ -1,7 +1,7 @@
 <script lang="ts">
     /**
      * @desc 表格单元格（`<td>` / `<th>`）：统一列内边距 + 水平对齐。
-     * 抽自 `comparison-modal.svelte` 两张对比表里逐字重复的外层壳：
+     * 覆盖 `comparison-modal.svelte` 两张对比表里的三种单元格壳（括号内为实测出现次数）：
      *   - 表头右侧列 `px-2 py-1.5 text-right font-medium`（6 处，含 1 处带 `style`）
      *   - 表体数字列 `px-2 py-2 text-right tabular-nums`（3 处）
      *   - 表体统计列 `px-2 py-2 text-right text-[10px] tabular-nums`（1 处，带 `style`）

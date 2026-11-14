@@ -1,15 +1,15 @@
 <script lang="ts">
     /**
-     * @desc 设置 → 归档管理（Phase 5.1 第三增量：自 `settings-modal.svelte` 原样抽出，标记与行为未改）。
-     * 迁移说明：
-     *   - `archiveDeleteTarget`（原外壳的 `confirmDelete`）、`closeArchiveDelete`、`doArchiveDelete`
+     * @desc 设置 → 归档管理。
+     * 状态归属：
+     *   - `archiveDeleteTarget`、`closeArchiveDelete`、`doArchiveDelete`
      *     落在 `settings-ui.svelte.ts`：永久删除确认弹窗必须留在外壳（`fixed` 覆盖层不能放进设置面板内容区），
      *     而「关闭二次确认时直接删除」的路径在本组件，两边共用同一份状态与同一个删除实现。
-     *   - `weaponIcons` / `echoIcons` / `setIcons` 也落在 store：原外壳在**挂载时**（与是否打开设置无关）
-     *     就预取这三张图标表，该预取 `$effect` 仍留在外壳以保持原时序；若把状态留在本组件，
+     *   - `weaponIcons` / `echoIcons` / `setIcons` 也落在 store：外壳在**挂载时**（与是否打开设置无关）
+     *     就预取这三张图标表，该预取 `$effect` 留在外壳以保持预取时序；若把状态留在本组件，
      *     TabPanel 的 `{#key active}` 会让每次切回归档 tab 都重新预取一次，属行为变化。
      *   - `charIconMap` 只是全局 store `$lib/calc/timeline.store.svelte` 的 $derived 视图（非自有状态），随本组件留下。
-     *   - `handleArchiveDelete` 在搬迁前就**已无人调用**（死代码）：归档专属，故原样带走，未删除、未改写。
+     *   - `handleArchiveDelete` 无调用方（死代码）：归档专属，保留原样。
      */
     import Icon from '@iconify/svelte'
     import SectionTitle from '$lib/components/ui/section-title.svelte'

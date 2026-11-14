@@ -49,9 +49,8 @@ export const MAX_TOOL_ROUNDS = 48
  *
  * 其余分段（人设 / 被动技能正文 / 主动技能清单 / 当前状态 / 变化队列）每轮都由
  * `buildTurnSegments()` 按当前设置重新注入，因此**不能**随历史一起带走 ——
- * 否则它们会在历史上逐轮堆积、重复注入。这也正是 `onMessages` 契约里
- * 「回传本次完整消息序列（不含 system）」的要求（原实现只 `slice(1)` 丢掉 persona，
- * 留下另外四个 system 段，实测会造成 prompt token 逐轮虚涨）。
+ * 否则它们会在历史里逐轮堆积、重复注入。`onMessages` 契约要求的「回传本次完整消息序列（不含 system）」
+ * 指的就是只带这两段：只 `slice(1)` 会丢掉 persona，却把另外四个 system 段留下，prompt token 逐轮虚涨。
  */
 const PERSISTED_SEGMENT_IDS: readonly TurnSegmentId[] = ['history', 'user']
 
@@ -252,8 +251,8 @@ async function runResponsesRound(
                 emit({ type: 'tool', toolName: 'web_search', toolArgs: query ? { query } : {}, seq: searchSeq })
             } else if (searchIndex >= 0) {
                 endToolCall(searchIndex, true, '服务端检索完成')
-                // 必须发一条**同 seq 的结束事件**：原实现只更新实时状态、不发结果事件，
-                // 于是这张卡永远停在「执行中…」，并把后续所有工具的结果配对顶偏
+                // 必须发一条**同 seq 的结束事件**：只更新实时状态而不发结果事件时，
+                // 这张卡会永远停在「执行中…」，并把后续所有工具的结果配对顶偏
                 emit({ type: 'tool', toolName: 'web_search', seq: searchSeq, done: true })
                 searchIndex = -1
                 searchSeq = -1
@@ -405,7 +404,7 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
     let truncated = false
     /** @desc 是否正常收尾（工具轮次耗尽时仍为 `false`，需要向用户报告而不是假装完成） */
     let finished = false
-    /** @desc 兜底：配置缺字段（老数据 / 手工构造）时不让循环次数变成 0 */
+    /** @desc 兜底：配置缺字段（存量数据 / 手工构造）时不让循环次数变成 0 */
     const maxRounds = cfg.maxToolRounds || MAX_TOOL_ROUNDS
     /** @desc 长任务模式因轮次预算耗尽而停止（需要在收尾时明确告诉用户） */
     let longTaskHitLimit = false
@@ -521,7 +520,7 @@ export async function runAiTurn(options: RunTurnOptions): Promise<RunTurnResult>
                 text = result.content
             }
             if (continueLongTask(round, result.content ?? '')) continue
-            // 最终回复也写进历史：下一轮模型才知道自己上一轮回答了什么（原来只回传工具往返）
+            // 最终回复也写进历史：下一轮模型才知道自己上一轮回答了什么（只回传工具往返则丢掉这段）
             if (result.content?.trim()) messages.push({ role: 'assistant', content: result.content })
             finished = true
             break

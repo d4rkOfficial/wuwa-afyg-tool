@@ -146,9 +146,9 @@ describe('引擎：已勾选的 buff 遇到不匹配的伤害条目时不得生�
         )
     })
 
-    it('Buff 级规则（伤害名全等）按条目 displayName 判定', () => {
-        const matched = buff([ZONE], [{ kind: 'damageNameEquals', value: '测试伤害' }])
-        const mismatched = buff([ZONE], [{ kind: 'damageNameEquals', value: '别的伤害' }])
+    it('Buff 级规则（伤害名锚定正则）按条目 displayName 判定', () => {
+        const matched = buff([ZONE], [{ kind: 'damageNameRegex', pattern: '^测试伤害$' }])
+        const mismatched = buff([ZONE], [{ kind: 'damageNameRegex', pattern: '^别的伤害$' }])
         assert.ok(damageWith(['共鸣技能伤害'], [matched]) > damageWith(['共鸣技能伤害'], []), '显示名一致时应生效')
         assert.equal(
             damageWith(['共鸣技能伤害'], [mismatched]),

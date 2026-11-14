@@ -85,7 +85,7 @@
 
     /** @desc 左栏实测高度：右栏（Buff）按它定高并内部滚动，两栏底边对齐 */
     let leftHeight = $state(0)
-    /** @desc 两栏是否并排（= 布局的 xl 断点）：堆叠时右栏不再固定高度 */
+    /** @desc 两栏是否并排（= 布局的 xl 断点）：堆叠时右栏不固定高度 */
     let sideBySide = $state(false)
 
     onMount(() => {

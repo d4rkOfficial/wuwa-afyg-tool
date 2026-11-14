@@ -1,7 +1,7 @@
 // 触发套装选择的件数预算回归。
 //
 // 症状（用户报告）：在套装里**先选 3 件套、再点 5 件套**，件数会变成 3 + 5 = 8（picker 底部显示 `8/5`）——
-// 5 件套占满全部 5 个部位，本就必须替换掉先前选择，但旧实现只做 `[...selected, {5}, {2}]`。
+// 5 件套占满全部 5 个部位，本就必须替换掉先前选择；只做 `[...selected, {5}, {2}]` 的追加会得到 8。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -51,7 +51,7 @@ describe('件数切换不能超预算（回归：先 3 件套再 5 件套）', (
         assert.equal(totalPiecesOf(after), 5)
     })
 
-    it('已选套装内部换档：5 → 3 会释放部位（其它套装此前已被它替换掉）', () => {
+    it('已选套装内部换档：5 → 3 会释放部位（其它套装已被 5 件套替换掉）', () => {
         const five = fivePieceSelection('A')
         const three = togglePieceSelection(five, 'A', 3)
         assert.deepEqual(three, sel(['A', 3]))

@@ -192,7 +192,7 @@
 {/snippet}
 
 <!-- Ref Line Context Menu -->
-<!-- @desc 退场动效（本文件 4 个右键菜单）：原先只有进场 animate-pop-in，关闭是瞬间擦除。
+<!-- @desc 退场动效（本文件 4 个右键菜单）：进场由 animate-pop-in 负责，关闭若不加 `out:` 就是瞬间擦除。
      这 4 个面板是各自 `{#if <store>}` 的**根节点**且自身带进场 keyframes，外面没有任何可挂过渡的
      非 animate-* 包裹层，故只能把 **`out:` 单向**过渡挂在同一节点上：进场仍由 animate-pop-in 负责，
      不存在双重进场；关闭途中 CSS 级联里过渡优先级高于动画，仍在跑的 keyframes 也不会盖掉退场。

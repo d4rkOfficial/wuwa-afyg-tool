@@ -143,7 +143,7 @@ const customHitView = (hit: CustomHit) => ({
 })
 
 // 解析位置参数：{pos: 排轴坐标} 绝对位置，或 {anchor: 块短索引, side?: before/after, offset?: 坐标偏移} 相对块。
-// 排轴统一用 pos 定位（像素坐标，与摘要里的 pos 同一坐标系、与秒数无关）；旧的 {time: 秒} 已废除。
+// 排轴统一用 pos 定位（像素坐标，与摘要里的 pos 同一坐标系、与秒数无关）；`{time: 秒}` 不受支持。
 const resolvePosition = (position: Record<string, unknown>): number =>
     parsePositionArgs(position, {
         maxPos: getMaxPos(),
@@ -222,8 +222,8 @@ defineTool('get_timeline_summary', {
             // 跨工程**只读**：直接读持久化工程数据，不切活动工程，也不动全局排轴 store
             const project = getProjects().find((p) => p.id === projectId)
             if (!project) throw new Error(`未找到工程：${projectId}`)
-            // 注意：跨工程读取直读持久化数据，**绕过** `timeline.store` 的读盘垫片（旧工程把名字存在
-            // `time`、位置存成数字秒）。极旧的工程若从未被激活过，这里的 `pos` / `name` 可能缺失 ——
+            // 注意：跨工程读取直读持久化数据，**绕过** `timeline.store` 的读盘垫片（既有工程把名字存在
+            // `time`、位置存成数字秒）。从未被激活过的工程里 `pos` / `name` 可能缺失 ——
             // 已确认可接受，不做修复：激活一次即会被归一化并落盘。
             const data = project.encounter.timeline.data ?? { opBlocks: [], refLines: [], damageBlocks: [] }
             return {
@@ -571,7 +571,7 @@ defineTool('update_custom_hit', {
 
 defineTool('remove_custom_hit', {
     description:
-        '删除一条自定义倍率（按角色 + 倍率名定位）。已经绑定到操作块的同名命中不会自动解除绑定，删除前请确认不再需要。',
+        '删除一条自定义倍率（按角色 + 倍率名定位）。已经绑定到操作块的同名命中不会自动解除绑定，删除前请确认该倍率的绑定与用途均已处理。',
     dangerous: true,
     parameters: {
         type: 'object',
@@ -773,7 +773,10 @@ defineTool('update_damage_hit', {
             targetType: { type: 'string', enum: ['block', 'refLine'], description: '目标类型（默认 block）' },
             block: { type: 'string', description: '目标短索引（操作块或参考线，取值见 get_timeline_summary）' },
             hit: { type: 'string', description: '该条命中的 hitKey（见 get_damage_bindings）' },
-            ratio: { type: 'string', description: '新的倍率串（如 "120%" / "80%攻击+20%生命"）；基础类型须与原来一致' },
+            ratio: {
+                type: 'string',
+                description: '新的倍率串（如 "120%" / "80%攻击+20%生命"）；基础类型须与该命中的基础类型一致'
+            },
             element: {
                 type: 'string',
                 enum: ['物理', '冷凝', '热熔', '导电', '气动', '衍射', '湮灭'],
@@ -1241,7 +1244,7 @@ defineTool('enable_ref_line_timing', {
 
 defineTool('disable_ref_line_timing', {
     description:
-        '禁用某条参考线的时间记点（按**短索引**，从 timings 移除，不再参与 DPS 分段）。若该参考线未启用则幂等返回。',
+        '禁用某条参考线的时间记点（按**短索引**，从 timings 移除，并从 DPS 分段中排除）。若该参考线未启用则幂等返回。',
     parameters: {
         type: 'object',
         properties: { line: { type: 'string', description: '参考线短索引' } },

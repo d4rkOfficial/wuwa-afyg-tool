@@ -1,9 +1,9 @@
 <script lang="ts">
     /**
-     * @desc 数据分析 → 时间记点 + 分段 DPS（Phase 5.3：自 `data-analysis-modal.svelte` 原样抽出，标记与行为未改）。
+     * @desc 数据分析 → 时间记点 + 分段 DPS。
      *
      * 时间记点状态 `timings` 由外壳持有（标题栏/对比弹窗都要写回），本组件只渲染 + 回调；
-     * `selectedRange` / `timingOpen` 是纯视图状态，用 `$bindable` 双向绑定以保持标记逐字不变。
+     * `selectedRange` / `timingOpen` 是纯视图状态，用 `$bindable` 双向绑定。
      * 表头与表体的「角色列 × 效应列」两组 `{#each}` 各收敛为一个 snippet（`<th>` 与 `<td>` 内容不同，无法共用一个）。
      */
     import Icon from '@iconify/svelte'
@@ -84,7 +84,7 @@
         },
         {
             name: '单调追加',
-            description: '绝对时间早于上一记点 → 自动改为追加',
+            description: '绝对时间早于上一记点 → 自动按追加处理',
             content: '绝对时间若早于上一记点，自动按追加处理：时间 = 上一记点 + 片段值，保证各记点时间单调递增。'
         },
         {

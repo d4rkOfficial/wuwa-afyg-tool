@@ -1,10 +1,10 @@
 <script lang="ts">
     /**
      * @desc 设置行：左侧标签(+提示)、右侧控件的横向布局，自带分隔线与输入底色。
-     * 原先 `settings-modal.svelte` 里手写了 12 份相同的
+     * 基类即
      * `<div class="flex items-center justify-between gap-3 rounded-none border px-3 py-2">`，
-     * 且各自重复内联 `border-color` / `background` 两条样式。
-     * 需要额外上边距的实例用 `class="mt-2"` 传入（原文件 5 处）。
+     * 分隔线与底色由本组件统一发射（调用点无需各自内联 `border-color` / `background`）。
+     * 需要额外上边距的实例用 `class="mt-2"` 传入。
      *
      * `sf-radius`：让这一行的直角跟随「设置-外观主题-圆角」的统一圆角（规则见 `layout.css` 的未分层段）。
      */

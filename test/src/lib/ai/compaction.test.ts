@@ -108,8 +108,7 @@ test('applyCompaction：新历史 = 摘要消息 + 原样保留的最近消息',
 
 test('applyCompaction：真实规模的历史下确实变小', () => {
     // 真实历史里助手消息与工具返回都远长于摘要，用大段正文才不会让摘要前缀的固定开销盖过收益
-    const big = (n: number) =>
-        `第 ${n} 轮正文：${'这是一段足够长的工具返回内容，用来模拟真实历史上的规模。'.repeat(12)}`
+    const big = (n: number) => `第 ${n} 轮正文：${'这是一段足够长的工具返回内容，用来模拟真实会话的规模。'.repeat(12)}`
     const messages: ChatMessage[] = []
     for (let i = 1; i <= 6; i++) messages.push(m('user', big(i)), m('assistant', big(i)), m('tool', big(i)))
     const plan = planCompaction(messages, 3)

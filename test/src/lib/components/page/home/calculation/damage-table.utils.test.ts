@@ -5,7 +5,7 @@
 //    拉表的可用性判定（`buffUsableByEntry`，铺开表与下拉表共用）必须同步挡住，否则是「勾得上、数值毫无变化」的假可勾。
 //
 // ② 「非直伤条目的乘区条件必须带条目上下文」——
-//    曾经对非直伤条目传空上下文（`{}`），于是一律触发 `evaluateCondition` 的「需要条目上下文的子句视为不满足」，
+//    非直伤条目也要带条目上下文：传空上下文（`{}`）会一律触发 `evaluateCondition` 的「需要条目上下文的子句视为不满足」，
 //    把带属性/类型条件的乘区全判成不匹配。实测症状：效应条目上带「导电/效应」条件的加深 buff 挂不上，
 //    但引擎其实吃它。此处钉住「拉表条件过滤 == 引擎贡献判定」这条不变式。
 import { describe, it } from 'node:test'
@@ -142,7 +142,7 @@ describe('非直伤条目的可用性门槛：其余乘区口径不变', () => {
     })
 })
 
-describe('非直伤条目也要带条目上下文判乘区条件（含属性/类型条件的 buff 不再被误藏）', () => {
+describe('非直伤条目也要带条目上下文判乘区条件（含属性/类型条件的 buff 不被误藏）', () => {
     /** @desc 用户实例：武器 1 阶 + 乘区「加深(条件 导电/效应)」的 buff 挂不上电磁效应 */
     const weaponGate: BuffRule[] = [{ kind: 'refinement', charIdx: 0, min: 1 }]
     const conductiveEffectEntry: DamageEntry = {

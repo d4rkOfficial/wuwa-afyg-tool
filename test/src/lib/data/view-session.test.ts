@@ -53,7 +53,7 @@ describe('view-session：按「工程 + 视图」记住页签与滚动位置', (
         assert.equal(readSessionScroll('p1', 'config', 'char2'), null)
     })
 
-    it('挂载时恢复位置，滚动时记录，解绑后不再记录', () => {
+    it('挂载时恢复位置，滚动时记录，解绑后停止记录', () => {
         // 恢复在下一帧写：测试里把 rAF 折成立即执行
         const originalRaf = globalThis.requestAnimationFrame
         globalThis.requestAnimationFrame = ((fn: FrameRequestCallback) => {
@@ -75,7 +75,7 @@ describe('view-session：按「工程 + 视图」记住页签与滚动位置', (
             detach()
             el.scrollLeft = 1
             el.emitScroll()
-            assert.deepEqual(readSessionScroll('p1', 'timeline', 'timeline'), { top: 12, left: 900 }, '解绑后不再记录')
+            assert.deepEqual(readSessionScroll('p1', 'timeline', 'timeline'), { top: 12, left: 900 }, '解绑后停止记录')
         } finally {
             globalThis.requestAnimationFrame = originalRaf
         }

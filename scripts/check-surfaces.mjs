@@ -102,7 +102,7 @@ if (bad === 0) console.log('  ✓ 组件命名空间三处一致')
 // ── SURFACE_GROUPS 提示文案 ↔ AI 工具描述：必须同步 ──
 // settings.ts 的 set_setting.description 内联了各区域含义（不能拼接：generate-tools-doc.mjs
 // 的 pickString 只取第一个字符串字面量，拼接会让 docs/tools.md 被静默截断）。
-// 故改为断言：每个 SURFACE_GROUPS[*].hint 都必须原样出现在 settings.ts 里。
+// 故断言：每个 SURFACE_GROUPS[*].hint 都必须原样出现在 settings.ts 里。
 const settingsSrc = readFileSync('src/lib/ai/tools/settings.ts', 'utf8')
 const hints = [...typesSrc.matchAll(/hint:\s*'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1])
 const missingHints = hints.filter((h) => !settingsSrc.includes(h))

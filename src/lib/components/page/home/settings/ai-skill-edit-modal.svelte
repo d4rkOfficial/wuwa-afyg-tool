@@ -27,10 +27,9 @@
     const MODE_OPTIONS: SkillMode[] = ['active', 'passive']
 
     /**
-     * @desc 类型 / 启用两个控件（T15：原来是手搓分段按钮组 + 手搓 toggle-switch 图标按钮）统一成
-     * `ui/tabs` 的文字 tab。`类型` 与列表行的「技能启用」是同一个 toggle 概念，都用同一实现。
-     * `w-32` 让轨道定宽 → 两段必然等分，滑动指示块无需测量即可对齐（见 `ui/tabs` 顶部注释）。
-     * 轨道宽度取设置内统一的 `ROW_TABS`（`./utils`），原先这里是 `w-32`、列表行是 `w-28`。
+     * @desc 类型 / 启用两个控件都是 `ui/tabs` 的文字 tab，与列表行的「技能启用」共用一个 toggle 概念。
+     * 轨道定宽（取设置内统一的 `ROW_TABS`，见 `./utils`）→ 两段必然等分，滑动指示块无需测量即可对齐
+     * （见 `ui/tabs` 顶部注释）。
      */
     const MODE_TABS = MODE_OPTIONS.map((mode) => ({
         value: mode,

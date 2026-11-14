@@ -30,7 +30,7 @@ function isValidShortcut(physical: string): boolean {
     return physical === ' ' || /^[a-z]$/.test(physical)
 }
 
-/** @desc 旧版「重击与普攻共用左键图标」：存量数据里的旧默认值迁到独立的重击图标，用户自定义值保持不变 */
+/** @desc 存量数据里 `heavypress` 的默认值（= 与普攻共用左键图标）迁到独立的重击图标，用户自定义值保持不变 */
 const LEGACY_BLOCK_KEYS: Record<string, string> = {
     heavypress: 'MouseLeft'
 }

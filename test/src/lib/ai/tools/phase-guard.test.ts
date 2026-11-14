@@ -22,7 +22,7 @@ test('环节锁定时写工具返回可读错误（不会静默成功）', async
     }
 })
 
-test('解锁后同一写工具不再被锁定守卫拦截', async () => {
+test('解锁后同一写工具不被锁定守卫拦截', async () => {
     const project = createProjectData('解锁测试工程')
     project.encounter.calculation.locked = false
     __seedProjectsForTest([project], project.id)

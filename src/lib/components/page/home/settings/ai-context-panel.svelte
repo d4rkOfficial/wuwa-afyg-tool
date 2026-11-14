@@ -102,7 +102,7 @@
      *  时长与减弱动态效果一律交给 `$lib/utils/motion.ts` 的 `slideParams`：
      *  `layout.css` 的 `prefers-reduced-motion` 只管 CSS 动画，管不到 JS 过渡，
      *  `slideParams` 内部已把 reduce 下的时长压到 1ms（保留过渡钩子，避免结构分支变化），
-     *  故本组件不再自行订阅 `matchMedia`（原第 19 处实质硬编码时长已消除）。
+     *  故本组件不自行订阅 `matchMedia`（时长全部经 `slideParams` 走 token）。
      *  档位取 `MOTION_MS.base`（180ms）：`layout.css` 对该 token 的用途注释即「展开 / 收起」。
      */
 </script>

@@ -61,8 +61,8 @@ export async function loadSkills(): Promise<void> {
     if (!browser || _loaded) return
     const stored = await dbGet<AiSkill[]>(SKILLS_KEY)
     const saved = Array.isArray(stored?.data) ? stored.data.filter((s) => s && typeof s.name === 'string') : []
-    // 旧数据兼容：缺 mode 字段 → 按主动处理（mergeBuiltinSkills → normalizeSkill → coerceSkillMode）
-    // 一次性迁移：旧版「提示词设置」里的命名规则 / 黑话词典 → 对应内置技能卡的正文覆盖
+    // 缺 mode 字段 → 按主动处理（mergeBuiltinSkills → normalizeSkill → coerceSkillMode）
+    // 一次性迁移：ai-prefs 里的命名规则 / 黑话词典 → 对应内置技能卡的正文覆盖
     await loadGenPrefs()
     const legacy = legacyPrefsToSkillOverrides(getGenPrefs()).filter((o) => !saved.some((s) => s.id === o.id))
     _skills = mergeBuiltinSkills([...saved, ...legacy])
@@ -141,7 +141,7 @@ export async function toggleSkillEnabled(id: string): Promise<void> {
     await persist()
 }
 
-/** @desc 导入技能（同名跳过），返回新增数量；旧格式缺 mode 时按主动导入 */
+/** @desc 导入技能（同名跳过），返回新增数量；缺 mode 时按主动导入 */
 export async function importSkills(list: Partial<AiSkill>[]): Promise<number> {
     const fresh: AiSkill[] = []
     for (const item of list) {

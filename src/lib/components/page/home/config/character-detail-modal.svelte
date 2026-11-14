@@ -105,7 +105,7 @@
     const savedChain = $derived(conditionProfile.chains[activeTab] ?? 0)
     const savedRefine = $derived(conditionProfile.refinements[activeTab] ?? 1)
 
-    /** @desc 链/阶分段清单（`value` 为档位字符串，语义与改造前逐字一致：链 0-6 / 阶 0-5，0 阶显示「无专」） */
+    /** @desc 链/阶分段清单（`value` 为档位字符串：链 0-6 / 阶 0-5，0 阶显示「无专」） */
     const chainItems = [0, 1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `${n}链` }))
     const refineItems = [0, 1, 2, 3, 4, 5].map((n) => ({
         value: String(n),
@@ -336,7 +336,7 @@
                · `无专` = 两个汉字 = 28.0px；`1阶`…`5阶` = 23.05px
                · 只传 `w-fit`：轨道被等分后每段内容盒 = 293.234/6 − 24 = 24.87px < 28px → `无专` 折行
                · 只传 `w-fit whitespace-nowrap`：不折行了，但宽标签的 `min-width:auto` 变成 max-content（52px），
-                 `flex:1 1 0%` 分不到份额就**不再收缩** → 各段**不再等宽**（52 vs 47），指示块又对不齐（实测左差 4.14px）
+                 `flex:1 1 0%` 分不到份额就**不收缩** → 各段**不等宽**（52 vs 47），指示块又对不齐（实测左差 4.14px）
                · 只给定宽：`min-width:auto` 仍按「一个字」算，标签照折（`w-[340px]` 下链组 0链…6链 全部折 2 行）
              故「等宽 + 不折行 + 指示块对齐」要求**每段内容盒 ≥ 最宽标签**，即
                `车道内宽 / N ≥ 最宽标签 + 左右内边距` → `W − 4px ≥ N × (28 + 24)`

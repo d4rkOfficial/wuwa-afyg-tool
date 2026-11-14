@@ -18,7 +18,7 @@ test('raceWithAbort：signal 触发后立刻返回中止值，**不等那个永�
     assert.equal(await promise, ABORTED_TOOL_OUTPUT)
 })
 
-test('raceWithAbort：进入时 signal 已 abort，不再启动等待', async () => {
+test('raceWithAbort：进入时 signal 已 abort，不启动等待', async () => {
     const controller = new AbortController()
     controller.abort()
     assert.equal(await raceWithAbort(Promise.resolve('too late'), controller.signal, () => 'aborted'), 'aborted')

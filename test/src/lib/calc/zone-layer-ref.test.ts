@@ -198,11 +198,11 @@ const fixedBuff = (id: string, value: number, slots: number[]): BuffInstance =>
     ({ id, name: `定值-${id}`, scope: slots, zones: [{ zoneId: 'specialFinal1', value }] }) as unknown as BuffInstance
 
 describe('层数作为引用来源：按角色读取、互不串味', () => {
-    it('引用来源清单里有同奏增益层数，没有集谐干涉层数、也没有已移除的自定义层数', () => {
+    it('引用来源清单里有同奏增益层数，没有集谐干涉层数、也没有自定义层数', () => {
         assert.ok(ZONE_REF_MAP.has('unisonBoonLayer'), '同奏增益层数应可作为引用来源')
         assert.equal(ZONE_REF_MAP.has('tuneStrainLayer'), false, '集谐干涉层数不属于角色，不作为引用来源')
         for (const id of ['customLayer1', 'customLayer2', 'customLayer3']) {
-            assert.equal(ZONE_REF_MAP.has(id), false, `${id} 已移除，不应再是引用来源`)
+            assert.equal(ZONE_REF_MAP.has(id), false, `${id} 不是引用来源`)
         }
         assert.equal(ZONE_REF_DEFS.length, new Set(ZONE_REF_DEFS.map((d) => d.id)).size, '引用来源 id 不能重复')
     })

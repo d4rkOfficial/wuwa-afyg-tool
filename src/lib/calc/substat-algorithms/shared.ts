@@ -51,7 +51,7 @@ export interface RecomputeOverrides {
  * @desc 单个角色的分析上下文。
  *
  * `index` 是**队伍槽位下标**（不是过滤掉空位后的序号）：`configState.characters` 与 `team` 都按槽位索引，
- * 旧实现用过滤后的序号取声骸，空槽位存在时会读错角色的声骸。
+ * 用过滤后的序号取声骸会在空槽位存在时读错角色的声骸。
  */
 export interface CharacterDamageContext {
     index: number
@@ -87,7 +87,7 @@ export const diffTotals = (a: DamageTotals, b: DamageTotals): DamageTotals => ({
 
 /**
  * @desc 单条伤害的「当前配置」值：与结果页 `applyModes` 同序（未命中 > 凹暴 > 不暴 > 期望）。
- * 贡献分析只看这一个口径，不再分别展示凹暴 / 不暴两列。
+ * 贡献分析只看这一个口径，不分别展示凹暴 / 不暴两列。
  */
 const actualOf = (entry: ResultEntry, inputs: AnalysisInputs): number =>
     inputs.missEntryIds.has(entry.id)

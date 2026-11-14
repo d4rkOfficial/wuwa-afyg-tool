@@ -1,10 +1,9 @@
 <script lang="ts">
     /**
      * @desc 设置项的标签(+可选提示)：统一标签与提示的字号/字重/次要色。
-     * 原先 `settings-modal.svelte` 里手写了 18 份标签 span 与 10 份提示 span（合成 10 组）。
      *
      * 注：`class` / `style` 作用于**标签行**；提示行样式固定，不受其影响。
-     * `hint` 省略时只渲染标签行（原文件 8 处只有标签）。
+     * `hint` 省略时只渲染标签行。
      */
     import type { ComponentsProps } from '$lib/types'
     import { mergeClass } from '$lib/utils/component-style'
