@@ -1,0 +1,80 @@
+{
+    "buffSets": [
+        {
+            "id": "fixture-row-1",
+            "entity_type": "character",
+            "entity_name": "契约角色",
+            "buff_name": "契约文件夹\\联调效果",
+            "scope": "team",
+            "exclusive": false,
+            "condition": {
+                "chains": [
+                    {
+                        "charIdx": 0,
+                        "min": 3
+                    }
+                ],
+                "refinements": [
+                    {
+                        "charIdx": 0,
+                        "min": 2
+                    }
+                ],
+                "rules": [
+                    {
+                        "kind": "damageNameRegex",
+                        "pattern": "共鸣解放|处决"
+                    },
+                    {
+                        "kind": "zoneCompare",
+                        "charIdx": -1,
+                        "zone": "critRate",
+                        "op": "ge",
+                        "value": 60
+                    },
+                    {
+                        "kind": "enemyType",
+                        "types": ["BOSS", "精英怪"]
+                    }
+                ]
+            },
+            "buff_set": [
+                {
+                    "zoneId": "bonusDmg",
+                    "value": 15,
+                    "condition": {
+                        "damageTypes": ["共鸣解放伤害"]
+                    }
+                },
+                {
+                    "zoneId": "extraRatio",
+                    "value": 0,
+                    "ref": {
+                        "targetZoneId": "totalAtk",
+                        "pct": 50,
+                        "refOwner": "active"
+                    }
+                },
+                {
+                    "zoneId": "critRate",
+                    "value": 0,
+                    "ref": {
+                        "targetZoneId": "baseAtk",
+                        "pct": 10,
+                        "refOwner": "owner"
+                    }
+                }
+            ]
+        }
+    ],
+    "folders": [
+        {
+            "id": "fixture-folder-1",
+            "entity_type": "character",
+            "entity_name": "契约角色",
+            "name": "契约文件夹",
+            "sort_order": 0
+        }
+    ],
+    "total": 1
+}
