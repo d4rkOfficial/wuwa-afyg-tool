@@ -108,12 +108,21 @@ let _updateInFlight = false
 /** @desc 表格快照（撤销/重做只覆盖这些数据；条目由时间线派生，不纳入历史） */
 const tableSnapshot = (): CalcState => getCalcState()
 
+/** @desc 撤销基线的 JSON 指纹：只随基线变化重算，避免每次 `markTableDirty` 都整份 stringify 基线 */
+let _historyBaseJson = ''
+
+/** @desc 落撤销基线（同时缓存它的 JSON 指纹，见 `markTableDirty` 的差异判定） */
+const setHistoryBase = (snap: CalcState | null): void => {
+    _historyBase = snap
+    _historyBaseJson = snap === null ? '' : JSON.stringify(snap)
+}
+
 /** @desc 标记表格已变更：微任务合并后压入撤销栈（与基线无差异时忽略） */
 export function markTableDirty(): void {
     // 基线兜底：`markTableDirty()` 必须在写操作**之前**调用（各 mutation 均遵守），
     // 因此此刻的快照就是「变更前状态」。若基线尚未建立（例如本会话还没有任何 init 落基线），
     // 这里同步补种基线 —— 保证第一次修改也能撤销（微任务里的基线会晚于本 tick 内的同步写操作）。
-    if (_historyBase === null) _historyBase = tableSnapshot()
+    if (_historyBase === null) setHistoryBase(tableSnapshot())
     _historyDirty = true
     if (_historyScheduled) return
     _historyScheduled = true
@@ -122,13 +131,13 @@ export function markTableDirty(): void {
         if (!_historyDirty) return
         _historyDirty = false
         const snap = tableSnapshot()
-        if (_historyBase && JSON.stringify(_historyBase) === JSON.stringify(snap)) return
+        if (_historyBase && _historyBaseJson === JSON.stringify(snap)) return
         if (_historyBase) {
             _undoStack = [..._undoStack, _historyBase]
             if (_undoStack.length > MAX_TABLE_HISTORY) _undoStack = _undoStack.slice(1)
             _redoStack = []
         }
-        _historyBase = snap
+        setHistoryBase(snap)
         _historyVersion++
     })
 }
@@ -163,7 +172,7 @@ export function undoTable(): boolean {
     }
     _undoStack = _undoStack.slice(0, -1)
     _redoStack = [..._redoStack, tableSnapshot()]
-    _historyBase = prev
+    setHistoryBase(prev)
     applyTableSnapshot(prev)
     _historyVersion++
     return true
@@ -179,7 +188,7 @@ export function redoTable(): boolean {
     }
     _redoStack = _redoStack.slice(0, -1)
     _undoStack = [..._undoStack, tableSnapshot()]
-    _historyBase = next
+    setHistoryBase(next)
     applyTableSnapshot(next)
     _historyVersion++
     return true
@@ -210,7 +219,7 @@ export function canRedoTable(): boolean {
 export function resetTableHistory(): void {
     _undoStack = []
     _redoStack = []
-    _historyBase = null
+    setHistoryBase(null)
     _historyDirty = false
     _historyVersion++
 }
@@ -343,7 +352,7 @@ export function init(
         // 随后立刻落一次基线 —— 让「第一次修改」也能被撤销
         // （markTableDirty 在没有基线时只建立基线不压栈）。
         resetTableHistory()
-        _historyBase = tableSnapshot()
+        setHistoryBase(tableSnapshot())
     }
     const pruned = pruneOrphanedBindings()
     if (pruned) {
@@ -1358,6 +1367,7 @@ export function setBuffSetIdsForEntry(entryId: string, setIds: string[]): boolea
     if (!assertUnlocked()) return false
     markTableDirty()
     _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: [...new Set(setIds)] }
+    notifySelfUpdate()
     return true
 }
 
@@ -1371,6 +1381,7 @@ export function setBuffSetIdsForEntries(map: Record<string, string[]>): boolean 
     }
     markTableDirty()
     _damageEntryBuffSetIds = next
+    notifySelfUpdate()
     return true
 }
 
@@ -1384,6 +1395,7 @@ export function toggleBuffSetForEntry(entryId: string, setId: string) {
     } else {
         _damageEntryBuffSetIds = { ..._damageEntryBuffSetIds, [entryId]: [...current, setId] }
     }
+    notifySelfUpdate()
 }
 
 /** @desc ── 条目伤害类型（视为某类伤害）── */
@@ -1837,13 +1849,23 @@ export function getCalcState(): CalcState {
     )
 }
 
+/**
+ * @desc 通知宿主持久化当前计算态（写操作**自身**触发时用）。
+ *
+ * `_updateInFlight` 是「这次回写是我自己造成的」的声明：宿主把状态作为 savedState 传回
+ * `init()` 时按自证回写处理（见 `init()` 开头的分支），跳过全量重载。
+ * 少了这一步，一次勾选就会重建条目 / 列序 / 整表结构，拉表点击会明显发涩。
+ */
+function notifySelfUpdate(): void {
+    if (!_onupdate) return
+    _updateInFlight = true
+    _onupdate(getCalcState())
+}
+
 /** @desc 通知宿主持久化当前计算态（AI 工具修改后调用） */
 export function notifyCalcUpdate() {
     markTableDirty()
-    if (_onupdate) {
-        _updateInFlight = true
-        _onupdate(getCalcState())
-    }
+    notifySelfUpdate()
 }
 
 /**

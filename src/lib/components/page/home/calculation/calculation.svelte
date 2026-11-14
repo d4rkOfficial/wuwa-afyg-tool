@@ -89,22 +89,19 @@
         })
     }
 
-    /** @desc 平铺表：切换某条目↔某 Buff 的绑定后持久化 */
+    /** @desc 平铺表：切换某条目↔某 Buff 的绑定（store 写入后自行通知宿主持久化） */
     function handleSpreadToggle(entryId: string, buffId: string) {
         toggleBuffSetForEntry(entryId, buffId)
-        onupdate(getCalcState())
     }
 
-    /** @desc 平铺表：批量覆写某条目绑定的 Buff 集合（框选/行列头三态用）后持久化 */
+    /** @desc 平铺表：批量覆写某条目绑定的 Buff 集合（框选/行列头三态用；store 写入后自行通知宿主持久化） */
     function handleSpreadSetEntryBuffSetIds(entryId: string, ids: string[]) {
         setBuffSetIdsForEntry(entryId, ids)
-        onupdate(getCalcState())
     }
 
-    /** @desc 平铺表：批量覆写多条目的 Buff 绑定（框选批量用，单次持久化） */
+    /** @desc 平铺表：批量覆写多条目的 Buff 绑定（框选批量用，单次通知） */
     function handleSpreadSetEntriesBuffSetIds(entries: Record<string, string[]>) {
-        if (!setBuffSetIdsForEntries(entries)) return
-        onupdate(getCalcState())
+        setBuffSetIdsForEntries(entries)
     }
 </script>
 

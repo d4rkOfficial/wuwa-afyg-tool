@@ -335,43 +335,54 @@
      * 所以只在**渲染时**按可见格现算，不写进表结构；开启「隐藏不达门槛列」时才在构建期参与选列。
      *
      * 判定器按条目装配一次（`createEntryRuleMatcher`）再逐 Buff 调用：一条行有上百列，逐格重建面板会把整表拖垮。
+     * 缓存按**该条目的绑定数组引用**失效（与 `paneSourcesOf` 同一套键设计）：勾选一次只有那一条的绑定数组换新，
+     * 其余行直接命中；否则一次勾选会把全部 matcher 重装（实测 C 档 5.4ms）。
      */
-    /** @desc 门槛判定上下文（依赖勾选）：`$derived` 引用比较，渲染热路径 O(1) */
+    /** @desc 门槛判定上下文（与勾选无关的那部分）：`$derived` 引用比较，整体作废用 */
     const rulesCtx = $derived({
         profile: conditionProfile,
         deps: engineDeps,
-        bindings: entryBuffSetIdMap,
         buffs: buffSets,
         entries: damageEntries
     })
-    let _rulesCache = new Map<string, boolean>()
+    interface EntryRules {
+        /** @desc 该条目当前的绑定数组（引用即版本号，换新即整条失效） */
+        bound: readonly string[]
+        matcher: (buff: BuffConf) => boolean
+    }
+    let _rulesByEntry = new Map<string, EntryRules>()
+    let _rulesMet = new Map<string, Map<string, boolean>>()
     let _rulesCtxRef: typeof rulesCtx | null = null
-    let _matchers = new Map<string, (buff: BuffConf) => boolean>()
 
     function rulesMetOf(bs: BuffConf, entry: DamageEntry): boolean {
         if ((bs.rules?.length ?? 0) === 0) return true
         if (_rulesCtxRef !== rulesCtx) {
             _rulesCtxRef = rulesCtx
-            _rulesCache.clear()
-            _matchers = new Map()
+            _rulesByEntry = new Map()
+            _rulesMet = new Map()
         }
-        const key = entry.id + '\u0000' + bs.id
-        const cached = _rulesCache.get(key)
+        const perEntry = _rulesMet.get(entry.id)
+        const cached = perEntry?.get(bs.id)
         if (cached !== undefined) return cached
-        let matcher = _matchers.get(entry.id)
-        if (!matcher) {
-            const boundIds = new Set(entryBuffSetIdMap[entry.id] ?? [])
-            const bound = buffSets.filter((buff) => boundIds.has(buff.id))
-            matcher = createEntryRuleMatcher({
-                entry,
-                boundBuffs: bound,
-                profile: conditionProfile,
-                deps: engineDeps
-            })
-            _matchers.set(entry.id, matcher)
+        const bound = entryBuffSetIdMap[entry.id] ?? EMPTY_IDS
+        let rules = _rulesByEntry.get(entry.id)
+        if (!rules || rules.bound !== bound) {
+            const boundIds = new Set(bound)
+            rules = {
+                bound,
+                matcher: createEntryRuleMatcher({
+                    entry,
+                    boundBuffs: buffSets.filter((buff) => boundIds.has(buff.id)),
+                    profile: conditionProfile,
+                    deps: engineDeps
+                })
+            }
+            _rulesByEntry.set(entry.id, rules)
         }
-        const met = matcher(bs)
-        _rulesCache.set(key, met)
+        const met = rules.matcher(bs)
+        const byBuff = _rulesMet.get(entry.id) ?? new Map<string, boolean>()
+        byBuff.set(bs.id, met)
+        _rulesMet.set(entry.id, byBuff)
         return met
     }
 
@@ -1001,14 +1012,16 @@
                     style="--sf-base: var(--theme-modal-bg); border-collapse: separate; border-spacing: 0; border-right: 1px solid var(--theme-divider-border); border-bottom: 1px solid var(--theme-divider-border); border-left: 1px solid var(--theme-divider-border);"
                 >
                     <!-- 标题块与全局 buff 折叠行放入 caption：宽度自动跟随表头（表格宽度） -->
-                    <caption class="text-left" data-sf="card" data-sf-flat style="--sf-base: var(--theme-modal-bg);">
-                        <div
-                            class="flex items-center gap-2 border-b border-(--theme-divider-border) px-3 py-2"
-                            style="background-image: linear-gradient(
-                            color-mix(in srgb, var(--theme-modal-text) 4%, transparent),
-                            color-mix(in srgb, var(--theme-modal-text) 4%, transparent)
-                        );"
-                        >
+                    <!-- 条带底纹与分隔线铺满表宽（strip 不动），里面的标题文字块单独 `sticky left-0`：
+                         横向滚动时标题不跟着跑掉。sticky 要有滑动余量 —— 文字块必须比 caption 窄
+                         （用 `w-max` 按内容自适应），否则和 caption 同宽会被顶住而失效（实测）。 -->
+                    <caption
+                        class="border-b border-(--theme-divider-border) text-left"
+                        data-sf="card"
+                        data-sf-flat
+                        style="--sf-base: var(--theme-modal-bg); box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--theme-modal-text) 4%, transparent);"
+                    >
+                        <div class="sticky left-0 z-10 flex w-max items-center gap-2 px-3 py-2">
                             <span
                                 class="text-sm font-black tracking-tight"
                                 style={charElement
@@ -1016,7 +1029,7 @@
                                     : 'color: var(--theme-modal-text);'}>{table.title}</span
                             >
                             <span class="text-xs text-(--theme-modal-text)/60">· {table.subtitle}</span>
-                            <span class="ml-auto text-[10px] text-(--theme-modal-text)/40">{table.rows.length} 条</span>
+                            <span class="text-[10px] text-(--theme-modal-text)/40">{table.rows.length} 条</span>
                         </div>
                     </caption>
                     <!-- 表头：顶级/中层文件夹按路径前缀 colspan 合并，最后一行为每列 Buff 短名；简略态跳过文件夹横条 -->
@@ -1032,6 +1045,7 @@
                                     <th
                                         data-sf="toolbar"
                                         data-sf-under="card"
+                                        data-sf-layer
                                         class="sticky {headerTopClass(
                                             rowIdx,
                                             effectiveDepth
@@ -1075,6 +1089,7 @@
                                     data-colhead={hc.ci}
                                     data-sf="toolbar"
                                     data-sf-under="card"
+                                    data-sf-layer
                                     data-col-w={layout.widths[colPos] ?? HEAD_COL_MIN_PX}
                                     class="sticky {headerTopClass(
                                         layout.bands.length,
@@ -1137,6 +1152,7 @@
                                     data-press=""
                                     data-rowhead={ri}
                                     data-sf="card"
+                                    data-sf-layer
                                     class="sticky left-0 z-20 select-none border-r border-b border-(--theme-divider-border) px-3 py-1.5 {row.editable
                                         ? 'cursor-pointer'
                                         : 'cursor-default'}"
@@ -1209,15 +1225,15 @@
                                             <!-- 分段平铺：非选中来源的行，右侧**绝对留白**（不显示图标/勾选，连禁止图标都不给） -->
                                             <span class="block h-7 w-full"></span>
                                         {:else if !cell.enabled}
-                                            <!-- 受作用域 / 伤害类型 / 属性条件限制：灰色禁止图标，且点不动 -->
+                                            <!-- 受作用域 / 伤害类型 / 属性条件限制：灰色叉图标（尺寸与打勾 / 空心圆一致），且点不动 -->
                                             <span
                                                 class="flex min-h-7 w-full items-center justify-center px-1 py-1"
                                                 title={cellTitle}
                                             >
                                                 <Icon
                                                     icon="mdi:close"
-                                                    class="size-4 shrink-0"
-                                                    style="color: var(--theme-modal-text); opacity: 0.28;"
+                                                    class="size-5 shrink-0"
+                                                    style="color: var(--theme-modal-text); opacity: 0.25;"
                                                 />
                                             </span>
                                         {:else}
@@ -1274,12 +1290,11 @@
         data-rowhead
         data-sf="toolbar"
         data-sf-under="card"
+        data-sf-layer
         class="sticky left-0 top-0 z-(--z-sticky) w-52 min-w-52 border-r border-(--theme-divider-border) px-3 text-left text-[10px] font-black tracking-[0.12em] text-(--theme-modal-text)/50"
         style="--sf-base: var(--theme-modal-bg); --sfu-base: var(--theme-modal-bg);"
         {rowspan}
-    >
-        条目
-    </th>
+    ></th>
 {/snippet}
 
 <style>
