@@ -32,7 +32,7 @@ const migrateV0toV1: Migration = {
         const team = normalizeTeam(raw.team)
         const calcState = migrateCalcState(phaseData('calculation'))
 
-        // 旧 conditionProfile → 角色槽位链/精炼（链阶真源是 team）
+        // v0 的 conditionProfile → 角色槽位链/精炼（链阶真源是 team）
         const profile = asRecord(raw.conditionProfile)
         const chains = Array.isArray(profile.chains) ? profile.chains : []
         const refinements = Array.isArray(profile.refinements) ? profile.refinements : []
@@ -91,7 +91,7 @@ const migrateV1toV2: Migration = {
     }
 }
 
-/** @desc 迁移 v2 → v3（当前版本）：引用语义修正 —— 把旧工程「跨角色副作用 buff」补勾到引用它们的伤害段 */
+/** @desc 迁移 v2 → v3（当前版本）：引用语义修正 —— 把 v1/v2 工程数据里的「跨角色副作用 buff」补勾到引用它们的伤害段 */
 const migrateV2toV3: Migration = {
     from: 2,
     to: 3,
@@ -124,7 +124,7 @@ const migrateV2toV3: Migration = {
     }
 }
 
-/** @desc 迁移 v3 → v4（当前版本）：乘区改名（历史 id 重映射）+ 「同名变体」拍平为单层乘区条目列表 */
+/** @desc 迁移 v3 → v4（当前版本）：乘区改名（v3 的乘区 id 重映射）+ 「同名变体」拍平为单层乘区条目列表 */
 const migrateV3toV4: Migration = {
     from: 3,
     to: 4,
@@ -132,8 +132,8 @@ const migrateV3toV4: Migration = {
         const encounter = asRecord(raw.encounter)
         const calcContainer = asRecord(encounter.calculation)
         // migrateCalcState 内部经 normalizeBuff → normalizeZones 完成：
-        // ① 历史乘区 id（customFinalDmg / customFinalDmgMul）重映射为 specialFinal1 / specialFinal2
-        // ② variants[] 拍平进 zones[]（变体级子条件下放到其每个条目），并丢弃已废弃的 damageEntryBuffVariantIds
+        // ① v3 的乘区 id（customFinalDmg / customFinalDmgMul）重映射为 specialFinal1 / specialFinal2
+        // ② variants[] 拍平进 zones[]（变体级子条件下放到其每个条目），damageEntryBuffVariantIds 随之丢弃
         const calcState = migrateCalcState(calcContainer.data ?? asRecord(raw.calc))
 
         return {
@@ -148,7 +148,7 @@ const migrateV3toV4: Migration = {
     }
 }
 
-/** @desc 迁移 v4 → v5：旧「备注即重击」的普攻块升级为独立重击图标块 */
+/** @desc 迁移 v4 → v5：把 v4 里「备注即重击」的普攻块升级为独立重击图标块 */
 const migrateV4toV5: Migration = {
     from: 4,
     to: 5,
@@ -174,7 +174,7 @@ const migrateV4toV5: Migration = {
     }
 }
 
-/** @desc 迁移 v5 → v6（当前版本）：Buff 文件夹命名迁移 + 旧导入按实体归档（声骸 / 套装 / 武器） */
+/** @desc 迁移 v5 → v6（当前版本）：Buff 文件夹命名迁移 + v5 及更早的导入按实体归档（声骸 / 套装 / 武器） */
 const migrateV5toV6: Migration = {
     from: 5,
     to: 6,
@@ -203,13 +203,13 @@ const migrateV5toV6: Migration = {
 /**
  * @desc 迁移 v6 → v7：Buff 级条件改版（`rules`）+ 移除星标。
  *
- * - 旧实例级 `condition` 的链/阶子句升级为 `chain` / `refinement` 规则（**链与阶可以并存**，
- *   历史被拆开的双条件 Buff **不合并**）；
- * - 旧实例级 `elements` / `damageTypes` 本就属乘区级条件，原样下放到乘区条目（`normalizeZones` 负责）；
- * - `starred` 与 `conditionRefCharIdx` 等已移除字段一律抹除（`normalizeBuff` 只输出白名单字段）。
+ * - v6 实例级 `condition` 的链/阶子句换算为 `chain` / `refinement` 规则（**链与阶可以并存**，
+ *   v6 数据里被拆开的双条件 Buff **不合并**）；
+ * - 实例级 `elements` / `damageTypes` 属于乘区级条件，原样下放到乘区条目（`normalizeZones` 负责）；
+ * - `starred` 与 `conditionRefCharIdx` 不在白名单内，一律抹除（`normalizeBuff` 只输出白名单字段）。
  *
  * 真源 `encounter` 与兼容视图 `phases` 都可能承载拉表态数据（导出文件只写 phases），两处都洗一遍。
- * 本步骤完全由幂等的 `migrateCalcState` 完成：重跑不会二次改写已迁移的数据。
+ * 本步骤完全由幂等的 `migrateCalcState` 完成：重跑不会二次改写数据。
  */
 const migrateV6toV7: Migration = {
     from: 6,
@@ -233,6 +233,65 @@ const migrateV6toV7: Migration = {
     }
 }
 
+/**
+ * @desc 迁移 v7 → v8：把「伤害名等于」并入「伤害名正则」。
+ *
+ * `normalizeRule` 对 `damageNameEquals` 的兼容分支会转成锚定正则（转义元字符 + `^…$`），
+ * 因此这里仍只需重跑幂等的 `migrateCalcState`；最终数据里只可能出现 `damageNameRegex`。
+ * 真源 `encounter` 与兼容视图 `phases` 两处都洗。
+ */
+const migrateV7toV8: Migration = {
+    from: 7,
+    to: 8,
+    migrate(raw) {
+        const encounter = asRecord(raw.encounter)
+        const phases = asRecord(raw.phases)
+        const encounterCalc = asRecord(encounter.calculation)
+        const phasesCalc = asRecord(phases.calculation)
+        const source = encounterCalc.data !== undefined ? encounterCalc.data : (phasesCalc.data ?? asRecord(raw.calc))
+        const calcState = migrateCalcState(source)
+        return {
+            ...raw,
+            version: 8,
+            buffs: calcState.buffSets,
+            encounter: { ...encounter, calculation: { ...encounterCalc, data: calcState } },
+            ...(phasesCalc.data !== undefined
+                ? { phases: { ...phases, calculation: { ...phasesCalc, data: calcState } } }
+                : {})
+        }
+    }
+}
+
+/**
+ * @desc 迁移 v8 → v9：条件收敛。
+ *
+ * - `enemyType` 由单值 `type` 改为多选 `types`（`normalizeRule` 的兼容分支会把旧单值并进数组）；
+ * - **同类条件只保留一条**（`normalizeRules` 按 kind 去重）。
+ *
+ * 与 v7 / v8 一样，全部由幂等的 `migrateCalcState` 完成；真源 `encounter` 与兼容视图 `phases` 两处都洗。
+ */
+const migrateV8toV9: Migration = {
+    from: 8,
+    to: 9,
+    migrate(raw) {
+        const encounter = asRecord(raw.encounter)
+        const phases = asRecord(raw.phases)
+        const encounterCalc = asRecord(encounter.calculation)
+        const phasesCalc = asRecord(phases.calculation)
+        const source = encounterCalc.data !== undefined ? encounterCalc.data : (phasesCalc.data ?? asRecord(raw.calc))
+        const calcState = migrateCalcState(source)
+        return {
+            ...raw,
+            version: 9,
+            buffs: calcState.buffSets,
+            encounter: { ...encounter, calculation: { ...encounterCalc, data: calcState } },
+            ...(phasesCalc.data !== undefined
+                ? { phases: { ...phases, calculation: { ...phasesCalc, data: calcState } } }
+                : {})
+        }
+    }
+}
+
 export const PROJECT_MIGRATIONS: Migration[] = [
     migrateV0toV1,
     migrateV1toV2,
@@ -240,5 +299,7 @@ export const PROJECT_MIGRATIONS: Migration[] = [
     migrateV3toV4,
     migrateV4toV5,
     migrateV5toV6,
-    migrateV6toV7
+    migrateV6toV7,
+    migrateV7toV8,
+    migrateV8toV9
 ]

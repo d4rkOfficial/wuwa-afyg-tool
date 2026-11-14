@@ -2,13 +2,13 @@
  * @desc Buff 级**规则**（`BuffInstance.rules`）的纯逻辑层：类型归一化、求值、依赖关系与文案。
  *
  * 设计要点（与 `.tmp/buff-modal-redesign/requirements.md` 的「已对齐的决定」一致）：
- * - 一条 Buff 可挂多条规则，**规则之间全部 AND**（没有 or 组合，也不再有任何「链阶互斥」护栏）；
+ * - 一条 Buff 可挂多条规则，**规则之间全部 AND**（没有 or 组合，也没有「链阶互斥」护栏）；
  * - 规则只作用于 **Buff 级**；乘区级条件（伤害属性 / 伤害类型）仍在 `BuffZoneValue.condition`；
  * - `buffActive` 是唯一的「跨 Buff」规则：由引擎按**最小不动点**求值（见 `resolveActiveBuffIds`），
  *   创建期禁止直接自引用与间接循环（见 `cyclePathOf`）；
  * - 删除被依赖 Buff 时由 `cascadeDeleteIdsOf` 给出级联删除集合；`any` 规则在引用集合仍有存活项时保留依赖方。
  *
- * 兼容：`rulesFromLegacyCondition` 把工坊 / AI / 旧工程里的实例级链·阶条件升级为规则，其余旧字段丢弃。
+ * 兼容：`rulesFromLegacyCondition` 把工坊 / AI / v6 及更早工程里的实例级链·阶条件换算为规则，其余实例级字段丢弃。
  */
 
 import type { BuffInstance, BuffRule, EnemyTypeKind, ZoneCompareId, ZoneCompareOp } from './calculation.types'
@@ -53,7 +53,6 @@ export const RULE_KIND_OPTIONS: { value: BuffRule['kind']; label: string; icon: 
     { value: 'chain', label: '角色共鸣链', icon: 'mdi:account-star-outline' },
     { value: 'refinement', label: '武器精炼阶数', icon: 'mdi:sword' },
     { value: 'damageNameRegex', label: '伤害名包含正则', icon: 'mdi:regex' },
-    { value: 'damageNameEquals', label: '伤害名等于', icon: 'mdi:format-text' },
     { value: 'zoneCompare', label: '角色面板数值', icon: 'mdi:chart-bar' },
     { value: 'enemyType', label: '敌人类型', icon: 'mdi:skull-outline' },
     { value: 'buffActive', label: '其它 BUFF 生效', icon: 'mdi:link-variant' }
@@ -114,6 +113,13 @@ const num = (v: unknown, fallback: number): number =>
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
+/**
+ * @desc 旧「伤害名等于」→ 锚定正则（v8 合并；迁移、旧导入与工坊数据共用）。
+ * 转义正则元字符并加 `^…$`，保留「全等」语义；空白值保持空草稿，避免变成 `^$` 匹配空串。
+ */
+export const equalsToRegexPattern = (value: string): string =>
+    value.trim() ? `^${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$` : ''
+
 /** @desc 槽位合法性：-1 = 伤害条目的角色，其余必须是 0..2 */
 const clampCharIdx = (v: unknown, allowActive: boolean): number | null => {
     const n = num(v, allowActive ? -1 : 0)
@@ -144,7 +150,8 @@ export const normalizeRule = (raw: unknown): BuffRule | null => {
             return { kind: 'damageNameRegex', pattern: str(r.pattern) }
         }
         case 'damageNameEquals': {
-            return { kind: 'damageNameEquals', value: str(r.value) }
+            // v8 起最终模型只保留正则；这里兼容迁移前的数据 / 旧导入 / 工坊文件
+            return { kind: 'damageNameRegex', pattern: equalsToRegexPattern(str(r.value)) }
         }
         case 'zoneCompare': {
             const charIdx = clampCharIdx(r.charIdx, true)
@@ -157,9 +164,17 @@ export const normalizeRule = (raw: unknown): BuffRule | null => {
             return { kind: 'zoneCompare', charIdx, zone, op, value }
         }
         case 'enemyType': {
-            const type = str(r.type) as EnemyTypeKind
-            if (!ENEMY_TYPE_OPTIONS.some((item) => item.value === type)) return null
-            return { kind: 'enemyType', type }
+            // 多选存 `types`；单值 `type` 是旧数据/旧导入的形状，归一化时并入
+            const raw = Array.isArray(r.types) ? r.types : typeof r.type === 'string' ? [r.type] : []
+            const types = [
+                ...new Set(
+                    (raw as unknown[]).filter((item): item is EnemyTypeKind =>
+                        ENEMY_TYPE_OPTIONS.some((option) => option.value === item)
+                    )
+                )
+            ]
+            if (types.length === 0) return null
+            return { kind: 'enemyType', types }
         }
         case 'buffActive': {
             const mode = str(r.mode) === 'any' ? 'any' : 'all'
@@ -187,7 +202,7 @@ export const isValidRegex = (pattern: string): boolean => {
 /**
  * @desc 规则是否「还没填写完整」（编辑器允许存盘的草稿）。
  *
- * 为什么允许草稿进数据：条件卡片是**就地编辑**的，新建一条「伤害名等于」时值必然是空的；
+ * 为什么允许草稿进数据：条件卡片是**就地编辑**的，新建一条「伤害名正则」时值必然是空的；
  * 若归一化直接把它丢掉，用户就永远填不进去（卡片刚创建就消失）。
  * 求值侧对草稿一律返回**不满足**（`ruleMet` 里判），因此草稿不会让 Buff 意外生效。
  */
@@ -195,8 +210,6 @@ export const isRuleDraft = (rule: BuffRule): boolean => {
     switch (rule.kind) {
         case 'damageNameRegex':
             return !rule.pattern.trim() || !isValidRegex(rule.pattern)
-        case 'damageNameEquals':
-            return !rule.value.trim()
         case 'buffActive':
             return rule.buffIds.length === 0
         default:
@@ -207,23 +220,28 @@ export const isRuleDraft = (rule: BuffRule): boolean => {
 /** @desc 一组规则里是否还有草稿（界面据此提示「未填写」） */
 export const hasDraftRule = (rules: BuffRule[] | undefined): boolean => (rules ?? []).some(isRuleDraft)
 
-/** @desc 归一化规则列表（丢弃非法项与重复项；空结果返回 undefined） */
+/**
+ * @desc 归一化规则列表（丢弃非法项、**同类只保留第一条**）。
+ *
+ * 「同类只留一条」是既定口径：同一 Buff 不需要两张「敌人类型」或两条「伤害名」，
+ * 需要多处取值时写进同一条规则的多值字段（`enemyType.types`、`buffActive.buffIds`）。
+ * 旧数据里被拆开的多条同 kind 规则（含 `chains` 给了多个槽位的情况）在这里收敛成第一条。
+ */
 export const normalizeRules = (raw: unknown): BuffRule[] | undefined => {
     if (!Array.isArray(raw)) return undefined
     const out: BuffRule[] = []
-    const seen = new Set<string>()
+    const seenKind = new Set<BuffRule['kind']>()
     for (const item of raw) {
         const rule = normalizeRule(item)
         if (!rule) continue
-        const key = JSON.stringify(rule)
-        if (seen.has(key)) continue
-        seen.add(key)
+        if (seenKind.has(rule.kind)) continue
+        seenKind.add(rule.kind)
         out.push(rule)
     }
     return out.length > 0 ? out : undefined
 }
 
-/** @desc 旧实例级链/阶条件（工坊 share / AI 生成 / 旧工程）：仅迁移读取 */
+/** @desc 实例级链/阶条件形态（工坊 share / AI 生成 / v6 及更早工程）：仅迁移读取 */
 export interface LegacyGateCondition {
     chains?: { charIdx?: number; min?: number }[]
     refinements?: { charIdx?: number; min?: number }[]
@@ -232,10 +250,10 @@ export interface LegacyGateCondition {
 }
 
 /**
- * @desc 旧实例级条件 → 规则列表。
- * - `chains` / `refinements` 各自按原值升级（**链与阶可以并存**，不再互斥、不再拆分 Buff）
- * - 旧单值 `chain` / `refinement` 用 `owner`（该实体归属槽位）补齐 charIdx
- * - 旧 `elements` / `damageTypes` 属乘区级条件，**不转规则**（由调用方下放到乘区）
+ * @desc 实例级条件 → 规则列表。
+ * - `chains` / `refinements` 各自按原值换算（**链与阶可以并存**，互不排斥，也不拆分 Buff）
+ * - 单值 `chain` / `refinement` 用 `owner`（该实体归属槽位）补齐 charIdx
+ * - `elements` / `damageTypes` 属乘区级条件，**不转规则**（由调用方下放到乘区）
  */
 export const rulesFromLegacyCondition = (raw: LegacyGateCondition | undefined, owner = 0): BuffRule[] | undefined => {
     if (!raw) return undefined
@@ -286,9 +304,6 @@ export const ruleMet = (rule: BuffRule, ctx: RuleContext): boolean => {
         case 'damageNameRegex':
             if (ctx.damageName === undefined) return true
             return new RegExp(rule.pattern).test(ctx.damageName)
-        case 'damageNameEquals':
-            if (ctx.damageName === undefined) return true
-            return ctx.damageName === rule.value
         case 'zoneCompare': {
             const idx = rule.charIdx < 0 ? ctx.activeCharIdx : rule.charIdx
             if (idx < 0) return true
@@ -299,7 +314,7 @@ export const ruleMet = (rule: BuffRule, ctx: RuleContext): boolean => {
         }
         case 'enemyType':
             if (ctx.enemyType === undefined) return true
-            return ctx.enemyType === rule.type
+            return rule.types.includes(ctx.enemyType)
         case 'buffActive':
             return ctx.activeOf ? buffActiveMet(rule, ctx.activeOf) : false
         default:
@@ -324,7 +339,7 @@ export const evaluateRules = (rules: BuffRule[] | undefined, ctx: RuleContext): 
     (rules ?? []).every((rule) => ruleMet(rule, ctx))
 
 /**
- * @desc `buffActive` 的**最小不动点**求值：从「全部未生效」出发反复激活，直到不再变化。
+ * @desc `buffActive` 的**最小不动点**求值：从「全部未生效」出发反复激活，直到结果稳定。
  *
  * 为什么是「最小」：规则只有 AND 与正极性引用（「某个 Buff 生效」才能激活自己），
  * 因此最小不动点即语义上唯一解；任何循环引用都自然落在「永不激活」上——
@@ -464,6 +479,8 @@ export interface RuleDescribeDeps {
     slotName?: (charIdx: number) => string
     /** @desc Buff 显示名 */
     buffName?: (buffId: string) => string
+    /** @desc `charIdx = -1`（伤害条目的角色）的称呼；工程侧说「当前角色」，Buff 集说「出伤者」 */
+    activeName?: string
 }
 
 /**
@@ -482,17 +499,15 @@ export const describeRule = (rule: BuffRule, deps: RuleDescribeDeps = {}): strin
             return `${slotName(rule.charIdx)} 武器精炼 ≥ ${rule.min} 阶`
         case 'damageNameRegex':
             return `伤害名匹配 /${rule.pattern}/`
-        case 'damageNameEquals':
-            return `伤害名 = ${rule.value}`
         case 'zoneCompare': {
             const option = ZONE_COMPARE_OPTIONS.find((item) => item.value === rule.zone)
             const op = ZONE_COMPARE_OPS.find((item) => item.value === rule.op)?.label ?? rule.op
-            const who = rule.charIdx < 0 ? '当前角色' : slotName(rule.charIdx)
+            const who = rule.charIdx < 0 ? (deps.activeName ?? '当前角色') : slotName(rule.charIdx)
             const unit = option?.unit === '%' ? '%' : ''
             return `${who} ${option?.label ?? rule.zone} ${op} ${rule.value}${unit}`
         }
         case 'enemyType':
-            return `敌人类型 = ${enemyTypeLabel(rule.type)}`
+            return `敌人类型 = ${rule.types.map((type) => enemyTypeLabel(type)).join(' / ')}`
         case 'buffActive': {
             const names = rule.buffIds.map(buffName).join('、')
             return rule.mode === 'any' ? `以下 BUFF 至少一个生效：${names}` : `以下 BUFF 全部生效：${names}`

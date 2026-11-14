@@ -1,4 +1,4 @@
-// Buff 级规则（BuffInstance.rules）：求值 / 归一化 / 旧条件升级 / 依赖（成环与级联删除）。
+// Buff 级规则（BuffInstance.rules）：求值 / 归一化 / v6 条件升级 / 依赖（成环与级联删除）。
 //
 // 口径来源：.tmp/buff-modal-redesign/requirements.md 的「已对齐的决定」——
 // 规则之间全部 AND；链与阶可以并存；`buffActive` 依赖按最小不动点求值；
@@ -53,14 +53,15 @@ describe('规则求值：链 / 阶 / 敌人 / 伤害名', () => {
         assert.equal(evaluateRules([{ kind: 'chain', charIdx: 2, min: 0 }], ctx()), true)
     })
 
-    it('敌人类型按工程配置字面量比较', () => {
-        const rule: BuffRule[] = [{ kind: 'enemyType', type: '精英怪' }]
+    it('敌人类型多选：命中任意一项即成立', () => {
+        const rule: BuffRule[] = [{ kind: 'enemyType', types: ['精英怪', '小怪'] }]
         assert.equal(evaluateRules(rule, ctx({ enemyType: '精英怪' })), true)
+        assert.equal(evaluateRules(rule, ctx({ enemyType: '小怪' })), true)
         assert.equal(evaluateRules(rule, ctx({ enemyType: 'BOSS' })), false)
         assert.equal(evaluateRules(rule, ctx()), true, '没有敌人上下文时不构成否定')
     })
 
-    it('伤害名：包含正则 / 全等', () => {
+    it('伤害名：包含正则 / 锚定全等', () => {
         assert.equal(
             evaluateRules([{ kind: 'damageNameRegex', pattern: '共鸣解放' }], ctx({ damageName: '共鸣解放·终曲' })),
             true
@@ -70,12 +71,11 @@ describe('规则求值：链 / 阶 / 敌人 / 伤害名', () => {
             false
         )
         assert.equal(
-            evaluateRules([{ kind: 'damageNameEquals', value: '共鸣解放·终曲' }], ctx({ damageName: '共鸣解放·终曲' })),
+            evaluateRules(
+                [{ kind: 'damageNameRegex', pattern: '^共鸣解放·终曲$' }],
+                ctx({ damageName: '共鸣解放·终曲' })
+            ),
             true
-        )
-        assert.equal(
-            evaluateRules([{ kind: 'damageNameEquals', value: '共鸣解放' }], ctx({ damageName: '共鸣解放·终曲' })),
-            false
         )
     })
 
@@ -160,7 +160,7 @@ describe('buffActive：最小不动点求值', () => {
     })
 })
 
-describe('归一化与旧条件升级', () => {
+describe('归一化与 v6 条件升级', () => {
     it('越界槽位 / 未知枚举被丢弃；草稿形态保留（求值恒不满足）', () => {
         assert.deepEqual(normalizeRule({ kind: 'damageNameRegex', pattern: '(' }), {
             kind: 'damageNameRegex',
@@ -173,32 +173,74 @@ describe('归一化与旧条件升级', () => {
         })
         assert.equal(normalizeRule({ kind: 'chain', charIdx: 5, min: 1 }), null)
         assert.equal(normalizeRule({ kind: 'refinement', charIdx: 0, min: 0 }), null, '阶最小是 1')
-        assert.equal(normalizeRule({ kind: 'enemyType', type: 'boss' }), null, '敌人类型取工程字面量')
+        assert.equal(normalizeRule({ kind: 'enemyType', types: ['boss'] }), null, '敌人类型取工程字面量')
+        assert.deepEqual(
+            normalizeRule({ kind: 'enemyType', type: 'BOSS' }),
+            { kind: 'enemyType', types: ['BOSS'] },
+            '旧单值 type 并入 types'
+        )
+        assert.deepEqual(
+            normalizeRule({ kind: 'enemyType', types: ['BOSS', 'BOSS', '小怪'] }),
+            { kind: 'enemyType', types: ['BOSS', '小怪'] },
+            '多选去重'
+        )
+    })
+
+    it('v7 的 damageNameEquals 归一化为锚定正则（转义元字符，保留全等语义）', () => {
+        assert.deepEqual(normalizeRule({ kind: 'damageNameEquals', value: '共鸣解放·终曲' }), {
+            kind: 'damageNameRegex',
+            pattern: '^共鸣解放·终曲$'
+        })
+        assert.deepEqual(normalizeRule({ kind: 'damageNameEquals', value: '终曲(重).*' }), {
+            kind: 'damageNameRegex',
+            pattern: '^终曲\\(重\\)\\.\\*$'
+        })
+        const exact = normalizeRule({ kind: 'damageNameEquals', value: '共鸣解放·终曲' })
+        assert.equal(evaluateRules(exact ? [exact] : [], ctx({ damageName: '共鸣解放·终曲' })), true)
+        assert.equal(evaluateRules(exact ? [exact] : [], ctx({ damageName: '共鸣解放·终曲·二' })), false)
     })
 
     it('草稿规则一律不满足（新建后还没填值的条件不能让 Buff 意外生效）', () => {
         assert.equal(evaluateRules([{ kind: 'damageNameRegex', pattern: '' }], ctx({ damageName: '任意' })), false)
         assert.equal(evaluateRules([{ kind: 'damageNameRegex', pattern: '(' }], ctx({ damageName: '任意' })), false)
-        assert.equal(evaluateRules([{ kind: 'damageNameEquals', value: '  ' }], ctx({ damageName: '任意' })), false)
         assert.equal(evaluateRules([{ kind: 'buffActive', mode: 'all', buffIds: [] }], ctx()), false)
         assert.equal(isRuleDraft({ kind: 'chain', charIdx: 0, min: 1 }), false)
         assert.equal(hasDraftRule([{ kind: 'chain', charIdx: 0, min: 1 }]), false)
-        assert.equal(hasDraftRule([{ kind: 'damageNameEquals', value: '' }]), true)
+        assert.deepEqual(normalizeRule({ kind: 'damageNameEquals', value: '  ' }), {
+            kind: 'damageNameRegex',
+            pattern: ''
+        })
+        assert.equal(hasDraftRule([{ kind: 'damageNameRegex', pattern: '' }]), true)
     })
 
-    it('normalizeRules 去重并保持顺序', () => {
+    it('normalizeRules 同类只保留第一条并保持顺序', () => {
         const rules = normalizeRules([
             { kind: 'chain', charIdx: 0, min: 1 },
             { kind: 'chain', charIdx: 0, min: 1 },
-            { kind: 'enemyType', type: 'BOSS' }
+            { kind: 'enemyType', types: ['BOSS'] }
         ])
         assert.deepEqual(rules, [
             { kind: 'chain', charIdx: 0, min: 1 },
-            { kind: 'enemyType', type: 'BOSS' }
+            { kind: 'enemyType', types: ['BOSS'] }
         ])
     })
 
-    it('旧 instance condition 的链/阶升级为规则（可并存，不互斥）', () => {
+    it('同类条件只保留第一条（不会出现两条同 kind 规则）', () => {
+        assert.deepEqual(
+            normalizeRules([
+                { kind: 'zoneCompare', charIdx: 0, zone: 'critRate', op: 'ge', value: 50 },
+                { kind: 'zoneCompare', charIdx: -1, zone: 'atk', op: 'gt', value: 1000 },
+                { kind: 'enemyType', types: ['BOSS'] },
+                { kind: 'enemyType', types: ['小怪'] }
+            ]),
+            [
+                { kind: 'zoneCompare', charIdx: 0, zone: 'critRate', op: 'ge', value: 50 },
+                { kind: 'enemyType', types: ['BOSS'] }
+            ]
+        )
+    })
+
+    it('v6 instance condition 的链/阶升级为规则（可并存，不互斥）', () => {
         assert.deepEqual(rulesFromLegacyCondition({ chains: [{ charIdx: 1, min: 2 }] }, 0), [
             { kind: 'chain', charIdx: 1, min: 2 }
         ])
@@ -273,7 +315,12 @@ describe('文案', () => {
             describeRule({ kind: 'refinement', charIdx: 1, min: 3 }, { slotName: () => '乙' }),
             '乙 武器精炼 ≥ 3 阶'
         )
-        assert.equal(describeRule({ kind: 'enemyType', type: 'BOSS' }), '敌人类型 = BOSS')
+        assert.equal(describeRule({ kind: 'enemyType', types: ['BOSS'] }), '敌人类型 = BOSS')
+        assert.equal(
+            describeRule({ kind: 'enemyType', types: ['BOSS', '精英怪'] }),
+            '敌人类型 = BOSS / 精英怪',
+            '多选按 / 连接'
+        )
         assert.equal(
             describeRule(
                 { kind: 'buffActive', mode: 'any', buffIds: ['a', 'b'] },
@@ -283,10 +330,10 @@ describe('文案', () => {
         )
         assert.equal(
             describeRules([
-                { kind: 'enemyType', type: '小怪' },
-                { kind: 'damageNameEquals', value: 'X' }
+                { kind: 'enemyType', types: ['小怪'] },
+                { kind: 'damageNameRegex', pattern: 'X' }
             ]),
-            '敌人类型 = 小怪 且 伤害名 = X'
+            '敌人类型 = 小怪 且 伤害名匹配 /X/'
         )
     })
 })

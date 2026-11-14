@@ -1,10 +1,10 @@
 // 工程迁移 v6 → v7：Buff 级条件改版（rules）与移除星标。
 //
 // 口径（.tmp/buff-modal-redesign/requirements.md「已对齐的决定」）：
-// - 旧实例级 condition 的链/阶 → `chain` / `refinement` 规则；**链与阶可以并存**；
-// - 历史上被拆开的双条件 Buff **不回并**（迁移只做字段升级，不动条目数量）；
-// - 旧 elements / damageTypes 属乘区级条件，不转 rules；
-// - `starred` / `conditionRefCharIdx` 等已移除字段全部抹除；
+// - v6 实例级 condition 的链/阶 → `chain` / `refinement` 规则；**链与阶可以并存**；
+// - v6 里被拆开的双条件 Buff **不回并**（迁移只做字段升级，不动条目数量）；
+// - v6 的 elements / damageTypes 属乘区级条件，不转 rules；
+// - v6 独有字段（`starred` / `condition` / `conditionRefCharIdx`）全部抹除；
 // - encounter 与 phases 两种承载都要洗；迁移必须幂等。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
@@ -18,7 +18,7 @@ const v6Project = (buffSets: unknown[], carry: 'encounter' | 'phases' = 'encount
     const base = {
         version: 6,
         id: 'p1',
-        name: '旧工程',
+        name: 'v6 工程',
         createdAt: 1,
         team: [{ character: '甲' }, { character: '乙' }, { character: '丙' }],
         analysis: undefined,
@@ -55,7 +55,7 @@ const legacyBuff = (patch: Record<string, unknown>) => ({
 })
 
 describe('v6 → v7：实例级链/阶条件升级为 rules', () => {
-    it('单链 / 单阶 / 链阶并存都升级，且并存不再被拆成两个 Buff', () => {
+    it('单链 / 单阶 / 链阶并存都升级，且并存保持为一条 Buff', () => {
         const project = migrateProject(
             v6Project([
                 legacyBuff({ id: 'c', condition: { chains: [{ charIdx: 1, min: 2 }] }, conditionRefCharIdx: 1 }),
@@ -65,7 +65,7 @@ describe('v6 → v7：实例级链/阶条件升级为 rules', () => {
         )
         assert.equal(project.version, PROJECT_VERSION)
         const buffs = project.buffs
-        assert.equal(buffs.length, 3, '链阶并存不合并/拆分（历史拆分也不回并）')
+        assert.equal(buffs.length, 3, '链阶并存不合并 / 拆分（v6 里已拆开的也不回并）')
         assert.deepEqual(buffs[0].rules, [{ kind: 'chain', charIdx: 1, min: 2 }])
         assert.deepEqual(buffs[1].rules, [{ kind: 'refinement', charIdx: 0, min: 3 }])
         assert.deepEqual(buffs[2].rules, [
@@ -74,7 +74,7 @@ describe('v6 → v7：实例级链/阶条件升级为 rules', () => {
         ])
     })
 
-    it('旧 elements / damageTypes 不转 rules，下放到乘区条目', () => {
+    it('v6 的 elements / damageTypes 不转 rules，下放到乘区条目', () => {
         const project = migrateProject(
             v6Project([
                 legacyBuff({
@@ -108,16 +108,16 @@ describe('v6 → v7：实例级链/阶条件升级为 rules', () => {
         assert.ok(Array.isArray(buff.rules))
     })
 
-    it('已迁移过的数据（rules 已存在）原样保留', () => {
+    it('已是 v7 的数据（rules 已存在）原样保留', () => {
         const project = migrateProject(
             v6Project([
                 legacyBuff({
-                    rules: [{ kind: 'enemyType', type: 'BOSS' }],
+                    rules: [{ kind: 'enemyType', types: ['BOSS'] }],
                     condition: { chains: [{ charIdx: 0, min: 1 }] }
                 })
             ])
         )
-        assert.deepEqual(project.buffs[0].rules, [{ kind: 'enemyType', type: 'BOSS' }], 'rules 优先于旧 condition')
+        assert.deepEqual(project.buffs[0].rules, [{ kind: 'enemyType', types: ['BOSS'] }], 'rules 优先于 v6 condition')
     })
 
     it('导出文件形态（数据只在兼容视图 phases 里）同样升级', () => {
@@ -139,8 +139,8 @@ describe('v6 → v7：实例级链/阶条件升级为 rules', () => {
     })
 })
 
-describe('migrateCalcState：旧条件升级（结构归一化的单一入口）', () => {
-    it('直接喂旧 buff 也能得到 rules', () => {
+describe('migrateCalcState：v6 condition 升级（结构归一化的单一入口）', () => {
+    it('直接喂 v6 buff 也能得到 rules', () => {
         const state = migrateCalcState({
             buffSets: [legacyBuff({ condition: { chain: 4 }, conditionRefCharIdx: 2 })],
             damageEntryBuffSetIds: {},
@@ -149,7 +149,7 @@ describe('migrateCalcState：旧条件升级（结构归一化的单一入口）
         assert.deepEqual(state.buffSets[0].rules, [{ kind: 'chain', charIdx: 2, min: 4 }])
     })
 
-    it('空/非法旧条件不产出 rules 字段', () => {
+    it('空 / 非法的 v6 condition 不产出 rules 字段', () => {
         const state = migrateCalcState({
             buffSets: [legacyBuff({ condition: { chains: [] } })],
             damageEntryBuffSetIds: {},

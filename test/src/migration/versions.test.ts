@@ -1,8 +1,8 @@
-// v4 → v5：旧版靠备注区分重击的「普攻块」升级为独立的重击图标块。
+// v4 → v5：靠备注区分重击的「普攻块」升级为独立的重击图标块。
 //
-// 旧约定（本次迁移的输入）：
+// v4 约定（本次迁移的输入）：
 //   - 快速排轴录入的重击块 = key MouseLeft + 备注「重击」（当时重击与普攻共用图标，只能靠文字区分）；
-//   - 历史数据里还存在用 z / Z 开头的备注（z、Z、z1、Z12，数字可空、其后可跟任意内容），是用户手写的补充信息。
+//   - v4 数据里还存在用 z / Z 开头的备注（z、Z、z1、Z12，数字可空、其后可跟任意内容），是用户手写的补充信息。
 // 新约定（本次迁移的输出）：
 //   - 备注恰好是「重击」→ 换成重击图标 MouseLeftHold，备注清空（图标已能区分）；
 //   - 备注以 z / Z 开头（可紧跟数字）→ 只换图标，备注原样保留（备注里带着用户写的段数/说明）。
@@ -60,7 +60,7 @@ const v4Project = (opBlocks: OpBlock[], shape: 'encounter' | 'phases' = 'encount
 const migratedBlocks = (raw: Record<string, unknown>): OpBlock[] =>
     migrateProject(raw).encounter.timeline.data!.opBlocks
 
-describe('v4 → v5：旧「备注即重击」的普攻块升级为独立重击块', () => {
+describe('v4 → v5：「备注即重击」的普攻块升级为独立重击块', () => {
     it('备注「重击」→ 换成 MouseLeftHold 并清空备注', () => {
         const [only] = migratedBlocks(v4Project([block('b1', 'MouseLeft', '重击')]))
         assert.equal(only.key, 'MouseLeftHold')
@@ -106,7 +106,7 @@ describe('v4 → v5：旧「备注即重击」的普攻块升级为独立重击�
         )
     })
 
-    it('不命中旧约定的块原样保留（只认「重击」或 z/Z 开头）', () => {
+    it('不命中 v4 约定的块原样保留（只认「重击」或 z/Z 开头）', () => {
         const blocks = migratedBlocks(
             v4Project([
                 block('b1', 'MouseLeft', '重击后摇'),
@@ -161,9 +161,9 @@ describe('v4 → v5：旧「备注即重击」的普攻块升级为独立重击�
         assert.equal(viewTimeline.opBlocks[0].desc, '')
     })
 
-    it('版本号提升到当前版本（7）', () => {
+    it('版本号提升到当前版本（9）', () => {
         const project = migrateProject(v4Project([block('b1', 'MouseLeft', '重击')]))
-        assert.equal(PROJECT_VERSION, 7)
+        assert.equal(PROJECT_VERSION, 9)
         assert.equal(project.version, PROJECT_VERSION)
     })
 
@@ -181,7 +181,7 @@ describe('v4 → v5：旧「备注即重击」的普攻块升级为独立重击�
 })
 
 describe('无版本号的工坊下载件同样兜底升级', () => {
-    it('版本号被吃掉（迁移链不跑）时，旧备注块仍然换成重击块', () => {
+    it('版本号被吃掉（迁移链不跑）时，z / Z 备注块仍然换成重击块', () => {
         const raw = {
             ...v4Project([block('b1', 'MouseLeft', '重击')]),
             version: undefined,

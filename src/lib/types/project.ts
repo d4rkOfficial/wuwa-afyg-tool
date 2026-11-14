@@ -45,7 +45,7 @@ export interface PhaseStateV2<T> {
     data: T | null
 }
 
-/** @desc 新工程结构的四阶段容器：取代无类型的 phases[phase].data */
+/** @desc 新工程结构的四阶段容器：四阶段数据的唯一真源（`phases[phase].data` 只是视图） */
 export interface EncounterState {
     teamLocked: boolean
     timeline: PhaseStateV2<TimelineData>
@@ -53,9 +53,9 @@ export interface EncounterState {
     config: PhaseStateV2<ConfigState>
 }
 
-// ── 新工程结构（version 7：在 v6 文件夹归档之上，Buff 级条件改版为 `rules` 规则列表并移除星标）──
+// ── 新工程结构（version 9：敌人类型条件改多选，同类条件只保留一条）──
 
-export const PROJECT_VERSION = 7
+export const PROJECT_VERSION = 9
 
 export interface ProjectV2 {
     version: number
@@ -77,20 +77,20 @@ export interface ProjectV2 {
 
 /**
  * 兼容层的工程类型：新结构字段（version/encounter/buffs/analysis/comparison）为**唯一真源**，
- * 仅 `phases` 与 `conditionProfile` 作为过渡期视图保留（由 project store 单向派生），
- * 逐步把调用点迁移到新字段后再删除。
+ * 仅 `phases` 与 `conditionProfile` 作为视图保留（由 project store 单向派生）；
+ * 新代码请直接用 `encounter` / `buffs`。
  */
 export interface Project extends ProjectV2 {
-    /** @desc 过渡期视图：由 encounter 派生，写入时同步到 encounter */
+    /** @desc 视图字段：由 encounter 派生，写入时同步到 encounter */
     phases: {
         team: PhaseState
         timeline: PhaseState
         calculation: PhaseState
         config: PhaseState
     }
-    /** @desc 过渡期视图：由 team 槽位的链/精炼档位派生 */
+    /** @desc 视图字段：由 team 槽位的链/精炼档位派生 */
     conditionProfile?: { chains: number[]; refinements: number[] }
-    /** @desc 过渡期视图：buffs 的别名 */
+    /** @desc 视图字段：buffs 的别名 */
     buffSets?: BuffInstance[]
 }
 

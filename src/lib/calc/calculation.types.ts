@@ -85,8 +85,8 @@ export interface BuffZoneValue {
  * 组合口径固定为：**类内「或」、类间「与」**——
  * 伤害类型多选内部为或、伤害属性多选内部为或，而类型条件与属性条件之间必须同时满足。
  *
- * Buff 级的条件（链/阶/伤害名/角色面板/敌人类型/Buff 依赖）已整体迁到 `BuffInstance.rules`，
- * 本类型不再承载链/阶字段（`chain` / `refinement` / `chains` / `refinements` 一律不认）。
+ * Buff 级的条件（链/阶/伤害名/角色面板/敌人类型/Buff 依赖）统一由 `BuffInstance.rules` 承载；
+ * 本类型只表达乘区级条件，不承载链/阶字段（`chain` / `refinement` / `chains` / `refinements` 一律不认）。
  */
 export interface BuffCondition {
     /** @desc 伤害属性条件（多选，任一匹配即满足） */
@@ -118,12 +118,15 @@ export type ZoneCompareId =
 /**
  * @desc Buff 级规则（一条 Buff 可挂多条，**规则之间全部 AND**）。
  *
- * - `chain` / `refinement`：某角色共鸣链 ≥ min / 武器精炼 ≥ min（取代旧实例级 `condition.chains/refinements`）
- * - `damageNameRegex`：本次伤害条目的 `displayName` **正则包含匹配**
- * - `damageNameEquals`：本次伤害条目的 `displayName` 全等
+ * - `chain` / `refinement`：某角色共鸣链 ≥ min / 武器精炼 ≥ min（实例级 `condition.chains/refinements` 由迁移换算成这类规则）
+ * - `damageNameRegex`：本次伤害条目的 `displayName` **正则包含匹配**（需要全等时自行加 `^…$`；
+ *   v7 及更早的 `damageNameEquals` 由迁移 v8 换算成锚定正则）
  * - `zoneCompare`：某角色「无条件部分」面板数值比较（`charIdx = -1` 表示伤害条目的角色）
- * - `enemyType`：当前工程敌人类型
+ * - `enemyType`：当前工程敌人类型命中 `types` 中任意一项（多选，`type` 单值写法在归一化里并入）
  * - `buffActive`：被引用的 Buff 在**本次伤害**是否生效（all=全部 / any=至少一个）
+ *
+ * **同类条件只允许一条**（`normalizeRules` 按 kind 去重，保留第一条）：同一 Buff 不需要两条
+ * 「敌人类型」「伤害名」「面板数值」，需要多处取值时写进同一条规则的多选/多值字段。
  *
  * 规则只在 Buff 级生效；乘区级条件继续走 `BuffZoneValue.condition`。
  */
@@ -131,9 +134,8 @@ export type BuffRule =
     | { kind: 'chain'; charIdx: number; min: number }
     | { kind: 'refinement'; charIdx: number; min: number }
     | { kind: 'damageNameRegex'; pattern: string }
-    | { kind: 'damageNameEquals'; value: string }
     | { kind: 'zoneCompare'; charIdx: number; zone: ZoneCompareId; op: ZoneCompareOp; value: number }
-    | { kind: 'enemyType'; type: EnemyTypeKind }
+    | { kind: 'enemyType'; types: EnemyTypeKind[] }
     | { kind: 'buffActive'; mode: 'all' | 'any'; buffIds: string[] }
 
 /** @desc Buff 实例来源：user=用户创建/迁移，builtin=引擎内置源（角色/武器/声骸/敌人/公式域） */
