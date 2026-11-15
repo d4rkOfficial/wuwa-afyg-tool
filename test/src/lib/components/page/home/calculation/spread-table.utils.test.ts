@@ -26,6 +26,7 @@ import {
     type SegmentMarker
 } from '$lib/components/page/home/calculation/spread-table.utils'
 import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+import type { PaneEffectSource } from '$lib/calc/pane-effects'
 import type { CharSlot } from '$lib/types/project'
 
 describe('headTextWidthPx', () => {
@@ -269,7 +270,9 @@ describe('buildSegmentedTables', () => {
             activeSource,
             columns: [buff('b1', 'Buff1'), buff('b2', 'Buff2')],
             folderGroupOf: new Map(),
-            stateFor: (_bs, e) => ({ blocked: e.id === 'e2', hardOk: e.id !== 'e2' })
+            stateFor: (_bs, e) => ({ blocked: e.id === 'e2', hardOk: e.id !== 'e2' }),
+            paneSourcesOf: () => ({}),
+            team: TEAM
         })
 
     it('行按时间轴顺序切进各段；非选中来源的行不可编辑且右侧无单元格（绝对留白）', () => {
@@ -321,7 +324,9 @@ describe('buildSegmentedTables', () => {
             activeSource: 'slot-0:direct',
             columns: [buff('b1', 'Buff1')],
             folderGroupOf: new Map(),
-            stateFor: () => ({ blocked: false, hardOk: true })
+            stateFor: () => ({ blocked: false, hardOk: true }),
+            paneSourcesOf: () => ({}),
+            team: TEAM
         })
         assert.deepEqual(
             tables[0].rows.map((r) => [r.entry.id, r.runStart, r.runEnd]),
@@ -343,7 +348,9 @@ describe('buildSegmentedTables', () => {
             activeSource: 'slot-0:direct',
             columns: [buff('b1', 'Buff1'), buff('b2', 'Buff2')],
             folderGroupOf: new Map(),
-            stateFor: () => ({ blocked: false, hardOk: true })
+            stateFor: () => ({ blocked: false, hardOk: true }),
+            paneSourcesOf: () => ({}),
+            team: TEAM
         })
         assert.deepEqual(
             tables.map((t) => [t.title, t.rows.map((r) => r.entry.id)]),
@@ -353,6 +360,50 @@ describe('buildSegmentedTables', () => {
             ],
             '「爆发」段没有任何条目（e3 的位置 350 只在原 fixture 里）→ 不出现'
         )
+    })
+})
+
+// ────────────────────────── 分段平铺：影响源（跨角色转模）成列 ──────────────────────────
+
+describe('buildSegmentedTables：影响源（跨角色转模）也成列', () => {
+    const specs = buildSegmentSpecs([])
+    const entries = [entry('e1', '甲'), entry('e2', '甲')]
+    const columns = [buff('b1', 'Buff1'), buff('b2', 'Buff2')]
+
+    const build = (paneSourcesOf: (entryId: string) => Record<string, PaneEffectSource>) =>
+        buildSegmentedTables({
+            specs,
+            damageEntries: entries,
+            posOf: () => 0,
+            charToIdx,
+            activeSource: 'slot-0:direct',
+            columns,
+            folderGroupOf: new Map(),
+            // b2 的作用域指向后台角色「乙」：对甲的条目硬门槛永远不过（只有影响源身份能放行）
+            stateFor: (bs) => (bs.id === 'b2' ? { blocked: true, hardOk: false } : { blocked: false, hardOk: true }),
+            paneSourcesOf,
+            team: TEAM
+        })
+
+    it('硬门槛不过但属于影响源：仍成列，格子可勾、标影响源，并计入可勾集合', () => {
+        const tables = build((id): Record<string, PaneEffectSource> =>
+            id === 'e1' ? { b2: { charIdx: 1, zoneIds: ['recharge'] } } : {}
+        )
+        assert.deepEqual(tables[0].visibleColIdx, [0, 1], 'b2 靠影响源保留，不因硬门槛不过被筛掉')
+        assert.deepEqual(tables[0].rows[0].cells[1], { buffId: 'b2', enabled: true, hardOk: true, pane: true })
+        assert.deepEqual(tables[0].rows[0].enabledBuffIds, ['b1', 'b2'], '影响源进「可勾」集合（行全选要能选到）')
+        assert.equal(tables[0].enabledCounts[1], 1)
+    })
+
+    it('影响源写进表头：列名旁挂角色名与被改写乘区', () => {
+        const tables = build(() => ({ b2: { charIdx: 1, zoneIds: ['recharge'] } }))
+        assert.deepEqual(tables[0].headerCols[1].paneSource, { charName: '乙', zoneLabels: ['共鸣效率'] })
+        assert.equal(tables[0].headerCols[0].paneSource, undefined)
+    })
+
+    it('不是影响源时仍按硬门槛筛掉（列保留口径不变）', () => {
+        const tables = build(() => ({}))
+        assert.deepEqual(tables[0].visibleColIdx, [0])
     })
 })
 
