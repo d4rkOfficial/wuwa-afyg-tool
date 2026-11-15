@@ -24,6 +24,25 @@ export interface ShareSnapshot {
     expiresAt: number
 }
 
+/**
+ * @desc 把工坊返回的分享地址规整成「可以直接 fetch 的下载地址」。
+ * 接口给的 `url` 是分享页（`/share/<code>`，返回 HTML），导入方要的是 `/share/<code>/download`（返回 JSON），
+ * 少了这一段 fetch 回来的是网页、`parseProjectFile` 必然报格式错误。已经带 `/download` 的原样返回。
+ */
+export const shareDownloadUrlOf = (url: string): string => {
+    if (!url) return url
+    try {
+        const parsed = new URL(url)
+        const pathname = parsed.pathname.replace(/\/+$/, '')
+        if (!pathname || pathname.endsWith('/download')) return url
+        parsed.pathname = `${pathname}/download`
+        return parsed.toString()
+    } catch {
+        // 非绝对地址（相对路径等）：不做猜测，交给调用方原样使用
+        return url
+    }
+}
+
 /** @desc 工具箱导入链接：hash 路由 `import_project` 只认可直接 fetch 的下载地址 */
 export const shareToolLinkOf = (origin: string, downloadUrl: string): string =>
     `${origin}#import_project=${encodeURIComponent(downloadUrl)}`
@@ -41,11 +60,12 @@ export const buildShareSnapshot = (args: {
     ttlMs?: number
 }): ShareSnapshot => {
     const ttl = args.ttlMs ?? SHARE_TTL_MS
+    const downloadUrl = shareDownloadUrlOf(args.downloadUrl)
     return {
         projectId: args.projectId,
-        downloadUrl: args.downloadUrl,
-        toolLink: shareToolLinkOf(args.origin, args.downloadUrl),
-        fastCalcLink: shareFastCalcLinkOf(args.origin, args.downloadUrl),
+        downloadUrl,
+        toolLink: shareToolLinkOf(args.origin, downloadUrl),
+        fastCalcLink: shareFastCalcLinkOf(args.origin, downloadUrl),
         createdAt: args.createdAt,
         expiresAt: args.createdAt + ttl
     }

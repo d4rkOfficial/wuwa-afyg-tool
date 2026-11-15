@@ -9,6 +9,7 @@ import {
     formatShareCountdown,
     isShareSnapshotExpired,
     parseShareSnapshot,
+    shareDownloadUrlOf,
     shareFastCalcLinkOf,
     shareToolLinkOf
 } from '$lib/data/share.utils'
@@ -30,6 +31,20 @@ describe('分享链接格式', () => {
             'https://tool.example/fast-calc?import_project=https%3A%2F%2Fshare.example%2Fshare%2Fabc123%2Fdownload'
         )
     })
+
+    it('工坊给的分享页地址补上 /download（少了这段 fetch 回来是 HTML）', () => {
+        assert.equal(shareDownloadUrlOf('https://share.example/share/abc123'), DOWNLOAD)
+        assert.equal(shareDownloadUrlOf('https://share.example/share/abc123/'), DOWNLOAD)
+    })
+
+    it('已经带 /download 的地址原样返回，不重复拼接', () => {
+        assert.equal(shareDownloadUrlOf(DOWNLOAD), DOWNLOAD)
+        assert.equal(shareDownloadUrlOf(`${DOWNLOAD}/`), `${DOWNLOAD}/`)
+    })
+
+    it('非绝对地址不做猜测', () => {
+        assert.equal(shareDownloadUrlOf('/share/abc123'), '/share/abc123')
+    })
 })
 
 describe('分享快照', () => {
@@ -44,6 +59,20 @@ describe('分享快照', () => {
         assert.equal(snapshot.expiresAt, 1000 + SHARE_TTL_MS)
         assert.equal(snapshot.toolLink, shareToolLinkOf(ORIGIN, DOWNLOAD))
         assert.equal(snapshot.fastCalcLink, shareFastCalcLinkOf(ORIGIN, DOWNLOAD))
+    })
+
+    it('工坊分享页地址进快照时补 /download，两条链接都指向下载地址', () => {
+        const snapshot = buildShareSnapshot({
+            projectId: 'p1',
+            downloadUrl: 'https://share.example/share/abc123',
+            origin: ORIGIN,
+            createdAt: 1000
+        })
+        assert.equal(snapshot.downloadUrl, DOWNLOAD)
+        assert.equal(
+            snapshot.fastCalcLink,
+            'https://tool.example/fast-calc?import_project=https%3A%2F%2Fshare.example%2Fshare%2Fabc123%2Fdownload'
+        )
     })
 
     it('到点即过期', () => {
