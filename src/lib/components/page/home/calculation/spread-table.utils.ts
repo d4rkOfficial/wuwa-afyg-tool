@@ -60,6 +60,8 @@ export const HEAD_BAND_LINES = 3
 export const HEAD_NAME_LINES = 2
 /** @desc 文件夹横条的 `tracking-[0.1em]` 在 10px 字号下的额外字宽 */
 export const HEAD_BAND_TRACKING_PX = 1
+/** @desc 列名行「影响源」图标（与 Buff 名同行、排在名字左侧）占的宽度：图标 12px + 间距 2px */
+export const HEAD_PANE_ICON_PX = 14
 
 const CJK_RE = /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/
 
@@ -304,6 +306,37 @@ export const groupEntriesBySource = (
 }
 
 /**
+ * @desc 「影响源」并集（两种平铺共用）：被这些条目引用的角色面板，其改写者（作用于该角色、改写被引用乘区的 Buff）
+ * 在这些条目里的并集。跨角色转模（效果落在出伤角色、引用源却在后台角色）的 Buff 靠它成列。
+ */
+const collectPaneSources = (
+    entries: readonly DamageEntry[],
+    panesOf: (entry: DamageEntry) => Record<string, PaneEffectSource>
+): Map<string, { charIdx: number; zoneIds: string[] }> => {
+    const out = new Map<string, { charIdx: number; zoneIds: string[] }>()
+    for (const entry of entries) {
+        for (const [id, src] of Object.entries(panesOf(entry))) {
+            const existing = out.get(id)
+            if (!existing) {
+                out.set(id, { charIdx: src.charIdx, zoneIds: [...src.zoneIds] })
+                continue
+            }
+            for (const z of src.zoneIds) if (!existing.zoneIds.includes(z)) existing.zoneIds.push(z)
+        }
+    }
+    return out
+}
+
+/** @desc 影响源表头说明（角色名 + 被改写乘区标签）：槽位越界（队伍已换）时用「角色N」兜底 */
+const paneSourceLabelOf = (
+    team: readonly CharSlot[],
+    src: { charIdx: number; zoneIds: readonly string[] }
+): { charName: string; zoneLabels: string[] } => ({
+    charName: team[src.charIdx]?.character ?? `角色${src.charIdx + 1}`,
+    zoneLabels: zoneLabelsOf(src.zoneIds)
+})
+
+/**
  * @desc 分类平铺的一整张表（**只为选中来源构建**：分类平铺一次只显示一张子表，
  * 全量构建其它来源纯属浪费 —— 这是之前整表卡顿的主因之一）。
  *
@@ -349,17 +382,7 @@ export const buildCategorizedTable = (deps: SpreadTableDeps, group: SourceEntryG
     const visibleColIdx = cols.map((_, ci) => ci).filter((ci) => enabledCounts[ci] > 0)
 
     // 影响源：被本组任一条目引用的角色面板，其改写者在该组内的并集
-    const groupPaneSources = new Map<string, { charIdx: number; zoneIds: string[] }>()
-    for (const entry of group.entries) {
-        for (const [id, src] of Object.entries(paneSourcesOf(entry.id))) {
-            const existing = groupPaneSources.get(id)
-            if (!existing) {
-                groupPaneSources.set(id, { charIdx: src.charIdx, zoneIds: [...src.zoneIds] })
-                continue
-            }
-            for (const z of src.zoneIds) if (!existing.zoneIds.includes(z)) existing.zoneIds.push(z)
-        }
-    }
+    const groupPaneSources = collectPaneSources(group.entries, (entry) => paneSourcesOf(entry.id))
     const { headerGroups, headerCols, hasFolder } = buildHeaderOf({
         columns: cols,
         visibleColIdx,
@@ -367,11 +390,7 @@ export const buildCategorizedTable = (deps: SpreadTableDeps, group: SourceEntryG
         folderGroupOf,
         paneSourceOf: (buffId) => {
             const src = groupPaneSources.get(buffId)
-            if (!src) return undefined
-            return {
-                charName: team[src.charIdx]?.character ?? `角色${src.charIdx + 1}`,
-                zoneLabels: zoneLabelsOf(src.zoneIds)
-            }
+            return src ? paneSourceLabelOf(team, src) : undefined
         }
     })
 
@@ -398,7 +417,7 @@ export const buildHeaderOf = (args: {
     visibleColIdx: readonly number[]
     enabledCounts: readonly number[]
     folderGroupOf: ReadonlyMap<string, FolderGroup>
-    /** @desc buffId → 影响源说明（分类平铺用；分段平铺不传） */
+    /** @desc buffId → 影响源说明（两种平铺都传：影响源的列名旁要标连接图标） */
     paneSourceOf?: (buffId: string) => { charName: string; zoneLabels: string[] } | undefined
 }): { headerGroups: HeadGroupCell[]; headerCols: HeadCell[]; hasFolder: boolean } => {
     const { columns: cols, visibleColIdx, enabledCounts, folderGroupOf } = args
@@ -685,10 +704,14 @@ const markSelectedRuns = (rows: RowData[]): void => {
 /**
  * @desc 分段平铺的整表构建：
  * - **行** = 全部伤害条目（按时间轴位置升序，位置相同保持原顺序），按段规格切进不同的表；
- * - **列** = 选中来源「能吃到的 Buff」的并集（`hardOk` 并集；列序与分类平铺同一份 columns 一致）；
+ * - **列** = 选中来源「能吃到的 Buff」的并集（`hardOk` 并集 ∪ 影响源并集；列序与分类平铺同一份 columns 一致）；
  * - **可编辑** = 条目属于选中来源；其余行只显示首列伤害信息（模板里 `row.editable` 为 false → 首列灰化、右侧绝对留白）；
  * - **连续行段** = 相邻行都属于选中来源；段首 `runStart` / 段尾 `runEnd` 由模板画主题色分割线；
  * - **空段不建表** = 一条伤害都没有落进去的时段整张表丢掉（只剩表头的表是纯噪音）。
+ *
+ * 影响源（跨角色转模：效果落在出伤角色、引用源在后台角色）的 Buff 作用域指向被引用角色，
+ * 对出伤条目 `hardOk` 永远是 false —— 只看 `hardOk` 会把它们从列里筛掉。故与分类平铺同口径：
+ * 影响源独立放行（成列、可勾、未勾时显示连接图标）。
  */
 export const buildSegmentedTables = (args: {
     specs: readonly SegmentSpec[]
@@ -701,6 +724,10 @@ export const buildSegmentedTables = (args: {
     columns: readonly BuffConf[]
     folderGroupOf: ReadonlyMap<string, FolderGroup>
     stateFor: (bs: BuffConf, entry: DamageEntry, charIdx: number) => CellState
+    /** @desc 条目的「影响源」查询（跨角色转模的 Buff 靠它成列） */
+    paneSourcesOf: (entryId: string) => Record<string, PaneEffectSource>
+    /** @desc 队伍槽位（影响源表头文案取角色名） */
+    team: readonly CharSlot[]
     /** @desc Buff 级门槛判定（隐藏不达门槛列时才需要，依赖勾选） */
     rulesMetFor?: (bs: BuffConf, entry: DamageEntry) => boolean
     /** @desc 是否隐藏「不达门槛」的列（全局偏好） */
@@ -713,22 +740,40 @@ export const buildSegmentedTables = (args: {
     const editableOf = (entry: DamageEntry): boolean =>
         activeSource !== null && entrySourceKeyOf(charToIdx, entry) === activeSource
 
-    /** @desc 选中来源「真正可用」的 Buff 列 = 该来源各行 `hardOk`（+ 门槛，若开启隐藏）的并集 */
+    /** @desc 每条的影响源查询结果只取一次（建列与建格共用；组件侧的缓存按绑定数组引用失效） */
+    const paneCache = new Map<string, Record<string, PaneEffectSource>>()
+    const panesFor = (entry: DamageEntry): Record<string, PaneEffectSource> => {
+        const hit = paneCache.get(entry.id)
+        if (hit) return hit
+        const value = args.paneSourcesOf(entry.id)
+        paneCache.set(entry.id, value)
+        return value
+    }
+
+    /** @desc 选中来源「真正可用」的 Buff 列 = 该来源各行 `hardOk`（+ 门槛，若开启隐藏）∪ 影响源的并集 */
     const enabledCounts: number[] = cols.map(() => 0)
+    const activeEntries: DamageEntry[] = []
     for (const { entry } of ordered) {
         if (!editableOf(entry)) continue
+        activeEntries.push(entry)
         const charIdx = entryCharIdx(entry, charToIdx)
+        const panes = panesFor(entry)
         for (let ci = 0; ci < cols.length; ci++) {
             const state = args.stateFor(cols[ci], entry, charIdx)
-            if (columnCounted(args, cols[ci], entry, state)) enabledCounts[ci]++
+            if (columnCounted(args, cols[ci], entry, state) || panes[cols[ci].id] !== undefined) enabledCounts[ci]++
         }
     }
     const visibleColIdx = cols.map((_, ci) => ci).filter((ci) => enabledCounts[ci] > 0)
+    const paneSources = collectPaneSources(activeEntries, panesFor)
     const { headerGroups, headerCols, hasFolder } = buildHeaderOf({
         columns: cols,
         visibleColIdx,
         enabledCounts,
-        folderGroupOf: args.folderGroupOf
+        folderGroupOf: args.folderGroupOf,
+        paneSourceOf: (buffId) => {
+            const src = paneSources.get(buffId)
+            return src ? paneSourceLabelOf(args.team, src) : undefined
+        }
     })
 
     const tables: CalcTable[] = specs.map((spec) => ({
@@ -751,10 +796,17 @@ export const buildSegmentedTables = (args: {
         if (!table) continue
         const editable = editableOf(entry)
         const charIdx = entryCharIdx(entry, charToIdx)
+        const panes = editable ? panesFor(entry) : {}
         const cells: CellData[] = editable
             ? cols.map((bs) => {
                   const state = args.stateFor(bs, entry, charIdx)
-                  return { buffId: bs.id, enabled: !state.blocked, hardOk: state.hardOk, pane: false }
+                  const pane = panes[bs.id] !== undefined
+                  return {
+                      buffId: bs.id,
+                      enabled: !state.blocked || pane,
+                      hardOk: state.hardOk || pane,
+                      pane
+                  }
               })
             : []
         table.rows.push({

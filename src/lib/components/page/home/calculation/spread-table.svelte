@@ -39,8 +39,10 @@
         headColumnWidthPx,
         HEAD_BAND_LINES,
         HEAD_BAND_TRACKING_PX,
+        HEAD_CELL_PAD_PX,
         HEAD_COL_MIN_PX,
         HEAD_NAME_LINES,
+        HEAD_PANE_ICON_PX,
         resolveActiveSource,
         rowFingerprintOf,
         rowHeadTitle,
@@ -205,7 +207,9 @@
         const widths = group.visibleColIdx.map((ci, colPos) => {
             const hc = group.headerCols[colPos]
             const label = hc ? buffLeafName(columns[ci]?.name ?? hc.label) : ''
-            return headColumnWidthPx(label, HEAD_NAME_LINES)
+            const base = headColumnWidthPx(label, HEAD_NAME_LINES)
+            // 影响源图标与 Buff 名同行、排在名字左侧：得给它留出位置，否则名字被挤成多折一行
+            return hc?.paneSource ? base + HEAD_PANE_ICON_PX : base
         })
         for (const band of bands) {
             for (const cell of band) {
@@ -226,6 +230,10 @@
         for (let k = 0; k < span; k++) total += widths[start + k] ?? HEAD_COL_MIN_PX
         return total
     }
+
+    /** @desc 列名文字上限 = 列宽 − 单元格内边距 − （影响源图标 + 间距）；超长由 `line-clamp-2` 收尾 */
+    const headNameMaxWidth = (width: number, paneIcon: boolean): number =>
+        Math.max(0, width - HEAD_CELL_PAD_PX - (paneIcon ? HEAD_PANE_ICON_PX : 0))
 
     /** @desc 一列的分隔线类（列位索引）：一次算好，单元格渲染只查数组 */
     const columnSepsOf = (table: CalcTable): string[] =>
@@ -479,6 +487,8 @@
                   columns,
                   folderGroupOf,
                   stateFor: cellStateOf,
+                  paneSourcesOf,
+                  team,
                   ...(hideUnmetColumns ? { rulesMetFor: rulesMetOf, hideUnmetColumns } : {})
               })
             : []
@@ -1104,28 +1114,32 @@
                                     oncontextmenu={(e) => onColHeaderContextMenu(e, ti, hc.ci)}
                                 >
                                     <span
-                                        class="relative flex h-full w-full flex-col items-center justify-center px-1.5 py-1 transition-colors hover:bg-(--theme-modal-text)/5 {hc.enabled ===
+                                        class="flex h-full w-full items-center justify-center gap-0.5 px-1.5 py-1 transition-colors hover:bg-(--theme-modal-text)/5 {hc.enabled ===
                                         0
                                             ? 'opacity-30'
                                             : ''}"
                                     >
-                                        <!-- 表头 Buff 名：最多 2 行（`h-8` 32px − `py-1` 8px = 24px = 2 × `leading-3`）。
-                                             列宽由 `columnWidthsOf` 按名字长度算好，故这里只需把文字上限钉在「列宽 − 内边距」，
-                                             免得 `max-content` 再把列撑宽；超长仍由 `line-clamp` 收尾（完整名字在 `title` 里）。 -->
-                                        <span
-                                            class="line-clamp-2 w-full break-words text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
-                                            style="max-width: {(layout.widths[colPos] ?? HEAD_COL_MIN_PX) - 12}px;"
-                                            title={hc.title}>{buffLeafName(columns[hc.ci]?.name ?? hc.label)}</span
-                                        >
+                                        <!-- 影响源标记：与 Buff 名同一行、排在名字左侧（行内） -->
                                         {#if hc.paneSource}
                                             <span
-                                                class="absolute right-0.5 top-0.5 flex shrink-0 items-center"
+                                                class="flex shrink-0 items-center"
                                                 style="color: var(--theme-accent-text);"
                                                 title={paneSourceTooltip(hc.paneSource)}
                                             >
                                                 <Icon icon="mdi:transit-connection-variant" class="size-3" />
                                             </span>
                                         {/if}
+                                        <!-- 表头 Buff 名：最多 2 行（`h-8` 32px − `py-1` 8px = 24px = 2 × `leading-3`）。
+                                             列宽由 `columnWidthsOf` 按名字长度算好，故这里只需把文字上限钉在「列宽 − 内边距 − 图标」，
+                                             免得 `max-content` 再把列撑宽；超长仍由 `line-clamp` 收尾（完整名字在 `title` 里）。 -->
+                                        <span
+                                            class="line-clamp-2 min-w-0 break-words text-center text-[10px] font-medium leading-3 text-(--theme-modal-text)/60"
+                                            style="max-width: {headNameMaxWidth(
+                                                layout.widths[colPos] ?? HEAD_COL_MIN_PX,
+                                                !!hc.paneSource
+                                            )}px;"
+                                            title={hc.title}>{buffLeafName(columns[hc.ci]?.name ?? hc.label)}</span
+                                        >
                                     </span>
                                 </th>
                             {/each}
@@ -1171,30 +1185,44 @@
                                         <span
                                             class="truncate text-(--theme-modal-text)"
                                             style="color: {row.editable
-                                                ? `var(--theme-element-${row.entry.damageElement}, #888)`
+                                                ? `var(--theme-element-${row.entry.damageElement}, var(--theme-modal-text))`
                                                 : 'var(--theme-modal-text)'};">{row.entry.displayName}</span
                                         >
                                     </div>
-                                    <!-- 视为：伤害类型（只读展示，编辑统一在底部工具栏的「编辑伤害类型」弹窗）；stopPropagation 避免触发行高亮 -->
+                                    <!-- 灰色小字副行：可编辑行 = 伤害类型（只读展示，编辑统一在底部工具栏的「编辑伤害类型」弹窗）；
+                                         灰化行 = 伤害源名（这类行整行压暗，伤害类型读不出来也没用，来源才帮人对号） -->
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <div
                                         class="flex flex-wrap items-center gap-0.5 px-0.5 pb-0.5"
                                         onclick={(e) => e.stopPropagation()}
                                     >
-                                        <span class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
-                                            >伤害类型：</span
-                                        >
-                                        <!-- 去重后渲染：既有工程数据 / 外部导入的伤害类型数组可能带重复项，重复 key 会抛 each_key_duplicate -->
-                                        {#each [...new Set(entryDamageTypeMap[row.entry.id] ?? [])] as dt (dt)}
-                                            <Tag style="background: var(--theme-input-bg);">{damageTypeShort(dt)}</Tag>
-                                        {/each}
-                                        {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
-                                            {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
-                                            {#if inferred.length > 0}
-                                                <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
-                                                    >{inferredDamageTypeText(inferred)}</span
+                                        {#if row.editable}
+                                            <span
+                                                class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
+                                                >伤害类型：</span
+                                            >
+                                            <!-- 去重后渲染：既有工程数据 / 外部导入的伤害类型数组可能带重复项，重复 key 会抛 each_key_duplicate -->
+                                            {#each [...new Set(entryDamageTypeMap[row.entry.id] ?? [])] as dt (dt)}
+                                                <Tag style="background: var(--theme-input-bg);"
+                                                    >{damageTypeShort(dt)}</Tag
                                                 >
+                                            {/each}
+                                            {#if (entryDamageTypeMap[row.entry.id] ?? []).length === 0}
+                                                {@const inferred = inferredDamageTypeMap[row.entry.id] ?? []}
+                                                {#if inferred.length > 0}
+                                                    <span class="text-[10px] leading-tight text-(--theme-modal-text)/35"
+                                                        >{inferredDamageTypeText(inferred)}</span
+                                                    >
+                                                {/if}
                                             {/if}
+                                        {:else}
+                                            <span
+                                                class="text-[10px] font-black leading-tight text-(--theme-modal-text)/70"
+                                                >伤害源：</span
+                                            >
+                                            <span class="text-[10px] leading-tight text-(--theme-modal-text)"
+                                                >{row.entry.character || '—'}</span
+                                            >
                                         {/if}
                                     </div>
                                 </td>
