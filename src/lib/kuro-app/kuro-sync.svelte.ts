@@ -1,14 +1,14 @@
-import { buildKuroPlans, type KuroPlanDraft } from '$lib/kuro-app/kuro-plan'
+import { buildKuroPlans, type KuroPlanDraft } from './kuro-plan'
 import { getCharacterList } from '$lib/api/data-cache'
 import { saveSubstatPlan } from '$lib/data/substat-library.svelte'
-import { getKuroEchoCache, kuroRefreshCooldownLeft, saveKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
+import { getKuroEchoCache, kuroRefreshCooldownLeft, saveKuroEchoCache } from './kuro-echo-cache.svelte'
 import {
     getKuroActiveRole,
     isKuroLoggedIn,
     kuroFetchRoleEchoes,
     refreshKuroSession,
     type KuroCharacterEchoes
-} from '$lib/kuro-app/kuro.svelte'
+} from './kuro.svelte'
 
 /** @desc 方案名：同一角色重复同步会覆盖同一份，不堆积（时间与角色记在 note 里） */
 export const KURO_PLAN_NAME = '库街区同步'

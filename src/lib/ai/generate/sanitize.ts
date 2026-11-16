@@ -5,12 +5,12 @@ import {
     ZONE_NO_OVERRIDE_IDS,
     ZONE_REF_MAP,
     resolveZoneId
-} from '$lib/calc/calculation.consts'
+} from '$coconut/engine/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
-import { sanitizeLeafName } from '$lib/calc/buff-name'
-import type { BuffCondition } from '$lib/calc/calculation.types'
-import { normalizeRules, type LegacyGateCondition } from '$lib/calc/rules'
+import { sanitizeLeafName } from '$lib/buff/name'
+import type { BuffCondition } from '$coconut/engine/calculation.types'
+import { normalizeRules, type LegacyGateCondition } from '$coconut/engine/rules'
 
 /** @desc 生成结果里的实例级链/阶条件（链/阶 + 可能附带的属性/类型字段） */
 export type SanitizedGateCondition = LegacyGateCondition & {

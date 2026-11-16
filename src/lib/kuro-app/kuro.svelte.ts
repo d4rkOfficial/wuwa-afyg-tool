@@ -1,5 +1,5 @@
 import { browser } from '$app/environment'
-import { clearKuroEchoCache } from '$lib/kuro-app/kuro-echo-cache.svelte'
+import { clearKuroEchoCache } from './kuro-echo-cache.svelte'
 
 /**
  * @desc 库街区（实验性）同步：前端只调用应用自身的服务端路由 `/api/kuro-app/*`，

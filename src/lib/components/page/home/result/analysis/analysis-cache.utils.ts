@@ -1,7 +1,7 @@
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState } from '$lib/calc/config.types'
+import type { ConfigState } from '$coconut/engine/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import type { AlgorithmId } from '$lib/calc/substat-algorithms/types'
+import type { AlgorithmId } from '$lib/substat/types'
 
 /**
  * @desc 「数据分析 → 贡献」结果的**有效性判定与缓存登记**（纯函数）。

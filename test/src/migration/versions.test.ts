@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 
 import { migrateProject, VERSIONLESS_ASSUME_CURRENT_AFTER } from '$src/migration'
 import { PROJECT_VERSION } from '$lib/types/project'
-import type { OpBlock, TimelineData } from '$lib/calc/timeline.types'
+import type { OpBlock, TimelineData } from '$coconut/engine/timeline.types'
 
 const block = (id: string, key: string, desc: string, extra: Partial<OpBlock> = {}): OpBlock => ({
     id,

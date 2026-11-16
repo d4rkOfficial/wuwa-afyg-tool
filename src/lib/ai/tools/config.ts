@@ -9,10 +9,10 @@ import {
     updateSubstatValue,
     updateEnemy,
     updateResistance
-} from '$lib/calc/config.store.svelte'
+} from '$lib/project/config.store.svelte'
 import { getActiveProject, getProjects, updateConfig } from '$lib/data/project.svelte'
 import { MAIN_STAT_POOL } from '$lib/consts/stat-data'
-import { defaultConfig } from '$lib/calc/config.consts'
+import { defaultConfig } from '$lib/project/config.consts'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 const COSTS = [1, 3, 4, 5]

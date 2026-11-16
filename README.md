@@ -91,7 +91,7 @@ pnpm test:watch           # 监视重跑
 pnpm test:infer           # 联网的伤害类型推导 TDD 夹具（默认不在 pnpm test 内）
 ```
 
-单个文件也可以直接跑：`node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/src/lib/calc/coeff-crit.test.ts`。
+单个文件也可以直接跑：`node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/src/coconut-core/engine/coeff-crit.test.ts`。
 
 ## API
 

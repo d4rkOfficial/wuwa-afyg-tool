@@ -2,7 +2,7 @@
  * @desc AI/WS 工具的展示分组与短描述（供提示词编辑弹窗的「可调用工具」列表用）。
  *  工具定义里只有面向模型的完整 description，这里再按业务域细分归类，并压出一句短描述。
  */
-import type { ToolDefinition } from '$lib/ai/tools/registry'
+import type { ToolDefinition } from './registry'
 
 /** @desc 分组规则：按顺序匹配，先命中者胜（越具体的放越前面） */
 const GROUP_RULES: { label: string; test: RegExp }[] = [

@@ -36,11 +36,11 @@
         setAiEditTarget,
         setPromptEditOpen,
         type SettingsTab
-    } from '../settings-ui.svelte'
-    import SkillSection from '../skill-section.svelte'
+    } from '$lib/components/page/home/settings/settings-ui.svelte'
+    import SkillSection from '$lib/components/page/home/settings/skill-section.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
-    import { DANGER_MODE_OPTIONS, ROW_TABS, TAB_ACCENT } from '../utils'
+    import { DANGER_MODE_OPTIONS, ROW_TABS, TAB_ACCENT } from '$lib/components/page/home/settings/utils'
 
     interface Props extends ComponentsProps {
         /**

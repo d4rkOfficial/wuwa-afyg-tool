@@ -6,8 +6,8 @@
 // 若其它代码需要拿到 nanoka 的模块态版本，请通过该端点，而不要直接读上游。
 
 import { browser } from '$app/environment'
-import { fetchApiJson } from '$lib/api/local-api'
-import { providerQuery } from '$lib/api/provider'
+import { fetchApiJson } from './local-api'
+import { providerQuery } from './provider'
 import { readStorage, writeStorage } from '$lib/utils/safe-storage'
 
 const VERSION_KEY = 'wuwa-afyg:ww-version'

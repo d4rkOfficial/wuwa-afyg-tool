@@ -2,7 +2,7 @@
 // 注：Buff 命名规则与黑话词典由内置技能卡承载（见 $lib/ai/skills 的 BUILTIN_SKILLS），
 //     这里保留其字段的读取（LegacyPromptPrefs），供技能卡做一次性迁移。
 import { browser } from '$app/environment'
-import { dbGet, dbSet } from '$lib/data/db'
+import { dbGet, dbSet } from './db'
 import { DEFAULT_SYSTEM_PROMPT } from '$lib/ai/persona'
 import type { LegacyPromptPrefs } from '$lib/ai/skills'
 

@@ -5,10 +5,10 @@ import '$lib/ai/tools/substat-library'
 import { createProjectData, __seedProjectsForTest } from '$lib/data/project.svelte'
 import { reloadActiveProjectStores } from '$lib/data/project-reload'
 import { getSubstatPlans } from '$lib/data/substat-library.svelte'
-import { buildStandardSlots, cloneSlots } from '$lib/calc/standard-substats'
-import { defaultConfig } from '$lib/calc/config.consts'
-import { init as initConfig } from '$lib/calc/config.store.svelte'
-import type { EchoSlotConfig } from '$lib/calc/config.types'
+import { buildStandardSlots, cloneSlots } from '$lib/substat/standard'
+import { defaultConfig } from '$lib/project/config.consts'
+import { init as initConfig } from '$lib/project/config.store.svelte'
+import type { EchoSlotConfig } from '$coconut/engine/config.types'
 
 const run = async (name: string, args: Record<string, unknown> = {}) =>
     JSON.parse(await executeTool({ onConfirm: async () => true }, name, args))

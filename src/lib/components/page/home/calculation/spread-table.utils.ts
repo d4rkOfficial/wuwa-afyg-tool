@@ -9,9 +9,9 @@
  * 依赖方向：本文件不 import 任何 store —— store 侧的能力（可用性判定、影响源查询、自然序比较、
  * 角色元素色）一律由调用方以**函数参数**注入，故这里可被独立测试、也避免「纯逻辑反向依赖 runes store」。
  */
-import { LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$lib/calc/calculation.consts'
-import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
-import type { PaneEffectSource } from '$lib/calc/pane-effects'
+import { LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$coconut/engine/calculation.consts'
+import type { BuffConf, DamageEntry } from '$coconut/engine/calculation.types'
+import type { PaneEffectSource } from '$lib/buff/pane-effects'
 import type { CharSlot } from '$lib/types/project'
 import { entryCharIdx, isNonDirectDamage, zoneLabelsOf } from './damage-table.utils'
 

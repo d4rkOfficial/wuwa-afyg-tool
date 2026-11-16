@@ -33,20 +33,26 @@ import {
     canRedoTable,
     buildDamageEntriesFromTimeline,
     getCalcState
-} from '$lib/calc/calculation.store.svelte'
-import { loadCharSkills } from '$lib/calc/timeline.store.svelte'
+} from '$lib/project/calculation.store.svelte'
+import { loadCharSkills } from '$lib/project/timeline.store.svelte'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getActiveProject, getProjects } from '$lib/data/project.svelte'
-import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
-import { paneEffectSourcesOf } from '$lib/calc/pane-effects'
-import { getOpBlocks, getRefLines } from '$lib/calc/timeline.store.svelte'
+import { buildEntityImportItems } from '$lib/buff/import-utils'
+import { paneEffectSourcesOf } from '$lib/buff/pane-effects'
+import { getOpBlocks, getRefLines } from '$lib/project/timeline.store.svelte'
 import { renderBuffConfList, renderCalculationDigest, scopeLabel } from '$lib/ai/phase-digest'
 import { asIndex, buffConfsInOrder, damageEntriesInOrder, resolveBuffConf, resolveDamageEntry } from '$lib/ai/refs'
-import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import {
+    LEGACY_ZONE_IDS,
+    resolveZoneId,
+    ZONE_MAP,
+    ZONE_NO_REF_IDS,
+    ZONE_REF_MAP
+} from '$coconut/engine/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
-import { cyclePathOf, isRuleDraft, normalizeRule } from '$lib/calc/rules'
-import type { BuffRule, ZoneRef } from '$lib/calc/calculation.types'
-import { isEffectEntry } from '$lib/calc/registry/formulas'
+import { cyclePathOf, isRuleDraft, normalizeRule } from '$coconut/engine/rules'
+import type { BuffRule, ZoneRef } from '$coconut/engine/calculation.types'
+import { isEffectEntry } from '$coconut/engine/registry/formulas'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

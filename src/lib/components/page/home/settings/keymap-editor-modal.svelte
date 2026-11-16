@@ -8,7 +8,7 @@
     import Modal from '$lib/components/layout/modal.svelte'
     import Button from '$lib/components/ui/button.svelte'
     import { getUiBtnIcons } from '$lib/api/data-cache'
-    import { GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
+    import { GAMEPAD_BUTTONS } from '$lib/timeline/consts'
     import {
         getKeyMapEntries,
         physicalLabel,

@@ -4,7 +4,7 @@
      * 三列结构：倍率名 / 伤害类型多选 / 同步到所有同名伤害；顶部标题右侧为帮助按钮
      */
     import Icon from '@iconify/svelte'
-    import { isEffectEntry } from '$lib/calc/registry/formulas'
+    import { isEffectEntry } from '$coconut/engine/registry/formulas'
     import { fade, slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import type { ComponentsProps } from '$lib/types'
@@ -16,15 +16,15 @@
         getSameNameEntryIds,
         setDamageTypesForEntry,
         syncDamageTypesToSameName
-    } from '$lib/calc/calculation.store.svelte'
+    } from '$lib/project/calculation.store.svelte'
     import { getActiveProject } from '$lib/data/project.svelte'
-    import { inferDamageTypes } from '$lib/calc/utils'
-    import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
+    import { inferDamageTypes } from '$coconut/engine/utils'
+    import { buildEchoDescByEntry } from '$coconut/engine/skill-infer'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { addToast } from '$lib/data/toast.svelte'
-    import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharIconMap } from '$lib/project/timeline.store.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
-    import type { DamageEntry } from '$lib/calc/calculation.types'
+    import type { DamageEntry } from '$coconut/engine/calculation.types'
     import type { CharSlot } from '$lib/types/project'
     import type { UnsavedChangeItem } from '$lib/types/unsaved-change'
     import { diffDamageTypes, type DamageTypeEntrySnapshot } from './unsaved-changes.utils'

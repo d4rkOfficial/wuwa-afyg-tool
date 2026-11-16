@@ -1,5 +1,5 @@
-import type { ConfigState } from '$lib/calc/config.types'
-import type { ResultEntry } from '$lib/calc/result.types'
+import type { ConfigState } from '$coconut/engine/config.types'
+import type { ResultEntry } from '$coconut/engine/result.types'
 import type { CharSlot } from '$lib/types/project'
 
 /** @desc 工程文件里某一阶段的容器（只声明 fast-calc 需要的阶段） */

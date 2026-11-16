@@ -17,11 +17,11 @@
  * 2. 入参兼容内部 id（WS / 脚本要精确寻址时用）—— 旧消息里的 id 不会失效；
  * 3. 报错要精准：给总数、可用取值与一份紧凑清单，模型可直接自我纠正。
  */
-import { getOpBlocks, getRefLines, getTeam } from '$lib/calc/timeline.store.svelte'
-import { getAllBuffConfs, getAllDamageEntries } from '$lib/calc/calculation.store.svelte'
-import { shortKeyOf } from '$lib/ai/short-key'
-import type { OpBlock, RefLine } from '$lib/calc/timeline.types'
-import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+import { getOpBlocks, getRefLines, getTeam } from '$lib/project/timeline.store.svelte'
+import { getAllBuffConfs, getAllDamageEntries } from '$lib/project/calculation.store.svelte'
+import { shortKeyOf } from './short-key'
+import type { OpBlock, RefLine } from '$coconut/engine/timeline.types'
+import type { BuffConf, DamageEntry } from '$coconut/engine/calculation.types'
 
 /**
  * @desc 工具入参里的位置引用：排轴传**短索引**或内部 id；拉表/配装传**序号**（数字或纯数字字符串）或 id。

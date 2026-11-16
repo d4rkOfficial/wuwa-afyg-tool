@@ -137,11 +137,11 @@ const ENTITY_IDS = [
 
 /** @desc ① 自检的搜索范围：这些文件里必须能找到 ENTITY_IDS 的每一项 */
 const REGISTRY_SOURCES = [
-    'src/lib/calc/registry/actions.ts',
-    'src/lib/calc/registry/formulas.ts',
-    'src/lib/calc/registry/stats.ts',
-    'src/lib/calc/calculation.consts.ts',
-    'src/lib/calc/rules.ts',
+    'src/coconut-core/engine/registry/actions.ts',
+    'src/coconut-core/engine/registry/formulas.ts',
+    'src/coconut-core/engine/registry/stats.ts',
+    'src/coconut-core/engine/calculation.consts.ts',
+    'src/coconut-core/engine/rules.ts',
     'src/lib/consts/game-terms.ts',
     'src/lib/consts/stat-data.ts'
 ]
@@ -150,15 +150,15 @@ const REGISTRY_SOURCES = [
 
 /**
  * @desc 注册表文件：**允许**（且必须）出现实体名，不计入棘轮。
- * 后续阶段会收敛成 `src/lib/calc/registry/**` 下的若干注册域。
+ * 后续阶段会收敛成 `src/coconut-core/engine/registry/**` 下的若干注册域。
  */
 const REGISTRY = new Set([
-    'src/lib/calc/registry/actions.ts',
-    'src/lib/calc/registry/formulas.ts',
-    'src/lib/calc/registry/stats.ts',
-    'src/lib/calc/calculation.consts.ts',
-    'src/lib/calc/calculation.types.ts',
-    'src/lib/calc/rules.ts'
+    'src/coconut-core/engine/registry/actions.ts',
+    'src/coconut-core/engine/registry/formulas.ts',
+    'src/coconut-core/engine/registry/stats.ts',
+    'src/coconut-core/engine/calculation.consts.ts',
+    'src/coconut-core/engine/calculation.types.ts',
+    'src/coconut-core/engine/rules.ts'
 ])
 
 /**
@@ -167,7 +167,16 @@ const REGISTRY = new Set([
  * `*.svelte.ts`（Runes store）不进扫描：它们属于界面/持久化层，职责是把注册表拼成工程状态，
  * 天然要按实体名分派（AGENTS §5.1 把 `*.svelte.ts` 划在 UI/store 层，不套函数式约束，同理）。
  */
-const SCAN_DIRS = ['src/lib/calc', 'src/lib/components/page/home/calculation', 'src/lib/components/page/home/config']
+const SCAN_DIRS = [
+    'src/coconut-core',
+    'src/lib/buff',
+    'src/lib/timeline',
+    'src/lib/project',
+    'src/lib/result',
+    'src/lib/substat',
+    'src/lib/components/page/home/calculation',
+    'src/lib/components/page/home/config'
+]
 
 /**
  * @desc 棘轮基线：文件 → 当前实测的字面量计数（阶段 3 完成后实测，合计 192 处）。
@@ -176,36 +185,36 @@ const SCAN_DIRS = ['src/lib/calc', 'src/lib/components/page/home/calculation', '
  * 目标终态是整张表清零 —— 届时删掉 `BASELINE`，改为「非空即失败」。
  *
  * 分档说明：
- * - `damage-trace.ts` / `compute.ts` / `buff-library-condition.ts`
+ * - `damage-trace.ts` / `compute.ts` / `buff/library-condition.ts`
  *   → 阶段 2–3 继续由「系数暴击面板 + ResultEntry 结构化」清零；
- * - `skill-infer.ts` / `utils.ts` / `timeline.consts.ts` / `skill-segments.ts`
+ * - `skill-infer.ts` / `utils.ts` / `timeline/consts.ts` / `timeline/skill-segments.ts`
  *   → 阶段 2 由「中文词表注册」清零（决议 E6）；
  * - `config.types.ts` / `timeline.types.ts` 的 1 处是字面量联合类型 → 阶段 2 改为从注册表派生
  *   （`typeof ENEMY_TYPES[number]`）。
  */
 const BASELINE = new Map(
     Object.entries({
-        'src/lib/calc/damage-trace.ts': 53,
-        'src/lib/calc/compute.ts': 26,
-        'src/lib/calc/utils.ts': 38,
+        'src/coconut-core/engine/damage-trace.ts': 53,
+        'src/coconut-core/engine/compute.ts': 26,
+        'src/coconut-core/engine/utils.ts': 38,
         'src/lib/components/page/home/calculation/damage-table.utils.ts': 0,
         'src/lib/components/page/home/config/character-detail-utils.ts': 23,
-        'src/lib/calc/skill-infer.ts': 21,
-        'src/lib/calc/standard-substats.ts': 9,
-        'src/lib/calc/buff-library-condition.ts': 7,
-        'src/lib/calc/timeline.consts.ts': 4,
-        'src/lib/calc/skill-segments.ts': 3,
-        'src/lib/calc/pane-effects.ts': 2,
+        'src/coconut-core/engine/skill-infer.ts': 21,
+        'src/lib/substat/standard.ts': 9,
+        'src/lib/buff/library-condition.ts': 7,
+        'src/lib/timeline/consts.ts': 4,
+        'src/lib/timeline/skill-segments.ts': 3,
+        'src/lib/buff/pane-effects.ts': 2,
         'src/lib/components/page/home/calculation/spread-table.utils.ts': 2,
-        'src/lib/calc/config.consts.ts': 1,
-        'src/lib/calc/config.types.ts': 1,
-        'src/lib/calc/custom-hit.ts': 1,
-        'src/lib/calc/timeline.types.ts': 1,
+        'src/lib/project/config.consts.ts': 1,
+        'src/coconut-core/engine/config.types.ts': 1,
+        'src/lib/timeline/custom-hit.ts': 1,
+        'src/coconut-core/engine/timeline.types.ts': 1,
         // 已清零（登记为 0 表示「一旦出现即失败」）
-        'src/lib/calc/condition.ts': 0,
-        'src/lib/calc/zone-ops.ts': 0,
-        'src/lib/calc/result.types.ts': 0,
-        'src/lib/calc/calculation.consts.ts': 0,
+        'src/coconut-core/engine/condition.ts': 0,
+        'src/coconut-core/engine/zone-ops.ts': 0,
+        'src/coconut-core/engine/result.types.ts': 0,
+        'src/coconut-core/engine/calculation.consts.ts': 0,
         'src/lib/components/page/home/calculation/buff-modal.types.ts': 0
     })
 )

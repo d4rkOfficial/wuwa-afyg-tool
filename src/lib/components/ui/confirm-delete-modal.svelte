@@ -2,7 +2,7 @@
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import Button from '$lib/components/ui/button.svelte'
+    import Button from './button.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { mergeComponentsStyle } from '$lib/utils/component-style'
 

@@ -4,7 +4,7 @@
      *  - `?import_project=<工程 JSON 地址>`（浏览器 / 普通 iframe）；
      *  - 宿主在 `fast-calc:ready` 后发送 `{ type: 'fast-calc:load', project }`
      *    （wuwacalc-conv 报告页的本地重算走这条路径）。
-     *  页面上半部是角色 / 敌怪编辑，下半部是计算结果表格；计算全部走 `$lib/calc` 引擎，
+     *  页面上半部是角色 / 敌怪编辑，下半部是计算结果表格；计算全部走 `$coconut` 引擎，
      *  乘区列由 `ResultEntry.multiplierZones` 动态得出（引擎新增乘区会自动出现，页面不写死乘区清单）。
      *  计算完成后按旧协议回传 `fast-calc:result`，供 conv 报告页对齐逐技能差异。
      *
@@ -23,21 +23,21 @@
     import { onDestroy, onMount } from 'svelte'
     import { getCharacterInfo, getWeaponInfo, setApiBase } from '$lib/api/data-cache'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-    import { computeAll } from '$lib/calc/compute'
+    import { computeAll } from '$coconut/engine/compute'
     import {
         buildDamageSegments,
         type DamageSegments,
         type DamageTraceCtx,
         type TracePart
-    } from '$lib/calc/damage-trace'
-    import { getAllDamageEntries, getCalcState, init as initCalculation } from '$lib/calc/calculation.store.svelte'
-    import type { CalcState } from '$lib/calc/calculation.types'
-    import { enemyDefenseForLevel } from '$lib/calc/config.consts'
-    import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
-    import type { ResultEntry } from '$lib/calc/result.types'
-    import { formatMultiplierDisplay } from '$lib/calc/result.styles'
-    import type { TimelineData } from '$lib/calc/timeline.types'
-    import { ensureSkillCache } from '$lib/calc/timeline.store.svelte'
+    } from '$coconut/engine/damage-trace'
+    import { getAllDamageEntries, getCalcState, init as initCalculation } from '$lib/project/calculation.store.svelte'
+    import type { CalcState } from '$coconut/engine/calculation.types'
+    import { enemyDefenseForLevel } from '$lib/project/config.consts'
+    import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+    import type { ResultEntry } from '$coconut/engine/result.types'
+    import { formatMultiplierDisplay } from '$lib/result/styles'
+    import type { TimelineData } from '$coconut/engine/timeline.types'
+    import { ensureSkillCache } from '$lib/project/timeline.store.svelte'
     import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { ensureCharElements } from '$lib/data/char-elements.svelte'
     import type { CharSlot } from '$lib/types/project'

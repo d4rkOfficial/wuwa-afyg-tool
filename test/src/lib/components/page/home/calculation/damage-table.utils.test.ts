@@ -20,8 +20,14 @@ import {
     cellBlockReasonOf,
     zoneUsableByNonDirect
 } from '$lib/components/page/home/calculation/damage-table.utils'
-import { buffContributesToEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
-import type { BuffCondition, BuffInstance, BuffRule, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
+import { buffContributesToEntry, DEFAULT_CONDITION_PROFILE } from '$coconut/engine/compute'
+import type {
+    BuffCondition,
+    BuffInstance,
+    BuffRule,
+    BuffZoneValue,
+    DamageEntry
+} from '$coconut/engine/calculation.types'
 
 const effectEntry: DamageEntry = {
     id: 'eff',

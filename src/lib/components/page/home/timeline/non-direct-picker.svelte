@@ -20,7 +20,7 @@
     import Avatar from '$lib/components/ui/avatar.svelte'
     import Slider from '$lib/components/ui/slider.svelte'
     import SectionTitle from '$lib/components/ui/section-title.svelte'
-    import { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from '$lib/calc/timeline.consts'
+    import { NON_DIRECT_CONFIGS, NON_DIRECT_ELEMENT } from '$lib/timeline/consts'
     import {
         getNonDirectPickerBlockId,
         setNonDirectPickerBlockId,
@@ -39,7 +39,7 @@
         elementColor,
         getCharIconMap,
         applyNonDirectEntries
-    } from '$lib/calc/timeline.store.svelte'
+    } from '$lib/project/timeline.store.svelte'
 
     /** @desc 效应段数上限：仅防手滑（层数为 0 时不给改，见 `updateNonDirectPickerEffect`） */
     const MAX_HITS = 99

@@ -2,9 +2,9 @@
  * @desc 工程版本迁移链（v0 → 当前版本）。
  */
 
-import type { ConfigState } from '$lib/calc/config.types'
-import type { TimelineData } from '$lib/calc/timeline.types'
-import { bindPaneEffectSources, entryOwnersFromTimeline } from '$lib/calc/pane-effects'
+import type { ConfigState } from '$coconut/engine/config.types'
+import type { TimelineData } from '$coconut/engine/timeline.types'
+import { bindPaneEffectSources, entryOwnersFromTimeline } from '$lib/buff/pane-effects'
 import type { PhaseKey, ResultAnalysisData } from '$lib/types/project'
 import { migrateCalcState } from './buff'
 import { migrateBuffFolderNaming } from './buff-folders'

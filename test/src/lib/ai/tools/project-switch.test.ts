@@ -4,7 +4,7 @@ import { executeTool } from '$lib/ai/tools/registry'
 import '$lib/ai/tools/project'
 import { createProjectData, __seedProjectsForTest } from '$lib/data/project.svelte'
 import { reloadActiveProjectStores } from '$lib/data/project-reload'
-import { getOpBlocks } from '$lib/calc/timeline.store.svelte'
+import { getOpBlocks } from '$lib/project/timeline.store.svelte'
 import type { Project } from '$lib/types/project'
 
 const withOp = (name: string, key: string): Project => {

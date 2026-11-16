@@ -4,15 +4,15 @@
 
 > 相关源码
 >
-> | 文件                                | 职责                                                                           |
-> | ----------------------------------- | ------------------------------------------------------------------------------ |
-> | `src/lib/calc/registry/actions.ts`  | **Buff 作用注册表**（落点 / 合并语义 / 初值 / 可覆盖 / 可挂条件 / 可引用）     |
-> | `src/lib/calc/calculation.types.ts` | Buff / 乘区 / 条件的类型定义                                                   |
-> | `src/lib/calc/zone-ops.ts`          | 面板结构与作用写入的唯一实现（`emptyPanel` / `applyZone` / `recomputeTotals`） |
-> | `src/lib/calc/condition.ts`         | 乘区级条件（属性 / 类型）求值与归一化                                          |
-> | `src/lib/calc/rules.ts`             | Buff 级规则（求值 / 依赖 / 级联 / 文案）                                       |
-> | `src/lib/calc/compute.ts`           | 贡献聚合与逐条目计算                                                           |
-> | `src/migration/`                    | 历史数据迁移（版本链、拉表态、Buff 文件夹命名、v7 规则化 / v8 伤害名并正则）   |
+> | 文件                                           | 职责                                                                           |
+> | ---------------------------------------------- | ------------------------------------------------------------------------------ |
+> | `src/coconut-core/engine/registry/actions.ts`  | **Buff 作用注册表**（落点 / 合并语义 / 初值 / 可覆盖 / 可挂条件 / 可引用）     |
+> | `src/coconut-core/engine/calculation.types.ts` | Buff / 乘区 / 条件的类型定义                                                   |
+> | `src/coconut-core/engine/zone-ops.ts`          | 面板结构与作用写入的唯一实现（`emptyPanel` / `applyZone` / `recomputeTotals`） |
+> | `src/coconut-core/engine/condition.ts`         | 乘区级条件（属性 / 类型）求值与归一化                                          |
+> | `src/coconut-core/engine/rules.ts`             | Buff 级规则（求值 / 依赖 / 级联 / 文案）                                       |
+> | `src/coconut-core/engine/compute.ts`           | 贡献聚合与逐条目计算                                                           |
+> | `src/migration/`                               | 历史数据迁移（版本链、拉表态、Buff 文件夹命名、v7 规则化 / v8 伤害名并正则）   |
 
 ## 1. 统一模型
 
@@ -46,7 +46,7 @@ BuffInstance ─┘
 - **计算在 Worker 线程**（`substat-algorithms/analysis.worker.ts`）：副词条 Shapley 与 Buff 逐条移除是
   上千次 `computeOneEntry`，放主线程必然卡界面；Worker 不可用时才回退主线程分片（`analysis-runner.ts`）。
 - 两条路径共用 `analysis.ts` 的 `prepareContributionAnalysis` + `runContributionSteps`，结果逐字段一致
-  （`test/src/lib/calc/substat-algorithms/analysis-runner.test.ts` 钉住等价）。
+  （`test/src/lib/substat/analysis-runner.test.ts` 钉住等价）。
 - 请求必须可结构化克隆：`$state` 代理在派发前用 `$state.snapshot` 转纯数据。**Worker 里没有
   `localStorage`**，而客户端构建的 `browser` 恒为 `true` —— 模块顶层读存储一律走
   `$lib/utils/safe-storage`，否则 Worker 加载即崩。
@@ -132,7 +132,7 @@ if (链阶硬门槛满足 && 作用域匹配) {
   经 `LEGACY_ZONE_IDS` 重映射为 `specialFinal1` / `specialFinal2`（v3 → v4 迁移）。
 
 左侧 Buff 列表与拉表列序都来自工程内**显式存储的树** `CalcState.buffTree`（`{ global, nonGlobal }` 两个根），
-纯逻辑在 `src/lib/calc/buff-tree-state.ts`。树最多两级文件夹，Buff 可落在根 / 一级 / 二级；文件夹名可自定义，
+纯逻辑在 `src/lib/buff/tree-state.ts`。树最多两级文件夹，Buff 可落在根 / 一级 / 二级；文件夹名可自定义，
 图标由后代 Buff 派生（同角色纯链 → 头像 + 链范围、同角色纯阶 → 武器 + 阶范围、混合/跨角色 → generic、
 纯效应 → `mdi:auto-fix`）。拖拽 Buff/目录时列表自动收起所有文件夹。
 
@@ -231,7 +231,7 @@ type BuffRule =
 其余条件字段（`chains` / `refinements` / `chain` / `refinement` / `logic`）一律丢弃。
 Buff 级规则由 `normalizeRules()` 归一化（非法正则、空引用集合、越界槽位直接丢弃）。
 
-### Buff 集的条件口径（`calc/buff-library-condition`）
+### Buff 集的条件口径（`buff/library-condition`）
 
 Buff 集（主页「Buff 集」/ 工坊 `buff_sets`）存的是**模板**，条件按模板能表达的形态裁剪，
 与工程侧共用同一套 `BuffRule` 形状，差别只有两点：- **5 种规则**：`chain` / `refinement` / `damageNameRegex` / `zoneCompare` / `enemyType`。
@@ -320,7 +320,7 @@ Buff 库（本地 / 工坊）的作用域是**导入源语义**，由 `mapImport
   按当前口径（面板只由绑定到本条目的 Buff 组成），只勾在被引用角色身上的副作用 Buff 会失效，迁移用
   `bindPaneEffectSources()` 把它们补勾到引用这些面板的伤害段上（`entryOwnersFromTimeline()` 从时间线推导条目归属）：
   只加不减、幂等、跳过全局 Buff 与自引用，且**不按条件过滤**（与 v2 语义的跨条件变化保持等价）。
-  纯逻辑集中在 `src/lib/calc/pane-effects.ts`，store、界面与迁移共用同一口径。
+  纯逻辑集中在 `src/lib/buff/pane-effects.ts`，store、界面与迁移共用同一口径。
 
 ### Buff 树（工程内显式存储）
 

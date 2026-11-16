@@ -2,8 +2,8 @@
  * @desc 工程数据的对外迁移入口：版本读取、兼容视图派生与 migrateProject。
  */
 
-import type { ConfigState } from '$lib/calc/config.types'
-import type { TimelineData } from '$lib/calc/timeline.types'
+import type { ConfigState } from '$coconut/engine/config.types'
+import type { TimelineData } from '$coconut/engine/timeline.types'
 import type { CharSlot, CustomHit, PhaseKey, Project, ProjectV2, ResultAnalysisData } from '$lib/types/project'
 import { PROJECT_VERSION } from '$lib/types/project'
 import { migrateCalcState, normalizeCalcState } from './buff'

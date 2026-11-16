@@ -14,7 +14,7 @@
  */
 import { langFromUrl } from './lang'
 import { getProvider } from './provider'
-import type { DataProvider } from './provider/types'
+import type { DataProvider } from '$lib/api/provider/types'
 
 /** @desc 是否「无服务端独立静态包」构建；由 vite 的 define 注入（见 vite.config.ts） */
 export const isOfflineBuild = (): boolean => __OFFLINE_BUILD__

@@ -10,14 +10,14 @@
         moveSubstat,
         updateSubstatValue,
         getCalcState
-    } from '$lib/calc/config.store.svelte'
-    import { RESISTANCE_KEYS } from '$lib/calc/config.consts'
+    } from '$lib/project/config.store.svelte'
+    import { RESISTANCE_KEYS } from '$lib/project/config.consts'
     import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
     import { simulateEnhancement } from '$lib/consts/substat-roll-data'
     import { addToast } from '$lib/data/toast.svelte'
     import type { CharSlot } from '$lib/types/project'
-    import type { ConfigState } from '$lib/calc/config.types'
-    import { getCharIconMap, elementColor } from '$lib/calc/timeline.store.svelte'
+    import type { ConfigState } from '$coconut/engine/config.types'
+    import { getCharIconMap, elementColor } from '$lib/project/timeline.store.svelte'
     import { getActiveId } from '$lib/data/project.svelte'
     import { attachSessionScroll, readSessionScroll, readSessionTab, writeSessionTab } from '$lib/data/view-session'
     import EnemyPanel from './enemy-panel.svelte'

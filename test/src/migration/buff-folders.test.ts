@@ -4,7 +4,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { migrateProject } from '$src/migration'
-import type { BuffInstance, BuffTreeNode, BuffTreeState } from '$lib/calc/calculation.types'
+import type { BuffInstance, BuffTreeNode, BuffTreeState } from '$coconut/engine/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
 const echoSlot = (name: string | null) => ({ name, cost: name ? 4 : 0 })

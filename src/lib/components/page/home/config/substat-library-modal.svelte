@@ -39,12 +39,12 @@
         cloneSlots,
         samePlanSlots,
         STANDARD_PLAN_NAME
-    } from '$lib/calc/standard-substats'
-    import { getConfig, setEchoSlots } from '$lib/calc/config.store.svelte'
+    } from '$lib/substat/standard'
+    import { getConfig, setEchoSlots } from '$lib/project/config.store.svelte'
     import { getActiveProject, updateConfig } from '$lib/data/project.svelte'
     import { getCharacterIcons, getCharacterList, getElementIcons } from '$lib/api/data-cache'
     import type { Character } from '$lib/api/types'
-    import type { EchoSlotConfig } from '$lib/calc/config.types'
+    import type { EchoSlotConfig } from '$coconut/engine/config.types'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         isKuroLoggedIn,

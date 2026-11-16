@@ -8,11 +8,11 @@ import assert from 'node:assert/strict'
 
 import { cloneProject, createProjectData, __seedProjectsForTest } from '$lib/data/project.svelte'
 import type { Project } from '$lib/types/project'
-import type { TimelineData } from '$lib/calc/timeline.types'
-import type { ConfigState } from '$lib/calc/config.types'
-import { init as initTimeline, getTimelineState } from '$lib/calc/timeline.store.svelte'
-import { init as initCalculation, getCalcState } from '$lib/calc/calculation.store.svelte'
-import { init as initConfig, getConfig } from '$lib/calc/config.store.svelte'
+import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { ConfigState } from '$coconut/engine/config.types'
+import { init as initTimeline, getTimelineState } from '$lib/project/timeline.store.svelte'
+import { init as initCalculation, getCalcState } from '$lib/project/calculation.store.svelte'
+import { init as initConfig, getConfig } from '$lib/project/config.store.svelte'
 
 const TEAM = [
     { character: '甲', weapon: '武器A', triggerSets: [], echoes: [] },

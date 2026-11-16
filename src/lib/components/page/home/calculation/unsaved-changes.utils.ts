@@ -8,9 +8,9 @@
  * 口径：**只列真正变了的对象**（逐字段比较，顺序无关的字段先归一化），
  * 没改动返回空数组 —— 空数组就是「无需二次确认」的唯一判据。
  */
-import type { BuffInstance, BuffTreeNode, BuffTreeState, CalcState } from '$lib/calc/calculation.types'
+import type { BuffInstance, BuffTreeNode, BuffTreeState, CalcState } from '$coconut/engine/calculation.types'
 import type { UnsavedChangeItem } from '$lib/types/unsaved-change'
-import { ZONE_MAP, classifyBuffScope } from '$lib/calc/calculation.consts'
+import { ZONE_MAP, classifyBuffScope } from '$coconut/engine/calculation.consts'
 
 // ── 小工具 ──
 

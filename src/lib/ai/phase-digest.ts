@@ -12,11 +12,11 @@
  *
  * 工具侧只负责取数，措辞与排版集中在这里，避免同一阶段在不同工具里两种口径。
  */
-import type { DamageBlock, OpBlock, RefLine } from '$lib/calc/timeline.types'
-import { isEffectEntry } from '$lib/calc/registry/formulas'
-import type { DamageEntry } from '$lib/calc/calculation.types'
-import { autoConfigureTimings } from '$lib/calc/ref-line-timing'
-import { shortKeyOf } from '$lib/ai/short-key'
+import type { DamageBlock, OpBlock, RefLine } from '$coconut/engine/timeline.types'
+import { isEffectEntry } from '$coconut/engine/registry/formulas'
+import type { DamageEntry } from '$coconut/engine/calculation.types'
+import { autoConfigureTimings } from '$lib/timeline/ref-line-timing'
+import { shortKeyOf } from './short-key'
 
 /** @desc 秒数显示：保留两位（只用于配置或名称推导的参考线时间） */
 export const fmtSeconds = (seconds: number): string => `${seconds.toFixed(2)}s`

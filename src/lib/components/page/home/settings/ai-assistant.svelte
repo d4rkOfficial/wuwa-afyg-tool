@@ -8,7 +8,7 @@
     import { applyCompaction, planCompaction, summarizeMessages } from '$lib/ai/compaction'
     import { loadGenPrefs, isAiEnabled } from '$lib/data/ai-prefs.svelte'
     import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
-    import { notifyCalcUpdate, getCalcState } from '$lib/calc/calculation.store.svelte'
+    import { notifyCalcUpdate, getCalcState } from '$lib/project/calculation.store.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { getGpuAccel } from '$lib/data/render-prefs.svelte'
     import { cancelActiveDrags } from '$lib/utils/drag-guard'

@@ -36,20 +36,20 @@ import {
     loadEchoSkill,
     getTimelineState,
     canDelete
-} from '$lib/calc/timeline.store.svelte'
+} from '$lib/project/timeline.store.svelte'
 import { getCharElementMap } from '$lib/data/char-elements.svelte'
-import { customHitRatio } from '$lib/calc/custom-hit'
+import { customHitRatio } from '$lib/timeline/custom-hit'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
 import { updateTimeline, updateResultAnalysis, getActiveProject, getProjects } from '$lib/data/project.svelte'
-import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS } from '$lib/calc/timeline.consts'
-import { resolveRefLineSeconds, type RefLineLike } from '$lib/calc/ref-line-timing'
+import { BUTTON_KEY_ORDER, NON_DIRECT_CONFIGS } from '$lib/timeline/consts'
+import { resolveRefLineSeconds, type RefLineLike } from '$lib/timeline/ref-line-timing'
 import { buildTimelineDigestData, renderDamageRatioList, renderTimelineDigest } from '$lib/ai/phase-digest'
 import { opBlockKey, opBlocksInOrder, refLineKey, refLinesInOrder, resolveOpBlock, resolveRefLine } from '$lib/ai/refs'
 import { shortKeyOf } from '$lib/ai/short-key'
 import { damageHitKeys, resolveDamageHitKey } from '$lib/ai/damage-hit-key'
 import { BLOCK_W, parsePositionArgs } from '$lib/ai/timeline-position'
-import type { CustomHit, DamageBlock, SkillHit, NonDirectEntry, OpBlock, RefLine } from '$lib/calc/timeline.types'
+import type { CustomHit, DamageBlock, SkillHit, NonDirectEntry, OpBlock, RefLine } from '$coconut/engine/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

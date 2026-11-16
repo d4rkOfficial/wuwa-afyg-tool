@@ -16,8 +16,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 import { fetchBuffSetsFromShare, getBuffEntities } from '$lib/data/buff-library.svelte'
-import { buildEntityImportItems } from '$lib/calc/buff-import-utils'
-import { getAllBuffConfs, importBuffSetsWithDecisions } from '$lib/calc/calculation.store.svelte'
+import { buildEntityImportItems } from '$lib/buff/import-utils'
+import { getAllBuffConfs, importBuffSetsWithDecisions } from '$lib/project/calculation.store.svelte'
 import type { CharSlot } from '$lib/types/project'
 
 const PAYLOAD = readFileSync('test/src/lib/data/__fixtures__/share-buff-sets.json', 'utf8')

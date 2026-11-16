@@ -1,6 +1,6 @@
 // AI 弹窗控制器：页面/组件注册本地弹窗状态的读写，AI 可读取与开关（低耦合：页面只调 registerPanel）
-import { getShowBuffModal, setShowBuffModal } from '$lib/calc/calculation.store.svelte'
-import { getShowDamageList, setShowDamageList } from '$lib/calc/timeline.store.svelte'
+import { getShowBuffModal, setShowBuffModal } from '$lib/project/calculation.store.svelte'
+import { getShowDamageList, setShowDamageList } from '$lib/project/timeline.store.svelte'
 
 export interface PanelRegistration {
     label: string

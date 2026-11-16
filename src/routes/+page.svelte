@@ -36,19 +36,19 @@
     } from '$lib/data/share.svelte'
     import { pushProjectSwitch, pushPhaseChange } from '$lib/ai/change-queue.svelte'
     import type { PhaseKey } from '$lib/types/project'
-    import type { TimelineData } from '$lib/calc/timeline.types'
-    import type { CalcState } from '$lib/calc/calculation.types'
-    import type { ConfigState } from '$lib/calc/config.types'
+    import type { TimelineData } from '$coconut/engine/timeline.types'
+    import type { CalcState } from '$coconut/engine/calculation.types'
+    import type { ConfigState } from '$coconut/engine/config.types'
     import { PHASE_LABELS } from '$lib/consts/game-terms'
     import { addToast, removeToast } from '$lib/data/toast.svelte'
     import { preloadCharElements } from '$lib/data/char-elements.svelte'
-    import { loadCustomHits } from '$lib/calc/timeline.store.svelte'
+    import { loadCustomHits } from '$lib/project/timeline.store.svelte'
     import {
         setShowDamageTypeModal,
         getShowDamageTypeModal,
         setProfileChangeListener,
         getCalcState
-    } from '$lib/calc/calculation.store.svelte'
+    } from '$lib/project/calculation.store.svelte'
     import { getReloadOnResultRefresh, getReloadOnProfileChange } from '$lib/data/render-prefs.svelte'
     import { setWsHost } from '$lib/ws-remote/ws-remote.svelte'
     import { registerHashAction, runHashActions } from '$lib/utils/hash-actions.svelte'

@@ -15,6 +15,8 @@ const libDir = path.join(repoRoot, 'src', 'lib')
 const srcDir = path.join(repoRoot, 'src')
 const appMockDir = path.join(repoRoot, 'test', '__mocks__', 'app')
 
+const coconutDir = path.join(repoRoot, 'src', 'coconut-core')
+
 const aliasMap = [
     ['$lib/', libDir + path.sep],
     ['$lib', libDir],
@@ -22,6 +24,9 @@ const aliasMap = [
     // 测试位于 `test/src/...`，走相对路径会变成 7 层 `../../../..`。
     ['$src/', srcDir + path.sep],
     ['$src', srcDir],
+    // `$coconut/...` = 计算核 `src/coconut-core`（同样与 kit.alias 同源）
+    ['$coconut/', coconutDir + path.sep],
+    ['$coconut', coconutDir],
     ['$app/environment', path.join(appMockDir, 'environment.ts')]
 ]
 

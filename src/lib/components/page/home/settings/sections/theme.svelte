@@ -63,10 +63,16 @@
         setBgEditingLight,
         setBgUrl,
         setSurfaceKey
-    } from '../settings-ui.svelte'
+    } from '$lib/components/page/home/settings/settings-ui.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
-    import { ACTION_BTN, ACTION_BTN_ACCENT, ACTION_BTN_DANGER, ROW_TABS, TAB_ACCENT } from '../utils'
+    import {
+        ACTION_BTN,
+        ACTION_BTN_ACCENT,
+        ACTION_BTN_DANGER,
+        ROW_TABS,
+        TAB_ACCENT
+    } from '$lib/components/page/home/settings/utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()

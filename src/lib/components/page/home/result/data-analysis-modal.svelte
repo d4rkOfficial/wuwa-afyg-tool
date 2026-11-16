@@ -1,23 +1,34 @@
 <script lang="ts">
     import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
-    import { getCharElementMap, getCharIconMap, getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
-    import { resolveRefLineSeconds, autoConfigureTimings as autoConfigureTimingsPure } from '$lib/calc/ref-line-timing'
-    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$lib/calc/result.types'
+    import { getCharElementMap, getCharIconMap, getRefLines, getOpBlocks } from '$lib/project/timeline.store.svelte'
+    import {
+        resolveRefLineSeconds,
+        autoConfigureTimings as autoConfigureTimingsPure
+    } from '$lib/timeline/ref-line-timing'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$coconut/engine/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
-    import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
+    import type { AlgorithmId, AlgorithmInfo } from '$lib/substat/types'
     import Icon from '@iconify/svelte'
     import { openPanel } from '$lib/ai/panels.svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import Tabs from '$lib/components/ui/tabs.svelte'
-    import KpiOverview from './analysis/kpi-overview.svelte'
-    import SegmentDps from './analysis/segment-dps.svelte'
-    import DamageCurve from './analysis/damage-curve.svelte'
-    import DamageShare from './analysis/damage-share.svelte'
-    import ContributionAnalysis from './analysis/contribution-analysis.svelte'
-    import { cssVar, fadedColor } from './analysis/chart-utils'
-    import type { CharCard, DpsSegment, EffectCard, RangeStats, SegTotals, ShareItem, Timing } from './analysis/types'
+    import KpiOverview from '$lib/components/page/home/result/analysis/kpi-overview.svelte'
+    import SegmentDps from '$lib/components/page/home/result/analysis/segment-dps.svelte'
+    import DamageCurve from '$lib/components/page/home/result/analysis/damage-curve.svelte'
+    import DamageShare from '$lib/components/page/home/result/analysis/damage-share.svelte'
+    import ContributionAnalysis from '$lib/components/page/home/result/analysis/contribution-analysis.svelte'
+    import { cssVar, fadedColor } from '$lib/components/page/home/result/analysis/chart-utils'
+    import type {
+        CharCard,
+        DpsSegment,
+        EffectCard,
+        RangeStats,
+        SegTotals,
+        ShareItem,
+        Timing
+    } from '$lib/components/page/home/result/analysis/types'
 
     interface Props extends ComponentsProps {
         entries: ResultEntry[]
@@ -101,7 +112,7 @@
         return map
     })
 
-    /** @desc 启用参考线作为时间记点时解析秒数（共享 $lib/calc/ref-line-timing） */
+    /** @desc 启用参考线作为时间记点时解析秒数（共享 $lib/timeline/ref-line-timing） */
 
     function toggleRefLine(id: string) {
         if (timings.some((t) => t.refLineId === id)) {

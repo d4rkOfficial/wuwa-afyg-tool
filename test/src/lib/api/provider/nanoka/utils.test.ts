@@ -28,7 +28,7 @@ import {
     weaponDetail,
     echoDetail,
     sonataDetail
-} from './__fixtures__.ts'
+} from './__fixtures__'
 
 describe('ueToCdn', () => {
     it('strips UE prefix and extension, appends .webp to asset base', () => {

@@ -20,12 +20,12 @@ import {
     planSubstatTotal,
     STANDARD_PLAN_NAME,
     STANDARD_SUBSTAT_TOTAL
-} from '$lib/calc/standard-substats'
+} from '$lib/substat/standard'
 import { ensureCharInfo, getCharInfoMap } from '$lib/data/char-info.svelte'
-import { getConfig, setEchoSlots } from '$lib/calc/config.store.svelte'
+import { getConfig, setEchoSlots } from '$lib/project/config.store.svelte'
 import { getActiveProject, updateConfig } from '$lib/data/project.svelte'
 import { SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
-import type { EchoSlotConfig } from '$lib/calc/config.types'
+import type { EchoSlotConfig } from '$coconut/engine/config.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

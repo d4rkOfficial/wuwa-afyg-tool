@@ -9,14 +9,14 @@
      *  5) 表格宽度由表头内容决定（不测宽等宽、不补填充列）；
      *  6) 顶部「伤害源」切换按角色过滤要渲染的子表，从根上减少一次挂载的行/格数量。 */
     import { onMount, onDestroy } from 'svelte'
-    import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+    import type { BuffConf, DamageEntry } from '$coconut/engine/calculation.types'
     import type { WeaponInfo } from '$lib/api/types'
     import { getWeaponInfo } from '$lib/api/data-cache'
-    import { buffLeafName } from '$lib/calc/buff-name'
+    import { buffLeafName } from '$lib/buff/name'
     import type { CharSlot } from '$lib/types/project'
-    import type { ConditionProfile, RuleEvalDeps } from '$lib/calc/compute'
-    import type { PaneEffectSource } from '$lib/calc/pane-effects'
-    import { createEntryRuleMatcher } from '$lib/calc/compute'
+    import type { ConditionProfile, RuleEvalDeps } from '$coconut/engine/compute'
+    import type { PaneEffectSource } from '$lib/buff/pane-effects'
+    import { createEntryRuleMatcher } from '$coconut/engine/compute'
     import {
         applyIdsSelection,
         buildCharToIdx,
@@ -52,11 +52,11 @@
         type RowData,
         type SourceEntryGroup
     } from './spread-table.utils'
-    import { getCalcElementMap, getPaneEffectSources, getBuffTree } from '$lib/calc/calculation.store.svelte'
-    import { getConfig } from '$lib/calc/config.store.svelte'
-    import { getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
-    import { storedColumnLayout } from '$lib/calc/buff-tree-state'
-    import { elementColor, getCharIconMap } from '$lib/calc/timeline.store.svelte'
+    import { getCalcElementMap, getPaneEffectSources, getBuffTree } from '$lib/project/calculation.store.svelte'
+    import { getConfig } from '$lib/project/config.store.svelte'
+    import { getRefLines, getOpBlocks } from '$lib/project/timeline.store.svelte'
+    import { storedColumnLayout } from '$lib/buff/tree-state'
+    import { elementColor, getCharIconMap } from '$lib/project/timeline.store.svelte'
     import {
         getHeaderCompact,
         getScrollAxisDefault,
@@ -65,7 +65,7 @@
         type CalcViewMode
     } from '$lib/data/calc-view.svelte'
     import { ensureCharInfo, ensureEchoSkillText, getCharInfoMap, getEchoSkillText } from '$lib/data/char-info.svelte'
-    import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
+    import { buildEchoDescByEntry } from '$coconut/engine/skill-infer'
     import { getShortcutKey, normalizeShortcutEvent } from '$lib/data/shortcuts.svelte'
     import { registerDragCancel } from '$lib/utils/drag-guard'
     import { fallbackIcon } from '$lib/utils/icons'

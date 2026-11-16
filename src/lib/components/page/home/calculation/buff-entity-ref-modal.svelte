@@ -19,7 +19,7 @@
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
-    import { ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+    import { ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$coconut/engine/calculation.consts'
     import type { BuffEntityType, BuffLibraryZoneRef } from '$lib/data/buff-library.svelte'
     import {
         LIBRARY_REF_OWNER_TABS,
@@ -28,7 +28,7 @@
         isActiveRefOwner,
         sanitizeRefOwner,
         type LibraryRefOwner
-    } from '$lib/calc/buff-library-condition'
+    } from '$lib/buff/library-condition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { mergeClass } from '$lib/utils/component-style'
     import { simplifyPct } from './buff-entity-utils'

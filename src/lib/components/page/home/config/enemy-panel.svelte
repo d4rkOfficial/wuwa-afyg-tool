@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { getConfig, updateEnemy, updateResistance } from '$lib/calc/config.store.svelte'
-    import { enemyDefenseForLevel, RESISTANCE_KEYS } from '$lib/calc/config.consts'
+    import { getConfig, updateEnemy, updateResistance } from '$lib/project/config.store.svelte'
+    import { enemyDefenseForLevel, RESISTANCE_KEYS } from '$lib/project/config.consts'
     import { getElementIcons } from '$lib/api/data-cache'
     import Icon from '@iconify/svelte'
 

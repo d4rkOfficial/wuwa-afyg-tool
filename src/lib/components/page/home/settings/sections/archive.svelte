@@ -8,14 +8,14 @@
      *   - `weaponIcons` / `echoIcons` / `setIcons` 也落在 store：外壳在**挂载时**（与是否打开设置无关）
      *     就预取这三张图标表，该预取 `$effect` 留在外壳以保持预取时序；若把状态留在本组件，
      *     TabPanel 的 `{#key active}` 会让每次切回归档 tab 都重新预取一次，属行为变化。
-     *   - `charIconMap` 只是全局 store `$lib/calc/timeline.store.svelte` 的 $derived 视图（非自有状态），随本组件留下。
+     *   - `charIconMap` 只是全局 store `$lib/project/timeline.store.svelte` 的 $derived 视图（非自有状态），随本组件留下。
      *   - `handleArchiveDelete` 无调用方（死代码）：归档专属，保留原样。
      */
     import Icon from '@iconify/svelte'
     import SectionTitle from '$lib/components/ui/section-title.svelte'
     import Button from '$lib/components/ui/button.svelte'
     import EmptyState from '$lib/components/ui/empty-state.svelte'
-    import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharIconMap } from '$lib/project/timeline.store.svelte'
     import { addToast, removeToast } from '$lib/data/toast.svelte'
     import {
         buildExportFile,
@@ -32,10 +32,10 @@
         getArchiveEchoSetIcons,
         getArchiveWeaponIcons,
         setArchiveDeleteTarget
-    } from '../settings-ui.svelte'
+    } from '$lib/components/page/home/settings/settings-ui.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
-    import { ACTION_BTN, ACTION_BTN_DANGER } from '../utils'
+    import { ACTION_BTN, ACTION_BTN_DANGER } from '$lib/components/page/home/settings/utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()

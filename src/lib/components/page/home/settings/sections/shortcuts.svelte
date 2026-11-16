@@ -15,10 +15,10 @@
         resetShortcuts,
         shortcutLabel
     } from '$lib/data/shortcuts.svelte'
-    import { getShortcutCapture, setShortcutCapture } from '../settings-ui.svelte'
+    import { getShortcutCapture, setShortcutCapture } from '$lib/components/page/home/settings/settings-ui.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
-    import { ACTION_BTN } from '../utils'
+    import { ACTION_BTN } from '$lib/components/page/home/settings/utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()

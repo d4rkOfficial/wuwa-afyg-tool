@@ -11,7 +11,7 @@
         SECTION_NOTE,
         STAT_CARD_GRADIENT_STYLE,
         STAT_CARD_GRADIENT_SUBTLE_STYLE
-    } from '$lib/calc/result.styles'
+    } from '$lib/result/styles'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
     import { cssVar } from './chart-utils'

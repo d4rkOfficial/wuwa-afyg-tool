@@ -17,9 +17,9 @@ import {
     setContextSnapshot,
     setWorkSummary,
     toggleSegmentDisabled
-} from '../turn-state.svelte'
-import { TURN_SEGMENT_HINTS, TURN_SEGMENT_LABELS, type TurnSegmentId } from '../turn-context'
-import { cacheHitRate, formatPercent, formatTokens, summarizeTurn } from '../token-usage'
+} from '$lib/ai/turn-state.svelte'
+import { TURN_SEGMENT_HINTS, TURN_SEGMENT_LABELS, type TurnSegmentId } from '$lib/ai/turn-context'
+import { cacheHitRate, formatPercent, formatTokens, summarizeTurn } from '$lib/ai/token-usage'
 import {
     SHARE_COOLDOWN_MS,
     isShareCoolingDown,

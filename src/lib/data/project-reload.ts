@@ -1,13 +1,13 @@
 // 活动工程切换后的阶段 store 重载（页面与 AI 工具共用）
 import { getCharacterInfo, getEchoInfo } from '$lib/api/data-cache'
-import { init as initCalculation, setConditionProfile, setShowBuffModal } from '$lib/calc/calculation.store.svelte'
-import type { CalcState } from '$lib/calc/calculation.types'
-import { init as initConfig } from '$lib/calc/config.store.svelte'
-import type { ConfigState } from '$lib/calc/config.types'
-import { init as initTimeline } from '$lib/calc/timeline.store.svelte'
-import type { TimelineData } from '$lib/calc/timeline.types'
+import { init as initCalculation, setConditionProfile, setShowBuffModal } from '$lib/project/calculation.store.svelte'
+import type { CalcState } from '$coconut/engine/calculation.types'
+import { init as initConfig } from '$lib/project/config.store.svelte'
+import type { ConfigState } from '$coconut/engine/config.types'
+import { init as initTimeline } from '$lib/project/timeline.store.svelte'
+import type { TimelineData } from '$coconut/engine/timeline.types'
 import { conditionProfileFromTeam } from '$src/migration'
-import { getActiveProject, updateCalculation } from '$lib/data/project.svelte'
+import { getActiveProject, updateCalculation } from './project.svelte'
 
 /** @desc 重载当前工程全部阶段数据（不改变视图状态）；切工程 / 链阶变动 / 刷新结果共用 */
 export const reloadActiveProjectStores = (): void => {

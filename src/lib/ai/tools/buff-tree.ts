@@ -8,10 +8,10 @@ import {
     moveBuffFolderSibling,
     moveBuffTreeNode,
     renameBuffTreeFolder
-} from '$lib/calc/calculation.store.svelte'
-import { collectFolders } from '$lib/calc/buff-tree-state'
-import { buffLeafName } from '$lib/calc/buff-name'
-import type { BuffTreeNode } from '$lib/calc/calculation.types'
+} from '$lib/project/calculation.store.svelte'
+import { collectFolders } from '$lib/buff/tree-state'
+import { buffLeafName } from '$lib/buff/name'
+import type { BuffTreeNode } from '$coconut/engine/calculation.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

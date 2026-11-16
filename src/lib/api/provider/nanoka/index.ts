@@ -12,7 +12,7 @@ import type {
     Weapon,
     WeaponInfo
 } from '$lib/api/types'
-import type { DataProvider, InfoOptions, LangOptions } from '../types'
+import type { DataProvider, InfoOptions, LangOptions } from '$lib/api/provider/types'
 import { fetchData, fetchDetailPair, fetchZhData } from './fetch'
 import {
     ASSET_BASE,

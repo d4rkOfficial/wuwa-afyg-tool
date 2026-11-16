@@ -30,7 +30,14 @@
     import { getActiveWorkshopUrl } from '$lib/data/workshop.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
-    import { ACTION_BTN_ACCENT, ROW_TABS, TAB_ACCENT, pair, segBool, segValue } from '../utils'
+    import {
+        ACTION_BTN_ACCENT,
+        ROW_TABS,
+        TAB_ACCENT,
+        pair,
+        segBool,
+        segValue
+    } from '$lib/components/page/home/settings/utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()

@@ -16,8 +16,8 @@
  *
  * 刻意**不**碰共享可变状态的所有权：所有跨边界状态都由宿主持有，本模块只做读-改-写。
  */
-import { computeDraggedOrder, dragBlockIndex } from '$lib/calc/buff-drag'
-import type { BuffDragMode } from '$lib/calc/buff-drag'
+import { computeDraggedOrder, dragBlockIndex } from '$lib/buff/drag'
+import type { BuffDragMode } from '$lib/buff/drag'
 import type { BuffListContext } from './buff-modal.types'
 import { createDragState } from './buff-modal.utils'
 import type { DragState } from './buff-modal.utils'
@@ -30,7 +30,7 @@ import {
     getAllBuffConfs,
     reorderBuffTreeChildren,
     moveBuffTreeNode
-} from '$lib/calc/calculation.store.svelte'
+} from '$lib/project/calculation.store.svelte'
 import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
 
 export interface BuffDragDeps {

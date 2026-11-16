@@ -1,10 +1,10 @@
-# 计算核（`src/lib/calc/core`）
+# 计算核（`src/coconut-core/engine/core`）
 
 计算核是伤害计算的**纯函数层**：给它一个请求对象，它返回逐条目的结算结果与溯源。
 它不依赖 Svelte / 浏览器 / 上游 API，可以直接在 Node、Worker 或外部项目里 import。
 
 ```ts
-import { computeProject } from '$lib/calc/core'
+import { computeProject } from '$coconut/engine/core'
 
 const entries = computeProject({
     entries, // DamageEntry[]
@@ -27,7 +27,7 @@ const entries = computeProject({
 | `encodeValue` / `decodeValue`             | 交换格式的数值 ↔ 字符串                            |
 | `encodeBuff` / `decodeBuff`               | Buff 实例 ↔ 交换形态                               |
 
-`ComputeRequest` 的字段见 `src/lib/calc/core/engine.ts`。缺省值：
+`ComputeRequest` 的字段见 `src/coconut-core/engine/core/engine.ts`。缺省值：
 
 - `damageTypes` 缺省 → 伤害类型按技能名 / 技能文案自动推导；
 - `profile` 缺省 → 0 链 / 1 阶；
@@ -35,13 +35,13 @@ const entries = computeProject({
 
 ## 2. 调用方需要提供的数据契约
 
-| 类型                                      | 含义                                               | 从哪来                    |
-| ----------------------------------------- | -------------------------------------------------- | ------------------------- |
-| `CharacterInfo`（`$lib/api/types`）       | 90 级白值（攻 / 生 / 防 / 谐度破坏增幅）+ 技能文案 | 上游角色接口              |
-| `WeaponInfo`（`$lib/api/types`）          | 90 级基础攻击 + 副词条（`{ name, value }` 字符串） | 上游武器接口              |
-| `CharSlot`（`$lib/types/project`）        | 角色名 / 武器名 / `chain` / `refinement`           | 工程队伍配置              |
-| `ConfigState`（`$lib/calc/config.types`） | 五件声骸 + 敌人配置                                | 工程配置                  |
-| `DamageEntry` / `BuffInstance`            | 条目与 Buff 实例                                   | 时间线派生 / 工程拉表配置 |
+| 类型                                            | 含义                                               | 从哪来                    |
+| ----------------------------------------------- | -------------------------------------------------- | ------------------------- |
+| `CharacterInfo`（`$lib/api/types`）             | 90 级白值（攻 / 生 / 防 / 谐度破坏增幅）+ 技能文案 | 上游角色接口              |
+| `WeaponInfo`（`$lib/api/types`）                | 90 级基础攻击 + 副词条（`{ name, value }` 字符串） | 上游武器接口              |
+| `CharSlot`（`$lib/types/project`）              | 角色名 / 武器名 / `chain` / `refinement`           | 工程队伍配置              |
+| `ConfigState`（`$coconut/engine/config.types`） | 五件声骸 + 敌人配置                                | 工程配置                  |
+| `DamageEntry` / `BuffInstance`                  | 条目与 Buff 实例                                   | 时间线派生 / 工程拉表配置 |
 
 数值口径：`CharacterInfo.lv90BaseStats` 与 `WeaponInfo.lv90BaseAtk` 是**整数白值**；
 `WeaponInfo.substat.value` 是上游原样的字符串（`攻击` 这类词条会被归一成 `攻击%`，
@@ -57,7 +57,7 @@ const entries = computeProject({
 
 `baseAtk` / `totalAtk` / `atkPctSum` 这类平铺字段是 `panel` 的**派生兼容层**，新代码优先读 `panel`。
 乘区的展示参数是结构化的（`MultiplierDisplay`），本地化文案由界面层
-（`src/lib/calc/result.styles.ts` 的 `formatMultiplierDisplay`）生成。
+（`src/lib/result/styles.ts` 的 `formatMultiplierDisplay`）生成。
 
 ## 4. 自描述注册表
 
@@ -93,7 +93,7 @@ pnpm run build:calc-lib
 产物：`dist/calc-core/index.js`（单文件 ESM，零外部依赖，Node 直接 `import` 可用）。
 
 类型不额外生成 `.d.ts`：生成产物会把 `$lib/*` 别名写进去、对消费方不可用；TS 消费方
-（如工坊仓库）直接引用 `src/lib/calc/core/index.ts` 取类型。
+（如工坊仓库）直接引用 `src/coconut-core/engine/core/index.ts` 取类型。
 
 ## 7. 交换格式（字符串值只在边界出现）
 

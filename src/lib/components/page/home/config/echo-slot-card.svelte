@@ -13,7 +13,7 @@
     import { slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import type { ComponentsProps } from '$lib/types'
-    import type { EchoSlotConfig } from '$lib/calc/config.types'
+    import type { EchoSlotConfig } from '$coconut/engine/config.types'
     import { SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 
     interface Props extends ComponentsProps {

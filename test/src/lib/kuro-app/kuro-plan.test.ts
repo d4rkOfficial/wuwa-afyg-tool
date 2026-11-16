@@ -12,7 +12,7 @@ import {
     padSlots,
     type KuroPlanDraft
 } from '$lib/kuro-app/kuro-plan'
-import type { EchoSlotConfig } from '$lib/calc/config.types'
+import type { EchoSlotConfig } from '$coconut/engine/config.types'
 import type { KuroCharacterEchoes, KuroEcho } from '$lib/kuro-app/kuro.svelte'
 
 const echo = (cost: number, mainStatName: string): KuroEcho => ({

@@ -9,7 +9,7 @@
     import { onMount, untrack } from 'svelte'
     import Icon from '@iconify/svelte'
     import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
-    import { CARD_SURFACE_STYLE } from '$lib/calc/result.styles'
+    import { CARD_SURFACE_STYLE } from '$lib/result/styles'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
     import Tabs from '$lib/components/ui/tabs.svelte'

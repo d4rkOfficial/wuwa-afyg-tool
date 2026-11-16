@@ -1,7 +1,7 @@
 <script lang="ts">
     import Icon from '@iconify/svelte'
     import Modal from '$lib/components/layout/modal.svelte'
-    import { getShowDamageList, setShowDamageList, getDamageList } from '$lib/calc/timeline.store.svelte'
+    import { getShowDamageList, setShowDamageList, getDamageList } from '$lib/project/timeline.store.svelte'
 </script>
 
 <Modal

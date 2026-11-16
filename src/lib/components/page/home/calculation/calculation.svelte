@@ -14,10 +14,10 @@
         getDamageTypesForEntry,
         init,
         getConditionProfile
-    } from '$lib/calc/calculation.store.svelte'
+    } from '$lib/project/calculation.store.svelte'
     import type { CharSlot } from '$lib/types/project'
-    import type { TimelineData } from '$lib/calc/timeline.types'
-    import type { CalcState } from '$lib/calc/calculation.types'
+    import type { TimelineData } from '$coconut/engine/timeline.types'
+    import type { CalcState } from '$coconut/engine/calculation.types'
     import BuffModal from './buff-modal.svelte'
     import SpreadTable from './spread-table.svelte'
     import { getCalcViewMode } from '$lib/data/calc-view.svelte'

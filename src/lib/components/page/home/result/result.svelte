@@ -1,48 +1,48 @@
 <script lang="ts">
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
-    import type { CalcState } from '$lib/calc/calculation.types'
-    import type { ConfigState } from '$lib/calc/config.types'
+    import type { CalcState } from '$coconut/engine/calculation.types'
+    import type { ConfigState } from '$coconut/engine/config.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
     import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
-    import { getCharElementMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharElementMap } from '$lib/project/timeline.store.svelte'
     import { getActiveProject, updateResultAnalysis, updateComparisonPoints } from '$lib/data/project.svelte'
     import { getMultiEntryExpand } from '$lib/data/interaction-prefs.svelte'
     import { nextExpandedIds } from '$lib/utils/expand-state'
-    import { computeAll as computeAllDamage } from '$lib/calc/compute'
+    import { computeAll as computeAllDamage } from '$coconut/engine/compute'
     import {
         getAllDamageEntries,
         getCalcState,
         getConditionProfile,
         getGlobalBuffSetIds,
         getTableVersion
-    } from '$lib/calc/calculation.store.svelte'
-    import { getConfig } from '$lib/calc/config.store.svelte'
-    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$lib/calc/result.types'
+    } from '$lib/project/calculation.store.svelte'
+    import { getConfig } from '$lib/project/config.store.svelte'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$coconut/engine/result.types'
     import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
-    import { ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
-    import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
-    import { createContributionAnalysisRunner } from '$lib/calc/substat-algorithms/analysis-runner.svelte'
-    import type { ContributionAnalysisRequest } from '$lib/calc/substat-algorithms/analysis'
+    import { ALGORITHMS_INFO } from '$lib/substat'
+    import type { AlgorithmId, AlgorithmInfo } from '$lib/substat/types'
+    import { createContributionAnalysisRunner } from '$lib/substat/analysis-runner.svelte'
+    import type { ContributionAnalysisRequest } from '$lib/substat/analysis'
     import {
         analysisNeeded,
         nextAnalysisCache,
         type AnalysisCache,
         type AnalysisInputs,
         type AnalysisPart
-    } from './analysis/analysis-cache.utils'
+    } from '$lib/components/page/home/result/analysis/analysis-cache.utils'
     import { tick, untrack, onMount } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
     import { slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import Icon from '@iconify/svelte'
-    import { getComparisonEligibility } from '$lib/calc/comparison'
+    import { getComparisonEligibility } from '$lib/result/comparison'
     import DataAnalysisModal from './data-analysis-modal.svelte'
     import ComparisonModal from './comparison-modal.svelte'
     import DamageTraceView from './damage-trace-view.svelte'
     import DamageFactorList from './damage-factor-list.svelte'
-    import { damageFactorRows, type DamageTraceCtx, type CritDisplayMode } from '$lib/calc/damage-trace'
+    import { damageFactorRows, type DamageTraceCtx, type CritDisplayMode } from '$coconut/engine/damage-trace'
     import {
         CARD,
         CARD_PAD,
@@ -52,7 +52,7 @@
         STAT_ROW,
         STAT_VALUE_SM,
         SWATCH_DOT
-    } from '$lib/calc/result.styles'
+    } from '$lib/result/styles'
 
     interface Props extends ComponentsProps {
         team: [CharSlot, CharSlot, CharSlot]

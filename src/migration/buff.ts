@@ -6,12 +6,18 @@
  * 乘区级条件（伤害属性 / 伤害类型）保持原样，挂在各乘区条目上。
  */
 
-import type { BuffCondition, BuffInstance, BuffTreeState, BuffZoneValue, CalcState } from '$lib/calc/calculation.types'
-import { normalizeBuffTree } from '$lib/calc/buff-tree-state'
-import { ZONE_MAP, resolveZoneId } from '$lib/calc/calculation.consts'
-import { actionAllowsCondition } from '$lib/calc/registry/actions'
-import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$lib/calc/condition'
-import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$lib/calc/rules'
+import type {
+    BuffCondition,
+    BuffInstance,
+    BuffTreeState,
+    BuffZoneValue,
+    CalcState
+} from '$coconut/engine/calculation.types'
+import { normalizeBuffTree } from '$lib/buff/tree-state'
+import { ZONE_MAP, resolveZoneId } from '$coconut/engine/calculation.consts'
+import { actionAllowsCondition } from '$coconut/engine/registry/actions'
+import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$coconut/engine/condition'
+import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$coconut/engine/rules'
 import { asRecord, genId, isLegacyAutoGlobal, isRecord, pickNum } from './shared'
 
 // ── Buff 归一化：乘区条目列表（含旧 variants 拍平）与乘区级条件 ──
@@ -143,7 +149,7 @@ export const normalizeBuff = (raw: Partial<BuffInstance> & Record<string, unknow
 }
 
 /**
- * @desc 归一化生效条件（实现见 `$lib/calc/condition`，此处仅作迁移入口再导出，保持既有导入路径可用）：
+ * @desc 归一化生效条件（实现见 `$coconut/engine/condition`，此处仅作迁移入口再导出，保持既有导入路径可用）：
  * 只保留乘区级的伤害属性 / 伤害类型；链阶已迁到 Buff 级 `rules`。
  */
 export { normalizeCondition }

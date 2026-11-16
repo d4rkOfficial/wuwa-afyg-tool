@@ -10,9 +10,9 @@
 import assert from 'node:assert/strict'
 import { getProvider } from '$lib/api/provider'
 import { DAMAGE_TYPES as CANONICAL_DAMAGE_TYPES } from '$lib/consts/game-terms'
-import { inferDamageTypes } from '$lib/calc/utils'
+import { inferDamageTypes } from '$coconut/engine/utils'
 import type { CharacterInfo, SkillEntry } from '$lib/api/types'
-import type { DamageEntry } from '$lib/calc/calculation.types'
+import type { DamageEntry } from '$coconut/engine/calculation.types'
 
 /** @desc 权威伤害类型（`src/lib/consts/game-terms.ts`），用例的期望值必须是其中之一 */
 export type DamageTypeName = (typeof CANONICAL_DAMAGE_TYPES)[number]
@@ -223,7 +223,7 @@ export const assertCorrectDamageTypeInfer = async (
         expectedDamageType,
         `伤害类型推导不符：角色「${characterName}」倍率「${ratioName}」（技能节点：${outcome.skillType}）` +
             `\n期望：${expectedDamageType}\n实际：${outcome.actualDamageType}${note}` +
-            `\n排查：src/lib/calc/skill-infer.ts；用 dumpRatioContext('${characterName}', '${ratioName}') 看文案落在哪个大标题小节`
+            `\n排查：src/coconut-core/engine/skill-infer.ts；用 dumpRatioContext('${characterName}', '${ratioName}') 看文案落在哪个大标题小节`
     )
 }
 
@@ -262,7 +262,7 @@ export const reportDamageTypeInfer = async (cases: readonly InferCase[], title =
     if (failures.length > 0) {
         throw new Error(
             `${title}：${failures.length}/${cases.length} 条失败\n${failures.join('\n')}` +
-                `\n排查：src/lib/calc/skill-infer.ts（规则2 文案定位 / 规则1 名称前缀 / 技能类型兜底）`
+                `\n排查：src/coconut-core/engine/skill-infer.ts（规则2 文案定位 / 规则1 名称前缀 / 技能类型兜底）`
         )
     }
 }

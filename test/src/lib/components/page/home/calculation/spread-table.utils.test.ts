@@ -25,8 +25,8 @@ import {
     type CellState,
     type SegmentMarker
 } from '$lib/components/page/home/calculation/spread-table.utils'
-import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
-import type { PaneEffectSource } from '$lib/calc/pane-effects'
+import type { BuffConf, DamageEntry } from '$coconut/engine/calculation.types'
+import type { PaneEffectSource } from '$lib/buff/pane-effects'
 import type { CharSlot } from '$lib/types/project'
 
 describe('headTextWidthPx', () => {

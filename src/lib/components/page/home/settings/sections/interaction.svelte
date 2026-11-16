@@ -49,7 +49,7 @@
     } from '$lib/data/interaction-prefs.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
-    import { ROW_TABS, TAB_ACCENT, pair, segBool, segValue } from '../utils'
+    import { ROW_TABS, TAB_ACCENT, pair, segBool, segValue } from '$lib/components/page/home/settings/utils'
 
     interface Props extends ComponentsProps {
         /** @desc 「排轴页按键图标」的编辑按钮：打开独立的按键图标编辑弹窗 */

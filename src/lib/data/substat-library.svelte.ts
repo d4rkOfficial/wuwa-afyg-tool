@@ -1,5 +1,5 @@
 import { browser } from '$app/environment'
-import { dbGet, dbSet } from '$lib/data/db'
+import { dbGet, dbSet } from './db'
 import { getShareBase } from './workshop.svelte'
 import {
     cloneSlots,
@@ -7,8 +7,8 @@ import {
     planSubstatTotal,
     STANDARD_PLAN_NAME,
     STANDARD_SUBSTAT_TOTAL
-} from '$lib/calc/standard-substats'
-import type { EchoSlotConfig } from '$lib/calc/config.types'
+} from '$lib/substat/standard'
+import type { EchoSlotConfig } from '$coconut/engine/config.types'
 
 /** @desc 一套声骸词条方案：标准14词条（每角色唯一、不可删除、唯一可同步）或用户自建方案 */
 export interface SubstatPlan {

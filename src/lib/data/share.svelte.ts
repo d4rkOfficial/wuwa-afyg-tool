@@ -1,14 +1,8 @@
 import { browser } from '$app/environment'
 import { getShareBase } from './workshop.svelte'
-import {
-    buildExportFile,
-    getPhaseOrder,
-    importProjects,
-    parseProjectFile,
-    ProjectParseError
-} from '$lib/data/project.svelte'
-import { buildShareSnapshot, isShareSnapshotExpired, parseShareSnapshot, SHARE_TTL_MS } from '$lib/data/share.utils'
-import type { ShareSnapshot } from '$lib/data/share.utils'
+import { buildExportFile, getPhaseOrder, importProjects, parseProjectFile, ProjectParseError } from './project.svelte'
+import { buildShareSnapshot, isShareSnapshotExpired, parseShareSnapshot, SHARE_TTL_MS } from './share.utils'
+import type { ShareSnapshot } from './share.utils'
 import type { Project } from '$lib/types/project'
 
 export interface ShareTeamPreview {

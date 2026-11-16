@@ -5,8 +5,8 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { nanokaProvider } from '$lib/api/provider/nanoka/index'
-import { runContractTests } from './contract-test.ts'
+import { nanokaProvider } from '$lib/api/provider/nanoka'
+import { runContractTests } from './contract-test'
 import {
     characterList,
     weaponList,

@@ -6,8 +6,8 @@
  * 因此「文件夹行」与「逐条 Buff 行」是两个不同口径，界面上必须说明。
  */
 
-import { BUFF_PATH_SEP, buffFolderPath, buffLeafName } from '$lib/calc/buff-name'
-import type { BuffContribution, CharBuffAnalysis } from '$lib/calc/result.types'
+import { BUFF_PATH_SEP, buffFolderPath, buffLeafName } from '$lib/buff/name'
+import type { BuffContribution, CharBuffAnalysis } from '$coconut/engine/result.types'
 
 /** @desc 树里的一个文件夹节点（已带整组贡献与排序） */
 export interface BuffTreeFolder {

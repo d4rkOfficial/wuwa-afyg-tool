@@ -1,7 +1,7 @@
 // 自定义 Skill（持久化到 IndexedDB）：用户可维护一组「技能卡」，按主动/被动两种方式注入对话
 // 纯逻辑（类型 / 兼容归一化 / 内置合并 / 注入文本渲染）见 $lib/ai/skills.ts
 import { browser } from '$app/environment'
-import { dbGet, dbSet } from '$lib/data/db'
+import { dbGet, dbSet } from './db'
 import {
     BUILTIN_SKILLS,
     activeSkillsOf,
@@ -18,7 +18,7 @@ import {
     type AiSkill,
     type SkillMode
 } from '$lib/ai/skills'
-import { getGenPrefs, loadGenPrefs } from '$lib/data/ai-prefs.svelte'
+import { getGenPrefs, loadGenPrefs } from './ai-prefs.svelte'
 
 export { BUILTIN_SKILLS, renderActiveSkillListing, renderPassiveSkillsPrompt, SKILL_IDS }
 export type { AiSkill, SkillMode }

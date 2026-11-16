@@ -242,7 +242,7 @@ history 段原文 + user 段原文 + 本轮新产生的 assistant / tool 消息
 | `update_custom_hit` | 按当前名称定位并修改（可改名、改数值/单位/属性/段数）                  |
 | `remove_custom_hit` | 删除（已绑定到操作块的同名命中不会自动解绑）                           |
 
-倍率串格式化由 `$lib/calc/custom-hit` 的 `customHitRatio()` 统一提供，界面选择器与 AI 工具共用同一口径。
+倍率串格式化由 `$lib/timeline/custom-hit` 的 `customHitRatio()` 统一提供，界面选择器与 AI 工具共用同一口径。
 创建后再用 `get_char_skills` 确认，并用 `bind_damage_to_block` 绑定到操作块或参考线（targetType）。
 
 ## 1.6 跨工程只读
