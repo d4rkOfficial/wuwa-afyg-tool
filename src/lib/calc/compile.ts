@@ -9,18 +9,23 @@
  *
  * 内核侧因此完全无条件：拿到什么就加什么。
  */
-import type { BuffInstance, BuffZoneValue, DamageEntry as EngineDamageEntry } from '$coconut/engine/calculation.types'
+import type { BuffInstance, DamageEntry as EngineDamageEntry } from '$coconut/engine/calculation.types'
 import type { ComputeRequest } from '$coconut/engine/core'
 import {
     DEFAULT_CONDITION_PROFILE,
     entryActiveBuffs,
     entryStatsOf,
+    resolveRefZoneValues,
     zoneConditionMet,
     type ConditionProfile,
     type ZoneCtx
 } from '$coconut/engine/compute'
 import { ELEMENTS, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
 import type { Buff, Damage, DamageEntry, GeneralTable, Stat } from '$coconut'
+
+/** @desc 只读列表 Record → 可变列表 Record（引擎入参是可变形态） */
+const toMutableList = (record: Readonly<Record<string, readonly string[]>> | undefined): Record<string, string[]> =>
+    Object.fromEntries(Object.entries(record ?? {}).map(([key, value]) => [key, [...value]]))
 
 /** @desc 词条键是否属于「伤害类型加成」（这类词条要按段挂成 `bonusDmg`） */
 const isTypeBonusStat = (key: string): boolean => TYPE_BONUS_MAP[key] !== undefined
@@ -50,26 +55,21 @@ const zoneCtxOf = (entry: EngineDamageEntry, profile: ConditionProfile, damageTy
 })
 
 /**
- * @desc 一条乘区作用 → 内核的 `Buff`。
+ * @desc 生效 buff 的全部乘区作用（乘区级条件在此剔除）。
  *
- * 数值型直接给字面值；引用型（转模）只在「线性 + 同一角色」时可表达（内核的 `StatRef`
- * 没有比例系数与跨角色），其余由调用方在编译期折算成字面值 —— 见 `foldRefs`。
+ * 引用（转模）作用在编译期折算成**字面数值**：`refValues` 由引擎同一条链路算出
+ * （`resolveRefZoneValues`，口径与结算完全一致），这样内核不需要知道「引用」怎么读面板，
+ * 又能保住 buff id —— 溯源时贡献照样算在原来那条 buff 名下。
  */
-const buffOf = (zone: BuffZoneValue): Buff | null => {
-    if (zone.ref) return null
-    if (zone.value === 0) return null
-    return { id: `${zone.zoneId}`, effect: { applyTo: zone.zoneId, value: String(zone.value) } }
-}
-
-/** @desc 生效 buff 的全部乘区作用（乘区级条件在此剔除） */
-const effectsOf = (buffs: readonly BuffInstance[], ctx: ZoneCtx): Buff[] =>
-    buffs
-        .flatMap((buff) => buff.zones.map((zone) => ({ buff, zone })))
-        .filter(({ zone }) => zoneConditionMet(zone, ctx))
-        .flatMap(({ buff, zone }) => {
-            const effect = buffOf(zone)
-            return effect ? [{ ...effect, id: `${buff.id}:${zone.zoneId}` }] : []
+const effectsOf = (buffs: readonly BuffInstance[], ctx: ZoneCtx, refValues: ReadonlyMap<string, number>): Buff[] =>
+    buffs.flatMap((buff) =>
+        buff.zones.flatMap((zone, zoneIndex) => {
+            if (!zoneConditionMet(zone, ctx)) return []
+            const value = zone.ref ? refValues.get(`${buff.id}#${zoneIndex}`) : zone.value
+            if (value === undefined || value === 0) return []
+            return [{ id: buff.id, effect: { applyTo: zone.zoneId, value: String(value) } }]
         })
+    )
 
 /**
  * @desc 词条数组 → 内核可表达的形态：
@@ -113,6 +113,18 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
         typeBonusStats.push(typeBonus)
     }
 
+    const refContext = {
+        buffSets: [...request.buffs],
+        damageEntryBuffSetIds: toMutableList(request.bindings),
+        damageEntryDamageTypes: toMutableList(request.damageTypes),
+        configState: request.config,
+        team: [...request.team],
+        charInfoMap: { ...request.charInfo },
+        weaponInfoMap: { ...request.weaponInfo },
+        conditionProfile: profile,
+        ...(request.echoSkillText ? { echoSkillText: { ...request.echoSkillText } } : {})
+    }
+
     const damageEntries: DamageEntry[] = request.entries.map((entry) => {
         const charIndex = characters.indexOf(entry.character ?? '')
         const damageTypes = request.damageTypes?.[entry.id] ?? []
@@ -130,7 +142,11 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
                   })
                 : []
 
-        const buffs: Buff[] = [...effectsOf(active, ctx), ...typeBonusBuffsOf(typeBonusStats[charIndex] ?? [], ctx)]
+        const refValues = charIndex >= 0 ? resolveRefZoneValues(entry, refContext) : new Map<string, number>()
+        const buffs: Buff[] = [
+            ...effectsOf(active, ctx, refValues),
+            ...typeBonusBuffsOf(typeBonusStats[charIndex] ?? [], ctx)
+        ]
 
         const damage: Damage = {
             value: valueOf(entry),
@@ -138,7 +154,9 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
             element: entry.damageElement,
             formula: formulaOf(entry)
         }
-        return { source: entry.character ?? '', damages: [damage] }
+        // 段数由编译器展开：内核一段一条，合计即引擎的「每段 × 段数」
+        const hits = Math.max(1, Math.trunc(entry.hits || 1))
+        return { source: entry.character ?? '', damages: Array.from({ length: hits }, () => ({ ...damage })) }
     })
 
     return {
